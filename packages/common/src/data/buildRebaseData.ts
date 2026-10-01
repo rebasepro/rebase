@@ -1,4 +1,4 @@
-import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateSelect, type ComputedSortField, type FieldPath, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateSelect, type ComputedSortField, type FieldPath, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
@@ -884,6 +884,33 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
 }
 
 /**
+ * Refuse a write option this door cannot honour, by name, before anything is
+ * written.
+ *
+ * The in-process accessor implements the same `SDKCollectionClient` as the HTTP
+ * client, whose `ifMatch` is "Honoured on `update` and `delete`" — and its
+ * writes took no options at all, so `rebase.data.posts.update(id, data, {
+ * ifMatch: staleEtag })` overwrote the row and resolved. A precondition the
+ * caller wrote, dropped without a word, is the worst thing a door can do with
+ * it. The driver's `save` has no precondition and no idempotency store to hand
+ * these to, so they are refused rather than ignored. An `undefined` value is no
+ * option, as it is over HTTP: `etagOf(row)` is `undefined` for a row that
+ * carries no version, and that means "write unconditionally".
+ */
+function refuseUnhonouredWriteOptions(method: string, slug: string, options?: WriteOptions): void {
+    const unsupported = (["ifMatch", "idempotencyKey"] as const).filter((key) => options?.[key]);
+    if (unsupported.length === 0) return;
+    throw new RebaseClientError(
+        `${method}() on "${slug}" in-process (context.data, rebase.data) cannot honour ` +
+        `${unsupported.join(" or ")}: this door has no ` +
+        `${unsupported.includes("ifMatch") ? "precondition check" : "idempotency store"}, and ignoring ` +
+        "the option would write as though it had been checked. Drop it here, or send the write through " +
+        "the HTTP client, which honours it.",
+        { code: "UNSUPPORTED_OPTION", details: { method, options: unsupported } }
+    );
+}
+
+/**
  * Wrap a Entity-shaped {@link CollectionAccessor} into a flat
  * {@link SDKCollectionClient}. Every returned record is unwrapped to a flat row
  * so the backend SDK is byte-for-byte the same shape as the frontend client.
@@ -924,10 +951,15 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
             }
             return entityToRow(s);
         },
-        async create(data: Partial<M>, id?: string | number): Promise<M> {
+        async create(data: Partial<M>, id?: string | number, options?: WriteOptions): Promise<M> {
+            refuseUnhonouredWriteOptions("create", slug, options);
             return entityToRow(await snap.create(data as Partial<EntityValues<M>>, id));
         },
-        async createMany(data: Partial<M>[], options?: { upsert?: boolean }): Promise<M[]> {
+        async createMany(
+            data: Partial<M>[],
+            options?: { upsert?: boolean; onConflict?: readonly string[] } & WriteOptions
+        ): Promise<M[]> {
+            refuseUnhonouredWriteOptions("createMany", slug, options);
             if (!Array.isArray(data)) {
                 throw new TypeError("createMany expects an array of records.");
             }
@@ -938,7 +970,10 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
                     "Fall back to create() per record."
                 );
             }
-            const rows = await snap.createMany(data as Partial<EntityValues<M>>[], options);
+            const rows = await snap.createMany(data as Partial<EntityValues<M>>[], {
+                upsert: options?.upsert,
+                onConflict: options?.onConflict
+            });
             return rows.map(entityToRow);
         },
         /**
@@ -951,6 +986,7 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
          * one is exactly an upsert of one.
          */
         async upsert(data: Partial<M>, options?: UpsertOptions): Promise<M> {
+            refuseUnhonouredWriteOptions("upsert", slug, options);
             if (!snap.createMany) {
                 throw new Error(
                     "Upsert is not supported by this collection's data source: it needs a bulk write, " +
@@ -965,10 +1001,15 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
             if (!row) throw new Error(`Upsert into "${slug}" returned no row.`);
             return entityToRow(row);
         },
-        async update(id: string | number, data: Partial<M> | UpdateValues<Partial<M>>): Promise<M> {
+        async update(id: string | number, data: Partial<M> | UpdateValues<Partial<M>>, options?: WriteOptions): Promise<M> {
+            refuseUnhonouredWriteOptions("update", slug, options);
             return entityToRow(await snap.update(id, data as Partial<EntityValues<M>>));
         },
-        async updateMany(updates: { id: string | number; data: Partial<M> | UpdateValues<Partial<M>> }[]): Promise<M[]> {
+        async updateMany(
+            updates: { id: string | number; data: Partial<M> | UpdateValues<Partial<M>> }[],
+            options?: WriteOptions
+        ): Promise<M[]> {
+            refuseUnhonouredWriteOptions("updateMany", slug, options);
             if (!Array.isArray(updates)) {
                 throw new TypeError("updateMany expects an array of { id, data } entries.");
             }
@@ -985,10 +1026,12 @@ data: u.data as Partial<EntityValues<M>> }))
             );
             return rows.map(entityToRow);
         },
-        delete(id: string | number): Promise<void> {
+        async delete(id: string | number, options?: WriteOptions): Promise<void> {
+            refuseUnhonouredWriteOptions("delete", slug, options);
             return snap.delete(id);
         },
-        async deleteMany(ids: (string | number)[]): Promise<void> {
+        async deleteMany(ids: (string | number)[], options?: WriteOptions): Promise<void> {
+            refuseUnhonouredWriteOptions("deleteMany", slug, options);
             if (!Array.isArray(ids)) {
                 throw new TypeError("deleteMany expects an array of ids.");
             }

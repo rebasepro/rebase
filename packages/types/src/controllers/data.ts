@@ -1134,6 +1134,10 @@ export interface WriteOptions {
      * attempt is still being answered gets `IDEMPOTENCY_KEY_IN_PROGRESS` (409)
      * and should be sent again. A server that cannot store keys ignores the
      * header rather than refusing the write.
+     *
+     * The in-process accessor (`context.data`, `rebase.data`) has no store to
+     * keep keys in, and refuses one with `UNSUPPORTED_OPTION` rather than
+     * writing as though it had been checked.
      */
     idempotencyKey?: string;
 
@@ -1166,7 +1170,9 @@ export interface WriteOptions {
      *
      * `"*"` asserts only that the row exists.
      *
-     * Honoured on `update` and `delete`.
+     * Honoured on `update` and `delete` over HTTP. The in-process accessor
+     * (`context.data`, `rebase.data`) cannot check a precondition yet, and
+     * refuses one with `UNSUPPORTED_OPTION` rather than writing unconditionally.
      */
     ifMatch?: string;
 }

@@ -201,6 +201,7 @@ the ID you got. Read the response header.
 | `UNKNOWN_RESPONSE_FIELD` | 400 | `?fields=` asks for a field the collection does not have. | Check the spelling; the message lists the known fields. |
 | `UNKNOWN_VECTOR_PROPERTY` | 400 | A vector search named a property that is not a `vector` on this collection. | The message lists the collection's vector properties. |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | The `Content-Type` is not one this route accepts. | Send the type the route documents. |
+| `UNSUPPORTED_OPTION` | — | Thrown, not answered: a write through the in-process accessor (`context.data` in a callback, `rebase.data` in a function or cron) was given `ifMatch` or `idempotencyKey`. That door has no precondition check or idempotency store, so the option is refused before anything is written rather than ignored. | Drop the option there, or make the write through the HTTP client, which honours both. |
 | `UNSUPPORTED_RELATION_FILTER` | 400 | The filter crosses a `via` relation, whose join path is authored one way only, so there is nothing to correlate a subquery back to. | Filter from the owning side. |
 | `UNSUPPORTED_RELATION_FILTER_OPERATOR` | 400 | The operator is not defined for that field: a relation with no column on this row is filtered by membership, and case-insensitive matching only applies to text. | See the message; it lists what the field accepts. |
 | `VALIDATION_CONSTRAINT` | 400 | A value broke a `validation` rule the property declares — a length, a range, a pattern, a required field. | See the message; it names each violation. |
