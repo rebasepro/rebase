@@ -293,7 +293,7 @@ function CollectionItem({ collection, onInsertCode }: { collection: CollectionIn
                     {collection.slug}
                 </Typography>
                 <Tooltip title="Insert find() snippet">
-                    <IconButton
+                    <IconButton aria-label="Insert find() snippet"
                         size="smallest"
                         className="opacity-0 group-hover:opacity-100 text-text-disabled hover:text-primary transition-all"
                         onClick={(e) => {

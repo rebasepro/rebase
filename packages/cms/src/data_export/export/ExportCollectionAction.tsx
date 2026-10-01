@@ -192,7 +192,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
         <Tooltip title={"Export"}
             asChild={true}>
-            <IconButton
+            <IconButton aria-label={"Export"}
                 size={"small"}
                 onClick={handleClickOpen}>
                 <DownloadIcon size={iconSize.small}/>

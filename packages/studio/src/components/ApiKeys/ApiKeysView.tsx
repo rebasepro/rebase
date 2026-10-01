@@ -465,7 +465,7 @@ function SecretDisplayDialog({ keyWithSecret, onClose }: { keyWithSecret: ApiKey
                         {keyWithSecret.key}
                     </code>
                     <Tooltip title={copied ? t("copied") : t("copy")}>
-                        <IconButton size="small" onClick={handleCopy}>
+                        <IconButton aria-label={copied ? t("copied") : t("copy")} size="small" onClick={handleCopy}>
                             {copied
                                 ? <CheckCircleIcon size={iconSize.smallest} className="text-emerald-500"/>
                                 : <CopyIcon size={iconSize.smallest}/>

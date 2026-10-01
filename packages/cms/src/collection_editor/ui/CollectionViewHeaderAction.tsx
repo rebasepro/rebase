@@ -30,7 +30,7 @@ export function CollectionViewHeaderAction({
         <Tooltip
             asChild={true}
             title={t("studio_collection_view_edit")}>
-            <IconButton
+            <IconButton aria-label={t("studio_collection_view_edit")}
                 className={onHover ? "bg-surface-card" : "hidden"}
                 onClick={() => {
                     collectionEditorController.editProperty({

@@ -292,13 +292,13 @@ export function PropertyTreeEntry({
                     {isAIModified && <AIModifiedIndicator/>}
                     {isPropertyInferred && <>
                         <Tooltip title={"Inferred property"} asChild={true}>
-                            <IconButton size="smallest" disabled>
+                            <IconButton aria-label={"Inferred property"} size="smallest" disabled>
                                 <FileSearchIcon size={iconSize.smallest}/>
                             </IconButton>
                         </Tooltip>
                         {onPropertyRemove && <Tooltip title={"Remove inferred property"}
                             asChild={true}>
-                            <IconButton size="smallest"
+                            <IconButton aria-label={"Remove inferred property"} size="smallest"
                                 onClick={(e: React.MouseEvent) => {
                                     e.stopPropagation();
                                     onPropertyRemove(propertyKey, namespace);

@@ -97,7 +97,7 @@ export function SubcollectionsEditTab({
                                                 align="right">
                                                 <Tooltip title={"Remove"}
                                                     asChild={true}>
-                                                    <IconButton size="small"
+                                                    <IconButton aria-label={"Remove"} size="small"
                                                         onClick={(e: React.MouseEvent) => {
                                                             e.preventDefault();
                                                             e.stopPropagation();
@@ -149,7 +149,7 @@ export function SubcollectionsEditTab({
                                                     align="right">
                                                     <Tooltip title={"Remove"}
                                                         asChild={true}>
-                                                        <IconButton size="small"
+                                                        <IconButton aria-label={"Remove"} size="small"
                                                             onClick={(e: React.MouseEvent) => {
                                                                 e.preventDefault();
                                                                 e.stopPropagation();

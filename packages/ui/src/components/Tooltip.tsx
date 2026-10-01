@@ -5,6 +5,26 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cls } from "../util";
 import { useInjectStyles } from "../hooks";
 import { usePortalContainer } from "../hooks/PortalContainerContext";
+import { IconButton } from "./IconButton";
+
+/**
+ * A Radix tooltip only describes its trigger (`aria-describedby`, and only
+ * while open); it never names it. Wrapped around an icon-only button with no
+ * name of its own, the title was the one word that said what the button does,
+ * and a screen reader announced "button". So a string title names an
+ * icon-only button (no text, no `aria-label`/`aria-labelledby`) it wraps.
+ */
+function nameFromTitle(children: React.ReactNode, title: React.ReactNode): React.ReactNode {
+    if (typeof title !== "string" || !React.isValidElement<Record<string, unknown>>(children)) return children;
+    const type = children.type;
+    if (type !== IconButton && type !== "button" && type !== "a") return children;
+    const props = children.props;
+    if (props["aria-label"] || props["aria-labelledby"]) return children;
+    const hasText = React.Children.toArray(props.children as React.ReactNode)
+        .some((child) => typeof child === "string" || typeof child === "number");
+    if (hasText) return children;
+    return React.cloneElement(children, { "aria-label": title });
+}
 
 export type TooltipProps = {
     open?: boolean,
@@ -52,6 +72,8 @@ export const Tooltip = ({
 
     if (!title)
         return <>{children}</>;
+
+    children = nameFromTitle(children, title);
 
     const trigger = asChild
         ? <TooltipPrimitive.Trigger asChild={true}>

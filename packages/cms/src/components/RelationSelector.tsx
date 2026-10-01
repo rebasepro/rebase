@@ -773,7 +773,7 @@ relation } as RelationItem;
                                     <div className="flex items-center flex-shrink-0">
                                         {!multiple && selectedItems.length === 1 && selectedItems[0]?.data && (
                                             <Tooltip title={`Open ${selectedItems[0].label}`}>
-                                                <IconButton
+                                                <IconButton aria-label={`Open ${selectedItems[0].label}`}
                                                     component={"div"}
                                                     size={"small"}
                                                     className="opacity-60 hover:opacity-100"

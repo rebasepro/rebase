@@ -45,7 +45,7 @@ export function StorageItemPreview({
                     <Tooltip
                         asChild={true}
                         title={t("remove")}>
-                        <IconButton
+                        <IconButton aria-label={t("remove")}
                             size={"small"}
                             onClick={(event) => {
                                 event.stopPropagation();

@@ -1148,7 +1148,7 @@ message: "Policy imported successfully" });
                                                         </Button>
                                                         {policy.status !== "code_only" && (
                                                             <Tooltip title={t("studio_rls_delete")} asChild={true}>
-                                                                <IconButton
+                                                                <IconButton aria-label={t("studio_rls_delete")}
                                                                     size="small"
                                                                     onClick={() => setConfirmDropPolicy({
                                                                         policyName: policy.policyname,

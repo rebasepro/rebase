@@ -74,7 +74,7 @@ export function EntityActionsEditTab({
                                             align="right">
                                             <Tooltip title={"Remove"}
                                                 asChild={true}>
-                                                <IconButton size="small"
+                                                <IconButton aria-label={"Remove"} size="small"
                                                     onClick={(e) => {
                                                         e.preventDefault();
                                                         e.stopPropagation();

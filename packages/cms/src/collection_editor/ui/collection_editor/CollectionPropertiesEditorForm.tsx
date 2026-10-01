@@ -455,7 +455,7 @@ export function CollectionPropertiesEditorForm({
                     <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                         {inferPropertiesFromData && (
                             <Tooltip title={"Add new properties based on data"} asChild={true}>
-                                <IconButton
+                                <IconButton aria-label={"Add new properties based on data"}
                                     size="small"
                                     disabled={inferringProperties}
                                     onClick={inferPropertiesFromData}
@@ -465,7 +465,7 @@ export function CollectionPropertiesEditorForm({
                             </Tooltip>
                         )}
                         <Tooltip title={"Add new property"} asChild={true}>
-                            <IconButton
+                            <IconButton aria-label={"Add new property"}
                                 size="small"
                                 disabled={configController?.readOnly}
                                 onClick={() => setNewPropertyDialogOpen(true)}

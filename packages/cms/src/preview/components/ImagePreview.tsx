@@ -111,7 +111,7 @@ maxHeight: "100%" }}>
                 {navigator && <Tooltip
                     asChild={true}
                     title={t("copy_url_to_clipboard")} side={"bottom"}>
-                    <IconButton
+                    <IconButton aria-label={t("copy_url_to_clipboard")}
                         variant={"filled"}
                         size={"smallest"}
                         onClick={(e) => {
@@ -124,7 +124,7 @@ maxHeight: "100%" }}>
                 </Tooltip>}
 
                 <Tooltip title={t("open_image_in_new_tab")} side={"bottom"}>
-                    <IconButton
+                    <IconButton aria-label={t("open_image_in_new_tab")}
                         className="invisible group-hover:visible"
                         variant={"filled"}
                         component={"a" as React.ElementType}

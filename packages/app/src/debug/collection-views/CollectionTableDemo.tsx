@@ -94,7 +94,7 @@ export function CollectionTableDemo() {
                                 <TableCell><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-surface-raised text-surface-500 flex items-center justify-center text-[10px] font-semibold shrink-0">{project.assignee[0]}</div><Typography variant="body2" className="truncate">{project.assignee}</Typography></div></TableCell>
                                 <TableCell><div className="flex flex-wrap gap-1">{project.tags.map(tag => (<Chip key={tag} size="smallest" colorScheme="cyan">{tag}</Chip>))}</div></TableCell>
                                 <TableCell><Typography variant="body2" className="font-mono text-xs">{project.dueDate}</Typography></TableCell>
-                                <TableCell style={{ width: "80px" }}><div className="flex gap-1"><Tooltip title="Edit" asChild><IconButton size="smallest"><PencilIcon size={iconSize.smallest} /></IconButton></Tooltip><Tooltip title="Delete" asChild><IconButton size="smallest"><Trash2Icon size={iconSize.smallest} /></IconButton></Tooltip></div></TableCell>
+                                <TableCell style={{ width: "80px" }}><div className="flex gap-1"><Tooltip title="Edit" asChild><IconButton aria-label="Edit" size="smallest"><PencilIcon size={iconSize.smallest} /></IconButton></Tooltip><Tooltip title="Delete" asChild><IconButton aria-label="Delete" size="smallest"><Trash2Icon size={iconSize.smallest} /></IconButton></Tooltip></div></TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

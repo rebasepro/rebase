@@ -476,7 +476,7 @@ duration: 400 }
                         <div className="flex shrink-0 items-center gap-1.5">
                             {/* Fit view */}
                             <Tooltip title="Fit to view">
-                                <IconButton
+                                <IconButton aria-label="Fit to view"
                                     size="small"
                                     onClick={handleFitView}
                                 >
@@ -498,7 +498,7 @@ duration: 400 }
 
                             {/* Re-layout */}
                             <Tooltip title="Re-layout">
-                                <IconButton
+                                <IconButton aria-label="Re-layout"
                                     size="small"
                                     onClick={relayout}
                                 >

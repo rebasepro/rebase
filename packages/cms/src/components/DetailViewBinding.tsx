@@ -528,7 +528,7 @@ entityId }
     // and an expand button there competes with it.
     (layout === "side_panel" || layout === "dialog") && entityId ? (
         <Tooltip title={"Open full screen"}>
-            <IconButton
+            <IconButton aria-label={"Open full screen"}
                 size="small"
                 onClick={() => {
                     const entityUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);

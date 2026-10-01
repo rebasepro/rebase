@@ -554,7 +554,7 @@ parentEntityIds,
                             : errorMessage}
                     </Typography>
                     <Tooltip title={t("refresh_data")}>
-                        <IconButton
+                        <IconButton aria-label={t("refresh_data")}
                             size="small"
                             onClick={() => boardDataController.refreshAll()}
                         >

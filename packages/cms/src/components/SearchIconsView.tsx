@@ -62,7 +62,7 @@ export function SearchIconsView({
                 {icons.map((icon: string) => (
                     <Tooltip title={icon} key={icon}
                         asChild={true}>
-                        <IconButton
+                        <IconButton aria-label={icon}
                             shape={"square"}
                             toggled={selectedIcon === icon}
                             onClick={onIconSelected ? () => onIconSelected(icon) : undefined}

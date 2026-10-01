@@ -145,7 +145,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
             >
                 <div className="flex gap-1 border-r pr-1 mr-1 dark:border-gray-700">
                     <Tooltip title={t("add_row_before")}>
-                        <IconButton size="small" onClick={() => executeCommand(addRowBefore)}>
+                        <IconButton aria-label={t("add_row_before")} size="small" onClick={() => executeCommand(addRowBefore)}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -156,7 +156,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={t("add_row_after")}>
-                        <IconButton size="small" onClick={() => executeCommand(addRowAfter)}>
+                        <IconButton aria-label={t("add_row_after")} size="small" onClick={() => executeCommand(addRowAfter)}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -167,7 +167,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={t("delete_row")}>
-                        <IconButton size="small" onClick={() => executeCommand(deleteRow)}>
+                        <IconButton aria-label={t("delete_row")} size="small" onClick={() => executeCommand(deleteRow)}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -180,7 +180,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
 
                 <div className="flex gap-1 border-r pr-1 mr-1 dark:border-gray-700">
                     <Tooltip title={t("add_column_before")}>
-                        <IconButton size="small" onClick={() => executeCommand(addColumnBefore)}>
+                        <IconButton aria-label={t("add_column_before")} size="small" onClick={() => executeCommand(addColumnBefore)}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -191,7 +191,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={t("add_column_after")}>
-                        <IconButton size="small" onClick={() => executeCommand(addColumnAfter)}>
+                        <IconButton aria-label={t("add_column_after")} size="small" onClick={() => executeCommand(addColumnAfter)}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -202,7 +202,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
                         </IconButton>
                     </Tooltip>
                     <Tooltip title={t("delete_column")}>
-                        <IconButton size="small" onClick={() => executeCommand(deleteColumn)}>
+                        <IconButton aria-label={t("delete_column")} size="small" onClick={() => executeCommand(deleteColumn)}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -214,7 +214,7 @@ export const TableBubble = forwardRef<HTMLDivElement, TableBubbleProps>(
                 </div>
 
                 <Tooltip title={t("delete_table")}>
-                    <IconButton size="small" onClick={() => executeCommand(deleteTable)}>
+                    <IconButton aria-label={t("delete_table")} size="small" onClick={() => executeCommand(deleteTable)}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="3 6 5 6 21 6"></polyline>

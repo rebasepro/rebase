@@ -69,7 +69,7 @@ export function BasicExportAction({
 
         <Tooltip title={"Export"}
             asChild={true}>
-            <IconButton
+            <IconButton aria-label={"Export"}
                 size={"small"}
                 onClick={handleClickOpen}>
                 <DownloadIcon

@@ -125,7 +125,7 @@ function MetaRow({
                 </span>
                 {copyable && (
                     <Tooltip title={copied ? "Copied" : "Copy"}>
-                        <IconButton size={"smallest"} onClick={copy}>
+                        <IconButton aria-label={copied ? "Copied" : "Copy"} size={"smallest"} onClick={copy}>
                             {copied ? <CheckIcon size={iconSize.smallest}/> : <CopyIcon size={iconSize.smallest}/>}
                         </IconButton>
                     </Tooltip>

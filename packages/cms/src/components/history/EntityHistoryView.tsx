@@ -154,7 +154,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
                         actions={
                             <Tooltip title={t("history_revert") ?? "Revert to this version"}
                                 className={"m-2 grow-0 self-start"}>
-                                <IconButton
+                                <IconButton aria-label={t("history_revert") ?? "Revert to this version"}
                                     onClick={() => {
                                         if (dirty) {
                                             snackbarController.open({

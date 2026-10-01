@@ -265,7 +265,7 @@ export function ArrayItemOptions({
                 side={direction === "column" ? "left" : undefined}
                 title={title}
             >
-                <IconButton
+                <IconButton aria-label={title}
                     size="small"
                     disabled={disabled || (!showMenu && !sortable)}
                     {...(sortable ? dragHandleProps : {})}

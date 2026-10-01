@@ -709,7 +709,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                 </div>
                                 <div className="flex shrink-0 items-center justify-end gap-1.5">
                                     <Tooltip title="Save as snippet">
-                                        <IconButton
+                                        <IconButton aria-label="Save as snippet"
                                             size="small"
                                             onClick={() => {
                                                 setSnippetName("");
@@ -723,7 +723,7 @@ message: t("studio_sql_markdown_copy_failed") });
 
                                     {result?.value != null && (
                                         <Tooltip title="Export result as JSON">
-                                            <IconButton size="small" onClick={exportResult}>
+                                            <IconButton aria-label="Export result as JSON" size="small" onClick={exportResult}>
                                                 <DownloadIcon size={iconSize.smallest}/>
                                             </IconButton>
                                         </Tooltip>
@@ -887,7 +887,7 @@ resizable: false }, ...tableData.columns]
                                                                                 <div className="h-full flex items-center justify-center">
                                                                                     <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
 id: String(ra.entityId) })}>
-                                                                                        <IconButton
+                                                                                        <IconButton aria-label={t("studio_sql_edit_entity", { name: ra.collection.collection.name, id: String(ra.entityId) })}
                                                                                             size="small"
                                                                                             className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
                                                                                             onClick={(e) => {

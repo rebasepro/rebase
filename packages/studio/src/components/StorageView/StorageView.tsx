@@ -281,7 +281,7 @@ function FilePreviewPanel({
                     <div className="flex items-center gap-0.5">
                         {downloadUrl && (
                             <Tooltip title="Download">
-                                <IconButton
+                                <IconButton aria-label="Download"
                                     size="small"
                                     onClick={() => window.open(downloadUrl, "_blank")}
                                 >
@@ -290,7 +290,7 @@ function FilePreviewPanel({
                             </Tooltip>
                         )}
                         <Tooltip title="Delete">
-                            <IconButton
+                            <IconButton aria-label="Delete"
                                 size="small"
                                 onClick={() => setDeleteDialogOpen(true)}
                                 className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
@@ -1298,7 +1298,7 @@ message: e instanceof Error ? e.message : String(e) });
                                     {/* Breadcrumbs — always visible */}
                                     {currentPath && (
                                         <Tooltip title="Go up">
-                                            <IconButton size="small" onClick={handleNavigateUp}>
+                                            <IconButton aria-label="Go up" size="small" onClick={handleNavigateUp}>
                                                 <ArrowLeftIcon size={iconSize.smallest}/>
                                             </IconButton>
                                         </Tooltip>
@@ -1391,7 +1391,7 @@ message: e instanceof Error ? e.message : String(e) });
                                     )}
 
                                     <Tooltip title="Grid view">
-                                        <IconButton
+                                        <IconButton aria-label="Grid view"
                                             size="small"
                                             onClick={() => setViewMode("grid")}
                                             className={cls(viewMode === "grid" && "bg-surface-raised")}
@@ -1400,7 +1400,7 @@ message: e instanceof Error ? e.message : String(e) });
                                         </IconButton>
                                     </Tooltip>
                                     <Tooltip title="List view">
-                                        <IconButton
+                                        <IconButton aria-label="List view"
                                             size="small"
                                             onClick={() => setViewMode("list")}
                                             className={cls(viewMode === "list" && "bg-surface-raised")}
@@ -1412,13 +1412,13 @@ message: e instanceof Error ? e.message : String(e) });
                                     <div className={cls("h-4 w-px mx-0.5", defaultBorderMixin, "bg-surface-raised")}/>
 
                                     <Tooltip title="Refresh">
-                                        <IconButton size="small" onClick={handleRefresh} disabled={loading}>
+                                        <IconButton aria-label="Refresh" size="small" onClick={handleRefresh} disabled={loading}>
                                             <RefreshCwIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </Tooltip>
 
                                     <Tooltip title="New folder">
-                                        <IconButton
+                                        <IconButton aria-label="New folder"
                                             size="small"
                                             onClick={() => {
                                                 setNewFolderName("");

@@ -103,7 +103,7 @@ export function GeneralSettingsForm({
 
                         <Tooltip title={"Change icon"}
                             asChild={true}>
-                            <IconButton
+                            <IconButton aria-label={"Change icon"}
                                 shape={"square"}
                                 disabled={configController?.readOnly}
                                 onClick={() => setIconDialogOpen(true)}>

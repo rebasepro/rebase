@@ -260,7 +260,7 @@ function EntityActionButton({
     const [loading, setLoading] = React.useState(false);
     return <Tooltip
         title={action.name}>
-        <IconButton
+        <IconButton aria-label={action.name}
             disabled={!enabled}
             onClick={(event) => {
                 console.debug("Executing action", action.key, props);

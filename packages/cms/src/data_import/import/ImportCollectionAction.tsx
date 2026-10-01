@@ -105,7 +105,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
 
         <Tooltip title={"Import"}
             asChild={true}>
-            <IconButton
+            <IconButton aria-label={"Import"}
                 size={"small"}
                 onClick={handleClickOpen}>
                 <UploadIcon size={iconSize.small}/>

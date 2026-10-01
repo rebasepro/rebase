@@ -1196,7 +1196,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                         const enabled = !action.isEnabled || action.isEnabled(clickProps);
                         return (
                             <Tooltip key={action.key ?? index} title={action.name} asChild>
-                                <IconButton
+                                <IconButton aria-label={action.name}
                                     size="small"
                                     disabled={!enabled}
                                     onClick={(e: React.MouseEvent) => {

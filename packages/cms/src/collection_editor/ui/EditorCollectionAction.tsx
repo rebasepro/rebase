@@ -29,7 +29,7 @@ export function EditorCollectionAction({
     const editorButton = <Tooltip
         asChild={true}
         title={tooltipTitle}>
-        <IconButton
+        <IconButton aria-label={tooltipTitle}
             size={"small"}
             disabled={!canEditCollection}
             onClick={canEditCollection

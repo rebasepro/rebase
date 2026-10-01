@@ -129,7 +129,7 @@ export function CollectionDetailsForm({
 
                         <Tooltip title={"Change icon"}
                             asChild={true}>
-                            <IconButton
+                            <IconButton aria-label={"Change icon"}
                                 shape={"square"}
                                 onClick={() => setIconDialogOpen(true)}>
                                 {collectionIcon}

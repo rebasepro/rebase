@@ -116,7 +116,7 @@ export function CreationResultDialog({
                                     {result.temporaryPassword}
                                 </code>
                                 <Tooltip title={t("copy_password") ?? "Copy password"} asChild>
-                                    <IconButton onClick={handleCopyPassword}>
+                                    <IconButton aria-label={t("copy_password") ?? "Copy password"} onClick={handleCopyPassword}>
                                         {copied ? <CheckCircleIcon className="text-green-600"/> : <CopyIcon/>}
                                     </IconButton>
                                 </Tooltip>

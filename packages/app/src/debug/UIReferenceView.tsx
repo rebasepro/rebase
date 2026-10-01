@@ -1055,7 +1055,7 @@ roles: [] }
                                     <TableRow key={user.uid}>
                                         <TableCell style={{ width: "64px" }}>
                                             <Tooltip asChild title="Delete this user">
-                                                <IconButton size="small"><Trash2Icon/></IconButton>
+                                                <IconButton aria-label="Delete this user" size="small"><Trash2Icon/></IconButton>
                                             </Tooltip>
                                         </TableCell>
                                         <TableCell>{user.email}</TableCell>

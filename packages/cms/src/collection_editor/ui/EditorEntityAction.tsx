@@ -27,7 +27,7 @@ export function EditorEntityAction({
     const editorButton = <Tooltip
         asChild={true}
         title={canEditCollection ? (isDirty ? t("studio_editor_entity_save_first") : t("studio_editor_entity_edit_schema")) : t("studio_editor_entity_no_permission")}>
-        <IconButton
+        <IconButton aria-label={canEditCollection ? (isDirty ? t("studio_editor_entity_save_first") : t("studio_editor_entity_edit_schema")) : t("studio_editor_entity_no_permission")}
             disabled={Boolean(!canEditCollection || isDirty)}
             onClick={canEditCollection
                 ? () => collectionEditorController?.editCollection({
