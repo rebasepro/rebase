@@ -331,12 +331,35 @@ export const DEFAULT_CAPABILITIES: DataSourceCapabilities = {
     supportsSchemaAdmin: true
 };
 
-const CAPABILITIES_REGISTRY: Record<string, DataSourceCapabilities> = {
-    postgres: POSTGRES_CAPABILITIES,
-    firestore: FIREBASE_CAPABILITIES,
-    mongodb: MONGODB_CAPABILITIES,
-    "(default)": DEFAULT_CAPABILITIES
+const BUILT_IN_CAPABILITIES: ReadonlyMap<string, DataSourceCapabilities> = new Map([
+    ["postgres", POSTGRES_CAPABILITIES],
+    ["firestore", FIREBASE_CAPABILITIES],
+    ["mongodb", MONGODB_CAPABILITIES],
+    ["(default)", DEFAULT_CAPABILITIES]
+]);
+
+/**
+ * Capabilities registered at runtime, on `globalThis` rather than in a module
+ * local: a third-party driver inlines its own copy of this package and
+ * registers through it, while the app and the server read through theirs. A
+ * module local made the registration land in a copy nobody else reads.
+ * See `module-state-across-copies.test.ts`.
+ */
+const REGISTERED_CAPABILITIES_KEY = Symbol.for("@rebasepro/types.dataSourceCapabilities.v1");
+
+type GlobalWithCapabilities = typeof globalThis & {
+    [REGISTERED_CAPABILITIES_KEY]?: Map<string, DataSourceCapabilities>;
 };
+
+function registeredCapabilities(): Map<string, DataSourceCapabilities> {
+    const g = globalThis as GlobalWithCapabilities;
+    let registered = g[REGISTERED_CAPABILITIES_KEY];
+    if (!registered) {
+        registered = new Map();
+        g[REGISTERED_CAPABILITIES_KEY] = registered;
+    }
+    return registered;
+}
 
 /**
  * Look up capabilities for a given engine key.
@@ -345,7 +368,7 @@ const CAPABILITIES_REGISTRY: Record<string, DataSourceCapabilities> = {
  */
 export function getDataSourceCapabilities(engine?: string): DataSourceCapabilities {
     if (!engine) return POSTGRES_CAPABILITIES; // postgres is the default engine
-    return CAPABILITIES_REGISTRY[engine] ?? DEFAULT_CAPABILITIES;
+    return registeredCapabilities().get(engine) ?? BUILT_IN_CAPABILITIES.get(engine) ?? DEFAULT_CAPABILITIES;
 }
 
 /**
@@ -353,5 +376,5 @@ export function getDataSourceCapabilities(engine?: string): DataSourceCapabiliti
  * @group Models
  */
 export function registerDataSourceCapabilities(capabilities: DataSourceCapabilities): void {
-    CAPABILITIES_REGISTRY[capabilities.key] = capabilities;
+    registeredCapabilities().set(capabilities.key, capabilities);
 }

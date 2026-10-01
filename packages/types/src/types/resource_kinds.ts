@@ -352,23 +352,92 @@ export interface TopicRuntime {
     publish(topic: string, event: unknown): Promise<void>;
 }
 
-const runtimeHolder: { current: TopicRuntime | null } = { current: null };
+/**
+ * Declared handlers and installed runtimes, for topics and queues — on
+ * `globalThis` under a shared symbol, never in module locals.
+ *
+ * A module local is one per COPY of this package, and two copies in one
+ * process is the normal layout rather than an accident: `@rebasepro/server`
+ * inlines this package into its own dist, while `config/resources.ts` imports
+ * it from `node_modules`. With locals, a project's `.handler()` and
+ * `.subscription()` went into the project's copy and the worker read the
+ * server's empty one (`Job queue started {"tasks":0}`), and the runtime the
+ * server installed was invisible to the project's `enqueue`/`publish` — so
+ * every queue and topic threw "no runtime is installed" inside a running
+ * backend. The CLI deriving the graph had the same split. Same mechanism and
+ * reasoning as `registry()` in resources.ts; `module-state-across-copies.test.ts`
+ * loads two copies to hold it, and scans for any other module-level state that
+ * would split the same way.
+ *
+ * The version is in the symbol: a change to this object's SHAPE takes a new
+ * suffix, so no copy ever reads a shape it does not know.
+ */
+const WORK_KEY = Symbol.for("@rebasepro/types.workRegistry.v1");
+
+interface WorkRegistry {
+    topicRuntime: TopicRuntime | null;
+    subscriptions: TopicSubscription[];
+    queueRuntime: QueueRuntime | null;
+    queueConsumers: Map<string, QueueConsumer>;
+}
+
+type GlobalWithWork = typeof globalThis & { [WORK_KEY]?: WorkRegistry };
+
+function work(): WorkRegistry {
+    const g = globalThis as GlobalWithWork;
+    let shared = g[WORK_KEY];
+    if (!shared) {
+        shared = { topicRuntime: null, subscriptions: [], queueRuntime: null, queueConsumers: new Map() };
+        g[WORK_KEY] = shared;
+    }
+    return shared;
+}
+
+/**
+ * Where `@rebasepro/server` publishes its client once it has booted (its
+ * `singleton.ts`). Read only to tell the two causes of a missing runtime apart.
+ */
+const SERVER_INSTANCE_SLOT = Symbol.for("@rebasepro/server:singleton-instance");
+
+type GlobalWithServer = typeof globalThis & { [SERVER_INSTANCE_SLOT]?: unknown };
+
+/**
+ * Why there is no runtime to send through, as far as this process can tell.
+ *
+ * Outside a backend — the CLI evaluating config, a script, a unit test — the
+ * answer is that there is nothing to deliver to. Inside one it is not: the
+ * backend installs a runtime at boot for what `config/resources.ts` declared,
+ * so a missing one there means boot never saw the declaration, or the backend
+ * carries a copy of this package too old to share the slot it installs into.
+ * Saying "outside a backend" to somebody whose backend is running sends them
+ * looking for the wrong thing.
+ */
+function missingRuntimeCause(kind: "queue" | "topic"): string {
+    const backendUp = (globalThis as GlobalWithServer)[SERVER_INSTANCE_SLOT] != null;
+    if (!backendUp) {
+        return "This works inside a running Rebase backend; this looks like code running outside one " +
+            "(a build, a script, or a test without a harness).";
+    }
+    return `A Rebase backend is running in this process but installed no ${kind} runtime. It installs one at boot ` +
+        `when config/resources.ts declares a ${kind}, so either this ${kind} is declared somewhere boot does not ` +
+        "read, or the backend's copy of @rebasepro/types predates the shared runtime slot this copy reads — keep " +
+        "@rebasepro/server and @rebasepro/types on the same version.";
+}
 
 /** Install the transport topics publish through. Called by the server at boot. */
 export function setTopicRuntime(runtime: TopicRuntime | null): void {
-    runtimeHolder.current = runtime;
+    work().topicRuntime = runtime;
 }
-
-const subscriptions: TopicSubscription[] = [];
 
 /** Every declared subscription, for the worker to wire and the graph to record. */
 export function declaredSubscriptions(topic?: string): TopicSubscription[] {
+    const { subscriptions } = work();
     return topic ? subscriptions.filter(s => s.topic === topic) : subscriptions.slice();
 }
 
 /** Forget declared subscriptions. For tests, alongside `resetDeclaredResources`. */
 export function resetDeclaredSubscriptions(): void {
-    subscriptions.length = 0;
+    work().subscriptions.length = 0;
 }
 
 /** A topic handle, carrying its payload type. */
@@ -413,12 +482,10 @@ export function topic<T = unknown>(key: string, options: TopicOptions = {}): Top
         ...handle,
         toString() { return key; },
         async publish(event: T): Promise<void> {
-            const runtime = runtimeHolder.current;
+            const runtime = work().topicRuntime;
             if (!runtime) {
                 throw new Error(
-                    `Cannot publish to topic "${key}": no topic runtime is installed. ` +
-                    "Publishing works inside a running Rebase backend; this looks like config " +
-                    "being evaluated outside one (a build, a script, or a test without a harness)."
+                    `Cannot publish to topic "${key}": no topic runtime is installed. ${missingRuntimeCause("topic")}`
                 );
             }
             await runtime.publish(key, event);
@@ -427,6 +494,7 @@ export function topic<T = unknown>(key: string, options: TopicOptions = {}): Top
             if (!name || name.trim() === "") {
                 throw new Error(`A subscription on topic "${key}" needs a non-empty name.`);
             }
+            const { subscriptions } = work();
             if (subscriptions.some(s => s.topic === key && s.name === name)) {
                 throw new Error(
                     `Topic "${key}" already has a subscription named "${name}". ` +
@@ -579,11 +647,9 @@ export interface QueueRuntime {
     enqueue(queue: string, payload: unknown, options?: QueueEnqueueOptions): Promise<{ id: string }>;
 }
 
-const queueRuntimeHolder: { current: QueueRuntime | null } = { current: null };
-
 /** Install the transport queues enqueue through. Called by the server at boot. */
 export function setQueueRuntime(runtime: QueueRuntime | null): void {
-    queueRuntimeHolder.current = runtime;
+    work().queueRuntime = runtime;
 }
 
 /** A queue's handler, as recorded for the worker to wire. */
@@ -592,16 +658,14 @@ export interface QueueConsumer<T = unknown> {
     handler: QueueHandler<T>;
 }
 
-const queueConsumers = new Map<string, QueueConsumer>();
-
 /** Every declared queue handler, for the worker to wire. */
 export function declaredQueueConsumers(): QueueConsumer[] {
-    return [...queueConsumers.values()];
+    return [...work().queueConsumers.values()];
 }
 
 /** Forget declared queue handlers. For tests, alongside `resetDeclaredResources`. */
 export function resetDeclaredQueueConsumers(): void {
-    queueConsumers.clear();
+    work().queueConsumers.clear();
 }
 
 /** A queue handle, carrying its payload type. */
@@ -644,17 +708,16 @@ export function queue<T = unknown>(key: string, options: QueueOptions = {}): Que
         ...handle,
         toString() { return key; },
         async enqueue(payload: T, enqueueOptions?: QueueEnqueueOptions): Promise<{ id: string }> {
-            const runtime = queueRuntimeHolder.current;
+            const runtime = work().queueRuntime;
             if (!runtime) {
                 throw new Error(
-                    `Cannot enqueue on queue "${key}": no queue runtime is installed. ` +
-                    "Enqueueing works inside a running Rebase backend; this looks like config " +
-                    "being evaluated outside one (a build, a script, or a test without a harness)."
+                    `Cannot enqueue on queue "${key}": no queue runtime is installed. ${missingRuntimeCause("queue")}`
                 );
             }
             return runtime.enqueue(key, payload, enqueueOptions);
         },
         handler(fn: QueueHandler<T>): void {
+            const { queueConsumers } = work();
             if (queueConsumers.has(key)) {
                 throw new Error(
                     `Queue "${key}" already has a handler. A queue has exactly one consumer; ` +
