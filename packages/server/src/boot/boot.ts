@@ -30,7 +30,7 @@ import { serveSPA } from "../serve-spa";
 import { installShutdownHandlers } from "../init/shutdown";
 import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
 
-import { loadBootEnv, resolveCorsOrigin, resolveEnableSwagger, type RebaseBootEnv } from "./env";
+import { loadBootEnv, resolveCorsOptions, resolveEnableSwagger, type RebaseBootEnv } from "./env";
 import { resolveRole, RoleConfigurationError } from "./role";
 import { FunctionSelectionError } from "../functions/selection";
 import { CollectionConfigError } from "../collections/validate-config";
@@ -287,10 +287,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // which a client parsing `error.code` cannot read at all.
     installRootErrorHandler(app);
 
-    app.use("/*", cors({
-        origin: resolveCorsOrigin(env),
-        credentials: true
-    }));
+    app.use("/*", cors(resolveCorsOptions(env)));
     app.use("/*", secureHeaders({
         // An API serves assets and tokens to origins other than its own, so the
         // browser defaults are wrong here in two specific ways:

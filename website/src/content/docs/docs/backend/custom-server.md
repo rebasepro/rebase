@@ -235,6 +235,27 @@ You do not have to choose between Rebase and Drizzle. The bootstrapper compiles 
 ### Graceful Connection Draining
 In serverless environments or orchestrators (like Kubernetes), terminating pods can result in broken connections. Always implement signal handlers that invoke `realtimeProvider.stopListening()` (which terminates the dedicated pg LISTEN client) and `pool.end()` to prevent leaking connection slots in your database server.
 
+### CORS for a browser frontend
+A custom server owns its CORS config, and a frontend on another origin can read
+only the response headers it exposes. Expose the ones the SDK reads, or
+`etagOf(row)` is always `undefined` there — an `ifMatch` write then goes out
+with no `If-Match` — and a 429 loses its `Retry-After`:
+
+```typescript no-verify
+import cors from "cors";
+
+app.use(cors({
+    origin: ["https://app.example.com"],
+    credentials: true,
+    exposedHeaders: [
+        "ETag", "Retry-After", "X-Request-ID",
+        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
+        "Preference-Applied"
+    ]
+}));
+```
+
+The Rebase runtime and the ejected backend send this list already.
 
 ## Related
 

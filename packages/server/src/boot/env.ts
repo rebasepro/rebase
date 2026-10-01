@@ -481,3 +481,45 @@ export function resolveCorsOrigin(env: RebaseBootEnv): CorsOriginResolver {
 
     return (origin: string) => (allowed.includes(origin) ? origin : null);
 }
+
+/**
+ * Response headers a browser app on another origin may read.
+ *
+ * Outside the CORS-safelisted few, a cross-origin `fetch` sees a header only
+ * when `Access-Control-Expose-Headers` names it — and the runtime named none.
+ * So in every cross-origin setup (every `rebase dev` project: a Vite frontend on
+ * its own port) the SDK read no `ETag`, `etagOf(row)` was always `undefined`,
+ * and an `ifMatch` update went out with no `If-Match` — a conditional write
+ * silently made unconditional. A 429's `Retry-After` and the `X-Request-ID` an
+ * error is reported by were lost the same way.
+ *
+ * These are the headers the SDK reads, plus the ones the API sends for a caller
+ * to act on (`X-RateLimit-*`, `Preference-Applied`). A backend that wires its
+ * own `cors()` wants the same list; `packages/server/test/cors-exposed-headers.test.ts`
+ * fails when the SDK reads a header this does not name.
+ */
+export const CORS_EXPOSED_HEADERS: readonly string[] = [
+    "ETag",
+    "Retry-After",
+    "X-Request-ID",
+    "X-RateLimit-Limit",
+    "X-RateLimit-Remaining",
+    "X-RateLimit-Reset",
+    "Preference-Applied"
+];
+
+/** What the runtime hands Hono's `cors()`. */
+export interface RebaseCorsOptions {
+    origin: CorsOriginResolver;
+    credentials: true;
+    exposeHeaders: string[];
+}
+
+/** The runtime's whole CORS config, so a test can drive the same one boot does. */
+export function resolveCorsOptions(env: RebaseBootEnv): RebaseCorsOptions {
+    return {
+        origin: resolveCorsOrigin(env),
+        credentials: true,
+        exposeHeaders: [...CORS_EXPOSED_HEADERS]
+    };
+}

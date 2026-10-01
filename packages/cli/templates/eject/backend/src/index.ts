@@ -81,7 +81,20 @@ app.use("/*", cors({
         if (!origin) return "*";
         return isLocalhostOrigin(origin) ? origin : null;
     },
-    credentials: true
+    credentials: true,
+    // A frontend on another origin reads only the response headers named here.
+    // Without `ETag` the SDK's `etagOf(row)` is always undefined there, and an
+    // `ifMatch` write silently goes out unconditional; without `Retry-After`
+    // and `X-Request-ID` a 429 or an error loses what it reports.
+    exposeHeaders: [
+        "ETag",
+        "Retry-After",
+        "X-Request-ID",
+        "X-RateLimit-Limit",
+        "X-RateLimit-Remaining",
+        "X-RateLimit-Reset",
+        "Preference-Applied"
+    ]
 }));
 
 app.use("/*", secureHeaders());

@@ -149,6 +149,14 @@ row from `find()`, from the offline cache, or from a server that sends no
 `ETag` — and passing `undefined` sends no precondition, so the call above
 degrades to an ordinary update rather than throwing.
 
+From a browser on another origin — a Vite frontend on its own port, an `app.`
+host calling an `api.` host — the `ETag` is readable only because the server
+names it in `Access-Control-Expose-Headers`. The Rebase runtime does, along
+with `Retry-After`, `X-Request-ID`, the `X-RateLimit-*` headers and
+`Preference-Applied`. A backend that wires its own `cors()` has to expose the
+same list, or `etagOf` is always `undefined` there and every conditional write
+goes out unconditional.
+
 ### Skipping the response
 
 Every write resolves to the row it wrote. Pass `{ returning: false }` when you
