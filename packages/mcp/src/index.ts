@@ -1747,6 +1747,10 @@ function neutraliseMarkers(text: string): string {
  * string inside the body is broken with a zero-width space so it does not read
  * as one. The source is JSON-escaped (with `<` and `>` too), so it cannot end
  * the opening marker early either.
+ *
+ * The remote endpoint fences with `untrustedEnvelope` from `@rebasepro/common`,
+ * which this package does not depend on; a test holds this copy to that one's
+ * output ("the envelope is the remote endpoint's").
  */
 export function untrustedEnvelope(source: string, body: string): string {
     const id = randomUUID();

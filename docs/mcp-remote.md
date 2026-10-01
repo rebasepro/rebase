@@ -145,6 +145,13 @@ sets the soft-delete field back to `null`.
 `packages/server-postgres/test/e2e/mcp-tools-e2e.test.ts` runs the tools on the
 real driver beside the REST routes and compares the answers.
 
+A result's `content[0].text` is fenced in `untrustedEnvelope`
+(`@rebasepro/common`), the marking the local MCP server puts on every data
+result: a row was written by somebody, and it reaches the model on the channel
+the model takes its instructions from. `structuredContent` stays the plain
+result. The `initialize` instructions and each row-returning tool's description
+say so.
+
 ## The consent screen
 
 One page, self-contained HTML with no build step and no external asset, because

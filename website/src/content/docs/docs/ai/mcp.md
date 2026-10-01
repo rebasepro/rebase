@@ -354,6 +354,11 @@ shaped like a marker is broken with a zero-width space, so a row that prints
 `<<<END_UNTRUSTED_DATA>>>` cannot end the envelope early and put what follows it
 outside.
 
+The [remote endpoint](#the-remote-endpoint) fences every tool result the same
+way, and says so in its `initialize` instructions and in the description of each
+tool that returns rows. Its `structuredContent` carries the plain result, which
+is data by type.
+
 It is a marker, not a sandbox. An assistant holding these tools is only as safe
 as the content you let it read.
 

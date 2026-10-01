@@ -1226,6 +1226,7 @@ function toFilterTuples
 function topLevelIncludeNames
 function traverseValueProperty
 function traverseValuesProperties
+function untrustedEnvelope
 function updateDateAutoValues
 function updateUserAutoValues
 function wrapAsEntityData
