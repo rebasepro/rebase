@@ -1,0 +1,39 @@
+Planning migration statements (1 in total):
+
+  -- create "notes" table:
+    -> CREATE TABLE "public"."notes" (
+         "id" integer NOT NULL,
+         "body" text NULL DEFAULT 'a;b -> c',
+         "kind" text NULL,
+         PRIMARY KEY ("id"),
+         CONSTRAINT "notes_kind_check" CHECK (kind = ANY (ARRAY['x;'::text, 'y'::text]))
+       );
+
+-------------------------------------------
+
+Analyzing planned statements (1 in total):
+
+  -- no diagnostics found
+
+  -------------------------
+  -- 13.013167ms
+  -- 1 schema change
+
+-------------------------------------------
+
+Running dry-run migration (1 statement in total):
+
+  -- create "notes" table
+    -> CREATE TABLE "public"."notes" (
+         "id" integer NOT NULL,
+         "body" text NULL DEFAULT 'a;b -> c',
+         "kind" text NULL,
+         PRIMARY KEY ("id"),
+         CONSTRAINT "notes_kind_check" CHECK (kind = ANY (ARRAY['x;'::text, 'y'::text]))
+       );
+  -- ok (18.375µs)
+
+  -------------------------
+  -- 65.459µs
+  -- 1 migration
+  -- 1 sql statement

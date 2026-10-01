@@ -53,6 +53,111 @@ export function splitSqlStatements(sql: string): string[] {
         .filter((s) => s.length > 0);
 }
 
+/** `->`, the marker Atlas prints in front of the first line of every statement. */
+const PLAN_MARKER_RE = /^\s*->\s?/;
+/** `-------`, both the rule between sections and the one above a summary. */
+const PLAN_RULE_RE = /^\s*-{5,}\s*$/;
+/** `Planning migration statements (3 in total):` — and the count it announces. */
+const PLAN_HEADING_RE = /^Planning migration statements \((\d+) in total\):/m;
+/** What Atlas prints, and nothing else, when there is nothing to plan. */
+const PLAN_SYNCED_RE = /^\s*Schema is synced, no changes to be made\s*$/;
+
+/** What {@link readPlan} could make of a plan. */
+interface ReadPlan {
+    statements: string[];
+    /** The `(N in total)` Atlas announced, when its report said one. */
+    announced?: number;
+}
+
+/**
+ * Read the statements out of whatever Atlas printed.
+ *
+ * `atlas schema apply --dry-run` does not print SQL. It prints a report, and
+ * the same statements appear in it twice:
+ *
+ *     Planning migration statements (2 in total):
+ *
+ *       -- modify "people" table:
+ *         -> ALTER TABLE "public"."people" ALTER COLUMN "rating" TYPE numeric(4,1);
+ *       -- create "notes" table:
+ *         -> CREATE TABLE "public"."notes" (
+ *              "body" text NULL DEFAULT 'a;b',
+ *              …
+ *            );
+ *
+ *     -------------------------------------------
+ *
+ *     Analyzing planned statements (2 in total):
+ *       …
+ *     Running dry-run migration (2 statements in total):
+ *       -- modify "people" table
+ *         -> ALTER TABLE …;          ← the same statement, again
+ *       -- ok (19µs)
+ *
+ * Splitting that on `;` is how the push gate went blind: the heading has no
+ * `;` and does not start with `--`, so it became the first line of the first
+ * statement, and an `ALTER TABLE` parse anchored at the start of a statement
+ * read nothing — every narrowing type change applied without a prompt. Reading
+ * both sections was a second bug, counting every destructive statement twice.
+ *
+ * So the report is read as a report: a statement is a `->` line and the lines
+ * indented under it, up to the next `--` heading, `->`, blank line or rule;
+ * only the first section that holds a `->` is read; and `;` plays no part,
+ * because a default like `'a;b'` contains one.
+ *
+ * Plain SQL — a migration file, or an Atlas that printed SQL — has no `->`
+ * and is split the old way.
+ */
+function readPlan(plan: string): ReadPlan {
+    if (PLAN_SYNCED_RE.test(plan)) return { statements: [] };
+    const lines = plan.split(/\r?\n/);
+    if (!lines.some(line => PLAN_MARKER_RE.test(line))) return { statements: splitSqlStatements(plan) };
+
+    const heading = PLAN_HEADING_RE.exec(plan);
+    const statements: string[] = [];
+    let current: string[] | null = null;
+    const flush = () => {
+        if (current) statements.push(current.join("\n").trim().replace(/;\s*$/, "").trimEnd());
+        current = null;
+    };
+
+    for (const line of lines) {
+        if (PLAN_MARKER_RE.test(line)) {
+            flush();
+            current = [line.replace(PLAN_MARKER_RE, "")];
+            continue;
+        }
+        // A section heading sits in column 0 and is neither a marker nor a
+        // `--` line; the rule between sections is dashes. Either one after a
+        // statement has been read means the plan is over and what follows is
+        // Atlas re-printing it.
+        const sectionEnds = PLAN_RULE_RE.test(line) || (/^\S/.test(line) && !line.startsWith("--"));
+        if (sectionEnds) {
+            flush();
+            if (statements.length > 0) break;
+            continue;
+        }
+        if (!current) continue;
+        if (line.trim() === "" || line.trim().startsWith("--")) {
+            flush();
+            continue;
+        }
+        current.push(line);
+    }
+    flush();
+
+    return { statements, announced: heading ? Number(heading[1]) : undefined };
+}
+
+/**
+ * The statements of an Atlas plan, each exactly once, without Atlas's
+ * rendering and without the trailing `;`. See {@link readPlan} for the shape
+ * it reads; `test/fixtures/atlas-dry-run/` holds real captures of it.
+ */
+export function extractPlanStatements(plan: string): string[] {
+    return readPlan(plan).statements;
+}
+
 export interface DestructiveStatement {
     /** The offending statement (trimmed, without the trailing `;`). */
     statement: string;
@@ -109,7 +214,21 @@ export function detectDestructiveStatements(
     columnTypes: readonly ExistingColumnType[] = []
 ): DestructiveStatement[] {
     const found: DestructiveStatement[] = [];
-    for (const statement of splitSqlStatements(planSql)) {
+    const { statements, announced } = readPlan(planSql);
+    // Fail closed on a plan this could not read. Atlas says how many statements
+    // it planned; reading a different number means its rendering changed under
+    // us, and a gate that has not read the plan cannot call it safe. Reported
+    // as one more destructive finding, so it takes the same road: a prompt on
+    // a terminal, a refusal elsewhere, `--allow-destructive` to go ahead.
+    if (announced !== undefined && announced !== statements.length) {
+        found.push({
+            statement: `Planning migration statements (${announced} in total)`,
+            kind: "UNREADABLE PLAN",
+            detail: `Atlas announced ${announced} statement(s) and ${statements.length} could be read — `
+                + "read the plan yourself before allowing it"
+        });
+    }
+    for (const statement of statements) {
         const dropped = DESTRUCTIVE_PATTERNS.find(({ re }) => re.test(statement));
         if (dropped) {
             found.push({ statement, kind: dropped.label });
@@ -181,12 +300,25 @@ function splitClauses(body: string): string[] {
 }
 
 /**
+ * The statement from its `ALTER TABLE` on, wherever on a line that starts.
+ *
+ * {@link readPlan} hands over clean statements. This is the second line of
+ * defence for text it could not clean — a rendering it does not know yet —
+ * where a line of prose above the statement must not hide the statement, which
+ * is exactly how an anchored match once read Atlas's whole plan as safe.
+ */
+export function fromAlterTable(statement: string): string {
+    const start = /(?:^|\n)[ \t]*(?:->[ \t]*)?(ALTER\s+TABLE\b)/i.exec(statement);
+    return start ? statement.slice(start.index + start[0].length - start[1].length).trim() : statement.trim();
+}
+
+/**
  * Every `ALTER COLUMN … [SET DATA] TYPE` in one statement. Atlas prints its
  * dry-run statements under a `-> ` marker and puts several clauses in one
  * `ALTER TABLE`, so both are handled.
  */
 function parseColumnTypeChanges(statement: string): ColumnTypeChange[] {
-    const table = ALTER_TABLE_RE.exec(statement.replace(/^\s*->\s*/, "").trim());
+    const table = ALTER_TABLE_RE.exec(fromAlterTable(statement));
     if (!table) return [];
     const [schema, name] = table[2]
         ? [unquote(table[1]), unquote(table[2])]

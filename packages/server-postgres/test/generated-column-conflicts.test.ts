@@ -56,11 +56,12 @@ describe("parseColumnMutations", () => {
         expect(parseColumnMutations(plan)).toEqual([]);
     });
 
-    it("reads the plan Atlas actually prints, arrows and headings and all", () => {
-        // `schema apply --dry-run` renders a plan, not a SQL file: every
-        // statement is indented under a heading and prefixed with `-> `. An
-        // anchored `^ALTER TABLE` matches none of it, and the failure mode is
-        // silence — the exact bug this test exists to catch.
+    it("reads Atlas's per-statement rendering, arrows and headings and all", () => {
+        // Hand-written, and so not the whole story: the real report also has a
+        // `Planning migration statements (N in total):` heading glued above the
+        // first statement, and prints every statement twice. This test passed
+        // while the real plan read as nothing — `atlas-plan-fixtures.test.ts`
+        // reads captured Atlas output and is the one that holds the line.
         const plan = [
             "       -- planned migration:",
             "",

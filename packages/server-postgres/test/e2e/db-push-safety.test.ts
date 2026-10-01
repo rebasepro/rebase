@@ -51,6 +51,28 @@ function collectionsIndex(): string {
     return `import tasksCollection from "./tasks.js";\nexport default [tasksCollection];\n`;
 }
 
+/**
+ * A collection whose column TYPES move between pushes. `rating` is
+ * `numeric(precision, scale)`; `nickname` is a `varchar(max)` that a search
+ * block reads, so retyping it collides with the generated search column.
+ */
+function pricesCollectionJs(opts: { precision: number; scale: number; nicknameMax: number }): string {
+    return `
+const pricesCollection = {
+    name: "Prices",
+    slug: "prices",
+    table: "prices",
+    search: { fields: [{ path: "nickname", weight: "A" }] },
+    properties: {
+        id:       { name: "ID", type: "string", isId: "uuid" },
+        nickname: { name: "Nickname", type: "string", columnType: "varchar", validation: { max: ${opts.nicknameMax} } },
+        rating:   { name: "Rating", type: "number", precision: ${opts.precision}, scale: ${opts.scale} }
+    }
+};
+export default pricesCollection;
+`;
+}
+
 function cleanEnv(connectionString: string): Record<string, string> {
     const env = { ...process.env } as Record<string, string>;
     for (const key of Object.keys(env)) {
@@ -151,5 +173,67 @@ describe("db push destructive-change gate E2E", () => {
         const allowed = await runPush(["--allow-destructive"]);
         expect(allowed.exitCode).toBe(0);
         expect(await noteColumnExists()).toBe(false);
+    }, 150_000);
+
+    /**
+     * The half of the gate that names no DROP. It once read every real Atlas
+     * plan as safe: the `Planning migration statements (N in total):` heading
+     * Atlas prints above the first statement was glued onto it, and the parse
+     * that looks for `ALTER TABLE` found prose instead — so `numeric(5,2)` →
+     * `numeric(4,1)` rounded 123.45 to 123.5 with no prompt, off a TTY. The
+     * unit tests passed throughout, on a plan somebody typed. This one runs the
+     * real binary against a real database.
+     */
+    it("refuses a narrowing type change non-interactively, and the value survives", async () => {
+        fs.writeFileSync(path.join(collectionsDir, "index.js"),
+            `import pricesCollection from "./prices.js";\nexport default [pricesCollection];\n`);
+        fs.writeFileSync(path.join(collectionsDir, "prices.js"),
+            pricesCollectionJs({ precision: 5, scale: 2, nicknameMax: 40 }));
+        const created = await runPush();
+        expect(created.all ?? "").not.toMatch(/UNREADABLE PLAN/);
+        expect(created.exitCode).toBe(0);
+        await dbClient.query(`INSERT INTO prices (nickname, rating) VALUES ('first', 123.45)`);
+
+        fs.writeFileSync(path.join(collectionsDir, "prices.js"),
+            pricesCollectionJs({ precision: 4, scale: 1, nicknameMax: 40 }));
+
+        // Named once, though Atlas prints every statement twice.
+        const dry = await runPush(["--dry-run"]);
+        expect(dry.exitCode).toBe(0);
+        expect(dry.all ?? "").toMatch(/1 of those DESTROY data/);
+        expect(dry.all ?? "").toMatch(/ALTER COLUMN TYPE \("rating" numeric\(5,2\) → numeric\(4,1\)\)/);
+
+        const refused = await runPush();
+        expect(refused.exitCode).not.toBe(0);
+        expect(refused.all ?? "").toMatch(/This push includes 1 destructive change/);
+        expect(refused.all ?? "").not.toMatch(/UNREADABLE PLAN/);
+
+        const row = await dbClient.query(`SELECT rating::text AS rating,
+            (SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+              WHERE attrelid = 'prices'::regclass AND attname = 'rating') AS type FROM prices`);
+        expect(row.rows).toEqual([{ rating: "123.45", type: "numeric(5,2)" }]);
+    }, 150_000);
+
+    /**
+     * The same blindness, on the path that moves the search column out of the
+     * way: Postgres refuses to retype a column a generated column reads, and
+     * `db push` drops and rebuilds Rebase's own search column around the apply —
+     * but only if it sees the retype in the plan. It did not, and every push
+     * after widening a searched `varchar` failed with no hint.
+     */
+    it("widens a column a search block reads, rebuilding the search column around it", async () => {
+        fs.writeFileSync(path.join(collectionsDir, "prices.js"),
+            pricesCollectionJs({ precision: 5, scale: 2, nicknameMax: 100 }));
+        const pushed = await runPush();
+        expect(pushed.all ?? "").not.toMatch(/cannot alter type of a column used by a generated column/);
+        expect(pushed.exitCode).toBe(0);
+
+        const columns = await dbClient.query(`SELECT attname, format_type(atttypid, atttypmod) AS type,
+                attgenerated <> '' AS generated
+            FROM pg_attribute WHERE attrelid = 'prices'::regclass AND attnum > 0 AND NOT attisdropped
+            ORDER BY attname`);
+        const byName = Object.fromEntries(columns.rows.map((r: { attname: string; type: string; generated: boolean }) => [r.attname, r]));
+        expect(byName.nickname.type).toBe("character varying(100)");
+        expect(Object.values(byName).some((c) => (c as { generated: boolean }).generated)).toBe(true);
     }, 150_000);
 });

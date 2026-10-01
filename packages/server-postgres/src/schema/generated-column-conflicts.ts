@@ -28,7 +28,7 @@
  * are rows someone else read. Unit-tested in
  * `generated-column-conflicts.test.ts`.
  */
-import { splitSqlStatements } from "./destructive-sql";
+import { extractPlanStatements, fromAlterTable } from "./destructive-sql";
 
 /** An operation on a column that PostgreSQL refuses while a dependant exists. */
 export type ColumnMutationKind = "type" | "drop";
@@ -75,18 +75,6 @@ const unquote = (ident: string): string =>
     ident.startsWith("\"") ? ident.slice(1, -1) : ident;
 
 /**
- * Strip Atlas's plan rendering from a statement.
- *
- * What `schema apply --dry-run` prints is not a SQL file: each statement is
- * indented under a `-- modify "posts" table` heading and prefixed with `-> `,
- * with an `-- ok (12µs)` line after it. `splitSqlStatements` drops the comment
- * lines, and this drops the arrow — without it an anchored `^ALTER TABLE`
- * matches nothing at all, which is a silent no-op rather than an error.
- */
-const stripPlanMarker = (statement: string): string =>
-    statement.replace(/^\s*->\s*/, "").trim();
-
-/**
  * Every column an Atlas plan retypes or drops, with the table it belongs to.
  *
  * One statement carries many clauses — Atlas emits `ALTER TABLE "public"."posts"
@@ -96,8 +84,15 @@ const stripPlanMarker = (statement: string): string =>
 export function parseColumnMutations(planSql: string): ColumnMutation[] {
     const mutations: ColumnMutation[] = [];
 
-    for (const raw of splitSqlStatements(planSql)) {
-        const statement = stripPlanMarker(raw);
+    // The same reading of the plan the destructive gate uses, and it has to
+    // be the same: what `schema apply --dry-run` prints is a report, not SQL,
+    // with a heading glued above the first statement and every statement
+    // printed twice. Stripping a leading `->` off `;`-split text was the old
+    // reading here, and it never saw the first statement of a plan — so a
+    // retyped searched column failed every push with no hint, while
+    // `db generate`, which parses a clean migration file, got it right.
+    for (const raw of extractPlanStatements(planSql)) {
+        const statement = fromAlterTable(raw);
         const table = TABLE_RE.exec(statement);
         if (!table) continue;
         // With both groups present the first is the schema; with one, the

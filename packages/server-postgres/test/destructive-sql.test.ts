@@ -138,6 +138,28 @@ describe("an ALTER COLUMN … TYPE in the plan", () => {
         expect(found.map(d => d.detail)).toEqual(["\"views\" integer → smallint"]);
     });
 
+    it("finds the ALTER TABLE under a line of prose it could not strip", () => {
+        // The second line of defence. Text the plan reader does not recognise
+        // falls back to a `;` split, and the first statement then starts with
+        // whatever preceded it — the shape that once read every plan as safe.
+        const plan = 'Some heading Atlas has not printed before:\n\n  ALTER TABLE "public"."posts" ALTER COLUMN "views" TYPE smallint;';
+        expect(detectDestructiveStatements(plan, columns).map(d => d.detail)).toEqual(["\"views\" integer → smallint"]);
+    });
+
+    it("refuses to call a plan safe when it read fewer statements than Atlas announced", () => {
+        const plan = [
+            "Planning migration statements (2 in total):",
+            "",
+            '  -- modify "posts" table:',
+            '    -> ALTER TABLE "public"."posts" ADD COLUMN "note" text NULL;',
+            "  ~~ a statement rendered some new way ~~",
+            ""
+        ].join("\n");
+        const found = detectDestructiveStatements(plan, columns);
+        expect(found.map(d => d.kind)).toEqual(["UNREADABLE PLAN"]);
+        expect(found[0].detail).toMatch(/announced 2 statement\(s\) and 1 could be read/);
+    });
+
     it("still reports a DROP in the same statement as a DROP", () => {
         const plan = 'ALTER TABLE "public"."posts" DROP COLUMN "legacy", ALTER COLUMN "views" TYPE bigint;';
         expect(detectDestructiveStatements(plan, columns).map(d => d.kind)).toEqual(["DROP COLUMN"]);

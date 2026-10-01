@@ -1,0 +1,27 @@
+Planning migration statements (1 in total):
+
+  -- modify "people" table:
+    -> ALTER TABLE "public"."people" ALTER COLUMN "nickname" TYPE character varying(3), ALTER COLUMN "rating" TYPE numeric(4,1), ALTER COLUMN "big" TYPE integer, ALTER COLUMN "aliases" TYPE text, ALTER COLUMN "meta" TYPE text;
+
+-------------------------------------------
+
+Analyzing planned statements (1 in total):
+
+  -- no diagnostics found
+
+  -------------------------
+  -- 16.962084ms
+  -- 1 schema change
+
+-------------------------------------------
+
+Running dry-run migration (1 statement in total):
+
+  -- modify "people" table
+    -> ALTER TABLE "public"."people" ALTER COLUMN "nickname" TYPE character varying(3), ALTER COLUMN "rating" TYPE numeric(4,1), ALTER COLUMN "big" TYPE integer, ALTER COLUMN "aliases" TYPE text, ALTER COLUMN "meta" TYPE text;
+  -- ok (19.208µs)
+
+  -------------------------
+  -- 62.709µs
+  -- 1 migration
+  -- 1 sql statement

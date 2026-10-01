@@ -45,7 +45,7 @@ import {
 } from "./cli-errors";
 import { forLibpq } from "./utils/connection-string";
 import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
-import { detectDestructiveStatements, decidePushSafety } from "./schema/destructive-sql";
+import { detectDestructiveStatements, decidePushSafety, extractPlanStatements } from "./schema/destructive-sql";
 import {
     parseColumnMutations,
     findGeneratedColumnConflicts,
@@ -531,6 +531,15 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 plan,
                 databaseUrl ? await queryColumnTypes(databaseUrl) : []
             );
+            // What to show a person: the statements, once each. Atlas's report
+            // prints every one twice and wraps them in timings; when the gate
+            // could not read it, the report itself is the only honest thing
+            // to show.
+            const unreadable = destructive.some(d => d.kind === "UNREADABLE PLAN");
+            const planStatements = extractPlanStatements(plan);
+            const planListing = unreadable
+                ? plan.trim()
+                : planStatements.map(statement => `${statement};`).join("\n");
 
             // A generated column makes every column it reads immutable to
             // Atlas: PostgreSQL refuses `ALTER COLUMN … TYPE` and `DROP COLUMN`
@@ -570,9 +579,9 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             if (dryRun) {
                 out(chalk.gray("  Step 3/3: --dry-run — nothing was applied."));
                 out("");
-                if (plan.trim()) {
+                if (planStatements.length > 0 || unreadable) {
                     out(chalk.bold("  Planned changes:"));
-                    out(chalk.gray(plan.trim().split("\n").map((l) => `       ${l}`).join("\n")));
+                    out(chalk.gray(planListing.split("\n").map((l) => `       ${l}`).join("\n")));
                 } else {
                     out(chalk.green("  ✓ No changes: the database already matches these collections."));
                 }
@@ -626,7 +635,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 }
                 outWarn("");
                 outWarn(chalk.yellow("  Full planned changes:"));
-                outWarn(chalk.gray(plan.trim().split("\n").map((l) => `       ${l}`).join("\n")));
+                outWarn(chalk.gray(planListing.split("\n").map((l) => `       ${l}`).join("\n")));
                 outWarn("");
 
                 if (decision === "refuse") {

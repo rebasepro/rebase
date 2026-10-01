@@ -1,0 +1,33 @@
+Planning migration statements (2 in total):
+
+  -- modify "people" table:
+    -> ALTER TABLE "public"."people" ALTER COLUMN "status" TYPE text USING "status"::text, ALTER COLUMN "status" DROP DEFAULT;
+  -- drop enum type "people_status":
+    -> DROP TYPE "public"."people_status";
+
+-------------------------------------------
+
+Analyzing planned statements (2 in total):
+
+  -- no diagnostics found
+
+  -------------------------
+  -- 20.688667ms
+  -- 2 schema changes
+
+-------------------------------------------
+
+Running dry-run migration (2 statements in total):
+
+  -- modify "people" table
+    -> ALTER TABLE "public"."people" ALTER COLUMN "status" TYPE text USING "status"::text, ALTER COLUMN "status" DROP DEFAULT;
+  -- ok (20.416µs)
+
+  -- drop enum type "people_status"
+    -> DROP TYPE "public"."people_status";
+  -- ok (18.25µs)
+
+  -------------------------
+  -- 74.291µs
+  -- 1 migration
+  -- 2 sql statements

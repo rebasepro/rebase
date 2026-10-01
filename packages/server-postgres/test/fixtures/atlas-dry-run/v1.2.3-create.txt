@@ -1,0 +1,69 @@
+Planning migration statements (3 in total):
+
+  -- create enum type "people_status":
+    -> CREATE TYPE "public"."people_status" AS ENUM ('new', 'old');
+  -- create "old_stuff" table:
+    -> CREATE TABLE "public"."old_stuff" (
+         "id" integer NOT NULL,
+         PRIMARY KEY ("id")
+       );
+  -- create "people" table:
+    -> CREATE TABLE "public"."people" (
+         "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+         "name" text NOT NULL,
+         "bio" text NULL,
+         "nickname" text NULL,
+         "rating" numeric(5,2) NULL,
+         "big" bigint NULL,
+         "status" "public"."people_status" NULL DEFAULT 'new',
+         "aliases" text[] NULL,
+         "meta" jsonb NULL,
+         "legacy" text NULL,
+         PRIMARY KEY ("id")
+       );
+
+-------------------------------------------
+
+Analyzing planned statements (3 in total):
+
+  -- no diagnostics found
+
+  -------------------------
+  -- 25.153875ms
+  -- 3 schema changes
+
+-------------------------------------------
+
+Running dry-run migration (3 statements in total):
+
+  -- create enum type "people_status"
+    -> CREATE TYPE "public"."people_status" AS ENUM ('new', 'old');
+  -- ok (50.959µs)
+
+  -- create "old_stuff" table
+    -> CREATE TABLE "public"."old_stuff" (
+         "id" integer NOT NULL,
+         PRIMARY KEY ("id")
+       );
+  -- ok (39.041µs)
+
+  -- create "people" table
+    -> CREATE TABLE "public"."people" (
+         "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+         "name" text NOT NULL,
+         "bio" text NULL,
+         "nickname" text NULL,
+         "rating" numeric(5,2) NULL,
+         "big" bigint NULL,
+         "status" "public"."people_status" NULL DEFAULT 'new',
+         "aliases" text[] NULL,
+         "meta" jsonb NULL,
+         "legacy" text NULL,
+         PRIMARY KEY ("id")
+       );
+  -- ok (31.5µs)
+
+  -------------------------
+  -- 300.875µs
+  -- 1 migration
+  -- 3 sql statements
