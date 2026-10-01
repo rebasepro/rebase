@@ -149,7 +149,7 @@ description: "First job" }),
                 schedule: "0 0 3 * * *",
                 reason: "Expected 5 fields, got 6"
             }]);
-            expect(body.note).toMatch(/invalid schedule/);
+            expect(body.note).toMatch(/1 job\(s\) were refused/);
             expect((body.jobs as unknown[])).toHaveLength(2);
         });
 

@@ -3,7 +3,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { loadCronJobsFromDirectory, loadCronJobsWithDiagnostics } from "../src/cron/cron-loader";
-import { parseCronExpression } from "../src/cron/cron-scheduler";
+import { CronScheduler, parseCronExpression } from "../src/cron/cron-scheduler";
 
 /**
  * Two defects that made a documented cron feature inert and an ordinary cron
@@ -78,6 +78,32 @@ describe("cron loader", () => {
         expect(jobs[0].definition.name).toBe("plain");
         expect(jobs[0].definition.enabled).toBe(true);
         expect(jobs[0].definition.timeoutSeconds).toBe(300);
+    });
+
+    /**
+     * `timeoutSeconds: 0` or `NaN` was quietly replaced by the 300 s default
+     * (`|| 300`), so a nightly 20-minute job written with `0` meaning "no
+     * limit" was aborted at five minutes every night while the cron listing
+     * showed it healthy. The scheduler refuses both — and lists them under
+     * `rejected` — but only ever saw them through this loader, after the
+     * default had already eaten them. Through the loader, as production runs.
+     */
+    it.each([
+        ["zero", "zero", 0],
+        ["NaN", "nan", Number.NaN],
+        ["a negative number", "negative", -5]
+    ])("hands a timeoutSeconds of %s to the scheduler, which rejects it", async (_label, id, timeoutSeconds) => {
+        // A file name per case: the loader declares each cron in the process's
+        // resource graph, and one id declared twice differently is refused.
+        writeJob(`${id}.js`, { schedule: "0 3 * * *", timeoutSeconds, handler: async () => {} });
+
+        const scheduler = new CronScheduler();
+        scheduler.registerJobs(await loadCronJobsFromDirectory(dir, importer));
+
+        expect(await scheduler.fetchJobs()).toEqual([]);
+        expect(scheduler.listRejectedJobs()).toEqual([
+            expect.objectContaining({ id, reason: expect.stringMatching(/timeoutSeconds must be a positive number/) })
+        ]);
     });
 
     /**

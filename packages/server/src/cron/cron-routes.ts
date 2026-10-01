@@ -59,7 +59,10 @@ export function createCronRoutes(scheduler: CronScheduler, skipped = 0): Hono<Ho
                 ...(rejected.length > 0 && { rejected }),
                 note: [
                     skipped > 0 ? `${skipped} cron file(s) failed to load` : undefined,
-                    rejected.length > 0 ? `${rejected.length} job(s) have an invalid schedule` : undefined
+                    // Not "an invalid schedule": a job is also refused for an
+                    // unknown timezone or a timeout that is not a positive
+                    // number, and `rejected` says which.
+                    rejected.length > 0 ? `${rejected.length} job(s) were refused` : undefined
                 ].filter(Boolean).join(" and ") +
                     " — NOT scheduled. " +
                     (rejected.length > 0

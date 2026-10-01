@@ -116,7 +116,12 @@ export async function loadCronJobsWithDiagnostics(
                     schedule: def.schedule as string,
                     name: (def.name as string) || id,
                     enabled: def.enabled !== false,
-                    timeoutSeconds: (def.timeoutSeconds as number) || 300,
+                    // `??`, not `||`: zero and NaN are values the author
+                    // wrote, and the scheduler refuses both by name (they end
+                    // up under `rejected`). `|| 300` swallowed them, so a job
+                    // written with `0` meaning "no limit" ran with five
+                    // minutes and was listed as healthy. `Infinity` is "none".
+                    timeoutSeconds: (def.timeoutSeconds as number | undefined) ?? 300,
                     handler: def.handler as CronJobDefinition["handler"]
                 };
 
