@@ -4,7 +4,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { FilterValues, WhereFilterOp } from "@rebasepro/types";
 import { Button, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import { FilterIcon, VirtualTableWhereFilterOp } from "@rebasepro/ui";
-import { resolveFilterOperators } from "@rebasepro/app";
+import { isPropertyFilterable } from "@rebasepro/app";
 import { useCollectionScope, useTranslation } from "@rebasepro/app";
 import { FilterFieldBinding } from "../SelectableTable/filters/FilterFieldBinding";
 
@@ -25,6 +25,25 @@ import { FilterFieldBinding } from "../SelectableTable/filters/FilterFieldBindin
 type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
 const _whereFilterOpDefinitionsAgree: MutuallyAssignable<WhereFilterOp, VirtualTableWhereFilterOp> = true;
 void _whereFilterOpDefinitionsAgree;
+
+/**
+ * The properties the dialog lists, each with a filter field: every property
+ * that can be filtered, bar the collection's fixed-filter fields.
+ */
+export function getFilterableProperties(
+    properties: Record<string, Property>,
+    fixedFilter?: FilterValues<string>,
+    engine?: string
+): [string, Property][] {
+    return Object.entries(properties).filter(([key, property]) => {
+        if (!property) return false;
+        // Force filter properties should not be editable
+        if (fixedFilter && key in fixedFilter) return false;
+        // The table header asks the same question, so the two cannot list
+        // different properties.
+        return isPropertyFilterable(property, engine);
+    });
+}
 
 export interface FiltersDialogProps {
     open: boolean;
@@ -65,22 +84,9 @@ export function FiltersDialog({
     }, [open, filterValues]);
 
     // Get list of filterable properties
-    const filterableProperties = useMemo(() => {
-        return Object.entries(properties).filter(([key, property]) => {
-            if (!property) return false;
-            // Force filter properties should not be editable
-            if (fixedFilter && key in fixedFilter) return false;
-            const isArray = property.type === "array";
-            const ofProp = isArray && "of" in property ? property.of : undefined;
-            const baseProperty = isArray ? (Array.isArray(ofProp) ? ofProp[0] : ofProp) as Property | undefined : property;
-            if (!baseProperty) return false;
-            // A property is filterable when it has a custom filter field, or
-            // when at least one operator survives the engine ∩ type ∩
-            // property-narrowing resolution.
-            if (baseProperty.admin?.Filter) return true;
-            return resolveFilterOperators({ property: baseProperty, isArray, engine }).length > 0;
-        });
-    }, [properties, fixedFilter, engine]);
+    const filterableProperties = useMemo(
+        () => getFilterableProperties(properties, fixedFilter, engine),
+        [properties, fixedFilter, engine]);
 
     const handleFilterChange = useCallback((propertyKey: string, value?: [VirtualTableWhereFilterOp, any]) => {
         setLocalFilters(prev => {

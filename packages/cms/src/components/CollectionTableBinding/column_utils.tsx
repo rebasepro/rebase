@@ -4,7 +4,7 @@ import { getTableCellAlignment, getTablePropertyColumnWidth } from "./internal/c
 import { FilterValues } from "@rebasepro/types";
 import { VirtualTableColumn } from "@rebasepro/ui";
 import { getResolvedPropertyInPath } from "../../util/property_utils";
-import { getColumnKeysForProperty, isFilterableRelation } from "@rebasepro/app";
+import { getColumnKeysForProperty, isPropertyFilterable } from "@rebasepro/app";
 
 export function buildIdColumn(largeLayout?: boolean): VirtualTableColumn {
     return {
@@ -58,7 +58,7 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
                 console.warn(`No property found in path "${key}" — skipping that column.`);
                 return [];
             }
-            const filterable = filterableProperty(property, false, engine);
+            const filterable = filterableProperty(property, engine);
             return [{
                 key: key as string,
                 align: getTableCellAlignment(property),
@@ -135,23 +135,12 @@ function sortableProperty(property: Property): boolean {
     return kind === "belongsTo";
 }
 
-function filterableProperty(property: Property, partOfArray = false, engine?: string): boolean {
-    // A relation this engine's driver cannot compile into a `WHERE` has
-    // nothing to filter on, so the header's filter control would open onto a
-    // field that renders nothing (`FilterFieldBinding` returns null on an
-    // empty operator list) — and, before the driver started failing closed,
-    // sending one silently returned every row. Same authority as the operator
-    // resolution, and engine-aware for the same reason: this table renders
-    // over Postgres, Mongo, Firestore and anything a developer registers.
-    if (!isFilterableRelation(property, engine)) return false;
-    if (partOfArray) {
-        return ["string", "number", "date", "reference", "relation"].includes(property.type);
-    }
-    if (property.type === "array") {
-        if (property.of && !Array.isArray(property.of))
-            return filterableProperty(property.of, true, engine);
-        else
-            return false;
-    }
-    return ["string", "number", "boolean", "date", "reference", "relation", "array"].includes(property.type);
+function filterableProperty(property: Property, engine?: string): boolean {
+    // The same question the filters dialog asks, answered in one place — see
+    // `isPropertyFilterable`. It used to be answered here by a second
+    // predicate, and the two disagreed on arrays, on `filterOperators: []`
+    // and on a custom `admin.Filter`. A relation this engine's driver cannot
+    // compile into a `WHERE` is not filterable either way: before the driver
+    // started failing closed, sending one silently returned every row.
+    return isPropertyFilterable(property, engine);
 }
