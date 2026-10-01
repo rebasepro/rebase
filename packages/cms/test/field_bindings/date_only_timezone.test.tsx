@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @jest-environment ./test/helpers/los-angeles-tz-environment.cjs
  */
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
@@ -16,9 +16,14 @@ import { fireEvent, render, screen } from "@testing-library/react";
  * East of it, picking the 15th produced the 14th's evening in UTC, and the 14th
  * is what was stored.
  *
- * These run in whatever zone the machine is in, so each case pairs a value
- * that goes wrong to the west with one that goes wrong to the east: outside
- * UTC, a field working in the local zone fails one of them.
+ * Each case pairs a value that goes wrong to the west with one that goes wrong
+ * to the east, so outside UTC a field working in the local zone fails one of
+ * them. In UTC it fails neither — and UTC is where CI runs, so for as long as
+ * these ran in the machine's own zone, reverting the fix passed CI and failed
+ * only on a laptop east of Greenwich. The environment in the docblock above
+ * pins America/Los_Angeles (a test file cannot set `TZ` itself; see
+ * tooling/scripts/jest/zone-environment.cjs), and the first test below
+ * proves the pin took.
  */
 
 jest.mock("@rebasepro/app", () => {
@@ -67,6 +72,16 @@ function renderField(property: object, value: Date | null, setValue: (value: Dat
 function input(): HTMLInputElement {
     return screen.getByLabelText("Due") as HTMLInputElement;
 }
+
+describe("the host zone is the one this file needs", () => {
+    it("reads the 15th's first minute as the 14th's evening, Pacific daylight time", () => {
+        // Guards the rest of the file: if the runtime ignored the pin, every test
+        // below would pass against UTC and prove nothing.
+        expect(startOfThe15th.getDate()).toBe(14);
+        expect(startOfThe15th.getHours()).toBe(17);
+        expect(startOfThe15th.getTimezoneOffset()).toBe(420);
+    });
+});
 
 describe("a date-only property", () => {
 

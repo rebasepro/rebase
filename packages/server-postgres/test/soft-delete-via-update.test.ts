@@ -61,7 +61,7 @@ function driverOver(pglite: PGlite): PostgresBackendDriver {
 }
 
 const deletedAtOf = async (id: number): Promise<string | null> =>
-    (await db.query<{ deleted_at: string | null }>("SELECT deleted_at::text AS deleted_at FROM posts WHERE id = $1", [id])).rows[0].deleted_at;
+    (await db.query<{ deleted_at: string | null }>("SELECT (deleted_at AT TIME ZONE 'UTC')::text AS deleted_at FROM posts WHERE id = $1", [id])).rows[0].deleted_at;
 const titleOf = async (id: number): Promise<string> =>
     (await db.query<{ title: string }>("SELECT title FROM posts WHERE id = $1", [id])).rows[0].title;
 

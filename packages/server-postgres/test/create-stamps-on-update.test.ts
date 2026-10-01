@@ -64,7 +64,7 @@ function driverOver(pglite: PGlite, user?: User): PostgresBackendDriver {
 type Stored = { title: string; created_by: string | null; created_at: string | null; updated_by: string | null };
 const stored = async (): Promise<Stored> =>
     (await db.query<Stored>(
-        "SELECT title, created_by, created_at::text, updated_by FROM docs WHERE id = $1", [rowId])).rows[0];
+        "SELECT title, created_by, (created_at AT TIME ZONE 'UTC')::text AS created_at, updated_by FROM docs WHERE id = $1", [rowId])).rows[0];
 
 function expectCreationKept(row: Stored): void {
     expect(row.created_by).toBe("alice");

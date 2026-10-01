@@ -94,7 +94,8 @@ type Stored = {
 };
 const rowOf = async (id: number): Promise<Stored | undefined> =>
     (await db.query<Stored>(
-        "SELECT id, code, title, tenant, active, created_by, created_at::text, deleted_at::text FROM docs WHERE id = $1",
+        "SELECT id, code, title, tenant, active, created_by, (created_at AT TIME ZONE 'UTC')::text AS created_at, " +
+        "(deleted_at AT TIME ZONE 'UTC')::text AS deleted_at FROM docs WHERE id = $1",
         [id])).rows[0];
 
 /** Alice's row in tenant a; Carol's in tenant b (hidden from tenant a); a trashed one in a. */

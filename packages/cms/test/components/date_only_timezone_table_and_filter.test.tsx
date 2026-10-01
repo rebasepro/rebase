@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * @jest-environment ./test/helpers/los-angeles-tz-environment.cjs
  */
 import React from "react";
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
@@ -18,9 +18,14 @@ import type { DateProperty, Entity, Property, WhereFilterOp } from "@rebasepro/t
  * and a filter for the 15th asked for the 14th's evening. A property's
  * declared `timezone` reached neither of them.
  *
- * These run in whatever zone the machine is in, so each case pairs a value
- * that goes wrong to the west with one that goes wrong to the east: outside
- * UTC, a field working in the local zone fails one of them.
+ * Each case pairs a value that goes wrong to the west with one that goes wrong
+ * to the east, so outside UTC a field working in the local zone fails one of
+ * them. In UTC it fails neither — and UTC is where CI runs, so for as long as
+ * these ran in the machine's own zone, reverting the fix passed CI and failed
+ * only on a laptop east of Greenwich. The environment in the docblock above
+ * pins America/Los_Angeles (a test file cannot set `TZ` itself; see
+ * tooling/scripts/jest/zone-environment.cjs), and the first test below
+ * proves the pin took.
  */
 
 jest.mock("@rebasepro/app", () => {
@@ -88,6 +93,16 @@ function renderFilter(property: Property, value: Date | undefined, setValue: (va
     if (!(input instanceof HTMLInputElement)) throw new Error("the date filter rendered no date input");
     return { view, input };
 }
+
+describe("the host zone is the one this file needs", () => {
+    it("reads the 15th's first minute as the 14th's evening, Pacific daylight time", () => {
+        // Guards the rest of the file: if the runtime ignored the pin, every test
+        // below would pass against UTC and prove nothing.
+        expect(startOfThe15th.getDate()).toBe(14);
+        expect(startOfThe15th.getHours()).toBe(17);
+        expect(startOfThe15th.getTimezoneOffset()).toBe(420);
+    });
+});
 
 describe("the table cell of a date-only property", () => {
 
