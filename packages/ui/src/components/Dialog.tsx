@@ -1,10 +1,11 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { paperMixin } from "../styles";
+import { focusedDisabled, paperMixin } from "../styles";
 import { cls } from "../util";
 import { PortalContainerProvider, usePortalContainer } from "../hooks/PortalContainerContext";
 import { useRestoreInterruptedFocus } from "../hooks/useRestoreInterruptedFocus";
+import { useModalFocus } from "../hooks/useModalFocus";
 
 export type DialogProps = {
     open?: boolean;
@@ -19,11 +20,32 @@ export type DialogProps = {
     maxWidth?: keyof typeof widthClasses;
     modal?: boolean;
     onOpenAutoFocus?: (e: Event) => void;
+    /**
+     * Called when focus is about to return after the dialog closes. By default
+     * it goes back to the element that had it when the dialog opened; call
+     * `preventDefault()` to put it somewhere else.
+     */
+    onCloseAutoFocus?: (e: Event) => void;
     onEscapeKeyDown?: (e: KeyboardEvent) => void;
     onPointerDownOutside?: (e: Event) => void;
     onInteractOutside?: (e: Event) => void;
     /**
-     * If `true`, the dialog will not focus the first focusable element when opened.
+     * Whether a click on the dimmed backdrop closes the dialog. Off by default:
+     * a record or a form dialog holds work that one stray click must not throw
+     * away. Turn it on for a picker, where closing loses nothing. Escape closes
+     * either kind.
+     */
+    dismissOnBackdrop?: boolean;
+    /**
+     * The element to focus when the dialog opens, for a dialog whose purpose is
+     * one field. Without it the dialog focuses itself, so a screen reader
+     * announces it by its title and a phone does not raise its keyboard.
+     */
+    initialFocus?: React.RefObject<HTMLElement | null>;
+    /**
+     * If `true` (the default), the dialog will not focus the first focusable
+     * element when opened: it focuses its own container instead. `false` lets
+     * the first focusable element take focus.
      */
     disableInitialFocus?: boolean;
     portalContainer?: HTMLElement | null;
@@ -58,9 +80,12 @@ export const Dialog = ({
                            maxWidth = "lg",
                            modal = true,
                            onOpenAutoFocus,
+                           onCloseAutoFocus,
                            onEscapeKeyDown,
                            onPointerDownOutside,
                            onInteractOutside,
+                           dismissOnBackdrop = false,
+                           initialFocus,
                            disableInitialFocus = true,
                            portalContainer,
                            "aria-describedby": ariaDescribedby
@@ -77,6 +102,20 @@ export const Dialog = ({
     // whenever the first field's tooltip closed on the way out.
     const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
     useRestoreInterruptedFocus(contentEl);
+
+    // The two surfaces outside the paper: a pointer-down on either is a
+    // click on the backdrop. Anything else outside the paper — a toast, a
+    // popup some other layer portaled to the body — is not.
+    const [overlayEl, setOverlayEl] = useState<HTMLDivElement | null>(null);
+    const [layerEl, setLayerEl] = useState<HTMLDivElement | null>(null);
+
+    const focus = useModalFocus({
+        open: Boolean(open),
+        initialFocus,
+        focusContainer: disableInitialFocus,
+        onOpenAutoFocus,
+        onCloseAutoFocus
+    });
 
     // Get the portal container from context
     const contextContainer = usePortalContainer();
@@ -103,48 +142,71 @@ export const Dialog = ({
                               onOpenChange={onOpenChange}>
             <DialogPrimitive.Portal container={finalContainer}>
 
-                <div className={cls("fixed inset-0 z-50", containerClassName)}>
+                <div ref={setLayerEl}
+                     className={cls("fixed inset-0 z-50 flex justify-center items-center", containerClassName)}>
 
                     <DialogPrimitive.Overlay
+                        ref={setOverlayEl}
                         className={cls("fixed inset-0 transition-opacity ease-in-out duration-200 bg-black/50 dark:bg-black/60 backdrop-blur-sm",
                             displayed && open ? "opacity-100" : "opacity-0",
-                            "z-50 fixed top-0 left-0 w-full h-full flex justify-center items-center"
+                            "z-50 fixed top-0 left-0 w-full h-full"
                         )}
                         style={{
                             pointerEvents: displayed ? "auto" : "none"
                         }}
                     />
 
+                    {/* The content IS the paper's box: what is outside it is the
+                        backdrop, and what assistive technology and a test runner
+                        measure as the dialog is what the user sees. It used to fill
+                        the viewport, so the dimmed area was part of the dialog and
+                        the outside-click handlers could never fire. The paper itself
+                        is a child because its open animation scales it, and a
+                        transform would make it the containing block of every popup
+                        portaled into the host beside it. */}
                     <DialogPrimitive.Content
                         ref={setContentEl}
                         onEscapeKeyDown={onEscapeKeyDown}
-                        onOpenAutoFocus={(e) => {
-                            if (disableInitialFocus) {
-                                e.preventDefault();
-                            }
-                            onOpenAutoFocus?.(e);
+                        onOpenAutoFocus={focus.onOpenAutoFocus}
+                        onCloseAutoFocus={focus.onCloseAutoFocus}
+                        onPointerDownOutside={(e) => {
+                            onPointerDownOutside?.(e);
+                            if (e.defaultPrevented) return;
+                            const target = e.target;
+                            const onBackdrop = target === overlayEl || target === layerEl;
+                            if (!dismissOnBackdrop || !onBackdrop) e.preventDefault();
                         }}
-                        onPointerDownOutside={onPointerDownOutside}
+                        // Focus leaving the paper is not a request to close it. A modal
+                        // dialog already ignores it; a non-modal one would dismiss.
+                        onFocusOutside={(e) => e.preventDefault()}
                         onInteractOutside={onInteractOutside}
                         aria-describedby={ariaDescribedby}
-                        className={cls("relative h-full outline-none flex justify-center items-center z-60 opacity-100 transition-all duration-200 ease-in-out")}
+                        className={cls(
+                            "relative z-60 outline-none",
+                            // Focused on open so a screen reader announces it; it is
+                            // a container, not a control, so it draws no ring.
+                            focusedDisabled,
+                            fullWidth && !fullScreen ? "w-11/12" : undefined,
+                            fullHeight && !fullScreen ? "h-[90vh]" : undefined,
+                            fullScreen ? "h-screen w-screen" : undefined,
+                            maxWidth && !fullScreen ? widthClasses[maxWidth] : undefined
+                        )}
                     >
                         <div
                             className={cls(paperMixin,
                                 "rounded-2xl",
                                 "z-60",
                                 "relative",
+                                "w-full",
                                 "overflow-hidden",
                                 "outline-none focus:outline-none",
-                                fullWidth && !fullScreen ? "w-11/12" : undefined,
-                                fullHeight && !fullScreen ? "h-full" : undefined,
+                                fullHeight || fullScreen ? "h-full" : undefined,
                                 "text-text-primary dark:text-text-primary-dark",
                                 "justify-center items-center",
-                                fullScreen ? "h-screen w-screen" : "max-h-[90vh] shadow-lg",
+                                fullScreen ? undefined : "max-h-[90vh] shadow-lg",
                                 "ease-in-out duration-200",
                                 scrollable && "overflow-y-auto",
                                 displayed && open ? "opacity-100 scale-100" : "opacity-0 scale-[0.97]",
-                                maxWidth && !fullScreen ? widthClasses[maxWidth] : undefined,
                                 className
                             )}>
                             <PortalContainerProvider container={popupHost}>

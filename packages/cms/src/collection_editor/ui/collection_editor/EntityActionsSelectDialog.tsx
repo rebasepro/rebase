@@ -10,9 +10,15 @@ export function EntityActionsSelectDialog({
         entityActions
     } = useCustomizationController();
 
+    // A picker: closing it loses nothing, so the backdrop and Escape both
+    // cancel it, the same as the Cancel button.
     return <Dialog
         maxWidth={"md"}
-        open={open}>
+        open={open}
+        onOpenChange={(isOpen) => {
+            if (!isOpen) onClose();
+        }}
+        dismissOnBackdrop>
         <DialogTitle>Select custom action</DialogTitle>
         <DialogContent className={"flex flex-col gap-4"}>
             {entityActions?.map((action) => {

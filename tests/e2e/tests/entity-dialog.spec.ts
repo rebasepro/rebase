@@ -16,6 +16,10 @@
  *    key is now revealed inline, in the label row, and covers nothing.
  *  - A three-field form was split into two columns.
  *  - Create and "Create and close" were in the top bar instead of the footer.
+ *
+ * And one found later by the kit audit: opening the dialog from the keyboard
+ * left focus on "Add user" behind it — hidden from assistive technology by the
+ * modal, announced as nothing, and fired again by the next Enter.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { AUTH_STATE } from "../auth";
@@ -55,6 +59,25 @@ test.describe("entity dialog", () => {
         await armRemovalOnBlur("#form_field_displayName input");
         await page.keyboard.press("Shift+Tab");
         await expect(email, "Shift+Tab from Name did not return to Email").toBeFocused();
+    });
+
+    test("opening it with Enter moves focus into the dialog", async ({ page }) => {
+        await page.goto("/c/users");
+        const add = page.getByRole("button", { name: /Add User/i }).first();
+        await expect(add).toBeVisible({ timeout: 15000 });
+        await add.focus();
+        await page.keyboard.press("Enter");
+
+        const dialog = page.getByRole("dialog");
+        await expect(dialog.locator("#form_field_email input")).toBeVisible({ timeout: 15000 });
+        const focusIsInside = await page.evaluate(
+            () => Boolean(document.activeElement?.closest("[role=dialog]"))
+        );
+        expect(focusIsInside, "focus stayed on the trigger behind the modal").toBe(true);
+
+        // A second Enter acts inside the dialog, not on the trigger beneath it.
+        await page.keyboard.press("Enter");
+        await expect(dialog).toHaveCount(1);
     });
 
     test("focusing a field opens nothing over the form", async ({ page }) => {

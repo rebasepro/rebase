@@ -5,6 +5,7 @@ import { defaultBorderMixin } from "../styles";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { usePortalContainer, PortalContainerProvider } from "../hooks/PortalContainerContext";
 import { useRestoreInterruptedFocus } from "../hooks/useRestoreInterruptedFocus";
+import { useModalFocus } from "../hooks/useModalFocus";
 
 interface SheetProps {
     children: React.ReactNode;
@@ -18,6 +19,19 @@ interface SheetProps {
     onOpenChange?: (open: boolean) => void;
     onPointerDownOutside?: (e: Event) => void;
     onInteractOutside?: (e: Event) => void;
+    /**
+     * The element to focus when the sheet opens. Without it the sheet focuses
+     * itself, so a screen reader announces it by its title and a phone does
+     * not raise its keyboard.
+     */
+    initialFocus?: React.RefObject<HTMLElement | null>;
+    /** Called as the sheet opens, before focus moves into it. `preventDefault()` keeps focus where it is. */
+    onOpenAutoFocus?: (e: Event) => void;
+    /**
+     * Called when focus is about to return after the sheet closes. By default
+     * it goes back to the element that had it when the sheet opened.
+     */
+    onCloseAutoFocus?: (e: Event) => void;
     className?: string;
     style?: React.CSSProperties;
     overlayClassName?: string;
@@ -36,6 +50,9 @@ export const Sheet: React.FC<SheetProps> = ({
     onOpenChange,
     onPointerDownOutside,
     onInteractOutside,
+    initialFocus,
+    onOpenAutoFocus,
+    onCloseAutoFocus,
     transparent,
     className,
     style,
@@ -50,6 +67,12 @@ export const Sheet: React.FC<SheetProps> = ({
     // Popups portal into the content, which is also the focus trap's container:
     // one closing on blur used to drop a Tab onto the panel itself.
     useRestoreInterruptedFocus(contentEl);
+    const focus = useModalFocus({
+        open,
+        initialFocus,
+        onOpenAutoFocus,
+        onCloseAutoFocus
+    });
 
     // Get the portal container from context
     const contextContainer = usePortalContainer();
@@ -96,7 +119,8 @@ export const Sheet: React.FC<SheetProps> = ({
                 <DialogPrimitive.Content
                     {...props}
                     ref={setContentEl}
-                    onOpenAutoFocus={(event) => event.preventDefault()}
+                    onOpenAutoFocus={focus.onOpenAutoFocus}
+                    onCloseAutoFocus={focus.onCloseAutoFocus}
                     onPointerDownOutside={onPointerDownOutside}
                     onInteractOutside={onInteractOutside}
                     className={cls(

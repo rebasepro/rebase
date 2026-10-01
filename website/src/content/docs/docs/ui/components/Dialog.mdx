@@ -24,12 +24,19 @@ import { Dialog } from "@rebasepro/ui";
 | `maxWidth` | `"xl" \| "2xl" \| "xs" \| "sm" \| "md" \| "lg" \| "3xl" \| "4xl" \| "5xl" \| "6xl" \| "7xl" \| "full"` | — |  |
 | `modal` | `boolean` | — |  |
 | `onOpenAutoFocus` | `(e: Event) => void` | — |  |
+| `onCloseAutoFocus` | `(e: Event) => void` | — | Called when focus is about to return after the dialog closes. By default it goes back to the element that had it when the dialog opened; call `preventDefault()` to put it somewhere else. |
 | `onEscapeKeyDown` | `(e: KeyboardEvent) => void` | — |  |
 | `onPointerDownOutside` | `(e: Event) => void` | — |  |
 | `onInteractOutside` | `(e: Event) => void` | — |  |
-| `disableInitialFocus` | `boolean` | — | If `true`, the dialog will not focus the first focusable element when opened. |
+| `dismissOnBackdrop` | `boolean` | — | Whether a click on the dimmed backdrop closes the dialog. Off by default: a record or a form dialog holds work that one stray click must not throw away. Turn it on for a picker. Escape closes either kind. |
+| `initialFocus` | `React.RefObject<HTMLElement \| null>` | — | The element to focus when the dialog opens. Without it the dialog focuses itself, so a screen reader announces it by its title and a phone does not raise its keyboard. |
+| `disableInitialFocus` | `boolean` | — | If `true` (the default), the dialog will not focus the first focusable element when opened: it focuses its own container instead. `false` lets the first focusable element take focus. |
 | `portalContainer` | `HTMLElement` | — |  |
 | `aria-describedby` | `string` | — |  |
+
+## Focus
+
+When a dialog opens, focus moves into it: to `initialFocus` if you name an element, otherwise to the dialog itself. Its title is announced, and the first Tab lands on its first control. When it closes, focus returns to whatever had it before — the button that opened it, or the trigger of the menu whose item did.
 
 ## Example
 

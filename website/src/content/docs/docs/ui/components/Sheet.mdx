@@ -23,6 +23,9 @@ import { Sheet } from "@rebasepro/ui";
 | `onOpenChange` | `(open: boolean) => void` | — |  |
 | `onPointerDownOutside` | `(e: Event) => void` | — |  |
 | `onInteractOutside` | `(e: Event) => void` | — |  |
+| `initialFocus` | `React.RefObject<HTMLElement \| null>` | — | The element to focus when the sheet opens. Without it the sheet focuses itself. |
+| `onOpenAutoFocus` | `(e: Event) => void` | — | Called as the sheet opens, before focus moves into it. `preventDefault()` keeps focus where it is. |
+| `onCloseAutoFocus` | `(e: Event) => void` | — | Called when focus is about to return after the sheet closes. By default it goes back to the element that had it when the sheet opened. |
 | `className` | `string` | — |  |
 | `style` | `React.CSSProperties` | — |  |
 | `overlayClassName` | `string` | — |  |
