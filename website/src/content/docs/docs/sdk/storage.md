@@ -81,6 +81,27 @@ The SDK caches signed URLs to avoid redundant server calls.
 - **Private files** get a URL with a **short-lived, path-scoped download token** (`?token=…`, 5 minutes unless the server sets `STORAGE_DOWNLOAD_TOKEN_TTL`) — never your access token. Because it expires, **don't persist a private URL**; store the file **path** and call `getSignedUrl()` again when you render it.
 - **Public files** (stored under the `public/` prefix — set `storage: { public: true }` on the property, or pass `public: true` to `putObject`) get a **stable, token-less, permanent, CDN-cacheable** URL with no server round-trip. These are safe to store in a database and hotlink.
 
+### Files inside text
+
+Text that embeds a file — the images in a markdown field — cannot hold a
+private URL either, so it holds a **storage reference** instead:
+`rebase-storage:posts/cover.png`, with `?storageId=media` when the file is in a
+named source. That is what the admin panel's markdown editor writes for an
+uploaded image. Exchange the references for URLs when you render the text:
+
+```typescript
+import { resolveStorageReferences } from "@rebasepro/client";
+
+const post = await client.data.collection("posts").findById("post-1");
+const body = await resolveStorageReferences(String(post?.body ?? ""), client);
+// `body` is the same markdown, each reference replaced by a fresh URL.
+```
+
+Each object is signed once per call, from its own source, so a private image
+keeps working however long ago it was uploaded. A reference that names an
+object that no longer exists is left as it is. `storageReference(key,
+storageId?)` builds one, for text you write yourself.
+
 ## Download a File
 
 Retrieve a file as a `File` object:

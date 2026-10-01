@@ -1,3 +1,4 @@
+import { DEFAULT_STORAGE_SOURCE_KEY } from "../types/storage_source";
 /**
  * Path prefix that marks an object as **public**. Files stored under this
  * prefix are served without any auth token via a stable, permanent,
@@ -33,6 +34,183 @@ export function isPublicStoragePath(path: string | null | undefined): boolean {
     // private. Named buckets: pass the key (not `bucket/key`) so the prefix is
     // anchored; otherwise it falls back to a private, token-scoped URL (safe).
     return p.startsWith(PUBLIC_STORAGE_PREFIX) || p.startsWith(`default/${PUBLIC_STORAGE_PREFIX}`);
+}
+
+/**
+ * The scheme of a **storage reference**: a stored object named inside text.
+ *
+ * Text that embeds a file — a markdown body above all — cannot hold a private
+ * object's URL: that URL carries a download token which expires in minutes,
+ * after which every reader of the text gets a 401 for an image that is still in
+ * the bucket. It holds a reference instead,
+ * `rebase-storage:posts/cover.png` (`?storageId=media` for a named source),
+ * and whoever renders the text exchanges each reference for a fresh URL with
+ * {@link resolveStorageReferences} — `resolveStorageReferences(text, client)`
+ * from `@rebasepro/client` on a site.
+ *
+ * @group Models
+ */
+export const STORAGE_REFERENCE_SCHEME = "rebase-storage:";
+
+/**
+ * The object a storage reference names.
+ *
+ * @group Models
+ */
+export interface StorageReferenceTarget {
+    /** The object's key in its storage source. */
+    key: string;
+    /** The named storage source holding it. Absent for the default source. */
+    storageId?: string;
+}
+
+/**
+ * `encodeURIComponent`, plus the five characters it leaves alone that end or
+ * break a markdown link destination: `(`, `)`, `'`, `!` and `*`.
+ */
+const encodeReferencePart = (part: string): string =>
+    encodeURIComponent(part).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+
+/**
+ * A reference as it appears in text: the scheme, then the characters
+ * {@link storageReference} writes. Kept beside {@link STORAGE_REFERENCE_SCHEME};
+ * the test round-trips names chosen to break it.
+ */
+const STORAGE_REFERENCE_PATTERN = /rebase-storage:[A-Za-z0-9\-._~%/?=&]+/g;
+
+/**
+ * The reference for an object — what text stores in place of its URL.
+ *
+ * Every part is percent-encoded, so the reference contains no space,
+ * parenthesis or quote and survives as one markdown link destination whatever
+ * the file was called.
+ *
+ * @group Models
+ */
+export function storageReference(key: string, storageId?: string | null): string {
+    const path = key.replace(/^\/+/, "").split("/").map(encodeReferencePart).join("/");
+    const named = storageId && storageId !== DEFAULT_STORAGE_SOURCE_KEY
+        ? `?storageId=${encodeReferencePart(storageId)}`
+        : "";
+    return `${STORAGE_REFERENCE_SCHEME}${path}${named}`;
+}
+
+/**
+ * Whether a string — an image's `src`, a link's `href` — is a storage reference.
+ *
+ * @group Models
+ */
+export function isStorageReference(value: string | null | undefined): value is string {
+    return typeof value === "string" && value.startsWith(STORAGE_REFERENCE_SCHEME);
+}
+
+/**
+ * The object a storage reference names, or `null` for anything else — a URL, a
+ * bare key, or a reference whose key would climb out of its prefix.
+ *
+ * @group Models
+ */
+export function parseStorageReference(value: string | null | undefined): StorageReferenceTarget | null {
+    if (!isStorageReference(value)) return null;
+    const rest = value.slice(STORAGE_REFERENCE_SCHEME.length);
+    const queryAt = rest.indexOf("?");
+    const rawPath = queryAt === -1 ? rest : rest.slice(0, queryAt);
+    const query = queryAt === -1 ? "" : rest.slice(queryAt + 1);
+
+    let key: string;
+    let storageId: string | undefined;
+    try {
+        key = rawPath.split("/").map(decodeURIComponent).join("/");
+        for (const pair of query.split("&")) {
+            const [name, raw] = pair.split("=");
+            if (name === "storageId" && raw) storageId = decodeURIComponent(raw);
+        }
+    } catch {
+        return null;
+    }
+    if (!key || key.split("/").some((segment) => segment === "..")) return null;
+    return storageId && storageId !== DEFAULT_STORAGE_SOURCE_KEY ? { key, storageId } : { key };
+}
+
+/**
+ * Where {@link resolveStorageReferences} gets URLs from: a function that
+ * answers one, or anything shaped like a Rebase client — its `storage` for the
+ * default source and `createStorageSource(id)` for a named one.
+ *
+ * @group Models
+ */
+export type StorageReferenceResolver =
+    | ((target: StorageReferenceTarget) => Promise<string | null | undefined>)
+    | {
+        storage?: StorageSource;
+        createStorageSource?(storageId: string): StorageSource;
+    };
+
+/**
+ * Exchange every storage reference in `text` for a URL, at the moment the text
+ * is rendered.
+ *
+ * ```ts
+ * const html = markdown.render(await resolveStorageReferences(post.body, client));
+ * ```
+ *
+ * Each distinct object is asked for once — `getSignedUrl(key)` on its source —
+ * so a private object gets a freshly minted download URL every time the text is
+ * rendered. A reference that cannot be resolved (no such object, an unknown
+ * source) is left as it was, so a missing object reads as a missing image
+ * rather than as a failed render.
+ *
+ * @group Models
+ */
+export async function resolveStorageReferences(
+    text: string,
+    from: StorageReferenceResolver
+): Promise<string> {
+    if (!text || !text.includes(STORAGE_REFERENCE_SCHEME)) return text;
+    const resolve = typeof from === "function" ? from : resolverFromSources(from);
+    const references = new Set(text.match(STORAGE_REFERENCE_PATTERN) ?? []);
+    const urls = new Map<string, string>();
+    await Promise.all([...references].map(async (reference) => {
+        const target = parseStorageReference(reference);
+        if (!target) return;
+        try {
+            const url = await resolve(target);
+            if (url) urls.set(reference, url);
+        } catch {
+            // Left as it was: one unreadable object must not fail the page.
+        }
+    }));
+    if (urls.size === 0) return text;
+    return text.replace(STORAGE_REFERENCE_PATTERN, (reference) => {
+        const url = urls.get(reference);
+        return url === undefined ? reference : asLinkDestination(url);
+    });
+}
+
+/**
+ * A URL as one markdown link destination: whitespace, parentheses, angle
+ * brackets and quotes percent-encoded, since any of them ends the destination
+ * and turns the image into literal text. The URL means the same thing either
+ * way.
+ */
+const asLinkDestination = (url: string): string =>
+    url.replace(/[\s()<>"']/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`);
+
+/** A resolver over a client's storage sources, one source per named key. */
+function resolverFromSources(
+    client: Exclude<StorageReferenceResolver, (target: StorageReferenceTarget) => unknown>
+): (target: StorageReferenceTarget) => Promise<string | null> {
+    const named = new Map<string, StorageSource | undefined>();
+    return async ({ key, storageId }) => {
+        let source = client.storage;
+        if (storageId) {
+            if (!named.has(storageId)) named.set(storageId, client.createStorageSource?.(storageId));
+            source = named.get(storageId);
+        }
+        if (!source) return null;
+        const config = await source.getSignedUrl(key);
+        return config.fileNotFound ? null : config.url;
+    };
 }
 
 /**

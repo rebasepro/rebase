@@ -1,5 +1,5 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { resourceKeyOf } from "@rebasepro/types";
+import { resourceKeyOf, storageReference } from "@rebasepro/types";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { useAuthController, useStorageSource } from "@rebasepro/app";
@@ -21,6 +21,7 @@ import {
 import type { RichTextEditorProps } from "../../editor";
 import { resolveStorageFilenameString, resolveStoragePathString } from "@rebasepro/common";
 import { randomString } from "@rebasepro/utils";
+import { useImageSrcResolver } from "../../hooks/useStorageReferenceResolver";
 
 // Lazy-load ProseMirror editor + markdown parser/serializer (~300KB)
 // Only fetched when a markdown field is actually rendered.
@@ -96,11 +97,15 @@ export function MarkdownEditorFieldBinding({
 
     // Resolve the correct storage source for this property.
     // Mirrors the resolution in useStorageUploadController.
+    const storageSourceKey = storage?.storageSource === undefined ? undefined : resourceKeyOf(storage.storageSource);
     const storageSource = useMemo(() => resolveStorageSource({
-        sourceKey: storage?.storageSource === undefined ? undefined : resourceKeyOf(storage.storageSource),
+        sourceKey: storageSourceKey,
         sources: storageSources.sources,
         defaultSource: defaultStorageSource
-    }), [storage?.storageSource, storageSources.sources, defaultStorageSource]);
+    }), [storageSourceKey, storageSources.sources, defaultStorageSource]);
+
+    // How the editor shows an image the text names by reference.
+    const resolveImageSrc = useImageSrcResolver();
 
     const entityValues = context.values;
     const entityId = context.entityId;
@@ -212,13 +217,15 @@ export function MarkdownEditorFieldBinding({
                 file,
                 key
             });
-            const downloadConfig = await storageSource.getSignedUrl(result.key);
-            const url = downloadConfig.url;
-            if (!url) {
-                throw new Error("Error uploading image");
-            }
-            return url;
+            // The text keeps a reference to the object, never its URL. A
+            // private object's URL carries a download token that expires in
+            // minutes, and this text is saved — so the post showed a broken
+            // image, in this panel and on every site that published it, five
+            // minutes after the upload. Whoever renders the text asks for a
+            // URL then (`resolveStorageReferences`).
+            return storageReference(result.key, storageSourceKey);
         }}
+        resolveImageSrc={resolveImageSrc}
         {...editorProps}
     />
     </Suspense>;

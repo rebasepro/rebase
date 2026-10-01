@@ -63,6 +63,13 @@ export type { PaginationErrorCode } from "@rebasepro/common";
 // Logical-condition helpers for `.where(or(...), and(...))`.
 export { QueryBuilder, or, and, not, cond } from "@rebasepro/common";
 
+// Files named inside text — a markdown body's images. The text stores a
+// `rebase-storage:` reference, never a URL whose download token expires;
+// `resolveStorageReferences(text, client)` exchanges each one for a fresh URL
+// when the text is rendered.
+export { resolveStorageReferences, storageReference, parseStorageReference, isStorageReference, STORAGE_REFERENCE_SCHEME } from "@rebasepro/types";
+export type { StorageReferenceTarget, StorageReferenceResolver } from "@rebasepro/types";
+
 // Auth: session/token types, config, and the pluggable storage strategies.
 export { createCookieStorage, createMemoryStorage } from "./auth";
 export type { AuthConfig, AuthStorage, CookieStorageOptions, CreateAuthOptions } from "./auth";

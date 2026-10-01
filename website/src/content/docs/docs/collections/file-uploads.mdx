@@ -92,6 +92,20 @@ upload that names no property — an older client, a direct call — still falls
 back to the global cap, because a request with no property context has no
 property rule to check, and refusing it would break clients that predate this.
 
+### Images in a markdown field
+
+A markdown property (`admin.markdown: true`) with a `storage` block takes image
+uploads in its editor. The text stores each image as a **storage reference** —
+`![](rebase-storage:posts/abc_cover.png)` — not as a URL: a private file's URL
+carries a download token that expires in minutes, and the text is saved. The
+admin panel's editor and previews exchange each reference for a fresh URL when
+they show it; a site that renders the field does the same with
+`resolveStorageReferences(text, client)` — see
+[Files inside text](/docs/sdk/storage#files-inside-text).
+
+Text saved before this change holds the URLs themselves, and their tokens have
+expired; re-insert those images to store references.
+
 ### Where the file is allowed to go
 
 `storagePath` is a default, not a boundary: nothing on the server confines an

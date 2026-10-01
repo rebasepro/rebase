@@ -10,7 +10,7 @@ import { useAuthController, useCustomizationController, resolveComponentRef } fr
 import { EmptyValue } from "./components/EmptyValue";
 import { UrlComponentPreview } from "./components/UrlComponentPreview";
 import { StorageThumbnail } from "./components/StorageThumbnail";
-import { Markdown } from "@rebasepro/ui";
+import { StorageMarkdown } from "./components/StorageMarkdown";
 import { StringPropertyPreview } from "./property_previews/StringPropertyPreview";
 import { ArrayPropertyPreview } from "./property_previews/ArrayPropertyPreview";
 import { ArrayOfReferencesPreview } from "./property_previews/ArrayOfReferencesPreview";
@@ -115,7 +115,9 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
             } else if (stringProperty.admin?.markdown) {
                 content = compact
                     ? <span className={"text-sm"}>{markdownToPlainText(value)}</span>
-                    : <Markdown source={value} size={"small"}/>;
+                    // Images stored by reference get a fresh URL here, each
+                    // time — the editor writes no URLs into the text.
+                    : <StorageMarkdown source={value} size={"small"}/>;
             } else if (stringProperty.userSelect) {
                 content = <UserPreview
                     value={value}

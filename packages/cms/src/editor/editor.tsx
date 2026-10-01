@@ -29,6 +29,12 @@ export type RichTextEditorProps = {
   onJsonContentChange?: (content: JSONContent | null) => void,
   onHtmlContentChange?: (content: string) => void,
   handleImageUpload: (file: File) => Promise<string>,
+  /**
+   * Turns an image's stored `src` into a URL to show. `handleImageUpload`
+   * returns a `rebase-storage:` reference to keep in the text — a private
+   * object's URL expires — and the editor asks this for a URL to display it.
+   */
+  resolveImageSrc?: (src: string) => Promise<string | null | undefined>,
   version?: number,
   textSize?: RichTextEditorTextSize,
   highlight?: { from: number, to: number },
@@ -53,6 +59,7 @@ export const RichTextEditor = ({
   textSize = "base",
   highlight,
   handleImageUpload,
+  resolveImageSrc,
   aiController,
   disabled
 }: RichTextEditorProps) => {
@@ -142,7 +149,8 @@ onJsonContentChange };
   const { state, view, editorRef } = useProseMirror({
     initialContent: content,
     editable: !disabled,
-    handleImageUpload
+    handleImageUpload,
+    resolveImageSrc
   });
 
   // When `version` changes externally (e.g. form discard/reset), re-parse the

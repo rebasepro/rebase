@@ -1,7 +1,8 @@
 
 import React, { memo, useCallback, useMemo } from "react";
 import { Entity } from "@rebasepro/types";
-import { Checkbox, Chip, cls, defaultBorderMixin, Markdown } from "@rebasepro/ui";
+import { Checkbox, Chip, cls, defaultBorderMixin } from "@rebasepro/ui";
+import { StorageMarkdown } from "../../preview/components/StorageMarkdown";
 import { PropertyPreview } from "../../preview";
 import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
@@ -178,7 +179,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
                     {slots.subtitle ? (
                         <div className="text-xs text-surface-500 mt-1 line-clamp-3 opacity-80">
                             {typeof slots.subtitle.value === "string" ? (
-                                <Markdown source={slots.subtitle.value} size="small" />
+                                <StorageMarkdown source={slots.subtitle.value} size="small" />
                             ) : (
                                 <SlotValue slot={slots.subtitle} size="small"/>
                             )}

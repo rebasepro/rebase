@@ -5,7 +5,7 @@ import { schema } from "../schema";
 import { getCorePlugins } from "../plugins";
 import { parser } from "../markdown";
 import { nodeViews } from "../nodeViews";
-import { createDropImagePlugin } from "../extensions/Image";
+import { createDropImagePlugin, createImageSrcResolverPlugin, type ImageSrcResolver } from "../extensions/Image";
 import { columnResizing, tableEditing } from "prosemirror-tables";
 import { parseSanitizedHtml } from "../sanitize-html";
 
@@ -23,14 +23,23 @@ interface UseProseMirrorProps {
     initialContent?: string | any;
     editable?: boolean;
     handleImageUpload?: (file: File) => Promise<string>;
+    /** See {@link RichTextEditorProps.resolveImageSrc}. */
+    resolveImageSrc?: ImageSrcResolver;
 }
 
-export function useProseMirror({ initialContent, editable = true, handleImageUpload }: UseProseMirrorProps) {
+export function useProseMirror({ initialContent, editable = true, handleImageUpload, resolveImageSrc }: UseProseMirrorProps) {
+    // The view is built once, so the plugin holds a function that reads the
+    // latest resolver rather than the first one — storage sources can arrive
+    // after the editor mounts.
+    const resolveImageSrcRef = useRef(resolveImageSrc);
+    resolveImageSrcRef.current = resolveImageSrc;
+
     const plugins = [
         ...getCorePlugins(),
         columnResizing(),
         tableEditing(),
-        trailingNodePlugin
+        trailingNodePlugin,
+        createImageSrcResolverPlugin(async (src) => resolveImageSrcRef.current ? resolveImageSrcRef.current(src) : undefined)
     ];
     if (handleImageUpload) {
         plugins.push(createDropImagePlugin(handleImageUpload));

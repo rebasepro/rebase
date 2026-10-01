@@ -1,8 +1,52 @@
 import { cls, defaultBorderMixin } from "@rebasepro/ui";
 import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
-import { Plugin, PluginKey } from "prosemirror-state";
+import { EditorState, Plugin, PluginKey } from "prosemirror-state";
+import { isStorageReference } from "@rebasepro/types";
 
 export type UploadFn = (image: File) => Promise<string>;
+
+/**
+ * Turns an image's stored `src` into one a browser can load.
+ *
+ * An uploaded image is stored as a `rebase-storage:` reference rather than a
+ * URL — a private object's URL carries a token that expires in minutes — so
+ * the editor asks for a URL each time it shows one.
+ */
+export type ImageSrcResolver = (src: string) => Promise<string | null | undefined>;
+
+const ImageSrcResolverKey = new PluginKey<ImageSrcResolver | undefined>("imageSrcResolver");
+
+/**
+ * Carries the resolver to the image node views. They render in their own React
+ * roots (see `ReactNodeView`), out of reach of any context, so the editor state
+ * is where they can find it.
+ */
+export const createImageSrcResolverPlugin = (resolve: ImageSrcResolver): Plugin =>
+    new Plugin<ImageSrcResolver | undefined>({
+        key: ImageSrcResolverKey,
+        state: {
+            init: () => resolve,
+            apply: (_tr, value) => value
+        }
+    });
+
+/** The resolver this editor was given, if any. */
+export function imageSrcResolverOf(state: EditorState): ImageSrcResolver | undefined {
+    return ImageSrcResolverKey.getState(state);
+}
+
+/**
+ * The URL to load for a stored `src`: a reference resolved, anything else as
+ * it is, and `undefined` for a reference this editor cannot resolve.
+ */
+export async function loadableImageSrc(state: EditorState, src: string): Promise<string | undefined> {
+    if (!isStorageReference(src)) return src;
+    try {
+        return (await imageSrcResolverOf(state)?.(src)) ?? undefined;
+    } catch {
+        return undefined;
+    }
+}
 
 export async function onFileRead(view: EditorView, readerEvent: ProgressEvent<FileReader>, pos: number, upload: UploadFn, image: File) {
 
@@ -54,9 +98,15 @@ export async function onFileRead(view: EditorView, readerEvent: ProgressEvent<Fi
         view.dispatch(tr);
     };
 
-    // Preload the image so it doesn't cause a layout shift when replacing the placeholder
+    // Preload the image so it doesn't cause a layout shift when replacing the
+    // placeholder — from a URL, since what the upload returns is a reference.
+    const preloadUrl = await loadableImageSrc(view.state, src);
+    if (!preloadUrl) {
+        replacePlaceholder();
+        return;
+    }
     const preloader = new Image();
-    preloader.src = src;
+    preloader.src = preloadUrl;
     preloader.onload = replacePlaceholder;
     preloader.onerror = replacePlaceholder;
 }

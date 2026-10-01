@@ -12,11 +12,11 @@ class CollectionConfigError { hint }
 class CronScheduler { fetchJob, fetchJobs, getJob, getJobLogs, getJobLogsFromDb, jobIdsWhere, listJobs, listRejectedJobs, persistJobEnabled, registerJobs, setClient, setJobEnabled, setStore, start, stop, triggerJob }
 class DefaultDriverRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
-class GCSStorageController { deleteObject, getMetadata, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
-class LocalStorageController { deleteObject, getAbsolutePath, getBasePath, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
+class GCSStorageController { deleteObject, getMetadata, getObject, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject }
+class LocalStorageController { deleteObject, getAbsolutePath, getBasePath, getObject, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject }
 class MetricsRegistry { incrementCounter, recordRequest, render, setGauge, startedAt }
 class RawHtml { toString, value }
-class S3StorageController { deleteObject, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
+class S3StorageController { deleteObject, getObject, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject }
 class SMTPEmailService { isConfigured, send, verifyConnection }
 class StoragePolicyError
 class TransformCache { buildKey, get, set }
@@ -324,7 +324,7 @@ interface QueryOptions { cursor, distinct, fields, include, limit, logical, offs
 interface RealtimeProvider { destroy, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RebaseApiError { code, details, statusCode }
 interface RebaseAuthConfig { accessExpiresIn, activeKid, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, captcha, collection, cookieAuth, defaultRole, disableSelfRegistration, discord, email, emailOtp, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, microsoft, providers, refreshExpiresIn, requireAuth, serviceKey, signingKeys, slack, spotify, twitter }
-interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, callbacks, collections, collectionsDir, compression, corsHandled, cronPersistence, cronsDir, csrf, database, enableSwagger, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, jobs, liveSchema, logging, maxBodySize, ownership, provisionSchema, provisioningDriverResult, rateLimit, rlsAudit, runtimeVersion, schemaEditor, schemaVersion, server, storage, storageAuthorize, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces }
+interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, callbacks, collections, collectionsDir, compression, corsHandled, cronPersistence, cronsDir, csrf, database, enableSwagger, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, jobs, liveSchema, logging, maxBodySize, ownership, provisionSchema, provisioningDriverResult, rateLimit, rlsAudit, runtimeVersion, schemaEditor, schemaVersion, server, storage, storageAuthorize, storageDownloadTokenTtl, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageRenditionCache, storageTriggers, surfaces }
 interface RebaseBackendInstance { auth, collectionRegistry, cronScheduler, driver, driverRegistry, healthCheck, history, jobQueue, metricsHistory, realtimeService, realtimeServices, setCollectionCallbacks, shutdown, storageController, storageRegistry }
 interface RebaseFunctionContext { rebase }
 interface RecoveryCode { id, uid, usedAt }
@@ -350,11 +350,11 @@ interface SingleSubscriptionConfig { clientId, id, path }
 interface StorageAuthorizeContext { bucket, data, key, operation, storageId, user }
 interface StorageAuthorizeData { collection }
 interface StorageAuthorizeUser { email, roles, uid }
-interface StorageController { deleteObject, getMetadata, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
+interface StorageController { deleteObject, getMetadata, getObject, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject }
 interface StoragePolicy { allow, operations, path }
 interface StoragePolicyContext { bucket, data, key, operation, params, storageId, user }
 interface StorageRegistry { get, getDefault, getOrDefault, has, list, register, size }
-interface StorageRoutesConfig { authAdapter, authorize, authorizeData, basePath, controller, maxFileSize, publicRead, registry, renditionCache, requireAuth, sources, triggers, uploadConstraints }
+interface StorageRoutesConfig { authAdapter, authorize, authorizeData, basePath, controller, downloadTokenTtlSeconds, maxFileSize, publicRead, registry, renditionCache, requireAuth, sources, triggers, uploadConstraints }
 interface TokenRepository { createMagicLinkToken, createPasswordResetToken, createRefreshToken, deleteAllPasswordResetTokensForUser, deleteAllRefreshTokensForUser, deleteExpiredTokens, deleteRefreshToken, deleteRefreshTokenById, findRefreshTokenByHash, findValidMagicLinkToken, findValidPasswordResetToken, getTokensValidAfter, listRefreshTokensForUser, markMagicLinkTokenUsed, markPasswordResetTokenUsed, markRefreshTokenRotated, pruneRefreshTokens, revokeRefreshTokenSession, setTokensValidAfter }
 interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
 interface UploadConstraints { acceptedFiles, maxSize, source }
@@ -460,6 +460,7 @@ const RLS_ROLES_SQL
 const RLS_UID_SQL
 const RUNTIME_CONTRACT_VERSION
 const SCHEMA_VERSION_HEADER
+const STORAGE_REFERENCE_SCHEME
 const policy { and, authClaim, authRoles, authUid, authenticated, compare, existsIn, false, field, literal, not, or, outerField, raw, registered, rolesContain, rolesOverlap, serverContext, true }
 function amendResourceKind
 function bucket
@@ -504,6 +505,7 @@ function isSQLAdmin
 function isSchemaAdmin
 function isSchemaEditingAdmin
 function isSerializedCollectionRef
+function isStorageReference
 function isTenantClaimSource
 function isTenantMembershipSource
 function isToMany
@@ -516,6 +518,7 @@ function nestAdminPropertyKeys
 function parseAppAddress
 function parseEnvBoolean
 function parseRelationAggregateSort
+function parseStorageReference
 function queue
 function registerDataSourceCapabilities
 function registerResourceKind
@@ -525,6 +528,7 @@ function resetDeclaredResources
 function resetDeclaredSubscriptions
 function resolveClientListLimit
 function resolveResourceRefs
+function resolveStorageReferences
 function resourceEnvSuffix
 function resourceId
 function resourceKeyOf
@@ -538,6 +542,7 @@ function setQueueRuntime
 function setTopicRuntime
 function sortKeyToString
 function storageEnvSuffix
+function storageReference
 function toCanonicalOp
 function topic
 function unsupportedMethod
@@ -786,6 +791,7 @@ interface StorageAuthorizeData { collection }
 interface StorageAuthorizeUser { email, roles, uid }
 interface StorageListResult { items, nextPageToken, prefixes }
 interface StorageReference { bucket, fullPath, name, parent, root, toString }
+interface StorageReferenceTarget { key, storageId }
 interface StorageSource { deleteObject, getObject, getSignedUrl, listObjects, putObject }
 interface StorageSourceDefinition { account, default, engine, key, label, transport }
 interface StorageSourceRegistry { get, getDefault, getOrDefault, has, list }
@@ -941,6 +947,7 @@ type SortKey
 type StorageAuthorize
 type StorageConfig { acceptedFiles, fileName, imageResize, includeBucketUrl, maxSize, metadata, postProcess, previewUrl, processFile, public, storagePath, storageSource, storeUrl }
 type StorageOperation
+type StorageReferenceResolver
 type StorageSourceTransport
 type StrictProperties
 type TenantSource
@@ -964,6 +971,7 @@ class RebaseClientError { code, details, requestId, retryAfterSeconds, status }
 class RebasePaginationError { code }
 class RebaseRealtimeChannel { broadcast, enableHistory, history, join, leave, name, onBroadcast, onBroadcast, onError, onPresence, sequence, track, untrack }
 class RebaseWebSocketClient { authenticate, checkUniqueField, count, createBranch, delete, deleteBranch, disconnect, ensureConnected, executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCollection, fetchCurrentDatabase, fetchOne, fetchTableMetadata, fetchUnmappedTables, getAuthToken, hasSocket, listBranches, listenCollection, listenOne, on, onChannelMessage, onReconnect, onUnauthorized, reauthenticate, save, sendMessage, setAuthTokenGetter }
+const STORAGE_REFERENCE_SCHEME
 function and
 function cond
 function createBackups { download, list }
@@ -972,8 +980,12 @@ function createMemoryStorage
 function createRebaseClient
 function etagOf
 function isOfflineError
+function isStorageReference
 function not
 function or
+function parseStorageReference
+function resolveStorageReferences
+function storageReference
 interface AdminUser { createdAt, displayName, email, metadata, photoURL, providerId, roles, uid, updatedAt }
 interface ApiKeyMasked { admin, created_at, created_by, expires_at, id, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiKeyPermission { collection, operations }
@@ -1019,6 +1031,7 @@ interface RebaseSession { accessToken, expiresAt, refreshToken, user }
 interface RowSnapshotMeta { fromCache, hasPendingWrites }
 interface SDKCollectionClient { after, aggregate, count, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, upsert, vectorSearch, where, where, where }
 interface SDKQueryBuilderInterface { after, aggregate, count, distinct, fields, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
+interface StorageReferenceTarget { key, storageId }
 interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
 interface UpsertOptions { idempotencyKey, ifMatch, onConflict, returning }
 type AuthChangeEvent
@@ -1034,6 +1047,7 @@ type IterateParams
 type PaginationErrorCode
 type PresenceState
 type RebaseErrorCode
+type StorageReferenceResolver
 type UpdateValues
 type User { claims, createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, photoURL, providerId, roles, uid }
 
