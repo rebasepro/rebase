@@ -161,7 +161,7 @@ interface NestedPath {
  * `Idempotency-Key`, the same answer. It was two pipelines, and the nested one
  * re-listed two of the root's checks by hand and skipped the rest.
  */
-interface RowAddress {
+export interface RowAddress {
     /** The collection the row belongs to: what a body is checked against and an `ETag` computed for. */
     collection: CollectionConfig;
     /**
@@ -940,7 +940,7 @@ export class RestApiGenerator {
      *   and a tag compared against a read that hides it compares against
      *   nothing.
      */
-    private async rowForETag(
+    static async rowForETag(
         driver: DataDriver,
         address: RowAddress,
         id: string,
@@ -963,7 +963,7 @@ export class RestApiGenerator {
      * relation was a 412. A narrowed read therefore takes its tag from
      * {@link rowForETag}, the read the write routes make.
      */
-    private async readRow(
+    static async readRow(
         driver: DataDriver,
         address: RowAddress,
         id: string,
@@ -988,7 +988,7 @@ export class RestApiGenerator {
         // two then leaves the tag older than the body — a 412 the caller
         // recovers from by reading again — and never newer, which would pass a
         // write made against the older body over the change it never saw.
-        const tagged = narrowed ? await this.rowForETag(driver, address, id, undefined, withDeleted) : undefined;
+        const tagged = narrowed ? await RestApiGenerator.rowForETag(driver, address, id, undefined, withDeleted) : undefined;
         // `fields` reaches the driver as a projection: the same columns a list
         // read would select, so one row and a page of them cost the same per
         // row rather than the get route paying for every column.
@@ -1156,7 +1156,7 @@ export class RestApiGenerator {
             if (ifMatch) {
                 await assertIfMatch(
                     ifMatch,
-                    await this.rowForETag(driver, address, id, existingEntity, restoring),
+                    await RestApiGenerator.rowForETag(driver, address, id, existingEntity, restoring),
                     collection,
                     { collection: collection.slug, id }
                 );
@@ -1224,7 +1224,7 @@ export class RestApiGenerator {
                 // safe once somebody else has edited it in between.
                 await assertIfMatch(
                     ifMatch,
-                    await this.rowForETag(driver, address, id, existingEntity, hardDelete ? true : undefined),
+                    await RestApiGenerator.rowForETag(driver, address, id, existingEntity, hardDelete ? true : undefined),
                     collection,
                     { collection: collection.slug, id }
                 );
@@ -1272,7 +1272,7 @@ export class RestApiGenerator {
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
             const driver = this.getScopedDriver(c);
 
-            const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
+            const total = await RestApiGenerator.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
             return c.json({ count: total });
         });
 
@@ -1372,7 +1372,7 @@ export class RestApiGenerator {
 
             const driver = this.getScopedDriver(c);
 
-            const page = await this.readPage(
+            const page = await RestApiGenerator.readPage(
                 driver, resolvedCollection, queryOptions, searchString, searchExplain
             );
 
@@ -1390,7 +1390,7 @@ export class RestApiGenerator {
             const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
             const driver = this.getScopedDriver(c);
 
-            const read = await this.readRow(driver, ownRow(getCollectionDataPath(collection)), String(id), queryOptions);
+            const read = await RestApiGenerator.readRow(driver, ownRow(getCollectionDataPath(collection)), String(id), queryOptions);
             if (!read) {
                 throw this.entityNotFound(collection.slug, String(id));
             }
@@ -1805,7 +1805,7 @@ id };
                 // added to the others was missed here in turn — the logical
                 // group first, then `?deleted=`, so a trash view's count
                 // reported the live rows.
-                const total = await this.countRawEntities(
+                const total = await RestApiGenerator.countRawEntities(
                     driver, nestedCollection, queryOptions, searchString, nested.path
                 );
 
@@ -1813,7 +1813,7 @@ id };
             } else if (parsed.id) {
                 // GET /parent/:parentId/child/:id — single entity
                 const queryOptions = this.parseQuery(c.req.queries(), nestedAccess);
-                const read = await this.readRow(driver, nestedRow(nested), parsed.id, queryOptions);
+                const read = await RestApiGenerator.readRow(driver, nestedRow(nested), parsed.id, queryOptions);
                 if (!read) throw this.entityNotFound(nested.path, parsed.id);
 
                 // The same tag the row's own address hands out, so a nested
@@ -1848,7 +1848,7 @@ id };
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
                 const searchExplainRaw = Array.isArray(queryDict.searchExplain) ? queryDict.searchExplain[queryDict.searchExplain.length - 1] : undefined;
 
-                const page = await this.readPage(
+                const page = await RestApiGenerator.readPage(
                     driver,
                     // The collection hoisted above, not a second lookup of the
                     // same path: one resolve, so the access check and the read
@@ -1993,7 +1993,7 @@ id };
      * @param collectionPath the path to read — a nested listing passes its own
      *   `parent/:id/child` path, which the driver resolves.
      */
-    private async readPage(
+    static async readPage(
         driver: DataDriver,
         collection: CollectionConfig,
         queryOptions: QueryOptions,
@@ -2044,7 +2044,7 @@ id };
                 },
                 queryOptions.include
             )
-            : await this.fetchRawCollection(
+            : await RestApiGenerator.fetchRawCollection(
                 driver, collection, { ...queryOptions, limit: probeLimit }, searchString, searchExplain, path, startAfter
             );
 
@@ -2053,7 +2053,7 @@ id };
             ? (fetched as Record<string, unknown>[]).slice(0, limit)
             : fetched as Record<string, unknown>[];
 
-        const total = await this.countRawEntities(driver, collection, queryOptions, searchString, path);
+        const total = await RestApiGenerator.countRawEntities(driver, collection, queryOptions, searchString, path);
 
         const rows = projectResponseFields(
             entities,
@@ -2102,7 +2102,7 @@ id };
     /**
      * Fetch raw collection data without Entity wrapper (fallback for non-Postgres)
      */
-    private async fetchRawCollection(
+    static async fetchRawCollection(
         driver: DataDriver,
         collection: CollectionConfig,
         queryOptions: QueryOptions,
@@ -2151,7 +2151,7 @@ id };
     /**
      * Count raw entities for a collection
      */
-    private async countRawEntities(
+    static async countRawEntities(
         driver: DataDriver,
         collection: CollectionConfig,
         queryOptions: QueryOptions,

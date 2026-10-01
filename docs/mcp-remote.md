@@ -111,12 +111,39 @@ Two, and no more:
 
 | Scope | What it grants |
 |---|---|
-| `mcp:read` | `list_collections`, `query_collection`, `get_document` |
+| `mcp:read` | `list_collections`, `query_collection`, `count_documents`, `get_document` |
 | `mcp:write` | The above plus `create_document`, `update_document`, `delete_document` |
 
 A scope decides whether a tool is *offered*. It is not the access-control
 mechanism — a `mcp:write` token still cannot write a row the user could not
 write themselves.
+
+## The tools speak REST
+
+The arguments are the SDK's — `where`, `orderBy`, `limit`, `offset`,
+`searchString`, and `data` for a write — and a read's arguments are handed to
+the REST list route's own parser (`parseQueryOptions`) as the query string the
+SDK would send. The reads then go through REST's own read path
+(`RestApiGenerator.readPage` / `readRow` / `countRawEntities`), so:
+
+- a row is the row `GET /api/data/<collection>` serves: dates as ISO strings, a
+  `belongsTo` as its foreign key (`authorId`), never the admin view model's
+  `{ "__type": "date" }` envelope or an embedded related row — which is what
+  lets a model send a row it read back in `update_document`;
+- `query_collection` answers REST's list body, `{ data, meta }`, and
+  `count_documents` answers `/count`'s `{ count }`;
+- every refusal is REST's, in REST's words: an unknown field or operator, a
+  field the caller's roles cannot read, a `limit` past the ceiling (refused,
+  not clamped).
+
+An undeclared argument is refused rather than ignored: an ignored `filter`
+where the tool reads `where` would be an unfiltered read that looks like an
+answer. An update or delete first reads its row the way REST's routes do, so a
+row in the trash is "No row with id …", as REST's 404 — except a restore, which
+sets the soft-delete field back to `null`.
+
+`packages/server-postgres/test/e2e/mcp-tools-e2e.test.ts` runs the tools on the
+real driver beside the REST routes and compares the answers.
 
 ## The consent screen
 

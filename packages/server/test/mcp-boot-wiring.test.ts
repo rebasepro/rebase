@@ -245,6 +245,8 @@ describe("when it does mount", () => {
         const deleted: unknown[] = [];
         const driver = capableDriver() as DataDriver & Record<string, unknown>;
         driver.withAuth = async () => driver;
+        // The row exists: the tool reads it before deleting, as REST does.
+        driver.fetchOne = async () => ({ id: "admin-1" });
         driver.delete = async (props: unknown) => { deleted.push(props); };
         const users = {
             slug: "users",

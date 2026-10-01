@@ -550,11 +550,23 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` limits it
   to clients you register), and sends the person to a consent screen that signs
   them in through your existing `/auth/login`.
-- **Six tools, two scopes.** `mcp:read` offers `list_collections`,
-  `query_collection` and `get_document`; `mcp:write` adds `create_document`,
-  `update_document` and `delete_document`. A scope decides which tools are
-  offered, not which rows: an empty list can be RLS working, and `mcp:write` still
-  cannot write a row the person could not.
+- **Seven tools, two scopes.** `mcp:read` offers `list_collections`,
+  `query_collection`, `count_documents` and `get_document`; `mcp:write` adds
+  `create_document`, `update_document` and `delete_document`. A scope decides
+  which tools are offered, not which rows: an empty list can be RLS working, and
+  `mcp:write` still cannot write a row the person could not.
+- **The SDK's vocabulary, REST's answers.** The tools take the arguments the SDK
+  and the local server take — `where` (`{"status": ["==", "paid"]}`), `orderBy`
+  (`["created_at", "desc"]` or `"created_at:desc"`), `limit`, `offset`,
+  `searchString`, and `data` for a write — and read through the same path as
+  `GET /api/data/<collection>`. A row comes back exactly as REST serves it (dates
+  as ISO strings, a `belongsTo` as its foreign key, e.g. `authorId`), so a row
+  read can be sent back in an update unchanged. `query_collection` answers
+  REST's list body, `{ data, meta }` with `meta.total` and `meta.hasMore`;
+  `count_documents` answers `{ count }`. A `limit` above 1000 is refused, as on
+  REST, and so is an argument a tool does not declare. An edit or delete of a
+  row in the trash is refused, as REST refuses it with a 404; setting the
+  soft-delete field back to `null` restores it.
 - **A token for this endpoint only.** An MCP access token is refused by
   `/api/data`, `/api/admin` and the WebSocket, so connecting an assistant does not
   hand it a session.

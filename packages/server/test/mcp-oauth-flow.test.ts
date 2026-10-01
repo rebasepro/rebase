@@ -88,14 +88,14 @@ describe("the full flow", () => {
 
         const list = await rpc(app, token, { jsonrpc: "2.0", id: 2, method: "tools/list" });
         const listed = (await list.json() as { result: { tools: { name: string }[] } }).result.tools;
-        expect(listed.map(t => t.name)).toEqual(["list_collections", "query_collection", "get_document"]);
+        expect(listed.map(t => t.name)).toEqual(["list_collections", "query_collection", "count_documents", "get_document"]);
 
         const call = await rpc(app, token, {
             jsonrpc: "2.0", id: 3, method: "tools/call",
             params: { name: "query_collection", arguments: { collection: "candidates" } }
         });
-        const result = (await call.json() as { result: { structuredContent: { rows: unknown[] } } }).result;
-        expect(result.structuredContent.rows).toHaveLength(1);
+        const result = (await call.json() as { result: { structuredContent: { data: unknown[] } } }).result;
+        expect(result.structuredContent.data).toHaveLength(1);
 
         // The point of the whole exercise: the driver was scoped to the person
         // who consented before a single row was read.
@@ -451,7 +451,10 @@ describe("resource-server refusals", () => {
         expect(payload.result.content[0].text).toContain("Unknown collection");
     });
 
-    it("refuses a filter on a field the collection does not declare", async () => {
+    it("refuses an argument the tool does not declare", async () => {
+        // `filter` is not `where`: ignored, it would be an unfiltered read.
+        // An undeclared *field* in `where` is the driver's refusal, as on
+        // REST, and `mcp-tools-e2e` asks the real one.
         const { driver } = stubDriver();
         const { app } = buildApp({ driver });
         const { clientId, code, verifier } = await authorize(app);
@@ -466,6 +469,6 @@ describe("resource-server refusals", () => {
         });
         const payload = await res.json() as { result: { isError: boolean; content: { text: string }[] } };
         expect(payload.result.isError).toBe(true);
-        expect(payload.result.content[0].text).toContain("not a field");
+        expect(payload.result.content[0].text).toContain("\"filter\" is not an argument of query_collection");
     });
 });

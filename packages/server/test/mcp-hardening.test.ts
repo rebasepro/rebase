@@ -11,12 +11,13 @@
  * there is nothing asserting that a correct request succeeds — that is the
  * other file's job — and everything asserting that something does not happen.
  */
-import { RebaseApiError, type CollectionConfig } from "@rebasepro/types";
+import { DEFAULT_LIST_LIMIT, RebaseApiError, type CollectionConfig } from "@rebasepro/types";
 import { ApiError } from "../src/api/errors";
+import { parseQueryOptions } from "../src/api/rest/query-parser";
 import { configureJwt, generateAccessToken, generateMcpAccessToken, signPurposeToken } from "../src/auth/jwt";
 import {
     buildApp, stubDriver, authorize, redeem, connectedClient, registerClient,
-    refreshWith, rpc, pkcePair, RESOURCE, REDIRECT, JWT_SECRET
+    refreshWith, rpc, pkcePair, RESOURCE, REDIRECT, JWT_SECRET, COLLECTIONS
 } from "./helpers/mcp-harness";
 
 configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h" });
@@ -326,80 +327,111 @@ describe("tool inputs", () => {
         expect(body.result?.isError).toBe(true);
     });
 
-    it("refuses an ORDER BY on a field the collection does not declare", async () => {
-        // An identifier cannot be bound as a parameter, so whether it is safe
-        // depends on what the driver does with it. The registry is the only
-        // thing that knows which names are real.
-        const { body } = await call("query_collection", { collection: "candidates", orderBy: "id; DROP TABLE x" });
+    // The arguments are REST's: the tool hands them to the REST list route's
+    // own parser, so every refusal below is the one `GET /api/data/candidates`
+    // answers, in the same words. An undeclared field in `where` or `orderBy`
+    // is refused by the driver, as on REST — see `mcp-tools-e2e`, which runs
+    // the real one.
+    function restRefusal(query: Record<string, string>): string | undefined {
+        try {
+            parseQueryOptions(query, {}, { collection: COLLECTIONS[0] });
+            return undefined;
+        } catch (error) {
+            return (error as Error).message;
+        }
+    }
+
+    it("refuses a sort direction other than asc or desc, as REST does", async () => {
+        const { body, calls } = await call("query_collection", { collection: "candidates", orderBy: "name:sideways" });
         expect(body.result?.isError).toBe(true);
-        expect(body.result?.content[0].text).toContain("cannot be used to sort");
+        expect(body.result?.content[0].text).toBe(restRefusal({ orderBy: "name:sideways" }));
+        expect(calls.filter(c => c.method === "fetchCollection")).toHaveLength(0);
     });
 
-    it("allows ordering by a declared field and by id", async () => {
-        for (const field of ["name", "stage", "id"]) {
-            const { calls } = await call("query_collection", { collection: "candidates", orderBy: field });
+    it("sorts by the SDK's [field, direction] and by REST's field:direction alike", async () => {
+        for (const orderBy of [["name", "desc"], "name:desc", [["name", "desc"]]]) {
+            const { calls } = await call("query_collection", { collection: "candidates", orderBy });
             const args = calls.at(-1)?.args as { orderBy?: [string, string][] };
-            expect(args.orderBy).toEqual([[field, "asc"]]);
+            expect(args.orderBy).toEqual([["name", "desc"]]);
         }
     });
 
-    it("treats any order value other than desc as ascending", async () => {
-        const { calls } = await call("query_collection", { collection: "candidates", orderBy: "name", order: "sideways" });
-        const args = calls.at(-1)?.args as { orderBy?: [string, string][] };
-        expect(args.orderBy).toEqual([["name", "asc"]]);
-    });
-
-    it("refuses a filter on an undeclared field", async () => {
-        const { body } = await call("query_collection", {
-            collection: "candidates", filter: { salary: ["==", 1] }
-        });
-        expect(body.result?.isError).toBe(true);
-    });
+    it.each([["filter", { stage: ["==", "x"] }], ["order", "desc"], ["values", { name: "x" }]])(
+        "refuses `%s`, which is not an argument, rather than ignoring it",
+        async (name, value) => {
+            // An ignored `filter` is an unfiltered read that looks like an answer.
+            const { body, calls } = await call("query_collection", { collection: "candidates", [name]: value });
+            expect(body.result?.isError).toBe(true);
+            expect(body.result?.content[0].text).toContain(`"${name}" is not an argument of query_collection`);
+            expect(calls.filter(c => c.method === "fetchCollection")).toHaveLength(0);
+        }
+    );
 
     it.each([
         ["a string", "everything"],
         ["an array", ["a", "b"]],
         ["a number", 5]
-    ])("refuses %s as a filter object", async (_label, filter) => {
-        const { body } = await call("query_collection", { collection: "candidates", filter });
+    ])("refuses %s as a where object", async (_label, where) => {
+        const { body } = await call("query_collection", { collection: "candidates", where });
         expect(body.result?.isError).toBe(true);
     });
 
-    it("refuses a filter condition that is not [operator, value]", async () => {
-        for (const condition of [["=="], ["==", 1, 2], "==", 5, null]) {
+    it("refuses a where condition exactly when REST refuses it", async () => {
+        for (const condition of [["=="], ["==", 1, 2], ["!!", 1], "==", 5, null, ["in", "a"], ["==", "x"]]) {
             const { body } = await call("query_collection", {
-                collection: "candidates", filter: { stage: condition }
+                collection: "candidates", where: { stage: condition }
             });
-            expect(body.result?.isError).toBe(true);
+            const rest = restRefusal({ where: JSON.stringify({ stage: condition }) });
+            expect([condition, body.result?.isError ? body.result.content[0].text : undefined]).toEqual([condition, rest]);
         }
     });
 
     it.each([
-        ["a huge limit", 1_000_000, 200],
-        ["a negative limit", -5, 25],
-        ["zero", 0, 25],
-        ["a fractional limit", 10.7, 10],
-        ["a string", "abc", 25],
-        ["Infinity", Number.MAX_VALUE, 200]
-    ])("clamps %s", async (_label, limit, expected) => {
-        const { calls } = await call("query_collection", { collection: "candidates", limit });
-        expect((calls.at(-1)?.args as { limit: number }).limit).toBe(expected);
+        ["a huge limit", 1_000_000],
+        ["a negative limit", -5],
+        ["zero", 0],
+        ["a fractional limit", 10.7],
+        ["a string", "abc"],
+        ["Infinity", Number.MAX_VALUE]
+    ])("refuses %s, as REST does, rather than clamping it", async (_label, limit) => {
+        // A page quietly smaller than the one asked for cannot be told apart
+        // from the end of the collection.
+        const { body, calls } = await call("query_collection", { collection: "candidates", limit });
+        expect(body.result?.isError).toBe(true);
+        expect(body.result?.content[0].text).toBe(restRefusal({ limit: String(limit) }));
+        expect(calls.filter(c => c.method === "fetchCollection")).toHaveLength(0);
+    });
+
+    it("reads REST's default page when no limit is given", async () => {
+        const { calls } = await call("query_collection", { collection: "candidates" });
+        expect((calls.at(-1)?.args as { limit: number }).limit).toBe(DEFAULT_LIST_LIMIT);
     });
 
     it.each([
-        ["a negative offset", -10, 0],
-        ["a fractional offset", 5.9, 5],
-        ["a string", "ten", 0]
-    ])("clamps %s", async (_label, offset, expected) => {
-        const { calls } = await call("query_collection", { collection: "candidates", offset });
-        expect((calls.at(-1)?.args as { offset: number }).offset).toBe(expected);
+        ["a negative offset", -10],
+        ["a fractional offset", 5.9],
+        ["a string", "ten"]
+    ])("refuses %s, as REST does", async (_label, offset) => {
+        const { body } = await call("query_collection", { collection: "candidates", offset });
+        expect(body.result?.isError).toBe(true);
+        expect(body.result?.content[0].text).toBe(restRefusal({ offset: String(offset) }));
     });
 
-    it("says when a result was truncated", async () => {
-        // A model given exactly `limit` rows and no signal reports the truncated
-        // set as the complete answer.
-        const { body } = await call("query_collection", { collection: "candidates", limit: 1 });
-        expect(body.result?.structuredContent).toMatchObject({ truncated: true, count: 1 });
+    it("says whether more rows follow from the count, not from a full page", async () => {
+        // `rows.length === limit` called a complete page truncated: a
+        // collection of exactly one row, read one at a time, never ended.
+        for (const [total, hasMore] of [[1, false], [3, true]] as const) {
+            const { driver } = stubDriver();
+            (driver as unknown as { count: () => Promise<number> }).count = async () => total;
+            const { app } = buildApp({ driver });
+            const { accessToken } = await connectedClient(app);
+            const res = await rpc(app, accessToken, {
+                jsonrpc: "2.0", id: 1, method: "tools/call",
+                params: { name: "query_collection", arguments: { collection: "candidates", limit: 1 } }
+            });
+            const body = await res.json() as { result: { structuredContent: { meta: Record<string, unknown> } } };
+            expect(body.result.structuredContent.meta).toMatchObject({ total, hasMore });
+        }
     });
 
     it("gives one message for an absent row and one the caller cannot see", async () => {
@@ -475,7 +507,7 @@ describe("tool inputs", () => {
 
         const res = await rpc(app, accessToken, {
             jsonrpc: "2.0", id: 1, method: "tools/call",
-            params: { name: "update_document", arguments: { collection: "candidates", id: "c1", values: { name: "Y" } } }
+            params: { name: "update_document", arguments: { collection: "candidates", id: "c1", data: { name: "Y" } } }
         });
         const body = await res.json() as { result: { isError: boolean; content: { text: string }[] } };
         expect(body.result.isError).toBe(true);
@@ -494,7 +526,7 @@ describe("tool inputs", () => {
 
         const res = await rpc(app, accessToken, {
             jsonrpc: "2.0", id: 1, method: "tools/call",
-            params: { name: "update_document", arguments: { collection: "candidates", id: "c1", values: { name: "Y" } } }
+            params: { name: "update_document", arguments: { collection: "candidates", id: "c1", data: { name: "Y" } } }
         });
         const body = await res.json() as { result: { isError: boolean; content: { text: string }[] } };
         expect(body.result.isError).toBe(true);
@@ -531,18 +563,19 @@ describe("tool inputs", () => {
 
         const calls = [
             { name: "query_collection", arguments: { collection: "candidates" } },
+            { name: "count_documents", arguments: { collection: "candidates" } },
             { name: "get_document", arguments: { collection: "candidates", id: "c1" } },
-            { name: "create_document", arguments: { collection: "candidates", values: { name: "X" } } },
-            { name: "update_document", arguments: { collection: "candidates", id: "c1", values: { name: "Y" } } },
+            { name: "create_document", arguments: { collection: "candidates", data: { name: "X" } } },
+            { name: "update_document", arguments: { collection: "candidates", id: "c1", data: { name: "Y" } } },
             { name: "delete_document", arguments: { collection: "candidates", id: "c1" } }
         ];
         for (const params of calls) {
             await rpc(app, accessToken, { jsonrpc: "2.0", id: 1, method: "tools/call", params });
         }
 
-        // Five calls, five scopings, all as the same person. A tool that
+        // Six calls, six scopings, all as the same person. A tool that
         // reached for `ctx.driver` directly would show up as a short count.
-        expect(scopedAs).toHaveLength(5);
+        expect(scopedAs).toHaveLength(6);
         expect(new Set(scopedAs.map(s => s.uid))).toEqual(new Set(["user-1"]));
     });
 
@@ -580,7 +613,7 @@ describe("the endpoint carries its own body limit and rate limit", () => {
 
         const res = await rpc(app, accessToken, {
             jsonrpc: "2.0", id: 1, method: "tools/call",
-            params: { name: "create_document", arguments: { collection: "candidates", values: { name: "x".repeat(4096) } } }
+            params: { name: "create_document", arguments: { collection: "candidates", data: { name: "x".repeat(4096) } } }
         });
         expect(res.status).toBe(413);
         expect(calls).toHaveLength(0);
@@ -658,8 +691,8 @@ describe("the mutating tools apply the field write rules", () => {
     }
 
     it.each([
-        ["update_document", { collection: "candidates", id: "c1", values: { rating: 5 } }],
-        ["create_document", { collection: "candidates", values: { name: "X", rating: 5 } }]
+        ["update_document", { collection: "candidates", id: "c1", data: { rating: 5 } }],
+        ["create_document", { collection: "candidates", data: { name: "X", rating: 5 } }]
     ])("%s refuses a field the caller's roles cannot write, and says why", async (tool, args) => {
         const { body, saves } = await call(tool, args);
         expect(body.result?.isError).toBe(true);
@@ -668,9 +701,9 @@ describe("the mutating tools apply the field write rules", () => {
     });
 
     it.each([
-        ["update_document", "teamId", { collection: "candidates", id: "c1", values: { teamId: "t2" } }],
-        ["update_document", "team_id", { collection: "candidates", id: "c1", values: { team_id: "t2" } }],
-        ["create_document", "teamId", { collection: "candidates", values: { name: "X", teamId: "t2" } }]
+        ["update_document", "teamId", { collection: "candidates", id: "c1", data: { teamId: "t2" } }],
+        ["update_document", "team_id", { collection: "candidates", id: "c1", data: { team_id: "t2" } }],
+        ["create_document", "teamId", { collection: "candidates", data: { name: "X", teamId: "t2" } }]
     ])("%s refuses `%s`, the foreign key of a relation the caller's roles cannot write", async (tool, key, args) => {
         // `teamId` sets the column `team` sets, so the relation's rule is its rule.
         const { body, saves } = await call(tool, args);
@@ -681,7 +714,7 @@ describe("the mutating tools apply the field write rules", () => {
 
     it("writes the foreign key for a caller who may write the relation", async () => {
         const { body, saves } = await call(
-            "update_document", { collection: "candidates", id: "c1", values: { teamId: "t2" } }, ["hiring_manager"]
+            "update_document", { collection: "candidates", id: "c1", data: { teamId: "t2" } }, ["hiring_manager"]
         );
         expect(body.result?.isError).toBeUndefined();
         expect(saves).toHaveLength(1);
@@ -689,7 +722,7 @@ describe("the mutating tools apply the field write rules", () => {
 
     it("refuses an `excludeFromApi` column under either spelling, for any role", async () => {
         for (const values of [{ inviteToken: "t" }, { invite_token: "t" }]) {
-            const { body, saves } = await call("update_document", { collection: "candidates", id: "c1", values }, ["admin"]);
+            const { body, saves } = await call("update_document", { collection: "candidates", id: "c1", data: values }, ["admin"]);
             expect(body.result?.isError).toBe(true);
             expect(body.result?.content[0].text).toContain("excluded from the API");
             expect(saves).toHaveLength(0);
@@ -697,21 +730,21 @@ describe("the mutating tools apply the field write rules", () => {
     });
 
     it("refuses a field the collection does not have", async () => {
-        const { body, saves } = await call("update_document", { collection: "candidates", id: "c1", values: { nmae: "Y" } });
+        const { body, saves } = await call("update_document", { collection: "candidates", id: "c1", data: { nmae: "Y" } });
         expect(body.result?.isError).toBe(true);
         expect(body.result?.content[0].text).toContain("has no field 'nmae'");
         expect(saves).toHaveLength(0);
     });
 
-    it("refuses `values` that is not an object", async () => {
-        const { body, saves } = await call("update_document", { collection: "candidates", id: "c1", values: "rating=5" });
+    it("refuses `data` that is not an object", async () => {
+        const { body, saves } = await call("update_document", { collection: "candidates", id: "c1", data: "rating=5" });
         expect(body.result?.isError).toBe(true);
         expect(saves).toHaveLength(0);
     });
 
     it("writes the field for a caller holding the role", async () => {
         const { body, saves } = await call(
-            "update_document", { collection: "candidates", id: "c1", values: { rating: 5 } }, ["hiring_manager"]
+            "update_document", { collection: "candidates", id: "c1", data: { rating: 5 } }, ["hiring_manager"]
         );
         expect(body.result?.isError).toBeUndefined();
         expect(saves).toHaveLength(1);
@@ -719,7 +752,7 @@ describe("the mutating tools apply the field write rules", () => {
 
     it("checks a field operation's type, as PATCH does, before the driver compiles it", async () => {
         const { body, saves } = await call(
-            "update_document", { collection: "candidates", id: "c1", values: { name: { $inc: 1 } } }
+            "update_document", { collection: "candidates", id: "c1", data: { name: { $inc: 1 } } }
         );
         expect(body.result?.isError).toBe(true);
         expect(body.result?.content[0].text).toContain("$inc is not defined on 'name', which is a string property");
@@ -728,7 +761,7 @@ describe("the mutating tools apply the field write rules", () => {
 
     it("refuses a field operation on a create, as POST does", async () => {
         const { body, saves } = await call(
-            "create_document", { collection: "candidates", values: { name: "X", rating: { $inc: 1 } } }, ["hiring_manager"]
+            "create_document", { collection: "candidates", data: { name: "X", rating: { $inc: 1 } } }, ["hiring_manager"]
         );
         expect(body.result?.isError).toBe(true);
         expect(body.result?.content[0].text).toContain("cannot carry field operations ('rating')");
@@ -740,7 +773,7 @@ describe("the mutating tools apply the field write rules", () => {
 
 describe("query_collection applies the field read rules to what it filters and sorts on", () => {
     // The strip keeps a withheld value off the wire; this is the other half.
-    // `filter: { salary: [">", 100000] }` returns the rows whose hidden salary is
+    // `where: { salary: [">", 100000] }` returns the rows whose hidden salary is
     // above 100k, and bisecting the bound reads it out one call at a time — the
     // exact oracle `GET /api/data/...?salary=gt.100000` answers 400 for.
     const guarded = [{
@@ -766,21 +799,21 @@ describe("query_collection applies the field read rules to what it filters and s
     }
 
     it("refuses a filter on a field the caller's roles cannot read", async () => {
-        const { body, fetches } = await query({ filter: { salary: [">", 100000] } });
+        const { body, fetches } = await query({ where: { salary: [">", 100000] } });
         expect(body.result?.isError).toBe(true);
         expect(body.result?.content[0].text).toContain("'salary' is not readable on 'candidates' with your roles");
         expect(fetches).toHaveLength(0);
     });
 
     it("refuses a sort on one", async () => {
-        const { body, fetches } = await query({ orderBy: "salary", order: "desc" });
+        const { body, fetches } = await query({ orderBy: ["salary", "desc"] });
         expect(body.result?.isError).toBe(true);
         expect(body.result?.content[0].text).toContain("cannot be used in `orderBy`");
         expect(fetches).toHaveLength(0);
     });
 
     it("refuses an `excludeFromApi` column in either position, for any role", async () => {
-        for (const args of [{ filter: { inviteToken: ["==", "t"] } }, { orderBy: "inviteToken" }]) {
+        for (const args of [{ where: { inviteToken: ["==", "t"] } }, { orderBy: "inviteToken" }]) {
             const { body, fetches } = await query(args, ["admin"]);
             expect(body.result?.isError).toBe(true);
             expect(body.result?.content[0].text).toContain("'inviteToken' is not readable");
@@ -788,14 +821,8 @@ describe("query_collection applies the field read rules to what it filters and s
         }
     });
 
-    it("does not offer an unreadable field in the list of known ones", async () => {
-        const { body } = await query({ orderBy: "nmae" });
-        expect(body.result?.isError).toBe(true);
-        expect(body.result?.content[0].text).toContain("Known fields: id, name.");
-    });
-
     it("lets a caller holding the role filter and sort on it", async () => {
-        const { body, fetches } = await query({ filter: { salary: [">", 100000] }, orderBy: "salary" }, ["hr"]);
+        const { body, fetches } = await query({ where: { salary: [">", 100000] }, orderBy: "salary" }, ["hr"]);
         expect(body.result?.isError).toBeUndefined();
         expect(fetches).toHaveLength(1);
     });

@@ -259,9 +259,7 @@ export const PARITY_CASES: readonly ParityCase[] = [
         then: { outcome: "ok", hooks: [], history: [], ...live() },
         pending: {
             socket: "the socket's FETCH_ONE serves the admin view model (`{ __type: \"date\" }`), "
-                + "which the admin panel reads; a decision in the data-doors sweep report",
-            mcp: "DD-7: get_document serves the admin view model (`{ __type: \"date\" }`); "
-                + "the ai-and-extras fixer moves the MCP reads onto the REST walk"
+                + "which the admin panel reads; a decision in the data-doors sweep report"
         }
     },
     {

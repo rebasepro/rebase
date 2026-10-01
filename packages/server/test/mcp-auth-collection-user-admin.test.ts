@@ -149,7 +149,7 @@ describe("update_document on the auth collection", () => {
     it("refuses to demote the last administrator", async () => {
         const { call, writes } = harness({ admins: ["admin-1"] });
 
-        const result = await call("update_document", { collection: "users", id: "admin-1", values: { roles: ["viewer"] } });
+        const result = await call("update_document", { collection: "users", id: "admin-1", data: { roles: ["viewer"] } });
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe("Cannot demote the last administrator");
@@ -159,7 +159,7 @@ describe("update_document on the auth collection", () => {
     it("demotes an administrator who is not the last", async () => {
         const { call, writes } = harness({ admins: ["admin-1", "admin-2"] });
 
-        const result = await call("update_document", { collection: "users", id: "admin-2", values: { roles: ["viewer"] } });
+        const result = await call("update_document", { collection: "users", id: "admin-2", data: { roles: ["viewer"] } });
 
         expect(result.isError).toBeUndefined();
         expect(writes()).toHaveLength(1);
@@ -169,7 +169,7 @@ describe("update_document on the auth collection", () => {
         const { call, writes } = harness({ admins: ["admin-1"] });
 
         const result = await call("update_document", {
-            collection: "users", id: "editor-1", values: { email: "  Ann.Smith@Example.COM " }
+            collection: "users", id: "editor-1", data: { email: "  Ann.Smith@Example.COM " }
         });
 
         expect(result.isError).toBeUndefined();
@@ -179,7 +179,7 @@ describe("update_document on the auth collection", () => {
     it("refuses an email another account holds", async () => {
         const { call, writes } = harness({ admins: ["admin-1"], emails: { "editor-2": "ann@example.com" } });
 
-        const result = await call("update_document", { collection: "users", id: "editor-1", values: { email: "Ann@Example.com" } });
+        const result = await call("update_document", { collection: "users", id: "editor-1", data: { email: "Ann@Example.com" } });
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe("Email already registered");
@@ -192,7 +192,7 @@ describe("create_document on the auth collection", () => {
         const { call, writes } = harness({ admins: ["admin-1"] });
 
         const result = await call("create_document", {
-            collection: "users", values: { email: "New.User@Example.COM", password: "Correct-Horse-9" }
+            collection: "users", data: { email: "New.User@Example.COM", password: "Correct-Horse-9" }
         });
 
         expect(result.isError).toBeUndefined();
@@ -212,7 +212,7 @@ describe("create_document on the auth collection", () => {
     it("hands back the generated password when no email service can send the invitation", async () => {
         const { call, writes } = harness({ admins: ["admin-1"] });
 
-        const result = await call("create_document", { collection: "users", values: { email: "new@example.com" } });
+        const result = await call("create_document", { collection: "users", data: { email: "new@example.com" } });
 
         expect(result.isError).toBeUndefined();
         const temporaryPassword = result.structuredContent?.temporaryPassword;
@@ -231,7 +231,7 @@ describe("create_document on the auth collection", () => {
         const { call, writes } = harness({ admins: ["admin-1"], collection: hooked });
 
         const result = await call("create_document", {
-            collection: "users", values: { email: "Hook@Example.com", inviteCode: "abc" }
+            collection: "users", data: { email: "Hook@Example.com", inviteCode: "abc" }
         });
 
         expect(result.isError).toBeUndefined();
@@ -243,7 +243,7 @@ describe("create_document on the auth collection", () => {
     it("still refuses a field the users collection does not have", async () => {
         const { call, writes } = harness({ admins: ["admin-1"] });
 
-        const result = await call("create_document", { collection: "users", values: { email: "a@b.c", nmae: "x" } });
+        const result = await call("create_document", { collection: "users", data: { email: "a@b.c", nmae: "x" } });
 
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toContain("has no field 'nmae'");
@@ -255,8 +255,8 @@ describe("every other collection", () => {
     it("is written as it arrived", async () => {
         const { call, writes } = harness({ admins: ["admin-1"] });
 
-        await call("create_document", { collection: "candidates", values: { email: "Mixed@Case.COM" } });
-        await call("update_document", { collection: "candidates", id: "c1", values: { email: "Other@Case.COM" } });
+        await call("create_document", { collection: "candidates", data: { email: "Mixed@Case.COM" } });
+        await call("update_document", { collection: "candidates", id: "c1", data: { email: "Other@Case.COM" } });
         await call("delete_document", { collection: "candidates", id: "admin-1" });
 
         const [created, updated, deleted] = writes();

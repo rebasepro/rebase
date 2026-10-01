@@ -20,14 +20,16 @@
  * second lock, not the main one — a `mcp:write` token still cannot write a row
  * the user could not write themselves.
  */
-import type { AuthAdapter, CollectionConfig, DataDriver, FilterValues } from "@rebasepro/types";
-import { getCollectionDataPath } from "@rebasepro/types";
-import { type FieldViewer, restrictedFieldNames } from "@rebasepro/common";
+import type { AuthAdapter, CollectionConfig, DataDriver, OrderBySpec } from "@rebasepro/types";
+import { ALL_WHERE_FILTER_OPS, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, getCollectionDataPath } from "@rebasepro/types";
+import { type FieldViewer, OrderBySpecError, restoresSoftDeletedRow, serializeOrderBy } from "@rebasepro/common";
 import { scopeDataDriver } from "../auth/rls-scope.js";
 import { ApiError } from "../api/errors.js";
 import { assertWriteRequestValid } from "../api/rest/write-validation.js";
 import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "../api/rest/field-ops.js";
-import { assertQueryFieldsReadable } from "../api/rest/field-access-query.js";
+import { parseQueryOptions } from "../api/rest/query-parser.js";
+import { RestApiGenerator, type RowAddress } from "../api/rest/api-generator.js";
+import type { QueryOptions } from "../api/types.js";
 import {
     assertUserCreationBodyValid,
     createUserThroughAuthCollection,
@@ -66,10 +68,6 @@ export interface McpToolDefinition {
     requiredScope: "mcp:read" | "mcp:write";
     run(args: Record<string, unknown>, ctx: McpToolContext): Promise<unknown>;
 }
-
-/** How many rows a single call may return, whatever it asks for. */
-const MAX_ROWS = 200;
-const DEFAULT_ROWS = 25;
 
 /**
  * Resolve a collection the caller named.
@@ -132,7 +130,7 @@ function asToolError(check: () => void): void {
 }
 
 /**
- * The `values` of a write, checked the way every other write door checks them.
+ * The `data` of a write, checked the way every other write door checks them.
  *
  * RLS decides which *rows* a caller may write, not which *fields*: `access.write`
  * and `excludeFromApi` are enforced where a caller's body arrives, which for REST
@@ -162,7 +160,7 @@ function writableValues(
 
 function valuesObject(raw: unknown): Record<string, unknown> {
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-        throw new McpToolError("`values` must be an object of field names to values.");
+        throw new McpToolError("`data` must be an object of field names to values.");
     }
     return raw as Record<string, unknown>;
 }
@@ -188,7 +186,7 @@ async function createUser(
     const adapter = ctx.authAdapter;
     if (!createsUsers(adapter, collection)) return undefined;
 
-    const body = valuesObject(args.values);
+    const body = valuesObject(args.data);
     asToolError(() => {
         assertUserCreationBodyValid(adapter, collection, body, viewerOf(ctx));
         assertNoFieldOpsOnCreate(body, "A create");
@@ -211,77 +209,98 @@ function collectionPath(collection: CollectionConfig): string {
     return getCollectionDataPath(collection);
 }
 
-function clampLimit(raw: unknown): number {
-    const asked = Number(raw ?? DEFAULT_ROWS);
-    if (!Number.isFinite(asked) || asked <= 0) return DEFAULT_ROWS;
-    return Math.min(Math.floor(asked), MAX_ROWS);
-}
-
-/** A non-negative row offset. `NaN`, `-1` and `"soon"` all mean "from the start". */
-function clampOffset(raw: unknown): number {
-    const asked = Number(raw ?? 0);
-    if (!Number.isFinite(asked) || asked <= 0) return 0;
-    return Math.floor(asked);
+/** This collection's rows at their own address, as REST's routes address them. */
+function ownRow(collection: CollectionConfig): RowAddress {
+    return {
+        collection,
+        path: collectionPath(collection),
+        driverCollection: collection,
+        name: collection.slug
+    };
 }
 
 /**
- * A field name the collection actually declares.
+ * A read's arguments as the REST list route receives them — the query string
+ * the SDK would send for the same `find()` — parsed by REST's own parser.
  *
- * Every caller-supplied identifier that reaches the driver goes through here.
- * `filter` had this check from the start and `orderBy` did not, which is the
- * same class of gap twice over: an identifier is not a value, so it cannot be
- * bound as a parameter, and whether it is safe depends entirely on what the
- * driver does with it. The registry is the only thing that knows which names
- * are real, so the check belongs here rather than in each driver's hope that
- * it quoted everything.
- *
- * `id` is admitted alongside the declared properties because every collection
- * has one and none of them declare it.
+ * So `where`, `orderBy`, `limit` and `offset` mean on this door exactly what
+ * they mean on `GET /api/data/<collection>`, the SDK and the local MCP server:
+ * the same dialect, the same refusals in the same words (an unknown field or
+ * operator, a field the caller's roles cannot read, a `limit` past the
+ * ceiling), the same foreign-key names (`authorId`) for a `belongsTo`.
  */
-function assertKnownField(collection: CollectionConfig, field: string, what: string, viewer: FieldViewer): string {
-    const properties = collection.properties ?? {};
-    if (field !== "id" && !(field in properties)) {
-        // The list is an offer, so it leaves out what this caller cannot read:
-        // naming a field the next call would refuse sends the model round again.
-        const unreadable = new Set(restrictedFieldNames(collection, viewer, "read").declared);
-        const offered = Object.keys(properties).filter(name => !unreadable.has(name));
-        throw new McpToolError(
-            `"${field}" is not a field of ${collectionPath(collection)}, so it cannot be used to ${what}. `
-            + `Known fields: ${["id", ...offered].join(", ")}.`
-        );
-    }
-    return field;
-}
-
-/**
- * Translate the model's filter object into the driver's filter shape.
- *
- * The wire form is `{ field: [op, value] }` — `FilterValues` — and it is
- * accepted only for fields the collection actually declares. An unknown field
- * is refused rather than dropped: silently ignoring a filter turns "show me the
- * unpaid invoices" into "show me every invoice", which is a worse answer than
- * an error and looks like a correct one.
- */
-function buildFilter(collection: CollectionConfig, raw: unknown, viewer: FieldViewer): FilterValues<string> | undefined {
-    if (raw == null) return undefined;
-    if (typeof raw !== "object" || Array.isArray(raw)) {
-        throw new McpToolError("filter must be an object of { field: [operator, value] }.");
-    }
-
-    const filter: Record<string, [string, unknown]> = {};
-
-    for (const [field, condition] of Object.entries(raw as Record<string, unknown>)) {
-        assertKnownField(collection, field, "filter", viewer);
-        if (!Array.isArray(condition) || condition.length !== 2 || typeof condition[0] !== "string") {
-            throw new McpToolError(`filter.${field} must be [operator, value], e.g. ["==", "paid"].`);
+function readOptions(args: Record<string, unknown>, collection: CollectionConfig, ctx: McpToolContext): QueryOptions {
+    const query: Record<string, string> = {};
+    if (args.where !== undefined && args.where !== null) {
+        if (typeof args.where !== "object" || Array.isArray(args.where)) {
+            throw new McpToolError("`where` must be an object of field → [operator, value], e.g. {\"status\": [\"==\", \"paid\"]}.");
         }
-        filter[field] = [condition[0], condition[1]];
+        query.where = JSON.stringify(args.where);
     }
-
-    return filter as FilterValues<string>;
+    if (args.orderBy !== undefined && args.orderBy !== null) {
+        let wire: string | undefined;
+        try {
+            wire = serializeOrderBy(args.orderBy as OrderBySpec | string);
+        } catch (error) {
+            if (error instanceof OrderBySpecError) throw new McpToolError(`\`orderBy\`: ${error.message}`);
+            throw error;
+        }
+        if (wire) query.orderBy = wire;
+    }
+    if (args.limit !== undefined && args.limit !== null) query.limit = String(args.limit);
+    if (args.offset !== undefined && args.offset !== null) query.offset = String(args.offset);
+    return parseQueryOptions(query, {}, { collection, viewer: viewerOf(ctx) });
 }
 
-export const MCP_TOOLS: McpToolDefinition[] = [
+/** REST's `?searchString=`: text search across the collection's text fields. */
+function searchStringOf(args: Record<string, unknown>): string | undefined {
+    if (args.searchString === undefined || args.searchString === null || args.searchString === "") return undefined;
+    if (typeof args.searchString !== "string") throw new McpToolError("`searchString` must be text.");
+    return args.searchString;
+}
+
+/**
+ * The row an update or delete addresses, read the way REST's routes read it
+ * before they write: the caller's own read, with the trash hidden — except for
+ * a restore, the one edit that reaches a trashed row.
+ *
+ * Absent, it is the same answer `get_document` gives, and REST's 404: a row in
+ * the trash is not one to edit or delete again, and the tools used to do both.
+ */
+async function assertRowExists(
+    driver: DataDriver,
+    collection: CollectionConfig,
+    id: string,
+    withDeleted?: true
+): Promise<void> {
+    const existing = await driver.fetchOne({ path: collectionPath(collection), id, collection, withDeleted });
+    if (!existing) throw notFound(collection, id);
+}
+
+function notFound(collection: CollectionConfig, id: string): McpToolError {
+    // Deliberately one message for "absent" and "not visible to you".
+    // Distinguishing them turns the tools into an existence oracle for rows
+    // the caller cannot read.
+    return new McpToolError(`No row with id "${id}" in ${collectionPath(collection)}.`);
+}
+
+const COLLECTION_ARG = { type: "string", description: "Collection name from list_collections." };
+
+const WHERE_ARG = {
+    type: "object",
+    description: "Filter, as the SDK's `where` and REST's `?where=`: field → [operator, value], e.g. "
+        + "{\"status\": [\"==\", \"paid\"], \"total\": [\">\", 100]}. Several conditions on one field: "
+        + "{\"total\": [[\">=\", 10], [\"<\", 100]]}. A belongsTo relation is filtered by its foreign key, "
+        + "as the rows carry it (e.g. \"authorId\"). Operators: " + ALL_WHERE_FILTER_OPS.join(", ") + "."
+};
+
+const SEARCH_ARG = {
+    type: "string",
+    description: "Text search, as REST's `searchString`: matches rows whose text fields contain it "
+        + "(or the collection's declared full-text search)."
+};
+
+const TOOLS: McpToolDefinition[] = [
     {
         name: "list_collections",
         description:
@@ -323,21 +342,27 @@ export const MCP_TOOLS: McpToolDefinition[] = [
     {
         name: "query_collection",
         description:
-            "Read rows from a collection. Returns only rows the signed-in user is allowed to see, " +
-            "so an empty result can mean 'none match' or 'none visible to you'.",
+            "Read rows from a collection, exactly as the REST API's `GET /api/data/<collection>` serves them: "
+            + "`data` is the rows (dates as ISO text, a belongsTo relation as its foreign key, e.g. `authorId`), "
+            + "`meta` has `total` and `hasMore`. Returns only rows the signed-in user is allowed to see, so an "
+            + "empty result can mean 'none match' or 'none visible to you'. Page with `offset` while "
+            + "`meta.hasMore` is true.",
         requiredScope: "mcp:read",
         inputSchema: {
             type: "object",
             properties: {
-                collection: { type: "string", description: "Collection name from list_collections." },
-                filter: {
-                    type: "object",
-                    description: 'Field conditions, e.g. {"status": ["==", "paid"], "total": [">", 100]}.',
-                    additionalProperties: { type: "array" }
+                collection: COLLECTION_ARG,
+                where: WHERE_ARG,
+                orderBy: {
+                    type: ["string", "array"],
+                    description: "Sort, as the SDK's `orderBy`: [\"created_at\", \"desc\"], a list of those "
+                        + "applied in order, or \"created_at:desc\"."
                 },
-                orderBy: { type: "string", description: "Field to sort by." },
-                order: { type: "string", enum: ["asc", "desc"], description: "Sort direction." },
-                limit: { type: "number", description: `Rows to return (max ${MAX_ROWS}).` },
+                searchString: SEARCH_ARG,
+                limit: {
+                    type: "number",
+                    description: `Rows to return, 1 to ${MAX_LIST_LIMIT} (default ${DEFAULT_LIST_LIMIT}). A larger limit is refused.`
+                },
                 offset: { type: "number", description: "Rows to skip." }
             },
             required: ["collection"],
@@ -345,55 +370,51 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         },
         async run(args, ctx) {
             const collection = resolveCollection(ctx, args.collection);
-            const viewer = viewerOf(ctx);
-            const filter = buildFilter(collection, args.filter, viewer);
-            const sortField = args.orderBy
-                ? assertKnownField(collection, String(args.orderBy), "sort", viewer)
-                : undefined;
-
-            // The driver keeps a withheld value out of the rows; this keeps it
-            // out of the question. A filter on a field the caller cannot read
-            // answers "which rows have salary > 100000" one call at a time, and
-            // a sort on one ranks by it — so both are refused, by the check the
-            // REST list route runs on the same parameters.
-            asToolError(() => assertQueryFieldsReadable(
-                { where: filter, orderBy: sortField ? [{ field: sortField }] : undefined },
-                collection,
-                viewer
-            ));
-
+            const options = readOptions(args, collection, ctx);
             const driver = await scopedDriver(ctx);
-            const limit = clampLimit(args.limit);
+            // REST's own listing, so a row here is the row `GET` serves — not
+            // the admin panel's view model (`{ __type: "date" }`, a relation
+            // as an embedded row), which no write door accepts back.
+            const page = await RestApiGenerator.readPage(driver, collection, options, searchStringOf(args));
+            return { data: page.rows, meta: page.meta };
+        }
+    },
 
-            const rows = await driver.fetchCollection({
-                path: collectionPath(collection),
-                collection,
-                filter,
-                limit,
-                offset: clampOffset(args.offset),
-                orderBy: sortField ? [[sortField, args.order === "desc" ? "desc" : "asc"]] : undefined
-            } as Parameters<DataDriver["fetchCollection"]>[0]);
-
-            return {
-                collection: collectionPath(collection),
-                count: rows.length,
-                // Say so explicitly. A model that gets exactly `limit` rows back
-                // and is not told there may be more will report the truncated
-                // set as the complete answer.
-                truncated: rows.length === limit,
-                rows
-            };
+    {
+        name: "count_documents",
+        description:
+            "Count the rows of a collection that match, exactly as the REST API's "
+            + "`GET /api/data/<collection>/count` does. Counts only rows the signed-in user is allowed to see.",
+        requiredScope: "mcp:read",
+        inputSchema: {
+            type: "object",
+            properties: {
+                collection: COLLECTION_ARG,
+                where: WHERE_ARG,
+                searchString: SEARCH_ARG
+            },
+            required: ["collection"],
+            additionalProperties: false
+        },
+        async run(args, ctx) {
+            const collection = resolveCollection(ctx, args.collection);
+            const options = readOptions(args, collection, ctx);
+            const driver = await scopedDriver(ctx);
+            const count = await RestApiGenerator.countRawEntities(driver, collection, options, searchStringOf(args));
+            return { count };
         }
     },
 
     {
         name: "get_document",
-        description: "Read one row by id. Fails if the signed-in user cannot see it.",
+        description:
+            "Read one row by id, exactly as the REST API's `GET /api/data/<collection>/<id>` serves it. "
+            + "Fails if the signed-in user cannot see it.",
         requiredScope: "mcp:read",
         inputSchema: {
             type: "object",
             properties: {
-                collection: { type: "string" },
+                collection: COLLECTION_ARG,
                 id: { type: "string" }
             },
             required: ["collection", "id"],
@@ -401,20 +422,11 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         },
         async run(args, ctx) {
             const collection = resolveCollection(ctx, args.collection);
+            const id = String(args.id);
             const driver = await scopedDriver(ctx);
-            const row = await driver.fetchOne({
-                path: collectionPath(collection),
-                collection,
-                id: String(args.id)
-            });
-
-            if (!row) {
-                // Deliberately one message for "absent" and "not visible to
-                // you". Distinguishing them turns this tool into an existence
-                // oracle for rows the caller cannot read.
-                throw new McpToolError(`No row with id "${args.id}" in ${collectionPath(collection)}.`);
-            }
-            return row;
+            const read = await RestApiGenerator.readRow(driver, ownRow(collection), id, {});
+            if (!read) throw notFound(collection, id);
+            return read.row;
         }
     },
 
@@ -425,11 +437,11 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         inputSchema: {
             type: "object",
             properties: {
-                collection: { type: "string" },
-                values: { type: "object", description: "Field values for the new row." },
+                collection: COLLECTION_ARG,
+                data: { type: "object", description: "Field values for the new row, as the SDK's `create(data)`." },
                 id: { type: "string", description: "Optional explicit id." }
             },
-            required: ["collection", "values"],
+            required: ["collection", "data"],
             additionalProperties: false
         },
         async run(args, ctx) {
@@ -441,7 +453,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
                 });
                 return user;
             }
-            const values = writableValues(args.values, collection, ctx, "new");
+            const values = writableValues(args.data, collection, ctx, "new");
             const driver = await scopedDriver(ctx);
             const saved = await driver.save({
                 path: collectionPath(collection),
@@ -459,28 +471,31 @@ export const MCP_TOOLS: McpToolDefinition[] = [
 
     {
         name: "update_document",
-        description: "Change fields on an existing row. Only the fields given are touched.",
+        description: "Change fields on an existing row, as the SDK's `update(id, data)`. Only the fields "
+            + "given are touched. A row read with get_document or query_collection can be sent back as it is.",
         requiredScope: "mcp:write",
         inputSchema: {
             type: "object",
             properties: {
-                collection: { type: "string" },
+                collection: COLLECTION_ARG,
                 id: { type: "string" },
-                values: { type: "object", description: "Fields to change." }
+                data: { type: "object", description: "Fields to change." }
             },
-            required: ["collection", "id", "values"],
+            required: ["collection", "id", "data"],
             additionalProperties: false
         },
         async run(args, ctx) {
             const collection = resolveCollection(ctx, args.collection);
             const id = String(args.id);
+            const body = writableValues(args.data, collection, ctx, "existing");
+            const driver = await scopedDriver(ctx);
+            await assertRowExists(driver, collection, id, restoresSoftDeletedRow(collection, body) ? true : undefined);
             // On the auth collection, the adapter's check and stored form: no
             // demoting the last administrator, the email as sign-in looks it up.
             const [values] = await prepareAuthCollectionUpdates(ctx.authAdapter, collection, [{
                 uid: id,
-                values: writableValues(args.values, collection, ctx, "existing")
+                values: body
             }]);
-            const driver = await scopedDriver(ctx);
             const saved = await driver.save({
                 path: collectionPath(collection),
                 collection,
@@ -503,7 +518,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         inputSchema: {
             type: "object",
             properties: {
-                collection: { type: "string" },
+                collection: COLLECTION_ARG,
                 id: { type: "string" }
             },
             required: ["collection", "id"],
@@ -512,6 +527,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         async run(args, ctx) {
             const collection = resolveCollection(ctx, args.collection);
             const driver = await scopedDriver(ctx);
+            await assertRowExists(driver, collection, String(args.id));
             // On the auth collection: the last administrator stays, and
             // `beforeUserDelete` may veto; after, the sessions end and
             // `afterUserDelete` runs.
@@ -527,6 +543,33 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         }
     }
 ];
+
+export const MCP_TOOLS: McpToolDefinition[] = TOOLS.map(tool => ({
+    ...tool,
+    run: (args, ctx) => {
+        assertDeclaredArguments(tool, args);
+        return tool.run(args, ctx);
+    }
+}));
+
+/**
+ * Refuse an argument the tool does not declare.
+ *
+ * Ignored, a misspelt or outdated argument changes the answer without a word:
+ * `filter` where the tool reads `where` is an unfiltered read, which looks like
+ * a correct answer to "show me the unpaid invoices". The schema says
+ * `additionalProperties: false`, but a client is not obliged to check it.
+ */
+function assertDeclaredArguments(tool: McpToolDefinition, args: Record<string, unknown>): void {
+    const declared = Object.keys((tool.inputSchema.properties ?? {}) as Record<string, unknown>);
+    const unknown = Object.keys(args).filter(name => !declared.includes(name));
+    if (unknown.length > 0) {
+        throw new McpToolError(
+            `${unknown.map(name => `"${name}"`).join(", ")} ${unknown.length === 1 ? "is not an argument" : "are not arguments"} `
+            + `of ${tool.name}. Its arguments are: ${declared.join(", ")}.`
+        );
+    }
+}
 
 /** The tools a caller holding `scope` may see and call. */
 export function toolsForScope(scope: string): McpToolDefinition[] {

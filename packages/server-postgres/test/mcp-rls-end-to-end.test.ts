@@ -170,27 +170,27 @@ describe("what an agent can read", () => {
         const driver = rlsDriver();
         const result = await tool("query_collection").run(
             { collection: "candidates" }, ctx(driver, "user-1")
-        ) as { rows: { id: string }[] };
+        ) as { data: { id: string }[] };
 
-        expect(result.rows.map(r => r.id).sort()).toEqual(["a1", "a2"]);
+        expect(result.data.map(r => r.id).sort()).toEqual(["a1", "a2"]);
     });
 
     it("returns a different set for a different caller", async () => {
         const driver = rlsDriver();
         const result = await tool("query_collection").run(
             { collection: "candidates" }, ctx(driver, "user-2")
-        ) as { rows: { id: string }[] };
+        ) as { data: { id: string }[] };
 
-        expect(result.rows.map(r => r.id)).toEqual(["b1"]);
+        expect(result.data.map(r => r.id)).toEqual(["b1"]);
     });
 
     it("returns nothing for a caller who owns nothing", async () => {
         const driver = rlsDriver();
         const result = await tool("query_collection").run(
             { collection: "candidates" }, ctx(driver, "user-3")
-        ) as { rows: unknown[] };
+        ) as { data: unknown[] };
 
-        expect(result.rows).toEqual([]);
+        expect(result.data).toEqual([]);
     });
 
     it("cannot read another user's row by id, even knowing the id", async () => {
@@ -218,12 +218,12 @@ describe("what an agent can read", () => {
         const driver = rlsDriver();
         const readOnly = await tool("query_collection").run(
             { collection: "candidates" }, ctx(driver, "user-1", "mcp:read")
-        ) as { rows: unknown[] };
+        ) as { data: unknown[] };
         const readWrite = await tool("query_collection").run(
             { collection: "candidates" }, ctx(driver, "user-1", "mcp:read mcp:write")
-        ) as { rows: unknown[] };
+        ) as { data: unknown[] };
 
-        expect(readOnly.rows).toEqual(readWrite.rows);
+        expect(readOnly.data).toEqual(readWrite.data);
     });
 });
 
@@ -234,7 +234,7 @@ describe("what an agent can write", () => {
         const driver = rlsDriver();
         await expect(
             tool("create_document").run(
-                { collection: "candidates", values: { name: "Mallory", ownerId: "user-2" } },
+                { collection: "candidates", data: { name: "Mallory", ownerId: "user-2" } },
                 ctx(driver, "user-1")
             )
         ).rejects.toThrow();
@@ -243,7 +243,7 @@ describe("what an agent can write", () => {
     it("can create a row it owns", async () => {
         const driver = rlsDriver();
         const created = await tool("create_document").run(
-            { collection: "candidates", values: { name: "Mine", stage: "new", ownerId: "user-1" } },
+            { collection: "candidates", data: { name: "Mine", stage: "new", ownerId: "user-1" } },
             ctx(driver, "user-1")
         ) as { name: string };
         expect(created.name).toBe("Mine");
@@ -251,12 +251,13 @@ describe("what an agent can write", () => {
 
     it("cannot delete another user's row", async () => {
         const driver = rlsDriver();
-        await tool("delete_document").run(
+        // The caller's own read of the row finds nothing — which is how RLS
+        // expresses "you cannot see it" — so the answer is REST's 404, in the
+        // words `get_document` uses for an absent row. The row is still there.
+        await expect(tool("delete_document").run(
             { collection: "candidates", id: "b1" }, ctx(driver, "user-1")
-        );
+        )).rejects.toThrow(/No row with id "b1"/);
 
-        // The DELETE matched no rows rather than erroring — which is how RLS
-        // expresses "you cannot see it". The row is still there.
         const stillThere = await db.query(`SELECT id FROM candidates WHERE id = 'b1'`);
         expect(stillThere.rows).toHaveLength(1);
     });
@@ -298,8 +299,8 @@ describe("the identity the database sees", () => {
         const driver = rlsDriver();
         const result = await tool("query_collection").run(
             { collection: "candidates" }, ctx(driver, "user-1")
-        ) as { rows: unknown[] };
-        expect(result.rows).toHaveLength(2);
+        ) as { data: unknown[] };
+        expect(result.data).toHaveLength(2);
 
         const seen = await inContext({ uid: "user-1", roles: [], isAnonymous: false }, async (tx) => {
             const res = await tx.execute(
@@ -318,17 +319,17 @@ describe("the identity the database sees", () => {
 
         const first = await tool("query_collection").run(
             { collection: "candidates" }, ctx(driver, "user-1")
-        ) as { rows: unknown[] };
+        ) as { data: unknown[] };
         const second = await tool("query_collection").run(
             { collection: "candidates" }, ctx(driver, "user-2")
-        ) as { rows: { id: string }[] };
+        ) as { data: { id: string }[] };
         const third = await tool("query_collection").run(
             { collection: "candidates" }, ctx(driver, "user-3")
-        ) as { rows: unknown[] };
+        ) as { data: unknown[] };
 
-        expect(first.rows).toHaveLength(2);
-        expect(second.rows.map(r => r.id)).toEqual(["b1"]);
-        expect(third.rows).toEqual([]);
+        expect(first.data).toHaveLength(2);
+        expect(second.data.map(r => r.id)).toEqual(["b1"]);
+        expect(third.data).toEqual([]);
 
         // And outside any transaction the setting is gone.
         const after = await db.query(`SELECT current_setting('app.uid', true) AS uid`);
