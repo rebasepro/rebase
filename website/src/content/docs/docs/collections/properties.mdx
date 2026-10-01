@@ -54,9 +54,11 @@ All property types share these options:
 :::note[What "admin form only" means]
 Several options below carry that label: they shape the form the panel draws and
 nothing else — the API accepts a write that ignores them, and no constraint
-stands behind them. A rule that must hold for every caller is a
-[validation rule](/docs/collections/validation-and-conditions/) or a
-[security rule](/docs/collections/security-rules/).
+stands behind them. A rule that must hold for every API caller is a
+[validation rule](/docs/collections/validation-and-conditions/) — checked on REST,
+socket and MCP writes, [not on in-process ones](/docs/collections/validation-and-conditions/#where-validation-runs)
+— or a [security rule](/docs/collections/security-rules/), which the database
+enforces for everyone.
 :::
 
 ### UI Configuration (`admin`)

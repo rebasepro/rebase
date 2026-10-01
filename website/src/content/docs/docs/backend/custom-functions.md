@@ -338,7 +338,7 @@ It runs on a TCP connection to your database, which makes it the only accessor t
 :::caution[Direct Drizzle access is Node-only]
 You can also import your own Drizzle instance and query it directly (`db.execute(sql\`…\`)`). It works, and on a self-hosted or managed Node deployment it is fine.
 
-It is worth knowing what it costs: a function that imports `drizzle-orm` and a `pg` pool is permanently a Node function, it bypasses your collection callbacks and validation, and it takes its connection from somewhere other than the request. `rebase.sql()` gives you the same raw SQL through the framework's own connection. Prefer it.
+It is worth knowing what it costs: a function that imports `drizzle-orm` and a `pg` pool is permanently a Node function, it bypasses your collection callbacks, which `rebase.data` runs (neither checks `validation`, which applies to [API requests](/docs/collections/validation-and-conditions/#where-validation-runs)), and it takes its connection from somewhere other than the request. `rebase.sql()` gives you the same raw SQL through the framework's own connection. Prefer it.
 :::
 
 ## Configuration and Secrets

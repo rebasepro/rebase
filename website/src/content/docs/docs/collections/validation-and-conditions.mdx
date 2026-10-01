@@ -59,6 +59,18 @@ properties: {
 }
 ```
 
+### Where validation runs
+
+The server checks `validation` at the request boundary — REST, the realtime
+socket and MCP — on what the caller sent, before `beforeSave` runs, and answers
+a write that breaks a rule with a 400 naming every failing field. Server code
+writing in-process is trusted and is **not** checked against these rules:
+`rebase.data` and `rebase.dataAsAdmin` in a function or cron job, `context.data`
+in a callback, a seed script. What holds there is what the database enforces —
+`required` (NOT NULL), `unique` (a unique index), an enum's type, and the width
+of a `varchar` or `char` column. Anything else your server code writes, check in
+the code that writes it.
+
 ### Every type
 
 | Rule | Type | Description |
@@ -150,9 +162,11 @@ that is guiding someone and one that is refusing them.
 :::caution[Conditions are form behaviour]
 **Admin form only — not enforced by the API or the database.** They run in the
 browser, on the entity being edited, and shape what the panel offers. A rule
-that has to hold for every caller belongs in `validation`, which the server
-checks, or in a [security rule](/docs/collections/security-rules/), which the
-database enforces for anyone — panel, SDK or `curl`.
+that has to hold for every API caller belongs in `validation`, which the server
+checks on REST, socket and MCP writes (not on your own server code's
+[in-process writes](#where-validation-runs)), or in a
+[security rule](/docs/collections/security-rules/), which the database enforces
+for anyone — panel, SDK or `curl`.
 :::
 
 ### 2. Property Builders (Programmatic)

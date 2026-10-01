@@ -1037,7 +1037,14 @@ content: {
 
 ## Property Validation
 
-Every property supports a `validation` object with these common options:
+Every property supports a `validation` object with these common options.
+
+**Where it runs:** the server checks `validation` on REST, realtime-socket and MCP
+writes — what a caller sent. In-process writes (`rebase.data` /
+`rebase.dataAsAdmin` in functions and cron jobs, `context.data` in callbacks,
+seed scripts) are trusted and NOT checked: there only the database's constraints
+hold (`required` → NOT NULL, `unique` → unique index, enum type, `varchar`/`char`
+width). Validate in your own code what server code writes.
 
 | Option | Type | Applies To | Description |
 |--------|------|-----------|-------------|
