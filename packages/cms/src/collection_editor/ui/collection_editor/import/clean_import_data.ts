@@ -15,9 +15,17 @@ export function cleanPropertiesFromImport(properties: Properties, parentSlug = "
 
         if (property.type === "map" && property.properties) {
             const slugifiedResult = cleanPropertiesFromImport(property.properties as Properties, fullSlug);
+            // The children's mapping is keyed by their own names in the file
+            // (`streetName`), and the rows are flattened to the full column
+            // name (`address.streetName`) before they are looked up — so it
+            // joins the parent's mapping under the parent's name in the file.
+            // Dropped, every nested key that slugging changes was not imported.
+            const childMapping = Object.fromEntries(Object.entries(slugifiedResult.headersMapping)
+                .map(([childKey, childSlug]) => [`${key}.${childKey}`, childSlug]));
             return {
                 headersMapping: { ...acc.headersMapping,
-[key]: fullSlug },
+                    [key]: fullSlug,
+                    ...childMapping },
                 properties: {
                     ...acc.properties,
                     [slug]: {

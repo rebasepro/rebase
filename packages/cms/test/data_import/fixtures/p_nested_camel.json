@@ -1,0 +1,4 @@
+[
+ {"firstName":"Ann","address":{"streetName":"Main St","City":"Oslo","zip code":"0150","country":"NO"}},
+ {"firstName":"Bob","address":{"streetName":"High St","City":"Bergen","zip code":"5003","country":"NO"}}
+]
