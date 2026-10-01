@@ -908,7 +908,6 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                 renderExtraPropertyFields={renderExtraPropertyFields}
                                 extraIcon={extraView?.icon &&
                                     <IconButton
-                                        color={"primary"}
                                         onClick={() => setCurrentView("extra_view")}>
                                         {extraView.icon}
                                     </IconButton>}

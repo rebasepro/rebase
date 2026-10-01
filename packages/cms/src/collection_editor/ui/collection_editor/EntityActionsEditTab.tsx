@@ -79,8 +79,7 @@ export function EntityActionsEditTab({
                                                         e.preventDefault();
                                                         e.stopPropagation();
                                                         setActionToDelete(action.key);
-                                                    }}
-                                                    color="inherit">
+                                                    }}>
                                                     <Trash2Icon size={iconSize.small}/>
                                                 </IconButton>
                                             </Tooltip>

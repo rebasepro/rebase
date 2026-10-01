@@ -261,7 +261,6 @@ function EntityActionButton({
     return <Tooltip
         title={action.name}>
         <IconButton
-            color="primary"
             disabled={!enabled}
             onClick={(event) => {
                 console.debug("Executing action", action.key, props);

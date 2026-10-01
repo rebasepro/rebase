@@ -274,7 +274,6 @@ function StorageUpload({
                 selected={selected}
                 openPopup={!disabled ? openPopup : undefined}>
                 <IconButton
-                    color={"inherit"}
                     size={"small"}
                     onClick={open}>
                     <PencilIcon className={"text-surface-500"}/>

@@ -156,7 +156,6 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
             </Button>
             : <IconButton
                 size={"small"}
-                color={"primary"}
                 disabled={!multipleDeleteEnabled}
                 onClick={onMultipleDeleteClick}>
                 <RemoveIcon size={iconSize.small}/>

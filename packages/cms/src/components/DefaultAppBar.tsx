@@ -228,7 +228,6 @@ export const DefaultAppBar = function DefaultAppBar({
             {includeModeToggle &&
                 <Menu
                     trigger={<IconButton
-                        color="inherit"
                         aria-label="Toggle theme"
 >
                         {mode === "dark"

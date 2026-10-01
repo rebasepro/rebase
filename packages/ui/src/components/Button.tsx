@@ -3,7 +3,7 @@ import React from "react";
 import { cls } from "../util";
 import { type ButtonSize, controlHeightMixin, controlPaddingMixin } from "../styles";
 
-export type ButtonProps<C extends React.ElementType = "button"> = {
+type ButtonOwnProps<C extends React.ElementType> = {
     children?: React.ReactNode;
     variant?: "filled" | "outlined" | "text";
     disabled?: boolean;
@@ -14,7 +14,16 @@ export type ButtonProps<C extends React.ElementType = "button"> = {
     className?: string;
     component?: C;
     onClick?: React.MouseEventHandler<HTMLElement>;
-} & React.ComponentPropsWithoutRef<C>;
+};
+
+/**
+ * The kit's own props, plus those of the element it renders (`button`, or
+ * `component`). It used to intersect with `ComponentPropsWithoutRef` of a bare
+ * `ElementType`, which is as good as `any`: any misspelt or invented prop on
+ * the most-used control in the product compiled, and landed on the DOM.
+ */
+export type ButtonProps<C extends React.ElementType = "button"> =
+    ButtonOwnProps<C> & Omit<React.ComponentPropsWithoutRef<C>, keyof ButtonOwnProps<C>>;
 
 const ButtonInner = React.memo(React.forwardRef<
     HTMLButtonElement,
@@ -111,4 +120,5 @@ const ButtonInner = React.memo(React.forwardRef<
 
 ButtonInner.displayName = "Button"
 
-export const Button = ButtonInner as React.FC<ButtonProps<React.ElementType>>;
+export const Button = ButtonInner as
+    <C extends React.ElementType = "button">(props: ButtonProps<C> & React.RefAttributes<HTMLButtonElement>) => React.ReactElement | null;

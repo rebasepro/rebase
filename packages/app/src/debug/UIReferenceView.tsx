@@ -509,7 +509,7 @@ export function UIReferenceView() {
                         </div>
                         {/* Theme menu — from DefaultAppBar */}
                         <Menu trigger={
-                            <IconButton color="inherit">
+                            <IconButton>
                                 <MoonIcon/>
                             </IconButton>
                         }>

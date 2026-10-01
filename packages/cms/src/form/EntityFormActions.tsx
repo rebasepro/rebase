@@ -114,7 +114,6 @@ function buildBottomActions<M extends Record<string, unknown>>({
             {entityActions.map(action => (
                 <IconButton
                     key={action.name}
-                    color="primary"
                     onClick={(event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
                         event.stopPropagation();
                         if (entity)

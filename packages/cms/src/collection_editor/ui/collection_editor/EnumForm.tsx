@@ -189,7 +189,7 @@ function EnumFormFields({
                     Values
                 </Typography>
                 {allowDataInference &&
-                    <Button loading={inferring}
+                    <Button
                         disabled={disabled || inferring}
                         variant={"text"}
                         size={"small"}

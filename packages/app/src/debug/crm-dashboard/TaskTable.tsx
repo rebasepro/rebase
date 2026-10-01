@@ -374,22 +374,6 @@ function CompletedSection({
                 color="neutral"
                 className="w-full justify-between hover:bg-surface-hover px-3 py-1.5 h-auto text-left"
                 onClick={handleToggle}
-                endIcon={
-                    <svg
-                        className={cls(
-                            "h-3 w-3 text-text-secondary dark:text-text-secondary-dark transition-transform duration-150",
-                            expanded && "rotate-90"
-                        )}
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    >
-                        <polyline points="9 18 15 12 9 6" />
-                    </svg>
-                }
             >
                 <Typography
                     variant="caption"
@@ -398,6 +382,21 @@ function CompletedSection({
                 >
                     Completed{tasks.length > 0 ? ` (${tasks.length}${hasMore ? "+" : ""})` : ""}
                 </Typography>
+                {/* Button has no `endIcon`: it landed on the DOM as an attribute and the chevron never rendered. */}
+                <svg
+                    className={cls(
+                        "h-3 w-3 text-text-secondary dark:text-text-secondary-dark transition-transform duration-150",
+                        expanded && "rotate-90"
+                    )}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                >
+                    <polyline points="9 18 15 12 9 6" />
+                </svg>
             </Button>
             {expanded && (
                 <div className="mt-1 space-y-0.5">

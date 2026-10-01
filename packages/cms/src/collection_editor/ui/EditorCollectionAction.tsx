@@ -31,7 +31,6 @@ export function EditorCollectionAction({
         title={tooltipTitle}>
         <IconButton
             size={"small"}
-            color={"primary"}
             disabled={!canEditCollection}
             onClick={canEditCollection
                 ? () => collectionEditorController?.editCollection({

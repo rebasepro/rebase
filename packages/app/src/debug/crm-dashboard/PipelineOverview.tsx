@@ -98,9 +98,9 @@ export function PipelineOverview({
                     variant="text"
                     size="small"
                     onClick={() => { onNavigate('/c/engagements'); }}
-                    endIcon={<ChevronRightIcon className="h-4 w-4" />}
                 >
                     View All
+                    <ChevronRightIcon className="h-4 w-4" />
                 </Button>
             </div>
 

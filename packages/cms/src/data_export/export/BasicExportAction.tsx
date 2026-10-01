@@ -71,7 +71,7 @@ export function BasicExportAction({
             asChild={true}>
             <IconButton
                 size={"small"}
-                color={"primary"} onClick={handleClickOpen}>
+                onClick={handleClickOpen}>
                 <DownloadIcon
                     size={iconSize.small}/>
             </IconButton>

@@ -28,7 +28,7 @@ export function EntityTableCellActions({
         }
     }, []);
 
-    const iconRef = useRef<HTMLButtonElement>(undefined);
+    const iconRef = useRef<HTMLButtonElement>(null);
     useEffect(() => {
         if (iconRef.current && selected) {
             iconRef.current.focus({ preventScroll: true });
@@ -43,7 +43,6 @@ export function EntityTableCellActions({
                 {selected && !disabled && showExpandIcon &&
                     <IconButton
                         ref={iconRef}
-                        color={"inherit"}
                         size={"small"}
                         onClick={doOpenPopup}>
                         <svg

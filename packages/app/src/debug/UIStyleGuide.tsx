@@ -110,13 +110,13 @@ export const UIStyleGuide = () => {
                 <Paper className="p-6">
                     <div className="flex flex-wrap gap-8 items-center">
                         <div className="flex flex-col items-center gap-2">
-                            <IconButton color="primary">
+                            <IconButton>
                                 <IconExample/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">primary</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
-                            <IconButton color="secondary">
+                            <IconButton>
                                 <IconExample/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">secondary</span>
@@ -134,7 +134,7 @@ export const UIStyleGuide = () => {
                             <span className="text-[10px] text-text-disabled font-mono">disabled</span>
                         </div>
                         <div className="flex flex-col items-center gap-2">
-                            <IconButton size="small" color="error">
+                            <IconButton size="small">
                                 <Trash2Icon/>
                             </IconButton>
                             <span className="text-[10px] text-text-disabled font-mono">delete</span>

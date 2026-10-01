@@ -8,7 +8,6 @@ export function LanguageToggle() {
     return (
         <Menu
             trigger={<IconButton
-                color="inherit"
                 aria-label={t("change_language")}>
                 <LanguagesIcon size={iconSize.small}/>
             </IconButton>}>

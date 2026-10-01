@@ -227,7 +227,6 @@ export function FormEnhanceAction({
                     <IconButton
                         onClick={() => generate(instructions)}
                         size={"small"}
-                        color={!instructions ? "primary" : undefined}
                         disabled={loading || !instructions}>
                         {loading &&
                             <CircularProgress size={"smallest"}/>}

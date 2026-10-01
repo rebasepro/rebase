@@ -572,7 +572,6 @@ export function DrawerFooterActions({
                             <Menu
                                 trigger={
                                     <IconButton
-                                        color="inherit"
                                         aria-label={t("toggle_theme", { defaultValue: "Toggle theme" })}
                                         className="text-surface-500 dark:text-surface-400"
                                     >

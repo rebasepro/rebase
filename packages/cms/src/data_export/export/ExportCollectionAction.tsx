@@ -194,7 +194,6 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
             asChild={true}>
             <IconButton
                 size={"small"}
-                color={"primary"}
                 onClick={handleClickOpen}>
                 <DownloadIcon size={iconSize.small}/>
             </IconButton>

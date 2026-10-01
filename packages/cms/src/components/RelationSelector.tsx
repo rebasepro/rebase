@@ -776,7 +776,6 @@ relation } as RelationItem;
                                                 <IconButton
                                                     component={"div"}
                                                     size={"small"}
-                                                    color={"inherit"}
                                                     className="opacity-60 hover:opacity-100"
                                                     onClick={(e) => {
                                                         e.stopPropagation();

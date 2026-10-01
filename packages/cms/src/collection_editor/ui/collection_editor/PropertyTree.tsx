@@ -299,7 +299,6 @@ export function PropertyTreeEntry({
                         {onPropertyRemove && <Tooltip title={"Remove inferred property"}
                             asChild={true}>
                             <IconButton size="smallest"
-                                color="inherit"
                                 onClick={(e: React.MouseEvent) => {
                                     e.stopPropagation();
                                     onPropertyRemove(propertyKey, namespace);

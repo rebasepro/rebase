@@ -264,7 +264,6 @@ export function EntityPreviewBindingData({
                 <div className="flex-shrink-0">
                     <Tooltip title={`See details for ${entity.id}`} className={"shrink-0"}>
                         <IconButton
-                            color={"inherit"}
                             size={"small"}
                             className={size !== "small" ? "self-start" : ""}
                             onClick={(e) => {

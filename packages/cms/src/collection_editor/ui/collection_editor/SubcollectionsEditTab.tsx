@@ -102,8 +102,7 @@ export function SubcollectionsEditTab({
                                                             e.preventDefault();
                                                             e.stopPropagation();
                                                             setSubcollectionToDelete(subcollection.slug);
-                                                        }}
-                                                        color="inherit">
+                                                        }}>
                                                         <Trash2Icon size={iconSize.small}/>
                                                     </IconButton>
                                                 </Tooltip>
@@ -155,8 +154,7 @@ export function SubcollectionsEditTab({
                                                                 e.preventDefault();
                                                                 e.stopPropagation();
                                                                 setViewToDelete(view.key);
-                                                            }}
-                                                            color="inherit">
+                                                            }}>
                                                             <Trash2Icon size={iconSize.small}/>
                                                         </IconButton>
                                                     </Tooltip>

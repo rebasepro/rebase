@@ -349,7 +349,6 @@ function DrawerWrapper(props: {
             return null;
         return <>
             <IconButton
-                color="inherit"
                 aria-label={t("open_menu")}
                 onClick={() => props.setDrawerOpen(true)}
                 className="absolute sm:top-2 sm:left-4 top-1 left-2"

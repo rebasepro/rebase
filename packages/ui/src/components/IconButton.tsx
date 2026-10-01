@@ -2,18 +2,28 @@
 import React from "react";
 import { cls } from "../util";
 
-export type IconButtonProps<C extends React.ElementType> =
-    Omit<(C extends "button" ? React.ButtonHTMLAttributes<HTMLButtonElement> : React.ComponentProps<C>), "onClick">
-    & {
+type IconButtonOwnProps<C extends React.ElementType> = {
     size?: "medium" | "small" | "smallest" | "large";
     variant?: "ghost" | "filled",
     shape?: "circular" | "square",
     disabled?: boolean;
     toggled?: boolean;
     component?: C;
-    onClick?: React.MouseEventHandler<any>;
+    onClick?: React.MouseEventHandler<HTMLElement>;
+    className?: string;
+    children?: React.ReactNode;
     "aria-label"?: string;
-}
+};
+
+/**
+ * The kit's own props, plus those of the element it renders (`button`, or
+ * `component`). Typed against that element rather than `any`: a misspelt or
+ * invented prop is a compile error, not an attribute on the DOM. `color` is
+ * left out — it is an obsolete HTML attribute that does nothing, and callers
+ * wrote `color="primary"` expecting the accent icon `Button`'s `color` gives.
+ */
+export type IconButtonProps<C extends React.ElementType = "button"> =
+    IconButtonOwnProps<C> & Omit<React.ComponentPropsWithoutRef<C>, keyof IconButtonOwnProps<C> | "color">;
 
 const buttonClasses = "hover:scale-[1.04] active:scale-95 transition-transform";
 // `[&>svg]:shrink-0` is load-bearing: without it flex compresses the icon to
@@ -59,7 +69,7 @@ const IconButtonInner = <C extends React.ElementType = "button">({
                                                                  }: IconButtonProps<C>, ref: React.ForwardedRef<HTMLButtonElement>) => {
 
     const bgClasses = variant === "ghost" ? "bg-transparent hover:bg-surface-hover" : "bg-surface-raised hover:bg-surface-raised-hover";
-    const Component: React.ElementType<any> = component || "button";
+    const Component: React.ElementType = component || "button";
     const isNativeButton = Component === "button";
 
     // Give the icon a size that matches the button when the caller didn't pick
@@ -104,4 +114,5 @@ const IconButtonInner = <C extends React.ElementType = "button">({
     );
 };
 
-export const IconButton = React.forwardRef(IconButtonInner as React.ForwardRefRenderFunction<HTMLButtonElement, IconButtonProps<any>>) as React.ComponentType<IconButtonProps<any>>;
+export const IconButton = React.forwardRef(IconButtonInner as React.ForwardRefRenderFunction<HTMLButtonElement, IconButtonProps<React.ElementType>>) as
+    <C extends React.ElementType = "button">(props: IconButtonProps<C> & React.RefAttributes<HTMLButtonElement>) => React.ReactElement | null;

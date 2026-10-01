@@ -457,7 +457,6 @@ export function LoginView({
                 <LanguageToggle/>
                 <Menu
                     trigger={<IconButton
-                        color="inherit"
                         aria-label="Toggle theme">
                         {colorMode === "dark"
                             ? <MoonIcon size={iconSize.small}/>
