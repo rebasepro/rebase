@@ -1054,17 +1054,25 @@ parentEntityIds,
             : null;
 
         // Shared empty state — plugin slot takes priority, then override, then default
+        // "No results" is only true of a view the user narrowed: a search, or
+        // a filter they can clear. The collection's `fixedFilter` is its
+        // scope, not a filter, and a sort never empties a set — counting the
+        // declared default `sort` hid "Create your first entry" from every
+        // empty collection that declares one.
         const isSearching = !!tableController.searchString;
-        const isFilteredOrSorted = tableController.filterValues !== undefined || tableController.sortBy !== undefined || isSearching;
+        const fixedFilter = collection.fixedFilter;
+        const isFiltered = isSearching || Object.keys(tableController.filterValues ?? {})
+            .some(key => !fixedFilter || !(key in fixedFilter));
         const ResolvedEmptyState = useComponentOverride("Collection.EmptyState", DefaultCollectionEmptyState);
         const ResolvedCollectionActions = useComponentOverride("Collection.Actions", CollectionViewActions);
         const ResolvedCollectionTable = useComponentOverride("Collection.Table", CollectionTableBinding) as typeof CollectionTableBinding;
         const emptyComponent = pluginEmptyStates.length > 0
             ? <>{pluginEmptyStates}</>
             : <ResolvedEmptyState
-                canCreate={canCreateEntities && !isFilteredOrSorted}
+                canCreate={canCreateEntities && !isFiltered}
                 onNewClick={onNewClick}
                 isSearching={isSearching}
+                isFiltered={isFiltered}
                 searchString={tableController.searchString ?? ""}
             />;
 
@@ -1421,11 +1429,14 @@ function DefaultCollectionEmptyState({
     canCreate,
     onNewClick,
     isSearching,
+    isFiltered,
     searchString
 }: {
     canCreate: boolean;
     onNewClick: () => void;
     isSearching: boolean;
+    /** A search or a filter the user applied is narrowing the view. */
+    isFiltered?: boolean;
     searchString: string;
 }) {
     const { t } = useTranslation();
@@ -1443,11 +1454,14 @@ function DefaultCollectionEmptyState({
             </div>
         );
     }
+    // Nothing narrows the view and the user cannot create: the collection is
+    // empty, which is all there is to say.
+    let message = t("no_entries_found");
+    if (isSearching) message = t("no_results_search", { search: searchString });
+    else if (isFiltered) message = t("no_results_filter");
     return (
         <Typography variant={"label"}>
-            {isSearching
-                ? t("no_results_search", { search: searchString })
-                : t("no_results_filter_sort")}
+            {message}
         </Typography>
     );
 }

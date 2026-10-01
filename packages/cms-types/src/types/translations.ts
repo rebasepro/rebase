@@ -91,6 +91,8 @@ export interface RebaseTranslations {
     all_entries_loaded: string;
     create_your_first_entry: string;
     no_results_filter_sort: string;
+    /** An empty view the user narrowed with filters */
+    no_results_filter: string;
     /** Shown when a text search yields no results. Supports `{{search}}` interpolation. */
     no_results_search?: string;
     add: string;

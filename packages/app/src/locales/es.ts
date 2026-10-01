@@ -70,6 +70,7 @@ export const es: RebaseTranslations = {
     all_entries_loaded: "Todas las {{count}} entradas cargadas",
     create_your_first_entry: "Crea tu primera entrada",
     no_results_filter_sort: "No hay resultados con el filtro/orden aplicado",
+    no_results_filter: "No hay resultados con los filtros aplicados",
     no_results_search: "No se encontraron resultados para \"{{search}}\"",
     add: "Añadir",
     remove: "Quitar",
