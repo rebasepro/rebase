@@ -3,7 +3,7 @@ import { cls, defaultBorderMixin, IconButton, Sheet, Tooltip } from "@rebasepro/
 import { ChevronLeftIcon, ErrorBoundary, MenuIcon } from "@rebasepro/ui";
 import { deepEqual as equal } from "fast-equals"
 
-import { useLargeLayout, useTranslation } from "@rebasepro/app";
+import { ConnectionLostBanner, useLargeLayout, useTranslation } from "@rebasepro/app";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { AppContext } from "./useApp";
 
@@ -261,6 +261,14 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
                         className="flex flex-col grow overflow-auto">
 
                         {hasAppBar && <DrawerHeader/>}
+
+                        {/* Above the sheet, so it is there on every screen: while
+                            the realtime connection is down, every live view is
+                            showing what it last received. */}
+                        <ConnectionLostBanner className={cls("px-2 pt-1", {
+                            "lg:pt-0 lg:pb-2": padding,
+                            "lg:pt-2": !hasAppBar && padding
+                        })}/>
 
                         <div
                             // The sheet is one lightness step above the frame AND carries a

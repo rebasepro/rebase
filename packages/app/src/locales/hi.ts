@@ -194,6 +194,8 @@ export const hi: RebaseTranslations = {
     error_updating_asset: "एसेट अपडेट करने में त्रुटि",
     error_deleting_asset: "एसेट हटाने में त्रुटि",
     error_firestore_index: "इस क्वेरी के लिए Firestore इंडेक्स आवश्यक है।",
+    realtime_connection_lost_title: "लाइव अपडेट रुके हुए हैं",
+    realtime_connection_lost_body: "सर्वर से कनेक्शन टूट गया है, इसलिए आप जो देख रहे हैं वह पुराना हो सकता है। कनेक्शन वापस आते ही यह अपडेट हो जाएगा।",
     create_index: "इंडेक्स बनाएं",
     value_is_not_reference: "मान एक संदर्भ नहीं है।",
     click_to_edit: "संपादित करने के लिए क्लिक करें",

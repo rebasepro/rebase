@@ -172,6 +172,10 @@ export interface RebaseTranslations {
     error_deleting: string;
     error_before_delete: string;
     error_firestore_index: string;
+    /** Banner title while the realtime connection is down and live views are not updating */
+    realtime_connection_lost_title: string;
+    /** Banner body for the same */
+    realtime_connection_lost_body: string;
     create_index: string;
     value_is_not_reference: string;
     click_to_edit: string;

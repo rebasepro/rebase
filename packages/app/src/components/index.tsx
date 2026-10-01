@@ -25,3 +25,4 @@ export * from "./LoginView";
 export * from "./RebaseAuth";
 
 export * from "./SchemaDriftBanner";
+export * from "./ConnectionLostBanner";

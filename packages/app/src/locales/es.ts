@@ -202,6 +202,8 @@ export const es: RebaseTranslations = {
     error_updating_asset: "Error al actualizar recurso",
     error_deleting_asset: "Error al eliminar recurso",
     error_firestore_index: "Se requiere un índice de Firestore para esta consulta.",
+    realtime_connection_lost_title: "Actualizaciones en directo en pausa",
+    realtime_connection_lost_body: "Se ha perdido la conexión con el servidor, así que lo que ves puede estar desactualizado. Se actualizará en cuanto vuelva la conexión.",
     create_index: "Crear índice",
     value_is_not_reference: "El valor no es una referencia.",
     click_to_edit: "Haz clic para editar",

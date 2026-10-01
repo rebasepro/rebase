@@ -26,7 +26,9 @@ jest.mock("@rebasepro/app", () => ({
         return large;
     },
     useAdminModeController: () => ({ mode: "cms" }),
-    useTranslation: () => ({ t: (k: string) => k })
+    useTranslation: () => ({ t: (k: string) => k }),
+    // The realtime banner has its own test in @rebasepro/app.
+    ConnectionLostBanner: () => null
 }));
 
 function setLargeLayout(large: boolean) {

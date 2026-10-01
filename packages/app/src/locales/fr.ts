@@ -194,6 +194,8 @@ export const fr: RebaseTranslations = {
     error_updating_asset: "Erreur lors de la mise à jour de l'actif",
     error_deleting_asset: "Erreur lors de la suppression de l'actif",
     error_firestore_index: "Un index Firestore est requis pour cette requête.",
+    realtime_connection_lost_title: "Mises à jour en direct suspendues",
+    realtime_connection_lost_body: "La connexion au serveur a été perdue : ce que vous voyez n'est peut-être plus à jour. L'affichage se mettra à jour dès le retour de la connexion.",
     create_index: "Créer un index",
     value_is_not_reference: "La valeur n'est pas une référence.",
     click_to_edit: "Cliquez pour modifier",

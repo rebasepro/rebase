@@ -202,6 +202,8 @@ export const en: RebaseTranslations = {
     error_updating_asset: "Error updating asset",
     error_deleting_asset: "Error deleting asset",
     error_firestore_index: "A Firestore index is required for this query.",
+    realtime_connection_lost_title: "Live updates paused",
+    realtime_connection_lost_body: "The connection to the server was lost, so what you see may be out of date. It refreshes as soon as the connection is back.",
     create_index: "Create Index",
     value_is_not_reference: "Value is not a reference.",
     click_to_edit: "Click to edit",
