@@ -243,7 +243,8 @@ describe("storage routes fire triggers", () => {
             }
         }));
         expect(create.status).toBe(201);
-        const id = new URL(create.headers.get("Location")!).pathname.split("/").pop()!;
+        // Resolved against the endpoint, as a TUS client does: the Location is a path.
+        const id = new URL(create.headers.get("Location")!, "http://localhost/api/storage/tus").pathname.split("/").pop()!;
 
         // Two chunks, because the interesting question is whether the trigger
         // fires per chunk or per upload.
