@@ -24,13 +24,15 @@ export type { ImageTransformOptions } from "./image-transform";
 export { TusHandler } from "./tus-handler";
 export {
     createUploadConstraintResolver,
+    createUploadPathResolver,
     assertUploadWithinPropertyLimits,
+    assertUploadWithinPathLimits,
     isAcceptedFile,
     readUploadPropertyContext,
     UPLOAD_COLLECTION_FIELD,
     UPLOAD_PROPERTY_FIELD
 } from "./property-limits";
-export type { UploadConstraints, ResolveUploadConstraints } from "./property-limits";
+export type { UploadConstraints, ResolveUploadConstraints, ResolveUploadPathConstraints } from "./property-limits";
 
 import { BackendStorageConfig, StorageController } from "./types";
 import { LocalStorageController } from "./LocalStorageController";

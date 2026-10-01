@@ -121,6 +121,7 @@ import {
     BackendStorageConfig,
     createStorageRoutes,
     createUploadConstraintResolver,
+    createUploadPathResolver,
     DEFAULT_MAX_FILE_SIZE,
     DEFAULT_STORAGE_ID,
     StorageController,
@@ -2514,7 +2515,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // Read lazily so a collection registered after this point (the
             // introspected ones) is still covered.
             uploadConstraints: (slug, property) =>
-                createUploadConstraintResolver(collectionRegistry.getRawCollections())(slug, property)
+                createUploadConstraintResolver(collectionRegistry.getRawCollections())(slug, property),
+            // And the same limits by where the file lands: every upload into a
+            // property's `storagePath` meets them, whether or not it names the
+            // property. Compiled once per collection list.
+            uploadPathConstraints: (storageId, key) =>
+                createUploadPathResolver(collectionRegistry.getRawCollections())(storageId, key)
         });
 
         // Wrapper router: middleware must be registered BEFORE the routes it

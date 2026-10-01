@@ -233,18 +233,15 @@ export interface UploadFileProps {
      * and the property path within it (`coverImage`, `meta.avatar`,
      * `gallery` for an array of files).
      *
-     * The server reads it to enforce that property's own `storage.maxSize` and
-     * `storage.acceptedFiles`, which were declared per property, published in
-     * the generated types, rendered by the panel's file picker, and until now
-     * enforced by nothing on the server — so a `curl` past the picker put a
-     * 40 MB executable in a bucket whose config said "images, under 200 KB".
+     * The server holds the upload to that property's own `storage.maxSize`
+     * and `storage.acceptedFiles`. It holds every upload to the limits of the
+     * properties whose `storagePath` its key falls in anyway, named or not;
+     * naming the property adds that property's rule, which matters for a
+     * property whose `storagePath` is a function the server cannot read.
      *
      * Advisory in one direction only. The rules are resolved from the server's
-     * own registry by slug, so naming a property can make an upload *stricter*
-     * or leave it at the global cap; it can never widen anything.
-     *
-     * Omitted, the upload is checked against the deployment's global
-     * `maxFileSize` exactly as before.
+     * own registry by slug, so naming a property can make an upload *stricter*;
+     * it can never widen anything.
      */
     context?: UploadPropertyContext
 }

@@ -1,5 +1,7 @@
 import type { CollectionConfig, Property, StorageConfig } from "@rebasepro/types";
+import { PUBLIC_STORAGE_PREFIX, resourceKeyOf } from "@rebasepro/types";
 import { ApiError } from "../api/errors";
+import { canonicalStorageId } from "./keys";
 
 /**
  * Server-side enforcement of a storage property's own `maxSize` and
@@ -14,12 +16,14 @@ import { ApiError } from "../api/errors";
  * executable in the avatar bucket, and the config that said otherwise was never
  * consulted.
  *
- * The limits are per *property*, so enforcing them needs to know which property
- * a request is for. Uploads carry that as context (a form field on `POST
- * /upload`, `Upload-Metadata` on the resumable path); when it is absent the
- * global cap is still the ceiling, exactly as before. That is the honest
- * fallback: an upload that names no property has no property limit to check,
- * and refusing every context-less upload would break every existing client.
+ * The limits are per *property*, and the server finds the property two ways.
+ * By where the file lands: a property's `storagePath` is where its files go, so
+ * every upload into it meets the property's limits (`createUploadPathResolver`)
+ * — the panel never named its property, and a direct caller need not. And by
+ * name, when the upload carries context (a form field on `POST /upload`,
+ * `Upload-Metadata` on the resumable path), which covers a property whose
+ * `storagePath` is a function. A key no property claims, uploaded with no
+ * context, meets the source's own limit alone.
  */
 
 /** What a property says a file may be. */
@@ -105,6 +109,133 @@ export function createUploadConstraintResolver(
             source: `${collectionSlug}.${propertyPath}`
         };
     };
+}
+
+/**
+ * The limits of every property whose storage path a key falls in.
+ *
+ * @param storageId the source the upload is written to, canonical.
+ * @param key the canonical key the upload is written to.
+ */
+export type ResolveUploadPathConstraints = (storageId: string, key: string) => UploadConstraints[];
+
+interface UploadPathRule {
+    storageId: string;
+    pattern: RegExp;
+    constraints: UploadConstraints;
+}
+
+/**
+ * A `storagePath` template as a pattern over the keys the panel writes under
+ * it: `<storagePath>/<fileName>`, one segment for the file, under `public/`
+ * for a public property.
+ *
+ * The placeholders the panel fills in (`resolveStoragePathString`) are
+ * wildcards: one segment each, except `{path}` — a collection path, which a
+ * subcollection's has several of — and `{file.type}`, which has a `/` in it.
+ */
+function storagePathPattern(template: string, isPublic: boolean): RegExp {
+    const trimmed = template.replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
+    const prefixed = isPublic && !trimmed.startsWith(PUBLIC_STORAGE_PREFIX) && trimmed !== PUBLIC_STORAGE_PREFIX.slice(0, -1)
+        ? `${PUBLIC_STORAGE_PREFIX}${trimmed}`.replace(/\/+$/, "")
+        : trimmed;
+    const body = prefixed
+        .split(/(\{[^}]*\})/)
+        .map(part => {
+            if (part === "{path}" || part === "{file.type}") return ".+";
+            if (/^\{(propertyKey|rand|file|file\.name|file\.ext|entityId)\}$/.test(part)) return "[^/]+";
+            return part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        })
+        .join("");
+    return new RegExp(`^${body ? `${body}/` : ""}[^/]+$`);
+}
+
+/** Every storage property in a property map, with its dotted path. */
+function storageProperties(
+    properties: Record<string, Property> | undefined,
+    prefix: string
+): { path: string; storage: StorageConfig }[] {
+    if (!properties) return [];
+    const found: { path: string; storage: StorageConfig }[] = [];
+    for (const [key, property] of Object.entries(properties)) {
+        const path = prefix ? `${prefix}.${key}` : key;
+        let current: Property | undefined = property;
+        while (current?.type === "array" && current.of && !Array.isArray(current.of)) {
+            current = current.of as Property;
+        }
+        const storage = (current as { storage?: StorageConfig } | undefined)?.storage;
+        if (storage) found.push({ path, storage });
+        if (current?.type === "map") {
+            found.push(...storageProperties(current.properties as Record<string, Property> | undefined, path));
+        }
+    }
+    return found;
+}
+
+const pathRuleCache = new WeakMap<readonly CollectionConfig[], UploadPathRule[]>();
+
+/**
+ * The storage-path rules of the collections this backend serves.
+ *
+ * A property's `maxSize` and `acceptedFiles` used to be checked only when an
+ * upload named the property — which the panel never did, and a direct caller
+ * simply does not — so the limits the docs called "enforced by the server"
+ * held for nobody. A property's `storagePath` is where its files go, so it is
+ * also where its limits hold: every upload into that path, through any door,
+ * meets them.
+ *
+ * A path computed by a function cannot be read without running it, and has no
+ * rule; neither has a property that declares no limits.
+ */
+export function createUploadPathResolver(collections: readonly CollectionConfig[]): ResolveUploadPathConstraints {
+    let rules = pathRuleCache.get(collections);
+    if (!rules) {
+        rules = [];
+        for (const collection of collections) {
+            for (const { path, storage } of storageProperties(collection.properties as Record<string, Property>, "")) {
+                if (typeof storage.storagePath !== "string") continue;
+                if (storage.maxSize === undefined && !storage.acceptedFiles?.length) continue;
+                rules.push({
+                    storageId: canonicalStorageId(storage.storageSource === undefined ? undefined : resourceKeyOf(storage.storageSource)),
+                    pattern: storagePathPattern(storage.storagePath, storage.public === true),
+                    constraints: {
+                        maxSize: storage.maxSize,
+                        acceptedFiles: storage.acceptedFiles,
+                        source: `${collection.slug}.${path}`
+                    }
+                });
+            }
+        }
+        pathRuleCache.set(collections, rules);
+    }
+    const compiled = rules;
+    return (storageId, key) => compiled
+        .filter(rule => rule.storageId === storageId && rule.pattern.test(key))
+        .map(rule => rule.constraints);
+}
+
+/**
+ * Refuse an upload that no property claiming its path would accept.
+ *
+ * Several properties may share a path; the file is for one of them, so it is
+ * enough that one accepts it. When none does, the first one's refusal is the
+ * answer, naming its property.
+ */
+export function assertUploadWithinPathLimits(
+    constraints: readonly UploadConstraints[],
+    file: { size?: number; type?: string; name?: string }
+): void {
+    if (constraints.length === 0) return;
+    let refusal: unknown;
+    for (const rule of constraints) {
+        try {
+            assertUploadWithinPropertyLimits(rule, file);
+            return;
+        } catch (err) {
+            refusal ??= err;
+        }
+    }
+    throw refusal;
 }
 
 /**

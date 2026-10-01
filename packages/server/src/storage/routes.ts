@@ -16,9 +16,11 @@ import { LocalStorageController } from "./LocalStorageController";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
 import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type DownloadConfig, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
 import {
+    assertUploadWithinPathLimits,
     assertUploadWithinPropertyLimits,
     readUploadPropertyContext,
-    type ResolveUploadConstraints
+    type ResolveUploadConstraints,
+    type ResolveUploadPathConstraints
 } from "./property-limits";
 import { objectValidators, isNotModified, applyCacheHeaders, buildEntityTag } from "./cache-headers";
 import { parseRange, contentRange, unsatisfiableContentRange } from "./range";
@@ -254,6 +256,13 @@ export interface StorageRoutesConfig {
      * to the global cap exactly as before.
      */
     uploadConstraints?: ResolveUploadConstraints;
+    /**
+     * The limits of the properties whose `storagePath` an upload's key falls
+     * in, by source and key — see `createUploadPathResolver`. Applied to every
+     * upload, whether or not it names a property, so a property's limits hold
+     * for every file written where its files go.
+     */
+    uploadPathConstraints?: ResolveUploadPathConstraints;
     /**
      * When provided, storage routes delegate auth to this adapter instead
      * of the built-in JWT module. This mirrors how data routes use
@@ -674,11 +683,18 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // context leaves the global cap in charge, which is what every existing
         // client relies on.
         const uploadContext = readUploadPropertyContext(body as Record<string, unknown>);
+        const fileFacts = { size: uploadedFile.size, type: uploadedFile.type, name: uploadedFile.name };
         if (uploadContext && config.uploadConstraints) {
             assertUploadWithinPropertyLimits(
                 config.uploadConstraints(uploadContext.collection, uploadContext.property),
-                { size: uploadedFile.size, type: uploadedFile.type, name: uploadedFile.name }
+                fileFacts
             );
+        }
+        // And the rules of the path the file lands in, named or not: a
+        // property's limits hold for every file written where its files go,
+        // and naming a looser property does not unlock a stricter one's path.
+        if (config.uploadPathConstraints) {
+            assertUploadWithinPathLimits(config.uploadPathConstraints(canonicalStorageId(storageId), finalKey), fileFacts);
         }
 
         // Extract custom metadata from request body
@@ -1199,7 +1215,9 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // `POST /upload` alone would leave the resumable route as the way
         // around it — which is exactly how the global cap came to be missing
         // from this path in the first place.
-        config.uploadConstraints
+        config.uploadConstraints,
+        // And the rules of the path the upload lands in, for the same reason.
+        config.uploadPathConstraints
     );
     tusHandler.startCleanup();
 

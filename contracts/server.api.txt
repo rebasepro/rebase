@@ -72,6 +72,7 @@ function assertIfMatch
 function assertNestedWriteAllowed
 function assertNoFieldOpsOnCreate
 function assertQueryFieldsReadable
+function assertUploadWithinPathLimits
 function assertUploadWithinPropertyLimits
 function assertUserCreationBodyValid
 function assertWriteRequestValid
@@ -116,6 +117,7 @@ function createStorageRoutes
 function createTwitterProvider
 function createUnconfiguredEmailService
 function createUploadConstraintResolver
+function createUploadPathResolver
 function createUserThroughAuthCollection
 function declaredErrorAnswer
 function declaredUniqueTargets
@@ -354,7 +356,7 @@ interface StorageController { deleteObject, getMetadata, getObject, getSignedUrl
 interface StoragePolicy { allow, operations, path }
 interface StoragePolicyContext { bucket, data, key, operation, params, storageId, user }
 interface StorageRegistry { get, getDefault, getOrDefault, has, list, register, size }
-interface StorageRoutesConfig { authAdapter, authorize, authorizeData, basePath, controller, downloadTokenTtlSeconds, maxFileSize, publicRead, registry, renditionCache, requireAuth, sources, triggers, uploadConstraints }
+interface StorageRoutesConfig { authAdapter, authorize, authorizeData, basePath, controller, downloadTokenTtlSeconds, maxFileSize, publicRead, registry, renditionCache, requireAuth, sources, triggers, uploadConstraints, uploadPathConstraints }
 interface TokenRepository { createMagicLinkToken, createPasswordResetToken, createRefreshToken, deleteAllPasswordResetTokensForUser, deleteAllRefreshTokensForUser, deleteExpiredTokens, deleteRefreshToken, deleteRefreshTokenById, findRefreshTokenByHash, findValidMagicLinkToken, findValidPasswordResetToken, getTokensValidAfter, listRefreshTokensForUser, markMagicLinkTokenUsed, markPasswordResetTokenUsed, markRefreshTokenRotated, pruneRefreshTokens, revokeRefreshTokenSession, setTokensValidAfter }
 interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
 interface UploadConstraints { acceptedFiles, maxSize, source }
@@ -392,6 +394,7 @@ type PublicJwk
 type RebaseBootEnv
 type RebaseEnv
 type ResolveUploadConstraints
+type ResolveUploadPathConstraints
 type ResolvedAuthHooks
 type ResourceResolution
 type RlsScanner

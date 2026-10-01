@@ -27,9 +27,11 @@ import {
     noDefaultStorageSourceError
 } from "./request-keys";
 import {
+    assertUploadWithinPathLimits,
     assertUploadWithinPropertyLimits,
     readUploadPropertyContext,
-    type ResolveUploadConstraints
+    type ResolveUploadConstraints,
+    type ResolveUploadPathConstraints
 } from "./property-limits";
 
 /** Metadata for an in-progress resumable upload. */
@@ -172,7 +174,13 @@ export class TusHandler {
          * and the metadata's content type, so a file the property will not
          * accept is refused before the first chunk rather than after the last.
          */
-        private uploadConstraints?: ResolveUploadConstraints
+        private uploadConstraints?: ResolveUploadConstraints,
+        /**
+         * The limits of the properties whose storage path the upload's key
+         * falls in — checked whether or not the upload names a property, as
+         * `POST /upload` checks them.
+         */
+        private uploadPathConstraints?: ResolveUploadPathConstraints
     ) {
         this.tusDir = join(storageBaseDir, ".tus-uploads");
     }
@@ -376,6 +384,13 @@ export class TusHandler {
         const target = this.targetFor(storageId);
         if (target) {
             writableBucketOrRefuse(bucket, target, knownSources);
+        }
+
+        if (this.uploadPathConstraints) {
+            assertUploadWithinPathLimits(
+                this.uploadPathConstraints(canonicalStorageId(storageId), key),
+                { size: uploadLength, type: contentType, name: metadata.filename || metadata.key }
+            );
         }
 
         // The destination source's own limit — the number `OPTIONS` advertised

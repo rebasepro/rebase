@@ -14,7 +14,7 @@ That split matters more than it looks. Most of `storage` is read by the admin
 panel's uploader on its way to the API, so a write that does not come from a
 form does not go through it — those options carry the label below. The two that
 decide what a file may *be*, `maxSize` and `acceptedFiles`, are the exception:
-the server checks them on every upload.
+the server checks them on every upload into the property's `storagePath`.
 
 ## One file
 
@@ -56,12 +56,12 @@ Everything inside `storage`.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `storagePath` | `string \| function` | **Required.** Where in the bucket the file goes. A string with placeholders — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — or a function of the upload's context. **Admin form only — not enforced by the API or the database:** it is the panel's uploader that resolves it, and `client.storage.upload()` names its own key |
+| `storagePath` | `string \| function` | **Required.** Where in the bucket the file goes. A string with placeholders — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — or a function of the upload's context. **Admin form only — not enforced by the API or the database:** it is the panel's uploader that resolves it, and `client.storage.upload()` names its own key. A string path is also where the server holds every upload to this property's `maxSize` and `acceptedFiles` |
 | `fileName` | `string \| function` | The uploaded object's file name, with the same placeholders. **Admin form only — not enforced by the API or the database.** |
 | `storageSource` | `string` | Which registered bucket, when a project has more than one. The `bucket("media")` handle works here too |
 | `public` | `boolean` | Store under the public prefix and serve through a stable, token-less, cacheable URL. `false` by default, which means private objects and short-lived signed URLs |
-| `acceptedFiles` | `FileType[]` | MIME types this property takes. The asterisk form works — `image/*`. **Enforced by the server**, not only by the file picker |
-| `maxSize` | `number` | Largest accepted file, in bytes. **Enforced by the server**, on the plain and the resumable upload paths alike |
+| `acceptedFiles` | `FileType[]` | MIME types this property takes. The asterisk form works — `image/*`. **Enforced by the server** for every upload into the property's `storagePath` — see [What the server checks](#what-the-server-checks) |
+| `maxSize` | `number` | Largest accepted file, in bytes. **Enforced by the server**, like `acceptedFiles`, on the plain and the resumable upload paths alike |
 | `metadata` | `Record<string, unknown>` | Object metadata to store alongside the file |
 | `includeBucketUrl` | `boolean` | Write `s3://my-bucket/path/to/file.png` into the column instead of `path/to/file.png`. `false` by default |
 | `storeUrl` | `boolean` | Write the download URL into the column instead of the key. `false` by default, and worth leaving that way: a URL that carries a token stops working when the token does, and the original reference is then gone |
@@ -87,10 +87,24 @@ property a file was destined for, so `curl -F file=@payload.exe` past the picker
 put a 40 MB executable in the avatar bucket and the config that said otherwise
 was never consulted.
 
-Both are now checked server-side, against the property the upload names. An
-upload that names no property — an older client, a direct call — still falls
-back to the global cap, because a request with no property context has no
-property rule to check, and refusing it would break clients that predate this.
+Both are now checked by the server against **where the file lands**. A
+property's `storagePath` is where its files go, so it is also where its limits
+hold: every upload whose key is a file directly under that path — from the
+panel, `client.storage.putObject`, a resumable upload, Studio's storage browser
+or `curl` — meets them, whether or not it names the property, on the property's
+own storage source. Placeholders match whatever the panel would fill in:
+`{entityId}`, `{rand}`, `{file}` and the like stand for one path segment,
+`{path}` for any number. A `public: true` property's path is under `public/`.
+
+- Several properties sharing one path: a file one of them accepts is accepted.
+- An upload that also names its property (`collection` + `property`, as
+  `putObject({ context })` sends them) is held to that property too. Naming a
+  looser property does not unlock a stricter one's path.
+- A `storagePath` written as a function cannot be read without running it, so
+  it has no server-side rule: those limits hold only for uploads that name the
+  property.
+- A path no property claims is held to the source's own limit
+  (`STORAGE_MAX_FILE_SIZE`) alone.
 
 ### Images in a markdown field
 
