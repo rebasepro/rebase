@@ -12,7 +12,7 @@ import { PluginFormActionProps } from "@rebasepro/cms-types";
 import { useAuthController } from "@rebasepro/app";
 import { autofillStream, fetchAiStatusCached, fetchPromptSuggestions } from "../api";
 import { getSimplifiedProperties } from "../utils/properties";
-import { flatMapEntityValues, omitDisabledValues } from "../utils/values";
+import { flatMapEntityValues, isRequestedSuggestion, omitDisabledValues } from "../utils/values";
 import { useEditorAIController } from "../editor/useEditorAIController";
 import { getValueInPath } from "@rebasepro/utils";
 
@@ -219,7 +219,7 @@ fields };
                     instructions: params.instructions
                 },
                 onDelta: (key, text) => {
-                    if (!isCurrent()) return;
+                    if (!isCurrent() || !isRequestedSuggestion(key, currentProperties)) return;
                     upsertField(key, (existing) => existing
                         ? { ...existing,
 proposed: String(existing.proposed ?? "") + text }
@@ -233,7 +233,7 @@ proposed: String(existing.proposed ?? "") + text }
                         });
                 },
                 onValue: (key, value) => {
-                    if (!isCurrent()) return;
+                    if (!isCurrent() || !isRequestedSuggestion(key, currentProperties)) return;
                     const coerced = coerceToProperty(value, getPropertyFromKey(currentProperties, key));
                     upsertField(key, (existing) => ({
                         key,

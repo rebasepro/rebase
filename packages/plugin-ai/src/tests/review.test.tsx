@@ -761,3 +761,47 @@ describe("the availability probe", () => {
         expect(statusCalls.length).toBe(1);
     });
 });
+
+describe("autofill applies only what it asked for", () => {
+    /**
+     * The service answers with whatever keys it likes, and it is steered by the
+     * record's other values, which visitors may have written. A suggestion for
+     * a field the form locks (`readOnly`, so the request marked it disabled and
+     * sent no value) or for a key that is no property at all reached the
+     * review pre-ticked, and Apply wrote it into the form — the README says
+     * such fields are "neither filled nor sent".
+     */
+    const LOCKED_COLLECTION = {
+        name: "Products",
+        singularName: "Product",
+        properties: {
+            title: { type: "string", name: "Title" },
+            approved: { type: "string", name: "Approved", admin: { readOnly: true } },
+            stock: { type: "number", name: "Stock" }
+        }
+    } as any;
+
+    it("does not offer or write a field the service was never asked about, nor a locked one", async () => {
+        const body = [
+            'event: suggestion_delta\ndata: {"key":"approved","text":"y"}',
+            'event: suggestion\ndata: {"key":"title","value":"Blue widget"}',
+            'event: suggestion\ndata: {"key":"approved","value":"yes"}',
+            'event: suggestion\ndata: {"key":"ownerId","value":"attacker"}',
+            'event: done\ndata: {"suggestions":{}}',
+            ""
+        ].join("\n\n");
+        mockService(() => streamingResponse([body]));
+        const { result, setFieldValue } = await mountController({ title: "", approved: "no" }, { collection: LOCKED_COLLECTION });
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+        await act(async () => {
+            await result.current.generate({ values: { title: "", approved: "no" } });
+        });
+
+        expect(autofillRequestBody().properties.approved.disabled).toBe(true);
+        expect(result.current.review?.fields.map(f => f.key)).toEqual(["title"]);
+        act(() => {
+            result.current.applyReview();
+        });
+        expect(setFieldValue.mock.calls).toEqual([["title", "Blue widget"]]);
+    });
+});

@@ -70,3 +70,20 @@ export function omitDisabledValues(
             !disabled.some((prefix) => key === prefix || key.startsWith(`${prefix}.`)))
     );
 }
+
+/**
+ * Whether a suggestion the service sent for `key` may reach the review: `key`
+ * is a property the request described, and neither it nor a map above it is
+ * disabled.
+ *
+ * The service answers with whatever keys it likes, steered by the record's
+ * other values — which visitors may have written. A suggestion for a locked
+ * field, or for a key that is no property at all, is one the request never
+ * asked for, and applying it writes past the lock the request stated.
+ */
+export function isRequestedSuggestion(key: string, properties: Record<string, InputProperty>): boolean {
+    const property = Object.hasOwn(properties ?? {}, key) ? properties[key] : undefined;
+    if (!property || typeof property !== "object" || property.disabled) return false;
+    return !Object.entries(properties).some(([prefix, other]) =>
+        other && typeof other === "object" && other.disabled && key.startsWith(`${prefix}.`));
+}
