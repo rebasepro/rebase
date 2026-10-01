@@ -34,6 +34,8 @@ import {
 import { resolveCliEntry, resolveSpawn } from "../dev-db/daemon";
 import path from "path";
 import fs from "fs";
+import os from "os";
+import { createHash } from "crypto";
 import { fileURLToPath } from "url";
 import {
     cmsMountOf,
@@ -239,6 +241,68 @@ export function devWatchIncludes(
         .map(entry => path.resolve(projectRoot, entry));
     dirs.push(path.join(projectRoot, "config"));
     return dirs;
+}
+
+/** Where dev watches the collections it regenerates the schema and SDK from. */
+function devCollectionsDir(projectRoot: string): string {
+    return path.join(projectRoot, "config", "collections");
+}
+
+/**
+ * The file dev writes to restart the backend, or `null` when tsx would not see it.
+ *
+ * Outside the project, so nothing appears in the developer's tree, and keyed by
+ * the project so two `rebase dev`s never restart each other. tsx ignores every
+ * path with a dot-named segment (its built-in `**\/.*\/**`), so a trigger under
+ * `.rebase/` — or under a TMPDIR inside a dot directory — would never fire; in
+ * that case there is no trigger and {@link devWatchArgs} leaves the
+ * collections to tsx, as before.
+ */
+export function devRestartTrigger(projectRoot: string): string | null {
+    let tmp = os.tmpdir();
+    try {
+        tmp = fs.realpathSync(tmp);
+    } catch {
+        // A tmpdir that cannot be resolved is used as given.
+    }
+    const key = createHash("sha256").update(projectRoot).digest("hex").slice(0, 16);
+    // Named for what it means: tsx prints the name on every restart it causes.
+    const trigger = path.join(tmp, "rebase-dev", key, "collections-changed");
+    return trigger.split(path.sep).some(segment => segment.startsWith(".")) ? null : trigger;
+}
+
+/**
+ * The `tsx watch` argument list for the backend (unquoted).
+ *
+ * One save of a collection file must restart the backend once. The runtime
+ * `import()`s the collections, so tsx tracks them as dependencies and used to
+ * restart the moment a file was saved — before dev had regenerated
+ * `schema.generated.ts`. That boot warned "schema.generated.ts no longer
+ * describes the database … Run `rebase schema generate`", telling the reader to
+ * run what dev was running at that moment, and the regeneration then rewrote
+ * the file and restarted the backend a second time. So tsx is told to leave the
+ * collections directory alone (`--exclude` wins over its dependency tracking),
+ * and dev restarts the backend itself, once, after the regeneration — through
+ * `restartTrigger`, which tsx watches.
+ */
+export function devWatchArgs(
+    projectRoot: string,
+    paths: { REBASE_DEV_FUNCTIONS?: string; REBASE_DEV_CRONS?: string },
+    entryTarget: string,
+    restartTrigger: string | null
+): string[] {
+    // tsx's own flags first: it stops reading flags at the first one it does
+    // not know (`--conditions` is Node's) and hands the rest to Node, which
+    // then refuses `--include` as a bad option.
+    const args = ["watch"];
+    for (const dir of devWatchIncludes(projectRoot, paths)) args.push("--include", dir);
+    if (restartTrigger) {
+        args.push("--include", restartTrigger);
+        // A glob, so forward slashes whatever the platform's separator is.
+        args.push("--exclude", `${devCollectionsDir(projectRoot).split(path.sep).join("/")}/**`);
+    }
+    args.push("--conditions", "development", entryTarget);
+    return args;
 }
 
 /**
@@ -1373,10 +1437,37 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             Object.assign(env, runtimePaths);
         }
 
-        const watchArgs = ["watch", "--conditions", "development", quoteForShell(entryTarget)];
-        for (const dir of devWatchIncludes(projectRoot, runtimePaths)) {
-            watchArgs.splice(1, 0, "--include", quoteForShell(dir));
+        const restartTrigger = devRestartTrigger(projectRoot);
+        if (restartTrigger) {
+            try {
+                fs.mkdirSync(path.dirname(restartTrigger), { recursive: true });
+                fs.writeFileSync(restartTrigger, String(Date.now()));
+            } catch {
+                // Unwritable tmpdir: the trigger cannot fire, so let tsx keep the
+                // collections — two restarts per save beats none.
+            }
         }
+        const usableTrigger = restartTrigger && fs.existsSync(restartTrigger) ? restartTrigger : null;
+        const watchArgs = devWatchArgs(projectRoot, runtimePaths, entryTarget, usableTrigger).map(quoteForShell);
+        /** Restart the backend once, after dev has finished reacting to a collection save. */
+        const restartBackend = (): void => {
+            if (!usableTrigger) return; // tsx restarted on the save itself
+            try {
+                fs.writeFileSync(usableTrigger, String(Date.now()));
+            } catch {
+                // Best effort: the next save tries again.
+            }
+        };
+        const generatedSchemaFile = path.resolve(projectRoot, runtimePaths.REBASE_DEV_SCHEMA);
+        /** What tsx reacts to: a write, even of identical bytes, moves the mtime. */
+        const generatedSchemaStamp = (): string | null => {
+            try {
+                const stat = fs.statSync(generatedSchemaFile);
+                return `${stat.mtimeMs}:${stat.size}`;
+            } catch {
+                return null;
+            }
+        };
 
         // Watch the collections folder and regenerate what is derived from it.
         //
@@ -1395,7 +1486,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // compiles against: either one silently falling behind the collections
         // during a dev session is a surprise waiting at the next deploy. The
         // reader's single instruction is still "save the file".
-        const collectionsDir = path.join(projectRoot, "config", "collections");
+        const collectionsDir = devCollectionsDir(projectRoot);
         if (fs.existsSync(collectionsDir)) {
             let debounce: NodeJS.Timeout | null = null;
             // The SQL schema and the SDK do not answer to the same edits. The
@@ -1418,6 +1509,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     void (async () => {
                         if (!regenerateSchema) {
                             await regenerateSdk(projectRoot);
+                            restartBackend();
                             return;
                         }
                         // The box is drawn at a fixed width, so a name longer
@@ -1431,7 +1523,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                             chalk.yellow("  └──────────────────────────────────────────────────────────────┘")
                         ].join("\n"));
 
+                        const schemaBefore = generatedSchemaStamp();
                         await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdk(projectRoot)]);
+                        // The stock runtime imports the generated schema, so tsx
+                        // already restarts when it is written; a second restart
+                        // from the trigger is exactly what this avoids.
+                        // Otherwise — nothing was written, or an ejected
+                        // entrypoint may not import it — dev restarts the
+                        // backend itself.
+                        if (!(usesStockRuntime && generatedSchemaStamp() !== schemaBefore)) restartBackend();
 
                         console.log([
                             chalk.green("  ✓ Schema and SDK types regenerated. The backend restarts and boot"),

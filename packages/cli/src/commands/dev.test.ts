@@ -17,7 +17,7 @@ import net from "net";
 import os from "os";
 import path from "path";
 
-import { appBannerLines, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devStaticShape, devWatchIncludes, getProjectPort, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
+import { appBannerLines, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devStaticShape, devWatchArgs, devWatchIncludes, getProjectPort, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
 import type { PreparedDatabase } from "../dev-db/prepare";
 import { validateManifest } from "../manifest";
 
@@ -61,6 +61,101 @@ describe("devWatchIncludes", () => {
         expect(devWatchIncludes("/srv/app", { REBASE_DEV_FUNCTIONS: "backend/functions" }))
             .toEqual([path.join("/srv/app", "backend", "functions"), path.join("/srv/app", "config")]);
     });
+});
+
+/**
+ * One save of a collection file, one backend restart.
+ *
+ * The runtime `import()`s the collections, so tsx tracked them as dependencies
+ * and restarted the moment a file was saved — before dev had regenerated
+ * `schema.generated.ts`. That boot logged "schema.generated.ts no longer
+ * describes the database … Run `rebase schema generate`" (the command dev was
+ * running at that moment), and the regeneration then rewrote the file and
+ * restarted the backend a second time. The collections directory is dev's to
+ * react to: tsx is told to leave it alone, and dev restarts the backend once,
+ * after the regeneration, through a trigger file tsx watches.
+ */
+describe("devWatchArgs", () => {
+    const paths = { REBASE_DEV_FUNCTIONS: "backend/functions", REBASE_DEV_CRONS: "backend/crons" };
+
+    it("hands the collections directory to dev, and watches the trigger instead", () => {
+        const args = devWatchArgs("/srv/app", paths, "entry.mjs", "/tmp/rebase-dev/x/restart");
+        const pairs = (flag: string) => args.flatMap((a, i) => (a === flag ? [args[i + 1]] : []));
+        expect(pairs("--exclude")).toEqual(["/srv/app/config/collections/**"]);
+        expect(pairs("--include")).toContain("/tmp/rebase-dev/x/restart");
+        // The rest of config/ (resources, auth, …) still restarts on its own.
+        expect(pairs("--include")).toContain(path.join("/srv/app", "config"));
+        expect(args.at(-1)).toBe("entry.mjs");
+        expect(args[0]).toBe("watch");
+        // tsx stops reading its own flags at the first one it does not know and
+        // hands the rest to Node ("node: bad option: --include").
+        expect(args.lastIndexOf("--include")).toBeLessThan(args.indexOf("--conditions"));
+        expect(args.indexOf("--exclude")).toBeLessThan(args.indexOf("--conditions"));
+    });
+
+    it("leaves the collections to tsx when there is no trigger it could watch", () => {
+        const args = devWatchArgs("/srv/app", paths, "entry.mjs", null);
+        expect(args).not.toContain("--exclude");
+    });
+
+    it("puts the trigger where tsx is willing to watch it", () => {
+        // tsx ignores every path with a dot-named segment, so a trigger under
+        // `.rebase/` would never fire and the backend would never restart.
+        const trigger = devRestartTrigger("/srv/app");
+        expect(trigger).not.toBeNull();
+        expect(trigger!.split(path.sep).filter(Boolean).some(segment => segment.startsWith("."))).toBe(false);
+        expect(devRestartTrigger("/srv/app")).toBe(trigger);
+        expect(devRestartTrigger("/srv/other")).not.toBe(trigger);
+    });
+
+    it("restarts once on the trigger and not on a collection save, under the real tsx", async () => {
+        // The arguments are only half of it: the claim is about what tsx does
+        // with them — that `--exclude` beats its own dependency tracking — so
+        // run it.
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-dev-watch-")));
+        const tsx = path.join(__dirname, "..", "..", "node_modules", ".bin", "tsx");
+        try {
+            fs.mkdirSync(path.join(root, "config", "collections"), { recursive: true });
+            fs.mkdirSync(path.join(root, "backend"));
+            const collection = path.join(root, "config", "collections", "posts.mjs");
+            fs.writeFileSync(collection, "export default { slug: 'posts' };\n");
+            const boots = path.join(root, "boots.log");
+            fs.writeFileSync(path.join(root, "backend", "entry.mjs"), [
+                "import fs from 'node:fs';",
+                "import { pathToFileURL } from 'node:url';",
+                `await import(pathToFileURL(${JSON.stringify(collection)}).href);`,
+                `fs.appendFileSync(${JSON.stringify(boots)}, 'boot\\n');`,
+                "setInterval(() => {}, 1000);"
+            ].join("\n"));
+            const trigger = path.join(root, "trigger", "restart");
+            fs.mkdirSync(path.dirname(trigger));
+            fs.writeFileSync(trigger, "0");
+
+            const count = () => (fs.existsSync(boots) ? fs.readFileSync(boots, "utf8").split("\n").filter(Boolean).length : 0);
+            const waitFor = async (n: number) => {
+                for (let i = 0; i < 100 && count() < n; i++) await new Promise(r => setTimeout(r, 100));
+                return count();
+            };
+
+            const { execa } = await import("execa");
+            const child = execa(tsx, devWatchArgs(root, {}, "entry.mjs", trigger), { cwd: path.join(root, "backend"), reject: false });
+            try {
+                expect(await waitFor(1)).toBe(1);
+                await new Promise(r => setTimeout(r, 500));
+                fs.appendFileSync(collection, "export const touched = true;\n");
+                await new Promise(r => setTimeout(r, 1500));
+                expect(count(), "tsx restarted on a collection save").toBe(1);
+
+                fs.writeFileSync(trigger, String(Date.now()));
+                expect(await waitFor(2)).toBe(2);
+            } finally {
+                child.kill("SIGTERM");
+                await child;
+            }
+        } finally {
+            fs.rmSync(root, { recursive: true, force: true });
+        }
+    }, 30_000);
 });
 
 describe("getProjectPort", () => {
