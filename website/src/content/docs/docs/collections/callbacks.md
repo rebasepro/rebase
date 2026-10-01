@@ -373,7 +373,7 @@ Every callback receives a `context` object that includes `context.data` — a un
 `context.data` uses a JavaScript Proxy, so you can access any collection by its slug as a property:
 
 ```typescript
-afterSave: async ({ values, entityId, context }) => {
+afterSave: async ({ values, id, context }) => {
     // Dynamic property access — works for any collection slug
     const jobs = context.data.jobs;
     const users = context.data.users;
@@ -401,26 +401,19 @@ Each collection accessor (`context.data.<slug>`) provides these methods:
 
 ### Querying with `.find()`
 
-The `find()` method supports rich filtering:
+The `find()` method filters with `[operator, value]` tuples — the typed form of
+the `?status=eq.published` query string the REST API reads:
 
 ```typescript
 afterSave: async ({ values, context }) => {
-    // Simple equality
+    // Equality
     const { data: activeJobs } = await context.data.jobs.find({
-        where: { status: "published" },
+        where: { status: ["==", "published"] },
         limit: 10,
         orderBy: ["createdAt", "desc"]
     });
 
-    // PostgREST-style operators
-    const { data: recentJobs } = await context.data.jobs.find({
-        where: {
-            status: "eq.published",
-            salary: "gte.50000"
-        }
-    });
-
-    // Tuple syntax
+    // Several conditions, AND-ed
     const { data: expensiveJobs } = await context.data.jobs.find({
         where: {
             salary: [">=", 100000],
@@ -433,7 +426,7 @@ afterSave: async ({ values, context }) => {
 ### Creating Entities
 
 ```typescript
-afterSave: async ({ values, entityId, previousValues, context }) => {
+afterSave: async ({ values, id, previousValues, context }) => {
     // Promote an approved submission to a published job
     if (values.status === "approved" && previousValues?.status !== "approved") {
         const newJob = await context.data.jobs.create({
@@ -441,11 +434,11 @@ afterSave: async ({ values, entityId, previousValues, context }) => {
             description: values.description,
             company_id: values.company_id,
             status: "published",
-            source_submission_id: entityId,
+            source_submission_id: id,
         });
 
         // Link back to the original submission
-        await context.data["job-submissions"].update(entityId, {
+        await context.data["job-submissions"].update(id, {
             promoted_job_id: newJob.id,
         });
     }
@@ -474,7 +467,9 @@ afterSave: async ({ context }) => {
     // is an admin's reach, not a bypass: a collection whose only rule is
     // `policy.serverContext()` stays closed to it, since that compiles to
     // `rebase.uid() IS NULL` and this accessor's uid is `service`.
-    await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
+    // `dataAsAdmin` is always there on the server, where `callbacks` run; its
+    // type allows for the browser SDK, which has none — hence the `!`.
+    await context.client.dataAsAdmin!.audit_logs.create({ action: "approved" });
 }
 ```
 
