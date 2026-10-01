@@ -1,9 +1,9 @@
-import { RealtimeService, type SubscriptionAuthContext } from "./services/realtimeService";
+import type { SubscriptionAuthContext } from "./services/realtimeService";
 import { BranchingUnsupportedError } from "./services/BranchService";
 import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
-import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeSocketLimits } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketLimits, WebSocketMessage } from "@rebasepro/types";
 import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
@@ -12,6 +12,40 @@ import type { Server, IncomingMessage } from "http";
 import { inspect } from "util";
 import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertUserCreationBodyValid, createUserThroughAuthCollection, type NestedWriteKind } from "@rebasepro/server";
 import { logger } from "@rebasepro/server";
+
+/**
+ * What this socket calls on the realtime side, and all of it.
+ *
+ * One `RealtimeService`, or — on a project with several realtime-capable
+ * sources — the routed composite over them (`createRoutedRealtimeService`).
+ * The parameter used to be typed as the one implementation and the composite
+ * was cast to it, so when `AUTHENTICATE` began calling `rescopeClient`, which
+ * the composite never had, nothing failed until every multi-source sign-in
+ * answered INTERNAL_ERROR. Declared here, by the caller, so what is handed in
+ * is checked against what is called.
+ */
+export interface SocketRealtimeService {
+    addClient(clientId: string, ws: WebSocket): void;
+    rescopeClient(clientId: string, authContext: SubscriptionAuthContext): Promise<void>;
+    handleClientMessage(clientId: string, message: WebSocketMessage, authContext?: SubscriptionAuthContext): Promise<void> | void;
+}
+
+/**
+ * Narrow a bootstrapper's realtime provider to what the socket calls.
+ *
+ * The provider arrives typed as the engine-agnostic `RealtimeProvider`, which
+ * declares none of the client-connection methods. Checked rather than cast, so
+ * a provider missing one refuses at boot, naming it, instead of on a client's
+ * first frame.
+ */
+export function socketRealtimeMissing(provider: RealtimeProvider): string[] {
+    return (["addClient", "rescopeClient", "handleClientMessage"] as const)
+        .filter((method) => !(method in provider) || typeof Reflect.get(provider, method) !== "function");
+}
+
+export function isSocketRealtimeService(provider: RealtimeProvider): provider is RealtimeProvider & SocketRealtimeService {
+    return socketRealtimeMissing(provider).length === 0;
+}
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
 interface WsAuthConfig {
@@ -238,7 +272,7 @@ function connectionOrigin(request: IncomingMessage | undefined): Omit<DataRateLi
  */
 export function createPostgresWebSocket(
     server: Server,
-    realtimeService: RealtimeService,
+    realtimeService: SocketRealtimeService,
     driver: PostgresBackendDriver,
     authConfig?: WsAuthConfig,
     authAdapter?: AuthAdapter,

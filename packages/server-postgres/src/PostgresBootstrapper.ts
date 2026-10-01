@@ -1571,10 +1571,19 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
         },
 
         async initializeWebsockets(server: unknown, realtimeService: RealtimeProvider, driver: DataDriver, config?: unknown, adapter?: unknown, limits?: RealtimeSocketLimits): Promise<void> {
-            const { createPostgresWebSocket } = await import("./websocket");
+            const { createPostgresWebSocket, isSocketRealtimeService, socketRealtimeMissing } = await import("./websocket");
+            // Narrowed, not cast: on a multi-source project this is the routed
+            // composite, and a cast to the Postgres service is what let the
+            // socket call a method the composite did not have.
+            if (!isSocketRealtimeService(realtimeService)) {
+                throw new Error(
+                    "The realtime service handed to the Postgres socket cannot serve it — it has no " +
+                    `${socketRealtimeMissing(realtimeService).join(", ")}. Every socket would fail on its first frame.`
+                );
+            }
             createPostgresWebSocket(
                 server as import("http").Server,
-                realtimeService as RealtimeService,
+                realtimeService,
                 driver as PostgresBackendDriver,
                 config as { requireAuth?: boolean; jwtSecret?: string; serviceKey?: string },
                 adapter as AuthAdapter | undefined,

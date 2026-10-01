@@ -19,6 +19,17 @@ export interface WsRealtimeService extends RealtimeProvider {
     addClient(clientId: string, ws: unknown): void;
     handleClientMessage(clientId: string, message: ClientMessage, authContext?: unknown): Promise<void> | void;
     /**
+     * Re-judge everything a socket holds open as the identity it signed in
+     * as — called on every `AUTHENTICATE`, a token refresh included.
+     *
+     * Required, because the socket calls it. It was added to the Postgres
+     * service and the socket and not here, the bootstrapper cast the composite
+     * to the service, and every sign-in on a multi-source project answered
+     * INTERNAL_ERROR. `routed-realtime-service-forwarding.test.ts` reads this
+     * interface and the socket's calls so it cannot happen twice.
+     */
+    rescopeClient(clientId: string, authContext: unknown): Promise<void>;
+    /**
      * Whether this provider actually implements channels, presence and
      * broadcast. Declared by the provider rather than inferred, because the
      * alternative — assuming the default one does — is how these frames came to
@@ -112,6 +123,13 @@ export function createRoutedRealtimeService(opts: RoutedRealtimeOptions): WsReal
     return {
         addClient(clientId, ws) {
             for (const p of all()) p.addClient?.(clientId, ws);
+        },
+
+        // Every source: each holds its own share of the socket's
+        // subscriptions, and channel memberships live on one of them.
+        // A provider that keeps nothing per identity has nothing to re-scope.
+        async rescopeClient(clientId, authContext) {
+            await Promise.all(all().map((p) => p.rescopeClient?.(clientId, authContext)));
         },
 
         async handleClientMessage(clientId, message, authContext) {
