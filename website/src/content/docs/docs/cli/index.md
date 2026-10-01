@@ -57,7 +57,7 @@ Start the development server:
 rebase dev
 ```
 
-Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save.
+Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save. <span class="since-badge" data-since="0.24">Since 0.24</span> for the SDK types — on 0.23 it regenerates the schema only, and `rebase generate-sdk` is yours to run.
 
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.

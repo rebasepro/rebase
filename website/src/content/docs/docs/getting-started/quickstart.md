@@ -187,6 +187,9 @@ Save the file. That is the whole step: `rebase dev` regenerates
 collections, restarts the backend, and boot creates the new table — so your **Products** collection appears in the
 navigation.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> for the SDK types: on 0.23, `rebase dev` regenerates the schema only, so run
+`rebase generate-sdk` after a collection change before importing its types.
+
 The same is true of a property added to a collection you already have: save,
 and the column is there.
 

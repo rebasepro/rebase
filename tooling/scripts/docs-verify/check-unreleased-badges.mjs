@@ -151,6 +151,31 @@ function readNotNew(root) {
 }
 
 /**
+ * Unreleased **behaviour** that no token names, as
+ * `{ "<what>": { "entry": "<text of its [Unreleased] entry>", "pattern": "<regex>" } }`.
+ *
+ * A token is a name, and some changes rename nothing. `rebase dev` regenerating
+ * the SDK types on every save is one: its entry's only backticked lead-in is the
+ * flag it removed, and `generated/sdk` is a path that has shipped for releases.
+ * So four pages — the quickstart among them — described the new behaviour as
+ * current, and a reader on 0.23 waited for a `generated/` directory that never
+ * appeared, with no badge to say why.
+ *
+ * Each entry is live while its `entry` text is under `## [Unreleased]`: an
+ * unbadged section whose prose matches `pattern` (case-insensitive, whitespace
+ * collapsed) is a finding. Once a release moves the entry out, the behaviour has
+ * shipped and the entry is dead weight — reported, and deleted by
+ * {@link pruneNotNew}, which the release runs.
+ */
+const BEHAVIOURS_FILE = "tooling/scripts/docs-verify/unreleased-behaviours.json";
+
+function readBehaviours(root) {
+    const file = path.join(root, BEHAVIOURS_FILE);
+    if (!existsSync(file)) return new Map();
+    return new Map(Object.entries(JSON.parse(readFileSync(file, "utf8"))));
+}
+
+/**
  * Tokens that name two different things, with the page pattern that means the
  * unreleased one.
  *
@@ -239,10 +264,10 @@ function badgedPages(root) {
 export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
     const findings = [];
     const changelogPath = path.join(root, "CHANGELOG.md");
-    if (!existsSync(changelogPath)) return { findings, tokens: [], scanned: 0, deadNotNew: [] };
+    if (!existsSync(changelogPath)) return { findings, tokens: [], scanned: 0, deadNotNew: [], deadBehaviours: [] };
 
     const split = splitChangelog(readFileSync(changelogPath, "utf8"));
-    if (!split) return { findings, tokens: [], scanned: 0, deadNotNew: [] };
+    if (!split) return { findings, tokens: [], scanned: 0, deadNotNew: [], deadBehaviours: [] };
     const { unreleased, released } = split;
     const NOT_NEW = readNotNew(root);
 
@@ -300,6 +325,24 @@ export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
                     "produces that token any more. Delete the entry."
             });
         }
+    }
+
+    /** Live unreleased behaviours, as `[what, pattern]`. */
+    const behaviours = [];
+    const deadBehaviours = [];
+    for (const [what, { entry, pattern }] of readBehaviours(root)) {
+        if (unreleased.replace(/\s+/g, " ").includes(entry.replace(/\s+/g, " "))) {
+            behaviours.push([what, new RegExp(pattern, "i")]);
+            continue;
+        }
+        deadBehaviours.push(what);
+        findings.push({
+            file: BEHAVIOURS_FILE,
+            line: 0,
+            message:
+                `"${what}" names an entry that is no longer under ## [Unreleased], so the behaviour ` +
+                "has shipped. Delete the entry."
+        });
     }
 
     // ── 3: every section mentioning one of them carries a badge ───────────
@@ -367,6 +410,21 @@ export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
             }
             if (badged.length) continue;
 
+            const prose = lines.slice(start, end).filter((_, i) => !isCode[start + i]).join(" ").replace(/\s+/g, " ");
+            const behaviour = behaviours.find(([, pattern]) => pattern.test(prose));
+            if (behaviour) {
+                const heading = lines[start]?.trim().replace(/^#+\s*/, "") || "(page intro)";
+                findings.push({
+                    file,
+                    line: start + 1,
+                    message:
+                        `"${heading}" describes ${behaviour[0]}, which is only in ## [Unreleased] — ` +
+                        `add <span class="since-badge" data-since="${nextVersion()}">Since ${nextVersion()}</span> ` +
+                        "beside the sentence, and say what the released version does instead."
+                });
+                continue;
+            }
+
             for (const token of tokens) {
                 const scope = SCOPED.get(token);
                 if (scope && !scope.pattern.test(`/${file}`)) continue;
@@ -404,7 +462,7 @@ export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
         }
     }
 
-    return { findings, tokens: [...tokens].sort(), scanned: files.length, deadNotNew };
+    return { findings, tokens: [...tokens].sort(), scanned: files.length, deadNotNew, deadBehaviours };
 }
 
 /** A whole badge element: the hand-written span `.md` pages use, or `<Since v="…" />`. */
@@ -500,11 +558,17 @@ count: [...removed.values()].reduce((a, b) => a + b, 0) });
  * @returns {{ pruned: string[] }}
  */
 export function pruneNotNew(root = DEFAULT_ROOT) {
-    const { deadNotNew } = checkUnreleasedBadges(root);
-    if (!deadNotNew.length) return { pruned: [] };
-    const kept = [...readNotNew(root)].filter(([token]) => !deadNotNew.includes(token));
-    writeFileSync(path.join(root, NOT_NEW_FILE), `${JSON.stringify(Object.fromEntries(kept), null, 2)}\n`);
-    return { pruned: deadNotNew };
+    const { deadNotNew, deadBehaviours } = checkUnreleasedBadges(root);
+    if (deadNotNew.length) {
+        const kept = [...readNotNew(root)].filter(([token]) => !deadNotNew.includes(token));
+        writeFileSync(path.join(root, NOT_NEW_FILE), `${JSON.stringify(Object.fromEntries(kept), null, 2)}\n`);
+    }
+    // The behaviours a release shipped go the same way, for the same reason.
+    if (deadBehaviours.length) {
+        const kept = [...readBehaviours(root)].filter(([what]) => !deadBehaviours.includes(what));
+        writeFileSync(path.join(root, BEHAVIOURS_FILE), `${JSON.stringify(Object.fromEntries(kept), null, 2)}\n`);
+    }
+    return { pruned: [...deadNotNew, ...deadBehaviours] };
 }
 
 // `verify:docs` runs this as one stage of many; running the file on its own is
