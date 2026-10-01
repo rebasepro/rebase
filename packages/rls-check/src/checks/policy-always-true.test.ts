@@ -3,11 +3,11 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_ROLES, policy, reachable, role, snapshot, table } from "../../test/fixtures/snapshot";
 import type { DbSnapshot } from "../types";
 import { policyAlwaysTrue as check } from "./policy-always-true";
+import { isUnconditionalTrue } from "./sql";
 
 // These tests are about the policy's shape; `reachable` grants every table to
 // the exposed roles, because a policy on a table nobody can reach is not reported.
 const policyAlwaysTrue = { run: (s: DbSnapshot) => check.run(reachable(s)) };
-import { isUnconditionalTrue } from "./sql";
 
 const base = (policies: ReturnType<typeof policy>[]) =>
     snapshot({ relations: [table("public", "orders")], policies });
@@ -37,6 +37,70 @@ describe("policy-always-true", () => {
         );
 
         expect(f.title).toContain("WITH CHECK");
+    });
+
+    /**
+     * `USING (user_id = auth.uid()) WITH CHECK (true)` on an UPDATE policy was
+     * "no scoping whatsoever", critical. USING still decides which rows can be
+     * touched; what the constant check gives away is what a touched row may
+     * become — reassigned to another user, moved to another tenant. Serious,
+     * and not the same thing as every row.
+     */
+    describe("only WITH CHECK constant", () => {
+        const update = (using: string | null, command: "UPDATE" | "ALL" = "UPDATE") =>
+            policyAlwaysTrue.run(
+                base([policy("public", "orders", "orders_update", { command, using, withCheck: "true", roles: ["authenticated"] })])
+            );
+
+        it("is high on an UPDATE whose USING scopes the rows", () => {
+            const [f] = update("(user_id = auth.uid())");
+
+            expect(f.severity).toBe("high");
+            expect(f.impact).not.toContain("no scoping whatsoever");
+            expect(f.impact).toContain("another user");
+            expect(f.detail).toContain("USING");
+        });
+
+        it("is high on an UPDATE with no USING, which reaches rows only through other policies", () => {
+            const [f] = update(null);
+
+            expect(f.severity).toBe("high");
+            expect(f.detail).toContain("no USING");
+            expect(f.impact).not.toContain("no scoping whatsoever");
+        });
+
+        it("stays critical on a FOR ALL policy, whose check also admits any INSERT", () => {
+            const [f] = update("(user_id = auth.uid())", "ALL");
+
+            expect(f.severity).toBe("critical");
+            expect(f.impact).toContain("insert");
+            expect(f.impact).not.toContain("no scoping whatsoever");
+        });
+
+        it("stays critical when USING is constant too", () => {
+            expect(update("true")[0].severity).toBe("critical");
+        });
+
+        it("is softened to medium by a RESTRICTIVE gate, as before", () => {
+            const [f] = policyAlwaysTrue.run(
+                base([
+                    policy("public", "orders", "orders_update", {
+                        command: "UPDATE",
+                        using: "(user_id = auth.uid())",
+                        withCheck: "true",
+                        roles: ["authenticated"]
+                    }),
+                    policy("public", "orders", "gate", {
+                        command: "UPDATE",
+                        permissive: false,
+                        using: "(tenant_id = 1)",
+                        roles: ["authenticated"]
+                    })
+                ])
+            );
+
+            expect(f.severity).toBe("medium");
+        });
     });
 
     it("does NOT flag `true` appearing inside a larger expression", () => {

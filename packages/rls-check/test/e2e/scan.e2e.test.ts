@@ -371,6 +371,13 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
         ).rejects.toThrow(/permission denied for schema/);
     });
 
+    it("grades a constant WITH CHECK under a scoped or absent USING high, not critical", () => {
+        const on = (table: string) => full.findings.filter((finding) => objectName(finding) === table);
+
+        expect(on("vuln_update_check_true").map((f) => [f.id, f.severity])).toEqual([["policy-always-true", "high"]]);
+        expect(on("vuln_update_check_only").map((f) => [f.id, f.severity])).toEqual([["policy-always-true", "high"]]);
+    });
+
     it("does not flag a junction table that follows its endpoints", () => {
         const flagged = full.findings
             .filter((finding) => finding.id === "junction-table-unprotected")

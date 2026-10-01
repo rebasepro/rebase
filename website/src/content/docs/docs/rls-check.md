@@ -277,6 +277,11 @@ Like every check, it reports the policy only when a role it applies to can reach
 holds the privilege its command needs, and `USAGE` on the schema. `USING (true) TO anon` on a
 table `anon` holds nothing on is answered "permission denied" before the policy is consulted.
 
+When only the `WITH CHECK` of an `UPDATE` policy is constant — `USING (user_id = rebase.uid())
+WITH CHECK (true)` — it is **high**: `USING` still decides which rows can be touched, and the
+check lets a touched row become anything, such as another user's. On a `FOR ALL` policy the
+same check also admits any `INSERT`, so that stays critical.
+
 If `RESTRICTIVE` policies on the same command (`ALL` for a permissive `ALL`) apply to every
 exposed role the permissive policy reaches, this is downgraded to medium and reported as
 something to verify rather than a certainty, because restrictive policies AND after the

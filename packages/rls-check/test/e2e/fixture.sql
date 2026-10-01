@@ -343,6 +343,33 @@ CREATE POLICY secure_anon_delete_nousing_delete ON public.secure_anon_delete_nou
 GRANT SELECT, DELETE ON public.secure_anon_delete_nousing TO anon;
 INSERT INTO public.secure_anon_delete_nousing (body) VALUES ('a row');
 
+-- policy-always-true, with only the check constant. USING still scopes which
+-- rows an UPDATE reaches; WITH CHECK (true) lets a reached row become anything
+-- (another owner, another tenant). High, not "no scoping whatsoever" critical.
+CREATE TABLE public.vuln_update_check_true (
+    id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id  uuid NOT NULL,
+    body      text
+);
+ALTER TABLE public.vuln_update_check_true ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vuln_update_check_true FORCE ROW LEVEL SECURITY;
+CREATE POLICY vuln_update_check_true_update ON public.vuln_update_check_true
+    FOR UPDATE TO authenticated USING (owner_id = auth.uid()) WITH CHECK (true);
+GRANT SELECT, UPDATE ON public.vuln_update_check_true TO authenticated;
+
+-- The same check with no USING at all: on its own it updates no row, so anon
+-- cannot write through it (no anonymous-write-allowed), and what it widens is
+-- any other UPDATE policy's check.
+CREATE TABLE public.vuln_update_check_only (
+    id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    body  text
+);
+ALTER TABLE public.vuln_update_check_only ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vuln_update_check_only FORCE ROW LEVEL SECURITY;
+CREATE POLICY vuln_update_check_only_update ON public.vuln_update_check_only
+    FOR UPDATE TO anon WITH CHECK (true);
+GRANT UPDATE ON public.vuln_update_check_only TO anon;
+
 -- Membership table for the subquery check. One FK, so it is not junction-shaped.
 CREATE TABLE public.memberships (
     id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),

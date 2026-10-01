@@ -63,7 +63,13 @@ export const policyAlwaysTrue: Check = {
                     : null;
             const rel = relationAt(snapshot, policy.schema, policy.table);
             const verb = policy.command === "SELECT" ? "read" : "act on";
-            const severity: Severity = gate ? "medium" : "critical";
+            // Only the check is constant, on a policy whose USING decides which
+            // rows can be touched: what is given away is what a row may become,
+            // not which rows. FOR ALL keeps critical — its check also admits any
+            // INSERT, which is the same hole as an INSERT policy's.
+            const checkOnly =
+                !clauses.includes("USING") && (policy.command === "UPDATE" || policy.command === "ALL");
+            const severity: Severity = gate ? "medium" : checkOnly && policy.command === "UPDATE" ? "high" : "critical";
 
             findings.push(
                 finding({
@@ -75,10 +81,25 @@ export const policyAlwaysTrue: Check = {
                         `${listAnd(clauses)} (true) for ${listAnd(exposed)}`,
                     target: { schema: policy.schema, table: policy.table, policy: policy.name },
                     detail:
-                        `This permissive ${policy.command} policy's ${listAnd(clauses)} expression is a ` +
-                        `constant truth, so it matches every row for ${listAnd(exposed)}. Permissive ` +
-                        `policies are ORed together, so this one alone satisfies the table's row filter ` +
-                        `no matter how strict the others are.` +
+                        (checkOnly
+                            ? `This permissive ${policy.command} policy's WITH CHECK expression is a constant ` +
+                              `truth, so any new row value passes it for ${listAnd(exposed)}. ` +
+                              (policy.using == null
+                                  ? `It has no USING clause, so on its own it lets no row be updated — but ` +
+                                    `permissive policies' checks are ORed, so every UPDATE another policy lets ` +
+                                    `through may write any values at all.`
+                                  : `Its USING clause still decides which rows can be touched; the check ` +
+                                    `decides what they may become, and it accepts anything. Permissive ` +
+                                    `policies' checks are ORed, so this one overrides any stricter check ` +
+                                    `beside it.`) +
+                              (policy.command === "ALL"
+                                  ? ` On a FOR ALL policy the same check governs INSERT, so any row at all ` +
+                                    `can be inserted.`
+                                  : "")
+                            : `This permissive ${policy.command} policy's ${listAnd(clauses)} expression is a ` +
+                              `constant truth, so it matches every row for ${listAnd(exposed)}. Permissive ` +
+                              `policies are ORed together, so this one alone satisfies the table's row filter ` +
+                              `no matter how strict the others are.`) +
                         (gate
                             ? ` The ${gate.name} also ${gate.verb} to this command ` +
                               `and to every role it reaches, ANDed after it, so access may still be gated — ` +
@@ -88,8 +109,15 @@ export const policyAlwaysTrue: Check = {
                     impact: gate
                         ? `Row filtering on this table rests entirely on the ${gate.name}. ` +
                           `If it does not cover a case, ${listAnd(exposed)} can ${verb} every row${rowsPhrase(rel)}.`
-                        : `If this table is reachable over an API as ${listAnd(exposed)}, a caller can ` +
-                          `${verb} every row${rowsPhrase(rel)} — the policy applies no scoping whatsoever.`,
+                        : checkOnly
+                            ? `If this table is reachable over an API as ${listAnd(exposed)}, a caller can rewrite ` +
+                              `any row it is allowed to update into anything — reassign it to another user, move ` +
+                              `it to another tenant, set any flag it carries` +
+                              (policy.command === "ALL"
+                                  ? ` — and insert rows with any values, attributed to anyone.`
+                                  : `. Which rows it can reach is still scoped by USING.`)
+                            : `If this table is reachable over an API as ${listAnd(exposed)}, a caller can ` +
+                              `${verb} every row${rowsPhrase(rel)} — the policy applies no scoping whatsoever.`,
                     fix: isRebaseManagedPolicy(snapshot, policy)
                         ? managedPolicyFix(
                             policy,
