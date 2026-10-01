@@ -88,7 +88,9 @@ export async function startPgContainer(): Promise<PgContainer> {
 
 export async function stopPgContainer(containerName: string): Promise<void> {
     try {
-        await run("docker", ["rm", "-f", containerName]);
+        // `-v`: the postgres image declares its data directory as a volume, and
+        // `rm -f` alone leaves that anonymous volume behind — one per run.
+        await run("docker", ["rm", "-f", "-v", containerName]);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error(`[pg-setup] Cleanup failed for ${containerName}: ${message}`);
