@@ -51,6 +51,10 @@ export const SwitchFieldBinding = function SwitchFieldBinding({
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}
                     title={property.name ?? propertyKey}/>}
+                // The entity form sets `hideLabel` for every field FieldBlock
+                // labels, and FieldBlock's label is not tied to the control —
+                // so the switch names itself, as the date field does.
+                aria-label={hideLabel ? (property.name ?? propertyKey) : undefined}
                 disabled={disabled}
                 autoFocus={autoFocus}
                 size={size}

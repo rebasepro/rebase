@@ -42,6 +42,11 @@ export type BooleanSwitchProps = {
     className?: string;
     disabled?: boolean;
     size?: "smallest" | "small" | "medium" | "large";
+    /** Names the switch when no visible label is tied to it. */
+    "aria-label"?: string;
+    /** The id of the element whose text names the switch. */
+    "aria-labelledby"?: string;
+    id?: string;
 } & ({
     allowIndeterminate: true;
     onValueChange?: (newValue: boolean | null) => void;

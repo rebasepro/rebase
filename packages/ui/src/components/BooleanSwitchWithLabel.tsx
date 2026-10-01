@@ -5,7 +5,8 @@ import {
     fieldBackgroundDisabledMixin,
     fieldBackgroundHoverMixin,
     fieldBackgroundMixin,
-    focusedClasses
+    focusedClasses,
+    focusedDisabled
 } from "../styles";
 import { BooleanSwitch, BooleanSwitchProps } from "./BooleanSwitch";
 import { cls } from "../util";
@@ -38,6 +39,8 @@ export const BooleanSwitchWithLabel = function BooleanSwitchWithLabel({
                                                                           className,
                                                                           fullWidth = true,
                                                                           inputClassName,
+                                                                          "aria-label": ariaLabel,
+                                                                          "aria-labelledby": ariaLabelledBy,
                                                                           ...props
                                                                       }: BooleanSwitchWithLabelProps) {
 
@@ -49,23 +52,22 @@ export const BooleanSwitchWithLabel = function BooleanSwitchWithLabel({
     const onBlur = () => setFocused(false);
 
     React.useEffect(() => {
-        if (autoFocus) {
-            // refInput.current?.focus();
-        }
+        if (autoFocus) refInput.current?.focus();
+        // Mount only, like the `autoFocus` attribute it stands in for.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const focus = document.activeElement === refInput?.current || document.activeElement === ref?.current
 
     return (
+        // The row is a click target only. It used to be a second
+        // `role="switch"` carrying the label, wrapped around the real switch
+        // (the one that takes focus), which had no name: a screen reader
+        // tabbing in heard "switch, off". The label now names the switch.
         <div
             ref={ref}
             onFocus={onFocus}
             onBlur={onBlur}
-            role="switch"
-            aria-checked={props.allowIndeterminate && (value === null || value === undefined) ? "mixed" : !!value}
-            aria-disabled={disabled || undefined}
-            aria-labelledby={label ? switchLabelId : undefined}
-            tabIndex={-1}
             className={cls(
                 !invisible && fieldBackgroundMixin,
                 !invisible && (disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin),
@@ -93,7 +95,6 @@ export const BooleanSwitchWithLabel = function BooleanSwitchWithLabel({
                 } else {
                     onValueChange?.(!value);
                 }
-                // refInput.current?.focus();
             }}
         >
 
@@ -101,7 +102,12 @@ export const BooleanSwitchWithLabel = function BooleanSwitchWithLabel({
                 value={value}
                 ref={refInput}
                 size={size}
-                className={cls(invisible && focus ? focusedClasses : "", inputClassName)}
+                aria-labelledby={ariaLabelledBy ?? (label ? switchLabelId : undefined)}
+                aria-label={ariaLabel}
+                // The row draws the focus ring around the whole field; a second
+                // ring on the switch inside it would be noise. Invisible rows
+                // have no ring of their own, so the switch keeps it.
+                className={cls(invisible ? (focus ? focusedClasses : "") : focusedDisabled, inputClassName)}
                 disabled={disabled}
                 {...props}
             />
