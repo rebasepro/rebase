@@ -49,6 +49,7 @@ import {
     getJunctionCollectionConfig,
     getJunctionSecurityRules,
     getTableName,
+    type JunctionSpec,
     getTableVarName,
     policyToPostgres,
     relationalCollections,
@@ -1313,14 +1314,48 @@ const authColumnType = (sqlType: string): PgType => {
 
 // ── A junction table ─────────────────────────────────────────────────────────
 
-function planJunctionTable(
-    tableName: string,
+/**
+ * Which declaring side a junction is planned from.
+ *
+ * With one side, that side — as it always was, so a junction only one end
+ * declares keeps the key every database already has. With both ends declaring
+ * it, the planner used to take whichever it reached first, and the two doors
+ * reach them in different orders: `db push` loads files by name, boot walks the
+ * bundle's array. The same junction was keyed `(a_id, b_id)` by one and
+ * `(b_id, a_id)` by the other, and a push against a boot-built database rebuilt
+ * the key. Now the side whose table sorts first, which is the order `db push`
+ * already used wherever a file is named after its table.
+ */
+function canonicalJunctionSide(
+    table: string,
     relation: ResolvedRelation,
     source: CollectionConfig,
+    spec: JunctionSpec | undefined
+): { relation: ResolvedRelation; source: CollectionConfig } {
+    if (!spec || spec.declaringSides.length < 2) return { relation, source };
+    const ordered = [...spec.declaringSides].sort((a, b) => {
+        const left = bareTableName(getTableName(a.collection));
+        const right = bareTableName(getTableName(b.collection));
+        if (left !== right) return left < right ? -1 : 1;
+        return a.junctionColumn < b.junctionColumn ? -1 : a.junctionColumn > b.junctionColumn ? 1 : 0;
+    });
+    const chosen = ordered[0].collection;
+    if (chosen === source) return { relation, source };
+    const resolved = Object.values(resolveCollectionRelations(chosen))
+        .find(r => isManyToMany(r) && bareTableName(r.through.table) === table);
+    return resolved ? { relation: resolved, source: chosen } : { relation, source };
+}
+
+function planJunctionTable(
+    tableName: string,
+    reachedRelation: ResolvedRelation,
+    reachedSource: CollectionConfig,
     junctionSpecs: ReturnType<typeof resolveJunctionSpecs>,
     resolveCollection: ResolveCollection,
     triggerFunctionNeeded: { value: boolean }
 ): TablePlan {
+    const { relation, source } = canonicalJunctionSide(
+        bareTableName(tableName), reachedRelation, reachedSource, junctionSpecs.get(bareTableName(tableName)));
     if (!isManyToMany(relation)) {
         throw new Error(`Internal: junction table "${tableName}" was reached from a ${relation.kind} relation.`);
     }
