@@ -121,6 +121,7 @@ export const COLUMNS_QUERY = `
         c.column_default,
         c.ordinal_position,
         c.is_generated,
+        c.generation_expression,
         c.is_identity,
         c.identity_generation,
         c.character_maximum_length,

@@ -6,10 +6,13 @@
  * no process.exit.  It is imported by introspect-db.ts (the CLI entry-point)
  * and consumed directly by tests.
  */
-import { firstFreeKey, toWireKey } from "@rebasepro/utils";
+import { firstFreeKey, toPostgresIdentifier, toWireKey } from "@rebasepro/utils";
 import { inferPropertyFromData } from "./introspect-db-inference";
 import { humanize } from "./introspect-db-naming";
 import { mapPgType } from "./introspect-db-types";
+import { arrayStorage, columnStorage, literalDefaultOf, onDeleteOf, primaryKeyStorage } from "./introspect-db-storage";
+import { reconstructSearchBlock } from "./introspect-db-search";
+import { SEARCH_STAMP_PREFIX } from "./search-column";
 import type { CheckFactsByTable } from "./introspect-db-constraints";
 import type { TableClassification } from "./introspect-db-structure";
 import {
@@ -637,6 +640,19 @@ export interface GenerationContext {
      * from the target project and passes it. See `detectCollectionBuilder`.
      */
     builder?: CollectionBuilder;
+    /**
+     * Collects one line per column the planner will not reproduce exactly —
+     * what `rebase db push` would do to it, and how to avoid that when there is
+     * a way. The CLI prints them; the same lines are written at the top of the
+     * generated file.
+     */
+    notes?: string[];
+    /**
+     * Tables this run does not generate a collection for, so nothing may point
+     * at them: a relation whose target file does not exist is an import that
+     * does not resolve.
+     */
+    skippedTables?: ReadonlySet<string>;
 }
 
 /** Adds entries to a property's `validation` block, creating it if absent. */
@@ -680,6 +696,9 @@ function withAdminOptions(extra: string, entries: string[], emitAdmin = true): s
     }
     return `${extra}\n            admin: {\n${block}\n            },`;
 }
+
+/** A SQL string literal. */
+const quoteSqlString = (value: string): string => `'${value.replace(/'/g, "''")}'`;
 
 /** A TypeScript string literal, escaped. */
 function quote(value: string): string {
@@ -809,6 +828,9 @@ export function generateCollectionFile(
 
     let propsOutput = "";
     let relationsOutput = "";
+    /** What the planner will not reproduce exactly, column by column. */
+    const fileNotes: string[] = [];
+    const skippedTables = context.skippedTables ?? new Set<string>();
     const orderEntries: PropertyOrderEntry[] = [];
     const propertyBlocks = new Map<string, string>();
     /**
@@ -831,6 +853,13 @@ export function generateCollectionFile(
 
     // Map columns
     for (const col of meta.columns) {
+        // A Rebase search column is the collection's `search` block, not a
+        // property — read back below. As a property it planned a `text`
+        // column, and the first push dropped the generated expression.
+        if (col.is_generated === "ALWAYS" && (columnComments.get(col.column_name) ?? "").startsWith(SEARCH_STAMP_PREFIX)) {
+            continue;
+        }
+
         // Skip foreign keys since we handle them as relations
         // Exception: Do not skip if it's part of the primary key!
         if (meta.fks.some((fk) => fk.column_name === col.column_name) && !meta.pks.includes(col.column_name)) continue;
@@ -892,6 +921,24 @@ export function generateCollectionFile(
                 .map((v) => `{ id: ${quote(v)}, label: ${quote(humanize(v))} }`)
                 .join(", ");
             extra += `\n            enum: [${enumEntries}],`;
+            // A string `enum` is a Postgres enum type, and this column is text
+            // with a CHECK. A push would plan that conversion and Postgres
+            // refuses to cast it implicitly — so say what makes the two agree.
+            const enumType = toPostgresIdentifier(`${tableName}_${col.column_name}`);
+            const labels = columnChecks.enumValues.map((v) => `'${v.replace(/'/g, "''")}'`).join(", ");
+            const check = (context.metadata?.checks ?? [])
+                .find((c) => c.table_name === tableName && c.definition.includes(col.column_name));
+            const table = `"${tableName}"`;
+            const column = `"${col.column_name}"`;
+            const restoreDefault = literalDefaultOf(col, "string");
+            fileNotes.push(
+                `"${col.column_name}" is text with CHECK (… IN …), declared here as an \`enum\`, which Rebase stores ` +
+                `as the enum type "${enumType}". Convert the column before pushing: CREATE TYPE "${enumType}" AS ENUM (${labels}); ` +
+                `ALTER TABLE ${table} ${check ? `DROP CONSTRAINT "${check.constraint_name}", ` : ""}ALTER COLUMN ${column} DROP DEFAULT, ` +
+                `ALTER COLUMN ${column} TYPE "${enumType}" USING ${column}::"${enumType}"` +
+                (restoreDefault && "source" in restoreDefault ? `, ALTER COLUMN ${column} SET DEFAULT ${quoteSqlString(JSON.parse(restoreDefault.source) as string)}` : "") +
+                "; — or delete the `enum` to keep the column as it is."
+            );
         }
 
         // Date auto-value heuristics
@@ -912,19 +959,15 @@ export function generateCollectionFile(
 
         // Array/Map heuristics (Fallback if not inferred)
         if (finalPropType === "array" && !inferenceExtra.includes("of: {")) {
-            let innerType = "string";
-            let colType = "";
-            if (col.udt_name.startsWith("_")) {
-                const baseType = col.udt_name.substring(1);
-                innerType = mapPgType(baseType);
-                if (innerType === "string") colType = "text[]";
-                else if (innerType === "number") colType = col.udt_name === "_numeric" ? "numeric[]" : "integer[]";
-                else if (innerType === "boolean") colType = "boolean[]";
+            // Only the four element types the planner stores natively. Reading
+            // `bigint[]` as `integer[]` and `varchar[]` as `text[]` — what this
+            // did — planned a type change on the first push.
+            const stored = arrayStorage(col);
+            if (stored.columnType) {
+                extra += `\n            columnType: ${quote(stored.columnType)},`;
             }
-            if (colType) {
-                extra += `\n            columnType: ${quote(colType)},`;
-            }
-            extra += `\n            of: { name: ${quote(`${humanize(col.column_name)} Item`)}, type: ${quote(innerType)} },`;
+            if (stored.note) fileNotes.push(stored.note);
+            extra += `\n            of: { name: ${quote(`${humanize(col.column_name)} Item`)}, type: ${quote(stored.innerType)} },`;
         } else if (finalPropType === "map" && !inferenceExtra.includes("keyValue: true") && !inferenceExtra.includes("properties: {")) {
             extra += "\n            keyValue: true,";
         }
@@ -956,6 +999,32 @@ export function generateCollectionFile(
         if (inferenceExtra) {
             extra += inferenceExtra;
             if (!extra.endsWith(",")) extra += ",";
+        }
+
+        // ── What the planner needs to build this same column ─────────────────
+        // A key's storage is decided with its `isId`, below; a composite key's
+        // columns are not generated as a collection at all.
+        const isPkColumn = meta.pks.includes(col.column_name);
+        if (!isPkColumn && !isReadOnlyColumn(col)) {
+            const enumTypeName = toPostgresIdentifier(`${tableName}_${col.column_name}`);
+            const enumTypeShared = isEnumColumn && (context.metadata?.columns ?? meta.columns)
+                .filter((other) => other.udt_name === col.udt_name && other.data_type === "USER-DEFINED").length > 1;
+            const stored = finalPropType === "array"
+                ? { keys: [] as string[] }
+                : columnStorage(col, finalPropType, { isEnumColumn, enumTypeName, enumTypeShared });
+            for (const key of stored.keys) {
+                const name = key.slice(0, key.indexOf(":"));
+                if (!hasGeneratedKey(extra, name) && !hasGeneratedKey(inferenceExtra, name)) extra += `\n            ${key},`;
+            }
+            if (stored.note) fileNotes.push(stored.note);
+
+            // A literal DEFAULT the database holds. Leaving it out planned
+            // `DROP DEFAULT` on the first push.
+            if (!hasGeneratedKey(extra, "autoValue") && !hasGeneratedKey(extra, "defaultValue")) {
+                const fallback = literalDefaultOf(col, finalPropType);
+                if (fallback && "source" in fallback) extra += `\n            defaultValue: ${fallback.source},`;
+                else if (fallback) fileNotes.push(fallback.note);
+            }
         }
 
         // ── Rules the database already enforces ──────────────────────────────
@@ -1019,12 +1088,18 @@ export function generateCollectionFile(
         if (meta.pks.includes(col.column_name)) {
             if (isCompositePk) {
                 extra += `\n            // Part of composite primary key (${commentText(meta.pks.join(", "))})`;
-            } else if (finalPropType === "number" && !inferenceExtra.includes("isId:")) {
-                extra += "\n            isId: \"increment\",";
-            } else if (col.data_type.toLowerCase() === "uuid" && !inferenceExtra.includes("isId:")) {
-                extra += "\n            isId: \"uuid\",";
             } else if (!inferenceExtra.includes("isId:")) {
-                extra += "\n            isId: \"uuid\", // Verify if this is a UUID or CUID";
+                // The strategy the column actually has. `"increment"` is an
+                // INTEGER identity and nothing else; a serial key is `SERIAL`,
+                // a key with no default is `"manual"`. Calling every number key
+                // `"increment"` and every other key `"uuid"` planned a type
+                // change on any key that was not exactly that.
+                const stored = primaryKeyStorage(col, finalPropType);
+                for (const key of stored.keys) {
+                    const name = key.slice(0, key.indexOf(":"));
+                    if (!hasGeneratedKey(extra, name)) extra += `\n            ${key},`;
+                }
+                if (stored.note) fileNotes.push(stored.note);
             }
         }
 
@@ -1036,7 +1111,9 @@ export function generateCollectionFile(
         // `required` on a column the user cannot write is a form that cannot be
         // submitted: pagila's `film.fulltext` is NOT NULL and maintained by a
         // trigger, so demanding it of the user blocks every create.
-        if (col.is_nullable === "NO" && !meta.pks.includes(col.column_name) && !col.column_default && !isReadOnlyColumn(col)) {
+        // With a default too: NOT NULL is NOT NULL, and leaving `required` off a
+        // column that has a default planned `DROP NOT NULL` on the first push.
+        if (col.is_nullable === "NO" && !meta.pks.includes(col.column_name) && !isReadOnlyColumn(col)) {
             if (extra.includes("validation: {")) {
                 extra = extra.replace("validation: {", "validation: {\n                required: true,");
             } else {
@@ -1069,6 +1146,7 @@ export function generateCollectionFile(
     // Map Owning Relations (from this table's FKs to other tables)
     for (const fk of meta.fks) {
         const targetTableName = fk.foreign_table_name;
+        if (skippedTables.has(targetTableName)) continue;
         if (!joinTables.has(targetTableName)) {
             // The relation gets its own property key, and it must not be one this
             // file has already used — a duplicate key in an object literal is a
@@ -1113,15 +1191,25 @@ export function generateCollectionFile(
 
             const relHumanName = humanize(relName);
 
+            // The key column's NOT NULL and its ON DELETE, which the planner
+            // reads from `validation.required` and `onDelete`. Without them a
+            // required link came back optional and every `ON DELETE CASCADE`
+            // came back as `SET NULL`.
+            const fkColumn = meta.columns.find((c) => c.column_name === fk.column_name);
+            const required = fkColumn?.is_nullable === "NO";
+            const onDelete = onDeleteOf(fk, required);
+            const requiredLine = required ? "\n            validation: { required: true }," : "";
+            const onDeleteLine = onDelete ? `,\n                onDelete: ${quote(onDelete)}` : "";
+
             propertyBlocks.set(relName, `
         ${propKey(relName)}: {
             name: ${quote(relHumanName)},
-            type: "relation",
+            type: "relation",${requiredLine}
             // mapped from foreign key: ${commentText(fk.column_name)} -> ${commentText(targetTableName)}(${commentText(fk.foreign_column_name)})
             relation: {
                 kind: "belongsTo",
                 target: ${relationTarget(targetCollectionCamel)},
-                localKey: ${quote(fk.column_name)}
+                localKey: ${quote(fk.column_name)}${onDeleteLine}
             }
         },`);
         }
@@ -1129,7 +1217,25 @@ export function generateCollectionFile(
 
     // Map Inverse Relations (1-to-many where OTHER table points to THIS table)
     // These go into the `relations` array so they render as subcollection tabs.
-    const inverseFks = allFks.filter((fk) => fk.foreign_table_name === tableName && !joinTables.has(fk.table_name));
+    /**
+     * A name for an entry in the `relations` array that no property and no
+     * earlier entry has taken.
+     *
+     * Relations and properties share one namespace — a relation is found by
+     * name — so a `belongsTo` property called `series` beside a many-to-many
+     * also called `series` left one of them unreachable: the planner resolved
+     * the property's name to the many-to-many, planned no `series_id` column,
+     * and the first push dropped it.
+     */
+    const usedRelationNames = new Set<string>();
+    const relationNameFor = (preferred: string, fallback: string): string => {
+        const taken = { has: (key: string) => propertyBlocks.has(key) || usedRelationNames.has(key) };
+        const name = firstFreeKey([preferred, fallback], taken);
+        usedRelationNames.add(name);
+        return name;
+    };
+
+    const inverseFks = allFks.filter((fk) => fk.foreign_table_name === tableName && !joinTables.has(fk.table_name) && !skippedTables.has(fk.table_name));
     for (const fk of inverseFks) {
         const sourceTableName = fk.table_name;
 
@@ -1138,7 +1244,7 @@ export function generateCollectionFile(
         relationsOutput += `
         {
             kind: "hasMany",
-            relationName: ${quote(sourceTableName)},
+            relationName: ${quote(relationNameFor(sourceTableName, `${sourceTableName}_by_${fk.column_name}`))},
             target: ${relationTarget(targetCollectionCamel)},
             // the ${commentText(sourceTableName)}.${commentText(fk.column_name)} FK points back here
             foreignKeyOnTarget: ${quote(fk.column_name)}
@@ -1158,8 +1264,17 @@ export function generateCollectionFile(
 
         const joinFks = jtMeta.fks;
 
-        // Handle self-referencing M2M: both FKs point to the same table
-        const selfRefFks = joinFks.filter((fk) => fk.foreign_table_name === tableName);
+        // Handle self-referencing M2M: both FKs point to the same table.
+        // Ordered by the junction's own key, so the source column is the one
+        // the key leads with — the planner keys the junction (source, target),
+        // and constraint-name order re-keyed it on the first push.
+        const keyPosition = (fk: ForeignKeyRow) => {
+            const position = jtMeta.pks.indexOf(fk.column_name);
+            return position === -1 ? Number.MAX_SAFE_INTEGER : position;
+        };
+        const selfRefFks = joinFks
+            .filter((fk) => fk.foreign_table_name === tableName)
+            .sort((a, b) => keyPosition(a) - keyPosition(b));
         if (selfRefFks.length === 2) {
             // Self-referencing M2M — generate a single owning relation
             const thisFk = selfRefFks[0];
@@ -1170,7 +1285,7 @@ export function generateCollectionFile(
             relationsOutput += `
         {
             kind: "manyToMany",
-            relationName: ${quote(relPropName)},
+            relationName: ${quote(relationNameFor(relPropName, `${relPropName}_${jt}`))},
             target: ${relationTarget(toCollectionVarName(tableName))},
             through: {
                 table: ${quote(jt)},
@@ -1183,7 +1298,24 @@ export function generateCollectionFile(
 
         const otherFk = joinFks.find((fk) => fk.foreign_table_name !== tableName);
 
-        if (otherFk) {
+        // Which ends declare the link decides how the planner keys the
+        // junction: from the one declaring side, or — when both declare it —
+        // from the side whose table sorts first. So the link is declared on
+        // both ends only when that keys it the way the database already has
+        // it; otherwise only on the end whose column leads the key, and the
+        // other end says why.
+        const leadingFk = joinFks.find((fk) => fk.column_name === jtMeta.pks[0]);
+        const leadingTable = leadingFk?.foreign_table_name;
+        const sortsFirst = otherFk ? [tableName, otherFk.foreign_table_name].sort()[0] : tableName;
+        const declareHere = !leadingTable || leadingTable === sortsFirst || leadingTable === tableName;
+        if (otherFk && !declareHere) {
+            relationsOutput += `
+        // The many-to-many with ${commentText(otherFk.foreign_table_name)} through ${commentText(jt)} is declared on
+        // ${commentText(otherFk.foreign_table_name)} only: declaring it here too would re-key ${commentText(jt)}
+        // from (${commentText(jtMeta.pks.join(", "))}) on the next push.`;
+        }
+
+        if (otherFk && declareHere && !skippedTables.has(otherFk.foreign_table_name)) {
             const targetTableName = otherFk.foreign_table_name;
 
             const targetCollectionCamel = importCollection(targetTableName);
@@ -1203,11 +1335,21 @@ export function generateCollectionFile(
             relationsOutput += `
         {
             kind: "manyToMany",
-            relationName: ${quote(targetTableName)},
+            relationName: ${quote(relationNameFor(targetTableName, `${targetTableName}_via_${jt}`))},
             target: ${relationTarget(targetCollectionCamel)},${throughCode}
         },`;
         }
     }
+
+    const search = reconstructSearchBlock({
+        schema: context.metadata?.schema ?? "public",
+        table: tableName,
+        columns: meta.columns,
+        comments: columnComments,
+        keyByColumn
+    });
+    if (search.note) fileNotes.push(search.note);
+    const searchBlock = search.block ?? "";
 
     const relationsBlock = relationsOutput
         ? `\n    relations: [${relationsOutput}\n    ],`
@@ -1289,6 +1431,12 @@ export function generateCollectionFile(
         ? `\n// Introspected as a ${commentText(classification.role)}: ${commentText(classification.reason)}.\n`
         : "";
 
+    // What `rebase db push` would change, said where the reader looks first.
+    for (const note of fileNotes) context.notes?.push(`${tableName}: ${note}`);
+    const storageNote = fileNotes.length > 0
+        ? `\n// ⚠ Not reproduced exactly by \`rebase db push\` — read before pushing:\n${fileNotes.map((n) => `//   - ${commentText(n)}`).join("\n")}\n`
+        : "";
+
     const collectionVarName = toCollectionVarName(tableName);
     // `const x = defineCollection({ … })` is also the shape the ts-morph schema
     // editor in `@rebasepro/server` expects — `COLLECTION_FACTORIES` — so an
@@ -1307,12 +1455,12 @@ export function generateCollectionFile(
         ...importLines.filter((line) => line.includes('from "./'))
     ];
     const fileContent = `${orderedImports.join("\n")}
-${classificationNote}
+${classificationNote}${storageNote}
 ${open}
     name: ${quote(collectionName)},
     singularName: ${quote(singular)},
     slug: ${quote(tableName)},
-    table: ${quote(tableName)},${schemaBlock}${descriptionBlock}
+    table: ${quote(tableName)},${schemaBlock}${descriptionBlock}${searchBlock}
     properties: {${propsOutput}
     },${relationsBlock}${adminBlock}
 ${close}

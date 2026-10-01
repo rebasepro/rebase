@@ -166,7 +166,27 @@ async function main() {
         const generatedFiles: string[] = [];
         const skippedFiles: string[] = [];
 
-        const tablesToProcess = Array.from(tablesMap.entries()).filter(([tableName]) => !joinTables.has(tableName));
+        // A table keyed on more than one column is left out, with the reason.
+        // A collection reads and writes a row by one key column — validation
+        // refuses two `isId`s — and generating one anyway produced a file that
+        // read the table by an `id` column it does not have, and a push that
+        // planned that column as its new primary key.
+        const compositeKeyed = new Set(
+            Array.from(tablesMap.entries())
+                .filter(([tableName, meta]) => !joinTables.has(tableName) && meta.pks.length > 1)
+                .map(([tableName]) => tableName)
+        );
+        for (const tableName of compositeKeyed) {
+            outWarn(chalk.yellow(
+                `⚠ Skipping table ${JSON.stringify(tableName)}: it is keyed on ` +
+                `(${tablesMap.get(tableName)?.pks.join(", ")}), and a collection reads a row by one key column. ` +
+                "`rebase db push` leaves a table that is not a collection alone."
+            ));
+        }
+        const notes: string[] = [];
+
+        const tablesToProcess = Array.from(tablesMap.entries())
+            .filter(([tableName]) => !joinTables.has(tableName) && !compositeKeyed.has(tableName));
 
         const BATCH_SIZE = 10;
         for (let i = 0; i < tablesToProcess.length; i += BATCH_SIZE) {
@@ -224,13 +244,22 @@ async function main() {
                     tablesMap,
                     enumMap,
                     sampleData,
-                    { metadata, classifications, checkFacts, builder }
+                    { metadata, classifications, checkFacts, builder, notes, skippedTables: compositeKeyed }
                 );
 
                 fs.writeFileSync(filePath, fileContent, "utf-8");
                 generatedFiles.push(tableName);
                 out(chalk.green(`  ✓ ${filePath}`));
             }));
+        }
+
+        // Every column the planner will not reproduce exactly, before anyone
+        // pushes. Each line is also at the top of its file.
+        if (notes.length > 0) {
+            outWarn("");
+            outWarn(chalk.yellow(`⚠ ${notes.length} column(s) will not round-trip exactly — \`rebase db push\` would change them:`));
+            for (const note of [...notes].sort()) outWarn(chalk.gray(`  - ${note}`));
+            outWarn(chalk.gray("  Read these before the first push. Run `rebase db push --dry-run` to see the plan."));
         }
 
         // Generate index.ts (sorted alphabetically for deterministic output)

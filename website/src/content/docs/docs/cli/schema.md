@@ -77,6 +77,8 @@ rebase schema introspect
 
 This is useful when adopting Rebase on an existing database — introspect first, then customize the generated collections.
 
+**Introspect, then push, changes nothing.** The generated properties say exactly what each column is — `columnType`, `precision`/`scale`, `defaultValue`, `required`, a key's `isId` (`"increment"` for an integer identity, `columnType: "serial"` for a serial, `"manual"` for a key with no default), a relation's `onDelete`, and a collection's `search` block read back from the column it built — so `rebase db push --dry-run` right after an introspection plans no changes. Where no property can state a column — a `timestamp` without time zone, an `interval`, an `inet`, an enum type not named `<table>_<column>`, a default like `CURRENT_DATE` — introspection says so, per column, on the terminal and at the top of the file, with what a push would do to it and, when there is one, the statement that makes the two agree (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). A table keyed on more than one column is left out with its reason: a collection reads a row by one key column, and `db push` leaves a table that is not a collection alone.
+
 **What the generated files look like**
 
 Introspection writes collections against `defineCollection`, which keeps the property keys *literal* — so `propertiesOrder`, `listProperties`, `sort` and `display.title` complete over your own column names, and a key left behind by a renamed column is a compile error rather than a line that quietly does nothing. Which one it imports depends on what your project depends on, and is decided per run:
