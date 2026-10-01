@@ -193,9 +193,9 @@ rebase db backups list                  # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
-`backup` runs `pg_dump`; `restore` runs `pg_restore` and is destructive, so it
-requires `--yes`. `--out` accepts a local path or an object-storage URL, and
-defaults to `$BACKUP_DESTINATION` or `./backups`.
+`backup` runs `pg_dump`; `restore` runs `pg_restore`, destructive, so it requires
+`--yes`. Scheduling, the roles file that travels with each dump and the restore
+procedure are in [Backups and restore](/docs/deployment/backups/).
 
 ### `rebase db pull`
 

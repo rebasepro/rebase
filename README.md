@@ -149,7 +149,7 @@ First-class database backups for self-hosted Postgres, built on `pg_dump` / `pg_
 - **Scheduled backups** via the built-in cron system, uploading to your configured storage backend with retention pruning
 - **Studio Backups panel** — browse and download backups from the admin UI
 
-See **[docs/backups.md](docs/backups.md)** for the full guide, including security and PITR notes.
+See **[Backups and restore](https://rebase.pro/docs/deployment/backups/)** for the full guide — including what a backup does not cover (your uploaded files), security and PITR notes.
 
 ### 🔐 Authentication & Access Control
 

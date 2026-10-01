@@ -294,6 +294,7 @@ export default defineConfig({
                         { label: "Self-Hosting", slug: "docs/deployment/self-hosting" },
                         { label: "Split Processes", slug: "docs/deployment/split-processes" },
                         { label: "More Than One Instance", slug: "docs/deployment/multiple-instances" },
+                        { label: "Backups", slug: "docs/deployment/backups" },
                         { label: "Kubernetes", slug: "docs/deployment/kubernetes" },
                         { label: "AWS", slug: "docs/deployment/aws" },
                         { label: "Google Cloud", slug: "docs/deployment/gcp" },
