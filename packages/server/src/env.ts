@@ -146,7 +146,7 @@ function isLocalhostOrLoopback(value: string): boolean {
 /**
  * The full set of environment variables recognized by a Rebase backend.
  */
-const rebaseEnvSchema = z.object({
+export const rebaseEnvSchema = z.object({
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
     PORT: numericEnvVar("PORT", 3001),
     DATABASE_URL: z.string().url("DATABASE_URL must be a valid URL"),

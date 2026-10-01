@@ -11,7 +11,7 @@ import { BundleError } from "./bundle";
  * a set of environment variables, and everything either side needs to agree on
  * has to be part of the contract rather than a convention each project reinvents.
  */
-const bootEnvExtension = z.object({
+export const bootEnvExtension = z.object({
     // ── Email ────────────────────────────────────────────────────────────────
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: numericEnvVar("SMTP_PORT", 587),
