@@ -164,9 +164,18 @@ force: true });
                     if (!resolved) {
                         resolved = true;
                         clearTimeout(timeout);
+                        // SIGTERM, and wait for it to exit. `rebase dev` starts the
+                        // backend `detached`, in a process group of its own, so a
+                        // SIGKILL to dev's group never reached it: the `tsx watch`
+                        // backend outlived this step, reparented to init, still
+                        // connected to this database. A file change under its watch
+                        // restarted it, and its boot re-ensured the schema in the
+                        // middle of step 15 — `db migrate` from scratch then failed
+                        // on "type posts_status already exists". SIGTERM runs dev's
+                        // own cleanup, which kills each child's group.
                         setTimeout(() => {
-                            killTree(backendProcess, "SIGKILL");
-                            resolve();
+                            killTree(backendProcess, "SIGTERM");
+                            backendProcess.then(() => resolve(), () => resolve());
                         }, 2000);
                     }
                 }
@@ -286,6 +295,11 @@ env: cleanEnv });
         });
 
         console.log("14. Testing db generate migrations...");
+        const backendDir = path.join(scaffoldedDir, "backend");
+        const migrationsDir = path.join(backendDir, "drizzle", "migrations");
+        const sqlIn = (dir: string) =>
+            fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith(".sql")) : [];
+        const migrationsBefore = sqlIn(migrationsDir);
         await execa("node", [
             cliBin,
             "db",
@@ -295,11 +309,24 @@ env: cleanEnv });
             stdio: "inherit",
             env: cleanEnv
         });
-        // Verify that migration files are created under backend/drizzle
-        const drizzleDir = path.join(scaffoldedDir, "backend", "drizzle");
-        expect(fs.existsSync(drizzleDir)).toBe(true);
-        const files = fs.readdirSync(drizzleDir);
-        expect(files.some(f => f.endsWith(".sql"))).toBe(true);
+        // A new migration under backend/drizzle/migrations, which step 15b then
+        // applies to an empty database.
+        //
+        // This used to look for any `*.sql` directly in backend/drizzle. What it
+        // was finding there was the five files rendered from the collections
+        // (schema.sql, policies.sql, …), not a migration — and a59bf5c59 moved
+        // those out of the repository into backend/.rebase/sql. From then on
+        // this line failed every run, and steps 15b–17 (migrate from scratch,
+        // branches) never executed in CI.
+        const newMigrations = sqlIn(migrationsDir).filter(f => !migrationsBefore.includes(f));
+        expect(newMigrations).toHaveLength(1);
+
+        // The rendered SQL lives in .rebase/sql, which ignores itself, and none of
+        // it is left beside the migrations to be committed.
+        const generatedSqlDir = path.join(backendDir, ".rebase", "sql");
+        expect(fs.existsSync(path.join(generatedSqlDir, "schema.sql"))).toBe(true);
+        expect(fs.existsSync(path.join(generatedSqlDir, ".gitignore"))).toBe(true);
+        expect(sqlIn(path.join(backendDir, "drizzle"))).toEqual([]);
 
         console.log("15. Dropping tables to test db migrate from scratch...");
         await dbClient.query("DROP TABLE IF EXISTS posts_tags CASCADE");
@@ -327,6 +354,16 @@ env: cleanEnv });
             stdio: "inherit",
             env: cleanEnv
         });
+
+        // Exiting 0 is not the claim. The tables dropped in step 15 have to be
+        // back, built by the migration step 14 wrote.
+        const migratedRes = await dbClient.query(`
+            SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'
+        `);
+        const migratedTables = migratedRes.rows.map(r => r.table_name);
+        for (const table of ["authors", "posts", "tags"]) {
+            expect(migratedTables).toContain(table);
+        }
 
         console.log("16. Disconnecting dbClient to enable database branching templates...");
         await dbClient.end();
