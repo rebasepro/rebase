@@ -351,6 +351,25 @@ export const ACCOUNT_SCOPED_STORAGE_BASES = [
 ] as const;
 
 /**
+ * `STORAGE_MAX_FILE_SIZE[__KEY]`: a whole number of bytes, at least 1, or
+ * unset. Refused at boot otherwise — `10MB` or `0` taken as a number would be
+ * a limit nobody chose, discovered on the first upload.
+ */
+function readMaxFileSize(env: EnvBag, suffixes: readonly string[], suffix: string): number | undefined {
+    const raw = readVar(env, "STORAGE_MAX_FILE_SIZE", suffixes);
+    if (raw === undefined) return undefined;
+    const trimmed = raw.trim();
+    const value = /^\d+$/.test(trimmed) ? Number(trimmed) : NaN;
+    if (!Number.isSafeInteger(value) || value < 1) {
+        throw new BundleError(
+            `STORAGE_MAX_FILE_SIZE${suffix} must be a whole number of bytes, got "${raw}".`,
+            "For example 209715200 for 200 MB. Unset, a source accepts files up to 50 MB."
+        );
+    }
+    return value;
+}
+
+/**
  * Build one storage configuration from the variables for a single source.
  *
  * Returns `undefined` when the source has no configuration at all, so an
@@ -393,7 +412,7 @@ export function resolveStorageBackend(
     // directory and says which engine it is standing in for.
     const standIn = (engine: string): BackendStorageConfig | undefined =>
         options.production === false
-            ? { type: "local", basePath: localBasePath, standsInFor: engine }
+            ? withLimit({ type: "local", basePath: localBasePath, standsInFor: engine })
             : undefined;
     // The account's own suffix, derived by the same rule as a source key's, so
     // `account: "minio"` reads `S3_ACCESS_KEY_ID__MINIO`. Undefined when the
@@ -406,6 +425,13 @@ export function resolveStorageBackend(
         : undefined;
     const declaredType = readVar(env, "STORAGE_TYPE", suffixes);
     const type = (declaredType || engineHint || "").trim().toLowerCase();
+    // The largest file this source accepts. Per source, like everything else
+    // here, and never inherited by a named source from the default one: a
+    // media bucket for video and an avatar bucket want different numbers.
+    // Every upload door reads it — see `StorageController.maxFileSize`.
+    const maxFileSize = readMaxFileSize(env, suffixes, suffix);
+    const withLimit = <T extends BackendStorageConfig>(config: T): T =>
+        maxFileSize === undefined ? config : { ...config, maxFileSize };
     // Whether the *environment* named this backend, as opposed to inheriting it
     // from a declaration. It decides what a missing bucket means:
     //
@@ -466,7 +492,7 @@ export function resolveStorageBackend(
             );
         }
 
-        return {
+        return withLimit({
             type: "s3",
             bucket,
             region: readAccountVar(env, "S3_REGION", suffixes, accountSuffixes) || "auto",
@@ -474,7 +500,7 @@ export function resolveStorageBackend(
             secretAccessKey,
             endpoint: readAccountVar(env, "S3_ENDPOINT", suffixes, accountSuffixes),
             forcePathStyle: readAccountBool(env, "S3_FORCE_PATH_STYLE", suffixes, accountSuffixes)
-        };
+        });
     }
 
     if (type === "gcs") {
@@ -486,7 +512,7 @@ export function resolveStorageBackend(
                 `set ${`GCS_BUCKET${suffix}`}.`
             );
         }
-        return {
+        return withLimit({
             type: "gcs",
             bucket,
             // Account-scoped for the same reason as the S3 credentials: the
@@ -495,11 +521,11 @@ export function resolveStorageBackend(
             // ambient workload identity supplies them and neither is set.
             projectId: readAccountVar(env, "GCS_PROJECT_ID", suffixes, accountSuffixes),
             keyFilename: readAccountVar(env, "GCS_KEY_FILENAME", suffixes, accountSuffixes)
-        };
+        });
     }
 
     if (type === "local" || type === "") {
-        return { type: "local", basePath: localBasePath };
+        return withLimit({ type: "local", basePath: localBasePath });
     }
 
     throw new BundleError(

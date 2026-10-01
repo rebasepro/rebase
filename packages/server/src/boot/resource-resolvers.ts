@@ -169,7 +169,8 @@ const bucketResolver: ResourceResolver = {
         "S3_FORCE_PATH_STYLE",
         "GCS_BUCKET",
         "GCS_PROJECT_ID",
-        "GCS_KEY_FILENAME"
+        "GCS_KEY_FILENAME",
+        "STORAGE_MAX_FILE_SIZE"
     ],
     accountScoped: ACCOUNT_SCOPED_STORAGE_BASES,
     resolve(declaration, env, context) {

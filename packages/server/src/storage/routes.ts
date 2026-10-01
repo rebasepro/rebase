@@ -623,6 +623,21 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         const finalKey = canonicalKeyOrBadRequest(key || uploadedFile.name || "unnamed");
 
+        // The source's own limit. The body limit in front of this route is the
+        // largest any source accepts, so a source that accepts less is held to
+        // its number here — before authorization and before a byte is stored,
+        // as a 413 rather than the controller's refusal mid-write.
+        const sourceLimit = resolved.maxFileSize?.();
+        if (sourceLimit !== undefined && uploadedFile.size > sourceLimit) {
+            throw new ApiError(
+                413,
+                "PAYLOAD_TOO_LARGE",
+                `This file is ${uploadedFile.size} bytes, and storage source "${canonicalStorageId(storageId)}" ` +
+                `accepts at most ${sourceLimit}.`,
+                { size: uploadedFile.size, maxFileSize: sourceLimit, storageId: canonicalStorageId(storageId) }
+            );
+        }
+
         // Before authorization and before a byte is stored. The property the
         // file is destined for declares its own `maxSize` and `acceptedFiles`,
         // and until now only the browser's file picker read them — so a `curl`
@@ -1159,7 +1174,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     );
     tusHandler.startCleanup();
 
-    router.options("/tus", (_c) => tusHandler.options());
+    router.options("/tus", (c) => tusHandler.options(c));
     router.post("/tus", writeAuthMiddleware, async (c) => tusHandler.create(c));
     router.get("/tus/:id", readAuthMiddleware, (c) => tusHandler.head(c, c.req.param("id")));
     router.patch("/tus/:id", writeAuthMiddleware, async (c) => tusHandler.patch(c, c.req.param("id")));

@@ -238,15 +238,39 @@ export class TusHandler {
     // Protocol Endpoints
     // -----------------------------------------------------------------------
 
-    /** `OPTIONS /tus` — TUS capability discovery. */
-    options(): Response {
+    /** The controller an upload to this storage source is written to. */
+    private targetFor(storageId: string | undefined): StorageController | undefined {
+        return this.storageRegistry ? this.storageRegistry.get(storageId) : this.storageController;
+    }
+
+    /**
+     * The largest upload this source takes: the source's own limit, under the
+     * deployment's and the protocol ceiling. One function for what `OPTIONS`
+     * advertises and what `create` enforces, which used to be 5 GB and 50 MB.
+     */
+    private limitFor(target: StorageController | undefined): number {
+        return Math.min(
+            MAX_UPLOAD_SIZE,
+            this.maxFileSize ?? MAX_UPLOAD_SIZE,
+            target?.maxFileSize?.() ?? MAX_UPLOAD_SIZE
+        );
+    }
+
+    /**
+     * `OPTIONS /tus` — TUS capability discovery.
+     *
+     * `Tus-Max-Size` is the limit `create` holds this source to, for the source
+     * named by `?storageId` (the default one otherwise).
+     */
+    options(c?: Context): Response {
+        const storageId = c?.req.query("storageId") || undefined;
         return new Response(null, {
             status: 204,
             headers: {
                 "Tus-Resumable": "1.0.0",
                 "Tus-Version": "1.0.0",
                 "Tus-Extension": "creation,termination",
-                "Tus-Max-Size": String(MAX_UPLOAD_SIZE)
+                "Tus-Max-Size": String(this.limitFor(this.targetFor(storageId)))
             }
         });
     }
@@ -263,11 +287,6 @@ export class TusHandler {
         const uploadLength = parseInt(uploadLengthHeader, 10);
         if (Number.isNaN(uploadLength) || uploadLength <= 0) {
             throw ApiError.badRequest("Invalid Upload-Length");
-        }
-        // The smaller of the protocol ceiling and what this deployment accepts.
-        const limit = Math.min(MAX_UPLOAD_SIZE, this.maxFileSize ?? MAX_UPLOAD_SIZE);
-        if (uploadLength > limit) {
-            throw new ApiError(413, "PAYLOAD_TOO_LARGE", `Upload-Length exceeds maximum of ${limit} bytes`);
         }
 
         const metadata = this.parseMetadata(c.req.header("Upload-Metadata") || "");
@@ -354,9 +373,22 @@ export class TusHandler {
         // `POST /upload` makes, from the same module. On an object store the
         // name goes to the provider as given, so a bucket checked only for its
         // shape was any bucket the deployment's credentials reach.
-        const target = this.storageRegistry ? this.storageRegistry.get(storageId) : this.storageController;
+        const target = this.targetFor(storageId);
         if (target) {
             writableBucketOrRefuse(bucket, target, knownSources);
+        }
+
+        // The destination source's own limit — the number `OPTIONS` advertised
+        // for it — refused here, before the first chunk, rather than by the
+        // controller at finalize, after the last.
+        const limit = this.limitFor(target);
+        if (uploadLength > limit) {
+            throw new ApiError(
+                413,
+                "PAYLOAD_TOO_LARGE",
+                `Upload-Length exceeds maximum of ${limit} bytes`,
+                { maxFileSize: limit, size: uploadLength }
+            );
         }
 
         // Gate before any temp file exists, so a denied upload leaves nothing

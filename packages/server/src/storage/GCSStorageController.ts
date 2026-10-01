@@ -12,6 +12,7 @@ import {
     DEFAULT_MAX_FILE_SIZE
 } from "./types";
 import { folderKey, listingPrefix } from "./keys";
+import { ApiError } from "../api/errors";
 import {
     UploadFileProps,
     UploadFileResult,
@@ -313,13 +314,26 @@ export class GCSStorageController implements StorageController {
     // Private helpers
     // ------------------------------------------------------------------
 
+    /** See {@link StorageController.maxFileSize}. */
+    maxFileSize(): number {
+        return this.config.maxFileSize ?? DEFAULT_MAX_FILE_SIZE;
+    }
+
     /**
      * Validate file before upload
      */
     private validateFile(file: File): void {
-        const maxSize = this.config.maxFileSize ?? DEFAULT_MAX_FILE_SIZE;
+        const maxSize = this.maxFileSize();
         if (file.size > maxSize) {
-            throw new Error(`File size ${file.size} exceeds maximum allowed size ${maxSize}`);
+            // An ApiError, so the refusal reaches the caller as what it is. A
+            // plain Error was a 500 on `/upload` and a 502 on TUS — after the
+            // client had sent every byte.
+            throw new ApiError(
+                413,
+                "PAYLOAD_TOO_LARGE",
+                `File size ${file.size} exceeds this storage source's maximum of ${maxSize} bytes.`,
+                { size: file.size, maxFileSize: maxSize }
+            );
         }
 
         if (this.config.allowedMimeTypes && this.config.allowedMimeTypes.length > 0) {

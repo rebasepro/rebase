@@ -2424,11 +2424,26 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // "In place of" takes the exemption at the mount below. Without it,
         // both limits run and the smaller one always wins, so the global 10MB
         // refused every upload above it.
-        const storageMaxSize = (
-            config.storage && typeof config.storage === "object" && "type" in config.storage
-                ? (config.storage as BackendStorageConfig).maxFileSize
-                : undefined
-        ) ?? DEFAULT_MAX_FILE_SIZE;
+        //
+        // With several sources it is the largest of their limits — the route
+        // holds each source to its own — read from the controllers themselves.
+        // It used to be read from a single-source config only, and the boot
+        // path always passes a map, so every booted project got 50 MB whatever
+        // its sources said.
+        const sourceLimits = (storageRegistry
+            ? storageRegistry.list().map(key => storageRegistry.get(key))
+            : [storageController]
+        ).flatMap(c => {
+            const limit = c?.maxFileSize?.();
+            return typeof limit === "number" ? [limit] : [];
+        });
+        const storageMaxSize = sourceLimits.length > 0
+            ? Math.max(...sourceLimits)
+            : (
+                config.storage && typeof config.storage === "object" && "type" in config.storage
+                    ? (config.storage as BackendStorageConfig).maxFileSize
+                    : undefined
+            ) ?? DEFAULT_MAX_FILE_SIZE;
 
         // Storage is not under RLS and its keys share one flat namespace, so an
         // allow-all default is a cross-user read/write/delete hole. Refuse to

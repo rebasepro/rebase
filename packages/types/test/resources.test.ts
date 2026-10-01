@@ -301,7 +301,7 @@ describe("kinds are registered, not hardcoded", () => {
             expect(resourceKind("database")?.envBases).toContain("DB_POOL_MAX");
             expect(resourceKind("database")?.envBases).not.toContain("REBASE_DB_POOL_MAX");
             registerResourceKind(JSON.parse(JSON.stringify(shippedAt0173.bucket)));
-            expect(resourceKind("bucket")?.envBasesByEngine?.local).toEqual(["STORAGE_TYPE", "STORAGE_PATH"]);
+            expect(resourceKind("bucket")?.envBasesByEngine?.local).toEqual(["STORAGE_TYPE", "STORAGE_PATH", "STORAGE_MAX_FILE_SIZE"]);
         });
 
         it("the kinds map holds a frozen kind's shipped literal, byte for byte", () => {

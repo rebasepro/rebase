@@ -232,7 +232,25 @@ reach the API's cookies or endpoints.
 
 ## TUS Resumable Upload Protocol
 
-For uploading large files (up to **5GB**) or handling unstable network conditions, Rebase implements the **TUS v1.0.0** open protocol including the `Creation` and `Termination` extensions.
+For uploading large files or handling unstable network conditions, Rebase implements the **TUS v1.0.0** open protocol including the `Creation` and `Termination` extensions.
+
+### How large a file may be
+
+Each storage source accepts files up to its own limit: **50 MB** unless
+`STORAGE_MAX_FILE_SIZE` (bytes, suffixed `__<KEY>` for a named source) or the
+source's `maxFileSize` says otherwise. Every door holds a file to the same
+number. `POST /api/storage/upload` answers `413 PAYLOAD_TOO_LARGE` above it; a
+resumable upload is refused at creation, before its first chunk; and
+`OPTIONS /api/storage/tus` advertises it as `Tus-Max-Size` — for the source
+named by `?storageId=`, the default one otherwise.
+
+```bash
+STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
+STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
+```
+
+A completed file is held in the server's memory while it is written to the
+store, on every upload path, so size the limit to the memory the server has.
 
 ```
 Client                                                   Rebase Server
@@ -271,6 +289,7 @@ Client                                                   Rebase Server
 | `GCS_PROJECT_ID` | GCP project ID for GCS |
 | `GCS_KEY_FILENAME` | Path to a GCP service account key file (omit on GKE — Workload Identity/ADC supplies credentials) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Standard ADC variable, read by the Google SDK itself (not needed on GCP with default credentials) |
+| `STORAGE_MAX_FILE_SIZE` | Largest file the source accepts, in bytes (default `52428800`, 50 MB). Suffix `__<KEY>` for a named source. A value that is not a whole number of bytes refuses the boot. See [How large a file may be](#how-large-a-file-may-be) |
 | `FORCE_LOCAL_STORAGE` | Allow `STORAGE_TYPE=local` in production — see below |
 | `STORAGE_PUBLIC_READ` | Serve stored objects to unauthenticated readers. The env spelling of `storagePublicRead`, and one of the three ways to satisfy the [production boot guard](#per-object-authorization). |
 | `STORAGE_ALLOW_ANY_AUTHENTICATED` | Opt out of the boot guard, restoring the behaviour where any signed-in user may read, overwrite, delete or list any key. The env spelling of `storageInsecureAllowAnyAuthenticated`. Only defensible when every signed-in user is trusted with every file. |

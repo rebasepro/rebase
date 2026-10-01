@@ -175,6 +175,18 @@ export interface StorageController {
      * when the caller names none, and each provider maps it to its own.
      */
     knownBuckets?(): string[];
+
+    /**
+     * The largest file this controller accepts, in bytes.
+     *
+     * Every door that takes a file reads it, so the number a client is told is
+     * the number it is held to: the upload route checks it before anything is
+     * stored, the resumable route checks it at creation — before the first
+     * chunk rather than after the last — and advertises it as `Tus-Max-Size`,
+     * and the server's upload body limit is the largest of them. A controller
+     * that does not implement this is held to the deployment-wide limit alone.
+     */
+    maxFileSize?(): number;
 }
 
 /**

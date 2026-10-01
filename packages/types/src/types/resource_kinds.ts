@@ -190,10 +190,12 @@ amendResourceKind("bucket", {
         "S3_FORCE_PATH_STYLE",
         "GCS_BUCKET",
         "GCS_PROJECT_ID",
-        "GCS_KEY_FILENAME"
+        "GCS_KEY_FILENAME",
+        // The largest file the source accepts, read for every engine.
+        "STORAGE_MAX_FILE_SIZE"
     ],
     envBasesByEngine: {
-        local: ["STORAGE_TYPE", "STORAGE_PATH"],
+        local: ["STORAGE_TYPE", "STORAGE_PATH", "STORAGE_MAX_FILE_SIZE"],
         s3: [
             "STORAGE_TYPE",
             "S3_BUCKET",
@@ -201,9 +203,10 @@ amendResourceKind("bucket", {
             "S3_ACCESS_KEY_ID",
             "S3_SECRET_ACCESS_KEY",
             "S3_ENDPOINT",
-            "S3_FORCE_PATH_STYLE"
+            "S3_FORCE_PATH_STYLE",
+            "STORAGE_MAX_FILE_SIZE"
         ],
-        gcs: ["STORAGE_TYPE", "GCS_BUCKET", "GCS_PROJECT_ID", "GCS_KEY_FILENAME"],
+        gcs: ["STORAGE_TYPE", "GCS_BUCKET", "GCS_PROJECT_ID", "GCS_KEY_FILENAME", "STORAGE_MAX_FILE_SIZE"],
         azure: [],
         firebase: []
     }
