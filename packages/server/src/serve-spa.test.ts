@@ -390,3 +390,45 @@ describe("serveSPA at the root and the API's 404 envelope", () => {
         expect(await get(app, "/api/things")).toEqual({ status: 200, body: "{\"ok\":true}" });
     });
 });
+
+/**
+ * A conservative Content-Security-Policy on everything a static app serves:
+ * nothing may frame it from another origin, no plugins, no `<base>` pointing
+ * elsewhere. It restricts no script, style, worker or connection source, so
+ * the CMS admin — inline scripts, module workers, third-party sign-in — loads
+ * unchanged.
+ */
+describe("serveSPA's Content-Security-Policy", () => {
+    const CSP = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'";
+
+    function app(): Hono {
+        const hono = new Hono();
+        hono.get("/api/things", (c) => c.json({ ok: true }));
+        hono.get("/own-policy", (c) => {
+            c.header("Content-Security-Policy", "default-src 'none'");
+            return c.text("mine");
+        });
+        serveSPA(hono, {
+            frontendPath: writeApp("web", { "index.html": "<html>WEB</html>", "assets/app.js": "JS" }),
+            basePath: "/",
+            apiBasePath: "/api",
+            excludePaths: ["/health"],
+            spa: true
+        });
+        return hono;
+    }
+
+    it.each(["/", "/deep/link", "/assets/app.js"])("sends it on %s", async (url) => {
+        expect((await app().request(url)).headers.get("content-security-policy")).toBe(CSP);
+    });
+
+    it("leaves a response that set its own policy alone", async () => {
+        expect((await app().request("/own-policy")).headers.get("content-security-policy")).toBe("default-src 'none'");
+    });
+
+    it("stays off the API", async () => {
+        expect((await app().request("/api/things")).headers.get("content-security-policy")).toBeNull();
+        expect((await app().request("/api/typo")).headers.get("content-security-policy")).toBeNull();
+    });
+});
+

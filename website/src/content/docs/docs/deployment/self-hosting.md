@@ -373,6 +373,24 @@ broken down by API surface (data, auth, storage, functions) and collection, plus
 process gauges. Without a token the endpoint is readable by anyone who can reach
 the port, so set one unless it is on a private network.
 
+## Security headers
+
+Every response carries `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options:
+nosniff`, a `Referrer-Policy` and `Strict-Transport-Security: max-age=15552000`
+(180 days). The HSTS header leaves out `includeSubDomains`: that would tell
+browsers to refuse plain HTTP on every subdomain of your domain, including ones
+this server has nothing to do with, and a browser keeps it for as long as the
+header says. <span class="since-badge" data-since="0.24">Since 0.24</span>
+Set `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` when every subdomain is HTTPS-only;
+up to and including 0.23 the header always carried `includeSubDomains`.
+
+The static apps — the CMS admin and any frontend the bundle serves — also carry
+`Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri
+'self'`. It decides who may frame the app, rules out plugins and pins `<base>`
+to your origin, and restricts nothing else, so inline scripts, workers and
+third-party sign-in keep working. A response that sets its own policy keeps it.
+For anything stricter, put the policy on the reverse proxy in front.
+
 ## Running functions in their own process
 
 Everything above is one container serving the whole project, which is the right

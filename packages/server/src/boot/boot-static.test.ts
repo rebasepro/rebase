@@ -138,3 +138,29 @@ describe("booting a two-app static bundle", () => {
         expect((await get("/health")).status).toBe(200);
     });
 });
+
+/**
+ * Security headers on a served app.
+ *
+ * `secureHeaders()`' defaults sent `Strict-Transport-Security: max-age=15552000;
+ * includeSubDomains` on whatever domain a self-hoster serves, which forces HTTPS
+ * on every sibling subdomain of it for 180 days — a decision about hosts this
+ * process does not serve, made for the operator. And the static apps, the CMS
+ * admin among them, carried no Content-Security-Policy at all.
+ */
+describe("security headers on a static app", () => {
+    async function headers(url: string): Promise<Headers> {
+        return (await booted!.app.fetch(new Request(`http://localhost${url}`))).headers;
+    }
+
+    it("sends HSTS without includeSubDomains unless asked", async () => {
+        expect((await headers("/")).get("strict-transport-security")).toBe("max-age=15552000");
+    });
+
+    it("sends a conservative CSP on the page and its deep links", async () => {
+        for (const url of ["/", "/admin", "/admin/collections/posts", "/assets/app.js"]) {
+            const csp = (await headers(url)).get("content-security-policy");
+            expect(csp).toBe("frame-ancestors 'self'; object-src 'none'; base-uri 'self'");
+        }
+    });
+});

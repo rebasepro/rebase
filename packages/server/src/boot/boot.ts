@@ -2,7 +2,7 @@ import path from "path";
 import { createServer, type Server } from "http";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { secureHeaders } from "hono/secure-headers";
+import { runtimeSecureHeaders } from "./security-headers";
 import { getRequestListener } from "@hono/node-server";
 import {
     DEFAULT_DATA_SOURCE_KEY,
@@ -288,21 +288,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     installRootErrorHandler(app);
 
     app.use("/*", cors(resolveCorsOptions(env)));
-    app.use("/*", secureHeaders({
-        // An API serves assets and tokens to origins other than its own, so the
-        // browser defaults are wrong here in two specific ways:
-        //
-        // - `crossOriginResourcePolicy` defaults to `same-origin`, which blocks a
-        //   frontend on another origin from loading anything this server serves.
-        // - `crossOriginOpenerPolicy` defaults to `same-origin`, which severs
-        //   `window.opener` and breaks the OAuth popup sign-in that
-        //   `resolveAuthOptions` configures whenever GOOGLE_CLIENT_ID is set.
-        //
-        // Cross-origin access is still governed by CORS; these only stop the
-        // browser from refusing before CORS is consulted.
-        crossOriginResourcePolicy: "cross-origin",
-        crossOriginOpenerPolicy: "same-origin-allow-popups"
-    }));
+    app.use("/*", runtimeSecureHeaders({ hstsIncludeSubDomains: env.REBASE_HSTS_INCLUDE_SUBDOMAINS }));
 
     // Classified against the configured base path, not a hardcoded "/api" — a
     // project on a different base path would otherwise label every request
@@ -633,6 +619,22 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
  * probes, so a static app is provisioned by the exact same deployment path as a
  * backend — the only difference is what the bundle contains.
  */
+/**
+ * REBASE_HSTS_INCLUDE_SUBDOMAINS for the static-only path, which reads its few
+ * variables directly rather than through the backend's schema. Validated the
+ * same way: a value that is neither true nor false refuses the boot rather than
+ * quietly meaning one of them.
+ */
+function readHstsIncludeSubDomains(): boolean {
+    const raw = process.env.REBASE_HSTS_INCLUDE_SUBDOMAINS;
+    if (raw === undefined || raw === "") return false;
+    if (raw === "true" || raw === "false") return raw === "true";
+    throw new BundleError(
+        `The environment is not valid:\n  REBASE_HSTS_INCLUDE_SUBDOMAINS: expected "true" or "false", got "${raw}"`,
+        "See https://rebase.pro/docs/getting-started/configuration/ for the variables a deployment reads."
+    );
+}
+
 async function bootStaticApp(
     bundle: LoadedBundle,
     devRoot: string,
@@ -660,12 +662,8 @@ async function bootStaticApp(
     // one shape when it does.
     installRootErrorHandler(app);
 
-    // Assets must be loadable from other origins (a custom domain, the console),
-    // so the same cross-origin relaxation the API path makes applies here.
-    app.use("/*", secureHeaders({
-        crossOriginResourcePolicy: "cross-origin",
-        crossOriginOpenerPolicy: "same-origin-allow-popups"
-    }));
+    // The same headers the backend path sends — see `runtimeSecureHeaders`.
+    app.use("/*", runtimeSecureHeaders({ hstsIncludeSubDomains: readHstsIncludeSubDomains() }));
 
     const metrics = metricsEnabled ? createMetricsMiddleware(basePath) : undefined;
     if (metrics) app.use("/*", metrics.middleware);

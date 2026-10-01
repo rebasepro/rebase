@@ -67,6 +67,14 @@ export const bootEnvExtension = z.object({
      * db migrate`, or a reviewed `rebase db push` from a checkout.
      */
     REBASE_MIGRATE_ON_BOOT: z.enum(["none", "ensure", "push", ""]).optional(),
+    /**
+     * Add `includeSubDomains` to the `Strict-Transport-Security` header.
+     *
+     * Off by default: it tells browsers to refuse plain HTTP on every subdomain
+     * of the host that sent it, for six months — hosts this process does not
+     * serve. Turn it on when every subdomain of the domain is HTTPS-only.
+     */
+    REBASE_HSTS_INCLUDE_SUBDOMAINS: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
     /** Expose Prometheus metrics at `/metrics`. Off unless asked for. */
     REBASE_METRICS: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
     /**

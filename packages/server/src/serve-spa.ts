@@ -5,6 +5,7 @@ import * as fs from "fs";
 import fsp from "node:fs/promises";
 import { responseCompression } from "./utils/compression.js";
 import { logger } from "./utils/logger.js";
+import { STATIC_APP_CSP } from "./boot/security-headers.js";
 
 /**
  * Configuration for serving a Single Page Application
@@ -325,6 +326,12 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         host: c.req.header("host") ?? new URL(c.req.url).host,
         path: c.req.path
     });
+    // Paths under this app's scope that are not the app's: the API, the
+    // probes, sibling apps. The SPA fallback steps aside for them, and the
+    // app's own headers stay off them.
+    const allExcludePaths = [apiBasePath, ...excludePaths];
+    const isExcludedFromApp = (requestPath: string): boolean =>
+        allExcludePaths.some(p => isUnderPath(requestPath, p));
     // A third-party middleware cannot ask for itself. Returned as it came when
     // there is no `owns`, so a mount without one registers exactly what it
     // always has.
@@ -357,6 +364,12 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
     app.use(scope, async (c, next) => {
         if (declines(c)) return next();
         await next();
+        // The app's pages, not the API or the probes that share the scope of
+        // an app at "/". An explicit policy already on the response wins, as
+        // an explicit Cache-Control does below.
+        if (!isExcludedFromApp(c.req.path) && !c.res.headers.has("content-security-policy")) {
+            c.header("Content-Security-Policy", STATIC_APP_CSP);
+        }
         if (c.res.headers.has("cache-control")) return;
         // 404s and redirects are not the build's artifacts to cache. A 304 is,
         // and carries the header from the 200 that seeded it.
@@ -398,8 +411,6 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         return;
     }
 
-    // Build list of paths to exclude from SPA handling
-    const allExcludePaths = [apiBasePath, ...excludePaths];
 
     // Cache the index.html content to avoid re-reading from disk on every navigation request.
     let cachedHtml: string | null = null;
@@ -416,7 +427,7 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         if (c.req.method !== "GET" && c.req.method !== "HEAD") return next();
         // Skip excluded paths (API, health checks, sibling apps), and requests
         // another app owns.
-        if (declines(c) || allExcludePaths.some(p => isUnderPath(c.req.path, p))) {
+        if (declines(c) || isExcludedFromApp(c.req.path)) {
             return next();
         }
 
