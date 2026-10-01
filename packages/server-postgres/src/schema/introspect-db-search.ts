@@ -21,9 +21,9 @@
 import {
     DEFAULT_SEARCH_COLUMN,
     DEFAULT_SEARCH_LANGUAGE,
-    type CollectionConfig,
-    type Properties,
-    type Property,
+    type PostgresCollectionConfig,
+    type PostgresProperties,
+    type PostgresProperty,
     type SearchConfig
 } from "@rebasepro/types";
 import { buildSearchColumnSpec, searchColumnStamps, SEARCH_STAMP_PREFIX } from "./search-column";
@@ -42,7 +42,7 @@ export interface ReconstructedSearch {
 const SEGMENT = /setweight\(to_tsvector\('((?:[^']|'')+)'::regconfig, ([\s\S]+?)\), '([A-D])'::"char"\)/g;
 
 /** A property with the column's shape, for the candidate block to resolve against. */
-function propertyFor(col: TableColumn): Property | undefined {
+function propertyFor(col: TableColumn): PostgresProperty | undefined {
     if (col.data_type === "text" || col.data_type === "character varying" || col.data_type === "character") {
         return { name: col.column_name, type: "string", columnName: col.column_name };
     }
@@ -113,13 +113,13 @@ export function reconstructSearchBlock(input: {
 
     // Compiled by the code that built the column, and kept only if it is the
     // same column: the fingerprint is a hash of the exact expression.
-    const properties: Properties = {};
+    const properties: PostgresProperties = {};
     for (const [column, key] of input.keyByColumn) {
         const col = byColumn.get(column);
         const prop = col ? propertyFor(col) : undefined;
         if (prop) properties[key] = prop;
     }
-    const candidate: CollectionConfig = {
+    const candidate: PostgresCollectionConfig = {
         slug: input.table,
         name: input.table,
         table: input.table,
