@@ -1,3 +1,4 @@
+import ts from "typescript";
 import { isInsideDirectory, rebaseCollectionsPlugin, transformCollectionSource } from "../src/vitePlugin";
 
 /**
@@ -508,6 +509,85 @@ describe("server callbacks are stripped from the browser bundle", () => {
         // Same name, not inside a `callbacks` block — must not be touched.
         const result = transform('const c = { admin: { beforeSave: "a label" } };');
         expect(result).toBeNull();
+    });
+
+    // The strip knew one spelling: `key: value` inside a literal that is the
+    // value of `callbacks:`. Every other way of writing the same block shipped
+    // its body, and its imports, to every visitor of the admin.
+    describe("every way of writing the block", () => {
+        /** The output is still a module TypeScript can compile. */
+        const parses = (code: string) => {
+            const out = ts.transpileModule(code, {
+                reportDiagnostics: true,
+                compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
+            });
+            expect(out.diagnostics ?? []).toEqual([]);
+        };
+
+        it("strips a hook written with method syntax", () => {
+            const result = createTransform()(wrap(
+                "async beforeSave({ values }) { await chargeCard(values, process.env.STRIPE_KEY); return values; }, " +
+                "get afterRead() { return leak(process.env.SALT); }"));
+            expect(result).not.toBeNull();
+            expect(result!.code).toContain("beforeSave: undefined");
+            expect(result!.code).toContain("afterRead: undefined");
+            expect(result!.code).not.toContain("STRIPE_KEY");
+            expect(result!.code).not.toContain("SALT");
+            parses(result!.code);
+        });
+
+        it("strips a hook given by shorthand, and the declaration only it used", () => {
+            const result = createTransform()(
+                'import { charge } from "../server/stripe";\n' +
+                "const beforeSave = async ({ values }) => { await charge(process.env.STRIPE_KEY); return values; };\n" +
+                'export default { slug: "orders", callbacks: { beforeSave } };');
+            expect(result!.code).toContain("beforeSave: undefined");
+            expect(result!.code).not.toContain("STRIPE_KEY");
+            expect(result!.code).not.toContain("../server/stripe");
+            parses(result!.code);
+        });
+
+        it("strips a block given by reference, with the object and the imports only it used", () => {
+            const result = createTransform()(
+                'import Stripe from "stripe";\n' +
+                'import { formatPrice } from "../shared/format";\n' +
+                "const stripe = new Stripe(process.env.STRIPE_KEY);\n" +
+                "const cb = { beforeSave: async ({ values }) => { await stripe.charges.create(values); return values; } };\n" +
+                'export default { slug: "orders", label: formatPrice(1), callbacks: cb };');
+            expect(result!.code).toContain("callbacks: undefined");
+            expect(result!.code).not.toContain("STRIPE_KEY");
+            expect(result!.code).not.toContain('from "stripe"');
+            expect(result!.code).not.toContain("const cb");
+            // Still used outside the block: kept.
+            expect(result!.code).toContain('import { formatPrice } from "../shared/format";');
+            parses(result!.code);
+        });
+
+        it("strips a block imported from a server module, by shorthand", () => {
+            const result = createTransform()(
+                'import { callbacks } from "./orders.server";\n' +
+                'export default { slug: "orders", callbacks };');
+            expect(result!.code).toContain("callbacks: undefined");
+            expect(result!.code).not.toContain("orders.server");
+            parses(result!.code);
+        });
+
+        it("strips a spread into the block, and a block wrapped in `satisfies`", () => {
+            const result = createTransform()(
+                'import { serverHooks } from "./hooks.server";\n' +
+                'export default { slug: "orders", callbacks: { ...serverHooks, afterSave: () => notify(process.env.HOOK) } satisfies object };');
+            expect(result!.code).not.toContain("hooks.server");
+            expect(result!.code).not.toContain("process.env.HOOK");
+            parses(result!.code);
+        });
+
+        it("keeps an exported declaration, which another file may import", () => {
+            const result = createTransform()(
+                "export const cb = { beforeSave: async ({ values }) => values };\n" +
+                'export default { slug: "orders", callbacks: cb };');
+            expect(result!.code).toContain("callbacks: undefined");
+            expect(result!.code).toContain("export const cb");
+        });
     });
 });
 

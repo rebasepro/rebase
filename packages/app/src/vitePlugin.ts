@@ -68,20 +68,178 @@ const LAZY_COMPONENT_KEYS = new Set(["Field", "Preview", "Builder", "Filter", "C
  * it serializes a collection back to TypeScript, so nothing round-trips through
  * this and no user code can be lost by it.
  */
+/** One edit of the strip: the source range it replaces, and with what. */
+interface StripEdit {
+    start: number;
+    end: number;
+    text: string;
+}
+
+/** The object literal under `as`, `satisfies`, `!` and parentheses, if that is what a value is. */
+function unwrapObjectLiteral(expr: ts.Expression): ts.ObjectLiteralExpression | undefined {
+    let current: ts.Expression = expr;
+    while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current)
+        || ts.isSatisfiesExpression(current) || ts.isNonNullExpression(current)) {
+        current = current.expression;
+    }
+    return ts.isObjectLiteralExpression(current) ? current : undefined;
+}
+
 /**
- * True when `node` is a property of an object that is itself the value of a
- * `callbacks:` property — i.e. a real lifecycle hook, on a collection or on a
- * property, and not something that merely shares a name.
+ * Every edit that takes a `callbacks` block out of the browser's copy.
  *
  * Matches the key exactly, so `admin.browserCallbacks` — the panel's own block,
- * which is meant to reach the browser — is not caught by it.
+ * which is meant to reach the browser — is not caught by it. Whatever the
+ * spelling of the block, its server code goes:
+ *
+ *   - `callbacks: { beforeSave: … }` — each value becomes `undefined`, the key
+ *     stays (the one spelling this used to know);
+ *   - `callbacks: { async beforeSave() {…} }`, a getter, or `{ beforeSave }` —
+ *     the member becomes `beforeSave: undefined`;
+ *   - `callbacks: { ...serverHooks }` — the spread becomes `...undefined`;
+ *   - `callbacks: cb`, `callbacks: makeHooks()`, or `{ callbacks }` imported
+ *     from a server module — the whole block becomes `undefined`.
+ *
+ * The literal is looked for under `satisfies`/`as`, which is how a typed block
+ * is often written. Method syntax, a block defined beside the collection and
+ * one imported from a `.server` file all used to ship their bodies and their
+ * imports to every visitor of the admin.
  */
-function isInsideCallbacksBlock(node: ts.PropertyAssignment): boolean {
-    const objectLiteral = node.parent;
-    if (!objectLiteral || !ts.isObjectLiteralExpression(objectLiteral)) return false;
-    const owner = objectLiteral.parent;
-    if (!owner || !ts.isPropertyAssignment(owner)) return false;
-    return getPropertyName(owner) === "callbacks";
+function callbackStripEdits(sourceFile: ts.SourceFile): StripEdit[] {
+    const edits: StripEdit[] = [];
+    const memberEdit = (member: ts.ObjectLiteralElementLike): StripEdit | undefined => {
+        if (ts.isPropertyAssignment(member)) {
+            return { start: member.initializer.getStart(sourceFile), end: member.initializer.getEnd(), text: "undefined" };
+        }
+        if (ts.isSpreadAssignment(member)) {
+            return { start: member.getStart(sourceFile), end: member.getEnd(), text: "...undefined" };
+        }
+        // Method, getter, setter, shorthand: the member, rewritten as a key.
+        const name = member.name;
+        return name ? { start: member.getStart(sourceFile), end: member.getEnd(), text: `${name.getText(sourceFile)}: undefined` } : undefined;
+    };
+    walkAST(sourceFile, (node) => {
+        if (ts.isShorthandPropertyAssignment(node) && node.name.text === "callbacks") {
+            edits.push({ start: node.getStart(sourceFile), end: node.getEnd(), text: "callbacks: undefined" });
+            return;
+        }
+        if (!ts.isPropertyAssignment(node) || getPropertyName(node) !== "callbacks") return;
+        const literal = unwrapObjectLiteral(node.initializer);
+        if (!literal) {
+            edits.push({ start: node.initializer.getStart(sourceFile), end: node.initializer.getEnd(), text: "undefined" });
+            return;
+        }
+        for (const member of literal.properties) {
+            const edit = memberEdit(member);
+            if (edit) edits.push(edit);
+        }
+    });
+    // A `callbacks:` inside a range already replaced is gone with it.
+    return edits.filter(edit => !edits.some(outer => outer !== edit && outer.start <= edit.start && edit.end <= outer.end));
+}
+
+/** Whether an identifier is a read of a binding, rather than a name being declared or a property key. */
+function isReference(id: ts.Identifier): boolean {
+    const parent = id.parent;
+    if (!parent) return false;
+    if (ts.isPropertyAccessExpression(parent) && parent.name === id) return false;
+    if (ts.isQualifiedName(parent) && parent.right === id) return false;
+    if ((ts.isPropertyAssignment(parent) || ts.isMethodDeclaration(parent) || ts.isPropertyDeclaration(parent)
+        || ts.isPropertySignature(parent) || ts.isMethodSignature(parent) || ts.isGetAccessorDeclaration(parent)
+        || ts.isSetAccessorDeclaration(parent) || ts.isEnumMember(parent) || ts.isJsxAttribute(parent)) && parent.name === id) return false;
+    if ((ts.isVariableDeclaration(parent) || ts.isFunctionDeclaration(parent) || ts.isClassDeclaration(parent)
+        || ts.isParameter(parent) || ts.isImportClause(parent) || ts.isNamespaceImport(parent)
+        || ts.isBindingElement(parent) || ts.isFunctionExpression(parent) || ts.isClassExpression(parent)
+        || ts.isTypeAliasDeclaration(parent) || ts.isInterfaceDeclaration(parent) || ts.isTypeParameterDeclaration(parent))
+        && parent.name === id) return false;
+    if (ts.isBindingElement(parent) && parent.propertyName === id) return false;
+    if (ts.isImportSpecifier(parent)) return false;
+    if (ts.isLabeledStatement(parent) || ts.isBreakOrContinueStatement(parent)) return false;
+    return true;
+}
+
+/** A top-level statement the strip may take out, and the names it declares. */
+interface TopLevelBinding {
+    statement: ts.Statement;
+    names: string[];
+}
+
+/**
+ * Top-level code that only the stripped callbacks used: the imports and the
+ * declarations nothing else reads.
+ *
+ * Replacing a block with `undefined` is not enough on its own. A module an
+ * import names is still loaded — and evaluated, for its side effects — whether
+ * or not anything reads the binding, so `import { charge } from "./stripe.server"`
+ * kept the server module in the bundle (or broke the build on a Node built-in),
+ * and `const stripe = new Stripe(process.env.KEY)` still ran in the browser. A
+ * statement goes when something stripped read it and nothing left does; that
+ * repeats until nothing more goes, so a declaration only a removed declaration
+ * used goes too. An exported declaration stays: another file may import it.
+ */
+function deadTopLevelStatements(sourceFile: ts.SourceFile, removed: StripEdit[]): ts.Statement[] {
+    const bindings: TopLevelBinding[] = [];
+    for (const statement of sourceFile.statements) {
+        const exported = ts.canHaveModifiers(statement)
+            && (ts.getModifiers(statement) ?? []).some(m => m.kind === ts.SyntaxKind.ExportKeyword);
+        if (exported) continue;
+        if (ts.isImportDeclaration(statement)) {
+            const clause = statement.importClause;
+            if (!clause || clause.isTypeOnly) continue;
+            const names: string[] = [];
+            if (clause.name) names.push(clause.name.text);
+            const named = clause.namedBindings;
+            if (named && ts.isNamespaceImport(named)) names.push(named.name.text);
+            if (named && ts.isNamedImports(named)) {
+                for (const el of named.elements) if (!el.isTypeOnly) names.push(el.name.text);
+            }
+            if (names.length > 0) bindings.push({ statement, names });
+        } else if (ts.isVariableStatement(statement)) {
+            const names: string[] = [];
+            const collect = (name: ts.BindingName) => {
+                if (ts.isIdentifier(name)) names.push(name.text);
+                else for (const el of name.elements) if (!ts.isOmittedExpression(el)) collect(el.name);
+            };
+            for (const decl of statement.declarationList.declarations) collect(decl.name);
+            bindings.push({ statement, names });
+        } else if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name) {
+            bindings.push({ statement, names: [statement.name.text] });
+        }
+    }
+    if (bindings.length === 0) return [];
+
+    const references: ts.Identifier[] = [];
+    walkAST(sourceFile, (node) => {
+        if (ts.isIdentifier(node) && isReference(node)) references.push(node);
+    });
+
+    const ranges: { start: number; end: number }[] = removed.map(({ start, end }) => ({ start, end }));
+    const within = (node: ts.Node) => {
+        const at = node.getStart(sourceFile);
+        return ranges.some(r => r.start <= at && node.getEnd() <= r.end);
+    };
+    const dead: ts.Statement[] = [];
+    for (let changed = true; changed;) {
+        changed = false;
+        for (const binding of bindings) {
+            if (dead.includes(binding.statement)) continue;
+            let readByStripped = false;
+            let readLive = false;
+            for (const ref of references) {
+                if (!binding.names.includes(ref.text)) continue;
+                // A read inside the statement itself (a recursive function) is neither.
+                if (ref.getStart(sourceFile) >= binding.statement.getStart(sourceFile) && ref.getEnd() <= binding.statement.getEnd()) continue;
+                if (within(ref)) readByStripped = true;
+                else readLive = true;
+            }
+            if (readByStripped && !readLive) {
+                dead.push(binding.statement);
+                ranges.push({ start: binding.statement.getStart(sourceFile), end: binding.statement.getEnd() });
+                changed = true;
+            }
+        }
+    }
+    return dead;
 }
 
 /**
@@ -132,19 +290,27 @@ export function transformCollectionSource(
     const ms = new MagicString(code);
     let replaced = false;
 
+    // Server-only lifecycle hooks: out of the browser's copy, with whatever
+    // top-level code only they used.
+    const strips = callbackStripEdits(sourceFile);
+    for (const edit of strips) {
+        ms.overwrite(edit.start, edit.end, edit.text);
+        replaced = true;
+    }
+    const gone: { start: number; end: number }[] = [...strips];
+    for (const statement of deadTopLevelStatements(sourceFile, strips)) {
+        ms.remove(statement.getStart(sourceFile), statement.getEnd());
+        gone.push({ start: statement.getStart(sourceFile), end: statement.getEnd() });
+        replaced = true;
+    }
+    const stripped = (node: ts.Node) => gone.some(e => e.start <= node.getStart(sourceFile) && node.getEnd() <= e.end);
+
     walkAST(sourceFile, (node) => {
         // Only look at PropertyAssignment nodes (key: value in object literals)
         if (!ts.isPropertyAssignment(node)) return;
+        if (stripped(node)) return;
 
         const name = getPropertyName(node);
-
-        // Server-only lifecycle hooks: keep the key, drop the body.
-        if (name && isInsideCallbacksBlock(node)) {
-            const value = node.initializer;
-            ms.overwrite(value.getStart(sourceFile), value.getEnd(), "undefined");
-            replaced = true;
-            return;
-        }
 
         // Check the property name matches one of the lazy component keys
         const propName = name;
