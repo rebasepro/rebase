@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { TEST_ENV } from "./vitest.config";
+import { TEST_ENV, workspaceSourceAliases } from "./vitest.config";
 
 /**
  * The DB-backed suite: tests that start a real managed database.
@@ -27,5 +27,7 @@ export default defineConfig({
         // One file at a time. Several PGlite instances competing for cores make
         // every one of them slower and the timings unpredictable.
         fileParallelism: false
-    }
+    },
+    // See vitest.config.ts: the code under test, not the last build.
+    resolve: { alias: workspaceSourceAliases() }
 });

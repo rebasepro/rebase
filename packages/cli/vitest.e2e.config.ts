@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { TEST_ENV } from "./vitest.config";
+import { TEST_ENV, workspaceSourceAliases } from "./vitest.config";
 
 export default defineConfig({
     test: {
@@ -18,5 +18,9 @@ export default defineConfig({
         // installs for the same resources, which flakes on constrained runners.
         // Serialize the files so one container is live at a time.
         fileParallelism: false
-    }
+    },
+    // See vitest.config.ts. What this reaches is only what the suite imports
+    // itself; the CLI it drives is `bin/rebase.js`, which runs `dist` — and the
+    // scaffolds it installs consume every package as built output. Build first.
+    resolve: { alias: workspaceSourceAliases() }
 });
