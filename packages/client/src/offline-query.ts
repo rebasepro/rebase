@@ -259,16 +259,33 @@ function isTuple(value: unknown): value is [WhereFilterOp, unknown] {
         && toCanonicalOp(value[0]) !== undefined;
 }
 
+/**
+ * One field's condition, as the tuples this evaluator can read.
+ *
+ * The single reading of a condition, for {@link matchesWhere} and
+ * {@link isExactlyEvaluable} both. Each used to have its own, and only the
+ * first was hardened: `{ status: undefined }` (a skipped filter) and the bare
+ * wire string `"eq.active"` both reached `.filter` on a non-array in the
+ * second and threw.
+ *
+ * `unreadable` is set when the condition is there but yields nothing this
+ * build understands — a wire string, an operator from a newer server. Such a
+ * condition filters nothing locally while the server does filter on it, so an
+ * answer that ignored it would be wider than the server's.
+ */
+function conditionTuples(condition: unknown): { tuples: [WhereFilterOp, unknown][]; unreadable: boolean } {
+    if (condition === undefined) return { tuples: [], unreadable: false };
+    if (isTuple(condition)) return { tuples: [condition], unreadable: false };
+    if (!Array.isArray(condition)) return { tuples: [], unreadable: true };
+    const tuples = condition.filter(isTuple);
+    return { tuples, unreadable: tuples.length !== condition.length || tuples.length === 0 };
+}
+
 /** Evaluate a `where` clause: every field, and every tuple on a field, AND-ed. */
 export function matchesWhere(row: Record<string, unknown>, where: FilterValues<string> | undefined): boolean {
     if (!where) return true;
     for (const [field, condition] of Object.entries(where)) {
-        if (condition === undefined) continue;
-        const tuples: [WhereFilterOp, unknown][] = isTuple(condition)
-            ? [condition]
-            : Array.isArray(condition)
-                ? (condition as unknown[]).filter(isTuple) as [WhereFilterOp, unknown][]
-                : [];
+        const { tuples } = conditionTuples(condition);
         for (const [rawOp, value] of tuples) {
             const op = toCanonicalOp(rawOp) ?? rawOp;
             if (!matchesOperator(row[field], op, value)) return false;
@@ -400,12 +417,17 @@ export function resolvePagination(params?: FindParams): { limit: number; offset:
 /** `<`, `<=`, `>`, `>=` — the operators whose answer depends on a collation. */
 const ORDERING_OPS = new Set<WhereFilterOp>(["<", "<=", ">", ">="]);
 
-/** Does any condition in this `where` clause order its operands? */
-function whereOrders(where: FilterValues<string> | undefined): boolean {
+/**
+ * Does any condition in this `where` clause order its operands — or say
+ * something this evaluator cannot read at all? Either way the local answer is
+ * not the server's.
+ */
+function whereNotExact(where: FilterValues<string> | undefined): boolean {
     if (!where) return false;
     for (const condition of Object.values(where)) {
-        const tuples = isTuple(condition) ? [condition] : (condition as unknown[]).filter(isTuple);
-        if (tuples.some(([op]) => ORDERING_OPS.has(op))) return true;
+        const { tuples, unreadable } = conditionTuples(condition);
+        if (unreadable) return true;
+        if (tuples.some(([op]) => ORDERING_OPS.has(toCanonicalOp(op) ?? op))) return true;
     }
     return false;
 }
@@ -476,7 +498,7 @@ export function isExactlyEvaluable(params?: FindParams): boolean {
     // nearest of what happens to be cached while looking like the nearest there
     // are — a wrong answer that is indistinguishable from a right one.
     if (params.vectorSearch) return false;
-    if (whereOrders(params.where)) return false;
+    if (whereNotExact(params.where)) return false;
     if (logicalOrders(params.logical)) return false;
     // A dotted key reaches through a relation — `applications.status` asks
     // about rows in another table. `matchesWhere` reads `row[field]` flat, so

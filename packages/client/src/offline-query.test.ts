@@ -469,3 +469,38 @@ describe("local query engine", () => {
         });
     });
 });
+
+/**
+ * The `where` shapes the rest of the stack accepts must not throw here.
+ *
+ * `{ status: undefined }` is how a conditional filter is skipped — the
+ * transport's own error message tells callers to write it that way — and the
+ * bare PostgREST string (`"eq.active"`) is passed straight through by the
+ * serializer. `matchesWhere` handled both; `isExactlyEvaluable` reached
+ * `.filter` on a non-array and threw a `TypeError`, so turning offline support
+ * on broke a query that worked without it — online too, after the request had
+ * already been paid for. Audit 34, H4.
+ */
+describe("where shapes the transport accepts", () => {
+    it("a skipped filter is evaluable, and filters nothing", () => {
+        const params = { where: { status: undefined } } as unknown as FindParams;
+        expect(isExactlyEvaluable(params)).toBe(true);
+        expect(runLocalQuery([{ id: "1", status: "a" }], params).data).toHaveLength(1);
+    });
+
+    it("a bare wire string is not something this evaluator can read, so it is not called exact", () => {
+        const params = { where: { status: "eq.active" } } as unknown as FindParams;
+        expect(() => isExactlyEvaluable(params)).not.toThrow();
+        expect(isExactlyEvaluable(params)).toBe(false);
+    });
+
+    it("an operator this build does not know is not called exact either", () => {
+        const params = { where: { status: ["~=", "x"] } } as unknown as FindParams;
+        expect(isExactlyEvaluable(params)).toBe(false);
+    });
+
+    it("a list of known tuples is still exact", () => {
+        const params = { where: { n: [["!=", 1], ["!=", 2]] } } as unknown as FindParams;
+        expect(isExactlyEvaluable(params)).toBe(true);
+    });
+});

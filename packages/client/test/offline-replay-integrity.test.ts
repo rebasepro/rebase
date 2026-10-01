@@ -70,3 +70,13 @@ describe("a replayed create answered 409 (H1)", () => {
         expect(await posts.findById(created.id as string)).toMatchObject({ by_server: true });
     });
 });
+
+describe("a skipped filter with offline support on (H4)", () => {
+    it("a find with `{ status: undefined }` answers instead of throwing a TypeError", async () => {
+        const server = fakeServer();
+        server.rows.set("1", { id: "1", status: "a" });
+        const { posts } = manager(server);
+        const result = await posts.find({ where: { status: undefined } } as never);
+        expect(result.data).toHaveLength(1);
+    });
+});
