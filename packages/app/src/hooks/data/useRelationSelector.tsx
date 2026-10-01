@@ -164,7 +164,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
     // re-opening it.
     const limitRef = useRef(limit);
     limitRef.current = limit;
-    const windowRef = useRef<CollectionWindow<M> | null>(null);
+    const windowRef = useRef<CollectionWindow<Record<string, unknown>> | null>(null);
 
     const fetchData = useCallback(() => {
         cleanupSubscription();
@@ -183,8 +183,8 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         // `dispose` is what keeps this hook's results matching the query that
         // asked for them: an answer for "ab" that lands after the window for
         // "abc" opened is dropped, not painted.
-        const collectionWindow = new CollectionWindow<M>({
-            accessor: dataClient.collection<M>(path),
+        const collectionWindow = new CollectionWindow({
+            accessor: dataClient.collection(path),
             query: {
                 where: whereParams,
                 searchString: currentSearch || undefined,
@@ -195,7 +195,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
             onChange: (state) => {
                 if (state.rows) {
                     hasLoadedRef.current = true;
-                    setItems(state.rows.map((e) => entityToRelationItem(e)));
+                    setItems((state.rows as Entity<M>[]).map((e) => entityToRelationItem(e)));
                     setHasMore(!state.complete && !state.error);
                 }
                 if (state.error) {

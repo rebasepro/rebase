@@ -608,7 +608,7 @@ parentEntityIds,
      */
     const saveAsNew = useCallback(() => {
         const values = formex?.values ?? usedEntity?.values;
-        onValuesModified?.(false);
+        if (values) onValuesModified?.(false, values);
         navigateToEntity({
             openEntityMode: layout,
             collection,
