@@ -268,6 +268,17 @@ interface QuerySnapshot {
     rows?: AnyRow[];
 }
 
+/**
+ * Which user an operation runs for: the scope, and the epoch of that scope.
+ *
+ * Captured before an operation's first await and handed to every write it
+ * makes to the local database or the queue — see `OfflineManager.scopeEpoch`.
+ */
+interface ScopeTicket {
+    scope: string;
+    epoch: number;
+}
+
 interface RowEntry {
     row: AnyRow;
     cachedAt: number;
@@ -339,6 +350,19 @@ export class OfflineManager {
     private readonly connectivity: ConnectivityMonitor;
 
     private scope = "anon";
+    /**
+     * Bumped by every change of user, and by `clear()`.
+     *
+     * The load paths always re-checked the scope after their awaits; the write
+     * paths did not. A `find` sent for user A that answered after B had signed
+     * in wrote A's RLS-filtered rows into B's local database, under B's keys,
+     * and showed them to B's observers; a replay acknowledged after the switch
+     * dequeued a key under B's scope that did not exist, so A's write stayed
+     * queued and was sent again when A came back. Every write now carries the
+     * {@link ScopeTicket} its operation started under, and one that is stale
+     * touches nothing that belongs to the new user.
+     */
+    private scopeEpoch = 0;
     /** The local database: normalized rows and query snapshots per collection. */
     private collections = new Map<string, CollectionState>();
     /** In-memory mirror of the current scope's queue, in replay order. */
@@ -437,6 +461,8 @@ export class OfflineManager {
                 return () => this.statusListeners.delete(listener);
             },
             clear: async () => {
+                // Anything in flight was read for the rows being thrown away.
+                this.scopeEpoch++;
                 await this.store.clear(`${this.scope}|`);
                 this.queue = [];
                 this.resetCollections();
@@ -461,6 +487,7 @@ export class OfflineManager {
         const next = uid || "anon";
         if (next === this.scope) return;
         this.scope = next;
+        this.scopeEpoch++;
         this.queueLoad = undefined;
         this.queue = [];
         this.resetCollections();
@@ -471,6 +498,16 @@ export class OfflineManager {
         this.revalidateAll();
         // The returning user's queue may hold writes from a previous session.
         void this.sync().catch(() => undefined);
+    }
+
+    /** The user an operation is running for — see {@link scopeEpoch}. */
+    private ticket(): ScopeTicket {
+        return { scope: this.scope, epoch: this.scopeEpoch };
+    }
+
+    /** Whether an operation's user is still the signed-in one. */
+    private isCurrent(ticket: ScopeTicket): boolean {
+        return ticket.epoch === this.scopeEpoch;
     }
 
     /**
@@ -518,13 +555,18 @@ export class OfflineManager {
 
         const wrapped: CollectionClient<M> = {
             find: async (params?: FindParams<M>): Promise<FindResult<M>> => {
+                const ticket = this.ticket();
                 const state = await this.ensureCollection(slug);
                 if (this.connectivity.shouldAttempt()) {
                     try {
                         const res = await inner.find(params);
                         this.connectivity.markSuccess();
-                        await this.ingest(slug, res.data ?? [], isProjection(params));
-                        const snapshot = this.recordSnapshot(slug, params, res);
+                        // Answered for a user who has since signed out: theirs
+                        // to read, not the next user's to keep.
+                        if (!this.isCurrent(ticket)) return res;
+                        await this.ingest(slug, res.data ?? [], ticket, isProjection(params));
+                        if (!this.isCurrent(ticket)) return res;
+                        const snapshot = this.recordSnapshot(slug, params, res, ticket);
                         const answer = this.answer<M>(slug, params, snapshot);
                         this.notifyCollection(slug, false);
                         return { data: answer.data, meta: answer.meta };
@@ -557,17 +599,19 @@ export class OfflineManager {
             findAll: (params?: FindAllParams<M>) => collectAllPages<M>((p) => wrapped.find(p), params, slug),
 
             findById: async (id: string | number) => {
+                const ticket = this.ticket();
                 await this.ensureCollection(slug);
                 if (this.connectivity.shouldAttempt()) {
                     try {
                         const row = await inner.findById(id);
                         this.connectivity.markSuccess();
+                        if (!this.isCurrent(ticket)) return row;
                         if (row !== undefined) {
-                            await this.ingest(slug, [row]);
+                            await this.ingest(slug, [row], ticket);
                         } else if (!this.hasPending(slug, id)) {
                             // The server is authoritative that it is gone, and
                             // nothing local is waiting to recreate it.
-                            this.removeLocalRow(slug, id, true);
+                            this.removeLocalRow(slug, id, ticket, true);
                         }
                         this.notifyCollection(slug, false);
                         return this.localRow<M>(slug, id);
@@ -601,6 +645,7 @@ export class OfflineManager {
             },
 
             create: async (data: Partial<M>, id?: string | number, options?: WriteOptions) => {
+                const ticket = this.ticket();
                 await this.ensureCollection(slug);
                 // Named before it is sent: if the answer is lost, the queued
                 // replay presents the same key on the same request, and the
@@ -611,7 +656,7 @@ export class OfflineManager {
                     try {
                         const row = await inner.create(data, id, { ...options, idempotencyKey });
                         this.connectivity.markSuccess();
-                        await this.ingest(slug, [row]);
+                        await this.ingest(slug, [row], ticket);
                         this.notifyCollection(slug);
                         this.scheduleRefresh(slug);
                         return row;
@@ -632,8 +677,8 @@ export class OfflineManager {
                     generatedId: providedId === undefined,
                     ...(sent ? { sent: { idempotencyKey, data: { ...(data as AnyRow) }, id } } : {}),
                     rollback: { rows: { [String(rowId)]: this.rawLocalRow(slug, rowId) ?? null } }
-                });
-                this.setLocalRow(slug, rowId, row);
+                }, ticket);
+                this.setLocalRow(slug, rowId, row, ticket);
                 this.notifyCollection(slug);
                 return row;
             },
@@ -647,6 +692,7 @@ export class OfflineManager {
                     throw new TypeError("createMany expects an array of records.");
                 }
                 if (data.length === 0) return [];
+                const ticket = this.ticket();
                 // As in `create`: the key the batch is sent under is the key
                 // its replay is sent under.
                 const idempotencyKey = options?.idempotencyKey ?? createMutationId();
@@ -655,7 +701,7 @@ export class OfflineManager {
                     try {
                         const rows = await inner.createMany(data, { ...options, idempotencyKey });
                         this.connectivity.markSuccess();
-                        await this.ingest(slug, rows);
+                        await this.ingest(slug, rows, ticket);
                         this.notifyCollection(slug);
                         this.scheduleRefresh(slug);
                         return rows;
@@ -699,8 +745,8 @@ export class OfflineManager {
                         }
                         : {}),
                     rollback: { rows: rollback }
-                });
-                for (const row of rows) this.setLocalRow(slug, row.id as string | number, row);
+                }, ticket);
+                for (const row of rows) this.setLocalRow(slug, row.id as string | number, row, ticket);
                 this.notifyCollection(slug);
                 return rows;
             },
@@ -717,12 +763,13 @@ export class OfflineManager {
              * queue drains — the exact outcome upsert exists to prevent.
              */
             upsert: async (data: Partial<M>, options?: UpsertOptions) => {
+                const ticket = this.ticket();
                 await this.ensureCollection(slug);
                 if (this.connectivity.shouldAttempt()) {
                     try {
                         const row = await inner.upsert(data, options);
                         this.connectivity.markSuccess();
-                        await this.ingest(slug, [row]);
+                        await this.ingest(slug, [row], ticket);
                         this.notifyCollection(slug);
                         this.scheduleRefresh(slug);
                         return row;
@@ -747,8 +794,8 @@ export class OfflineManager {
                     data: [row],
                     upsert: true,
                     rollback: { rows: { [String(rowId)]: this.rawLocalRow(slug, rowId) ?? null } }
-                });
-                this.setLocalRow(slug, rowId, row);
+                }, ticket);
+                this.setLocalRow(slug, rowId, row, ticket);
                 this.notifyCollection(slug);
                 return row;
             },
@@ -762,6 +809,7 @@ export class OfflineManager {
                     throw new TypeError("updateMany expects an array of { id, data } entries.");
                 }
                 if (updates.length === 0) return [];
+                const ticket = this.ticket();
                 // Any row in the batch with a write already queued sends the
                 // whole batch to the queue. Splitting it — some rows now, some
                 // later — would break the one guarantee a batch makes, that its
@@ -772,7 +820,7 @@ export class OfflineManager {
                     try {
                         const rows = await inner.updateMany(updates, options);
                         this.connectivity.markSuccess();
-                        await this.ingest(slug, rows);
+                        await this.ingest(slug, rows, ticket);
                         this.notifyCollection(slug);
                         return rows;
                     } catch (error) {
@@ -793,8 +841,8 @@ export class OfflineManager {
                     updates: updates.map((u) => ({ id: u.id,
 data: u.data as AnyRow })),
                     rollback: { rows: rollback }
-                });
-                for (const row of optimistic) this.setLocalRow(slug, row.id as string | number, row);
+                }, ticket);
+                for (const row of optimistic) this.setLocalRow(slug, row.id as string | number, row, ticket);
                 this.notifyCollection(slug);
                 return optimistic;
             },
@@ -805,12 +853,13 @@ data: u.data as AnyRow })),
                     throw new TypeError("deleteMany expects an array of ids.");
                 }
                 if (ids.length === 0) return;
+                const ticket = this.ticket();
                 const anyPending = ids.some((id) => this.hasPending(slug, id));
                 if (this.connectivity.shouldAttempt() && !anyPending) {
                     try {
                         await inner.deleteMany(ids, options);
                         this.connectivity.markSuccess();
-                        for (const id of ids) this.removeLocalRow(slug, id, true);
+                        for (const id of ids) this.removeLocalRow(slug, id, ticket, true);
                         this.notifyCollection(slug);
                         this.scheduleRefresh(slug);
                         return;
@@ -828,8 +877,8 @@ data: u.data as AnyRow })),
                     type: "deleteMany",
                     ids,
                     rollback: { rows: rollback }
-                });
-                for (const id of ids) this.removeLocalRow(slug, id, false);
+                }, ticket);
+                for (const id of ids) this.removeLocalRow(slug, id, ticket, false);
                 this.notifyCollection(slug);
             },
 
@@ -838,6 +887,7 @@ data: u.data as AnyRow })),
                 data: Partial<M> | UpdateValues<Partial<M>>,
                 options?: WriteOptions
             ) => {
+                const ticket = this.ticket();
                 await this.ensureCollection(slug);
                 // As in `create`: the key the edit is sent under is the key
                 // its replay is sent under, so a replay of an edit that already
@@ -856,7 +906,7 @@ data: u.data as AnyRow })),
                     try {
                         const row = await inner.update(id, data, { ...options, idempotencyKey });
                         this.connectivity.markSuccess();
-                        await this.ingest(slug, [row]);
+                        await this.ingest(slug, [row], ticket);
                         this.notifyCollection(slug);
                         return row;
                     } catch (error) {
@@ -900,14 +950,15 @@ data: u.data as AnyRow })),
                     data: data as AnyRow,
                     ...(sent ? { sent: { idempotencyKey } } : {}),
                     rollback: { rows: { [String(id)]: base ?? null } }
-                });
+                }, ticket);
                 const optimistic = optimisticRow<M>({ ...(base ?? {}), ...(data as AnyRow) }, id);
-                this.setLocalRow(slug, id, optimistic);
+                this.setLocalRow(slug, id, optimistic, ticket);
                 this.notifyCollection(slug);
                 return optimistic;
             },
 
             delete: async (id: string | number, options?: WriteOptions) => {
+                const ticket = this.ticket();
                 await this.ensureCollection(slug);
                 // Keyed from the first attempt, because a delete is the write
                 // a lost answer hurts most: its replay finds the row gone and
@@ -922,7 +973,7 @@ data: u.data as AnyRow })),
                     try {
                         await inner.delete(id, { ...options, idempotencyKey });
                         this.connectivity.markSuccess();
-                        this.removeLocalRow(slug, id, true);
+                        this.removeLocalRow(slug, id, ticket, true);
                         this.notifyCollection(slug);
                         this.scheduleRefresh(slug);
                         return;
@@ -938,17 +989,19 @@ data: u.data as AnyRow })),
                     id,
                     ...(sent ? { sent: { idempotencyKey } } : {}),
                     rollback: { rows: { [String(id)]: this.rawLocalRow(slug, id) ?? null } }
-                });
-                this.removeLocalRow(slug, id);
+                }, ticket);
+                this.removeLocalRow(slug, id, ticket);
                 this.notifyCollection(slug);
             },
 
             count: async (params?: FindParams<M>): Promise<number> => {
+                const ticket = this.ticket();
                 await this.ensureCollection(slug);
                 if (this.connectivity.shouldAttempt()) {
                     try {
                         const n = await inner.count(params);
                         this.connectivity.markSuccess();
+                        if (!this.isCurrent(ticket)) return n;
                         void this.writeCache(this.countKey(slug, params), n);
                         return Math.max(0, n + this.pendingDelta(slug, params));
                     } catch (error) {
@@ -1019,7 +1072,9 @@ data: u.data as AnyRow })),
             wrapped.listen = (params, onUpdate, onError) => inner.listen(
                 params,
                 (response) => {
-                    void this.ingest(slug, response.data ?? [], isProjection(params))
+                    // The socket re-authenticates as whoever is signed in, so
+                    // a frame is the current user's.
+                    void this.ingest(slug, response.data ?? [], this.ticket(), isProjection(params))
                         .then(() => this.notifyCollection(slug, false));
                     onUpdate(response);
                 },
@@ -1030,7 +1085,7 @@ data: u.data as AnyRow })),
             wrapped.listenById = (id, onUpdate, onError) => inner.listenById(
                 id,
                 (row) => {
-                    if (row) void this.ingest(slug, [row]).then(() => this.notifyCollection(slug, false));
+                    if (row) void this.ingest(slug, [row], this.ticket()).then(() => this.notifyCollection(slug, false));
                     onUpdate(row);
                 },
                 onError
@@ -1099,8 +1154,9 @@ data: u.data as AnyRow })),
 
         if (options?.realtime !== false && !isUnsupported(inner.listen)) {
             unlisten = inner.listen(params, (response) => {
-                void this.ingest(slug, response.data ?? [], isProjection(params)).then(() => {
-                    this.recordSnapshot(slug, params, response);
+                const ticket = this.ticket();
+                void this.ingest(slug, response.data ?? [], ticket, isProjection(params)).then(() => {
+                    this.recordSnapshot(slug, params, response, ticket);
                     this.notifyCollection(slug, false);
                 });
             }, onError);
@@ -1164,11 +1220,11 @@ data: u.data as AnyRow })),
         if (options?.realtime !== false && !isUnsupported(inner.listenById)) {
             unlisten = inner.listenById(id, (row) => {
                 if (!row) {
-                    if (!this.hasPending(slug, id)) this.removeLocalRow(slug, id, true);
+                    if (!this.hasPending(slug, id)) this.removeLocalRow(slug, id, this.ticket(), true);
                     this.notifyCollection(slug, false);
                     return;
                 }
-                void this.ingest(slug, [row]).then(() => this.notifyCollection(slug, false));
+                void this.ingest(slug, [row], this.ticket()).then(() => this.notifyCollection(slug, false));
             }, onError);
         }
 
@@ -1515,7 +1571,8 @@ data: u.data as AnyRow })),
 
     // ─── Writing the local database ──────────────────────────────────────────
 
-    private setLocalRow(slug: string, id: string | number, row: AnyRow): void {
+    private setLocalRow(slug: string, id: string | number, row: AnyRow, ticket: ScopeTicket): void {
+        if (!this.isCurrent(ticket)) return;
         const state = this.collectionState(slug);
         const key = String(id);
         const cachedAt = Date.now();
@@ -1532,7 +1589,8 @@ data: u.data as AnyRow })),
      * it, opening a deleted row while offline would report a missing local
      * database instead of a missing row.
      */
-    private removeLocalRow(slug: string, id: string | number, known = false): void {
+    private removeLocalRow(slug: string, id: string | number, ticket: ScopeTicket, known = false): void {
+        if (!this.isCurrent(ticket)) return;
         const state = this.collectionState(slug);
         const key = String(id);
         const existed = state.rows.delete(key);
@@ -1567,9 +1625,10 @@ data: u.data as AnyRow })),
      * wrote the narrowed copy to disk, so a list lost its columns because a
      * dropdown elsewhere asked for titles.
      */
-    private async ingest(slug: string, rows: AnyRow[], projection = false): Promise<void> {
-        if (rows.length === 0) return;
+    private async ingest(slug: string, rows: AnyRow[], ticket: ScopeTicket, projection = false): Promise<void> {
+        if (rows.length === 0 || !this.isCurrent(ticket)) return;
         const state = await this.ensureCollection(slug);
+        if (!this.isCurrent(ticket)) return;
         const cachedAt = Date.now();
         const writes: { key: string; entry: { value: unknown; cachedAt: number } }[] = [];
         const deletes: string[] = [];
@@ -1636,7 +1695,12 @@ data: u.data as AnyRow })),
         return row;
     }
 
-    private recordSnapshot(slug: string, params: FindParams | undefined, result: FindResult<AnyRow>): QuerySnapshot {
+    private recordSnapshot(
+        slug: string,
+        params: FindParams | undefined,
+        result: FindResult<AnyRow>,
+        ticket: ScopeTicket
+    ): QuerySnapshot {
         const window = resolvePagination(params);
         const meta = result.meta ?? { total: result.data?.length ?? 0, ...window, hasMore: false };
         const snapshot: QuerySnapshot = {
@@ -1647,6 +1711,7 @@ data: u.data as AnyRow })),
             hasMore: meta.hasMore ?? false,
             ...(isProjection(params) ? { rows: (result.data ?? []).map((row) => ({ ...row })) } : {})
         };
+        if (!this.isCurrent(ticket)) return snapshot;
         const state = this.collectionState(slug);
         const key = buildQueryString(params);
         state.snapshots.set(key, snapshot);
@@ -1728,9 +1793,19 @@ data: u.data as AnyRow })),
         return this.queueLoad;
     }
 
-    private enqueue(mutation: Omit<PendingMutation, "mutationId" | "queuedAt">): Promise<void> {
+    private enqueue(mutation: Omit<PendingMutation, "mutationId" | "queuedAt">, ticket: ScopeTicket): Promise<void> {
         const result = this.enqueueChain.then(async () => {
             await this.ensureQueueLoaded();
+
+            // Made by a user who has since signed out. It is still their
+            // write, so it is kept under their scope — it replays when they
+            // are back — but it must not join the queue that now replays
+            // under someone else's credentials.
+            if (!this.isCurrent(ticket)) {
+                const orphan: PendingMutation = { ...mutation, mutationId: createMutationId(), queuedAt: Date.now() };
+                await this.store.enqueue(`${ticket.scope}|${orphan.mutationId}`, orphan);
+                return;
+            }
 
             // Tail coalescing: repeated edits to the most recently written row
             // (typing in a form) collapse into the queued op instead of
@@ -1858,6 +1933,7 @@ data: u.data as AnyRow })),
     }
 
     private async flush(): Promise<{ flushed: number; remaining: number }> {
+        const ticket = this.ticket();
         await this.ensureQueueLoaded();
         // Another tab may have queued or drained work since we last looked.
         await this.reloadQueue();
@@ -1871,7 +1947,8 @@ data: u.data as AnyRow })),
         const queuedAtStart = this.queue.length;
         let flushed = 0;
         try {
-            while (this.queue.length > 0 && !this.disposed) {
+            // Stops at a change of user: the queue in memory is theirs now.
+            while (this.queue.length > 0 && !this.disposed && this.isCurrent(ticket)) {
                 const op = this.queue[0];
                 touched.add(op.collection);
                 // Held across `drop` as well as `replay`: between the ACK and
@@ -1881,7 +1958,7 @@ data: u.data as AnyRow })),
                 this.inFlightId = op.mutationId;
                 try {
                     try {
-                        await this.replay(op);
+                        await this.replay(op, ticket);
                     } catch (error) {
                         if (isNetworkError(error)) {
                             // Still offline — keep the op and everything behind it.
@@ -1905,16 +1982,18 @@ data: u.data as AnyRow })),
                             // The server is busy, not unhappy. Keep the op — and
                             // its place in line, since later writes may depend on
                             // it — and come back after a backoff.
-                            await this.store.enqueue(this.queueKey(op), op).catch(() => undefined);
+                            await this.store.enqueue(`${ticket.scope}|${op.mutationId}`, op).catch(() => undefined);
                             this.connectivity.deferRetry();
                             this.patchStatus({ lastError: op.lastError });
                             break;
                         }
-                        await this.rejectMutation(op, error as Error);
+                        await this.rejectMutation(op, error as Error, ticket);
                         continue;
                     }
                     this.connectivity.markSuccess();
-                    await this.drop(op);
+                    // Acknowledged, so it leaves the queue of the user who
+                    // made it — even if that is no longer the signed-in one.
+                    await this.drop(op, ticket);
                     flushed++;
                 } finally {
                     this.inFlightId = null;
@@ -1923,6 +2002,10 @@ data: u.data as AnyRow })),
         } finally {
             this.patchStatus({ syncing: false });
         }
+
+        // The user changed mid-drain. What there was to clean up for theirs
+        // is done; nothing on screen is theirs any more.
+        if (!this.isCurrent(ticket)) return { flushed, remaining: this.queue.length };
 
         if (this.queue.length !== queuedAtStart) {
             for (const slug of touched) {
@@ -1940,7 +2023,7 @@ data: u.data as AnyRow })),
         return { flushed, remaining: this.queue.length };
     }
 
-    private async replay(op: PendingMutation): Promise<void> {
+    private async replay(op: PendingMutation, ticket: ScopeTicket): Promise<void> {
         const inner = this.innerFor(op.collection);
         if (op.type === "create") {
             // The queued row already carries its (client-generated) id.
@@ -1988,7 +2071,7 @@ data: u.data as AnyRow })),
                 row = await inner.findById(op.id!) as AnyRow | undefined;
                 if (!row) throw error;
             }
-            await this.adoptServerRow(op, op.id, row);
+            await this.adoptServerRow(op, op.id, row, ticket);
         } else if (op.type === "createMany") {
             const queued = (op.data as AnyRow[]) ?? [];
             // The mutation id names this batch, exactly as it names a single
@@ -2015,7 +2098,7 @@ data: u.data as AnyRow })),
                     asSent
                 );
             for (let i = 0; i < rows.length; i++) {
-                await this.adoptServerRow(op, queued[i]?.id as string | number | undefined, rows[i]);
+                await this.adoptServerRow(op, queued[i]?.id as string | number | undefined, rows[i], ticket);
             }
         } else if (op.type === "updateMany") {
             const queued = op.updates ?? [];
@@ -2029,7 +2112,7 @@ data: u.data as AnyRow })),
                 { idempotencyKey: op.mutationId }
             );
             for (let i = 0; i < rows.length; i++) {
-                await this.ingestReplaced(op, queued[i].id, rows[i]);
+                await this.ingestReplaced(op, queued[i].id, rows[i], ticket);
             }
         } else if (op.type === "update") {
             // Keyed only when the edit was already sent once: then its body is
@@ -2043,17 +2126,17 @@ data: u.data as AnyRow })),
                 op.data as AnyRow,
                 op.sent ? { idempotencyKey: op.sent.idempotencyKey } : undefined
             );
-            await this.ingestReplaced(op, op.id!, row);
+            await this.ingestReplaced(op, op.id!, row, ticket);
         } else if (op.type === "deleteMany") {
             const ids = op.ids ?? [];
             await inner.deleteMany(ids, { idempotencyKey: op.mutationId });
-            for (const id of ids) this.removeLocalRow(op.collection, id, true);
+            for (const id of ids) this.removeLocalRow(op.collection, id, ticket, true);
         } else if (op.type === "delete") {
             // A delete's request is its id, which nothing rewrites once it has
             // been sent, so it is always keyed: a replay of one that committed
             // is answered from the key instead of a 404 for the missing row.
             await inner.delete(op.id!, { idempotencyKey: op.sent?.idempotencyKey ?? op.mutationId });
-            this.removeLocalRow(op.collection, op.id!, true);
+            this.removeLocalRow(op.collection, op.id!, ticket, true);
         }
     }
 
@@ -2091,15 +2174,22 @@ data: u.data as AnyRow })),
     private async adoptServerRow(
         op: PendingMutation,
         localId: string | number | undefined,
-        row: AnyRow | undefined
+        row: AnyRow | undefined,
+        ticket: ScopeTicket
     ): Promise<void> {
         if (!row) return;
         const slug = op.collection;
         const serverId = row.id as string | number | undefined;
         if (localId !== undefined && serverId !== undefined && String(serverId) !== String(localId)) {
             const oldKey = String(localId);
-            this.removeLocalRow(slug, localId);
-            for (const queued of this.queue) {
+            this.removeLocalRow(slug, localId, ticket);
+            // The writes queued against the temporary id are the queue of the
+            // user who made them, which is only the one in memory while they
+            // are still signed in.
+            const queue = this.isCurrent(ticket)
+                ? this.queue
+                : await this.store.listQueue(`${ticket.scope}|`).catch(() => []);
+            for (const queued of queue) {
                 if (queued.collection !== slug) continue;
                 let dirty = false;
                 if (queued.id !== undefined && String(queued.id) === oldKey) {
@@ -2117,10 +2207,10 @@ data: u.data as AnyRow })),
                     delete rollbackRows[oldKey];
                     dirty = true;
                 }
-                if (dirty) await this.store.enqueue(this.queueKey(queued), queued).catch(() => undefined);
+                if (dirty) await this.store.enqueue(`${ticket.scope}|${queued.mutationId}`, queued).catch(() => undefined);
             }
         }
-        await this.ingestReplaced(op, serverId ?? localId!, row);
+        await this.ingestReplaced(op, serverId ?? localId!, row, ticket);
     }
 
     /**
@@ -2131,14 +2221,16 @@ data: u.data as AnyRow })),
      * back to the server's version in front of the user, only to change again
      * when they replay a moment later.
      */
-    private async ingestReplaced(op: PendingMutation, id: string | number, row: AnyRow): Promise<void> {
+    private async ingestReplaced(op: PendingMutation, id: string | number, row: AnyRow, ticket: ScopeTicket): Promise<void> {
+        if (!this.isCurrent(ticket)) return;
         const slug = op.collection;
         const state = await this.ensureCollection(slug);
+        if (!this.isCurrent(ticket)) return;
         const key = String(id);
         const merged = this.applyPendingToRow(slug, key, { ...row }, op.mutationId);
         if (merged === undefined) {
             // A queued delete is still waiting behind this write.
-            this.removeLocalRow(slug, key);
+            this.removeLocalRow(slug, key, ticket);
             return;
         }
         const cachedAt = Date.now();
@@ -2162,7 +2254,12 @@ data: u.data as AnyRow })),
      * of it, so both stand on their own and are kept — dropping them would
      * silently lose writes the server would have accepted.
      */
-    private async rejectMutation(op: PendingMutation, error: Error): Promise<void> {
+    private async rejectMutation(op: PendingMutation, error: Error, ticket: ScopeTicket): Promise<void> {
+        // Refused after its user signed out. Rolling back and reporting it
+        // would put their write, and its error, in front of whoever is signed
+        // in now; it stays in their queue and is refused again, to them, when
+        // they are back.
+        if (!this.isCurrent(ticket)) return;
         const ids = new Set(Object.keys(op.rollback?.rows ?? {}));
         if (op.id !== undefined) ids.add(String(op.id));
 
@@ -2177,14 +2274,15 @@ data: u.data as AnyRow })),
             else for (const id of hit) orphaned.delete(id);
         }
 
-        for (const dropped of doomed) await this.drop(dropped);
+        for (const dropped of doomed) await this.drop(dropped, ticket);
+        if (!this.isCurrent(ticket)) return;
 
         for (const [idKey, previous] of Object.entries(op.rollback?.rows ?? {})) {
             // With the doomed writes gone, whatever survives in the queue is
             // what the row should still look like on top of the restored base.
             const restored = this.applyPendingToRow(op.collection, idKey, previous ?? undefined);
-            if (restored === undefined) this.removeLocalRow(op.collection, idKey);
-            else this.setLocalRow(op.collection, idKey, restored);
+            if (restored === undefined) this.removeLocalRow(op.collection, idKey, ticket);
+            else this.setLocalRow(op.collection, idKey, restored, ticket);
         }
 
         this.patchStatus({ lastError: error.message });
@@ -2201,8 +2299,12 @@ data: u.data as AnyRow })),
         return op.id === undefined ? [] : [String(op.id)];
     }
 
-    private async drop(op: PendingMutation): Promise<void> {
-        await this.store.dequeue(this.queueKey(op)).catch(() => undefined);
+    private async drop(op: PendingMutation, ticket: ScopeTicket): Promise<void> {
+        // Under the scope it was queued in: computed from the current one, a
+        // replay acknowledged after a change of user dequeued a key that did
+        // not exist, and the write was sent again when its user came back.
+        await this.store.dequeue(`${ticket.scope}|${op.mutationId}`).catch(() => undefined);
+        if (!this.isCurrent(ticket)) return;
         this.queue = this.queue.filter((m) => m.mutationId !== op.mutationId);
         // No broadcast per item: draining a queue of fifty would be fifty
         // messages to every other tab. The flush announces itself once, at the end.

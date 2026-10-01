@@ -80,3 +80,79 @@ describe("a skipped filter with offline support on (H4)", () => {
         expect(result.data).toHaveLength(1);
     });
 });
+
+/**
+ * A request that outlives a sign-out/sign-in (H3).
+ *
+ * The local database and the queue are partitioned per user, and the load
+ * paths checked the user after their awaits — the write paths did not. A
+ * response for user A that arrived after B had signed in was stored as B's.
+ */
+describe("a request in flight across a change of user (H3)", () => {
+    it("a find answered after the switch does not land in the next user's local database", async () => {
+        const server = fakeServer();
+        const { offline, store, posts } = manager(server);
+        offline.setScope("A");
+        let release!: (rows: Record<string, unknown>[]) => void;
+        server.setFindGate(new Promise((resolve) => { release = resolve; }));
+        const pending = posts.find();
+        while (!server.calls.some((call) => call.op === "find")) await new Promise((resolve) => setTimeout(resolve, 0));
+
+        offline.setScope("B");
+        release([{ id: "a-1", secret: "only A may see this" }]);
+        await pending.catch(() => undefined);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect((await store.listCache("B|")).map((entry) => entry.key)).toEqual([]);
+        server.state.online = false;
+        server.setFindGate(undefined);
+        await expect(posts.findById("a-1")).rejects.toMatchObject({ code: "OFFLINE" });
+    });
+
+    it("a write made by A and queued after the switch is A's, not replayed as B", async () => {
+        const server = fakeServer();
+        const { offline, store, posts } = manager(server);
+        offline.setScope("A");
+        server.state.online = false;
+        await offline.api.pending();
+        // The write starts as A…
+        const writing = posts.create({ title: "A's note" });
+        // …and B signs in before it reaches the queue.
+        offline.setScope("B");
+        await writing;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(await offline.api.pending()).toEqual([]);
+        expect(await store.listQueue("B|")).toEqual([]);
+        expect(await store.listQueue("A|")).toHaveLength(1);
+    });
+
+    it("a replay ACKed after the switch is dequeued from A's queue, so it is not sent again", async () => {
+        const server = fakeServer();
+        const { offline, store, posts } = manager(server);
+        offline.setScope("A");
+        server.state.online = false;
+        await posts.create({ title: "A's note" });
+        expect(await store.listQueue("A|")).toHaveLength(1);
+        const creates = () => server.calls.filter((call) => call.op === "create").length;
+        const triedOnline = creates();
+
+        server.state.online = true;
+        let switched = false;
+        server.setReject((op) => {
+            // The request reaches the server; the user changes before the answer.
+            if (op === "create" && !switched) {
+                switched = true;
+                offline.setScope("B");
+            }
+            return undefined;
+        });
+        await offline.sync();
+
+        expect(await store.listQueue("A|")).toEqual([]);
+        expect(creates()).toBe(triedOnline + 1);
+        offline.setScope("A");
+        await offline.sync();
+        expect(creates()).toBe(triedOnline + 1);
+    });
+});
