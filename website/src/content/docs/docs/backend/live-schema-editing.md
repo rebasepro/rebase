@@ -125,9 +125,22 @@ The boot-time ensure path reports the same thing as a warning. Until this
 existed, a withheld constraint was withheld in silence.
 
 `needs-migration` covers everything the ensure path cannot do: dropping a
-collection or a property, changing a type, renaming a column, changing a primary
-key, removing an enum value. Each refusal names the change and what to do
-instead.
+collection or a property, changing a column's type (an integer toggle, a string
+becoming an enum, an array's element type, a varchar's width), renaming a
+column, changing a primary key, removing an enum value, making an existing
+column unique, and changing a relation — its kind, its target, its `localKey`,
+its `onDelete`. A `hasMany` or `hasOne` whose link column nothing creates is
+refused too. Each refusal names the change and what to do instead.
+
+The verdict is read from the schema each side produces — the same plan
+`schema.generated.ts` and `db push` are rendered from — so an edit that changes
+the database cannot be reported as no change. Two edits that look like changes
+and are not refused:
+
+- **Renaming a property's key while keeping its column** (`columnName` set to
+  the old column) moves no data. It is `safe`; API clients read the new name.
+- **Setting, changing or dropping a default** binds future writes only. It is
+  `safe`, and applied with `ALTER COLUMN … SET DEFAULT` / `DROP DEFAULT`.
 
 ## What gets committed
 

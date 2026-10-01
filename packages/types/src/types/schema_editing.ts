@@ -37,7 +37,17 @@ export type SchemaChangeKind =
     | "remove-enum-value"
     | "change-required"
     | "change-primary-key"
-    | "rename-table";
+    | "rename-table"
+    /** A property key renamed while keeping its column: no data moves. */
+    | "rename-property"
+    /** A relation's kind, foreign key or link column changes. */
+    | "change-relation"
+    /** A UNIQUE constraint, an index or an update trigger appears or goes. */
+    | "change-constraint"
+    /** A column's DEFAULT is set, changed or dropped. */
+    | "change-default"
+    /** The proposed collections cannot be planned at all. */
+    | "invalid-collection";
 
 export interface SchemaChange {
     kind: SchemaChangeKind;

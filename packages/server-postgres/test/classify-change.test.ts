@@ -231,12 +231,23 @@ describe("needs-migration — the ensure path cannot express it at all", () => {
         expect(change.detail).toContain("string to number");
     });
 
-    it("narrowing a string's declared maximum, which changes the column width", () => {
+    it("narrowing a varchar's declared maximum, which changes the column width", () => {
         const change = only(
-            [collection("posts", { title: str({ validation: { max: 500 } }) })],
-            [collection("posts", { title: str({ validation: { max: 50 } }) })]
+            [collection("posts", { title: str({ columnType: "varchar", validation: { max: 500 } }) })],
+            [collection("posts", { title: str({ columnType: "varchar", validation: { max: 50 } }) })]
         );
         expect(change.kind).toBe("change-property-type");
+        expect(change.detail).toContain("VARCHAR(500) to VARCHAR(50)");
+    });
+
+    // This pinned the hand-written list the classifier used to compare, which
+    // counted `validation.max` as physical whatever the column. On a `text`
+    // column it is a validation rule: the column has no width to change.
+    it("a maximum on a text column is validation, not a column change", () => {
+        expect(classifyCollectionChanges(
+            [collection("posts", { title: str({ validation: { max: 500 } }) })],
+            [collection("posts", { title: str({ validation: { max: 50 } }) })]
+        ).changes).toEqual([]);
     });
 
     it("changing a vector's dimensions", () => {
@@ -257,12 +268,27 @@ describe("needs-migration — the ensure path cannot express it at all", () => {
         expect(change.remedy).toContain("created");
     });
 
+    // Moved, rather than added beside `id`: two primary keys is a collection
+    // the planner refuses outright, which is its own refusal.
     it("changing the primary key", () => {
-        const change = only(
+        const result = classifyCollectionChanges(
+            [collection("posts", { code: str() })],
+            [{
+                ...collection("posts", { code: str({ isId: true }) }),
+                properties: { id: { type: "string", name: "Id" }, code: str({ isId: true }) }
+            } as unknown as CollectionConfig]
+        );
+        expect(result.changes.map(c => c.kind)).toContain("change-primary-key");
+        expect(result.verdict).toBe("needs-migration");
+    });
+
+    it("a proposal the planner refuses is refused with the planner's reason", () => {
+        const result = classifyCollectionChanges(
             [collection("posts", { code: str() })],
             [collection("posts", { code: str({ isId: true }) })]
         );
-        expect(change).toMatchObject({ kind: "change-primary-key", verdict: "needs-migration" });
+        expect(result.applicable).toBe(false);
+        expect(result.changes.some(c => c.kind === "invalid-collection")).toBe(true);
     });
 
     it("removing an enum value, which Postgres cannot do at all", () => {

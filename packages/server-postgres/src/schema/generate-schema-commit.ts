@@ -49,7 +49,7 @@ import {
     type ExistingSchema,
     type WithheldConstraint
 } from "./ensure-collection-tables";
-import { classifyCollectionChanges, type ClassifiedChanges } from "./classify-change";
+import { classifyCollectionChanges, defaultChangeStatements, type ClassifiedChanges } from "./classify-change";
 
 /**
  * Re-exported from the shared kernel. `@rebasepro/server` derives these for a
@@ -222,10 +222,16 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
     const previous = planCollectionSchemaEnsure(input.before, existing, options);
     const next = planCollectionSchemaEnsure(input.after, existing, options);
     const already = new Set(previous.statements);
+    const statements = next.statements.filter(statement => !already.has(statement));
+    // A changed or dropped DEFAULT, which the additive ensure never makes and
+    // the classifier calls safe — it binds future writes and touches no row.
+    for (const statement of defaultChangeStatements(input.before, input.after, existing.tables)) {
+        if (!statements.includes(statement)) statements.push(statement);
+    }
 
     return {
         files: [...(input.sourceFiles ?? []), ...generated],
-        statements: next.statements.filter(statement => !already.has(statement)),
+        statements,
         classified,
         message: commitMessage(classified),
         // From the `after` plan alone rather than differenced against `before`:
