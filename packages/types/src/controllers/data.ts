@@ -160,6 +160,49 @@ export interface IncludeOptions {
 export type IncludeSpec = string[] | Record<string, true | IncludeOptions>;
 
 /**
+ * An include checked against one generated collection's relations: `R` is its
+ * `Relations` map (relation name → the accessor it reaches) and `DB` the
+ * generated `Database`, so a nested `include` is checked against the *target's*
+ * relations in turn.
+ *
+ * A name, a dotted path starting with one, or `"*"`; or the tree, keyed by
+ * relation name. A name that is not a relation is a 400 `UNKNOWN_RELATION`
+ * from the server, and a compile error here.
+ *
+ * @group Data
+ */
+export type IncludeSpecFor<DB, R> =
+    | readonly (Extract<keyof R, string> | "*" | `${Extract<keyof R, string>}.${string}`)[]
+    | { [K in Extract<keyof R, string>]?: true | IncludeOptionsFor<DB, R[K]> };
+
+/**
+ * {@link IncludeOptions} for a relation that reaches the generated collection
+ * `T`: its nested `include` is checked against `T`'s relations.
+ *
+ * @group Data
+ */
+export interface IncludeOptionsFor<DB, T> extends Omit<IncludeOptions, "include"> {
+    include?: T extends keyof DB ? IncludeOf<DB[T], DB> : IncludeSpec;
+}
+
+/**
+ * The include a generated `Database` entry takes — {@link IncludeSpecFor} over
+ * its `Relations` — or the unchecked {@link IncludeSpec} for anything that does
+ * not declare its relations (a hand-written row type, an older generated file).
+ *
+ * @group Data
+ */
+export type IncludeOf<Entry, DB> = Entry extends { Relations: infer R } ? IncludeSpecFor<DB, R> : IncludeSpec;
+
+/**
+ * One argument of the fluent `.include(...)`: an element of the include list, a
+ * whole list, or the tree.
+ *
+ * @group Data
+ */
+export type IncludeArgOf<Inc> = Inc extends readonly (infer E)[] ? E | Inc : Inc;
+
+/**
  * Hops an {@link IncludeSpec} may nest. `comments.author` is two.
  *
  * @group Data
@@ -195,7 +238,7 @@ export const MAX_INCLUDE_DEPTH = 3;
  *
  * @group Data
  */
-export interface FindParams<M extends Record<string, unknown> = Record<string, unknown>> {
+export interface FindParams<M extends Record<string, unknown> = Record<string, unknown>, Inc = IncludeSpec> {
     /**
      * Maximum number of items to return.
      *
@@ -253,11 +296,14 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      * Not checked against `M` here: a relation name comes from the collection's
      * `relations`, not from its columns, so nothing in a *hand-written* row type
      * can validate one. A **generated** `Database` narrows this to the
-     * collection's actual relation keys, recursively — see `rebase codegen`.
+     * collection's actual relation keys, recursively — see
+     * {@link IncludeSpecFor}. The row a read returns still types each relation
+     * as optional; the generated `RowWith<A, I>` names the row with the
+     * included ones required.
      *
      * An unknown name is a 400 `UNKNOWN_RELATION`. It used to be ignored.
      */
-    include?: IncludeSpec;
+    include?: Inc;
 
     /**
      * Columns to return, instead of all of them.
@@ -769,8 +815,8 @@ export interface PageWalkOptions<M extends Record<string, unknown> = Record<stri
  *
  * @group Data
  */
-export type IterateParams<M extends Record<string, unknown> = Record<string, unknown>> =
-    Omit<FindParams<M>, "limit" | "offset" | "page"> & PageWalkOptions<M>;
+export type IterateParams<M extends Record<string, unknown> = Record<string, unknown>, Inc = IncludeSpec> =
+    Omit<FindParams<M, Inc>, "limit" | "offset" | "page"> & PageWalkOptions<M>;
 
 /**
  * Parameters accepted by {@link SDKCollectionClient.findAll}: the iteration
@@ -779,8 +825,8 @@ export type IterateParams<M extends Record<string, unknown> = Record<string, unk
  *
  * @group Data
  */
-export type FindAllParams<M extends Record<string, unknown> = Record<string, unknown>> =
-    IterateParams<M> & {
+export type FindAllParams<M extends Record<string, unknown> = Record<string, unknown>, Inc = IncludeSpec> =
+    IterateParams<M, Inc> & {
         /**
          * Most rows to materialise. Defaults to 10 000. Exceeding it **throws**
          * — a truncated array returned as if it were the whole answer is the
@@ -796,7 +842,7 @@ export type FindAllParams<M extends Record<string, unknown> = Record<string, unk
  *
  * @group Data
  */
-export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
+export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>, Inc = IncludeSpec> {
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
     /**
      * Filter on a relation path (`author.name`) or a JSON path
@@ -845,7 +891,7 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
      * Load relations — names, dotted paths (`"comments.author"`), or the
      * parametrised tree. Repeated calls merge rather than replace.
      */
-    include(...relations: (string | IncludeSpec)[]): this;
+    include(...relations: IncludeArgOf<Inc>[]): this;
     /**
      * Return only these columns. A real projection: the columns are what is
      * read from the database, not what survives a trim of the response.
@@ -1153,7 +1199,9 @@ export interface WriteOptions {
      *
      * Reach for it on imports and fire-and-forget writes. The method resolves
      * to `undefined` (or `[]`) when it is set, so a caller cannot accidentally
-     * use a row the server never sent.
+     * use a row the server never sent — and `create`, `update` and `upsert`
+     * are typed `M | undefined` for a literal `returning: false`, so reading a
+     * field off the result is a compile error rather than a `TypeError`.
      */
     returning?: boolean;
 
@@ -1180,7 +1228,9 @@ export interface WriteOptions {
 export interface SDKCollectionClient<
     M extends Record<string, unknown> = Record<string, unknown>,
     I = Partial<M>,
-    U = Partial<M>
+    U = Partial<M>,
+    /** The include this collection takes; {@link IncludeOf} for a generated `Database`. */
+    Inc = IncludeSpec
 > {
     /**
      * Find multiple records with optional filtering, pagination, and sorting.
@@ -1205,7 +1255,7 @@ export interface SDKCollectionClient<
      * it is where the pagination metadata lives, and it is present exactly when
      * there is some.
      */
-    find(params?: FindParams<M>): Promise<FindResult<M>>;
+    find(params?: FindParams<M, Inc>): Promise<FindResult<M>>;
 
     /**
      * Walk every record matching a query, one row at a time, fetching pages as
@@ -1244,7 +1294,7 @@ export interface SDKCollectionClient<
      *     await handle(job);
      * }
      */
-    iterate(params?: IterateParams<M>): AsyncIterableIterator<M>;
+    iterate(params?: IterateParams<M, Inc>): AsyncIterableIterator<M>;
 
     /**
      * {@link iterate}, collected into an array.
@@ -1266,7 +1316,7 @@ export interface SDKCollectionClient<
      *     cursor: "id"
      * });
      */
-    findAll(params?: FindAllParams<M>): Promise<M[]>;
+    findAll(params?: FindAllParams<M, Inc>): Promise<M[]>;
 
     /**
      * Find a single record by its ID.
@@ -1314,8 +1364,9 @@ export interface SDKCollectionClient<
      *   on anything else (a `sku`, a composite key), there is no `id` column to
      *   receive it — put the key in `data` instead, where it belongs among the
      *   columns.
-     * @returns The created row
+     * @returns The created row — or nothing, with `returning: false`.
      */
+    create(data: I, id: string | number | undefined, options: WriteOptions & { returning: false }): Promise<M | undefined>;
     create(data: I, id?: string | number, options?: WriteOptions): Promise<M>;
 
     /**
@@ -1366,6 +1417,7 @@ export interface SDKCollectionClient<
      * that retry from a second deliberate edit — which on a `PATCH` that
      * increments or appends is a second edit applied.
      */
+    update(id: string | number, data: U | UpdateValues<U>, options: WriteOptions & { returning: false }): Promise<M | undefined>;
     update(id: string | number, data: U | UpdateValues<U>, options?: WriteOptions): Promise<M>;
 
     /**
@@ -1397,6 +1449,7 @@ export interface SDKCollectionClient<
      * );
      * ```
      */
+    upsert(data: I, options: UpsertOptions & { returning: false }): Promise<M | undefined>;
     upsert(data: I, options?: UpsertOptions): Promise<M>;
 
     /**
@@ -1499,7 +1552,7 @@ export interface SDKCollectionClient<
      * `observe()` degrades to a single fetch instead of throwing, which is the
      * other reason to reach for it instead.
      */
-    listen(params: FindParams<M> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
+    listen(params: FindParams<M, Inc> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
 
     /** {@link listen} for a single row. Prefer `observeById()`. */
     listenById(id: string | number, onUpdate: (row: M | undefined) => void, onError?: (error: Error) => void): () => void;
@@ -1510,7 +1563,7 @@ export interface SDKCollectionClient<
      * Always present; see {@link listen} for what a transport that cannot serve
      * it does instead.
      */
-    count(params?: FindParams<M>): Promise<number>;
+    count(params?: FindParams<M, Inc>): Promise<number>;
 
     /**
      * `count`/`sum`/`avg`/`min`/`max` over the matching rows, optionally
@@ -1539,18 +1592,18 @@ export interface SDKCollectionClient<
     aggregate(params: AggregateParams<M>): Promise<AggregateResult>;
 
     // Fluent Query Builder
-    where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): SDKQueryBuilderInterface<M>;
+    where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): SDKQueryBuilderInterface<M, Inc>;
     /** A relation path (`author.name`) or a JSON path (`metadata->>tier`). */
-    where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): SDKQueryBuilderInterface<M>;
-    where(logicalCondition: LogicalCondition): SDKQueryBuilderInterface<M>;
+    where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): SDKQueryBuilderInterface<M, Inc>;
+    where(logicalCondition: LogicalCondition): SDKQueryBuilderInterface<M, Inc>;
     orderBy(
         column: FieldPath<M> | ComputedSortField | RelationAggregateSort,
         direction?: "asc" | "desc",
         nulls?: NullsPlacement
-    ): SDKQueryBuilderInterface<M>;
-    limit(count: number): SDKQueryBuilderInterface<M>;
-    offset(count: number): SDKQueryBuilderInterface<M>;
-    search(searchString: string, options?: { explain?: boolean }): SDKQueryBuilderInterface<M>;
+    ): SDKQueryBuilderInterface<M, Inc>;
+    limit(count: number): SDKQueryBuilderInterface<M, Inc>;
+    offset(count: number): SDKQueryBuilderInterface<M, Inc>;
+    search(searchString: string, options?: { explain?: boolean }): SDKQueryBuilderInterface<M, Inc>;
     /**
      * Order rows by nearest-neighbour distance to `vector`, closest first.
      * Postgres only, over a `type: "vector"` property. See
@@ -1560,14 +1613,14 @@ export interface SDKCollectionClient<
         property: string,
         vector: number[],
         options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
-    ): SDKQueryBuilderInterface<M>;
-    include(...relations: (string | IncludeSpec)[]): SDKQueryBuilderInterface<M>;
+    ): SDKQueryBuilderInterface<M, Inc>;
+    include(...relations: IncludeArgOf<Inc>[]): SDKQueryBuilderInterface<M, Inc>;
     /** {@link SDKQueryBuilderInterface.fields} */
-    fields(...columns: (FieldPath<M> | string)[]): SDKQueryBuilderInterface<M>;
+    fields(...columns: (FieldPath<M> | string)[]): SDKQueryBuilderInterface<M, Inc>;
     /** {@link SDKQueryBuilderInterface.distinct} */
-    distinct(enabled?: boolean): SDKQueryBuilderInterface<M>;
+    distinct(enabled?: boolean): SDKQueryBuilderInterface<M, Inc>;
     /** {@link SDKQueryBuilderInterface.after} */
-    after(cursor: string): SDKQueryBuilderInterface<M>;
+    after(cursor: string): SDKQueryBuilderInterface<M, Inc>;
 }
 
 /**
@@ -1694,7 +1747,7 @@ export type RebaseSdkData<DB = unknown> = {
     collection<M extends Record<string, unknown> = Record<string, unknown>>(slug: string): SDKCollectionClient<M>;
 } & (
     DB extends Record<string, unknown>
-        ? { [K in keyof DB]: SDKCollectionClient<RowOf<DB[K]>, InsertOf<DB[K]>, UpdateOf<DB[K]>> }
+        ? { [K in keyof DB]: SDKCollectionClient<RowOf<DB[K]>, InsertOf<DB[K]>, UpdateOf<DB[K]>, IncludeOf<DB[K], DB>> }
         : {
             /**
              * Dynamic flat collection accessor.

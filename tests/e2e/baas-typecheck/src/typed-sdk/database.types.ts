@@ -29,6 +29,7 @@ export interface Database {
     Relations: {
       posts: "posts";
     };
+    Slug: "authors";
   };
   myNotes: {
     Row: {
@@ -44,6 +45,7 @@ export interface Database {
     };
     Relations: {
     };
+    Slug: "my-notes";
   };
   orderItems: {
     Row: {
@@ -62,6 +64,7 @@ export interface Database {
     };
     Relations: {
     };
+    Slug: "order_items";
   };
   posts: {
     Row: {
@@ -106,6 +109,7 @@ export interface Database {
       author: "authors";
       tags: "tags";
     };
+    Slug: "posts";
   };
   tags: {
     Row: {
@@ -121,6 +125,7 @@ export interface Database {
     };
     Relations: {
     };
+    Slug: "tags";
   };
 }
 

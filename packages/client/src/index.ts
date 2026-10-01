@@ -16,6 +16,7 @@ import {
     type BatchOperation,
     type BatchResult,
     DEFAULT_STORAGE_SOURCE_KEY,
+    type IncludeOf,
     InsertOf,
     RebaseClient,
     RebaseSdkData,
@@ -172,21 +173,41 @@ type KebabToCamelCase<S extends string> =
     ? `${T}${Capitalize<KebabToCamelCase<U>>}`
     : S;
 
-// Resolve a generated `Database` entry from a (kebab-case) slug literal,
-// or `unknown` when the slug isn't in the schema — the extractors below
-// then fall back to the open row / partial shapes.
+/** The accessor whose generated entry declares `Slug: S`, or `never`. */
+type AccessorOfSlug<DB, S extends string> = {
+    [K in keyof DB]: DB[K] extends { Slug: S } ? K : never
+}[keyof DB];
+
+// Resolve a generated `Database` entry from a slug literal, or `unknown` when
+// the slug isn't in the schema — the extractors below then fall back to the
+// open row / partial shapes.
+//
+// Through the `Slug` each entry declares: the generator wrote it beside the
+// accessor it chose, so this reads one name rather than deriving the other. A
+// `Database` generated before entries carried `Slug` falls back to the old
+// kebab-only derivation, which is still right for kebab and single-word slugs.
 type DBEntry<DB, S extends string> =
-    KebabToCamelCase<S> extends keyof DB ? DB[KebabToCamelCase<S>] : unknown;
+    [AccessorOfSlug<DB, S>] extends [never]
+        ? (KebabToCamelCase<S> extends keyof DB ? DB[KebabToCamelCase<S>] : unknown)
+        : DB[AccessorOfSlug<DB, S>];
 
 type TypedDataLayer<DB> = {
     collection<S extends string>(slug: S): CollectionClient<
         RowOf<DBEntry<DB, S>>,
         InsertOf<DBEntry<DB, S>>,
-        UpdateOf<DBEntry<DB, S>>
+        UpdateOf<DBEntry<DB, S>>,
+        IncludeOf<DBEntry<DB, S>, DB>
     >;
 } & {
-    [K in keyof DB]: CollectionClient<RowOf<DB[K]>, InsertOf<DB[K]>, UpdateOf<DB[K]>>;
-} & RebaseSdkData;
+    [K in keyof DB]: CollectionClient<RowOf<DB[K]>, InsertOf<DB[K]>, UpdateOf<DB[K]>, IncludeOf<DB[K], DB>>;
+} & (
+    // Untyped, every name is a collection: the index signature is the point.
+    // Typed, it is the opposite — it was intersected in unconditionally, and
+    // its `[slug: string]` made `client.data.nopeCollection` compile on a
+    // `createRebaseClient<Database>`, to throw UNKNOWN_COLLECTION (or 404)
+    // at runtime. Only the by-slug `collection<M>()` overload is kept.
+    string extends keyof DB ? RebaseSdkData : Pick<RebaseSdkData, "collection">
+);
 
 /**
  * The return type of `createRebaseClient<DB>()`.
@@ -252,7 +273,20 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
      * Neither reaches into the response for a `data` key.
      */
     call: <T = unknown>(endpoint: string, payload?: unknown) => Promise<T>;
-    collection: <M extends Record<string, unknown> = Record<string, unknown>>(slug: string) => CollectionClient<M>;
+    /**
+     * A collection by slug — the same client `data.collection(slug)` returns,
+     * typed from the generated `Database` when the slug is one of its
+     * collections, or by the row type passed explicitly.
+     */
+    collection: {
+        <S extends string>(slug: S): CollectionClient<
+            RowOf<DBEntry<DB, S>>,
+            InsertOf<DBEntry<DB, S>>,
+            UpdateOf<DBEntry<DB, S>>,
+            IncludeOf<DBEntry<DB, S>, DB>
+        >;
+        <M extends Record<string, unknown> = Record<string, unknown>>(slug: string): CollectionClient<M>;
+    };
     /**
      * Write across collections in one transaction.
      *

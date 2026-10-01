@@ -228,9 +228,10 @@ export interface ObserveOptions {
 export interface CollectionClient<
     M extends Record<string, unknown> = Record<string, unknown>,
     I = Partial<M>,
-    U = Partial<M>
-> extends SDKCollectionClient<M, I, U> {
-    count(params?: FindParams<M>): Promise<number>;
+    U = Partial<M>,
+    Inc = IncludeSpec
+> extends SDKCollectionClient<M, I, U, Inc> {
+    count(params?: FindParams<M, Inc>): Promise<number>;
 
     /**
      * Subscribe to a query's results.
@@ -248,7 +249,7 @@ export interface CollectionClient<
      * @returns An unsubscribe function.
      */
     observe(
-        params: FindParams<M> | undefined,
+        params: FindParams<M, Inc> | undefined,
         onResult: (result: LiveResult<M>) => void,
         onError?: (error: Error) => void,
         options?: ObserveOptions
@@ -363,8 +364,8 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             });
             // With `returning: false` the bulk route answers the id, not the
             // row — and `create` resolves to nothing there, so this does too.
-            if (options?.returning === false) return undefined as unknown as M;
-            return raw?.data?.[0] as M;
+            const row = options?.returning === false ? undefined : raw?.data?.[0];
+            return row as M;
         },
 
         async createMany(

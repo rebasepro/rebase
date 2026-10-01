@@ -582,6 +582,17 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         }
         lines.push("    };");
 
+        // ── Slug ──
+        //
+        // The name the wire knows this collection by. The entry is keyed by the
+        // accessor (`orderItems`), and the client's typed `collection(slug)`
+        // has to get from one to the other: it used to re-derive the accessor
+        // from the slug at the type level, handling `-` and nothing else, so
+        // `collection("order_items")` — every snake_case table — came back
+        // untyped. Written by the one function that chose the accessor, so the
+        // two cannot disagree.
+        lines.push(`    Slug: ${emitString(collection.slug)};`);
+
         lines.push("  };");
     }
 

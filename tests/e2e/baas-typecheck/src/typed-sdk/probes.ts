@@ -107,3 +107,51 @@ export async function toManyWriteProbes(): Promise<number | null | undefined> {
     const { data } = await posts.find({ include: ["tags"] });
     return data[0]?.tags?.[0]?._pivot?.position;
 }
+
+/** SDK-10: `returning: false` resolves to no row, so using one is a compile error. */
+export async function returningProbes(): Promise<void> {
+    const created = await posts.create({ title: "t" }, undefined, { returning: false });
+    // @ts-expect-error — the server sent no row back
+    void created.id;
+    const updated = await posts.update("p1", { title: "t" }, { returning: false });
+    // @ts-expect-error — nor here
+    void updated.id;
+    const written = await posts.create({ title: "t" });
+    void written.id;
+}
+
+/** SDK-13: a typed client knows its collections. */
+export function accessorProbes(): void {
+    // @ts-expect-error — no such collection (UNKNOWN_COLLECTION)
+    void client.data.nopeCollection;
+    void client.data.collection("posts");
+}
+
+/** SDK-19: a collection reached by slug is typed, whatever the slug's spelling. */
+export async function slugProbes(): Promise<string> {
+    // Each of these is `unknown` — a compile error to assign — on an untyped row.
+    const items = await client.data.collection("order_items").find();
+    const sku: string = items.data[0].sku;
+    const notes = await client.data.collection("my-notes").find();
+    const body: string | null | undefined = notes.data[0].body;
+    const top = await client.collection("order_items").find();
+    const topSku: string = top.data[0].sku;
+    return sku + body + topSku;
+}
+
+/** SDK-9: `include` names the collection's relations, at every level. */
+export async function includeProbes(): Promise<void> {
+    await posts.find({ include: ["author", "tags"] });
+    await posts.find({ include: ["author.posts"] });
+    await posts.find({ include: { tags: { limit: 5 }, author: { include: { posts: true } } } });
+    await posts.include("author").where("views", ">", 1).find();
+    await posts.where("views", ">", 1).include("tags").find();
+    // @ts-expect-error — not a relation of posts (UNKNOWN_RELATION)
+    await posts.find({ include: ["authr"] });
+    // @ts-expect-error — nor through the builder
+    posts.include("authr");
+    // @ts-expect-error — nor after another builder step
+    posts.where("views", ">", 1).include("authr");
+    // @ts-expect-error — nested: not a relation of authors
+    await posts.find({ include: { author: { include: { postz: true } } } });
+}

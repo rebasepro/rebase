@@ -1,4 +1,4 @@
-import { AggregateParams, FindParams as TypesFindParams, FindResponse as TypesFindResponse, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
+import { AggregateParams, FindParams as TypesFindParams, FindResponse as TypesFindResponse, type IncludeSpec, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
 import { RESERVED_QUERY_KEYS, serializeFilter, serializeInclude, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
 import { rebaseReviver } from "./reviver";
 
@@ -156,7 +156,7 @@ export const ANONYMOUS_SERVER_CLIENT_WARNING =
  * `orderBy` went back to accepting any column name — the alias, not the
  * definition, was where the typing was lost.
  */
-export type FindParams<M extends Record<string, unknown> = Record<string, unknown>> = TypesFindParams<M>;
+export type FindParams<M extends Record<string, unknown> = Record<string, unknown>, Inc = IncludeSpec> = TypesFindParams<M, Inc>;
 export type FindResponse<T> = TypesFindResponse<T extends Record<string, unknown> ? T : Record<string, unknown>>;
 
 /**
