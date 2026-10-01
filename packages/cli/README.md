@@ -22,7 +22,7 @@ The CLI is also bundled with every Rebase project as a local dependency.
 | `rebase dev` | Start the development server (backend + frontend) |
 | `rebase build` | Build the apps declared in `rebase.json` into a bundle |
 | `rebase normalize-imports` | Complete compiled output's relative imports for Node ESM |
-| `rebase start` | Start the backend server (production) |
+| `rebase start` | Run the built bundle, as a deployment does, in the `NODE_ENV` you set |
 | `rebase apps list` | Show the apps this repository declares |
 | `rebase schema generate` | Generate Drizzle schema from collection definitions |
 | `rebase schema introspect` | Introspect an existing database → Rebase collections |

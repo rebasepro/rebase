@@ -101,14 +101,18 @@ skips the install, and `--json` prints one document.
 
 ### `rebase start`
 
-Run the built bundle as a production server:
+Run the built bundle the way a deployment runs it:
 
 ```bash
 rebase start
 ```
 
-Reads `PORT` and the rest of `.env`, unlike `rebase dev`. Point it at a bundle
-elsewhere with `rebase start --bundle ./dist-bundle`.
+Reads `PORT` and the rest of `.env`, unlike `rebase dev`, and runs in whatever
+`NODE_ENV` the shell or `.env` sets. A scaffolded `.env` says `development`, so
+development behaviour stays on — the first account to register becomes the
+admin — and `rebase start` says so at the top of its output. For a production
+server, run it with `NODE_ENV=production`. Point it at a bundle elsewhere with
+`rebase start --bundle ./dist-bundle`.
 
 ### `rebase apps list`
 

@@ -58,7 +58,7 @@ It starts both halves together:
 Both ports are **derived from this project's path** rather than fixed, so several
 Rebase projects can run side by side. `rebase dev` prints the two URLs it bound —
 **use those**, not `localhost:3001` / `localhost:5173`. (`PORT` and `VITE_API_URL`
-in `.env` configure `rebase start`, the production server, and are ignored here.)
+in `.env` configure `rebase start`, which runs the built bundle, and are ignored here.)
 Pin a port with `rebase dev --port 3001`.
 
 ### Flags worth knowing

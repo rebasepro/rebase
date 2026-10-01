@@ -377,7 +377,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("dev")}                     Start the development server
   ${chalk.blue.bold("build")}                   Build the apps declared in rebase.json into a bundle
   ${chalk.blue.bold("normalize-imports")}       Complete compiled output's relative imports for Node ESM
-  ${chalk.blue.bold("start")}                   Start the backend server ${chalk.gray("(production)")}
+  ${chalk.blue.bold("start")}                   Run the built bundle, as a deployment does ${chalk.gray("(in the NODE_ENV you set)")}
   ${chalk.blue.bold("upgrade")}                 Move every @rebasepro package to one release, then install
   ${chalk.blue.bold("apps list")}               Show the apps this repository declares
 

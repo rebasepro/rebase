@@ -45,8 +45,8 @@ is shut — see [Self-hosting](#self-hosting-with-docker).
 Ports are **derived from this project's path**, not fixed at 3001/5173, so
 several Rebase projects can run at once without colliding. That is why the URL
 in your terminal is the one to trust — and why the `PORT` and `VITE_API_URL` in
-`.env` are ignored by `rebase dev` (they apply to `rebase start`, the production
-server). Pin a port with `rebase dev --port 3001` if you need a stable one.
+`.env` are ignored by `rebase dev` (they apply to `rebase start`, which runs the
+built bundle). Pin a port with `rebase dev --port 3001` if you need a stable one.
 
 ### Variant: your own PostgreSQL
 

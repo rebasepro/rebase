@@ -12,7 +12,7 @@ import fs from "fs";
 import path from "path";
 import chalk from "chalk";
 import { execa } from "execa";
-import { requireProjectRoot, findEnvFile } from "../utils/project";
+import { requireProjectRoot, findEnvFile, readEnvFile } from "../utils/project";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { DEFAULT_BUNDLE_DIR } from "../bundle";
@@ -29,8 +29,58 @@ ${chalk.bold("Options")}
   --workspace        Run the backend workspace's own start script
   -h, --help         Show this help
 
+Runs the bundle the way a deployment does, reading PORT and the rest of .env,
+in whatever NODE_ENV the shell or .env sets. A scaffolded .env says
+development, which keeps development behaviour on — the first account to
+register becomes the admin. For a production server, run it with
+NODE_ENV=production; it says so at start when it is not one.
+
 Build first with ${chalk.cyan("rebase build")}.
 `.trim());
+}
+
+/** The NODE_ENV the runtime will see, and where it comes from. */
+export interface StartNodeEnv {
+    value: string | undefined;
+    source: "shell" | ".env" | "unset";
+}
+
+/**
+ * What NODE_ENV the server will boot in. The shell wins — dotenv never
+ * overrides a variable that is already set — then `.env`.
+ */
+export function startNodeEnv(projectRoot: string): StartNodeEnv {
+    if (process.env.NODE_ENV !== undefined) return { value: process.env.NODE_ENV, source: "shell" };
+    const fromFile = readEnvFile(projectRoot).NODE_ENV;
+    return fromFile !== undefined ? { value: fromFile, source: ".env" } : { value: undefined, source: "unset" };
+}
+
+/**
+ * The banner for a `rebase start` that is not a production server, or `null`.
+ *
+ * Not forced to production: the scaffold's `.env` points at a loopback
+ * database, which a production boot refuses, so forcing it would break the
+ * documented local run. What must not happen is the silence — a command the
+ * help called "(production)" booting with the first-registration window open.
+ */
+export function nonProductionWarning(nodeEnv: StartNodeEnv): string[] | null {
+    if (nodeEnv.value === "production") return null;
+    const what = nodeEnv.value === undefined
+        ? "NODE_ENV is not set"
+        : `NODE_ENV=${nodeEnv.value}${nodeEnv.source === ".env" ? " (from .env)" : ""}`;
+    return [
+        chalk.yellow.bold(`⚠ ${what} — this is not a production server.`),
+        chalk.yellow("  Development behaviour is on: the first account to register becomes the admin"),
+        chalk.yellow("  (REBASE_ADMIN_EMAIL is ignored), and with no SMTP configured, sign-in and"),
+        chalk.yellow("  password-reset links are printed to this log instead of sent."),
+        chalk.gray("  For a production server, run it with NODE_ENV=production (in the shell or .env).")
+    ];
+}
+
+function printNonProductionWarning(projectRoot: string): void {
+    const warning = nonProductionWarning(startNodeEnv(projectRoot));
+    if (!warning) return;
+    console.log(warning.join("\n") + "\n");
 }
 
 export async function startCommand(rawArgs: string[] = []): Promise<void> {
@@ -60,6 +110,9 @@ export async function startCommand(rawArgs: string[] = []): Promise<void> {
 
     const bundleDir = path.resolve(projectRoot, args["--bundle"] ?? DEFAULT_BUNDLE_DIR);
     const hasBundle = fs.existsSync(path.join(bundleDir, "manifest.json"));
+
+    // Before either path, and before the runtime's own boot logs bury it.
+    printNonProductionWarning(projectRoot);
 
     if (args["--workspace"] || !hasBundle) {
         if (!args["--workspace"] && !hasBundle) {
