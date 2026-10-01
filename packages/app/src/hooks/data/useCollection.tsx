@@ -5,6 +5,7 @@ import { useData } from "./useData";
 import { isSchemaDriftError, useSchemaDriftContext } from "../../components/SchemaDriftBanner";
 import { toFindParams } from "./collectionQuery";
 import { getRelationIncludeParams } from "../../util/previews";
+import { isConnectionLostError } from "../../util/realtime";
 import { useStableFilterValues } from "./useStableFilterValues";
 import type { AdminCollection } from "@rebasepro/cms-types";
 /**
@@ -111,7 +112,11 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
 
         setDataLoading(true);
 
+        // Whether this subscription has put rows on screen.
+        let showingData = false;
+
         const onEntitiesUpdate = async (res: { data: Entity<M>[], meta: { hasMore: boolean; total?: number } }) => {
+            showingData = true;
             const entities = res.data;
             setDataLoading(false);
             setDataLoadingError(undefined);
@@ -123,6 +128,9 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
         };
 
         const onError = (error: Error) => {
+            // The connection is down, not the collection: keep the rows. The
+            // subscription is kept too, and its next update replaces them.
+            if (showingData && isConnectionLostError(error)) return;
             console.error("ERROR", error);
             setDataLoading(false);
             setData([]);

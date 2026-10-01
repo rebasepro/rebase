@@ -13,10 +13,13 @@ import {
     ChannelMessage,
     TableMetadata,
     BranchInfo,
-    RebaseApiError
+    RebaseApiError,
+    type RealtimeConnectionState
 } from "@rebasepro/types";
 import { buildCompositeId, COMPOSITE_ID_SEPARATOR, type PrimaryKeyInfo } from "@rebasepro/common";
 import { rebaseReviver } from "./reviver";
+import { readSqlScriptResult } from "./sql-script";
+import type { SqlScriptResult } from "@rebasepro/types";
 
 
 
@@ -81,6 +84,24 @@ function requestTimeoutError(written: boolean): RebaseApiError {
         { code: "REQUEST_TIMEOUT" }
     );
 }
+
+/**
+ * What a live subscription or a joined channel is told, once, when the
+ * connection has been down for longer than a blip. The registration is kept and
+ * resumes when the socket is back.
+ */
+function realtimeLostError(): RebaseApiError {
+    return new RebaseApiError(
+        "The realtime connection is down, so live data is not updating. The client keeps reconnecting and refreshes this subscription when the connection is back.",
+        { code: "CONNECTION_LOST" }
+    );
+}
+
+/** The ceiling of the reconnect backoff. */
+const MAX_RECONNECT_DELAY_MS = 30_000;
+
+/** Each reconnect delay is drawn from the last fifth below its step. */
+const RECONNECT_JITTER = 0.2;
 
 /** A frame waiting in `messageQueue`, carrying the handlers of the promise its caller holds. */
 type QueuedFrame = Record<string, unknown> & {
@@ -209,16 +230,63 @@ export class RebaseWebSocketClient {
     private closedByCaller = false;
 
     /**
-     * Set when the backoff budget ran out, cleared by anything that earns a
-     * fresh one.
+     * Set when the backoff budget ran out with nothing registered, cleared by
+     * anything that earns a fresh one.
      *
-     * Unlike {@link closedByCaller} this is not final — nobody *asked* for the
-     * socket to stay down. Five attempts with exponential backoff is about a
-     * minute, which a laptop lid, a wifi handover or a backend rollout all
-     * exceed routinely; treating that as permanent meant realtime silently
-     * stopped for the rest of the page's life, with a reload the only cure.
+     * Only reachable with nothing registered: while a subscription or a joined
+     * channel exists the client never stops retrying (see `attemptReconnect`).
+     * And it is not final like {@link closedByCaller} — nobody *asked* for the
+     * socket to stay down, so the next subscribe dials again.
      */
     private gaveUp = false;
+
+    /** See {@link state}. */
+    private connectionState: RealtimeConnectionState = "idle";
+    private stateListeners = new Set<(state: RealtimeConnectionState) => void>();
+
+    /**
+     * Whether the current outage has been reported to the registrations as
+     * `CONNECTION_LOST`. Once per outage: cleared when a socket opens.
+     */
+    private outageReported = false;
+
+    /**
+     * Where the connection is.
+     *
+     * - `idle` — no socket, and none wanted yet (the connection is lazy), or
+     *   the last one was dropped by a sign-out.
+     * - `connecting` — dialling, with no outage in progress.
+     * - `connected` — the socket is open.
+     * - `reconnecting` — the socket dropped and the client is redialling. A
+     *   blip, so far: nothing has been reported.
+     * - `disconnected` — the outage has outlasted the blip budget. Every
+     *   subscription and joined channel has been told `CONNECTION_LOST` once;
+     *   the client keeps redialling (every 30 s at most) while any exists.
+     * - `closed` — `client.close()`. Final.
+     */
+    public get state(): RealtimeConnectionState {
+        return this.connectionState;
+    }
+
+    /** Called on every change of {@link state}. Returns the unsubscribe. */
+    public onStateChange(listener: (state: RealtimeConnectionState) => void): () => void {
+        this.stateListeners.add(listener);
+        return () => {
+            this.stateListeners.delete(listener);
+        };
+    }
+
+    private setState(next: RealtimeConnectionState): void {
+        if (next === this.connectionState) return;
+        this.connectionState = next;
+        for (const listener of [...this.stateListeners]) {
+            try {
+                listener(next);
+            } catch (error) {
+                console.error("Error in realtime state listener:", error);
+            }
+        }
+    }
 
     /**
      * Whether a socket exists at all (open or still opening).
@@ -249,6 +317,20 @@ export class RebaseWebSocketClient {
     public onReconnect(handler: () => void): () => void {
         return this.on("reconnect", handler);
     }
+
+    /**
+     * Notified once per outage that outlasted a blip, with the
+     * `CONNECTION_LOST` error — so a joined channel can tell its `onError`
+     * handlers, as subscriptions are told through theirs.
+     */
+    public onConnectionLost(handler: (error: RebaseApiError) => void): () => void {
+        this.connectionLostHandlers.add(handler);
+        return () => {
+            this.connectionLostHandlers.delete(handler);
+        };
+    }
+
+    private connectionLostHandlers = new Set<(error: RebaseApiError) => void>();
 
     public on(event: "connect" | "disconnect" | "reconnect" | "error", cb: (...args: unknown[]) => void) {
         if (!this.listeners.has(event)) {
@@ -330,7 +412,18 @@ export class RebaseWebSocketClient {
         message?: Record<string, unknown> & { _queuedResolve?: (p: unknown) => void; _queuedReject?: (p: Error) => void }
     }>();
     private reconnectAttempts = 0;
+    /**
+     * With nothing registered, how many failed redials before the client stops
+     * trying until something asks for the connection. With a registration it
+     * never stops.
+     */
     private maxReconnectAttempts = 5;
+    /**
+     * How many failed redials make a blip an outage: the point at which every
+     * registration is told `CONNECTION_LOST` and {@link state} reads
+     * `disconnected`. Three is 2 + 4 + 8 s of backoff, about 14 s down.
+     */
+    private lostAfterAttempts = 3;
     /**
      * Whether a socket of this client has ever opened — what makes the next
      * open a *reconnect*, whose server has forgotten every subscription and
@@ -391,7 +484,7 @@ export class RebaseWebSocketClient {
             }
             return;
         }
-        this.installOnlineListener();
+        this.installNetworkListeners();
         if (this.ws || this.reconnectTimeout) return;
         // A caller asking for a connection is a fresh reason to try, so it also
         // buys a fresh backoff budget. Without this, the first `subscribe`
@@ -399,26 +492,63 @@ export class RebaseWebSocketClient {
         if (this.gaveUp) {
             this.gaveUp = false;
             this.reconnectAttempts = 0;
+            this.outageReported = false;
         }
+        // A fresh dial — not a retry inside an outage, which keeps its state.
+        if (!this.outageReported) this.setState("connecting");
         this.initWebSocket();
     }
 
     /**
-     * The browser says the network is back — the usual reason the budget ran
-     * out in the first place. Registered lazily so a Node client, or a page
-     * that never subscribes, adds no listener.
+     * Dial now rather than at the next backoff step — the browser says the
+     * network is back, or the tab is in front of the user again. Both are the
+     * usual end of an outage; neither fires for a server restart, which the
+     * backoff covers.
      */
-    private installOnlineListener() {
+    private retryNow(reason: string): void {
+        if (this.closedByCaller) return;
+        if (this.connectionState !== "reconnecting" && this.connectionState !== "disconnected") return;
+        // A dial is already on its way.
+        if (this.ws) return;
+        console.debug(`${reason} — retrying the realtime connection`);
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
+        this.gaveUp = false;
+        this.reconnectAttempts = 0;
+        this.initWebSocket();
+    }
+
+    /**
+     * `online` and `visibilitychange`. Registered lazily so a Node client, or a
+     * page that never subscribes, adds no listener.
+     */
+    private installNetworkListeners() {
         if (this.onlineListener || typeof window === "undefined" || typeof window.addEventListener !== "function") return;
-        this.onlineListener = () => {
-            if (this.closedByCaller || !this.gaveUp) return;
-            console.debug("Network is back — retrying the realtime connection");
-            this.ensureConnected();
-        };
+        this.onlineListener = () => this.retryNow("Network is back");
         window.addEventListener("online", this.onlineListener);
+        if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+            this.visibilityListener = () => {
+                if (document.visibilityState === "visible") this.retryNow("Tab is visible again");
+            };
+            document.addEventListener("visibilitychange", this.visibilityListener);
+        }
+    }
+
+    private removeNetworkListeners() {
+        if (this.onlineListener && typeof window !== "undefined") {
+            window.removeEventListener("online", this.onlineListener);
+        }
+        if (this.visibilityListener && typeof document !== "undefined") {
+            document.removeEventListener("visibilitychange", this.visibilityListener);
+        }
+        this.onlineListener = null;
+        this.visibilityListener = null;
     }
 
     private onlineListener: (() => void) | null = null;
+    private visibilityListener: (() => void) | null = null;
 
     /**
      * Authenticate the WebSocket connection
@@ -499,16 +629,18 @@ export class RebaseWebSocketClient {
      */
     public disconnect(permanent = false): void {
         if (permanent) this.closedByCaller = true;
-        if (permanent && this.onlineListener && typeof window !== "undefined") {
-            window.removeEventListener("online", this.onlineListener);
-            this.onlineListener = null;
-        }
+        if (permanent) this.removeNetworkListeners();
         this.isAuthenticated = false;
         this.authPromise = null;
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = null;
         }
+        // Whatever outage there was ends here: the next dial is a fresh one.
+        this.reconnectAttempts = 0;
+        this.outageReported = false;
+        this.gaveUp = false;
+        this.setState(permanent ? "closed" : "idle");
         // The subscribe watchdogs too, and for the same reason as the reconnect
         // timer: nothing armed for a socket the caller just released may still
         // go off.
@@ -563,6 +695,12 @@ export class RebaseWebSocketClient {
                 this.hadConnection = true;
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
+                // The outage, if there was one, is over. The registrations
+                // hear about it through the re-subscribe below: each one's
+                // next `onUpdate` carries what was written meanwhile.
+                this.outageReported = false;
+                this.gaveUp = false;
+                this.setState("connected");
 
                 // Auto-authenticate if token getter is available
                 if (this.getAuthToken && !this.isAuthenticated) {
@@ -636,6 +774,7 @@ export class RebaseWebSocketClient {
                     }
                 }
 
+                this.setState(this.outageReported ? "disconnected" : "reconnecting");
                 this.attemptReconnect();
             };
 
@@ -698,19 +837,30 @@ export class RebaseWebSocketClient {
     }
 
     private attemptReconnect() {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error("Max reconnection attempts reached");
-            // Nothing will re-subscribe now, so stop every subscription that
-            // never loaded from spinning forever.
+        if (this.closedByCaller) return;
+
+        // A blip has become an outage. Said once, to everything that is live,
+        // so a view can say its data is stale instead of looking current.
+        if (this.reconnectAttempts >= this.lostAfterAttempts) this.reportConnectionLost();
+
+        // Giving up is only for a client nothing depends on. While anything is
+        // registered the client keeps redialling at the capped interval:
+        // stopping after five attempts (about a minute) left every live view
+        // that had loaded frozen for the life of the page after any longer
+        // outage — a deploy, a crash loop, a slow migration — because a server
+        // restart fires no `online` event and Node has no `window` at all.
+        if (this.reconnectAttempts >= this.maxReconnectAttempts && !this.hasRegistrations()) {
+            console.warn("[Rebase] Realtime: the server is unreachable and nothing is subscribed. Not retrying until something asks for the connection.");
             this.gaveUp = true;
-            this.failAllPendingSubscriptions(
-                new RebaseApiError("Connection lost", { code: "CONNECTION_LOST" })
-            );
             return;
         }
 
-        this.reconnectAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+        this.reconnectAttempts = Math.min(this.reconnectAttempts + 1, 30);
+        const ceiling = Math.min(1000 * Math.pow(2, this.reconnectAttempts), MAX_RECONNECT_DELAY_MS);
+        // Up to a fifth earlier, at random: a deploy drops every client at the
+        // same instant, and the same schedule would bring them all back at the
+        // same instant too.
+        const delay = ceiling - Math.floor(Math.random() * ceiling * RECONNECT_JITTER);
 
         console.debug(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
@@ -722,6 +872,73 @@ export class RebaseWebSocketClient {
             this.reconnectTimeout = null;
             this.initWebSocket();
         }, delay);
+    }
+
+    /**
+     * Whether anything depends on the socket coming back: a subscription, a
+     * joined channel, or a request whose caller is still waiting for a socket.
+     */
+    private hasRegistrations(): boolean {
+        return this.collectionSubscriptions.size > 0
+            || this.singleSubscriptions.size > 0
+            || this.channelHandlers.size > 0
+            || this.messageQueue.some(frame => typeof frame._queuedReject === "function");
+    }
+
+    /**
+     * Tell every subscription and joined channel, once per outage, that the
+     * connection is down and their data is not updating.
+     *
+     * Registrations are kept — that is the difference from a subscribe that
+     * failed. When the socket is back they are re-subscribed, and the fresh
+     * `onUpdate` is the recovery.
+     */
+    private reportConnectionLost(): void {
+        if (this.outageReported) return;
+        this.outageReported = true;
+        this.setState("disconnected");
+        const error = realtimeLostError();
+        for (const subscription of this.collectionSubscriptions.values()) {
+            this.notifyError(subscription.callbacks, error);
+        }
+        for (const subscription of this.singleSubscriptions.values()) {
+            this.notifyError(subscription.callbacks, error);
+        }
+        for (const handler of [...this.connectionLostHandlers]) {
+            try {
+                handler(error);
+            } catch (handlerError) {
+                console.error("Error in connection-lost handler:", handlerError);
+            }
+        }
+    }
+
+    private notifyError(callbacks: Map<string, { onError?: (error: Error) => void }>, error: Error): void {
+        for (const callback of [...callbacks.values()]) {
+            if (!callback.onError) continue;
+            try {
+                callback.onError(error);
+            } catch (callbackError) {
+                console.error("Error in subscription error callback:", callbackError);
+            }
+        }
+    }
+
+    /**
+     * A listener attaching while an outage is being reported is told at once:
+     * its subscribe waits for a socket that may be minutes away, and nothing
+     * else would say so.
+     */
+    private reportOutageTo(onError: ((error: Error) => void) | undefined): void {
+        if (!this.outageReported || !onError) return;
+        queueMicrotask(() => {
+            if (!this.outageReported) return;
+            try {
+                onError(realtimeLostError());
+            } catch (callbackError) {
+                console.error("Error in subscription error callback:", callbackError);
+            }
+        });
     }
 
     private isAuthError(message: WebSocketMessage): boolean {
@@ -1345,6 +1562,24 @@ options }
         return response.result || [];
     }
 
+    /**
+     * Run a script a person wrote — the Studio console — and get back what its
+     * last statement returned, every value as the database's text, with the
+     * table column each result column was read from. See
+     * `SQLAdmin.runSqlScript`.
+     */
+    async runSqlScript(sql: string, options?: { database?: string, role?: string }): Promise<SqlScriptResult> {
+        const response = await this.sendMessage({
+            type: "EXECUTE_SQL",
+            payload: {
+                sql,
+                options: { database: options?.database, role: options?.role },
+                mode: "script"
+            }
+        });
+        return readSqlScriptResult(response);
+    }
+
     async fetchAvailableDatabases(): Promise<string[]> {
         const response = await this.sendMessage({
             type: "FETCH_DATABASES",
@@ -1625,6 +1860,7 @@ incoming: normIncoming[key] };
             }>;
             callbackMap.set(callbackId, { onUpdate,
 onError });
+            this.reportOutageTo(onError);
 
             // Immediately fire the callback with cached data if available
             if (existingSubscription.latestData !== undefined && existingSubscription.isInitialDataReceived) {
@@ -1671,6 +1907,7 @@ onError });
         }>();
         callbackMap.set(callbackId, { onUpdate,
 onError });
+        this.reportOutageTo(onError);
 
         this.collectionSubscriptions.set(subscriptionKey, {
             backendSubscriptionId,
@@ -1727,6 +1964,7 @@ onError });
             }>;
             callbackMap.set(callbackId, { onUpdate,
 onError });
+            this.reportOutageTo(onError);
 
             // Immediately fire the callback with cached data if available
             if (existingSubscription.latestData !== undefined && existingSubscription.isInitialDataReceived) {
@@ -1771,6 +2009,7 @@ onError });
         }>();
         callbackMap.set(callbackId, { onUpdate,
 onError });
+        this.reportOutageTo(onError);
 
         this.singleSubscriptions.set(subscriptionKey, {
             backendSubscriptionId,
@@ -2007,21 +2246,6 @@ onError });
                 new RebaseApiError("Subscription timed out", { code: "SUBSCRIPTION_TIMEOUT" })
             );
         }, this.subscriptionTimeoutMs);
-    }
-
-    /**
-     * Fail every subscription that never received data. Called when reconnection
-     * is given up on, so views surface an error instead of spinning forever.
-     */
-    private failAllPendingSubscriptions(error: Error): void {
-        for (const key of [...this.collectionSubscriptions.keys()]) {
-            const sub = this.collectionSubscriptions.get(key);
-            if (sub && !sub.isInitialDataReceived) this.failCollectionSubscription(key, error);
-        }
-        for (const key of [...this.singleSubscriptions.keys()]) {
-            const sub = this.singleSubscriptions.get(key);
-            if (sub && !sub.isInitialDataReceived) this.failEntitySubscription(key, error);
-        }
     }
 
     /**

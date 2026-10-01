@@ -364,23 +364,38 @@ Stale presences are automatically cleaned up after 30 seconds of inactivity.
 
 The typed SDK automatically reconnects when the WebSocket connection drops:
 
-- **Exponential backoff** — Reconnect delays start at 1 second and double on each attempt, capping at 30 seconds.
-- **Maximum 5 attempts** — After 5 failed reconnection attempts, the client stops trying.
-- **Automatic resubscription** — On successful reconnect, all active subscriptions are re-registered with the server. No manual intervention needed.
+- **Exponential backoff** — The first redial is about 2 seconds after the drop, and each later one waits twice as long, up to 30 seconds. Each delay is shortened by up to a fifth at random, so clients dropped together by a deploy do not all come back at the same instant.
+- **No give-up while anything is live** — While a subscription or a joined channel exists, the client keeps redialling at the 30-second ceiling for as long as the outage lasts. With nothing registered it stops after 5 failed attempts, and the next subscription dials again. In a browser, the `online` event and the tab becoming visible again both redial at once instead of waiting out the backoff.
+- **Outages are reported once** — When the connection has been down for about 15 seconds (three failed redials), every live subscription's `onError` and every joined channel's `onError` receives one `RebaseApiError` with code `CONNECTION_LOST`. The subscription is **kept**: the error says its data is not updating, not that it has ended.
+- **Automatic resubscription** — On successful reconnect, all active subscriptions are re-registered with the server, and each one's next `onUpdate` carries whatever was written while the client was away. That update is the recovery signal. No manual intervention needed.
 - **Requests are at-most-once** — A request made while the socket is down waits for it, for up to 30 seconds from the call, and then fails with `REQUEST_TIMEOUT` without ever being sent. A request that was already sent when the connection dropped fails with `CONNECTION_LOST` and is **not** sent again: the server may or may not have run it, and only the caller knows whether running it twice is safe.
 
-You can listen to connection lifecycle events:
+`client.ws.state` says where the connection is, and `onStateChange` is told every change:
+
+| State | Meaning |
+|---|---|
+| `idle` | No socket, and none wanted yet (the connection is lazy), or a sign-out dropped it. |
+| `connecting` | Dialling, with no outage in progress. |
+| `connected` | The socket is open. |
+| `reconnecting` | The socket dropped and the client is redialling. Nothing has been reported yet. |
+| `disconnected` | The outage has lasted about 15 seconds or more. `CONNECTION_LOST` has been reported, and the client keeps redialling. |
+| `closed` | `client.close()` was called. Final. |
 
 ```typescript
 // `ws` is undefined on a client built without realtime, so narrow it once.
 const ws = client.ws;
 if (ws) {
+    ws.onStateChange((state) => {
+        showOfflineBanner(state === "disconnected");
+    });
     ws.on("connect", () => console.log("Connected"));
     ws.on("disconnect", () => console.log("Disconnected"));
     ws.on("reconnect", () => console.log("Reconnected"));
     ws.on("error", (error) => console.error("Error:", error));
 }
 ```
+
+The Rebase admin shows a banner of its own while the state is `disconnected`, and keeps the rows and records already on screen instead of replacing them with an error.
 
 ## Authentication & RLS
 

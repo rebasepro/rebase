@@ -8,7 +8,7 @@ description: Subscribe to live data changes with the Rebase typed SDK using WebS
 
 The Rebase typed SDK provides real-time data subscriptions via WebSocket. When records change on the server, your subscribed callbacks fire immediately with the updated data.
 
-The WebSocket connection is established automatically when a `websocketUrl` is available (derived from `baseUrl` by default). Reconnection and token refresh are handled transparently.
+The WebSocket connection is established automatically when a `websocketUrl` is available (derived from `baseUrl` by default). Reconnection and token refresh are handled for you. An outage that lasts more than about 15 seconds is reported once, to each subscription's `onError`, as `CONNECTION_LOST` — see [Authentication and Reconnection](#authentication-and-reconnection).
 
 ## Subscribing to a Collection
 
@@ -210,7 +210,29 @@ The WebSocket client handles authentication automatically:
 
 - On **sign-in** or **token refresh**, the new token is sent to an already-open socket via an `authenticate` message. If none is open, nothing happens — signing in is not a request for realtime, and a socket opened later authenticates itself.
 - On **sign-out**, the WebSocket connection is disconnected. The client stays usable; a later subscription reconnects anonymously.
-- If the connection drops, the client **reconnects automatically** and re-establishes all active subscriptions.
+- If the connection drops, the client **reconnects automatically** and re-establishes all active subscriptions. It never stops trying while a subscription or a joined channel exists; the delay between attempts grows to at most 30 seconds.
+- If the connection stays down for more than about 15 seconds, each subscription's `onError` (and each joined channel's `onError`) is called **once** with a `RebaseApiError` whose `code` is `CONNECTION_LOST`. The subscription is not ended: keep showing what you have, mark it as possibly stale, and wait. When the socket is back, the subscription's next `onUpdate` carries everything written in the meantime.
+- `client.ws.state` is the connection's state — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` or `closed` — and `client.ws.onStateChange(listener)` is told every change. `disconnected` is the state in which `CONNECTION_LOST` has been reported.
+- Requests sent over the socket are **at-most-once**. One that was sent when the connection dropped fails with `CONNECTION_LOST` and is never sent again, since the server may already have run it. One that is still waiting for a socket after 30 seconds fails with `REQUEST_TIMEOUT` without being sent.
+
+```typescript
+import { RebaseApiError } from "@rebasepro/client";
+
+const unsubscribe = client.data.orders.listen(
+    { where: { status: ["==", "open"] } },
+    (response) => {
+        setOrders(response.data);
+        setStale(false);
+    },
+    (error) => {
+        if (error instanceof RebaseApiError && error.code === "CONNECTION_LOST") {
+            setStale(true); // keep the rows; the next update clears it
+            return;
+        }
+        setError(error);
+    }
+);
+```
 
 No manual token management is needed — the integration between `client.auth` and the WebSocket layer is handled internally.
 

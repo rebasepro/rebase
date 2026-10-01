@@ -249,6 +249,32 @@ export type HistoryConfig = boolean | { retention?: number };
 // ─── RebaseWebSocket ─────────────────────────────────────────────────────────
 
 /**
+ * Where the realtime connection is.
+ *
+ * - `idle` — no socket, and none wanted yet (the connection is lazy), or the
+ *   last one was dropped by a sign-out.
+ * - `connecting` — dialling, with no outage in progress.
+ * - `connected` — the socket is open.
+ * - `reconnecting` — the socket dropped and the client is redialling. A blip,
+ *   so far: nothing has been reported.
+ * - `disconnected` — the outage has outlasted the blip budget (about 15 s).
+ *   Every live subscription and joined channel has been told
+ *   `CONNECTION_LOST` once, and the client keeps redialling — every 30 s at
+ *   most — for as long as any exists. When the socket is back each is
+ *   re-subscribed, and its next update carries what changed meanwhile.
+ * - `closed` — `client.close()`. Final.
+ *
+ * @group Realtime
+ */
+export type RealtimeConnectionState =
+    | "idle"
+    | "connecting"
+    | "connected"
+    | "reconnecting"
+    | "disconnected"
+    | "closed";
+
+/**
  * Minimal WebSocket client contract exposed on {@link RebaseClient}.
  *
  * The full implementation (`RebaseWebSocketClient` in `@rebasepro/client`)
@@ -263,6 +289,10 @@ export interface RebaseWebSocket {
     setAuthTokenGetter(getter: () => Promise<string | null>): void;
     /** Listen for connection lifecycle events. */
     on(event: "connect" | "disconnect" | "reconnect" | "error", cb: (...args: unknown[]) => void): () => void;
+    /** Where the connection is. See {@link RealtimeConnectionState}. */
+    readonly state: RealtimeConnectionState;
+    /** Called on every change of {@link state}. Returns the unsubscribe. */
+    onStateChange(listener: (state: RealtimeConnectionState) => void): () => void;
 }
 
 // ─── RebaseClient ────────────────────────────────────────────────────────────

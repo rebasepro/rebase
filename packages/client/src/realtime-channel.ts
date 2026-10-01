@@ -106,6 +106,11 @@ export interface ChannelTransport {
     sendMessage(message: Record<string, unknown>): Promise<unknown>;
     onChannelMessage(channel: string, handler: (message: ChannelMessage) => void): () => void;
     onReconnect(handler: () => void): () => void;
+    /**
+     * Notified once per outage that outlasted a blip. Optional so a test
+     * transport need not implement it.
+     */
+    onConnectionLost?(handler: (error: RebaseApiError) => void): () => void;
 }
 
 /**
@@ -268,6 +273,12 @@ export class RebaseRealtimeChannel {
                 void this.rejoin();
             })
         );
+
+        // An outage longer than a blip: nothing arrives on this channel until
+        // the socket is back, and the app should be able to say so. The
+        // re-join above is the recovery.
+        const onConnectionLost = this.transport.onConnectionLost?.((error) => this.emitError(error));
+        if (onConnectionLost) this.unsubscribers.push(onConnectionLost);
 
         await this.send("join_channel");
         // Not optional. Joining does not push the roster — without this the

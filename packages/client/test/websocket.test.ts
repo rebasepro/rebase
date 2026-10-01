@@ -1327,17 +1327,23 @@ id: "1" }, onUpdate, onError);
             createClient();
             jest.runAllTimers(); // connect
 
-            // The delay is 1000 * 2^attempt, capped at 30s. Pinning the whole
-            // schedule is the point: "a second socket exists after 2s" holds
-            // just as well for a client that redials immediately, or on a flat
-            // interval, which is what the backoff is there to prevent.
+            // The step is 1000 * 2^attempt, capped at 30s, and each delay is
+            // drawn from the last fifth below its step (jitter, so a deploy
+            // does not bring every client back at the same instant). Pinning
+            // the whole schedule is the point: "a second socket exists after
+            // 2s" holds just as well for a client that redials immediately,
+            // or on a flat interval, which is what the backoff is there to
+            // prevent. `Math.random` is pinned to the top of its range, which
+            // makes each delay exactly 80% of its step.
+            jest.spyOn(Math, "random").mockReturnValue(0.999999);
             MockWebSocket.failToConnect = true;
             try {
                 getWs().close();
 
-                const expectedDelays = [2000, 4000, 8000, 16000, 30000];
+                const steps = [2000, 4000, 8000, 16000, 30000];
                 let sockets = 1;
-                for (const delay of expectedDelays) {
+                for (const step of steps) {
+                    const delay = step - Math.floor(0.999999 * step * 0.2);
                     jest.advanceTimersByTime(delay - 1);
                     expect(MockWebSocket.instances).toHaveLength(sockets);
                     jest.advanceTimersByTime(1);
@@ -1492,7 +1498,12 @@ id: "1" }, onUpdate, onError);
                 await channel.leave();
             });
 
-            it("re-sends live subscriptions when a caller asks for the connection", async () => {
+            /**
+             * With a live subscription there is no budget to run out: the
+             * client keeps redialling at the 30 s ceiling, so the server
+             * coming back is enough — nobody has to ask.
+             */
+            it("re-sends live subscriptions when the server is back, without being asked", async () => {
                 const client = createClient();
                 jest.runAllTimers();
                 client.listenOne({ path: "posts", id: "1" }, jest.fn());
@@ -1505,8 +1516,7 @@ id: "1" }, onUpdate, onError);
 
                 exhaustRetries();
                 serverIsBack();
-                client.ensureConnected();
-                await jest.advanceTimersByTimeAsync(10);
+                await jest.advanceTimersByTimeAsync(30_010);
 
                 expect(frames(getWs()).filter(m => m.type === "subscribe_one")).toHaveLength(1);
             });

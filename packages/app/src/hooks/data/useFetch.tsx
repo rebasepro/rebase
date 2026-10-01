@@ -4,6 +4,7 @@ import { Entity, User } from "@rebasepro/types";
 import { RebaseContext, AdminCollection } from "@rebasepro/cms-types";
 import { useData } from "./useData";
 import { useRebaseContext } from "../useRebaseContext";
+import { isConnectionLostError } from "../../util/realtime";
 
 /**
  * @group Hooks and utilities
@@ -90,7 +91,11 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
             setDataLoading(true);
         }
 
+        // Whether a record is on screen — the cached one counts.
+        let showingEntity = Boolean(CACHE[`${path}/${entityId}`]);
+
         const onEntityUpdate = async (updatedEntity?: Entity<M> | null) => {
+            showingEntity = Boolean(updatedEntity);
             CACHE[`${path}/${entityId}`] = updatedEntity ?? undefined;
             setEntity(updatedEntity ?? undefined);
             setDataLoading(false);
@@ -98,6 +103,11 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
         };
 
         const onError = (error: Error) => {
+            // The connection is down, not the record. Dropping the entity here
+            // unmounted an open edit form, and everything typed into it, over
+            // an outage the client recovers from on its own: the listener is
+            // kept, and its next update is the fresh record.
+            if (showingEntity && isConnectionLostError(error)) return;
             console.error("ERROR fetching entity", error);
             setDataLoading(false);
             setEntity(undefined);
