@@ -1006,20 +1006,41 @@ export interface BatchRef {
     $ref: string;
 }
 
-/** One entry of a batch request. @group Data */
+/**
+ * A row's values in a batch: the collection's own columns, each of which may
+ * instead be a {@link BatchRef} to a value an earlier operation produces.
+ *
+ * Homomorphic over the row type, so a column the row type requires is required
+ * here too — a create in a batch is the same insert `create()` is. There used
+ * to be an `& Record<string, unknown>` on the end, which let a misspelt column
+ * compile and come back as a 400 `VALIDATION_UNKNOWN_FIELDS`.
+ */
+type BatchValues<T> = { [F in keyof T]: T[F] | BatchRef };
+
+/**
+ * One entry of a batch request.
+ *
+ * `collection` is the collection's **accessor** on a typed client — the name
+ * `client.data.<accessor>` takes, and the key of the generated `Database`
+ * (`orderItems`). The client resolves it to the slug the route knows
+ * (`order_items`) through its `collections` dictionary; a slug that is not an
+ * accessor is sent as written.
+ *
+ * @group Data
+ */
 export type BatchOperation<DB = Record<string, unknown>> = {
     [K in Extract<keyof DB, string>]:
         | {
             op: "create";
             collection: K;
-            values: { [F in keyof InsertOf<DB[K]>]?: InsertOf<DB[K]>[F] | BatchRef } & Record<string, unknown>;
+            values: BatchValues<InsertOf<DB[K]>>;
             /** Name this row so a later operation can reference its columns. */
             ref?: string;
         }
         | {
             op: "upsert";
             collection: K;
-            values: { [F in keyof InsertOf<DB[K]>]?: InsertOf<DB[K]>[F] | BatchRef } & Record<string, unknown>;
+            values: BatchValues<InsertOf<DB[K]>>;
             /** See {@link UpsertOptions.onConflict}. Defaults to the primary key. */
             onConflict?: readonly string[];
             ref?: string;
@@ -1028,7 +1049,7 @@ export type BatchOperation<DB = Record<string, unknown>> = {
             op: "update";
             collection: K;
             id: string | number | BatchRef;
-            values: { [F in keyof UpdateOf<DB[K]>]?: UpdateOf<DB[K]>[F] | FieldOperation | BatchRef } & Record<string, unknown>;
+            values: { [F in keyof UpdateOf<DB[K]>]?: UpdateOf<DB[K]>[F] | FieldOperation | BatchRef };
             ref?: string;
         }
         | {

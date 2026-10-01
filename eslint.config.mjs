@@ -152,6 +152,11 @@ export default [
             // source, and `_vendor` alone carries 1,339 errors in third-party
             // JS — enough to read as a catastrophic regression on any machine
             // that has run it, while CI, which never has, stays green.
+            // The codegen's output, checked in byte-for-byte so the typed-SDK
+            // probes beside it read what `rebase generate-sdk` writes — and kept
+            // that way by packages/codegen/test/baas-typecheck-fixture.test.ts,
+            // so it cannot be edited to satisfy a lint rule.
+            "tests/e2e/baas-typecheck/src/typed-sdk/database.types.ts",
             "ds-bundle/**",
             ".ds-sync/**",
             "tooling/design-sync/**",

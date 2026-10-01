@@ -268,12 +268,17 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
      * `data` is aligned to `operations`: the written row for a create, upsert
      * or update, and `null` for a delete.
      *
+     * `collection` is the accessor `client.data.<accessor>` takes — `orderItems`
+     * for the slug `order_items` — and is sent as the slug through the
+     * `collections` dictionary. A name that is not an accessor goes out as
+     * written, so an untyped client can still pass the slug.
+     *
      * @example
      * ```ts
      * await client.batch([
      *     { op: "create", collection: "orders", values: { total: 40 }, ref: "order" },
-     *     { op: "create", collection: "order_items",
-     *       values: { order_id: { $ref: "order.id" }, sku: "A-1" } },
+     *     { op: "create", collection: "orderItems",
+     *       values: { orderId: { $ref: "order.id" }, sku: "A-1" } },
      *     { op: "update", collection: "stock", id: "A-1", values: { count: { $inc: -1 } } }
      * ]);
      * ```
@@ -729,7 +734,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 body: payload !== undefined ? JSON.stringify(payload) : undefined
             });
         },
-        batch: async (operations: unknown[], options?: WriteOptions): Promise<BatchResult> => {
+        batch: async (operations: unknown[], batchOptions?: WriteOptions): Promise<BatchResult> => {
             if (!Array.isArray(operations)) {
                 throw new TypeError("batch expects an array of operations.");
             }
@@ -739,12 +744,28 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             if (operations.length === 0) return { data: [], meta: { operations: 0 } };
 
             const headers: Record<string, string> = {};
-            if (options?.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
-            if (options?.returning === false) headers.Prefer = "return=minimal";
+            if (batchOptions?.idempotencyKey) headers["Idempotency-Key"] = batchOptions.idempotencyKey;
+            if (batchOptions?.returning === false) headers.Prefer = "return=minimal";
+
+            // `collection` is typed as the generated accessor (`orderItems`),
+            // the name `client.data.<accessor>` takes; the route resolves it by
+            // slug (`order_items`). The dictionary is the one place that knows
+            // both, so it is resolved here — and a name that is not an accessor
+            // goes out as written, so a slug still works.
+            const dictionary = options.collections;
+            const wire = dictionary
+                ? operations.map((operation) => {
+                    if (!operation || typeof operation !== "object") return operation;
+                    const name = (operation as { collection?: unknown }).collection;
+                    return typeof name === "string" && Object.hasOwn(dictionary, name)
+                        ? { ...operation, collection: dictionary[name] }
+                        : operation;
+                })
+                : operations;
 
             return transport.request<BatchResult>("/data/_batch", {
                 method: "POST",
-                body: JSON.stringify({ operations }),
+                body: JSON.stringify({ operations: wire }),
                 ...(Object.keys(headers).length > 0 ? { headers } : {})
             });
         },

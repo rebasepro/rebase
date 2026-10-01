@@ -32,13 +32,28 @@ const posts = {
     }
 } as unknown as CollectionConfig;
 
+const orderItems = {
+    slug: "order_items",
+    name: "Order items",
+    table: "order_items",
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        sku: { name: "SKU", type: "string" }
+    }
+} as unknown as CollectionConfig;
+
 interface Harness {
     client: ReturnType<typeof createRebaseClient>;
     saves: Record<string, unknown>[];
+    batches: Record<string, unknown>[][];
 }
 
-function createHarness(collections: CollectionConfig[] = [posts]): Harness {
+function createHarness(
+    collections: CollectionConfig[] = [posts],
+    dictionary?: Record<string, string>
+): Harness {
     const saves: Record<string, unknown>[] = [];
+    const batches: Record<string, unknown>[][] = [];
     const existing = new Set<unknown>([1]);
 
     const save = async (props: Record<string, unknown>) => {
@@ -65,6 +80,10 @@ function createHarness(collections: CollectionConfig[] = [posts]): Harness {
                 out.push(await save({ ...props, values, status: "new" }));
             }
             return out;
+        },
+        async batchWrite(props: { operations: Record<string, unknown>[] }) {
+            batches.push(props.operations);
+            return props.operations.map((operation) => ({ id: 7, ...(operation.values as object) }));
         }
     } as unknown as DataDriver;
 
@@ -81,10 +100,11 @@ function createHarness(collections: CollectionConfig[] = [posts]): Harness {
         baseUrl: "http://rebase.test",
         realtime: false,
         token: "t",
+        ...(dictionary ? { collections: dictionary } : {}),
         fetch: ((input: RequestInfo | URL, init?: RequestInit) =>
             app.request(String(input).replace("http://rebase.test", ""), init)) as typeof fetch
     });
-    return { client, saves };
+    return { client, saves, batches };
 }
 
 describe("upsert() through the REST route", () => {
@@ -122,5 +142,41 @@ describe("upsert() through the REST route", () => {
 
         await expect(client.data.collection("posts").create({ id: 1, title: "dup" }))
             .rejects.toMatchObject({ status: 409 });
+    });
+});
+
+describe("batch() through the REST route", () => {
+    // The generated `Database` keys collections by accessor (`orderItems`), and
+    // `BatchOperation<DB>` types `collection` on those keys. The route resolves
+    // `collection` by slug (`order_items`). So on a typed client the spelling
+    // that compiled answered 400 "names the unknown collection", and the one the
+    // server knows was a compile error — batch was unusable for every
+    // collection whose slug is not already its accessor.
+
+    it("sends the slug for an accessor the collections dictionary names", async () => {
+        const { client, batches } = createHarness([posts, orderItems], { posts: "posts", orderItems: "order_items" });
+
+        const result = await client.batch([
+            { op: "create", collection: "orderItems", values: { sku: "A-1" } }
+        ]);
+
+        expect(result.data).toEqual([{ id: 7, sku: "A-1" }]);
+        expect(batches[0][0]).toMatchObject({ op: "create", path: "order_items" });
+    });
+
+    it("still accepts the slug itself", async () => {
+        const { client, batches } = createHarness([posts, orderItems], { posts: "posts", orderItems: "order_items" });
+
+        await client.batch([{ op: "create", collection: "order_items", values: { sku: "A-2" } }]);
+
+        expect(batches[0][0]).toMatchObject({ path: "order_items" });
+    });
+
+    it("sends the name verbatim on a client without a dictionary", async () => {
+        const { client, batches } = createHarness([posts, orderItems]);
+
+        await client.batch([{ op: "create", collection: "order_items", values: { sku: "A-3" } }]);
+
+        expect(batches[0][0]).toMatchObject({ path: "order_items" });
     });
 });

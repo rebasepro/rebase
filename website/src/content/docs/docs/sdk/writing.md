@@ -263,8 +263,8 @@ cross-collection form: one request, one transaction, all of it or none.
 const result = await client.batch([
     { op: "create", collection: "orders",
       values: { total: 40 }, ref: "order" },
-    { op: "create", collection: "order_items",
-      values: { order_id: { $ref: "order.id" }, sku: "A-1" } },
+    { op: "create", collection: "orderItems",
+      values: { orderId: { $ref: "order.id" }, sku: "A-1" } },
     { op: "update", collection: "stock",
       id: "A-1", values: { count: { $inc: -1 } } },
     { op: "delete", collection: "carts", id: "c-9" }
@@ -275,7 +275,11 @@ result.meta;  // { operations: 4 }
 ```
 
 `op` is `create`, `update`, `upsert` or `delete`, and `collection` narrows
-`values` to that collection's generated `Insert` or `Update` shape. Every
+`values` to that collection's generated `Insert` or `Update` shape — a column
+the collection does not have is a compile error, and so is a create missing a
+required one. `collection` is the accessor, the name `client.data.<accessor>`
+takes (`orderItems` for the slug `order_items`); the client sends the slug,
+through the `collections` dictionary it was created with. Every
 operation runs the pipeline its single-row equivalent runs — the same
 validation, callbacks and row-level security, as the same user.
 

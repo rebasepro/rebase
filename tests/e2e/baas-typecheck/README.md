@@ -37,6 +37,11 @@ cannot see through a type alias, and the fixture cannot see an unused import.
   security rules and callbacks, typed against core `CollectionConfig`. This is
   the proof that the *schema* half of a collection is fully typed with no React.
 - `src/sdk.ts` — `@rebasepro/client` usage, including typed accessors.
+- `src/typed-sdk/` — a typed client against a generated `Database`.
+  `database.types.ts` is the codegen's output for `collections.ts` (kept in step
+  by `packages/codegen/test/baas-typecheck-fixture.test.ts`), and `probes.ts`
+  asserts what that client refuses — each `@ts-expect-error` a call the server
+  refuses — and what it must accept.
 - `src/admin_absent.ts` — the negative half: `admin` on a property or a
   collection, and the `Admin*Options` types, must not compile from core.
   `@ts-expect-error` is the assertion, so the file fails if any of them ever
