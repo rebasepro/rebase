@@ -59,10 +59,42 @@ export interface SchemaEditRepository {
      * first. A missing file is not an error: a new collection has no source yet,
      * and the editor creates one.
      *
-     * Optional. A local working tree could implement it and does not need to:
-     * the file is already on the disk the editor reads.
+     * Also what {@link restore} is snapshotted from. The local working tree
+     * implements it for that reason alone: the editor reads its files from
+     * disk directly.
      */
     readFile?(path: string): Promise<string | undefined>;
+    /**
+     * Put these files back exactly as they were — `undefined` contents meaning
+     * the file did not exist — and unstage them.
+     *
+     * Called when the commit is refused after the change was written: a
+     * pre-commit hook, a missing git identity, a held `index.lock`. Without it
+     * the refusal left the source and the generated schema rewritten and
+     * staged — the panel reported failure while the source had changed — and
+     * every retry met those leftovers as somebody else's work in progress.
+     *
+     * Optional: a repository that writes nothing locally (the GitHub one
+     * stages in memory) has nothing to put back. Needs {@link readFile} to take
+     * the snapshot it restores.
+     */
+    restore?(files: { path: string; contents: string | undefined }[]): Promise<void>;
+}
+
+/**
+ * The commit was refused after the change had been written, and the tree was
+ * put back. Nothing changed: not the source, not the database.
+ */
+export class CommitRefusedError extends Error {
+    constructor(detail: string, readonly restored: boolean) {
+        super(
+            `Nothing was changed — the commit was refused: ${detail}` +
+            (restored
+                ? "\n  The collection source and the generated schema were put back as they were."
+                : "\n  The files written for this change could not be put back; check `git status` before retrying.")
+        );
+        this.name = "CommitRefusedError";
+    }
 }
 
 /** Runs the DDL. Separate from the repository so neither knows about the other. */
@@ -187,14 +219,47 @@ export async function applySchemaChange(input: SchemaEditInput): Promise<SchemaE
 
     const branch = await input.repository.currentBranch();
 
-    // Now the tree may be touched. The AST editor writes through the
-    // filesystem, so this is the first moment at which doing so is safe.
-    const written = input.writeSource ? await input.writeSource() : [];
-    const files = [...written, ...commit.files];
-    const paths = files.map(file => file.path);
+    // What every planned path holds now, so a refused commit can put it back.
+    // Taken after the dirty check: the tree is clean for these paths, so this
+    // is also what HEAD holds.
+    const { repository } = input;
+    const snapshot = repository.readFile && repository.restore
+        ? await Promise.all(plannedPaths.map(async path => ({ path, contents: await repository.readFile!(path) })))
+        : undefined;
 
-    await input.repository.writeFiles(files);
-    const sha = await input.repository.commit(paths, commit.message);
+    let files: SchemaChangeFile[] = [];
+    let sha: string;
+    let committing = false;
+    try {
+        // Now the tree may be touched. The AST editor writes through the
+        // filesystem, so this is the first moment at which doing so is safe.
+        const written = input.writeSource ? await input.writeSource() : [];
+        files = [...written, ...commit.files];
+        committing = true;
+        await repository.writeFiles(files);
+        sha = await repository.commit(files.map(file => file.path), commit.message);
+    } catch (err) {
+        if (!snapshot) throw err;
+        if (!committing) {
+            // The source editor refused — it says why, and its message is
+            // the useful one. Whatever it managed to write still goes back.
+            await repository.restore!(snapshot).catch(() => undefined);
+            throw err;
+        }
+        const detail = err instanceof Error ? err.message : String(err);
+        // A path written that was not planned has no snapshot to restore
+        // from, so it cannot be put back — say so rather than claim a clean
+        // tree.
+        const unplanned = files.map(file => file.path).filter(path => !plannedPaths.includes(path));
+        let restored = unplanned.length === 0;
+        try {
+            await repository.restore!(snapshot);
+        } catch {
+            restored = false;
+        }
+        throw new CommitRefusedError(detail, restored);
+    }
+    const paths = files.map(file => file.path);
 
     const committed = { sha, branch, files: paths };
 

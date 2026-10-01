@@ -61,11 +61,37 @@ async function git(root: string, args: string[]): Promise<string> {
         });
         return stdout;
     } catch (err) {
-        const detail = err instanceof Error
-            ? ((err as { stderr?: string }).stderr?.trim() || err.message)
-            : String(err);
-        throw new GitCommandError(args[0] ?? "", detail);
+        throw new GitCommandError(subcommandOf(args), failureDetail(err));
     }
+}
+
+/**
+ * The git subcommand in an argument list, past any `-c key=value` pairs.
+ *
+ * `args[0]` named the first *argument*, and a commit with an author starts
+ * with `-c user.name=…` — so a refused commit was reported as "git -c failed",
+ * which names nothing anybody can act on.
+ */
+function subcommandOf(args: string[]): string {
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === "-c") { i++; continue; }
+        if (!args[i].startsWith("-")) return args[i];
+    }
+    return args[0] ?? "";
+}
+
+/**
+ * What git (or a hook it ran) said, rather than the command line it ran.
+ *
+ * A pre-commit hook writes its refusal wherever it likes — lint-staged and
+ * husky print to stdout as often as to stderr — and that text is the only
+ * useful part of the failure.
+ */
+function failureDetail(err: unknown): string {
+    if (!(err instanceof Error)) return String(err);
+    const { stderr, stdout } = err as { stderr?: string; stdout?: string };
+    const said = [stderr?.trim(), stdout?.trim()].filter(Boolean).join("\n");
+    return said || err.message;
 }
 
 /**
@@ -97,6 +123,20 @@ export async function isGitRepository(root: string): Promise<boolean> {
 
 export function createLocalGitRepository(options: LocalGitOptions): SchemaEditRepository {
     const { root } = options;
+
+    /**
+     * An absolute path for a repository-relative one, refusing one outside the
+     * tree. The paths come from the generator rather than from a request, but
+     * a path that escapes the repository is worth failing on rather than
+     * trusting the layer above to have checked.
+     */
+    const inside = (relative: string): string => {
+        const absolute = path.resolve(root, relative);
+        if (!absolute.startsWith(path.resolve(root) + path.sep)) {
+            throw new Error(`Refusing to write outside the repository: ${relative}`);
+        }
+        return absolute;
+    };
 
     return {
         root,
@@ -131,16 +171,37 @@ export function createLocalGitRepository(options: LocalGitOptions): SchemaEditRe
 
         async writeFiles(files: SchemaChangeFile[]): Promise<void> {
             for (const file of files) {
-                const absolute = path.resolve(root, file.path);
-                // Refuse to write outside the tree. The paths come from the
-                // generator rather than from a request, but a path that escapes
-                // the repository is worth failing on rather than trusting the
-                // layer above to have checked.
-                if (!absolute.startsWith(path.resolve(root) + path.sep)) {
-                    throw new Error(`Refusing to write outside the repository: ${file.path}`);
-                }
+                const absolute = inside(file.path);
                 await fs.mkdir(path.dirname(absolute), { recursive: true });
                 await fs.writeFile(absolute, file.contents, "utf8");
+            }
+        },
+
+        async readFile(filePath: string): Promise<string | undefined> {
+            try {
+                return await fs.readFile(inside(filePath), "utf8");
+            } catch (err) {
+                if ((err as { code?: string }).code === "ENOENT") return undefined;
+                throw err;
+            }
+        },
+
+        async restore(files: { path: string; contents: string | undefined }[]): Promise<void> {
+            for (const file of files) {
+                const absolute = inside(file.path);
+                if (file.contents === undefined) {
+                    await fs.rm(absolute, { force: true });
+                } else {
+                    await fs.mkdir(path.dirname(absolute), { recursive: true });
+                    await fs.writeFile(absolute, file.contents, "utf8");
+                }
+            }
+            if (files.length === 0) return;
+            // Unstage what the refused commit staged. Per path, because a path
+            // that never existed and was never added is unknown to git, and
+            // one such path would fail the whole `reset`.
+            for (const file of files) {
+                await git(root, ["reset", "-q", "--", file.path]).catch(() => undefined);
             }
         },
 
