@@ -36,7 +36,14 @@
         "packages/server/src/services/driver-registry.ts",
         "packages/server/src/db/**"
       ],
-      "focus": "One operation set (find/list/get/count/aggregate/create/update/upsert/delete/batch/bulk, field operators, soft delete/restore, nested paths, keyset pagination, vector and full-text search) reached through five doors: REST, the SDK, websocket frames, MCP tools and the Postgres driver. Build the operation x door matrix and find every cell where a door disagrees: validation, required fields, defaults, coercion, hooks, history, error code/shape/status, pagination meta, missing-row and unknown-field behaviour. Check the query contract per operator per property type: the parser accepts what the builder emits, unsupported operators 400 rather than widen."
+      "focus": "One operation set (find/list/get/count/aggregate/create/update/upsert/delete/batch/bulk, field operators, soft delete/restore, nested paths, keyset pagination, vector and full-text search) reached through five doors: REST, the SDK, websocket frames, MCP tools and the Postgres driver. Build the operation x door matrix and find every cell where a door disagrees: validation, required fields, defaults, coercion, hooks, history, error code/shape/status, pagination meta, missing-row and unknown-field behaviour. Check the query contract per operator per property type: the parser accepts what the builder emits, unsupported operators 400 rather than widen.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "schema-pipeline",
@@ -54,7 +61,14 @@
         "packages/cms-types/src/**",
         "packages/types/src/**"
       ],
-      "focus": "defineCollection -> validate-config -> schema generate -> db generate/push/migrations -> boot ensure -> introspection/db pull -> doctor. Every property type x relation kind (belongsTo, hasOne, hasMany, manyToMany, via) x stage: do the stages agree? Round-trip fidelity (introspect -> generate -> introspect), renames and retypes, enums, indexes, generated columns, defaults, NOT NULL on a table with rows, composite keys, reserved words, identifiers over 63 chars, irregular plurals. db push on a database aged by an older version. Does the destructive gate catch every destructive op? Does validate-config reject the mistakes agents actually make with an actionable message?"
+      "focus": "defineCollection -> validate-config -> schema generate -> db generate/push/migrations -> boot ensure -> introspection/db pull -> doctor. Every property type x relation kind (belongsTo, hasOne, hasMany, manyToMany, via) x stage: do the stages agree? Round-trip fidelity (introspect -> generate -> introspect), renames and retypes, enums, indexes, generated columns, defaults, NOT NULL on a table with rows, composite keys, reserved words, identifiers over 63 chars, irregular plurals. db push on a database aged by an older version. Does the destructive gate catch every destructive op? Does validate-config reject the mistakes agents actually make with an actionable message?",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "studio-schema-edit",
@@ -69,7 +83,14 @@
         "packages/server/src/api/schema-editor-routes.ts",
         "packages/server/src/api/logs-routes.ts"
       ],
-      "focus": "Every edit the UI can express (add/rename/delete/retype a property, add each relation kind, change enum values, rename a collection) must leave source code AND database agreeing, on a fresh DB and one with rows. An edit that cannot be applied must say so truthfully and leave no half state. Two tabs editing one collection. SQL console: session/role isolation, result editing, huge results, cancel. Storage browser, logs, cron and functions views. Screens built from @rebasepro/ui and consistent with UIReferenceView."
+      "focus": "Every edit the UI can express (add/rename/delete/retype a property, add each relation kind, change enum values, rename a collection) must leave source code AND database agreeing, on a fresh DB and one with rows. An edit that cannot be applied must say so truthfully and leave no half state. Two tabs editing one collection. SQL console: session/role isolation, result editing, huge results, cancel. Storage browser, logs, cron and functions views. Screens built from @rebasepro/ui and consistent with UIReferenceView.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "identity",
@@ -83,7 +104,14 @@
         "packages/app/src/components/RebaseAuth.tsx",
         "packages/app/src/components/UserSettingsView.tsx"
       ],
-      "focus": "Who someone is (authorization is the permissions system). The whole lifecycle through every door: sign up (password, each OAuth provider, magic link, guest), verify email, sign in, refresh, multiple devices, sign out here/everywhere, change password, change email, forgot password, MFA enrol/challenge/recovery, link/unlink identity, admin invite, admin disable/delete — what happens to sessions, refresh tokens, sockets, API keys and owned rows. Emails sent and their links behind a proxy or base path. Token lifetimes, rotation, reuse detection, cookie flags, clock skew, enumeration. Gaps against Supabase Auth / Firebase Auth that a user hits in week one."
+      "focus": "Who someone is (authorization is the permissions system). The whole lifecycle through every door: sign up (password, each OAuth provider, magic link, guest), verify email, sign in, refresh, multiple devices, sign out here/everywhere, change password, change email, forgot password, MFA enrol/challenge/recovery, link/unlink identity, admin invite, admin disable/delete — what happens to sessions, refresh tokens, sockets, API keys and owned rows. Emails sent and their links behind a proxy or base path. Token lifetimes, rotation, reuse detection, cookie flags, clock skew, enumeration. Gaps against Supabase Auth / Firebase Auth that a user hits in week one.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "permissions",
@@ -125,7 +153,14 @@
         "packages/client/src/realtime-channel.ts",
         "packages/client/src/offline*.ts"
       ],
-      "focus": "Subscribe, then write from each door (REST, SDK, socket, MCP, CMS, raw SQL, a callback's dataAsAdmin, a cron job): does every subscriber get exactly one correct event? Reconnect after a network drop, a server restart, LISTEN loss; two instances with and without the bus; filtered/ordered/limited subscriptions as rows move in and out of the window; deletes, soft deletes, relation changes; a 10k burst. Offline: replay order, conflicts, schema change while offline, IDB eviction, two tabs. What does a developer see when realtime is silently dead?"
+      "focus": "Subscribe, then write from each door (REST, SDK, socket, MCP, CMS, raw SQL, a callback's dataAsAdmin, a cron job): does every subscriber get exactly one correct event? Reconnect after a network drop, a server restart, LISTEN loss; two instances with and without the bus; filtered/ordered/limited subscriptions as rows move in and out of the window; deletes, soft deletes, relation changes; a 10k burst. Offline: replay order, conflicts, schema change while offline, IDB eviction, two tabs. What does a developer see when realtime is silently dead?",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "storage",
@@ -138,7 +173,14 @@
         "packages/utils/src/storage.ts",
         "packages/common/src/util/storage.ts"
       ],
-      "focus": "Local, S3 and GCS controllers implement one interface: list/get/delete/copy/move/metadata/errors/content-type/streaming must agree. Orphans when a row is deleted, a field cleared or a file replaced. Uploads: size limits, content-type sniffing, SVG/HTML stored XSS, path canonicalisation, unicode names, multi-GB files, an interrupted tus upload resumed after restart, two instances. Image transforms: params, decompression bombs, cache. Signed URLs. Multi-source topology and a missing env for a declared source. CMS storage fields' upload/replace/delete UX."
+      "focus": "Local, S3 and GCS controllers implement one interface: list/get/delete/copy/move/metadata/errors/content-type/streaming must agree. Orphans when a row is deleted, a field cleared or a file replaced. Uploads: size limits, content-type sniffing, SVG/HTML stored XSS, path canonicalisation, unicode names, multi-GB files, an interrupted tus upload resumed after restart, two instances. Image transforms: params, decompression bombs, cache. Signed URLs. Multi-source topology and a missing env for a declared source. CMS storage fields' upload/replace/delete UX.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "server-logic",
@@ -160,7 +202,14 @@
         "packages/client/src/functions.ts",
         "packages/client/src/cron.ts"
       ],
-      "focus": "One write -> which hooks run, in what order, inside or outside the transaction, through each door (REST, batch, socket, MCP, CMS, nested path, upsert, bulk). Hooks that throw, are slow, write elsewhere or re-enter. Functions: auth defaults, body limits, timeout, errors to the client, dev reload, a syntax error at boot. Cron: missed ticks, overlap across instances, DST, a job removed from code, manual trigger. Jobs: visibility timeout, retries, poison messages, duplicates, shutdown mid-job. Webhooks: signing, retries, SSRF, redirects. Email: SMTP down must not answer 200 for work not done; template injection."
+      "focus": "One write -> which hooks run, in what order, inside or outside the transaction, through each door (REST, batch, socket, MCP, CMS, nested path, upsert, bulk). Hooks that throw, are slow, write elsewhere or re-enter. Functions: auth defaults, body limits, timeout, errors to the client, dev reload, a syntax error at boot. Cron: missed ticks, overlap across instances, DST, a job removed from code, manual trigger. Jobs: visibility timeout, retries, poison messages, duplicates, shutdown mid-job. Webhooks: signing, retries, SSRF, redirects. Email: SMTP down must not answer 200 for work not done; template injection.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "cli-journey",
@@ -170,7 +219,14 @@
         "packages/cli/templates/**",
         "packages/cli/bin/**"
       ],
-      "focus": "Run it for real in a scratch directory: init every template non-interactively, dev (PGlite), edit a collection, db generate/push, generate sdk, build, start, doctor on a healthy and a broken project, upgrade, apps, skills. Every moment a newcomer is stuck or lied to: success printed for nothing done, an error naming the wrong cause, a printed next step that fails, a prompt without a flag, JSON mode printing prose, help text that disagrees with behaviour, port collisions, no Postgres, Ctrl-C mid-command, init re-run in an existing project."
+      "focus": "Run it for real in a scratch directory: init every template non-interactively, dev (PGlite), edit a collection, db generate/push, generate sdk, build, start, doctor on a healthy and a broken project, upgrade, apps, skills. Every moment a newcomer is stuck or lied to: success printed for nothing done, an error naming the wrong cause, a printed next step that fails, a prompt without a flag, JSON mode printing prose, help text that disagrees with behaviour, port collisions, no Postgres, Ctrl-C mid-command, init re-run in an existing project.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "cms-views",
@@ -198,7 +254,14 @@
         "packages/app/src/index.ts",
         "packages/app/src/vitePlugin.ts"
       ],
-      "focus": "A CMS user's first hour: a 100k-row collection (speed, count, scroll), a filter on every property type, sorting by a relation, empty search, a row deleted by someone else while open, a failed load that must not look like 'no data', URL state across reload, deep links into nested collections, selection and bulk actions, side panels and full-screen records, back/forward. Equivalent controls built the same way across table/list/kanban/card. Anything built from raw HTML instead of @rebasepro/ui. i18n and dark mode of these screens."
+      "focus": "A CMS user's first hour: a 100k-row collection (speed, count, scroll), a filter on every property type, sorting by a relation, empty search, a row deleted by someone else while open, a failed load that must not look like 'no data', URL state across reload, deep links into nested collections, selection and bulk actions, side panels and full-screen records, back/forward. Equivalent controls built the same way across table/list/kanban/card. Anything built from raw HTML instead of @rebasepro/ui. i18n and dark mode of these screens.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "cms-forms",
@@ -215,7 +278,14 @@
         "packages/cms/src/components/ArrayContainer.tsx",
         "packages/forms/src/**"
       ],
-      "focus": "For every property type: a value typed in the form reaches the database unchanged and comes back unchanged — null vs empty vs missing, 0, false, dates across DST and timezones, map sub-keys, reordered arrays, required fields. Client validation rejects what the server rejects and accepts what it accepts. A server-side save failure shows a field error, not a generic toast. Dirty tracking, discard, unsaved-changes navigation, someone else saved first, inline cell edit vs form. Export -> edit -> import round trip on every type; CSV injection; a relation picker over 100k rows."
+      "focus": "For every property type: a value typed in the form reaches the database unchanged and comes back unchanged — null vs empty vs missing, 0, false, dates across DST and timezones, map sub-keys, reordered arrays, required fields. Client validation rejects what the server rejects and accepts what it accepts. A server-side save failure shows a field error, not a generic toast. Dirty tracking, discard, unsaved-changes navigation, someone else saved first, inline cell edit vs form. Export -> edit -> import round trip on every type; CSV injection; a relation picker over 100k rows.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "ui-kit",
@@ -230,7 +300,14 @@
         "packages/ui/src/*.ts",
         "packages/app/src/debug/**"
       ],
-      "focus": "Accessibility of every interactive primitive (focus trap and return, roles, keyboard, labels, focus ring). Controlled/uncontrolled and prop naming consistent across inputs. Overlay stacking: portals, z-index, scroll lock, nested dialogs. Dark mode and tokens vs hard-coded colours. Raw <button>/<input>/<select> and local re-implementations in CMS/Studio/app instead of the kit. UIReferenceView shows every component and variant actually used. VirtualTable at 100k rows."
+      "focus": "Accessibility of every interactive primitive (focus trap and return, roles, keyboard, labels, focus ring). Controlled/uncontrolled and prop naming consistent across inputs. Overlay stacking: portals, z-index, scroll lock, nested dialogs. Dark mode and tokens vs hard-coded colours. Raw <button>/<input>/<select> and local re-implementations in CMS/Studio/app instead of the kit. UIReferenceView shows every component and variant actually used. VirtualTable at 100k rows.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "sdk-types",
@@ -244,7 +321,14 @@
         "packages/common/src/**",
         "contracts/**"
       ],
-      "focus": "The types reject what the server rejects and accept what it accepts — prove with negative tsc probes (nonexistent column in where/orderBy/select, wrong value type per operator, nonexistent include, writing a generated field, defineCollection admin keys naming nonexistent properties); hunt dropped type parameters at seams. The generated SDK compiles and matches the server for every property type and relation kind; regeneration is idempotent. Transport on network error, 401 mid-session, 413, 429, non-JSON 500, sub-path servers; stable error classes and codes. Exports coherent; Node, browser and edge runtimes as claimed."
+      "focus": "The types reject what the server rejects and accept what it accepts — prove with negative tsc probes (nonexistent column in where/orderBy/select, wrong value type per operator, nonexistent include, writing a generated field, defineCollection admin keys naming nonexistent properties); hunt dropped type parameters at seams. The generated SDK compiles and matches the server for every property type and relation kind; regeneration is idempotent. Transport on network error, 401 mid-session, 413, 429, non-JSON 500, sub-path servers; stable error classes and codes. Exports coherent; Node, browser and edge runtimes as claimed.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "server-ops",
@@ -272,7 +356,14 @@
         "packages/server-postgres/src/types.ts",
         "packages/server/src/api/collections_for_test/**"
       ],
-      "focus": "Missing or invalid env fails closed at boot with an actionable message. Two instances behind a load balancer: what is per-instance that must be shared. SIGTERM mid-request, mid-job, mid-migration. Pool exhaustion. PII and secrets in logs and error bodies; stack traces in production. Static and host-routed apps: traversal, Host spoofing, SPA fallback swallowing API 404s, cache headers, collisions with /api. Rate limiting and trusted proxies, CORS, security headers, body limits and Hono middleware order. Backups and PITR restore for real. Booting an older stamped schema."
+      "focus": "Missing or invalid env fails closed at boot with an actionable message. Two instances behind a load balancer: what is per-instance that must be shared. SIGTERM mid-request, mid-job, mid-migration. Pool exhaustion. PII and secrets in logs and error bodies; stack traces in production. Static and host-routed apps: traversal, Host spoofing, SPA fallback swallowing API 404s, cache headers, collisions with /api. Rate limiting and trusted proxies, CORS, security headers, body limits and Hono middleware order. Backups and PITR restore for real. Booting an older stamped schema.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "docs-truth",
@@ -284,7 +375,14 @@
         "tooling/rebase-agent-skills/**",
         "app/**"
       ],
-      "focus": "Everything `pnpm verify:docs` cannot see: prose claims, stated defaults and limits, described behaviour, the getting-started path followed literally with the real CLI, examples building against the current version, agent skills describing removed or renamed APIs, pages that contradict each other. For each false claim decide whether the doc or the code is wrong. English pages only."
+      "focus": "Everything `pnpm verify:docs` cannot see: prose claims, stated defaults and limits, described behaviour, the getting-started path followed literally with the real CLI, examples building against the current version, agent skills describing removed or renamed APIs, pages that contradict each other. For each false claim decide whether the doc or the code is wrong. English pages only.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "gates",
@@ -301,7 +399,14 @@
         "docs/gates.md",
         "docs/verification.md"
       ],
-      "focus": "Which gates actually run, on which event, and which can pass silently (|| true, a skip reported green, continue-on-error, an early exit skipping later steps, a glob matching nothing). Test files no runner or tsc program picks up. Ratchets that only grow. Recent regression tests that pass with their fix reverted — mutation-check a sample. Systems with no test through the real wiring. Order- and TZ-dependent tests. Output: the missing guards that would stop whole bug classes."
+      "focus": "Which gates actually run, on which event, and which can pass silently (|| true, a skip reported green, continue-on-error, an early exit skipping later steps, a glob matching nothing). Test files no runner or tsc program picks up. Ratchets that only grow. Recent regression tests that pass with their fix reverted — mutation-check a sample. Systems with no test through the real wiring. Order- and TZ-dependent tests. Output: the missing guards that would stop whole bug classes.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     },
     {
       "id": "ai-and-extras",
@@ -315,7 +420,14 @@
         "packages/rls-check/src/**",
         "packages/cli/src/commands/agent-setup.ts"
       ],
-      "focus": "Could an LLM complete common tasks from the MCP tool descriptions alone? Every MCP tool behaves like the REST door for the same operation. Prompt injection through row data into plugin-ai or MCP output. Inference on messy real-world CSV/JSON. rls-check against a live database with broken and correct policies: false positives and negatives. The agent setup rebase init writes: current, and safe to re-run over user edits."
+      "focus": "Could an LLM complete common tasks from the MCP tool descriptions alone? Every MCP tool behaves like the REST door for the same operation. Prompt injection through row data into plugin-ai or MCP output. Inference on messy real-world CSV/JSON. rls-check against a live database with broken and correct policies: false positives and negatives. The agent setup rebase init writes: current, and safe to re-run over user edits.",
+      "audits": [
+        {
+          "date": "2026-10-01",
+          "commit": "0591952ff171",
+          "by": "sweep-2026-10-01"
+        }
+      ]
     }
   ],
   "unowned": [
