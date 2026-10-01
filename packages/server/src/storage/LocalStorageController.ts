@@ -219,6 +219,9 @@ export class LocalStorageController implements StorageController {
 
         try {
             await access(fullPath, fs.constants.R_OK);
+            // A directory is readable but is not an object — on S3 and GCS
+            // there is nothing at a folder's key, and the routes answer 404.
+            if (!(await stat(fullPath)).isFile()) throw new Error("not a file");
         } catch {
             return {
                 url: null,

@@ -183,6 +183,24 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
 
     // ── Reads that are not objects ─────────────────────────────────────
 
+    const createFolder = (folderPath: string) => request("/api/storage/folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: folderPath })
+    });
+
+    it("answers 404 for a folder asked for as a file — not 500 and not its metadata", async () => {
+        expect((await createFolder("docs")).status).toBe(201);
+        await h.controller.putObject({ file: textFile("a.txt", "x"), key: "docs/a.txt" });
+
+        const file = await request("/api/storage/file/docs");
+        expect(file.status).toBe(404);
+        // The error code is the route's, not the filesystem's.
+        expect(JSON.stringify(await file.json())).not.toContain("EISDIR");
+
+        expect((await request("/api/storage/metadata/docs")).status).toBe(404);
+    });
+
     it("reads back what it stored, and nothing for a missing key", async () => {
         await h.controller.putObject({ file: textFile("a.txt", "hello", "text/plain"), key: "rt/a.txt" });
         const object = await h.controller.getObject("rt/a.txt");

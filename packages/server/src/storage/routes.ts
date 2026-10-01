@@ -721,6 +721,12 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             } catch {
                 throw ApiError.notFound("File not found");
             }
+            // A folder is not an object. S3 and GCS answer 404 for one, and so
+            // does this: reading on regardless answered 500 with the
+            // filesystem's own error code (`EISDIR`) in the body.
+            if (!localStat.isFile()) {
+                throw ApiError.notFound("File not found");
+            }
 
             // Get content type from metadata or infer from extension
             let contentType = "application/octet-stream";
