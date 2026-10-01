@@ -97,8 +97,28 @@ export class CommitRefusedError extends Error {
     }
 }
 
-/** Runs the DDL. Separate from the repository so neither knows about the other. */
+/**
+ * Runs the DDL. Separate from the repository so neither knows about the other.
+ *
+ * Throws {@link StatementFailedError} when it can say how far it got.
+ */
 export type SchemaEditApply = (statements: string[]) => Promise<void>;
+
+/**
+ * Statement `appliedCount + 1` failed, after `appliedCount` statements had run.
+ *
+ * The statements run one at a time with no transaction around them —
+ * `CREATE INDEX CONCURRENTLY` may not run inside one — so the ones before the
+ * failure have already changed the database. A receipt that said "the database
+ * was not changed" after an `ADD COLUMN` had landed and the `FOREIGN KEY` that
+ * followed it had timed out described the state before the change.
+ */
+export class StatementFailedError extends Error {
+    constructor(readonly appliedCount: number, readonly statement: string, cause: unknown) {
+        super(cause instanceof Error ? cause.message : String(cause));
+        this.name = "StatementFailedError";
+    }
+}
 
 export interface SchemaEditInput {
     /**
@@ -151,6 +171,12 @@ export interface SchemaEditResult {
     applied: boolean;
     /** Why the apply did not run, when it did not. Never a reason to fail. */
     applyError?: string;
+    /**
+     * How many statements ran before the one that failed, when the applier
+     * could say. Equal to `statements.length` when everything ran; `undefined`
+     * when the apply failed without saying how far it got.
+     */
+    appliedStatements?: number;
     statements: string[];
     classified: ClassifiedSchemaChanges;
     /** What to tell the person who pressed the button. */
@@ -278,6 +304,7 @@ export async function applySchemaChange(input: SchemaEditInput): Promise<SchemaE
         return {
             committed,
             applied: true,
+            appliedStatements: commit.statements.length,
             statements: commit.statements,
             classified: commit.classified,
             summary:
@@ -286,6 +313,17 @@ export async function applySchemaChange(input: SchemaEditInput): Promise<SchemaE
         };
     } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
+        const appliedStatements = err instanceof StatementFailedError ? err.appliedCount : undefined;
+        const total = commit.statements.length;
+        const head = `Committed ${sha.slice(0, 9)} on ${branch}`;
+        // Worded from how far it got. Only "none of them ran" is "not changed".
+        const summary = appliedStatements === 0
+            ? `${head}, but the database was not changed: ${detail}. The change will be applied on the next boot.`
+            : appliedStatements !== undefined
+                ? `${head} and applied ${appliedStatements} of ${total} statement(s); the next one failed: ` +
+                  `${detail}. The rest will be applied on the next boot.`
+                : `${head}, but applying it failed: ${detail}. Some of its ${total} statement(s) may have run; ` +
+                  "the rest will be applied on the next boot.";
         // Not a throw. The commit is the durable half and it landed; the
         // database is now behind the repository, which is the state every
         // project is in between an edit and a deploy, and which boot fixes.
@@ -293,11 +331,10 @@ export async function applySchemaChange(input: SchemaEditInput): Promise<SchemaE
             committed,
             applied: false,
             applyError: detail,
+            appliedStatements,
             statements: commit.statements,
             classified: commit.classified,
-            summary:
-                `Committed ${sha.slice(0, 9)} on ${branch}, but the database was not changed: ` +
-                `${detail}. The change will be applied on the next boot.`
+            summary
         };
     }
 }

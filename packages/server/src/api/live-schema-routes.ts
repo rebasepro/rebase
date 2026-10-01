@@ -45,6 +45,7 @@ import { logger } from "../utils/logger";
 import {
     applySchemaChange,
     DirtyWorkingTreeError,
+    StatementFailedError,
     UnapplicableChangeError,
     type SchemaEditRepository
 } from "../schema-edit/apply-schema-change";
@@ -708,7 +709,15 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
                     // One statement at a time: several of these are
                     // `CREATE INDEX CONCURRENTLY`, which may not run inside a
                     // transaction, and a single batched call would open one.
-                    for (const statement of statements) await sql.executeSql(statement);
+                    // Which also means a failure part-way leaves the earlier
+                    // ones applied, so the count travels with the error.
+                    for (const [index, statement] of statements.entries()) {
+                        try {
+                            await sql.executeSql(statement);
+                        } catch (err) {
+                            throw new StatementFailedError(index, statement, err);
+                        }
+                    }
                 }
             });
 

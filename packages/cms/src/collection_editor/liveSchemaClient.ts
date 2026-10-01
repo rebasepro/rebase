@@ -65,6 +65,13 @@ export interface LiveSchemaPlan {
 export interface LiveSchemaResult {
     applied: boolean;
     applyError?: string;
+    /**
+     * How many statements ran before the one that failed. The statements run
+     * one at a time with no transaction around them, so a failure part-way
+     * leaves the earlier ones applied. `undefined` when the server could not
+     * say.
+     */
+    appliedStatements?: number;
     committed: { sha: string; branch: string; files: string[] };
     statements: string[];
     summary: string;

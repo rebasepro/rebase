@@ -223,6 +223,19 @@ function WithheldConstraints({ constraints }: { constraints: WithheldConstraint[
     );
 }
 
+/**
+ * How far a failed apply got, in a heading.
+ *
+ * The statements run one at a time with no transaction around them, so only
+ * "none ran" means the database is as it was.
+ */
+function partialApplyHeading(result: LiveSchemaResult): string {
+    const ran = result.appliedStatements;
+    if (ran === 0) return "The database was not changed";
+    if (ran === undefined) return "The database may have been changed in part";
+    return `${ran} of ${result.statements.length} statements ran, then one failed`;
+}
+
 /** The receipt. Shown in place of the plan once the change has been applied. */
 function Applied({ result }: { result: LiveSchemaResult }) {
     return (
@@ -238,12 +251,12 @@ function Applied({ result }: { result: LiveSchemaResult }) {
                 // deploy, and boot reconciles it.
                 <Alert color="warning">
                     <Typography variant="body2" className="font-medium mb-1">
-                        The database was not changed
+                        {partialApplyHeading(result)}
                     </Typography>
                     <Typography variant="body2">{result.applyError}</Typography>
                     <Typography variant="body2" className="mt-2">
-                        The commit is on <code>{result.committed.branch}</code> either way, so the
-                        change will be applied on the next boot.
+                        The commit is on <code>{result.committed.branch}</code> either way, so
+                        whatever did not run will be applied on the next boot.
                     </Typography>
                 </Alert>
             )}
