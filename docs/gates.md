@@ -43,11 +43,13 @@ exception carrying its reason — so a fourth still fails.
 pnpm ci:static      # every gate in the `static` job, in the same order
 pnpm run build && \
   pnpm ci:build-gates   # every gate in the `build-gates` job, likewise
+pnpm ci:e2e             # every end-to-end suite of the four e2e jobs (after the build)
+pnpm ci:e2e --lane vitest   # one job's suites: vitest, cli, selfhost or admin
 pnpm check:<name>       # one of them
 ```
 
-Both take `--list`, which prints their gate names one per line — that is the
-machine-readable form of the two tables below, and what `check:gates-doc`
+All three take `--list`, which prints their gate or suite names — that is the
+machine-readable form of the tables below, and what `check:gates-doc`
 compares them against.
 
 `ci:static` skips the two gates needing a tool the repository cannot install
@@ -56,9 +58,13 @@ and says which. Under CI it refuses to skip. `ci:build-gates` reads
 build output, so it refuses to run at all when no `packages/*/dist` exists —
 several of its gates would otherwise find nothing to look at and pass.
 
-`./tooling/scripts/verify-quality.sh` runs the build, both of these, the unit
-suites and the Playwright suite: it is the pre-PR command, and it is these two
-lists plus what neither of them covers.
+`./tooling/scripts/verify-quality.sh` runs the build, the two gate lists, the
+unit suites (in the zone CI uses), the harness tests and `ci:e2e`: it is the
+pre-PR command, and AGENTS.md says it "runs what CI runs". `check:gates-doc`
+holds that sentence to the workflow — a root script `verify.yml` invokes and
+the script does not fails it — and fails any recursive test run without
+`--no-bail`, because pnpm stops one at the first failing package and the rest
+never report.
 
 ## The static job
 
@@ -134,18 +140,39 @@ this list, in this order.
 | `test:gates` | The gate scripts' own unit tests. | — |
 | `check:config-paths` | Every alias target in every loadable `vite.config.*` exists. Four pointed at nothing: three at a `packages/ui/index.css` that never existed, one at a package deleted from the repo. A dead alias resolves through nothing until a reorder makes it first, and then it is a dev server that will not start. `website/astro.config.mjs` is the known gap — Vite's loader cannot read it. After the build, not in the static job: it loads each config for real, and `app/frontend/vite.config.ts` imports `@rebasepro/app/dist/vitePlugin.js`. | Delete the entry; it is dead, not broken |
 
-## Tests and end to end
+## Tests
 
 | Script | What it protects | Bank / fix |
 |---|---|---|
-| `test` | Every package's unit suite, serialized (`--workspace-concurrency=1`). | — |
+| `test` | Every package's unit suite, serialized (`--workspace-concurrency=1`) and `--no-bail`, so every package reports. CI runs it under `TZ=America/Los_Angeles`: a timezone test that runs in the machine's own zone cannot fail in UTC, the runner's zone, and developer machines are east of Greenwich. A test that needs one zone pins it per file — `tooling/scripts/jest/zone-environment.cjs`. | — |
 | `test:harness` | The agent harness's own tests. | — |
 | `test:saas-console` | The Cloud console's suite, run from **this** repository. The console resolves `@rebasepro/*` to this checkout, so a change here can break it — and did: a hook that grew an `i18n` member turned the control plane's CI red for three runs, from a commit made here. Needs `saas/` checked out beside this repo (it is part of this workspace); CI skips the step when it has no credential for that repository. | — |
-| `verify:selfhost` | A self-hosted deploy, built and booted from the repository. | — |
-| `verify:selfhost:docker` | The same, through the shipped compose file and image. | — |
-| `verify:corpus` | A corpus of bundles still loads under the current runtime contract. | — |
-| `check:contributor-setup:live` | The same three files, executed: compose is started and the documented URL has to reach *that* container, which a native Postgres on the same port silently prevents. Needs Docker. | `REBASE_DB_PORT` moves the port |
-| `rls:check` | A live database against the fifteen RLS checks, with table and policy floors so an empty database cannot pass. | `tooling/scripts/rls-baseline.json` |
+
+## End to end
+
+The four e2e jobs each run one lane of `pnpm ci:e2e`
+(`tooling/scripts/ci-e2e.mjs`), and `verify-quality.sh` runs all four. Every
+suite runs whatever happened to the one before it, nothing is retried (vitest
+gets `--retry=0`, Playwright `--fail-on-flaky-tests`), and a lane that needs a
+database server starts its own Postgres container. Needs the build and Docker.
+The root scripts among them:
+
+| Script | What it protects | Bank / fix |
+|---|---|---|
+| `check:contributor-setup:live` | CONTRIBUTING, `app/.env.example` and the compose file, executed: compose is started and the documented URL has to reach *that* container, which a native Postgres on the same port silently prevents. Lane `cli`. | `REBASE_DB_PORT` moves the port |
+| `verify:selfhost` | A self-hosted deploy, built and booted from the repository. Lane `selfhost`. | — |
+| `verify:selfhost:docker` | The same, through the shipped compose file and image. Lane `selfhost`. | — |
+| `verify:corpus` | A corpus of bundles still loads under the current runtime contract. Lane `selfhost`. | — |
+| `rls:check` | The database `verify:selfhost` pushed into, against the fifteen RLS checks, with table and policy floors so an empty database cannot pass. Lane `selfhost`. | `tooling/scripts/rls-baseline.json` |
+
+And the suites that are not root scripts:
+
+- lane `vitest`: `pnpm --filter @rebasepro/server-postgres test:e2e` (RLS enforcement, policy agreement, CDC, cron, channels),
+  `pnpm --filter @rebasepro/rls-check test:e2e` (each check fires on its trap and on nothing secure),
+  `pnpm --filter @rebasepro/cli test:e2e` (the CLI against a real database),
+  `pnpm --filter @rebasepro/cli test:integration` (`rebase dev`'s managed PGlite database, RLS enforced on it);
+- lane `cli`: `tests/e2e/tests/cli-init-e2e.ts`, `tests/e2e/tests/cli-init-baas-e2e.ts`, `tests/e2e/tests/client-sdk-e2e.ts`;
+- lane `admin`: `db push` and the seed into a fresh database, then the Playwright suite (`pnpm e2e`).
 
 ## Release only
 

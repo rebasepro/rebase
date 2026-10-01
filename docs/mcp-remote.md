@@ -132,6 +132,9 @@ SDK would send. The reads then go through REST's own read path
   lets a model send a row it read back in `update_document`;
 - `query_collection` answers REST's list body, `{ data, meta }`, and
   `count_documents` answers `/count`'s `{ count }`;
+- `list_collections` gives each collection's `row` and `create` JSON Schemas,
+  built by the OpenAPI generator's own `buildCollectionSchema` /
+  `buildCollectionInputSchema`, and its `softDeleteField`;
 - every refusal is REST's, in REST's words: an unknown field or operator, a
   field the caller's roles cannot read, a `limit` past the ceiling (refused,
   not clamped).

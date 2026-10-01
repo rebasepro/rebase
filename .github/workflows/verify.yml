@@ -238,15 +238,30 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
+      # In Los Angeles, not the runner's UTC. A timezone regression test that
+      # runs in "whatever zone the machine is in" cannot fail in UTC: the cms
+      # date-only fix (b23a4263a) passed here with the fix reverted, and failed
+      # only on a laptop east of Greenwich. The developer machines run east, so
+      # CI runs west, and between them both halves are exercised. A test that
+      # needs one particular zone pins it per file instead (see
+      # tooling/scripts/jest/zone-environment.cjs); this is the guard for the
+      # ones that do not know they depend on the zone. `verify-quality.sh` sets
+      # the same zone.
+      #
+      # `pnpm test` is `pnpm -r --no-bail …`: every package reports, rather than
+      # the first failing one hiding the rest.
       - name: Run tests
         run: pnpm test
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
+          TZ: America/Los_Angeles
 
       # The agent harness's own tests. They need neither a database nor a build,
       # and nothing else covers `tooling/scripts/harness/` — including the deploy
-      # preflight that .agent/workflows/deployment.md describes.
+      # preflight that .agent/workflows/deployment.md describes. `always()`: a
+      # failed unit suite says nothing about these, and must not hide them.
       - name: Harness tests
+        if: always()
         run: pnpm run test:harness
 
   # Scaffolding a project and driving it: `init`, the BaaS template, and the
@@ -285,46 +300,6 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
-      - name: Start PostgreSQL container
-        run: |
-          docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
-          # `-h 127.0.0.1`, and it is the whole point of this loop.
-          #
-          # The official image starts a TEMPORARY server during initdb to run
-          # its init scripts, then shuts it down and starts the real one. That
-          # temporary server sets `listen_addresses=''`, so it answers on the
-          # unix socket and not on TCP. A socket-based `pg_isready` therefore
-          # reports ready against the throwaway server, this loop exits early,
-          # and the next command lands in the shutdown window between the two:
-          #
-          #   createdb: error: connection to server on socket
-          #   "/var/run/postgresql/.s.PGSQL.5432" failed:
-          #   FATAL: the database system is shutting down
-          #
-          # which is what took e2e-selfhost down mid-release. Asking over TCP
-          # cannot see the temporary server at all, so the first success is the
-          # real one.
-          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas -h 127.0.0.1; do
-            echo "Waiting for postgres..."
-            sleep 1
-          done
-
-      # CONTRIBUTING's Getting Started, executed rather than compared.
-      # `check:contributor-setup` reads the compose file, `app/.env.example` and
-      # the steps and checks they agree; all three can agree on
-      # `localhost:5432` and the URL still not reach the container, because
-      # Docker publishes on `0.0.0.0` and a native Postgres binds the more
-      # specific `127.0.0.1`, which wins for `localhost`. Compose then reports
-      # `Up (healthy)` while `db push` writes the schema into the developer's
-      # own database, with no error anywhere on the path.
-      #
-      # `REBASE_DB_PORT` because the service above already holds 5432 — which
-      # also makes this the override the docs now teach, exercised.
-      - name: Contributor setup, live
-        run: pnpm run check:contributor-setup:live
-        env:
-          REBASE_DB_PORT: "5433"
-
       - name: Install Playwright Browsers
         run: |
           # `--with-deps` runs `apt-get update` first, and the runner image
@@ -358,65 +333,17 @@ jobs:
           pnpm exec playwright install chromium --with-deps \
             || pnpm exec playwright install chromium
 
-      - name: Run E2E Test Suite
-        run: pnpm exec tsx tests/e2e/tests/cli-init-e2e.ts
+      # CONTRIBUTING's setup executed, then the CMS scaffold, the BaaS scaffold
+      # and the client SDK over a real socket — each driver starts its own
+      # Postgres, and each suite runs whatever happened to the one before it.
+      # As four steps that took an `if: always()` on each, and the first one
+      # never had it. The suites, and the reason each exists, are the `cli` lane
+      # of tooling/scripts/ci-e2e.mjs, which `verify-quality.sh` runs too.
+      - name: CLI and SDK E2E (pnpm ci:e2e --lane cli)
+        run: pnpm run ci:e2e --lane cli
         env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
           SCREENSHOT_DIR: ${{ github.workspace }}/.artifacts/e2e-screenshots
 
-      # The only place a scaffolded project is installed and booted for real —
-      # workspace: deps don't resolve anywhere else — so it's what proves the
-      # baas template rather than just the library behind it.
-      #
-      # `always()` because the two suites cover different things, and a failure in
-      # the first said nothing about this one: it was skipped, so a single broken
-      # run reported half the truth and each fix revealed the next failure. This
-      # does not soften anything — the step still fails the job on its own, and
-      # the earlier step's failure still fails it. It only stops the second
-      # report from being suppressed by the first.
-      - name: Run BaaS E2E
-        if: always()
-        run: pnpm exec tsx tests/e2e/tests/cli-init-baas-e2e.ts
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-
-      # `@rebasepro/client`, driven the way a browser application drives it.
-      #
-      # Every tier of this path was covered and the composition of them was not:
-      # the client's own tests use a mocked transport, `rls-enforcement` proves
-      # RLS at the database tier with no HTTP or tokens, and `Run BaaS E2E`
-      # above drives the real SDK over the network but authenticates with a
-      # SERVICE KEY — the server-to-server path, which bypasses user identity
-      # and therefore never exercises RLS at all.
-      #
-      # So: register, sign in, have the server derive auth.uid() from the token,
-      # have Postgres scope rows to it, refresh, upload a file, receive a
-      # realtime event, sign out. Each tier can be individually correct and
-      # still disagree at the seam, and the seam is what this covers.
-      #
-      # It brings its own Postgres container (random host port, no clash with
-      # the service above) and boots the reference backend on a real socket —
-      # not `app.fetch()`, because a token that never crosses a socket proves
-      # nothing about headers and realtime is a WebSocket upgrade an in-process
-      # fetch cannot perform.
-      #
-      # ~10s once the packages are built. It already earned its place: it found
-      # that `client.close()` left the scheduled token-refresh timer armed, so
-      # any signed-in Node script hung forever after closing.
-      #
-      # `always()` for the same reason as its neighbours.
-      - name: Client SDK E2E (end-user auth, RLS, storage, realtime)
-        if: always()
-        run: pnpm exec tsx tests/e2e/tests/client-sdk-e2e.ts
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-
-      # The Playwright admin suite used to be excluded here, on the grounds that
-      # its `global-setup` needs a demo user that already exists and seeded
-      # collections to render — "a provisioned database, not a workflow step".
-      # That was true and is now handled: see `Admin panel E2E (Playwright)`
-      # above, which provisions and seeds one, and a `global-setup` that drives
-      # the first-run bootstrap when the user does not exist yet.
       - name: Upload E2E Screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -459,30 +386,6 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
-      - name: Start PostgreSQL container
-        run: |
-          docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
-          # `-h 127.0.0.1`, and it is the whole point of this loop.
-          #
-          # The official image starts a TEMPORARY server during initdb to run
-          # its init scripts, then shuts it down and starts the real one. That
-          # temporary server sets `listen_addresses=''`, so it answers on the
-          # unix socket and not on TCP. A socket-based `pg_isready` therefore
-          # reports ready against the throwaway server, this loop exits early,
-          # and the next command lands in the shutdown window between the two:
-          #
-          #   createdb: error: connection to server on socket
-          #   "/var/run/postgresql/.s.PGSQL.5432" failed:
-          #   FATAL: the database system is shutting down
-          #
-          # which is what took e2e-selfhost down mid-release. Asking over TCP
-          # cannot see the temporary server at all, so the first success is the
-          # real one.
-          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas -h 127.0.0.1; do
-            echo "Waiting for postgres..."
-            sleep 1
-          done
-
       - name: Install Playwright Browsers
         run: |
           # `--with-deps` runs `apt-get update` first, and the runner image
@@ -516,54 +419,14 @@ jobs:
           pnpm exec playwright install chromium --with-deps \
             || pnpm exec playwright install chromium
 
-      # The admin panel itself, driven in a browser. `cli-init-e2e` proves a
-      # scaffolded project installs and answers HTTP; nothing until now opened
-      # the UI that project exists to provide, so every collection view, the
-      # collection editor and the SQL console could break and stay green.
-      #
-      # This suite was written to be deterministic (pinned API port, adopt-or-
-      # start detection, teardown that reaps only servers it owns) and then ran
-      # in no pipeline — the 2026-07-28 audit left it open because nobody
-      # had watched an unattended run. It has now been run repeatedly, in CI mode
-      # with a cold server boot, against both a fresh database and a populated
-      # one: green each time. It has grown since — 36 tests, ~1.4m — as the
-      # BaaS REST surface and the panel's own write path were added to it.
-      #
-      # "Green each time" was too small a sample, and read as determinism it was
-      # wrong: `collections-crud` lost about one run in fifteen to a list whose
-      # order is random (see the comment at its create step) and the re-runs
-      # taught everyone it was a flake. Fixed 2026-09-20. The lesson for anything
-      # added here: a suite this size is green by luck often enough that "I ran
-      # it a few times" is not evidence — repeat the individual test.
-      #
-      # The reason it could not simply be switched on is the database. CI's is
-      # always empty, so `/auth/config` reports `needsSetup` and LoginView shows
-      # its bootstrap form instead of the sign-in screen — globalSetup waited for
-      # a "Sign in with email" button that first-run never renders and failed all
-      # ten tests at once. It now drives whichever screen is up, which means this
-      # step also covers creating the first admin: the first thing every new user
-      # of Rebase does, and previously tested at no tier.
-      #
-      # Schema then seed, both against a database created here: `db push` is what
-      # a developer runs, so a break in it fails here rather than in somebody's
-      # first ten minutes.
-      #
-      # `always()` for the same reason as its neighbours: different ground, and
-      # it still fails the job on its own.
-      - name: Admin panel E2E (Playwright)
-        if: always()
-        run: |
-          docker exec rebase-postgres createdb -U rebase rebase_admin_e2e
-          (cd app && pnpm exec rebase db push --yes)
-          (cd app/backend && pnpm exec tsx src/seed.ts)
-          pnpm exec playwright test -c tests/e2e/playwright.config.ts
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-          # sslmode=disable: the CI Postgres container serves no TLS, and Atlas
-          # (which `db push` shells out to) negotiates SSL first and fails with
-          # "SSL is not enabled on the server" rather than falling back.
-          DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_admin_e2e?sslmode=disable
-          JWT_SECRET: ci-admin-e2e-secret-ci-admin-e2e-secret-0123456789
+      # The admin panel itself, driven in a browser, against a Postgres the lane
+      # starts for itself: `db push`, the seed, then Playwright — with
+      # `--fail-on-flaky-tests`, so a test that only passed on a retry fails the
+      # job instead of disappearing into the html report. The steps, and the
+      # history behind them, are the `admin` lane of tooling/scripts/ci-e2e.mjs,
+      # which `verify-quality.sh` runs too.
+      - name: Admin panel E2E (pnpm ci:e2e --lane admin)
+        run: pnpm run ci:e2e --lane admin
 
       - name: Upload Playwright report
         if: always()
@@ -613,152 +476,21 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
-      - name: Start PostgreSQL container
-        run: |
-          docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
-          # `-h 127.0.0.1`, and it is the whole point of this loop.
-          #
-          # The official image starts a TEMPORARY server during initdb to run
-          # its init scripts, then shuts it down and starts the real one. That
-          # temporary server sets `listen_addresses=''`, so it answers on the
-          # unix socket and not on TCP. A socket-based `pg_isready` therefore
-          # reports ready against the throwaway server, this loop exits early,
-          # and the next command lands in the shutdown window between the two:
-          #
-          #   createdb: error: connection to server on socket
-          #   "/var/run/postgresql/.s.PGSQL.5432" failed:
-          #   FATAL: the database system is shutting down
-          #
-          # which is what took e2e-selfhost down mid-release. Asking over TCP
-          # cannot see the temporary server at all, so the first success is the
-          # real one.
-          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas -h 127.0.0.1; do
-            echo "Waiting for postgres..."
-            sleep 1
-          done
-
-      # The self-host acceptance run: build a real bundle from the reference
-      # app's collections, fold two static apps in at different paths, boot it
-      # against a real database and fetch it as a browser would.
-      #
-      # `tooling/scripts/verify-selfhost.mts` says to run it when you touch the manifest,
-      # the bundle format, folding or serveSPA — and until now nothing did, so
-      # the entire multi-app serving path had no automated proof at any tier.
-      # It reuses the Postgres service above; the script pushes the schema
-      # itself, but the database has to exist first.
-      #
-      # `always()` for the same reason as its neighbours: it covers different
-      # ground, and still fails the job on its own.
-      - name: Self-host acceptance
-        if: always()
-        run: |
-          docker exec rebase-postgres createdb -U rebase rebase_acceptance
-          pnpm run verify:selfhost
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-          ACCEPTANCE_DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_acceptance
-
-      # The same recipe, but through the artifact a stranger actually runs.
-      #
-      # The step above imports the runtime by path — deliberately, so a worktree
-      # cannot verify the wrong checkout — which means it proves the code and not
-      # the container. Its own header concedes the gap: "what that adds over this
-      # script is a container and an image tag." So nothing had ever executed
-      # `infra/docker/docker-compose.selfhost.yml`, and nothing had ever booted the
-      # published image. `check-runtime-image` asserts that image has a
-      # publisher; this asserts it runs.
-      #
-      # It builds the image from this commit, brings the compose file up on
-      # non-default ports, and fetches from OUTSIDE the container: the SPA, a
-      # 401 on an unauthenticated collection read, the collections served to a
-      # service key (which is how boot-time provisioning proves it happened),
-      # and a seeded admin who can actually sign in. Then it restarts the api,
-      # because provisioning runs on every boot and the second one is where a
-      # non-idempotent step surfaces — otherwise as a crash loop on somebody's
-      # server days after they deployed.
-      #
-      # It then does the whole thing again with the compose file `rebase init`
-      # generates, whose environment contract is a different one answered by a
-      # different writer (`configureEnvFile`, called here rather than
-      # transcribed). Both halves have shipped broken independently, and from a
-      # terminal each looks like the other's fault.
-      #
-      # `always()` for the same reason as its neighbours.
-      - name: Self-host container acceptance
-        if: always()
-        run: pnpm run verify:selfhost:docker
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-
-      # Every bundle shape we have ever shipped, booted on the runtime as it is
-      # now. The managed tier moves projects onto new images automatically,
-      # without anyone rebuilding them, and the only thing that had been standing
-      # behind that promise was a health gate watching request and error rates —
-      # which sees a crash loop and cannot see a bundle that stopped loading its
-      # collections, a schema version that changed identity under a deployed
-      # project, or an old manifest shape that now parses to something subtly
-      # different. Those are the regressions a fleet-wide auto-upgrade turns into
-      # one simultaneous outage.
-      #
-      # The fixtures are frozen and hand-authored, NOT built here: a fixture the
-      # builder regenerates moves whenever the builder moves, which is the one
-      # thing a regression corpus must not do. When one fails, the finding is
-      # that a bundle already deployed would fail — see tests/fixtures/bundles/README.md.
-      #
-      # Two axes, not one. Besides the frozen bundle SHAPES, this now boots the
-      # representative fixture once per published `@rebasepro/server-postgres`,
-      # with today's `@rebasepro/server` symlinked over it exactly as
-      # `infra/docker/entrypoint.mjs` does. That pairing — new server, old driver — is
-      # what every managed project actually runs, because the image supplies the
-      # server and the bundle supplies the driver; it has already caused one
-      # production login outage, and nothing tested it until now. Needs the
-      # network (npm) and CREATE DATABASE, both of which this job already has.
-      #
-      # `always()` for the same reason as its neighbours: different ground, and
-      # it still fails the job on its own.
-      - name: Bundle corpus
-        if: always()
-        run: |
-          docker exec rebase-postgres createdb -U rebase rebase_corpus
-          pnpm run verify:corpus
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-          CORPUS_DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_corpus
-
-      # The gate the whole rls-check package existed for and never had: point it
-      # at a database this pipeline actually generated. `Self-host acceptance`
-      # above runs `rebase db push` over the reference app's collections, so
-      # `rebase_acceptance` holds real generated DDL and a real policies.sql
-      # applied to it — the same artefact a user gets, which is the only thing
-      # worth gating on. A policy that grants more than the collection asked for
-      # fails the build here.
-      #
-      # Findings the collections declare ON PURPOSE (the reference app is
-      # public-read, so its SELECT policies are `USING (true)` and rls-check is
-      # right to say so) live in tooling/scripts/rls-baseline.json, per table, with a
-      # reason. That is deliberately not `--skip policy-always-true`: the same
-      # check on a table nobody baselined — a newly added collection, say — still
-      # fails.
-      #
-      # `--min-tables/--min-policies` are what stop this from being the vacuous
-      # gate this repo has been burned by before: with `if: always()` the step
-      # runs even when the push above failed, and against the empty database that
-      # leaves, rls-check finds nothing and exits 0. The floors turn that into
-      # exit 2. They are floors, not equality — a removed collection is not a
-      # security event — set well below the ~11 tables / ~88 policies the
-      # reference app currently generates.
-      - name: RLS scan of the generated schema
-        if: always()
-        run: pnpm rls:check --min-tables 8 --min-policies 40
-        env:
-          RLS_CHECK_DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_acceptance?sslmode=disable
+      # Self-host acceptance, the container that ships it, the frozen bundle
+      # corpus, and the RLS scan of the database acceptance pushed real DDL into
+      # — in that order, against a Postgres the lane starts for itself, every
+      # suite running whatever happened to the one before. The suites, and the
+      # reason each exists, are the `selfhost` lane of
+      # tooling/scripts/ci-e2e.mjs, which `verify-quality.sh` runs too.
+      - name: Self-host E2E (pnpm ci:e2e --lane selfhost)
+        run: pnpm run ci:e2e --lane selfhost
 
   # The security and integration suites. Each test file boots and tears down its
   # own Postgres and the packages run one after another, which makes this the
   # longest single job in the gate — so nothing is scheduled behind it.
   e2e-vitest:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -789,56 +521,16 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
-      - name: Start PostgreSQL container
-        run: |
-          docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
-          # `-h 127.0.0.1`, and it is the whole point of this loop.
-          #
-          # The official image starts a TEMPORARY server during initdb to run
-          # its init scripts, then shuts it down and starts the real one. That
-          # temporary server sets `listen_addresses=''`, so it answers on the
-          # unix socket and not on TCP. A socket-based `pg_isready` therefore
-          # reports ready against the throwaway server, this loop exits early,
-          # and the next command lands in the shutdown window between the two:
-          #
-          #   createdb: error: connection to server on socket
-          #   "/var/run/postgresql/.s.PGSQL.5432" failed:
-          #   FATAL: the database system is shutting down
-          #
-          # which is what took e2e-selfhost down mid-release. Asking over TCP
-          # cannot see the temporary server at all, so the first success is the
-          # real one.
-          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas -h 127.0.0.1; do
-            echo "Waiting for postgres..."
-            sleep 1
-          done
-
-      # The product's real security coverage, orphaned until now (this suite ran
-      # in NO pipeline, so a change breaking RLS shipped green — AUDIT P0 #2).
-      # rls-enforcement boots a real Postgres and asserts DB state after every
-      # RLS denial; policy-agreement proves the Postgres and JS policy backends
-      # agree; cdc/db/channel-history/cli round out the integration surface.
-      # @rebasepro/rls-check joins them for the same reason it was added: its
-      # fixture asserts that each of the fourteen checks fires on the object
-      # built to trip it AND that nothing fires on the `secure_*` objects, which
-      # is the only thing standing between the gate below and a scanner that has
-      # quietly stopped detecting anything. RLS_CHECK_REQUIRE_DOCKER turns its
-      # "no Docker, skip" escape hatch into a failure here — a skipped suite
-      # reports success for a scan that never ran.
+      # One package at a time, each whatever happened to the one before it. This
+      # was `pnpm --filter a --filter b --filter c test:e2e`, which stops at the
+      # first package that fails: on 2026-09-30 a server-postgres flake meant the
+      # RLS scanner's detection fixture and the CLI e2e never ran, and the CLI
+      # e2e had a real failure, from the day before, that the flake then hid.
+      # No retries (`--retry=0`): a flake fails the run and gets fixed.
       #
-      # Each test file boots and tears down its OWN Postgres via Docker (random
-      # host ports — no clash with the 5432 service above), so there are no
-      # connection settings to wire. `--workspace-concurrency=1` runs the two
-      # packages' suites one after another, and each vitest config sets
-      # `fileParallelism: false`, so exactly one container is ever live — the
-      # arrangement that makes this reliable on a shared runner.
-      #
-      # `always()`: like the two steps above, this covers different ground, so a
-      # failure there must not suppress this report. It still fails the job on
-      # its own.
-      - name: Run security & integration E2E (vitest)
-        if: always()
-        run: pnpm --filter @rebasepro/server-postgres --filter @rebasepro/cli --filter @rebasepro/rls-check --workspace-concurrency=1 test:e2e
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-          RLS_CHECK_REQUIRE_DOCKER: "1"
+      # The suites, and the reason each exists, are the `vitest` lane of
+      # tooling/scripts/ci-e2e.mjs — which `verify-quality.sh` runs too. Each
+      # file boots its own Postgres (random host port) or PGlite, so this job
+      # starts no database of its own.
+      - name: Security & integration E2E (pnpm ci:e2e --lane vitest)
+        run: pnpm run ci:e2e --lane vitest

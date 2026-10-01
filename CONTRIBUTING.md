@@ -203,9 +203,12 @@ It runs the build, then both of CI's gate lists — `pnpm ci:static` (the `stati
 job: type check, ESLint, the ratchets, the docs verifier) and
 `pnpm ci:build-gates` (the `build-gates` job: the published `.d.ts`, the
 scaffolded and ejected project typechecks, the API surface, the eager-JS budget,
-the generated website artifacts) — then the unit suites and the Playwright
-end-to-end tests. The browser suite needs a browser, which the npm package does
-not ship; the script installs it for you, or do it once yourself:
+the generated website artifacts) — then the unit suites, and every end-to-end
+suite of CI's four e2e jobs through `pnpm ci:e2e` (see [End-to-end](#end-to-end)).
+That last part needs Docker and takes a while; it is what CI runs, and
+`pnpm check:gates-doc` fails when the workflow runs something this script does
+not. The browser suites need a browser, which the npm package does not ship; the
+script installs it for you, or do it once yourself:
 
 ```bash
 pnpm exec playwright install chromium
@@ -231,8 +234,13 @@ it. A gate in one of those two tables and in neither runner fails
 ## Testing
 
 The root `pnpm test` runs every package's suite with `--workspace-concurrency=1`
-— serial on purpose, because several suites bind ports and open databases. It is
-about three and a half minutes.
+— serial on purpose, because several suites bind ports and open databases — and
+`--no-bail`, so a failing package does not hide the ones after it. It is about
+three and a half minutes. CI runs it with `TZ=America/Los_Angeles` (so does
+`verify-quality.sh`): a test that depends on the machine's zone can only fail
+away from UTC, and the runner is in UTC. A test that needs one particular zone
+pins it per file with an environment built by
+`tooling/scripts/jest/zone-environment.cjs`.
 
 While working on one package, run that package:
 
@@ -259,42 +267,48 @@ files that start the CLI or `rebase-server` as a child process, which loads
 Its `test` script sets that for you; a bare `pnpm exec jest` in that package fails on
 the first ESM import with `Cannot use import statement outside a module`.
 
-`packages/firebase` has tests and no runner — five of them, never executed. That
-is a recorded gap, not an oversight: `pnpm check:test-scripts` names it, and
-fixing it means adding a devDependency and a lockfile entry.
-
 ### End-to-end
 
-The e2e suites are not part of `pnpm test`. They need three things first:
+The e2e suites are not part of `pnpm test`. They need the build, a browser and
+Docker:
 
 ```bash
 pnpm --filter './packages/*' -r run build   # they drive dist, not src
 pnpm exec playwright install chromium       # the npm package ships no browser
-docker compose -f app/backend/docker-compose.yml up -d db
 ```
 
 The build is not optional for any of them: the CLI suite scaffolds a project
 that consumes every package as built output and refuses to start otherwise, and
 three server-postgres files start the CLI and `rebase-server` as child
-processes, which load `dist`. Then, and this is all of them — CI
-runs no e2e suite that is not on this list:
+processes, which load `dist`. Then one command runs every one of them, exactly
+as CI's four e2e jobs do — each job is one lane of it:
 
 ```bash
-pnpm e2e                                          # the Playwright admin-panel suite
+pnpm ci:e2e                  # everything, every suite reporting whatever failed before it
+pnpm ci:e2e --lane vitest    # one job's suites: vitest, cli, selfhost or admin
+pnpm ci:e2e --list           # what is in each lane
+```
+
+A lane that needs a database server starts its own Postgres container on a free
+port, so nothing here touches the database on 5432. Nothing is retried: a flaky
+test fails the run. The suites, one per line, for running one on its own:
+
+```bash
 pnpm exec tsx tests/e2e/tests/cli-init-e2e.ts     # scaffold, install, boot
 pnpm exec tsx tests/e2e/tests/cli-init-baas-e2e.ts   # the same for the BaaS preset
 pnpm exec tsx tests/e2e/tests/client-sdk-e2e.ts   # the SDK as a browser drives it
 pnpm --filter @rebasepro/server-postgres test:e2e # RLS enforcement, policy agreement
 pnpm --filter @rebasepro/cli test:e2e             # the CLI against a real database
+pnpm --filter @rebasepro/cli test:integration     # rebase dev's managed PGlite database
 pnpm --filter @rebasepro/rls-check test:e2e       # the scanner's own fixture
+pnpm e2e                                          # the admin panel (needs a pushed, seeded DATABASE_URL)
 ```
 
-Four more run in CI's e2e jobs and are gates rather than suites —
-`verify:selfhost`, `verify:selfhost:docker`, `verify:corpus` and `rls:check`.
-They are in **[docs/gates.md](docs/gates.md)** with what each protects.
-`pnpm check:gates-doc` reads the workflow's e2e jobs and fails when a suite it
-runs is named in neither this list nor that file, so neither can quietly fall
-behind the pipeline.
+Five more are gates rather than suites — `check:contributor-setup:live`,
+`verify:selfhost`, `verify:selfhost:docker`, `verify:corpus` and `rls:check` —
+and are in **[docs/gates.md](docs/gates.md)** with what each protects.
+`pnpm check:gates-doc` reads the workflow and `tooling/scripts/ci-e2e.mjs` and
+fails when a suite either runs is named in neither this list nor that file.
 
 ## Compatibility
 

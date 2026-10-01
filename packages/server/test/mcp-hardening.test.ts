@@ -1266,6 +1266,24 @@ describe("a notification gets no reply, whatever the method", () => {
 });
 
 describe("list_collections reports a real schema", () => {
+    type Listed = {
+        name: string;
+        softDeleteField?: string;
+        row: { required?: string[]; properties: Record<string, { type?: string; enum?: unknown[]; description?: string }> };
+        create: { required?: string[]; properties: Record<string, { type?: string; enum?: unknown[] }> };
+    };
+
+    async function listCollections(collections?: CollectionConfig[]): Promise<Listed[]> {
+        const { app } = buildApp(collections ? { collections } : {});
+        const { accessToken } = await connectedClient(app);
+        const res = await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "list_collections", arguments: {} }
+        });
+        const body = await res.json() as { result: { structuredContent: { collections: Listed[] } } };
+        return body.result.structuredContent.collections;
+    }
+
     it("names the actual property type, not `unknown`", async () => {
         // The bug this pins: the code read `property.dataType`, a key no
         // property in `@rebasepro/types` has ever had, so every field came back
@@ -1273,48 +1291,57 @@ describe("list_collections reports a real schema", () => {
         // it may send. The fixtures used the same wrong key, so the tests
         // agreed with the bug; it surfaced only when a real `CollectionConfig`
         // went through the real boot, which refused it outright.
-        const { app } = buildApp();
-        const { accessToken } = await connectedClient(app);
-
-        const res = await rpc(app, accessToken, {
-            jsonrpc: "2.0", id: 1, method: "tools/call",
-            params: { name: "list_collections", arguments: {} }
-        });
-        const body = await res.json() as {
-            result: { structuredContent: { collections: { fields: { name: string; type: string }[] }[] } };
-        };
-        const fields = body.result.structuredContent.collections[0].fields;
-
-        expect(fields.map(f => f.type)).not.toContain("unknown");
-        expect(fields.find(f => f.name === "name")?.type).toBe("string");
+        const [candidates] = await listCollections();
+        expect(candidates.row.properties.name.type).toBe("string");
+        expect(JSON.stringify(candidates)).not.toContain("unknown");
     });
 
     it("hides a property the REST API excludes", async () => {
         // An agent surface that listed more than `/api/data` does would be a way
         // to read the schema around the gate.
-        const collections = [{
+        const [candidates] = await listCollections([{
             slug: "candidates",
             name: "Candidates",
             properties: {
                 name: { type: "string", name: "Name" },
                 internalScore: { type: "number", name: "Score", excludeFromApi: true }
             }
-        }] as unknown as CollectionConfig[];
+        }] as unknown as CollectionConfig[]);
+        expect(Object.keys(candidates.row.properties)).toContain("name");
+        expect(JSON.stringify(candidates)).not.toContain("internalScore");
+    });
 
-        const { app } = buildApp({ collections });
-        const { accessToken } = await connectedClient(app);
-
-        const res = await rpc(app, accessToken, {
-            jsonrpc: "2.0", id: 1, method: "tools/call",
-            params: { name: "list_collections", arguments: {} }
-        });
-        const body = await res.json() as {
-            result: { structuredContent: { collections: { fields: { name: string }[] }[] } };
+    // A model learned an enum, a required field and a relation's foreign key
+    // only by failing writes — and `authorId`, the name every row carries,
+    // appeared nowhere. The listing is the schema REST's OpenAPI document
+    // publishes for the same collection.
+    it("says what a write must carry: required fields, enum values, the foreign key, the trash", async () => {
+        const authors = { slug: "authors", name: "Authors", properties: { name: { type: "string", name: "Name" } } };
+        const posts = {
+            slug: "posts",
+            name: "Posts",
+            softDelete: { field: "deleted_at" },
+            properties: {
+                title: { type: "string", name: "Title", validation: { required: true } },
+                status: { type: "string", name: "Status", enum: [{ id: "draft", label: "Draft" }, { id: "published", label: "Published" }] },
+                created_at: { type: "date", name: "Created", autoValue: "on_create" },
+                author: { type: "relation", name: "Author", relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" } },
+                deleted_at: { type: "date", name: "Deleted at" }
+            }
         };
-        const names = body.result.structuredContent.collections[0].fields.map(f => f.name);
+        const listed = await listCollections([authors, posts] as unknown as CollectionConfig[]);
+        const listedPosts = listed.find(c => c.name === "posts");
+        expect(listedPosts).toBeDefined();
+        const { row, create, softDeleteField } = listedPosts!;
 
-        expect(names).toContain("name");
-        expect(names).not.toContain("internalScore");
+        expect(row.required).toContain("title");
+        expect(create.required).toEqual(["title"]);
+        expect(row.properties.status.enum).toEqual(["draft", "published"]);
+        expect(create.properties.status.enum).toEqual(["draft", "published"]);
+        expect(row.properties.authorId.description).toContain("authors");
+        expect(Object.keys(create.properties)).toEqual(expect.arrayContaining(["authorId", "author"]));
+        expect(Object.keys(create.properties)).not.toContain("created_at");
+        expect(softDeleteField).toBe("deleted_at");
     });
 });
 

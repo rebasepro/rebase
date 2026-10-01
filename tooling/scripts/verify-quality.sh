@@ -21,8 +21,14 @@
 # tooling/scripts/ci-build-gates.mjs, and docs/gates.md as the table over both).
 # `ci:build-gates` was the last hole: eleven YAML steps this script never ran,
 # `check:generated` — the gate CONTRIBUTING warns you about forgetting — among
-# them. What is left here is what neither command does: the build, the unit
-# suites, and the browser end-to-end tests.
+# them. The end-to-end half was the last hole: this ran Playwright and nothing
+# else, while CI ran the RLS enforcement suite, the CLI e2e, the scaffolds,
+# self-host and the RLS scan. The CLI e2e failed on main for days after a
+# commit verified "end to end" by hand. They are `pnpm ci:e2e` now, the same
+# command the four e2e jobs run.
+#
+# `check:gates-doc` holds the claim: every root script verify.yml invokes has to
+# be invoked here too.
 # ============================================================
 
 RED='\033[0;31m'
@@ -75,29 +81,56 @@ else
 fi
 
 # 4. Unit Tests Check
+#    In America/Los_Angeles, as CI's unit job runs them: a timezone test that
+#    runs in the machine's own zone cannot fail in UTC, and the developer
+#    machines are east of Greenwich — so the zone CI covers is the one that
+#    would otherwise be covered nowhere. See the unit job in verify.yml.
 section "4. Unit Tests Suite"
-echo "Running unit tests (pnpm test)..."
-if pnpm test; then
+echo "Running unit tests (pnpm test, TZ=America/Los_Angeles)..."
+if TZ=America/Los_Angeles pnpm test; then
     ok "All unit tests passed successfully."
 else
     err "Some unit tests failed."
 fi
+echo "Running the agent harness's tests (pnpm test:harness)..."
+if pnpm run test:harness; then
+    ok "Harness tests passed."
+else
+    err "Harness tests failed."
+fi
 
-# 5. E2E Tests Check
+# The Cloud console's suite, which CI runs from this repository because the
+# console resolves @rebasepro/* to this checkout. It needs saas/ beside the
+# packages; CI skips it with a notice when it cannot check that repository out,
+# and so does this.
+if [ -d "./saas" ]; then
+    echo "Running the Cloud console's suite (pnpm test:saas-console)..."
+    if pnpm run test:saas-console; then
+        ok "Console suite passed."
+    else
+        err "Console suite failed."
+    fi
+else
+    warn "Skipped the Cloud console's suite: no saas/ checkout here (CI skips it the same way without the credential)."
+fi
+
+# 5. End-to-end suites — every lane CI's four e2e jobs run, through the same
+#    runner. Each lane starts what it needs (Postgres containers, scaffolds)
+#    and each suite runs whatever happened to the one before it. Needs Docker.
 #    Playwright ships no browser with the npm package: on a fresh clone the
-#    suite fails with "Executable doesn't exist" before running a single test.
-#    Installing is idempotent and near-instant once the browser is there, so it
-#    is a step rather than a precondition somebody has to have read about.
-section "5. Playwright E2E Integration Suite"
+#    browser suites fail with "Executable doesn't exist" before running a single
+#    test. Installing is idempotent and near-instant once the browser is there,
+#    so it is a step rather than a precondition somebody has to have read about.
+section "5. End-to-end suites (pnpm ci:e2e)"
 echo "Ensuring the Chromium build Playwright expects is installed..."
 if ! pnpm exec playwright install chromium; then
     err "Could not install Chromium for Playwright."
 fi
-echo "Running Playwright E2E tests (including SQL Console and Collection Editor)..."
-if pnpm run e2e; then
-    ok "All E2E integration tests passed successfully."
+echo "Running every e2e lane (vitest, cli, selfhost, admin)..."
+if pnpm run ci:e2e; then
+    ok "All end-to-end suites passed."
 else
-    err "Playwright E2E tests failed."
+    err "End-to-end suites failed. The summary above names each one and how to re-run it."
 fi
 
 # 6. Build Health Check (Vite & Bundles)

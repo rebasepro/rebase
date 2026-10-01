@@ -1332,7 +1332,7 @@ function emitRelationProperties(
  * Every declared property except the ones {@link isDocumentedProperty} rules
  * out, plus the foreign keys and relations {@link emitRelationProperties} adds.
  */
-function buildCollectionSchema(
+export function buildCollectionSchema(
     collection: CollectionConfig,
     registeredSchemas: ReadonlySet<string>
 ): Record<string, unknown> {
@@ -1516,7 +1516,7 @@ function buildCollectionUpdateSchema(collection: CollectionConfig): Record<strin
  * record that such a write was "still accepted" — the document was right and
  * the server was the thing that had not caught up.
  */
-function buildCollectionInputSchema(collection: CollectionConfig): Record<string, unknown> {
+export function buildCollectionInputSchema(collection: CollectionConfig): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
     // The write half, not the read half: a field readable by nobody but

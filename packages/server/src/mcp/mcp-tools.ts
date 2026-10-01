@@ -22,7 +22,7 @@
  */
 import type { AuthAdapter, CollectionConfig, DataDriver, OrderBySpec } from "@rebasepro/types";
 import { ALL_WHERE_FILTER_OPS, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, getCollectionDataPath } from "@rebasepro/types";
-import { type FieldViewer, OrderBySpecError, restoresSoftDeletedRow, serializeOrderBy } from "@rebasepro/common";
+import { type FieldViewer, OrderBySpecError, restoresSoftDeletedRow, serializeOrderBy, softDeleteFieldOf } from "@rebasepro/common";
 import { scopeDataDriver } from "../auth/rls-scope.js";
 import { ApiError } from "../api/errors.js";
 import { assertWriteRequestValid } from "../api/rest/write-validation.js";
@@ -30,6 +30,7 @@ import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "../api/rest/field
 import { parseQueryOptions } from "../api/rest/query-parser.js";
 import { RestApiGenerator, type RowAddress } from "../api/rest/api-generator.js";
 import type { QueryOptions } from "../api/types.js";
+import { buildCollectionInputSchema, buildCollectionSchema } from "../api/openapi-generator.js";
 import {
     assertUserCreationBodyValid,
     createUserThroughAuthCollection,
@@ -308,37 +309,35 @@ const TOOLS: McpToolDefinition[] = [
     {
         name: "list_collections",
         description:
-            "List the collections in this project, with their fields. Call this first — every " +
-            "other tool takes a collection name from here.",
+            "List the collections in this project and their schemas. Call this first — every other tool takes "
+            + "a collection name from here. For each collection, `row` is the JSON Schema of a row as the read "
+            + "tools return it (required fields, enum values, a belongsTo relation as its foreign key, e.g. "
+            + "`authorId`), and `create` is the JSON Schema of create_document's `data`; update_document takes "
+            + "any subset of it. `softDeleteField`, when present, is the field a delete stamps: a deleted row "
+            + "is hidden, and update_document setting that field to null restores it.",
         requiredScope: "mcp:read",
         inputSchema: { type: "object", properties: {}, additionalProperties: false },
         async run(_args, ctx) {
             return {
-                collections: ctx.collections.map(c => ({
-                    name: collectionPath(c),
-                    title: c.name,
-                    description: c.description ?? null,
-                    // `type`, not `dataType`. The latter is a field no property
-                    // in `@rebasepro/types` has ever had, and reading it made
-                    // every field report "unknown" — a schema listing that
-                    // tells a model nothing about what it is allowed to send.
-                    // The fixtures here were written with the same wrong key,
-                    // so the tests agreed with the bug; it surfaced only when a
-                    // real `CollectionConfig` was put through the real boot,
-                    // which refused it outright. Same shape as the
-                    // `buildSearchConditions` bug in server-mongo.
-                    fields: Object.entries(c.properties ?? {})
-                        // A property the REST API hides is hidden here too. An
-                        // agent surface that listed more than `/api/data` does
-                        // would be a way to read the schema around the gate.
-                        .filter(([, property]) => !(property as { excludeFromApi?: boolean }).excludeFromApi)
-                        .map(([key, property]) => ({
-                            name: key,
-                            type: (property as { type?: string }).type ?? "unknown",
-                            title: (property as { name?: string }).name ?? key,
-                            description: (property as { description?: string }).description ?? null
-                        }))
-                }))
+                collections: ctx.collections.map(c => {
+                    const softDeleteField = softDeleteFieldOf(c);
+                    return {
+                        name: collectionPath(c),
+                        title: c.name,
+                        description: c.description ?? null,
+                        // The schemas REST's OpenAPI document publishes for the
+                        // same collection, so what the listing says a row and a
+                        // write are is what `/api/data` serves and accepts: the
+                        // same fields hidden (`excludeFromApi`, a field closed
+                        // to everybody), the same foreign-key names, the same
+                        // required list. A `$ref` to another collection has no
+                        // document to point into here, so an included relation
+                        // is described as an object.
+                        row: buildCollectionSchema(c, new Set()),
+                        create: buildCollectionInputSchema(c),
+                        ...(softDeleteField && { softDeleteField })
+                    };
+                })
             };
         }
     },

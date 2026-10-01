@@ -14,8 +14,13 @@
  *   - a gate whose name breaks the `check:` / `verify:` / `test:` rule fails;
  *   - a gate listed under a job's section and absent from that job's runner
  *     fails, so a section cannot describe a list nothing runs;
- *   - an end-to-end suite the workflow invokes and neither CONTRIBUTING nor
- *     this table names fails, so a suite cannot run in CI and be in no register.
+ *   - an end-to-end suite the workflow or `ci:e2e` invokes and neither
+ *     CONTRIBUTING nor this table names fails, so a suite cannot run in CI and
+ *     be in no register;
+ *   - a root script the workflow runs and `verify-quality.sh` does not fails,
+ *     because AGENTS.md promises that script "runs what CI runs";
+ *   - a recursive test run without `--no-bail` fails, because pnpm stops one at
+ *     the first failing package and the packages after it never report.
  *
  * The third has three named exceptions, each carrying its reason in this file
  * rather than slipping past a regular expression — so a fourth still fails, and
@@ -60,6 +65,13 @@ const DOC = "docs/gates.md";
  */
 const WORKFLOW = ".github/workflows/verify.yml";
 const REGISTERS = ["CONTRIBUTING.md", "docs/gates.md"];
+
+/**
+ * The e2e runner, which holds the suites the four e2e jobs used to name as
+ * YAML steps, and the pre-push script AGENTS.md says "runs what CI runs".
+ */
+const E2E_RUNNER = "tooling/scripts/ci-e2e.mjs";
+const VERIFY_QUALITY = "tooling/scripts/verify-quality.sh";
 
 const VERIFIER_README = "tooling/scripts/docs-verify/README.md";
 const VERIFIER_README_SECTION = /<!-- gates:start -->([\s\S]*?)<!-- gates:end -->/;
@@ -153,13 +165,14 @@ const ciStaticGates = () => runnerGates("ci-static.mjs");
  * calls. A row in one of these and absent from the matching array is a gate the
  * table says runs and nothing runs.
  *
- * The other two sections are deliberately absent: "Tests and end to end" and
- * "Release only" are invoked by workflow steps and `release.sh` directly, and
- * have no single array to compare against.
+ * The other two sections are deliberately absent: "Tests" and "Release only"
+ * are invoked by workflow steps and `release.sh` directly, and have no single
+ * array to compare against.
  */
 const JOB_SECTIONS = [
     { heading: "## The static job", runner: "ci-static.mjs", command: "pnpm ci:static" },
-    { heading: "## After the build", runner: "ci-build-gates.mjs", command: "pnpm ci:build-gates" }
+    { heading: "## After the build", runner: "ci-build-gates.mjs", command: "pnpm ci:build-gates" },
+    { heading: "## End to end", runner: "ci-e2e.mjs", command: "pnpm ci:e2e" }
 ];
 
 /**
@@ -201,48 +214,130 @@ for (const { heading, runner, command } of JOB_SECTIONS) {
 }
 
 /**
- * Every end-to-end suite `verify.yml` runs, and whether a contributor can find
- * it written down. Two shapes, because that is how the jobs invoke them: a
- * script path handed to `tsx`, and a `test:e2e` run against one or more
- * workspace filters.
+ * Every end-to-end suite CI runs, and whether a contributor can find it written
+ * down. The jobs invoke them through `ci:e2e` now, so the runner is read as well
+ * as the workflow. Two shapes, because that is how suites are invoked: a script
+ * path handed to `tsx`, and a package's own suite (`test:e2e`,
+ * `test:integration`) — in the workflow as `--filter <pkg> … test:e2e`, in the
+ * runner as `pkg: "<pkg>", script: "<script>"`.
  */
 const unregistered = [];
 {
-    const workflowPath = path.join(ROOT, WORKFLOW);
-    if (!fs.existsSync(workflowPath)) {
-        unregistered.push(`${WORKFLOW} is missing — it is where the e2e suites are invoked.`);
-    } else {
-        const workflow = fs.readFileSync(workflowPath, "utf8");
-        const registers = REGISTERS.map((rel) => ({
-            rel,
-            text: fs.existsSync(path.join(ROOT, rel)) ? fs.readFileSync(path.join(ROOT, rel), "utf8") : ""
-        }));
+    const sources = [WORKFLOW, E2E_RUNNER].map((rel) => ({
+        rel,
+        text: fs.existsSync(path.join(ROOT, rel)) ? fs.readFileSync(path.join(ROOT, rel), "utf8") : null
+    }));
+    for (const { rel, text } of sources) {
+        if (text === null) unregistered.push(`${rel} is missing — it is where the e2e suites are invoked.`);
+    }
+    const registers = REGISTERS.map((rel) => ({
+        rel,
+        text: fs.existsSync(path.join(ROOT, rel)) ? fs.readFileSync(path.join(ROOT, rel), "utf8") : ""
+    }));
+    const namedOnOneLine = (...needles) => registers.some(({ text }) =>
+        text.split("\n").some((row) => needles.every((needle) => row.includes(needle))));
 
-        const suiteFiles = new Set(
-            [...workflow.matchAll(/tests\/e2e\/tests\/[\w.-]+\.ts/g)].map((m) => m[0])
-        );
+    for (const { rel, text } of sources) {
+        if (text === null) continue;
+
+        const suiteFiles = new Set([...text.matchAll(/tests\/e2e\/tests\/[\w.-]+\.ts/g)].map((m) => m[0]));
         for (const suite of suiteFiles) {
-            if (!registers.some(({ text }) => text.includes(suite))) {
-                unregistered.push(
-                    `\`${suite}\` runs in ${WORKFLOW} and is named in neither ${REGISTERS.join(" nor ")}.`
-                );
+            if (!registers.some(({ text: register }) => register.includes(suite))) {
+                unregistered.push(`\`${suite}\` runs in ${rel} and is named in neither ${REGISTERS.join(" nor ")}.`);
             }
         }
 
-        // `pnpm --filter @rebasepro/a --filter @rebasepro/b … test:e2e` — one
-        // step, several packages, and CI ran three where CONTRIBUTING named one.
-        for (const line of workflow.split("\n")) {
-            if (!line.includes("test:e2e")) continue;
-            for (const [, pkg] of line.matchAll(/--filter (@rebasepro\/[\w-]+)/g)) {
-                const named = registers.some(({ text }) =>
-                    text.split("\n").some((row) => row.includes(pkg) && row.includes("test:e2e")));
-                if (!named) {
-                    unregistered.push(
-                        `\`${pkg}\`'s \`test:e2e\` runs in ${WORKFLOW} and no single line of ` +
-                        `${REGISTERS.join(" or ")} names both.`
-                    );
-                }
+        const packageSuites = [];
+        for (const line of text.split("\n")) {
+            // `pnpm --filter @rebasepro/a --filter @rebasepro/b … test:e2e` — one
+            // step, several packages, and CI ran three where CONTRIBUTING named one.
+            if (line.includes("test:e2e")) {
+                for (const [, pkg] of line.matchAll(/--filter (@rebasepro\/[\w-]+)/g)) packageSuites.push([pkg, "test:e2e"]);
             }
+            for (const [, pkg, script] of line.matchAll(/pkg:\s*"(@rebasepro\/[\w-]+)",\s*script:\s*"([\w:-]+)"/g)) {
+                packageSuites.push([pkg, script]);
+            }
+        }
+        for (const [pkg, script] of packageSuites) {
+            if (!namedOnOneLine(pkg, script)) {
+                unregistered.push(
+                    `\`${pkg}\`'s \`${script}\` runs in ${rel} and no single line of ` +
+                    `${REGISTERS.join(" or ")} names both.`
+                );
+            }
+        }
+    }
+}
+
+/**
+ * Root package.json scripts a file invokes as `pnpm <script>` or
+ * `pnpm run <script>` — in command position only. Comments, step names and
+ * quoted strings are dropped first: `echo "Running pnpm ci:e2e"` is a sentence
+ * about the command, and counting it would let a script that only talks about
+ * a suite pass for one that runs it.
+ */
+function invokedRootScripts(text) {
+    const invoked = new Set();
+    const commandPosition =
+        /(?:^\s*|[;&|(]\s*|\b(?:if|then|do|else|run:)\s+|!\s+|\b[A-Z_]+=\S*\s+)pnpm\s+(?:run\s+)?([\w:.-]+)/g;
+    for (const raw of text.split("\n")) {
+        if (/^\s*(#|- name:|name:)/.test(raw)) continue;
+        const line = raw.replace(/"[^"]*"/g, "\"\"");
+        for (const [, name] of line.matchAll(commandPosition)) {
+            if (scripts.includes(name)) invoked.add(name);
+        }
+    }
+    return invoked;
+}
+
+/**
+ * What CI runs and the pre-push script does not.
+ *
+ * AGENTS.md: "`./tooling/scripts/verify-quality.sh` runs what CI runs". It ran
+ * the build, the two gate lists, the unit suites and Playwright, while the
+ * workflow also ran the RLS enforcement suite, the CLI e2e, the scaffolds,
+ * self-host, the bundle corpus, the RLS scan and the harness tests — and an
+ * agent following AGENTS.md reported "verified" without ever running them.
+ * A root script the workflow invokes has to be invoked there too.
+ */
+const notRunBeforePush = [];
+{
+    const workflowPath = path.join(ROOT, WORKFLOW);
+    const vqPath = path.join(ROOT, VERIFY_QUALITY);
+    if (fs.existsSync(workflowPath) && fs.existsSync(vqPath)) {
+        const local = invokedRootScripts(fs.readFileSync(vqPath, "utf8"));
+        for (const name of invokedRootScripts(fs.readFileSync(workflowPath, "utf8"))) {
+            if (!local.has(name)) notRunBeforePush.push(name);
+        }
+    } else if (!fs.existsSync(vqPath)) {
+        notRunBeforePush.push(`(${VERIFY_QUALITY} is missing)`);
+    }
+}
+
+/**
+ * A recursive test run that stops at the first failing package.
+ *
+ * `pnpm -r` and a multi-`--filter` run bail by default. The e2e-vitest job ran
+ * three packages that way, and on 2026-09-30 a flake in the first meant the
+ * other two never started — one of which had a real failure. A test run is a
+ * report: every package has to make one. (A build may bail: nothing after a
+ * failed build means anything.)
+ */
+const bailingTestRuns = [];
+{
+    const isRecursive = (line) => /(^|\s)(-r|--recursive)(\s|$)/.test(line) || (line.match(/--filter\b/g) ?? []).length > 1;
+    const runsTests = (line) => /(^|\s)(run\s+)?test(:[\w:-]+)?(\s|$|")/.test(line);
+    const check = (where, line) => {
+        if (/\bpnpm\b/.test(line) && isRecursive(line) && runsTests(line) && !line.includes("--no-bail")) {
+            bailingTestRuns.push(`${where}: ${line.trim()}`);
+        }
+    };
+    for (const [name, command] of Object.entries(pkg.scripts ?? {})) check(`package.json "${name}"`, command);
+    for (const rel of [WORKFLOW, VERIFY_QUALITY]) {
+        const file = path.join(ROOT, rel);
+        if (!fs.existsSync(file)) continue;
+        for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+            if (!line.trim().startsWith("#")) check(rel, line);
         }
     }
 }
@@ -292,14 +387,17 @@ const readmeProblems = [];
 }
 
 const problems = undocumented.length + phantom.length + misnamed.length
-    + writersAsGates.length + readmeProblems.length + unrun.length + unregistered.length;
+    + writersAsGates.length + readmeProblems.length + unrun.length + unregistered.length
+    + notRunBeforePush.length + bailingTestRuns.length;
 
 if (problems === 0) {
     console.log(green(
         `✓ ${gates.length} gate(s), every one with a row in ${DOC}` +
         ` (${Object.keys(NAMED_EXCEPTIONS).length} named naming-rule exceptions),` +
         ` every row under a job heading in the runner that job calls,` +
-        ` every e2e suite ${WORKFLOW} runs in a register,` +
+        ` every e2e suite ${WORKFLOW} and ${E2E_RUNNER} run in a register,` +
+        ` everything ${WORKFLOW} runs also run by ${VERIFY_QUALITY},` +
+        " every recursive test run with --no-bail," +
         ` and ${VERIFIER_README} says where it blocks.`
     ));
     process.exit(0);
@@ -365,6 +463,26 @@ if (unrun.length > 0) {
         "    is how eleven of them sat as hand-written YAML steps that\n" +
         "    `verify-quality.sh` did not run. Add it to the runner, or move the row\n" +
         "    to the section that describes where it actually runs.\n"
+    ));
+}
+
+if (notRunBeforePush.length > 0) {
+    console.error(red(`  ${notRunBeforePush.length} script(s) CI runs and ${VERIFY_QUALITY} does not:`));
+    for (const name of notRunBeforePush) console.error(`    ${bold(`pnpm ${name}`)}`);
+    console.error(dim(
+        "\n    AGENTS.md tells every contributor and agent that this script runs what CI\n" +
+        "    runs. Add the step there — or, if it cannot run on a developer's machine,\n" +
+        "    say why in the script and in AGENTS.md, rather than letting the claim lapse.\n"
+    ));
+}
+
+if (bailingTestRuns.length > 0) {
+    console.error(red(`  ${bailingTestRuns.length} recursive test run(s) that stop at the first failing package:`));
+    for (const line of bailingTestRuns) console.error(`    ${line}`);
+    console.error(dim(
+        "\n    Add --no-bail. pnpm stops a recursive run at the first package that\n" +
+        "    fails, so the packages after it report nothing and the next failure\n" +
+        "    hides behind this one.\n"
     ));
 }
 

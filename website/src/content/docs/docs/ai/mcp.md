@@ -568,7 +568,10 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   as ISO strings, a `belongsTo` as its foreign key, e.g. `authorId`), so a row
   read can be sent back in an update unchanged. `query_collection` answers
   REST's list body, `{ data, meta }` with `meta.total` and `meta.hasMore`;
-  `count_documents` answers `{ count }`. A `limit` above 1000 is refused, as on
+  `count_documents` answers `{ count }`. `list_collections` describes each
+  collection with the JSON Schemas REST's OpenAPI document publishes for it:
+  `row` (required fields, enum values, foreign keys) and `create` (what
+  `create_document` takes), plus `softDeleteField` where rows go to a trash. A `limit` above 1000 is refused, as on
   REST, and so is an argument a tool does not declare. An edit or delete of a
   row in the trash is refused, as REST refuses it with a 404; setting the
   soft-delete field back to `null` restores it.

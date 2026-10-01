@@ -41,9 +41,12 @@ task before you start:
   unless the user asked for that exact release, in the moment. Deploys are gated
   the same way. See `deployment.md` for what counts and what to do instead.
 - **Verify before you say it is done.** `./tooling/scripts/verify-quality.sh`
-  runs what CI runs: the static gates, the unit tests, the build gates and the
-  Playwright suite. For a docs-only change, `pnpm verify:docs:strict` is the gate
-  that reads it.
+  runs what CI runs: the static gates, the build gates, the unit tests and every
+  end-to-end suite (`pnpm ci:e2e` — the RLS and integration suites, the CLI and
+  SDK scaffolds, self-host, the admin panel; it needs Docker).
+  `pnpm check:gates-doc` fails when the workflow runs something it does not.
+  One lane is `pnpm ci:e2e --lane <vitest|cli|selfhost|admin>`. For a docs-only
+  change, `pnpm verify:docs:strict` is the gate that reads it.
 
 ## Measuring agent changes
 
