@@ -49,9 +49,14 @@ ${chalk.bold("Usage")}
   rebase build [app...]        Build the named apps (default: all)
 
 ${chalk.bold("Options")}
-  --out <dir>                  Bundle output directory (default: ${DEFAULT_BUNDLE_DIR})
+  --output, --out <dir>        Bundle output directory (default: ${DEFAULT_BUNDLE_DIR});
+                               one app at a time
   --skip-type-check            Compile without type checking (faster; use for iteration only)
   --skip-schema                Do not regenerate the database schema from collections
+  --no-static                  Do not fold the frontend into the backend bundle (each
+                               static app still gets its own bundle)
+  --skip-static-build          Fold the frontend as already built, without running its
+                               build command — for CI that built it in an earlier step
   --no-vendor                  Do not install dependencies into the bundle (they
                                install on every pod start instead, ~40-60s slower)
   --vendor                     Install them whatever the tree's size — for a

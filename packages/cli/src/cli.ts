@@ -72,7 +72,7 @@ export const ROOT_FLAGS = {
  * literal under this name: `help-coverage.test.ts`, `printed-commands.test.ts`
  * and the docs verifier read it out of this file's source.
  */
-const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade"];
+const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade", "normalize-imports"];
 
 /**
  * The subcommands each command group dispatches, from the lists those groups
@@ -111,7 +111,7 @@ export function telemetryCommandWords(
     subcommand: string | undefined
 ): { command: string; subcommand: string } {
     if (!command) return { command: "none", subcommand: "none" };
-    const dispatched = namespacedCommands.includes(command) || command === "normalize-imports" || command === "__dev-db-daemon";
+    const dispatched = namespacedCommands.includes(command) || command === "__dev-db-daemon";
     if (!dispatched) return { command: "other", subcommand: subcommand ? "other" : "none" };
 
     if (!subcommand) return { command, subcommand: "none" };

@@ -235,6 +235,89 @@ describe("every command the dispatch answers appears in a help page", () => {
 });
 
 /**
+ * Every flag a command's parser reads appears in that command's help.
+ *
+ * The test above for `doctor` and the one for `db branch` were written one
+ * command at a time, after each was caught; `rebase build` was not, and its
+ * help went on without `--output` (it showed only the alias `--out`, though
+ * the spec calls `--output` canonical), `--no-static` and
+ * `--skip-static-build` — all three parsed, none findable. So this reads every
+ * `parseCommandArgs({ spec, command })` call in the source the dispatch
+ * reaches, resolves the spec (inline, or a `const` in the same file), and
+ * holds the help page `command` names to every canonical long flag in it. A
+ * flag added to a parser without a help line fails here, on that commit.
+ *
+ * Aliases (a flag whose value is another flag's name) are not required: they
+ * are documented beside the flag they resolve to, or deliberately not at all.
+ * The cloud family has its own sweep (`cloud/cloud-help.test.ts`).
+ */
+describe("every flag a parser reads appears in its command's help", () => {
+    /** Source with comments blanked, so a commented-out flag is not a flag. */
+    const uncommented = (source: string): string =>
+        source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
+
+    /** The text of the `{ … }` that opens at `open`, braces balanced. */
+    function braced(source: string, open: number): string {
+        let depth = 0;
+        for (let i = open; i < source.length; i++) {
+            if (source[i] === "{") depth++;
+            else if (source[i] === "}" && --depth === 0) return source.slice(open, i + 1);
+        }
+        throw new Error("unbalanced braces");
+    }
+
+    /** Every `parseCommandArgs` call in a file: the command it names and the long flags its spec declares. */
+    function parsedCommands(file: string): Array<{ command: string; flags: string[] }> {
+        const source = uncommented(fs.readFileSync(file, "utf8"));
+        const out: Array<{ command: string; flags: string[] }> = [];
+        for (const call of source.matchAll(/parseCommandArgs\(\{/g)) {
+            const body = braced(source, call.index! + "parseCommandArgs(".length);
+            const command = /command:\s*"([^"]+)"/.exec(body)?.[1];
+            if (!command) throw new Error(`${path.basename(file)}: a parseCommandArgs call names no command`);
+            let spec: string;
+            const inline = /spec:\s*\{/.exec(body);
+            if (inline) {
+                spec = braced(body, inline.index + inline[0].length - 1);
+            } else {
+                const named = /spec:\s*([A-Z_][A-Z0-9_]*)/.exec(body)?.[1];
+                if (!named) throw new Error(`${path.basename(file)}: cannot read the spec of "${command}"`);
+                const declared = new RegExp(`const ${named}\\b[^=]*=\\s*\\{`).exec(source);
+                if (!declared) throw new Error(`${path.basename(file)}: ${named} is not declared in this file`);
+                spec = braced(source, declared.index + declared[0].length - 1);
+            }
+            // Canonical long flags: the value is a type, not another flag's name.
+            const flags = [...spec.matchAll(/"(--[a-z][a-z0-9-]*)"\s*:\s*(?!")/g)].map(m => m[1]);
+            out.push({ command, flags });
+        }
+        return out;
+    }
+
+    const files = [
+        path.join(here, "..", "cli.ts"),
+        ...fs.readdirSync(here)
+            .filter(name => name.endsWith(".ts") && !name.includes(".test."))
+            .map(name => path.join(here, name))
+    ];
+    const calls = files.flatMap(parsedCommands);
+
+    it("finds the parsers it is checking, so an empty sweep cannot pass", () => {
+        const commands = calls.map(c => c.command);
+        for (const expected of ["build", "dev", "init", "start", "generate-sdk", "auth reset-password", "skills install"]) {
+            expect(commands).toContain(expected);
+        }
+        expect(calls.find(c => c.command === "build")?.flags).toContain("--skip-static-build");
+    });
+
+    it.each(calls.map(c => [c.command, c.flags] as const))("rebase %s --help", async (command, flags) => {
+        await entry(["node", "rebase", ...command.split(" "), "--help"]);
+        const help = helpText();
+        expect(help.length, `rebase ${command} --help printed nothing`).toBeGreaterThan(0);
+        const missing = flags.filter(flag => !new RegExp(`${flag}(?![a-z0-9-])`).test(help));
+        expect(missing, `rebase ${command} --help does not mention flags its parser reads`).toEqual([]);
+    });
+});
+
+/**
  * A mistyped subcommand answers the same way in every family: one red line on
  * stderr, nothing on stdout, exit 1.
  *
@@ -349,6 +432,7 @@ describe("every command the dispatch answers parses its flags strictly", () => {
         resources: "resources.ts",
         status: "status.ts",
         upgrade: "upgrade.ts",
+        "normalize-imports": "normalize-imports.ts",
         // The family's parse is `parseCloudArgs`, which lives here and wraps
         // `parseCommandArgs` with the global cloud flags merged in. Which of its
         // thirty dispatchers reach it is the sweep at the bottom of this file —

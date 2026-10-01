@@ -1321,11 +1321,12 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         notes: ["`rebase db backup list` is the same command, spelled the cloud family's way."]
     },
     url: {
-        usage: "rebase db url",
+        usage: "rebase db url [--database-url <url>] [--docker]",
         summary: "Print the connection string this project uses. Nothing else goes to stdout, so it pipes.",
         notes: [
             "psql \"$(rebase db url)\"",
-            "Starts the managed database if it is not already running."
+            "Starts the managed database if it is not already running.",
+            "--database-url and --docker answer for the database `rebase dev` would pick with the same flag."
         ]
     },
     restore: {

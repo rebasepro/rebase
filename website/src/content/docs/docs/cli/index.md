@@ -75,11 +75,12 @@ application image to build yourself. Useful flags:
 
 | Flag | Effect |
 |------|--------|
-| `--out <dir>` | Write the bundle somewhere other than `dist-bundle/` |
+| `--output <dir>` (or `--out`) | Write the bundle somewhere other than `dist-bundle/` (one app at a time) |
 | `--vendor` | Always install and ship the bundle's dependencies |
 | `--no-vendor` | Never vendor; the pod installs on first start |
 | `--skip-type-check` | Skip typechecking (faster, less safe) |
-| `--no-static` | Skip building the frontend |
+| `--no-static` | Do not fold the frontend into the backend bundle (each static app still gets its own bundle) |
+| `--skip-static-build` | Fold the frontend as already built, without running its build command |
 
 Dependencies are vendored by default so a pod restart does not pay a 35–55 second
 install. A tree that grows past 200 MB on disk is dropped instead, because the
