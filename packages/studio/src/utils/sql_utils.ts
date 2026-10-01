@@ -1,5 +1,7 @@
-import { parse, parseFirst, type Expr, type SelectFromStatement, type SelectedColumn, type Statement } from "pgsql-ast-parser";
-import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
+import { astVisitor, parse, type Statement } from "pgsql-ast-parser";
+import { toSnakeCase } from "@rebasepro/utils";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import type { SqlScriptResult } from "@rebasepro/types";
 
 /** The statements in `sqlText`, or `null` when the parser cannot read it. */
 function parseStatements(sqlText: string): Statement[] | null {
@@ -93,417 +95,188 @@ export function needsDestructiveConfirmation(sqlText: string): boolean {
 }
 
 /**
- * A table extracted from a SQL query's FROM/JOIN clauses.
- */
-export interface ExtractedTable {
-    name: string;
-    /** The schema the query named, if it named one. */
-    schema?: string;
-    alias?: string;
-}
-
-/**
- * A table as SQL: `"schema"."table"` when the query named its schema, and a
- * bare `"table"` when it left it to the search path — which then resolves it
- * the same way it resolved the query.
+ * A table as SQL: `"schema"."table"` when a schema is given, a bare `"table"`
+ * otherwise.
  */
 export function quoteTableName(tableName: string, schemaName?: string): string {
-    const quote = (identifier: string) => `"${identifier.replace(/"/g, "\"\"")}"`;
-    return schemaName ? `${quote(schemaName)}.${quote(tableName)}` : quote(tableName);
+    return schemaName ? `${quoteIdentifier(schemaName)}.${quoteIdentifier(tableName)}` : quoteIdentifier(tableName);
 }
 
+/** An identifier as SQL, whatever it holds: double-quoted, with `"` doubled. */
+export function quoteIdentifier(identifier: string): string {
+    return `"${identifier.replace(/"/g, "\"\"")}"`;
+}
+
+/** What the console knows about a result: its columns, and the tables they came from. */
+export type ResultProvenance = Pick<SqlScriptResult, "columns" | "tables">;
+
 /**
- * The introspected columns of a table the query named — in the schema it
- * named, when it named one. Unqualified, the first schema that has a table of
- * that name answers.
+ * The stored cell a result cell is, and the key that finds its row.
  */
-function findTableInfo(schemas: Record<string, TableInfo[]>, table: ExtractedTable): TableInfo | undefined {
-    if (table.schema) {
-        return schemas[table.schema]?.find(t => t.tableName === table.name);
-    }
-    for (const schema of Object.values(schemas)) {
-        const tableInfo = schema.find(t => t.tableName === table.name);
-        if (tableInfo) return tableInfo;
-    }
-    return undefined;
+export interface CellEditTarget {
+    schema: string;
+    table: string;
+    /** The table column the edited value is written to. */
+    column: string;
+    /** Each primary key column of the table, and the result column holding its value for the row. */
+    key: { column: string; resultColumn: string }[];
 }
 
 /**
- * The name Postgres gives the result column of an unaliased select item, as
- * far as it can be told from the expression: a column keeps its name, a cast
- * the name of what it casts, a function call the function's, and anything
- * else a name no table column has.
+ * Why a cell cannot be edited: a translation key of the console's, and its
+ * parameters.
  */
-function expressionColumnName(expr: Expr): string {
-    switch (expr.type) {
-        case "ref":
-            return expr.name;
-        case "cast": {
-            const operandName = expressionColumnName(expr.operand);
-            if (operandName !== "?column?") return operandName;
-            return expr.to.kind === "array" ? operandName : expr.to.name;
-        }
-        case "call":
-            return expr.function.name;
-        case "keyword":
-            return expr.keyword;
-        case "case":
-            return "case";
-        case "array select":
-            return "array";
-        case "select": {
-            const [first] = expr.columns ?? [];
-            return first ? selectedColumnName(first) : "?column?";
-        }
-        default:
-            return "?column?";
-    }
+export interface CellEditRefusal {
+    key:
+        | "studio_sql_edit_unreadable_query"
+        | "studio_sql_edit_not_a_select"
+        | "studio_sql_edit_duplicate_column"
+        | "studio_sql_edit_computed_column"
+        | "studio_sql_edit_not_a_table"
+        | "studio_sql_edit_inherited_table"
+        | "studio_sql_edit_no_primary_key"
+        | "studio_sql_edit_key_missing"
+        | "studio_sql_edit_table_read_twice";
+    params: Record<string, string>;
 }
 
-function selectedColumnName(column: SelectedColumn): string {
-    return column.alias?.name ?? expressionColumnName(column.expr);
-}
+export type CellEditResolution =
+    | { target: CellEditTarget; refusal?: undefined }
+    | { target?: undefined; refusal: CellEditRefusal };
+
+const refuse = (key: CellEditRefusal["key"], params: Record<string, string> = {}): CellEditResolution =>
+    ({ refusal: { key, params } });
 
 /**
- * How many columns of the query's result may carry `name` — an upper bound:
- * a `*` over a source whose columns are not known counts once for every name.
+ * Which stored cell an edit of the result column `resultColumn` writes, and
+ * how its row is found again — or why no edit is safe.
  *
- * A result row is an object keyed by column name, so where two columns share
- * a name the row holds only the last of them. A key or a value read from such
- * a row cannot be told apart from its namesake: for `SELECT * FROM posts p
- * JOIN authors a …` the row's `id` is the author's.
+ * Decided on what the database reported, not on the query's text. Each
+ * column of the result says which table column it was read from, or that it
+ * was computed; a cell is editable only when it was read from a column of a
+ * table, every column of that table's primary key was read too, and each of
+ * them is the only column of the result with its name — a row holds one value
+ * per name.
+ *
+ * The text was the only evidence before, and it was wrong twice over. For
+ * `SELECT p.id, a.name FROM posts p JOIN authors a …` it took the post's `id`
+ * for the author's key and updated whichever author shared the post's id.
+ * For `SELECT id, lower(email) AS name FROM users` it wrote the edited text
+ * to `users.name`.
+ *
+ * The database reports a table, not which mention of it: in a self-join both
+ * sides are `authors`, and a key from one with a value from the other finds
+ * the wrong row. So the query is still read, for one thing — the table must
+ * be read once, and nothing it is read through may be read twice.
  */
-function resultColumnCounter(ast: SelectFromStatement, schemas: Record<string, TableInfo[]>): (name: string) => number {
-    const sources = (ast.from ?? []).map(item => {
-        if (item.type === "table") {
-            const renamed = item.name.columnNames ?? [];
-            const columns = findTableInfo(schemas, { name: item.name.name, schema: item.name.schema })
-                ?.columns.map((c, i) => renamed[i]?.name ?? c.name);
-            return { refName: item.name.alias ?? item.name.name, columns };
-        }
-        if (item.type === "statement") {
-            const { statement } = item;
-            const named = statement.type === "select" &&
-                (statement.columns ?? []).every(c => !(c.expr.type === "ref" && c.expr.name === "*"));
-            const renamed = item.columnNames ?? [];
-            const columns = named && statement.type === "select"
-                ? (statement.columns ?? []).map((c, i) => renamed[i]?.name ?? selectedColumnName(c))
-                : undefined;
-            return { refName: item.alias, columns };
-        }
-        return { refName: item.alias?.name, columns: undefined };
-    });
-    return (name: string) => {
-        let count = 0;
-        for (const column of ast.columns ?? []) {
-            const expr = column.expr;
-            if (expr.type === "ref" && expr.name === "*") {
-                const covered = expr.table
-                    ? sources.filter(source => source.refName === expr.table?.name)
-                    : sources;
-                if (covered.length === 0) count += 1;
-                for (const source of covered) {
-                    count += source.columns ? source.columns.filter(c => c === name).length : 1;
-                }
-            } else if (selectedColumnName(column) === name) {
-                count += 1;
-            }
-        }
-        return count;
-    };
+export function resolveCellEdit(sqlText: string, provenance: ResultProvenance, resultColumn: string): CellEditResolution {
+    const sameName = provenance.columns.filter(column => column.name === resultColumn);
+    if (sameName.length !== 1) return refuse("studio_sql_edit_duplicate_column", { column: resultColumn });
+    const source = sameName[0].source;
+    if (!source) return refuse("studio_sql_edit_computed_column", { column: resultColumn });
+
+    const tableLabel = `${source.schema}.${source.table}`;
+    const table = provenance.tables.find(t => t.schema === source.schema && t.table === source.table);
+    if (!table || (table.kind !== "table" && table.kind !== "partitioned table")) {
+        return refuse("studio_sql_edit_not_a_table", { column: resultColumn, table: tableLabel });
+    }
+    if (table.hasInheritors) return refuse("studio_sql_edit_inherited_table", { table: tableLabel });
+    if (table.primaryKey.length === 0) return refuse("studio_sql_edit_no_primary_key", { table: tableLabel });
+
+    const key: CellEditTarget["key"] = [];
+    for (const keyColumn of table.primaryKey) {
+        const holders = provenance.columns.filter(column =>
+            column.source?.schema === source.schema &&
+            column.source.table === source.table &&
+            column.source.column === keyColumn);
+        const holder = holders.length === 1 && provenance.columns.filter(column => column.name === holders[0].name).length === 1
+            ? holders[0]
+            : undefined;
+        if (!holder) return refuse("studio_sql_edit_key_missing", { table: tableLabel, columns: table.primaryKey.join(", ") });
+        key.push({ column: keyColumn, resultColumn: holder.name });
+    }
+
+    const readOnce = tableReadOnce(sqlText, source.table);
+    if (readOnce !== true) return readOnce;
+
+    return { target: { schema: source.schema, table: source.table, column: source.column, key } };
 }
 
 /**
- * A collection matched to a table in a SQL query.
+ * Whether `sqlText` is one SELECT that reads `table` once — counting every
+ * mention of a table of that name, in any schema and at any depth, and every
+ * mention of a `WITH` query, since one read twice reads its tables twice.
+ */
+function tableReadOnce(sqlText: string, table: string): true | CellEditResolution {
+    const statements = parseStatements(sqlText);
+    if (!statements) return refuse("studio_sql_edit_unreadable_query");
+    if (statements.length !== 1) return refuse("studio_sql_edit_not_a_select");
+    const [statement] = statements;
+    const isRead = statement.type === "select" ||
+        (statement.type === "with" &&
+            statement.in.type === "select" &&
+            statement.bind.every(binding => binding.statement.type === "select"));
+    if (!isRead) return refuse("studio_sql_edit_not_a_select");
+
+    const mentions = new Map<string, number>();
+    const withNames: string[] = [];
+    astVisitor(visitor => ({
+        fromTable: from => {
+            const name = from.name.name.toLowerCase();
+            mentions.set(name, (mentions.get(name) ?? 0) + 1);
+            visitor.super().fromTable(from);
+        },
+        with: withStatement => {
+            withNames.push(...withStatement.bind.map(binding => binding.alias.name.toLowerCase()));
+            visitor.super().with(withStatement);
+        }
+    })).statement(statement);
+
+    const readTwice = (mentions.get(table.toLowerCase()) ?? 0) !== 1 ||
+        withNames.some(name => (mentions.get(name) ?? 0) > 1);
+    return readTwice ? refuse("studio_sql_edit_table_read_twice", { table }) : true;
+}
+
+/**
+ * A collection whose records a query's rows can be opened as.
  */
 export interface ResolvedQueryCollection {
-    /** DB table name from the SQL AST (e.g. "blog_posts") */
+    /** The table, as the database named it. */
     tableName: string;
-    /** SQL alias if present (e.g. "bp") */
-    tableAlias?: string;
+    schemaName: string;
     /** The matched collection */
     collection: AdminCollection;
-    /** Columns from this table that are present in the result set */
-    columns: string[];
-    /** The result column name that holds the primary key for this table (e.g. "id", "author_id") */
-    pkColumn?: string;
+    /** The result column that holds the table's primary key. */
+    pkColumn: string;
 }
 
 /**
- * Extract all tables referenced in a SQL query's FROM and JOIN clauses.
- * Returns an empty array for non-SELECT queries or parse failures.
- */
-export function extractTablesFromQuery(sqlString: string): ExtractedTable[] {
-    try {
-        const ast = parseFirst(sqlString);
-        if (ast.type !== "select") return [];
-
-        const tables: ExtractedTable[] = [];
-
-        // pgsql-ast-parser From items — tables and joins with left/right branches
-        type FromNode = { type: string; name?: { name: string; schema?: string; alias?: string }; left?: FromNode; right?: FromNode };
-        const processFrom = (fromItems: FromNode[]) => {
-            for (const item of fromItems) {
-                if (item.type === "table" && item.name) {
-                    tables.push({ name: item.name.name,
-schema: item.name.schema,
-alias: item.name.alias });
-                }
-                if (item.type === "join") {
-                    if (item.left) processFrom([item.left]);
-                    if (item.right) processFrom([item.right]);
-                }
-            }
-        };
-
-        if (ast.from) {
-            processFrom(ast.from);
-        }
-
-        return tables;
-    } catch {
-        return [];
-    }
-}
-
-import { toSnakeCase } from "@rebasepro/utils";
-import type { AdminCollection } from "@rebasepro/cms-types";
-
-/**
- * Resolve which collections are referenced by a SQL query.
+ * The collections a result's rows can be opened as: those whose table one of
+ * the result's columns was read from, with the table's (single-column) primary
+ * key read too, under a name no other column of the result has.
  *
- * Parses the SQL, extracts table names, and matches each against
- * registered collections via `collection.table` (falling back to
- * snake_case of `collection.slug`).
- *
- * For each matched collection, determines which result columns
- * belong to that table using the database schema information.
+ * Matched on the provenance the database reported. A text match took the
+ * result's `id` for every table of a join: `SELECT p.id, a.name FROM posts p
+ * JOIN authors a …` offered to open the author whose id was the post's.
  */
-export function resolveQueryCollections(
-    sqlString: string,
-    schemas: Record<string, TableInfo[]>,
-    collections: AdminCollection[],
-    resultColumns?: string[]
-): ResolvedQueryCollection[] {
-    const tables = extractTablesFromQuery(sqlString);
-    if (tables.length === 0) return [];
-
-    // Parse the AST to resolve SELECT column aliases
-    const selectColumns: { table?: string; column: string; alias?: string }[] = [];
-    let countResultColumns: ((name: string) => number) | undefined;
-    try {
-        const ast = parseFirst(sqlString);
-        if (ast.type === "select") {
-            countResultColumns = resultColumnCounter(ast, schemas);
-            for (const col of ast.columns ?? []) {
-                if (col.expr?.type === "ref") {
-                    selectColumns.push({
-                        table: col.expr.table?.name,
-                        column: col.expr.name,
-                        alias: col.alias?.name
-                    });
-                }
-            }
-        }
-    } catch { /* parse failure is ok, we'll fall back */ }
-
+export function resolveQueryCollections(provenance: ResultProvenance, collections: AdminCollection[]): ResolvedQueryCollection[] {
     const results: ResolvedQueryCollection[] = [];
-
-    for (const table of tables) {
-        // Match table name against collection table or slug->snake_case —
-        // and, when the query named a schema, the collection's schema too:
-        // `archive.orders` is not the `orders` collection's table, and its
-        // rows' ids open somebody else's records.
-        const matched = collections.find(c => {
+    for (const table of provenance.tables) {
+        const collection = collections.find(c => {
             const tableName = ("table" in c ? c.table : undefined) || toSnakeCase(c.slug);
             const schemaName = ("schema" in c ? c.schema : undefined) || "public";
-            return tableName === table.name && (!table.schema || table.schema === schemaName);
+            return tableName === table.table && schemaName === table.schema;
         });
-
-        if (!matched) continue;
-
-        // Find columns belonging to this table from the schema
-        const tableColumns: string[] = findTableInfo(schemas, table)?.columns.map(c => c.name) ?? [];
-
-        // Determine which result column holds the PK ("id") for this table.
-        // 1. Check parsed SELECT columns for an explicit "id" column from this table (by name or alias)
-        // 2. Fall back to checking if result columns contain "id"
-        let pkColumn: string | undefined;
-
-        // Look in the AST select columns for `table.id` or `alias.id`
-        const tableRef = table.alias || table.name;
-        const idSelectCol = selectColumns.find(
-            sc => sc.column === "id" && (!sc.table || sc.table === tableRef || sc.table === table.name)
-        );
-        if (idSelectCol) {
-            pkColumn = idSelectCol.alias || idSelectCol.column; // use alias if present
-        }
-
-        // If we didn't find it from the AST (e.g. SELECT *), check if result columns have "id"
-        if (!pkColumn && resultColumns) {
-            if (resultColumns.includes("id")) {
-                pkColumn = "id";
-            }
-        }
-
-        // If still not found, fall back to checking tableColumns
-        if (!pkColumn && tableColumns.includes("id")) {
-            pkColumn = "id";
-        }
-
-        // A key column another column of the result shares its name with is
-        // not this table's: the row holds only the last of them.
-        if (pkColumn && (!countResultColumns || countResultColumns(pkColumn) > 1)) {
-            pkColumn = undefined;
-        }
-
-        results.push({
-            tableName: table.name,
-            tableAlias: table.alias,
-            collection: matched,
-            columns: tableColumns,
-            pkColumn
-        });
+        if (!collection || table.primaryKey.length !== 1) continue;
+        const [keyColumn] = table.primaryKey;
+        const holders = provenance.columns.filter(column =>
+            column.source?.schema === table.schema &&
+            column.source.table === table.table &&
+            column.source.column === keyColumn);
+        if (holders.length !== 1) continue;
+        const pkColumn = holders[0].name;
+        if (provenance.columns.filter(column => column.name === pkColumn).length !== 1) continue;
+        results.push({ tableName: table.table, schemaName: table.schema, collection, pkColumn });
     }
-
     return results;
-}
-
-export interface PKMapping {
-    /** The actual column name in the database table */
-    dbColumn: string;
-    /** The column name as it appears in the query result set (may be aliased) */
-    resultColumn: string;
-}
-
-export interface TableAndPKResult {
-    tableName?: string;
-    /**
-     * The schema the query named for that table — `undefined` when it named
-     * none. Build the UPDATE with {@link quoteTableName}: a bare table name
-     * resolves through the search path, which is how editing a row of
-     * `archive.orders` used to update `public.orders`.
-     */
-    schemaName?: string;
-    primaryKeys?: PKMapping[];
-    error?: string;
-}
-
-export function determineTableAndPK(sqlString: string, columnKey: string, schemas: Record<string, TableInfo[]>): TableAndPKResult {
-    try {
-        const tables = extractTablesFromQuery(sqlString);
-
-        const ast = parseFirst(sqlString);
-        if (ast.type !== "select") {
-            return { error: "Inline editing is only supported for SELECT queries." };
-        }
-
-        if (tables.length === 0) {
-            return { error: "Could not find any tables in the query." };
-        }
-
-        // Parse SELECT columns to resolve aliases
-        const selectColumns: { table?: string; column: string; alias?: string }[] = [];
-        if (ast.columns) {
-            for (const col of ast.columns) {
-                if (col.expr?.type === "ref") {
-                    selectColumns.push({
-                        table: col.expr.table?.name,
-                        column: col.expr.name,
-                        alias: col.alias?.name
-                    });
-                }
-            }
-        }
-
-        // Resolve which DB column `columnKey` refers to (it might be aliased)
-        const resolvedColumn = selectColumns.find(
-            sc => (sc.alias === columnKey) || (!sc.alias && sc.column === columnKey)
-        );
-        const actualDbColumnName = resolvedColumn?.column ?? columnKey;
-        const columnTableRef = resolvedColumn?.table; // e.g. "p" or "posts"
-
-        // Resolve the table for the edited column
-        let resolvedTable: ExtractedTable | null = null;
-
-        if (tables.length === 1) {
-            resolvedTable = tables[0];
-        } else {
-            // If the AST tells us which table, use that
-            if (columnTableRef) {
-                const matchedTable = tables.find(
-                    t => t.alias === columnTableRef || t.name === columnTableRef
-                );
-                if (matchedTable) {
-                    resolvedTable = matchedTable;
-                }
-            }
-
-            // Otherwise, look up which schema table has this column
-            if (!resolvedTable) {
-                const matchedTables = tables.filter(t =>
-                    findTableInfo(schemas, t)?.columns.some(c => c.name === actualDbColumnName) ?? false
-                );
-
-                if (matchedTables.length === 1) {
-                    resolvedTable = matchedTables[0];
-                } else if (matchedTables.length > 1) {
-                    return { error: `Ambiguous column "${columnKey}": Found in multiple queried tables.` };
-                } else {
-                    return { error: `Could not find column "${columnKey}" in the queried tables.` };
-                }
-            }
-        }
-
-        if (!resolvedTable) {
-            return { error: "Could not resolve the target table." };
-        }
-        const resolvedTableName = resolvedTable.name;
-
-        // Find the table's actual primary key columns from the schema — the
-        // schema the query named, when it named one.
-        const pkDbColumns = (findTableInfo(schemas, resolvedTable)?.columns ?? [])
-            .filter(c => c.isPrimaryKey)
-            .map(c => c.name);
-
-        if (pkDbColumns.length === 0) {
-            return { error: `Table "${resolvedTableName}" has no primary key defined.` };
-        }
-
-        // The table's alias in the query (for resolving PK result column names)
-        const tableAlias = resolvedTable.alias;
-
-        // Map each PK db column to its result column name (resolving aliases)
-        const primaryKeys: PKMapping[] = pkDbColumns.map(dbCol => {
-            // Find the SELECT column for this PK
-            const selectCol = selectColumns.find(
-                sc => sc.column === dbCol &&
-                    (!sc.table || sc.table === (tableAlias || resolvedTableName))
-            );
-            return {
-                dbColumn: dbCol,
-                resultColumn: selectCol?.alias || selectCol?.column || dbCol
-            };
-        });
-
-        // The row holds only the last of several columns of one name, so an
-        // edited value or a key read from a shared name may be another
-        // table's: the UPDATE would find some other row by it.
-        const countResultColumns = resultColumnCounter(ast, schemas);
-        if (countResultColumns(columnKey) > 1) {
-            return { error: `Ambiguous column "${columnKey}": the result has more than one column of that name. Give each one its own alias to edit it.` };
-        }
-        const sharedKey = primaryKeys.find(pk => countResultColumns(pk.resultColumn) > 1);
-        if (sharedKey) {
-            return { error: `Cannot tell which "${sharedKey.resultColumn}" column is the key of "${resolvedTableName}": the result has more than one column of that name. Give it its own alias (${tableAlias || resolvedTableName}.${sharedKey.dbColumn} AS ${resolvedTableName}_${sharedKey.dbColumn}) to edit this table.` };
-        }
-
-        return { tableName: resolvedTableName,
-schemaName: resolvedTable.schema,
-primaryKeys };
-    } catch (e: unknown) {
-        console.warn("Failed to parse SQL AST:", e);
-        const message = e instanceof Error ? e.message : String(e);
-        return { error: `Could not safely parse query for inline editing: ${message}` };
-    }
 }

@@ -94,7 +94,7 @@ describe("history is not lossy", () => {
             jest.spyOn(driver.dataService, "save")
                 .mockImplementation(async (_p, values) => ({ id: 1, ...(values as object) }) as any);
             // The row a delete reads before it deletes.
-            jest.spyOn(driver.dataService, "fetchOne").mockResolvedValue({ id: 1, title: "Hi" });
+            jest.spyOn(driver.dataService, "fetchOneForRest").mockResolvedValue({ id: 1, title: "Hi" });
             jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined as any);
             return driver;
         };

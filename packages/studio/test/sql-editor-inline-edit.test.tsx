@@ -5,6 +5,7 @@ import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { en } from "../../app/src/locales/en";
+import type { SqlScriptColumn, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
 
 /**
  * Editing a cell of the SQL console's results writes to the database and as
@@ -19,19 +20,48 @@ import { en } from "../../app/src/locales/en";
 
 type ExecuteOptions = { database?: string; role?: string };
 
-const orderColumns = [
+const schemaColumns = [
     { schema: "public", table: "orders", column: "id", data_type: "integer", is_pk: true },
-    { schema: "public", table: "orders", column: "status", data_type: "text", is_pk: false }
+    { schema: "public", table: "orders", column: "status", data_type: "text", is_pk: false },
+    { schema: "public", table: "posts", column: "id", data_type: "integer", is_pk: true },
+    { schema: "public", table: "posts", column: "author_id", data_type: "integer", is_pk: false },
+    { schema: "public", table: "authors", column: "id", data_type: "integer", is_pk: true },
+    { schema: "public", table: "authors", column: "name", data_type: "text", is_pk: false }
 ];
 
+const ORDERS = "SELECT * FROM orders";
+const POSTS_WITH_AUTHORS = "SELECT p.id, a.name FROM posts p JOIN authors a ON a.id = p.author_id";
+
+const tableOf = (table: string): SqlScriptTable => ({ schema: "public", table, kind: "table", primaryKey: ["id"], hasInheritors: false });
+const readFrom = (name: string, table: string): SqlScriptColumn => ({ name, source: { schema: "public", table, column: name } });
+
+/** What the server answers for each query the console runs: rows, and where each column was read from. */
+const scripts: Record<string, SqlScriptResult> = {
+    [ORDERS]: {
+        rows: [{ id: "7", status: "new" }],
+        columns: [readFrom("id", "orders"), readFrom("status", "orders")],
+        tables: [tableOf("orders")]
+    },
+    [POSTS_WITH_AUTHORS]: {
+        rows: [{ id: "1", name: "new" }],
+        columns: [readFrom("id", "posts"), readFrom("name", "authors")],
+        tables: [tableOf("posts"), tableOf("authors")]
+    }
+};
+
+const scriptFor = (sql: string): SqlScriptResult | undefined =>
+    Object.entries(scripts).find(([query]) => sql.startsWith(query))?.[1];
+
 const executeSql = jest.fn(async (sql: string, _options?: ExecuteOptions): Promise<unknown> => {
-    if (sql.includes("information_schema")) return orderColumns;
+    if (sql.includes("information_schema")) return schemaColumns;
     if (sql.includes("current_user")) return [{ role: "postgres" }];
-    if (sql.startsWith("SELECT * FROM orders")) return [{ id: 7, status: "new" }];
-    return [];
+    return scriptFor(sql)?.rows ?? [];
 });
-const databaseAdmin = {
+const runSqlScript = jest.fn(async (sql: string, _options?: ExecuteOptions): Promise<SqlScriptResult> =>
+    scriptFor(sql) ?? { rows: [], columns: [], tables: [] });
+const databaseAdmin: Record<string, unknown> = {
     executeSql,
+    runSqlScript,
     fetchAvailableDatabases: async () => ["app_prod", "app_staging"],
     fetchAvailableRoles: async () => ["postgres", "reader"],
     fetchCurrentDatabase: async () => "app_prod"
@@ -104,22 +134,27 @@ function label(key: keyof typeof en): string {
     return value;
 }
 
-/** The UPDATEs sent, with the connection each was sent on. */
+/** The UPDATEs sent, by either door, with the connection each was sent on. */
 function updates(): [string, ExecuteOptions | undefined][] {
-    return executeSql.mock.calls
+    return [...executeSql.mock.calls, ...runSqlScript.mock.calls]
         .filter(([sql]) => sql.startsWith("UPDATE"))
         .map(([sql, options]) => [sql, options]);
 }
 
-/** Runs `SELECT * FROM orders` on app_prod as postgres and waits for its row. */
-async function selectOrders(): Promise<void> {
+/** Runs `query` on app_prod as postgres and waits for its row. */
+async function runQuery(query: string): Promise<void> {
     render(<SQLEditor/>);
     await screen.findByRole("menuitem", { name: "app_staging" });
     await waitFor(() => expect(executeSql.mock.calls.some(([sql]) => sql.includes("information_schema"))).toBe(true));
-    fireEvent.change(await screen.findByLabelText("SQL"), { target: { value: "SELECT * FROM orders" } });
+    fireEvent.change(await screen.findByLabelText("SQL"), { target: { value: query } });
     fireEvent.click(screen.getByRole("button", { name: label("studio_sql_run") }));
     await screen.findByText("new");
-    const run = executeSql.mock.calls.find(([sql]) => sql.startsWith("SELECT * FROM orders"));
+}
+
+/** Runs `SELECT * FROM orders` on app_prod as postgres and waits for its row. */
+async function selectOrders(): Promise<void> {
+    await runQuery(ORDERS);
+    const run = [...executeSql.mock.calls, ...runSqlScript.mock.calls].find(([sql]) => sql.startsWith(ORDERS));
     expect(run?.[1]).toEqual({ database: "app_prod", role: "postgres" });
 }
 
@@ -147,6 +182,8 @@ async function tryToEditStatus(): Promise<void> {
 
 beforeEach(() => {
     executeSql.mockClear();
+    runSqlScript.mockClear();
+    databaseAdmin.runSqlScript = runSqlScript;
     snackbarOpen.mockClear();
     localStorage.clear();
 });
@@ -159,7 +196,7 @@ describe("inline editing a result row", () => {
 
         await waitFor(() => expect(updates()).toHaveLength(1));
         expect(updates()[0]).toEqual([
-            "UPDATE \"orders\" SET \"status\" = 'shipped' WHERE \"id\" = 7;",
+            "UPDATE \"public\".\"orders\" SET \"status\" = 'shipped' WHERE \"id\" = '7';",
             { database: "app_prod", role: "postgres" }
         ]);
     });
@@ -190,5 +227,37 @@ describe("inline editing a result row", () => {
             type: "error",
             message: label("studio_sql_cannot_edit_other_connection")
         });
+    });
+});
+
+/**
+ * Editing a cell of a join updated a different row of the edited table: the
+ * key was read off the query's text, and the only `id` in the result was the
+ * post's. `UPDATE authors SET name = … WHERE id = <the post's id>` overwrote
+ * whichever author had that id, and the console said "Row updated".
+ */
+describe("inline editing a joined table", () => {
+    jest.setTimeout(20000);
+
+    it("does not write a column whose table's key is not in the result", async () => {
+        await runQuery(POSTS_WITH_AUTHORS);
+
+        await tryToEditStatus();
+
+        expect(updates()).toEqual([]);
+        expect(snackbarOpen).toHaveBeenCalledWith({
+            type: "error",
+            message: "To edit columns of public.authors, select its primary key (id) under a name no other column of the result has."
+        });
+    });
+
+    it("edits nothing when the backend cannot say where a column came from", async () => {
+        delete databaseAdmin.runSqlScript;
+        await selectOrders();
+
+        await tryToEditStatus();
+
+        expect(updates()).toEqual([]);
+        expect(snackbarOpen).toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
     });
 });

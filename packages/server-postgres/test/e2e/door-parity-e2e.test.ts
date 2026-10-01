@@ -42,6 +42,7 @@ import { errorHandler } from "../../../server/src/api/errors.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { configureJwt, generateAccessToken } from "../../../server/src/auth/jwt.js";
 import { MCP_TOOLS, McpToolError } from "../../../server/src/mcp/mcp-tools.js";
+import { createHistoryRoutes } from "../../../server/src/history/history-routes.js";
 import {
     DOORS,
     PARITY_CASES,
@@ -57,6 +58,7 @@ import {
 const docsTable = pgTable("docs", {
     id: varchar("id").primaryKey(),
     title: varchar("title"),
+    due: timestamp("due", { withTimezone: true, mode: "string" }),
     created_at: timestamp("created_at", { withTimezone: true, mode: "string" }),
     deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "string" })
 });
@@ -66,8 +68,9 @@ const hookLog: string[] = [];
 
 /**
  * Soft delete, history and a hook at every write stage: the three things a door
- * can skip without any other symptom. `created_at` is a date, so a door that
- * hands back the admin view model (`{ __type: "date" }`) shows it.
+ * can skip without any other symptom. `due` and `created_at` are dates, so a
+ * door that hands back the admin view model (`{ __type: "date" }`) shows it —
+ * and `due`, unlike the create stamp, is one a revert writes back.
  */
 const docsCollection = {
     slug: "docs",
@@ -78,6 +81,7 @@ const docsCollection = {
     properties: {
         id: { name: "ID", type: "string", isId: true },
         title: { name: "Title", type: "string" },
+        due: { name: "Due", type: "date" },
         created_at: { name: "Created", type: "date", autoValue: "on_create" },
         deletedAt: { name: "Deleted at", type: "date" }
     },
@@ -99,6 +103,9 @@ const docsCollection = {
 } as unknown as CollectionConfig;
 
 const USER = { uid: "door-user", roles: ["admin"] };
+
+/** The `due` every staged row carries. */
+const DUE = "2026-01-02T03:04:05.000Z";
 
 /**
  * The doors with a spelling for a hard delete. `_batch` and MCP have none;
@@ -128,6 +135,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
     let pool: pg.Pool;
     let driver: PostgresBackendDriver;
     let realtime: RealtimeService;
+    let historyService: HistoryService;
     let server: Server;
     let socket: NodeWebSocket;
     const app = new Hono<HonoEnv>();
@@ -180,6 +188,13 @@ describe("door parity: one operation, one answer (E2E)", () => {
     async function mcp(tool: string, args: Record<string, unknown>): Promise<DoorAnswer> {
         const definition = MCP_TOOLS.find(candidate => candidate.name === tool);
         if (!definition) throw new Error(`No MCP tool ${tool}`);
+        // The row a write carries, under the name the tool declares for it
+        // (`data`, as the SDK spells it; `values` before that).
+        const declared = (definition.inputSchema.properties ?? {}) as Record<string, unknown>;
+        if ("row" in args && !("row" in declared)) {
+            const { row, ...rest } = args;
+            args = { ...rest, ["data" in declared ? "data" : "values"]: row };
+        }
         try {
             const out = await definition.run(args, {
                 driver: driver as unknown as DataDriver,
@@ -280,8 +295,8 @@ describe("door parity: one operation, one answer (E2E)", () => {
             )
         },
         mcp: {
-            create: (id, { values }) => mcp("create_document", { collection: "docs", values: { id, ...values } }),
-            update: (id, { values }) => mcp("update_document", { collection: "docs", id, values }),
+            create: (id, { values }) => mcp("create_document", { collection: "docs", row: { id, ...values } }),
+            update: (id, { values }) => mcp("update_document", { collection: "docs", id, row: values }),
             delete: (id) => mcp("delete_document", { collection: "docs", id }),
             get: (id) => mcp("get_document", { collection: "docs", id })
         },
@@ -309,8 +324,8 @@ describe("door parity: one operation, one answer (E2E)", () => {
     async function stage(state: StartingState, id: string): Promise<void> {
         if (state === "absent") return;
         await observer.query(
-            "INSERT INTO public.docs (id, title, created_at, deleted_at) VALUES ($1, $2, now(), $3)",
-            [id, STORED_TITLE, state === "trashed" ? new Date().toISOString() : null]
+            "INSERT INTO public.docs (id, title, due, created_at, deleted_at) VALUES ($1, $2, $3, now(), $4)",
+            [id, STORED_TITLE, DUE, state === "trashed" ? new Date().toISOString() : null]
         );
     }
 
@@ -348,6 +363,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
             CREATE TABLE public.docs (
                 id varchar PRIMARY KEY,
                 title varchar,
+                due timestamptz,
                 created_at timestamptz,
                 deleted_at timestamptz
             );
@@ -366,14 +382,17 @@ describe("door parity: one operation, one answer (E2E)", () => {
             undefined, undefined, new HistoryService(db as never, undefined, { inTransaction: historyInTransaction })
         );
         realtime.setDataDriver(driver);
+        historyService = new HistoryService(db as never, undefined, { inTransaction: historyInTransaction });
 
-        // REST, as `init.ts` mounts it: every request on a driver scoped to its caller.
+        // REST, as `init.ts` mounts it: every request on a driver scoped to its
+        // caller, and history before the generator's nested catch-all.
         app.onError(errorHandler);
         app.use("/api/data/*", async (c, next) => {
             c.set("user", USER as never);
             c.set("driver", await driver.withAuth(USER as never));
             await next();
         });
+        app.route("/api/data", createHistoryRoutes({ historyService, registry: registry as never, driver }));
         app.route("/api/data", new RestApiGenerator([docsCollection], driver).generateRoutes());
 
         // The socket, signed in as the same caller.
@@ -420,6 +439,75 @@ describe("door parity: one operation, one answer (E2E)", () => {
         )).rejects.toMatchObject({ statusCode: 409, code: "ROW_IN_TRASH" });
         const after = await observe(id, { ok: true });
         expect([after.state, after.title]).toEqual(["trashed", STORED_TITLE]);
+    });
+
+    /**
+     * A row's history across the trash: who deleted it, its restore, and the
+     * way back to the version before the delete. Each step failed (DD-4): the
+     * history of a trashed row was a 404 though `?deleted=only` listed it; a
+     * restore was never recorded; and the delete's entry held the admin view
+     * model (`due: { __type: "date" }`), so reverting to it was a Postgres
+     * type error.
+     */
+    describe("history follows a row through the trash (DD-4)", () => {
+        const actions = async (id: string) =>
+            ((await http("GET", `/docs/${id}/history`)).json.data as { action: string }[]).map(entry => entry.action);
+
+        it("reads the history of a row while it is in the trash", async () => {
+            await http("POST", "/docs", { id: "h-1", title: "kept", due: DUE });
+            await http("DELETE", "/docs/h-1");
+
+            const history = await http("GET", "/docs/h-1/history");
+            expect(history.status).toBe(200);
+            expect(history.json.data.map((entry: { action: string; updated_by: string }) => [entry.action, entry.updated_by]))
+                .toEqual([["delete", USER.uid], ["create", USER.uid]]);
+        });
+
+        it("records the restore, and reverts to the version the delete recorded", async () => {
+            await http("POST", "/docs", { id: "h-2", title: "before", due: DUE });
+            await http("DELETE", "/docs/h-2");
+            expect((await http("PATCH", "/docs/h-2", { deletedAt: null })).status).toBe(200);
+            await http("PATCH", "/docs/h-2", { title: "after", due: "2030-01-01T00:00:00.000Z" });
+            expect(await actions("h-2")).toEqual(["update", "update", "delete", "create"]);
+
+            const entries = (await http("GET", "/docs/h-2/history")).json.data as { id: string; action: string }[];
+            const deleted = entries.find(entry => entry.action === "delete")!;
+            const revert = await http("POST", `/docs/h-2/history/${deleted.id}/revert`);
+            expect(revert.status).toBe(200);
+
+            const stored = await observer.query("SELECT title, due FROM public.docs WHERE id = 'h-2'");
+            expect(stored.rows[0].title).toBe("before");
+            expect(new Date(stored.rows[0].due).toISOString()).toBe(DUE);
+        });
+
+        it("reverting a trashed row to a version from before the delete restores it", async () => {
+            await http("POST", "/docs", { id: "h-4", title: "original", due: DUE });
+            await http("DELETE", "/docs/h-4");
+            const entries = (await http("GET", "/docs/h-4/history")).json.data as { id: string; action: string }[];
+            const created = entries.find(entry => entry.action === "create")!;
+
+            expect((await http("POST", `/docs/h-4/history/${created.id}/revert`)).status).toBe(200);
+            const stored = await observer.query("SELECT title, deleted_at FROM public.docs WHERE id = 'h-4'");
+            expect(stored.rows[0]).toEqual({ title: "original", deleted_at: null });
+            expect(await actions("h-4")).toEqual(["update", "delete", "create"]);
+        });
+
+        it("reverts to a delete entry recorded in the old view-model shape", async () => {
+            // Entries written before the fix stay as they were; a revert to one
+            // reads its date envelopes rather than handing them to Postgres.
+            await http("POST", "/docs", { id: "h-3", title: "now", due: "2030-01-01T00:00:00.000Z" });
+            const legacy = await observer.query(
+                `INSERT INTO rebase.entity_history (table_name, entity_id, action, "values")
+                 VALUES ('docs', 'h-3', 'delete', $1::jsonb) RETURNING id`,
+                [JSON.stringify({ id: "h-3", title: "then", due: { __type: "date", value: DUE }, deletedAt: null })]
+            );
+
+            const revert = await http("POST", `/docs/h-3/history/${legacy.rows[0].id}/revert`);
+            expect(revert.status).toBe(200);
+            const stored = await observer.query("SELECT title, due FROM public.docs WHERE id = 'h-3'");
+            expect(stored.rows[0].title).toBe("then");
+            expect(new Date(stored.rows[0].due).toISOString()).toBe(DUE);
+        });
     });
 
     let caseSeq = 0;

@@ -4,6 +4,7 @@ import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver
 import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
 import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketLimits, WebSocketMessage } from "@rebasepro/types";
+import type { SqlScriptResult } from "@rebasepro/types";
 import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
@@ -45,6 +46,11 @@ export function socketRealtimeMissing(provider: RealtimeProvider): string[] {
 
 export function isSocketRealtimeService(provider: RealtimeProvider): provider is RealtimeProvider & SocketRealtimeService {
     return socketRealtimeMissing(provider).length === 0;
+}
+
+/** What a script run says besides its rows, which an `EXECUTE_SQL` answer carries as `result`. */
+function scriptDescription({ rows: _rows, ...description }: SqlScriptResult): Omit<SqlScriptResult, "rows"> {
+    return description;
 }
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
@@ -921,7 +927,7 @@ colors: true }));
                         break;
 
                     case "EXECUTE_SQL": {
-                        const { sql, options } = payload;
+                        const { sql, options, mode } = payload;
                         try {
                             const delegate = await getScopedDelegate();
                             const admin = delegate.admin;
@@ -929,12 +935,23 @@ colors: true }));
                                 sendError("ERROR", "NOT_SUPPORTED", "SQL execution is not available for this driver.");
                                 break;
                             }
+                            // The console's own runs: the result says, per
+                            // column, which table column the database read it
+                            // from — what an edit of a cell is written back
+                            // by. The rows still go in `result`, where a
+                            // client that reads nothing else finds them.
+                            const script = mode === "script" && typeof admin.runSqlScript === "function"
+                                ? await admin.runSqlScript(String(sql), {
+                                    database: typeof options?.database === "string" ? options.database : undefined,
+                                    role: typeof options?.role === "string" ? options.role : undefined
+                                })
+                                : undefined;
                             // A session of its own, reset before it goes back
                             // to the pool: what a person types may `SET ROLE`,
                             // and that must not reach the next request on
                             // that connection. Set here, after the client's
                             // options, so a frame cannot turn it off.
-                            const result = await admin.executeSql(sql, { ...options, isolateSession: true });
+                            const result = script ? script.rows : await admin.executeSql(sql, { ...options, isolateSession: true });
                             if (process.env.NODE_ENV !== "production") {
                                 wsDebug(`⚡ [WebSocket Server] SQL executed. Returned ${Array.isArray(result) ? result.length : "non-array"} rows.`);
                             }
@@ -974,7 +991,9 @@ colors: true }));
                             });
                             const response = {
                                 type: "EXECUTE_SQL_SUCCESS",
-                                payload: { result },
+                                // The rows once, as `result`; the rest of the
+                                // script's description beside them.
+                                payload: script ? { ...scriptDescription(script), result } : { result },
                                 requestId
                             };
                             ws.send(JSON.stringify(response));

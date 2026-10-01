@@ -47,8 +47,7 @@ import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView,
 import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeStoredJson, writeStoredString } from "@rebasepro/utils";
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
-import { parseFirst } from "pgsql-ast-parser";
-import { acceptsAutoLimit, buildExplainSql, determineTableAndPK, needsDestructiveConfirmation, quoteTableName, resolveQueryCollections, ResolvedQueryCollection } from "../../utils/sql_utils";
+import { acceptsAutoLimit, buildExplainSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, type CellEditResolution, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
@@ -277,7 +276,13 @@ export const SQLEditor = () => {
          * The database and role `lastExecutedSql` ran on: the rows on screen
          * were read there, and an edit of one is written there or not at all.
          */
-        lastExecutedConnection: SQLConnection | null
+        lastExecutedConnection: SQLConnection | null,
+        /**
+         * What the database said about the rows on screen: each column's
+         * name, and the table column it was read from. An edit is written
+         * back by this, and refused without it.
+         */
+        lastProvenance: ResultProvenance | null
     }>>(() => {
         const projectPrefixSync = getStoragePrefix(client?.baseUrl);
         // This runs during the first render, so anything it throws takes the
@@ -297,7 +302,8 @@ export const SQLEditor = () => {
             error: null,
             execTime: null,
             lastExecutedSql: null,
-            lastExecutedConnection: null
+            lastExecutedConnection: null,
+            lastProvenance: null
         }));
         if (restored.length > 0) return restored;
         return [{
@@ -311,7 +317,8 @@ export const SQLEditor = () => {
             error: null,
             execTime: null,
             lastExecutedSql: null,
-            lastExecutedConnection: null
+            lastExecutedConnection: null,
+            lastProvenance: null
         }];
     });
     const [activeTabId, setActiveTabId] = useState<string>(() => {
@@ -564,6 +571,17 @@ isPrimaryKey });
         connection !== null && connection.database === selectedDatabase && connection.role === selectedRole,
     [selectedDatabase, selectedRole]);
 
+    /**
+     * Which stored cell a result cell is — by what the database said about the
+     * last run's columns, and nothing else.
+     */
+    const resolveEdit = useCallback((columnKey: string): CellEditResolution => {
+        if (!activeTab.lastExecutedSql || !activeTab.lastProvenance) {
+            return { refusal: { key: "studio_sql_edit_computed_column", params: { column: columnKey } } };
+        }
+        return resolveCellEdit(activeTab.lastExecutedSql, activeTab.lastProvenance, columnKey);
+    }, [activeTab.lastExecutedSql, activeTab.lastProvenance]);
+
     const handleDoubleClick = useCallback((rowIndex: number, columnKey: string, initialValue: unknown, rowData: Record<string, unknown>) => {
         if (!activeTab.lastExecutedSql) {
             snackbarController.open({
@@ -583,18 +601,17 @@ isPrimaryKey });
             return;
         }
 
-        const resolution = determineTableAndPK(activeTab.lastExecutedSql, columnKey, schemas);
-
-        if (resolution.error || !resolution.primaryKeys || resolution.primaryKeys.length === 0) {
+        const resolution = resolveEdit(columnKey);
+        if (!resolution.target) {
             snackbarController.open({
                 type: "error",
-                message: resolution.error || t("studio_sql_cannot_resolve_table")
+                message: t(resolution.refusal.key, resolution.refusal.params)
             });
             return;
         }
 
-        // Check all PK values are present in the row
-        const missingPKs = resolution.primaryKeys.filter(
+        // A key read as NULL — the missing side of an outer join — finds no row.
+        const missingPKs = resolution.target.key.filter(
             pk => rowData[pk.resultColumn] === undefined || rowData[pk.resultColumn] === null
         );
         if (missingPKs.length > 0) {
@@ -608,7 +625,7 @@ isPrimaryKey });
         setEditingCell({ rowIndex,
 columnKey,
 initialValue });
-    }, [activeTab.lastExecutedSql, activeTab.lastExecutedConnection, isCurrentConnection, schemas, snackbarController, t]);
+    }, [activeTab.lastExecutedSql, activeTab.lastExecutedConnection, isCurrentConnection, resolveEdit, snackbarController, t]);
 
     const handleCellSave = useCallback(async (newValue: string | null, rowData: Record<string, unknown>, columnKey: string, rowIndex: number) => {
         if (!editingCell || !activeTab.lastExecutedSql) return;
@@ -624,17 +641,13 @@ message: t("studio_sql_cannot_edit_other_connection") });
             return;
         }
 
-        const resolution = determineTableAndPK(activeTab.lastExecutedSql, columnKey, schemas);
-        if (resolution.error || !resolution.tableName || !resolution.primaryKeys || resolution.primaryKeys.length === 0) {
+        const resolution = resolveEdit(columnKey);
+        if (!resolution.target) {
             snackbarController.open({ type: "error",
-message: resolution.error || "Resolution failed." });
+message: t(resolution.refusal.key, resolution.refusal.params) });
             return;
         }
-
-        // Qualified when the query was: a bare name resolves through the
-        // search path, so a row of `archive.orders` was written to
-        // `public.orders`.
-        const tableName = quoteTableName(resolution.tableName, resolution.schemaName);
+        const target = resolution.target;
 
         const formatValue = (val: unknown) => {
             if (val === null || val === undefined) return "NULL";
@@ -643,34 +656,14 @@ message: resolution.error || "Resolution failed." });
             return `'${String(val).replace(/'/g, "''")}'`;
         };
 
-        // Resolve the actual DB column name for the edited column (may differ from the result alias)
-        // e.g. if the query has `a.name AS author_name`, columnKey = "author_name" but DB column = "name"
-        const resolveDbColumnName = (resultColKey: string): string => {
-            try {
-                const ast = parseFirst(activeTab.lastExecutedSql!);
-                if (ast.type === "select" && ast.columns) {
-                    for (const col of ast.columns) {
-                        if (col.expr?.type === "ref") {
-                            const alias = col.alias?.name;
-                            const colName = col.expr.name;
-                            if (alias === resultColKey || (!alias && colName === resultColKey)) {
-                                return colName;
-                            }
-                        }
-                    }
-                }
-            } catch { /* fall back to columnKey */ }
-            return resultColKey;
-        };
-
-        const dbColumnName = resolveDbColumnName(columnKey);
-
-        // Build composite WHERE clause
-        const whereConditions = resolution.primaryKeys.map(
-            pk => `"${pk.dbColumn}" = ${formatValue(rowData[pk.resultColumn])}`
+        // The table and column the database said the cell was read from, in
+        // the schema it said — never a name read off the query, which
+        // resolves through the search path or belongs to another table.
+        const whereConditions = target.key.map(
+            pk => `${quoteIdentifier(pk.column)} = ${formatValue(rowData[pk.resultColumn])}`
         ).join(" AND ");
 
-        const updateSql = `UPDATE ${tableName} SET "${dbColumnName}" = ${formatValue(newValue)} WHERE ${whereConditions};`;
+        const updateSql = `UPDATE ${quoteTableName(target.table, target.schema)} SET ${quoteIdentifier(target.column)} = ${formatValue(newValue)} WHERE ${whereConditions};`;
 
         try {
             if (databaseAdmin?.executeSql) {
@@ -695,7 +688,7 @@ role: connection.role });
                 message: t("studio_sql_update_failed", { message: e instanceof Error ? e.message : String(e) })
             });
         }
-    }, [editingCell, schemas, activeTab.lastExecutedSql, activeTab.lastExecutedConnection, activeTab.results, isCurrentConnection, databaseAdmin, updateActiveTab, snackbarController, t]);
+    }, [editingCell, resolveEdit, activeTab.lastExecutedSql, activeTab.lastExecutedConnection, activeTab.results, isCurrentConnection, databaseAdmin, updateActiveTab, snackbarController, t]);
 
     const [columnWidths, setColumnWidths] = useState<Record<string, Record<string, number>>>(() => {
         const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
@@ -778,7 +771,8 @@ role: connection.role });
             error: null,
             execTime: null,
             lastExecutedSql: null,
-            lastExecutedConnection: null
+            lastExecutedConnection: null,
+            lastProvenance: null
         }]);
         setActiveTabId(newId);
     };
@@ -842,7 +836,8 @@ error: t("studio_sql_explain_single_statement") });
 error: null,
 results: null,
 lastExecutedSql: null,
-lastExecutedConnection: null });
+lastExecutedConnection: null,
+lastProvenance: null });
         const start = performance.now();
         try {
             if (databaseAdmin?.executeSql) {
@@ -876,14 +871,23 @@ results: null });
         const start = performance.now();
 
         try {
-            if (databaseAdmin?.executeSql) {
-                const result = await databaseAdmin.executeSql(sqlToRun, { database: selectedDatabase,
-role: selectedRole });
+            if (databaseAdmin?.runSqlScript || databaseAdmin?.executeSql) {
+                const connection = { database: selectedDatabase, role: selectedRole };
+                // A backend that cannot describe its result still runs the
+                // script; nothing in what it returns is said to come from a
+                // table, so no cell of it is edited.
+                const run = databaseAdmin.runSqlScript
+                    ? await databaseAdmin.runSqlScript(sqlToRun, connection)
+                    : undefined;
+                const rows: Record<string, unknown>[] = run ? run.rows : await databaseAdmin.executeSql!(sqlToRun, connection);
                 updateActiveTab({
-                    results: result,
+                    results: rows,
                     execTime: Math.round(performance.now() - start),
                     lastExecutedSql: sqlToRun,
-                    lastExecutedConnection: { database: selectedDatabase, role: selectedRole }
+                    lastExecutedConnection: connection,
+                    lastProvenance: run
+                        ? { columns: run.columns, tables: run.tables }
+                        : { columns: Object.keys(rows[0] ?? {}).map(name => ({ name })), tables: [] }
                 });
 
                 if (history[history.length - 1] !== activeTab.sql) {
@@ -1083,26 +1087,20 @@ role: selectedRole });
         const resultColumnKeys = Object.keys(results[0]);
 
         // Compute matched collections for this query, including PK column detection
-        const matchedCollections: ResolvedQueryCollection[] = (() => {
-            if (!activeTab.lastExecutedSql || !collectionRegistry.collections) return [];
-            try {
-                return resolveQueryCollections(activeTab.lastExecutedSql, schemas, collectionRegistry.collections, resultColumnKeys);
-            } catch {
-                return [];
-            }
-        })();
-
-        // Only collections that have a PK column in the result set can be opened
-        const actionableCollections = matchedCollections.filter(mc => mc.pkColumn && resultColumnKeys.includes(mc.pkColumn));
+        // Only collections whose key the database says is in the result can be opened.
+        const actionableCollections: ResolvedQueryCollection[] = activeTab.lastProvenance && collectionRegistry.collections
+            ? resolveQueryCollections(activeTab.lastProvenance, collectionRegistry.collections)
+                .filter(mc => resultColumnKeys.includes(mc.pkColumn))
+            : [];
 
         // For each row, determine which entities can be opened
         const getRowEntityActions = (rowData: Record<string, unknown>): { collection: ResolvedQueryCollection, entityId: string | number }[] => {
             if (!rowData) return [];
             return actionableCollections
-                .filter(mc => rowData[mc.pkColumn!] != null)
+                .filter(mc => rowData[mc.pkColumn] != null)
                 .map(mc => ({
                     collection: mc,
-                    entityId: rowData[mc.pkColumn!] as string | number
+                    entityId: rowData[mc.pkColumn] as string | number
                 }));
         };
 

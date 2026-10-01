@@ -66,7 +66,7 @@ describe("hooks and history see the stored row, not afterRead's view of it", () 
         jest.spyOn(driver.dataService, "getFetchService").mockReturnValue({
             fetchOneForRest: jest.fn().mockResolvedValue({ ...PREVIOUS })
         } as never);
-        jest.spyOn(driver.dataService, "fetchOne").mockResolvedValue({ ...STORED } as never);
+        jest.spyOn(driver.dataService, "fetchOneForRest").mockResolvedValue({ ...STORED } as never);
         jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined as never);
         return { driver, recordHistory, notifyUpdate };
     };

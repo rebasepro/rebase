@@ -926,7 +926,15 @@ export interface RebaseTranslations {
     studio_sql_markdown_copy_failed?: string;
     studio_sql_row_updated?: string;
     studio_sql_cannot_edit_missing_query?: string;
-    studio_sql_cannot_resolve_table?: string;
+    studio_sql_edit_unreadable_query?: string;
+    studio_sql_edit_not_a_select?: string;
+    studio_sql_edit_duplicate_column?: string;
+    studio_sql_edit_computed_column?: string;
+    studio_sql_edit_not_a_table?: string;
+    studio_sql_edit_inherited_table?: string;
+    studio_sql_edit_no_primary_key?: string;
+    studio_sql_edit_key_missing?: string;
+    studio_sql_edit_table_read_twice?: string;
     studio_sql_missing_pk?: string;
     studio_sql_cannot_edit_other_connection?: string;
     studio_sql_update_failed?: string;

@@ -137,10 +137,7 @@ const trashed = { state: "trashed" as const, title: STORED_TITLE };
 const absent = { state: "absent" as const };
 
 const saveHooks = (status: "new" | "existing") => [`beforeSave:${status}`, `afterSave:${status}`];
-const everyDoor = (why: string): Partial<Record<Door, string>> =>
-    Object.fromEntries(DOORS.map(door => [door, why]));
 
-const DD4_DELETE_ENTRY = "DD-4: a delete records the admin view model (`{ __type: \"date\" }`) as its history entry";
 const deleteHooks = ["beforeDelete", "afterDelete"];
 
 /**
@@ -221,11 +218,13 @@ export const PARITY_CASES: readonly ParityCase[] = [
 
     // ── delete ───────────────────────────────────────────────────────────
     {
+        // Every door recorded the delete's history entry in the admin view
+        // model (`{ __type: "date" }`), which a revert then wrote to Postgres
+        // (DD-4) — the judge's envelope check is what holds that.
         name: "a delete of a live row puts it in the trash",
         given: "live",
         when: { op: "delete" },
-        then: { outcome: "ok", hooks: deleteHooks, history: ["delete"], ...trashed },
-        pending: everyDoor(DD4_DELETE_ENTRY)
+        then: { outcome: "ok", hooks: deleteHooks, history: ["delete"], ...trashed }
     },
     {
         name: "a delete of a key no row has",
@@ -243,15 +242,13 @@ export const PARITY_CASES: readonly ParityCase[] = [
         name: "a hard delete of a live row removes it",
         given: "live",
         when: { op: "delete", hard: true },
-        then: { outcome: "ok", hooks: deleteHooks, history: ["delete"], ...absent },
-        pending: everyDoor(DD4_DELETE_ENTRY)
+        then: { outcome: "ok", hooks: deleteHooks, history: ["delete"], ...absent }
     },
     {
         name: "a hard delete of a trashed row empties it from the trash",
         given: "trashed",
         when: { op: "delete", hard: true },
-        then: { outcome: "ok", hooks: deleteHooks, history: ["delete"], ...absent },
-        pending: everyDoor(DD4_DELETE_ENTRY)
+        then: { outcome: "ok", hooks: deleteHooks, history: ["delete"], ...absent }
     },
 
     // ── reads ────────────────────────────────────────────────────────────

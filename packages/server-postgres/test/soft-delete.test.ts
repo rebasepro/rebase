@@ -190,7 +190,7 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
             .mockImplementation(async (_p, values) => ({ id: 1, ...(values as object) }) as any);
         deleteSpy = jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined as any);
         // The row the delete reads before it deletes.
-        fetchOneSpy = jest.spyOn(driver.dataService, "fetchOne").mockResolvedValue({ id: 7, title: "Hi" });
+        fetchOneSpy = jest.spyOn(driver.dataService, "fetchOneForRest").mockResolvedValue({ id: 7, title: "Hi" });
         return driver;
     };
 
@@ -254,11 +254,11 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
         // A hard delete of a row that is already stamped is how the trash is
         // emptied; the read that hides stamped rows would answer 404 for it.
         await stand().delete({ row: { id: "7", path: "posts" }, collection: posts, hard: true });
-        expect(fetchOneSpy).toHaveBeenCalledWith("posts", "7", undefined, true);
+        expect(fetchOneSpy).toHaveBeenCalledWith("posts", "7", undefined, undefined, { withDeleted: true });
 
         // A soft delete of a stamped row is a delete of nothing.
         await stand().delete({ row: { id: "7", path: "posts" }, collection: posts });
-        expect(fetchOneSpy).toHaveBeenCalledWith("posts", "7", undefined, undefined);
+        expect(fetchOneSpy).toHaveBeenCalledWith("posts", "7", undefined, undefined, { withDeleted: undefined });
     });
 
     it("is a real DELETE on a collection that does not soft-delete", async () => {

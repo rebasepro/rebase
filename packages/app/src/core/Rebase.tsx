@@ -342,6 +342,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
             const wsAdmin = ws;
             return {
                 executeSql: wsAdmin.executeSql!.bind(wsAdmin),
+                runSqlScript: wsAdmin.runSqlScript?.bind(wsAdmin),
                 fetchAvailableDatabases: wsAdmin.fetchAvailableDatabases?.bind(wsAdmin),
                 fetchAvailableRoles: wsAdmin.fetchAvailableRoles?.bind(wsAdmin),
                 fetchApplicationRoles: wsAdmin.fetchApplicationRoles?.bind(wsAdmin),

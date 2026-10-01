@@ -129,6 +129,22 @@ function canonicalJson(value: unknown): string {
     });
 }
 
+/**
+ * A stored version with its dates as the values they are.
+ *
+ * A delete used to record the row through the admin's view-model walk, which
+ * wraps a date as `{ __type: "date", value }`. Those entries stay as they were
+ * written, and a revert to one handed the envelope to Postgres as the column's
+ * value — a 400 `PG_22007` for a version the history list offered. Entries are
+ * the stored row now; this reads the old ones too.
+ */
+function withoutDateEnvelopes(values: Record<string, unknown>): Record<string, unknown> {
+    return Object.fromEntries(Object.entries(values).map(([key, value]) => [
+        key,
+        isPlainValues(value) && value.__type === "date" ? value.value ?? null : value
+    ]));
+}
+
 function isPlainValues(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -185,6 +201,9 @@ export function createHistoryRoutes(params: {
      *  - RLS, by fetching the row itself through the request-scoped driver.
      *    A row the caller may not read comes back undefined, and its history is
      *    then a 404 rather than a 403, because a 403 confirms the row exists.
+     *    A row in the trash is read too: `?deleted=only` lists it to the same
+     *    caller, and "who deleted this, and when" is the question its history
+     *    exists to answer — it was a 404 exactly while it mattered most.
      *
      * A missing scoped driver is an internal error, never a fallback to the
      * unscoped one — the same rule, and the same reason, as
@@ -207,7 +226,7 @@ export function createHistoryRoutes(params: {
         const scoped = c.get("driver") as DataDriver | undefined;
         if (!scoped) throw ApiError.internal("Scoped driver not available");
 
-        const row = await scoped.fetchOne({ path: collection.slug, id, collection });
+        const row = await scoped.fetchOne({ path: collection.slug, id, collection, withDeleted: true });
         if (!row) {
             throw ApiError.notFound(`Entity '${id}' not found in collection '${collection.slug}'`);
         }
@@ -320,7 +339,7 @@ export function createHistoryRoutes(params: {
         if (!isPlainValues(historyEntry.values)) {
             throw ApiError.badRequest("Cannot revert: history entry has no stored values");
         }
-        const values = restorableValues(historyEntry.values, current, collection, requestViewer(c));
+        const values = restorableValues(withoutDateEnvelopes(historyEntry.values), current, collection, requestViewer(c));
 
         // Revert by saving through the normal driver path — this will
         // itself create another history entry, giving a full audit trail.

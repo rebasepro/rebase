@@ -802,6 +802,94 @@ describe("WebSocket Server SQL audit line", () => {
 
 
 /**
+ * The SQL console's runs: `mode: "script"` asks the driver to describe what
+ * came back, so the console can write an edited cell to the row it was read
+ * from — and to no other.
+ */
+describe("WebSocket Server SQL console scripts", () => {
+    let mockDriver: PostgresBackendDriver;
+    const script = {
+        rows: [{ id: "1", name: "Ada" }],
+        columns: [
+            { name: "id", type: "integer", source: { schema: "public", table: "posts", column: "id" } },
+            { name: "name", type: "text", source: { schema: "public", table: "authors", column: "name" } }
+        ],
+        tables: [{ schema: "public", table: "posts", kind: "table", primaryKey: ["id"], hasInheritors: false }],
+        command: "SELECT",
+        rowCount: 1
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockWssInstance = null;
+        mockExtractUserFromToken.mockReturnValue({ uid: "admin-user", roles: ["admin"] });
+        mockDriver = {
+            key: "postgres",
+            initialised: true,
+            admin: {
+                executeSql: jest.fn(async () => [{ id: 1 }]),
+                runSqlScript: jest.fn(async () => script)
+            }
+        } as unknown as PostgresBackendDriver;
+        createPostgresWebSocket({} as Server, {
+            addClient: jest.fn(),
+            rescopeClient: jest.fn()
+        } as unknown as RealtimeService, mockDriver, {
+            requireAuth: true,
+            jwtSecret: "test-jwt-secret"
+        });
+    });
+
+    const signedIn = async () => {
+        const connectionCallback = mockWssInstance.on.mock.calls.find((call: any[]) => call[0] === "connection")[1];
+        const mockWs = { on: jest.fn(), send: jest.fn() } as any;
+        connectionCallback(mockWs);
+        const messageCallback = mockWs.on.mock.calls.find((call: any[]) => call[0] === "message")[1];
+        await messageCallback(Buffer.from(JSON.stringify({ type: "AUTHENTICATE", requestId: "auth", payload: { token: "t" } })));
+        return { mockWs, send: (message: unknown) => messageCallback(Buffer.from(JSON.stringify(message))) };
+    };
+
+    it("answers with the rows once and where each column was read from", async () => {
+        const { mockWs, send } = await signedIn();
+
+        await send({
+            type: "EXECUTE_SQL",
+            requestId: "req-script",
+            payload: { sql: "SELECT p.id, a.name FROM posts p JOIN authors a ON a.id = p.author_id", options: { database: "app", role: "reader" }, mode: "script" }
+        });
+
+        const admin = mockDriver.admin as unknown as { executeSql: jest.Mock; runSqlScript: jest.Mock };
+        expect(admin.runSqlScript).toHaveBeenCalledWith(
+            "SELECT p.id, a.name FROM posts p JOIN authors a ON a.id = p.author_id",
+            { database: "app", role: "reader" }
+        );
+        expect(admin.executeSql).not.toHaveBeenCalled();
+        const answer = JSON.parse(mockWs.send.mock.calls[mockWs.send.mock.calls.length - 1][0]);
+        expect(answer).toEqual({
+            type: "EXECUTE_SQL_SUCCESS",
+            requestId: "req-script",
+            payload: {
+                result: script.rows,
+                columns: script.columns,
+                tables: script.tables,
+                command: "SELECT",
+                rowCount: 1
+            }
+        });
+    });
+
+    it("still answers rows alone to a frame that did not ask for a script", async () => {
+        const { mockWs, send } = await signedIn();
+
+        await send({ type: "EXECUTE_SQL", requestId: "req-plain", payload: { sql: "SELECT 1" } });
+
+        const answer = JSON.parse(mockWs.send.mock.calls[mockWs.send.mock.calls.length - 1][0]);
+        expect(answer.payload).toEqual({ result: [{ id: 1 }] });
+    });
+});
+
+
+/**
  * The list ceiling on the socket.
  *
  * `FETCH_COLLECTION` handed the client's payload straight to the driver, so an

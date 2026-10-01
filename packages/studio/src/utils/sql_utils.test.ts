@@ -1,374 +1,243 @@
 
 import { describe, it, expect } from "@jest/globals";
-import { acceptsAutoLimit, buildExplainSql, determineTableAndPK, extractTablesFromQuery, needsDestructiveConfirmation, quoteTableName, resolveQueryCollections } from "./sql_utils";
-import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
+import { acceptsAutoLimit, buildExplainSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, type ResultProvenance } from "./sql_utils";
+import type { SqlScriptColumn, SqlScriptTable } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
-const mockSchemas: Record<string, TableInfo[]> = {
-    "public": [
-        {
-            schemaName: "public",
-            tableName: "users",
-            columns: [
-                { name: "id",
-dataType: "integer",
-isPrimaryKey: true },
-                { name: "email",
-dataType: "text",
-isPrimaryKey: false },
-                { name: "created_at",
-dataType: "timestamp",
-isPrimaryKey: false }
-            ]
-        },
-        {
-            schemaName: "public",
-            tableName: "roles",
-            columns: [
-                { name: "id",
-dataType: "integer",
-isPrimaryKey: true },
-                { name: "role_name",
-dataType: "text",
-isPrimaryKey: false },
-                { name: "created_at",
-dataType: "timestamp",
-isPrimaryKey: false }
-            ]
-        },
-        {
-            schemaName: "public",
-            tableName: "settings", // No primary key
-            columns: [
-                { name: "key",
-dataType: "text",
-isPrimaryKey: false },
-                { name: "value",
-dataType: "text",
-isPrimaryKey: false }
-            ]
-        },
-        {
-            schemaName: "public",
-            tableName: "blog_posts",
-            columns: [
-                { name: "id",
-dataType: "integer",
-isPrimaryKey: true },
-                { name: "title",
-dataType: "text",
-isPrimaryKey: false },
-                { name: "author_id",
-dataType: "integer",
-isPrimaryKey: false }
-            ]
-        },
-        {
-            schemaName: "public",
-            tableName: "order_items", // Composite PK
-            columns: [
-                { name: "order_id",
-dataType: "integer",
-isPrimaryKey: true },
-                { name: "item_id",
-dataType: "integer",
-isPrimaryKey: true },
-                { name: "quantity",
-dataType: "integer",
-isPrimaryKey: false }
-            ]
+/**
+ * The provenance below is what Postgres 18 reports for each query — the
+ * `tableID`/`columnID` of every field of its row description, named — read
+ * from a live server with `proofs/studio-sql/fields.mjs`. A computed column
+ * has no source; a column of a join has the source of the side it came from;
+ * a self-join's two sides are one table.
+ */
+const table = (name: string, primaryKey: string[], extra: Partial<SqlScriptTable> = {}): SqlScriptTable =>
+    ({ schema: "public", table: name, kind: "table", primaryKey, hasInheritors: false, ...extra });
+const read = (name: string, from: string, column: string = name, schema = "public"): SqlScriptColumn =>
+    ({ name, source: { schema, table: from, column } });
+const computed = (name: string): SqlScriptColumn => ({ name });
+
+const posts = table("posts", ["id"]);
+const authors = table("authors", ["id"]);
+const users = table("users", ["id"]);
+
+/**
+ * The critical case. Editing a cell of a join wrote to the edited table with
+ * a key read from the other one: `UPDATE "authors" SET "name" = … WHERE "id"
+ * = <the post's id>` overwrote whichever author shared the post's id.
+ */
+describe("editing a cell of a join", () => {
+    const sql = "SELECT p.id, a.name FROM posts p JOIN authors a ON a.id = p.author_id";
+    const provenance: ResultProvenance = { columns: [read("id", "posts"), read("name", "authors")], tables: [posts, authors] };
+
+    it("refuses a column whose table's key is not in the result", () => {
+        const resolution = resolveCellEdit(sql, provenance, "name");
+        expect(resolution.target).toBeUndefined();
+        expect(resolution.refusal).toEqual({ key: "studio_sql_edit_key_missing", params: { table: "public.authors", columns: "id" } });
+    });
+
+    it("still edits the table whose key is there", () => {
+        expect(resolveCellEdit(sql, provenance, "id").target).toEqual({
+            schema: "public", table: "posts", column: "id", key: [{ column: "id", resultColumn: "id" }]
+        });
+    });
+
+    it("edits the other table once its own key is selected, under its own name", () => {
+        const both = "SELECT p.id, a.id AS author_key, a.name FROM posts p JOIN authors a ON a.id = p.author_id";
+        const resolution = resolveCellEdit(both, {
+            columns: [read("id", "posts"), read("author_key", "authors", "id"), read("name", "authors")],
+            tables: [posts, authors]
+        }, "name");
+        expect(resolution.target).toEqual({
+            schema: "public", table: "authors", column: "name", key: [{ column: "id", resultColumn: "author_key" }]
+        });
+    });
+
+    it("refuses when two columns of the result share the edited name or the key's", () => {
+        const star = "SELECT * FROM posts p JOIN authors a ON a.id = p.author_id";
+        const starProvenance: ResultProvenance = {
+            columns: [read("id", "posts"), read("author_id", "posts"), read("title", "posts"), read("id", "authors"), read("name", "authors")],
+            tables: [posts, authors]
+        };
+        expect(resolveCellEdit(star, starProvenance, "title").refusal?.key).toBe("studio_sql_edit_key_missing");
+        expect(resolveCellEdit(star, starProvenance, "name").refusal?.key).toBe("studio_sql_edit_key_missing");
+        expect(resolveCellEdit(star, starProvenance, "id").refusal?.key).toBe("studio_sql_edit_duplicate_column");
+    });
+
+    it("refuses a self-join, whose two sides the database reports as one table", () => {
+        const resolution = resolveCellEdit(
+            "SELECT a.id, b.name FROM authors a JOIN authors b ON b.id = a.mentor_id",
+            { columns: [read("id", "authors"), read("name", "authors")], tables: [authors] },
+            "name"
+        );
+        expect(resolution.refusal).toEqual({ key: "studio_sql_edit_table_read_twice", params: { table: "authors" } });
+    });
+
+    it("refuses a table read once inside a WITH query that is read twice", () => {
+        const resolution = resolveCellEdit(
+            "WITH x AS (SELECT * FROM posts) SELECT a.id, b.title FROM x a JOIN x b ON b.author_id = a.id",
+            { columns: [read("id", "posts"), read("title", "posts")], tables: [posts] },
+            "title"
+        );
+        expect(resolution.refusal?.key).toBe("studio_sql_edit_table_read_twice");
+    });
+
+    it("refuses a table read again in a subquery, however deep", () => {
+        const resolution = resolveCellEdit(
+            "SELECT id, title FROM posts WHERE author_id IN (SELECT author_id FROM public.posts WHERE id = 1)",
+            { columns: [read("id", "posts"), read("title", "posts")], tables: [posts] },
+            "title"
+        );
+        expect(resolution.refusal?.key).toBe("studio_sql_edit_table_read_twice");
+    });
+});
+
+/**
+ * A computed column was written to the real column of the same name: `SELECT
+ * id, lower(email) AS name FROM users` edited `name` → `UPDATE users SET name`.
+ */
+describe("editing a computed column", () => {
+    it("refuses an expression, a literal and an aggregate — the database gives them no source", () => {
+        const sql = "SELECT id, lower(email) AS name, 'archived' AS status, count(*) OVER () AS total FROM users";
+        const provenance: ResultProvenance = {
+            columns: [read("id", "users"), computed("name"), computed("status"), computed("total")],
+            tables: [users]
+        };
+        for (const column of ["name", "status", "total"]) {
+            expect(resolveCellEdit(sql, provenance, column).refusal).toEqual({ key: "studio_sql_edit_computed_column", params: { column } });
         }
-    ]
-};
-
-const mockCollections: AdminCollection[] = [
-    {
-        slug: "users",
-        name: "Users",
-        table: "users",
-        properties: {}
-    } as AdminCollection,
-    {
-        slug: "roles",
-        name: "Roles",
-        table: "roles",
-        properties: {}
-    } as AdminCollection,
-    {
-        slug: "blogPosts",
-        name: "Blog Posts",
-        table: "blog_posts",
-        properties: {}
-    } as AdminCollection,
-    {
-        slug: "blog-entries", // slug with hyphen, no table → falls back to snake_case "blog_entries"
-        name: "Blog Entries",
-        table: "",
-        properties: {}
-    } as AdminCollection
-];
-
-describe("determineTableAndPK", () => {
-    it("resolves basic SELECT with actual PK from schema", () => {
-        const sql = "SELECT * FROM users";
-        const result = determineTableAndPK(sql, "email", mockSchemas);
-        expect(result.tableName).toBe("users");
-        expect(result.primaryKeys).toEqual([{ dbColumn: "id",
-resultColumn: "id" }]);
     });
 
-    it("resolves aliased FROM", () => {
-        const sql = "SELECT u.email FROM users u";
-        const result = determineTableAndPK(sql, "email", mockSchemas);
-        expect(result.tableName).toBe("users");
-        expect(result.primaryKeys).toEqual([{ dbColumn: "id",
-resultColumn: "id" }]);
+    it("refuses every column when nothing about the result is known", () => {
+        const resolution = resolveCellEdit("SELECT * FROM users", { columns: [{ name: "id" }, { name: "email" }], tables: [] }, "email");
+        expect(resolution.refusal?.key).toBe("studio_sql_edit_computed_column");
+    });
+});
+
+describe("editing a plain table", () => {
+    it("writes the column the database named, under whatever alias the query gave it", () => {
+        const resolution = resolveCellEdit(
+            "SELECT u.email AS user_email, u.id FROM users u",
+            { columns: [read("user_email", "users", "email"), read("id", "users")], tables: [users] },
+            "user_email"
+        );
+        expect(resolution.target).toEqual({
+            schema: "public", table: "users", column: "email", key: [{ column: "id", resultColumn: "id" }]
+        });
     });
 
-    it("resolves a JOIN whose tables' keys come back under their own names", () => {
-        const sql = "SELECT u.id AS user_id, u.email, r.role_name FROM users u JOIN roles r ON u.role_id = r.id";
-        const result = determineTableAndPK(sql, "email", mockSchemas);
-        expect(result.tableName).toBe("users");
-        expect(result.primaryKeys).toEqual([{ dbColumn: "id",
-resultColumn: "user_id" }]);
-    });
-
-    it("resolves aliased PK columns in JOINs", () => {
-        const sql = "SELECT u.id AS user_id, u.email, r.id AS role_id, r.role_name FROM users u JOIN roles r ON u.role_id = r.id";
-        const result = determineTableAndPK(sql, "email", mockSchemas);
-        expect(result.tableName).toBe("users");
-        expect(result.primaryKeys).toEqual([{ dbColumn: "id",
-resultColumn: "user_id" }]);
-
-        const result2 = determineTableAndPK(sql, "role_name", mockSchemas);
-        expect(result2.tableName).toBe("roles");
-        expect(result2.primaryKeys).toEqual([{ dbColumn: "id",
-resultColumn: "role_id" }]);
-    });
-
-    it("resolves aliased edit columns back to DB names", () => {
-        const sql = "SELECT u.email AS user_email FROM users u";
-        const result = determineTableAndPK(sql, "user_email", mockSchemas);
-        expect(result.tableName).toBe("users");
-    });
-
-    it("returns error for ambiguous JOIN columns", () => {
-        const sql = "SELECT * FROM users u JOIN roles r ON u.role_id = r.id";
-        // Both tables have created_at
-        const result = determineTableAndPK(sql, "created_at", mockSchemas);
-        expect(result.error).toContain("Ambiguous column");
-    });
-
-    it("returns error for unsupported non-SELECT queries", () => {
-        const sql = "DELETE FROM users WHERE id = 1";
-        const result = determineTableAndPK(sql, "email", mockSchemas);
-        expect(result.error).toContain("only supported for SELECT");
-    });
-
-    it("returns error for tables without primary keys", () => {
-        const sql = "SELECT * FROM settings";
-        const result = determineTableAndPK(sql, "key", mockSchemas);
-        expect(result.error).toContain("has no primary key defined");
-    });
-
-    it("supports composite primary keys", () => {
-        const sql = "SELECT * FROM order_items";
-        const result = determineTableAndPK(sql, "quantity", mockSchemas);
-        expect(result.tableName).toBe("order_items");
-        expect(result.primaryKeys).toHaveLength(2);
-        expect(result.primaryKeys).toEqual([
-            { dbColumn: "order_id",
-resultColumn: "order_id" },
-            { dbColumn: "item_id",
-resultColumn: "item_id" }
+    it("keeps every column of a composite key, in key order", () => {
+        const orderItems = table("order_items", ["order_id", "item_id"]);
+        const resolution = resolveCellEdit(
+            "SELECT quantity, item_id, order_id FROM order_items",
+            { columns: [read("quantity", "order_items"), read("item_id", "order_items"), read("order_id", "order_items")], tables: [orderItems] },
+            "quantity"
+        );
+        expect(resolution.target?.key).toEqual([
+            { column: "order_id", resultColumn: "order_id" },
+            { column: "item_id", resultColumn: "item_id" }
         ]);
     });
-});
 
-/**
- * Inline editing on a table outside `public`.
- *
- * The schema a query named was dropped on the way to the UPDATE: editing a row
- * of `SELECT * FROM archive.orders` ran `UPDATE "orders" …`, which the search
- * path resolved to `public.orders` — a different table's row changed, and the
- * console reported success.
- */
-describe("inline editing in a named schema", () => {
-    const twoOrders: Record<string, TableInfo[]> = {
-        public: [{
-            schemaName: "public",
-            tableName: "orders",
-            columns: [
-                { name: "id", dataType: "integer", isPrimaryKey: true },
-                { name: "status", dataType: "text", isPrimaryKey: false }
-            ]
-        }],
-        archive: [{
-            schemaName: "archive",
-            tableName: "orders",
-            columns: [
-                { name: "order_no", dataType: "integer", isPrimaryKey: true },
-                { name: "status", dataType: "text", isPrimaryKey: false }
-            ]
-        }]
-    };
-
-    it("keeps the schema the query named, and that table's primary key", () => {
-        const result = determineTableAndPK("SELECT * FROM archive.orders LIMIT 1000;", "status", twoOrders);
-        expect(result.schemaName).toBe("archive");
-        expect(result.tableName).toBe("orders");
-        expect(result.primaryKeys).toEqual([{ dbColumn: "order_no", resultColumn: "order_no" }]);
-        expect(quoteTableName(result.tableName!, result.schemaName)).toBe("\"archive\".\"orders\"");
+    it("keeps the schema the database reported, whatever the query left to the search path", () => {
+        const archived = table("orders", ["order_no"], { schema: "archive" });
+        const resolution = resolveCellEdit(
+            "SELECT * FROM orders",
+            { columns: [read("order_no", "orders", "order_no", "archive"), read("status", "orders", "status", "archive")], tables: [archived] },
+            "status"
+        );
+        expect(resolution.target?.schema).toBe("archive");
+        expect(quoteTableName(resolution.target!.table, resolution.target!.schema)).toBe("\"archive\".\"orders\"");
     });
 
-    it("leaves an unqualified table to the search path, as the query did", () => {
-        const result = determineTableAndPK("SELECT * FROM orders", "status", twoOrders);
-        expect(result.schemaName).toBeUndefined();
-        expect(quoteTableName(result.tableName!, result.schemaName)).toBe("\"orders\"");
-    });
-
-    it("does not match a collection's table in another schema", () => {
-        // `users` is a collection in `public`; `archive.users` is not it.
-        expect(resolveQueryCollections("SELECT * FROM archive.users", mockSchemas, mockCollections)).toHaveLength(0);
-        expect(resolveQueryCollections("SELECT * FROM public.users", mockSchemas, mockCollections)).toHaveLength(1);
-    });
-
-    it("tells two same-named tables in a join apart by schema", () => {
-        const sql = "SELECT a.order_no, a.status FROM archive.orders a JOIN public.orders p ON p.id = a.order_no";
-        const result = determineTableAndPK(sql, "status", twoOrders);
-        expect(result.schemaName).toBe("archive");
-        expect(result.primaryKeys).toEqual([{ dbColumn: "order_no", resultColumn: "order_no" }]);
+    it("reads through a subquery and a WITH query used once", () => {
+        const provenance: ResultProvenance = { columns: [read("id", "posts"), read("title", "posts")], tables: [posts] };
+        expect(resolveCellEdit("SELECT s.* FROM (SELECT id, title FROM posts) s", provenance, "title").target?.column).toBe("title");
+        expect(resolveCellEdit("WITH x AS (SELECT id, title FROM posts) SELECT * FROM x", provenance, "title").target?.column).toBe("title");
     });
 });
 
-/**
- * Inline editing a JOIN whose result has two columns of one name.
- *
- * A result row is an object keyed by column name, so of two `id` columns only
- * the last survives. `SELECT * FROM blog_posts p JOIN users u …` shows the
- * user's id in the row, and editing the post's title ran
- * `UPDATE "blog_posts" … WHERE "id" = <the user's id>` — another post changed,
- * the one on screen did not, and the console said "Row updated".
- */
-describe("inline editing a result with duplicate column names", () => {
-    const join = "FROM blog_posts p JOIN users u ON u.id = p.author_id";
+describe("tables whose rows a key cannot find", () => {
+    it("refuses a view, a table with no primary key, and a table others inherit", () => {
+        const view = resolveCellEdit("SELECT * FROM post_view", {
+            columns: [read("id", "post_view"), read("title", "post_view")],
+            tables: [table("post_view", [], { kind: "view" })]
+        }, "title");
+        expect(view.refusal).toEqual({ key: "studio_sql_edit_not_a_table", params: { column: "title", table: "public.post_view" } });
 
-    it("refuses when the edited table's key shares its name with another column", () => {
-        const star = determineTableAndPK(`SELECT * ${join}`, "title", mockSchemas);
-        expect(star.error).toContain("\"id\"");
-        expect(star.primaryKeys).toBeUndefined();
+        const keyless = resolveCellEdit("SELECT * FROM settings", {
+            columns: [read("key", "settings"), read("value", "settings")],
+            tables: [table("settings", [])]
+        }, "value");
+        expect(keyless.refusal).toEqual({ key: "studio_sql_edit_no_primary_key", params: { table: "public.settings" } });
 
-        const explicit = determineTableAndPK(`SELECT p.id, p.title, u.id, u.email ${join}`, "title", mockSchemas);
-        expect(explicit.error).toContain("\"id\"");
-        expect(explicit.primaryKeys).toBeUndefined();
-
-        const tableStar = determineTableAndPK(`SELECT p.*, u.id ${join}`, "title", mockSchemas);
-        expect(tableStar.error).toContain("\"id\"");
+        const inherited = resolveCellEdit("SELECT * FROM events", {
+            columns: [read("id", "events"), read("kind", "events")],
+            tables: [table("events", ["id"], { hasInheritors: true })]
+        }, "kind");
+        expect(inherited.refusal?.key).toBe("studio_sql_edit_inherited_table");
     });
 
-    it("refuses when the edited column shares its name with another column", () => {
-        const sql = "SELECT u.id AS user_id, r.id AS role_id, u.created_at, r.created_at FROM users u JOIN roles r ON u.role_id = r.id";
-        const result = determineTableAndPK(sql, "created_at", mockSchemas);
-        expect(result.error).toContain("\"created_at\"");
-        expect(result.tableName).toBeUndefined();
-    });
-
-    it("resolves the same join once each key has a name of its own", () => {
-        const result = determineTableAndPK(`SELECT p.id AS post_id, p.title, u.id AS user_id, u.email ${join}`, "title", mockSchemas);
-        expect(result.error).toBeUndefined();
-        expect(result.tableName).toBe("blog_posts");
-        expect(result.primaryKeys).toEqual([{ dbColumn: "id", resultColumn: "post_id" }]);
-    });
-
-    it("still resolves a single table's SELECT *", () => {
-        const result = determineTableAndPK("SELECT * FROM blog_posts", "title", mockSchemas);
-        expect(result.error).toBeUndefined();
-        expect(result.primaryKeys).toEqual([{ dbColumn: "id", resultColumn: "id" }]);
-    });
-
-    it("does not offer to open a record by a key column another table also fills", () => {
-        const resultColumns = ["id", "title", "author_id", "email", "created_at"];
-        const matched = resolveQueryCollections(`SELECT * ${join}`, mockSchemas, mockCollections, resultColumns);
-        expect(matched.map(m => [m.tableName, m.pkColumn])).toEqual([["blog_posts", undefined], ["users", undefined]]);
-
-        const aliased = resolveQueryCollections(`SELECT p.id AS post_id, p.title, u.id AS user_id ${join}`, mockSchemas, mockCollections, ["post_id", "title", "user_id"]);
-        expect(aliased.map(m => [m.tableName, m.pkColumn])).toEqual([["blog_posts", "post_id"], ["users", "user_id"]]);
+    it("edits a partitioned table by its key", () => {
+        const resolution = resolveCellEdit("SELECT * FROM measurements", {
+            columns: [read("id", "measurements"), read("taken_at", "measurements"), read("value", "measurements")],
+            tables: [table("measurements", ["id", "taken_at"], { kind: "partitioned table" })]
+        }, "value");
+        expect(resolution.target?.table).toBe("measurements");
     });
 });
 
-describe("extractTablesFromQuery", () => {
-    it("extracts a single table", () => {
-        const tables = extractTablesFromQuery("SELECT * FROM users");
-        expect(tables).toEqual([{ name: "users",
-alias: undefined }]);
+describe("what is not a single read", () => {
+    const provenance: ResultProvenance = { columns: [read("id", "posts"), read("title", "posts")], tables: [posts] };
+
+    it("refuses a script, a write and a write inside a WITH query", () => {
+        expect(resolveCellEdit("SELECT 1; SELECT id, title FROM posts", provenance, "title").refusal?.key).toBe("studio_sql_edit_not_a_select");
+        expect(resolveCellEdit("UPDATE posts SET title = title RETURNING id, title", provenance, "title").refusal?.key).toBe("studio_sql_edit_not_a_select");
+        expect(resolveCellEdit("WITH d AS (DELETE FROM posts RETURNING *) SELECT * FROM d", provenance, "title").refusal?.key).toBe("studio_sql_edit_not_a_select");
     });
 
-    it("extracts aliased tables", () => {
-        const tables = extractTablesFromQuery("SELECT u.email FROM users u");
-        expect(tables).toEqual([{ name: "users",
-alias: "u" }]);
+    it("refuses text it cannot read", () => {
+        expect(resolveCellEdit("SELECT id, title FROM posts WHERE ???", provenance, "title").refusal?.key).toBe("studio_sql_edit_unreadable_query");
     });
+});
 
-    it("extracts multiple tables from JOINs", () => {
-        const tables = extractTablesFromQuery("SELECT * FROM users u JOIN roles r ON u.role_id = r.id");
-        expect(tables).toHaveLength(2);
-        expect(tables[0].name).toBe("users");
-        expect(tables[1].name).toBe("roles");
-    });
-
-    it("returns empty for non-SELECT queries", () => {
-        expect(extractTablesFromQuery("DELETE FROM users")).toEqual([]);
-        expect(extractTablesFromQuery("INSERT INTO users (id) VALUES (1)")).toEqual([]);
-    });
-
-    it("returns empty for invalid SQL", () => {
-        expect(extractTablesFromQuery("NOT VALID SQL AT ALL ???")).toEqual([]);
+describe("quoteIdentifier", () => {
+    it("doubles every double quote, so a name cannot end the identifier", () => {
+        expect(quoteIdentifier("weird\"col")).toBe("\"weird\"\"col\"");
+        expect(quoteTableName("t\"x", "s\"y")).toBe("\"s\"\"y\".\"t\"\"x\"");
     });
 });
 
 describe("resolveQueryCollections", () => {
-    it("matches a single admin collection", () => {
-        const result = resolveQueryCollections("SELECT * FROM users", mockSchemas, mockCollections);
-        expect(result).toHaveLength(1);
-        expect(result[0].tableName).toBe("users");
-        expect(result[0].collection.name).toBe("Users");
-        expect(result[0].columns).toContain("id");
-        expect(result[0].columns).toContain("email");
+    const collections = [
+        { slug: "users", name: "Users", table: "users", properties: {} },
+        { slug: "posts", name: "Posts", table: "posts", properties: {} },
+        { slug: "authors", name: "Authors", table: "authors", properties: {} }
+    ] as unknown as AdminCollection[];
+
+    it("offers a table's records only by the key the database says is that table's", () => {
+        const matched = resolveQueryCollections({ columns: [read("id", "posts"), read("name", "authors")], tables: [posts, authors] }, collections);
+        expect(matched.map(m => [m.tableName, m.pkColumn])).toEqual([["posts", "id"]]);
     });
 
-    it("matches multiple admin collections in a JOIN", () => {
-        const result = resolveQueryCollections(
-            "SELECT * FROM users u JOIN roles r ON u.role_id = r.id",
-            mockSchemas,
-            mockCollections
-        );
-        expect(result).toHaveLength(2);
-        expect(result.map(r => r.collection.name).sort()).toEqual(["Roles", "Users"]);
+    it("offers both sides of a join once each key has a name of its own", () => {
+        const matched = resolveQueryCollections({
+            columns: [read("post_id", "posts", "id"), read("author_key", "authors", "id")],
+            tables: [posts, authors]
+        }, collections);
+        expect(matched.map(m => [m.tableName, m.pkColumn])).toEqual([["posts", "post_id"], ["authors", "author_key"]]);
     });
 
-    it("returns empty when no tables match any collection", () => {
-        const result = resolveQueryCollections("SELECT * FROM settings", mockSchemas, mockCollections);
-        expect(result).toHaveLength(0);
+    it("does not offer a key column another column of the result shares a name with", () => {
+        const matched = resolveQueryCollections({ columns: [read("id", "posts"), read("id", "authors")], tables: [posts, authors] }, collections);
+        expect(matched).toEqual([]);
     });
 
-    it("matches collection by table (not slug)", () => {
-        const result = resolveQueryCollections("SELECT * FROM blog_posts", mockSchemas, mockCollections);
-        expect(result).toHaveLength(1);
-        expect(result[0].collection.slug).toBe("blogPosts");
-    });
-
-    it("returns empty for non-SELECT queries", () => {
-        const result = resolveQueryCollections("DELETE FROM users WHERE id = 1", mockSchemas, mockCollections);
-        expect(result).toHaveLength(0);
-    });
-
-    it("preserves table alias information", () => {
-        const result = resolveQueryCollections("SELECT u.* FROM users u", mockSchemas, mockCollections);
-        expect(result).toHaveLength(1);
-        expect(result[0].tableAlias).toBe("u");
+    it("does not match a collection's table in another schema", () => {
+        const archivedUsers = table("users", ["id"], { schema: "archive" });
+        expect(resolveQueryCollections({ columns: [read("id", "users", "id", "archive")], tables: [archivedUsers] }, collections)).toEqual([]);
     });
 });
-
 
 describe("buildExplainSql", () => {
     it("plans one statement, without ANALYZE", () => {

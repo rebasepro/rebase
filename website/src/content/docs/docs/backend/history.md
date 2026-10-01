@@ -67,6 +67,14 @@ const ordersCollection = defineCollection({
    - The action (`create`, `update`, `delete`)
    - An array of `changed_fields` showing which columns were modified
 
+The values are the row as the REST API serves it: its columns, dates as
+timestamps, a `belongsTo` as its foreign key. That is what a revert writes back.
+
+On a collection with [soft delete](/docs/collections/soft-delete/), a delete is
+recorded as `delete` and a restore (the update setting the soft-delete field
+back to `null`) as `update`. A row's history stays readable while the row is in
+the trash, and reverting it to a version from before the delete restores it.
+
 ### Diff Tracking & Structural Deep Equality
 
 To avoid recording redundant logs where fields are saved but no values change, the `HistoryService` performs a structural deep equality comparison on the top-level keys of the old and new values:

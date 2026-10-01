@@ -23,6 +23,7 @@ import {
     BatchWriteProps,
     SaveManyProps,
     SaveProps,
+    SqlScriptResult,
     StorageSource,
     UpdateManyProps,
     UpdateRelationPivotProps,
@@ -41,13 +42,14 @@ import {
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath } from "./services/nested-path";
 import { resolveSoftDelete, rowInTrashError } from "./services/soft-delete";
 import { currentWriteScope, runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
+import { inWriteFrame, type WriteFrame } from "./services/write-depth";
 import { HistoryService } from "./history/HistoryService";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
@@ -55,6 +57,7 @@ import { applyAuthContext } from "./security/rls-enforcement";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
+import { runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
 
 /**
  * Has an operator opted out of database role switching entirely?
@@ -360,6 +363,7 @@ export class PostgresBackendDriver implements DataDriver {
     get admin(): DatabaseAdmin {
         return {
             executeSql: (...args: Parameters<NonNullable<DatabaseAdmin["executeSql"]>>) => this.executeSql(...args),
+            runSqlScript: (...args: Parameters<NonNullable<DatabaseAdmin["runSqlScript"]>>) => this.runSqlScript(...args),
             fetchAvailableDatabases: () => this.fetchAvailableDatabases(),
             fetchAvailableRoles: () => this.fetchAvailableRoles(),
             fetchApplicationRoles: () => this.fetchApplicationRoles(),
@@ -1059,7 +1063,7 @@ export class PostgresBackendDriver implements DataDriver {
                                                             status,
                                                             upsert,
                                                             onConflict
-                                                        }: SaveProps<M>): Promise<Record<string, unknown>> {
+                                                        }: SaveProps<M>, frame: WriteFrame): Promise<Record<string, unknown>> {
 
         const {
             collection: resolvedCollection,
@@ -1899,11 +1903,19 @@ export class PostgresBackendDriver implements DataDriver {
         // what a caller reads — and its view (a masked `email`, a computed
         // field) is not the row being deleted. It was what the delete hooks
         // judged and what history recorded as the row's final state.
-        const stored = await this.dataService.fetchOne<M>(
+        //
+        // And the row as REST serves it — columns, dates as timestamps, a
+        // foreign key as a key — which is what a save hands the same hooks and
+        // history. The admin's view-model walk wrapped every date as
+        // `{ __type: "date" }` and every relation in a ref carrying the related
+        // row, and that is what the delete's history entry held: a revert to
+        // it handed the envelope to Postgres as the column's value.
+        const stored = await this.dataService.fetchOneForRest<M>(
             targetPath,
             row.id,
+            undefined,
             resolvedCollection?.databaseId,
-            hard ? true : undefined
+            { withDeleted: hard ? true : undefined }
         );
         // Not found is answered before any callback runs: a callback handed a
         // row that is not there — or not there for this caller — would be

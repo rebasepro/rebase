@@ -70,7 +70,7 @@ describe("beforeDelete returning false", () => {
         jest.restoreAllMocks();
         jest.clearAllMocks();
         deleteSpy = jest.spyOn(DataService.prototype, "delete").mockResolvedValue(undefined as never);
-        jest.spyOn(DataService.prototype, "fetchOne").mockResolvedValue(STORED as never);
+        jest.spyOn(DataService.prototype, "fetchOneForRest").mockResolvedValue(STORED as never);
     });
 
     it("leaves the row alone — the delete is never issued", async () => {
@@ -150,7 +150,7 @@ describe("beforeDelete returning false", () => {
     });
 
     it("answers 404 for a row that is not there, before any callback runs", async () => {
-        jest.spyOn(DataService.prototype, "fetchOne").mockResolvedValue(undefined as never);
+        jest.spyOn(DataService.prototype, "fetchOneForRest").mockResolvedValue(undefined as never);
         const beforeDelete = jest.fn();
         const collection = articles({ beforeDelete });
         const driver = buildDriver(collection);

@@ -471,6 +471,82 @@ export interface DataTransformer {
 // =============================================================================
 
 /**
+ * The table column a value of a {@link SqlScriptResult} was read from, as the
+ * database itself reported it — not as the query's text suggests.
+ *
+ * @group Admin
+ */
+export interface SqlScriptColumnSource {
+    schema: string;
+    table: string;
+    column: string;
+}
+
+/**
+ * One column of a {@link SqlScriptResult}, in result order.
+ *
+ * @group Admin
+ */
+export interface SqlScriptColumn {
+    /** The name the result gives it. Two columns of one result may share it. */
+    name: string;
+    /** Its type, as the database names it: `integer`, `text[]`, `timestamp with time zone`. */
+    type?: string;
+    /**
+     * Where the database says the value came from: a plain reference to a
+     * column of a table or view, through any number of subqueries.
+     *
+     * Absent for everything no stored row holds — an expression, a cast that
+     * changes the type, a literal, an aggregate, a function's output, a
+     * `UNION`.
+     */
+    source?: SqlScriptColumnSource;
+}
+
+/**
+ * A table or view some column of a {@link SqlScriptResult} came from.
+ *
+ * @group Admin
+ */
+export interface SqlScriptTable {
+    schema: string;
+    table: string;
+    /** What the relation is. Only a `table` or a `partitioned table` holds rows that can be updated by key. */
+    kind: "table" | "partitioned table" | "view" | "materialized view" | "foreign table" | "other";
+    /** Its primary key columns, in key order. Empty when it has none. */
+    primaryKey: string[];
+    /**
+     * Other tables inherit this one (by `INHERITS`, not as partitions). A row
+     * read from it may live in one of them, and a primary key is not unique
+     * across them.
+     */
+    hasInheritors: boolean;
+}
+
+/**
+ * What a SQL script a person wrote returned. See {@link SQLAdmin.runSqlScript}.
+ *
+ * @group Admin
+ */
+export interface SqlScriptResult {
+    /**
+     * The last statement's rows, every value as the text the database wrote
+     * for it and `null` for SQL NULL — so a value written back is the value
+     * that was read, whatever its type. Keyed by column name: of two columns
+     * that share a name, the row holds the last.
+     */
+    rows: Record<string, string | null>[];
+    /** The last statement's columns, in order. */
+    columns: SqlScriptColumn[];
+    /** The tables and views {@link SqlScriptColumn.source} names. */
+    tables: SqlScriptTable[];
+    /** The last statement's command: `SELECT`, `UPDATE`, `CREATE TABLE` … */
+    command?: string;
+    /** How many rows the last statement returned or changed, when its command reports a count. */
+    rowCount?: number;
+}
+
+/**
  * Administrative operations for SQL-based databases (PostgreSQL, MySQL, etc.).
  * Used by the SQL Editor, RLS Editor, and schema browser.
  *
@@ -487,6 +563,18 @@ export interface SQLAdmin {
      * server's own queries use next.
      */
     executeSql(sql: string, options?: { database?: string; role?: string; params?: unknown[]; isolateSession?: boolean }): Promise<Record<string, unknown>[]>;
+
+    /**
+     * Run a script a person wrote — the Studio SQL console — and describe what
+     * it returned.
+     *
+     * On a session of its own, reset afterwards, as `role` for every statement
+     * of it. Values come back as the database's text, and each column says
+     * which table column it was read from, when the database says so: what
+     * the console needs to write a cell back to the row it came from and to
+     * no other.
+     */
+    runSqlScript?(sql: string, options?: { database?: string; role?: string }): Promise<SqlScriptResult>;
 
     /**
      * Fetch the available databases on the server.
