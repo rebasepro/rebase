@@ -236,6 +236,30 @@ Non devi scegliere tra Rebase e Drizzle. Il bootstrapper compila i tuoi schemi d
 ### Drenaggio Corretto delle Connessioni (Graceful Draining)
 Negli ambienti serverless o negli orchestratori (come Kubernetes), la chiusura dei pod può causare interruzioni anomale delle connessioni. Implementa sempre signal handler che richiamino `realtimeProvider.stopListening()` (il quale chiude il client dedicato a pg LISTEN) e `pool.end()` per prevenire il leak di slot di connessione nel tuo server di database.
 
+### CORS per un frontend nel browser
+Un server personalizzato possiede la propria configurazione CORS, e un frontend
+su un'altra origine può leggere solo gli header di risposta che espone.
+Esponi quelli che l'SDK legge, altrimenti `etagOf(row)` lì è sempre
+`undefined` — una scrittura con `ifMatch` parte allora senza `If-Match` — e un
+429 perde il suo `Retry-After`:
+
+```typescript
+import express from "express";
+import cors from "cors";
+
+const app = express();
+app.use(cors({
+    origin: ["https://app.example.com"],
+    credentials: true,
+    exposedHeaders: [
+        "ETag", "Retry-After", "X-Request-ID",
+        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
+        "Preference-Applied"
+    ]
+}));
+```
+
+Il runtime di Rebase e il backend ottenuto con `rebase eject` inviano già questo elenco.
 
 ## Correlati
 

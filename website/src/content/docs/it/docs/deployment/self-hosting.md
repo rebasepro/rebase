@@ -93,14 +93,11 @@ COPY dist-bundle /bundle
 
 Ciò che `ensure` deliberatamente non fa mai è modificare elementi già esistenti. Non altera il tipo di una colonna, non elimina tabelle o colonne e non modifica le etichette di un enum esistente — questo perché il riavvio di un container non deve poter rimodellare uno schema come effetto collaterale di un deploy.
 
-Pertanto vale comunque la pena eseguire `rebase db push`, per le due cose che l'avvio non tocca:
+Pertanto vale comunque la pena eseguire `rebase db push`, per ciò che l'avvio non tocca — qualsiasi modifica che non sia puramente additiva: una colonna rinominata, un tipo ristretto, un campo rimosso.
 
 ```bash
 rebase db push
 ```
-
-- **RLS sulle junction table** per le relazioni molti-a-molti.
-- **Qualsiasi modifica che non sia puramente additiva** — una colonna rinominata, un tipo ristretto, un campo rimosso.
 
 Eseguilo da un checkout locale o da un job di CI, puntando al database del deployment. Esegue prima un dry-run delle modifiche, rifiuta quelle distruttive in assenza di una conferma esplicita e può effettuare un backup prima dell'applicazione. Il database espone una porta nel file compose per consentirne l'accesso dall'host; rimuovi questa mappatura una volta impostato lo schema se il database non deve essere raggiungibile dall'esterno.
 
@@ -177,6 +174,7 @@ ExecStart=/usr/bin/rebase-server /srv/myapp/dist-bundle
 Restart=always
 Environment=NODE_ENV=production
 Environment=DATABASE_URL=postgresql://rebase:...@127.0.0.1:5432/rebase
+Environment=ALLOW_LOCALHOST_IN_PRODUCTION=true
 Environment=JWT_SECRET=...
 Environment=REBASE_SERVICE_KEY=...
 Environment=CORS_ORIGINS=https://app.example.com
@@ -186,6 +184,12 @@ Environment=REBASE_ADMIN_PASSWORD=...
 ```
 
 `NODE_ENV=production` non è una decorazione. Se non impostata, il processo viene eseguito in modalità di sviluppo: accetta le origini localhost, espone la specifica OpenAPI e **lascia aperta la finestra del primo amministratore** — per cui il primo sconosciuto che trova il form di registrazione diventa l'amministratore. Le due righe `REBASE_ADMIN_*` sostituiscono proprio questa finestra; vedi [Your first admin](/docs/getting-started/deployment/#your-first-admin).
+
+`ALLOW_LOCALHOST_IN_PRODUCTION=true` è presente perché il database si trova
+sulla stessa macchina. In produzione il runtime rifiuta qualsiasi variabile
+che punti a localhost — in un container, il loopback è il container stesso,
+quindi quell'indirizzo è sempre un errore — e questa riga gli indica che
+l'indirizzo è intenzionale. Rimuovila quando il database è altrove.
 
 Preferisci `EnvironmentFile=/etc/rebase.env` con permessi impostati su 0600 rispetto alle righe `Environment=` per i secret: un unit file è leggibile da chiunque (world-readable) e `systemctl show` stampa ogni valore specificato con `Environment=`.
 
@@ -242,6 +246,35 @@ REBASE_METRICS_TOKEN=<random string>
 ```
 
 Espone metriche Prometheus su `/metrics`: conteggio delle richieste e istogrammi di latenza suddivisi per superficie API (data, auth, storage, functions) e collection, oltre a gauge sul processo. Senza un token, l'endpoint è leggibile da chiunque possa raggiungere la porta, quindi impostane uno a meno che non si trovi su una rete privata.
+
+## Header di sicurezza
+
+Ogni risposta porta `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options:
+nosniff`, un `Referrer-Policy` e `Strict-Transport-Security: max-age=15552000`
+(180 giorni). L'header HSTS omette `includeSubDomains`: questo direbbe ai
+browser di rifiutare l'HTTP semplice su ogni sottodominio del tuo dominio,
+inclusi quelli con cui questo server non ha nulla a che fare, e un browser lo
+conserva per tutto il tempo indicato dall'header. <span class="since-badge" data-since="0.24">Dalla 0.24</span>
+Imposta `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` quando ogni sottodominio è
+solo-HTTPS; fino alla 0.23 incluso, l'header portava sempre `includeSubDomains`.
+
+Le app statiche — il pannello di amministrazione CMS e qualsiasi frontend
+servito dal bundle — portano anche `Content-Security-Policy:
+frame-ancestors 'self'; object-src 'none'; base-uri 'self'`. Decide chi può
+inserire l'app in un frame, esclude i plugin e fissa `<base>` alla tua
+origine, e non limita nulla altro, così script inline, worker e accessi di
+terze parti continuano a funzionare. Una risposta che imposta una propria
+policy la conserva. Per qualcosa di più restrittivo, metti la policy sul
+reverse proxy davanti al server.
+
+## Più di un'istanza
+
+Un container è l'impostazione predefinita e non richiede nulla in più. Prima
+che una seconda replica riceva traffico — o che un deploy a rotazione ne
+esegua due fianco a fianco — consulta
+[Eseguire più di un'istanza](/docs/deployment/multiple-instances/): limiti di
+frequenza, canali di broadcast, file locali, upload riprendibili e la cache
+delle immagini sono per processo finché un'impostazione non li condivide.
 
 ## Esecuzione delle funzioni in un processo dedicato
 

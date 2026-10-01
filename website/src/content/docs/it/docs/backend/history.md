@@ -68,6 +68,16 @@ const ordersCollection = defineCollection({
    - L'azione (`create`, `update`, `delete`)
    - Un array di `changed_fields` che mostra quali colonne sono state modificate
 
+I valori sono la riga come la serve l'API REST: le sue colonne, le date come
+timestamp, un `belongsTo` come la sua foreign key. È ciò che un revert scrive
+indietro.
+
+Su una collection con [soft delete](/docs/collections/soft-delete/), una
+eliminazione viene registrata come `delete` e un ripristino (l'aggiornamento che
+riporta il campo di soft delete a `null`) come `update`. La cronologia di una
+riga resta leggibile mentre la riga è nel cestino, e ripristinarla a una
+versione precedente all'eliminazione la fa tornare attiva.
+
 ### Tracciamento dei diff e uguaglianza strutturale profonda
 
 Per evitare di registrare log ridondanti quando i campi vengono salvati senza modifiche ai valori, il servizio `HistoryService` esegue un confronto di uguaglianza strutturale profonda (deep equality) sulle chiavi di primo livello dei vecchi e nuovi valori:

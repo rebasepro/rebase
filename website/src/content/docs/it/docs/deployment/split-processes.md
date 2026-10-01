@@ -205,6 +205,9 @@ configurazione) ogni volta che più di un processo gestisce websocket.
 **Scalabilità a zero.** Nessuna di queste funzionalità scala un processo a zero o ne avvia uno
 su richiesta. Si tratta di una funzionalità a livello di piattaforma di orchestrazione, non del runtime.
 
+Tutto il resto che un processo conserva solo per sé è raccolto in un unico elenco:
+[Eseguire più di un'istanza](/docs/deployment/multiple-instances/).
+
 ## Rilascio indipendente di una singola unità
 
 Tutto quanto descritto sopra suddivide *il luogo in cui il carico di lavoro viene eseguito*. L'intero sistema viene

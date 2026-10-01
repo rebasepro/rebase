@@ -23,6 +23,14 @@ anche per loro, tranne `?on_conflict=`.
 Il corpo di una scrittura deve essere un oggetto JSON. `null`, un numero, una
 stringa o un array restituisce `400 BAD_REQUEST`.
 
+Un aggiornamento non può cambiare la chiave di una riga. Un corpo che nomina la
+chiave con un altro valore restituisce `400 KEY_IMMUTABLE`, prima che venga
+eseguito qualsiasi hook e senza che nulla venga scritto, indipendentemente dal
+canale con cui arriva l'aggiornamento: REST, il socket realtime, MCP o
+`rebase.data` in-process. La chiave che la riga ha già viene accettata, come fa
+un form che rimanda l'intera riga. Per spostare una riga su una nuova chiave,
+creala in quella posizione ed elimina la vecchia.
+
 ### Idempotenza
 
 `Idempotency-Key: <uuid>` su qualsiasi scrittura significa "se hai già risposto a
@@ -176,7 +184,10 @@ registra un aggiornamento. Una riga che la lettura non ha potuto vedere, o una
 inserita in modo concorrente, viene comunque intercettata da
 `ON CONFLICT … DO UPDATE`, che imposta soltanto ciò che hanno scritto il corpo e
 gli hook, più i timestamp `on_update`. Una chiave che indica una riga al di fuori
-dell'ambito `beforeQuery` del chiamante risponde `404`.
+dell'ambito `beforeQuery` del chiamante risponde `404`. Una chiave che appartiene
+a una riga nel [cestino](/docs/collections/soft-delete/) risponde `409
+ROW_IN_TRASH` e non scrive nulla: ripristina prima la riga, oppure eliminala
+definitivamente.
 
 Una riga già esistente mantiene il proprio timestamp `on_create` e il proprio
 creatore `user_on_create`. Un conflitto

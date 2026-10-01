@@ -9,7 +9,7 @@ description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato
 
 L'SDK tipizzato di Rebase fornisce sottoscrizioni ai dati in tempo reale tramite WebSocket. Quando i record cambiano sul server, i callback a cui ti sei iscritto vengono eseguiti immediatamente con i dati aggiornati.
 
-La connessione WebSocket viene stabilita automaticamente quando è disponibile un `websocketUrl` (derivato da `baseUrl` per impostazione predefinita). La riconnessione e l'aggiornamento del token vengono gestiti in modo trasparente.
+La connessione WebSocket viene stabilita automaticamente quando è disponibile un `websocketUrl` (derivato da `baseUrl` per impostazione predefinita). La riconnessione e l'aggiornamento del token vengono gestiti per te. Un'interruzione che dura più di circa 15 secondi viene segnalata una sola volta, all'`onError` di ciascuna sottoscrizione, come `CONNECTION_LOST` — vedi [Autenticazione e riconnessione](#authentication-and-reconnection).
 
 ## Sottoscrizione a una collection
 
@@ -180,7 +180,29 @@ Il client WebSocket gestisce l'autenticazione automaticamente:
 
 - Al **login** o al **refresh del token**, il nuovo token viene inviato a un socket già aperto tramite un messaggio `authenticate`. Se non c'è alcun socket aperto, non accade nulla — l'accesso non è una richiesta per il realtime, e un socket aperto successivamente si autentica da solo.
 - Al **logout**, la connessione WebSocket viene disconnessa. Il client rimane utilizzabile; una sottoscrizione successiva si riconnette in modo anonimo.
-- Se la connessione cade, il client **si riconnette automaticamente** e ristabilisce tutte le sottoscrizioni attive.
+- Se la connessione cade, il client **si riconnette automaticamente** e ristabilisce tutte le sottoscrizioni attive. Non smette mai di tentare finché esiste una sottoscrizione o un canale cui si è aderito; il ritardo tra i tentativi cresce fino a un massimo di 30 secondi.
+- Se la connessione resta inattiva per più di circa 15 secondi, l'`onError` di ciascuna sottoscrizione (e l'`onError` di ciascun canale cui si è aderito) viene chiamato **una sola volta** con un `RebaseApiError` il cui `code` è `CONNECTION_LOST`. La sottoscrizione non viene terminata: continua a mostrare ciò che hai, segnalalo come potenzialmente non aggiornato, e attendi. Quando il socket torna attivo, il successivo `onUpdate` della sottoscrizione porta tutto ciò che è stato scritto nel frattempo.
+- `client.ws.state` è lo stato della connessione — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` o `closed` — e `client.ws.onStateChange(listener)` viene informato di ogni cambiamento. `disconnected` è lo stato in cui `CONNECTION_LOST` è stato segnalato.
+- Le richieste inviate tramite il socket sono **at-most-once**. Una che è stata inviata quando la connessione è caduta fallisce con `CONNECTION_LOST` e non viene mai rinviata, poiché il server potrebbe averla già eseguita. Una che attende ancora un socket dopo 30 secondi fallisce con `REQUEST_TIMEOUT` senza essere inviata.
+
+```typescript
+import { RebaseApiError } from "@rebasepro/client";
+
+const unsubscribe = client.data.orders.listen(
+    { where: { status: ["==", "open"] } },
+    (response) => {
+        setOrders(response.data);
+        setStale(false);
+    },
+    (error) => {
+        if (error instanceof RebaseApiError && error.code === "CONNECTION_LOST") {
+            setStale(true); // keep the rows; the next update clears it
+            return;
+        }
+        setError(error);
+    }
+);
+```
 
 Non è richiesta alcuna gestione manuale dei token — l'integrazione tra `client.auth` e il layer WebSocket viene gestita internamente.
 

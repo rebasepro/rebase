@@ -19,8 +19,8 @@ Entrambe le funzionalità sono disponibili per ogni collezione. L'esportazione p
 2. Fai clic sul pulsante **Import** nella barra degli strumenti
 3. Seleziona o trascina il tuo file
 4. Mappa le colonne del file con le proprietà della collezione
-5. Visualizza l'anteprima dei dati e risolvi eventuali errori di convalida
-6. Fai clic su **Import** per salvare tutte le entità
+5. Visualizza l'anteprima dei dati, inclusi eventuali valori che non possono essere convertiti
+6. Fai clic su **Save data** per scrivere le righe
 
 ### Formati supportati
 
@@ -36,16 +36,31 @@ La procedura guidata di importazione tenta automaticamente di associare le colon
 
 - Le **corrispondenze esatte** vengono mappate automaticamente (ad es. `name` → `name`)
 - Le **colonne non associate** possono essere mappate manualmente o ignorate
-- La **coercizione dei tipi** gestisce la conversione da stringa a numero, da stringa a booleano e il parsing delle date
+- La **conversione dei tipi** trasforma ogni cella nel tipo della proprietà a cui è mappata, ma solo quando non si perde nulla (vedi sotto)
 
-### Convalida
+### Conversione dei tipi
 
-Prima dell'importazione, la procedura guidata convalida tutte le righe rispetto alle definizioni delle proprietà della collezione:
+Una cella viene convertita solo quando il tipo della proprietà può contenere esattamente ciò che dice:
 
-- I campi obbligatori devono essere presenti
-- I valori enum devono corrispondere alle opzioni definite
-- I tipi di dati devono essere compatibili (ad es. un valore di testo per un campo numerico viene segnalato)
-- Gli errori di convalida vengono mostrati riga per riga per consentire di correggerli prima dell'importazione
+| Tipo di proprietà | Converte | Non converte |
+|---|---|---|
+| Numero | `12`, `-3.5`, `10.00`, `1e3` | `02134` (uno zero iniziale andrebbe perso), numeri con più di 15 cifre significative, `1,234`, `$5.00`, `12%`, `N/A` |
+| Booleano | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, in qualsiasi maiuscola/minuscola | qualsiasi altra cosa |
+| Data | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), date scritte per intero (`5 Jan 2024`), `05/01/2024`, secondi o millisecondi epoch | testo che non indica alcuna data |
+
+Una data senza orario è quel giorno in UTC. Per le date scritte come `05/01/2024`, è la colonna a decidere l'ordine: un primo numero superiore a 12 rende la colonna giorno-prima, un secondo numero superiore a 12 la rende mese-prima. Quando una colonna non lo indica mai, decide la locale del browser, e quando contiene entrambi gli ordini, una data che entrambi gli ordini potrebbero leggere non viene convertita.
+
+Una cella vuota non è un valore: non imposta nulla, e si applica il default scelto per quella proprietà.
+
+### Valori che non possono essere importati
+
+L'anteprima elenca ogni cella che non si converte, per colonna, con il numero di celle e le prime per riga e motivo. Quelle celle vengono lasciate vuote nelle righe importate; nulla viene trasformato in `0`, `false` o un valore vuoto senza essere elencato. Torna indietro per mappare la colonna su un'altra proprietà, oppure correggi il file e caricalo di nuovo.
+
+Le regole della collezione stessa — campi obbligatori, opzioni enum, valori unici — vengono verificate dal server mentre le righe vengono scritte, 25 righe alla volta. Se una riga viene rifiutata, l'importazione si interrompe e la indica; le righe precedenti sono già salvate, e **Retry** riprende dalla riga rifiutata.
+
+### Creare una collezione da un file
+
+Quando crei una collezione da un file, il tipo di ogni colonna viene inferito dai suoi valori. Una colonna è un numero solo se ogni valore al suo interno è un numero o un testo che si converte esattamente in uno, quindi una colonna di codici postali, codici prodotto con zeri iniziali, SKU lunghi o numeri di telefono resta testo. Una colonna che mescola tipi (numeri e parole, booleani e numeri) è testo. Le celle vuote non contano, quindi una colonna per lo più vuota non viene contrassegnata come obbligatoria.
 
 ### Configurazione dell'importazione
 

@@ -86,14 +86,13 @@ Le ultime tre variabili sono ciò che consente a questo deployment di ottenere u
 
 Ciò che `ensure` non fa mai è modificare elementi già esistenti: non altera il tipo di una colonna, non elimina nulla e non modifica le etichette di un enum esistente, poiché il riavvio di un container non deve rimodellare uno schema come effetto collaterale di un deploy.
 
-Due operazioni richiedono quindi ancora la CLI, eseguita da un checkout locale o da un job CI con `DATABASE_URL` puntato sul tuo Flexible Server (se necessario, aggiungi una regola del firewall che consenta il tuo IP client):
+Una sola operazione richiede quindi ancora la CLI, eseguita da un checkout locale o da un job CI con `DATABASE_URL` puntato sul tuo Flexible Server (se necessario, aggiungi una regola del firewall che consenta il tuo IP client):
 
 ```bash
 rebase db push
 ```
 
-- **RLS delle tabelle di giunzione (junction-table)** per le relazioni molti-a-molti.
-- **Qualsiasi modifica che non sia puramente additiva** — una colonna rinominata, un tipo con restrizioni maggiori, un campo rimosso.
+Qualsiasi modifica che non sia puramente additiva — una colonna rinominata, un tipo con restrizioni maggiori, un campo rimosso.
 
 L'immagine di runtime viene fornita senza la CLI, pertanto questo comando non viene mai eseguito all'interno del container. Per migrazioni con controllo di versione, esegui il commit dei file di migrazione con `rebase db generate` ed esegui invece `rebase db migrate` come passaggio della release.
 

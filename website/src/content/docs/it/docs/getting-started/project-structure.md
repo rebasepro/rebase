@@ -25,9 +25,9 @@ my-app/
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
 │
 ├── config/                 # Shared by the backend and the admin panel
-│   ├── index.ts            # Re-exports what the runtime reads (collections, storageAuthorize)
+│   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here
 │   ├── collections/        # Your data model
-│   │   ├── index.ts        # Exports `collections` and the default security rules
+│   │   ├── index.ts        # Sort order (`collections`) and `defaultSecurityRules` — not a registry
 │   │   ├── posts.ts        # Example collections
 │   │   └── users.ts        # The auth collection
 │   ├── resources.ts        # What this project needs from wherever it runs
@@ -161,8 +161,9 @@ const productsCollection = defineCollection({
     }
 });
 
-// The default export is what the registry picks up — every collection in the
-// scaffold is written this way.
+// The default export is what the loader picks up — every file in this directory
+// is loaded, listed in index.ts or not, and every collection in the scaffold is
+// written this way.
 export default productsCollection;
 ```
 
@@ -176,6 +177,9 @@ Lo `slug` diventa il percorso URL nell'interfaccia di amministrazione e l'endpoi
 4. **La CLI** le legge per generare i file di migrazione con `rebase schema generate`
 
 Mentre `rebase dev` è in esecuzione, il salvataggio di un file all'interno di `config/collections/` rigenera `backend/src/schema.generated.ts` e i tipi dell'SDK in `generated/sdk/` e riavvia il backend; all'avvio vengono create le tabelle e le colonne mancanti. Al di fuori di `rebase dev`, gli stessi passaggi corrispondono a `rebase schema generate` e `rebase generate-sdk`.
+
+<span class="since-badge" data-since="0.24">Dalla 0.24</span> per i tipi dell'SDK: sulla 0.23, `rebase dev` rigenera solo lo schema, e
+`rebase generate-sdk` resta un passaggio separato.
 
 ## Prossimi passi
 

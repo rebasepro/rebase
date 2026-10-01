@@ -10,12 +10,12 @@ description: Applica callback di ciclo di vita trasversali a ogni collection a l
 Rebase fornisce due livelli di callback per il ciclo di vita delle entità — entrambi utilizzano lo stesso tipo `CollectionCallbacks` di `@rebasepro/types`:
 
 - **[Callback per collection](/docs/collections/callbacks)**: definiti nelle configurazioni delle singole collection. Vengono eseguiti solo per quella specifica collection.
-- **Callback globali**: definiti su `initializeRebaseBackend({ callbacks })`. Vengono eseguiti su **ogni** collection, su qualsiasi percorso dati (API REST, WebSocket / realtime, `rebase.dataAsAdmin` lato server).
+- **Callback globali**: definiti su `initializeRebaseBackend({ callbacks })`. Vengono eseguiti su **ogni** collection, su qualsiasi percorso dati (API REST, WebSocket / realtime, `rebase.dataAsAdmin` lato server). L'unico writer che non vedono è il sistema di autenticazione: la registrazione, l'accesso OAuth e la gestione utenti dell'admin scrivono direttamente le righe utente ed eseguono invece gli [hook di autenticazione](/docs/backend/authentication/) (`afterUserCreate`, …).
 
 Usa i callback globali per:
 - **Row scoping** — `beforeQuery` su ogni collection, in modo che le letture di un tenant vengano limitate in un unico punto anziché per ciascuna collection. Solo per Postgres: affiancato a una sorgente dati MongoDB o Firestore, un `beforeQuery` globale rifiuta l'avvio anziché lasciare le letture di quella sorgente non limitate. Vedi [`beforeQuery`](/docs/collections/callbacks#beforequery).
 - **Mascheramento PII** — oscura i campi sensibili per i chiamanti non amministratori in tutte le collection.
-- **Audit logging unificato** — registra ogni creazione, aggiornamento o eliminazione in un unico punto.
+- **Audit logging unificato** — registra ogni creazione, aggiornamento o eliminazione in un unico punto. I nuovi account da registrazione e OAuth non ne fanno parte: registra quelli da `afterUserCreate`.
 - **Validazione trasversale** — applica invarianti che interessano più collection.
 
 :::note
@@ -141,7 +141,7 @@ passaggio di redazione con un'eccezione silenziosa, pertanto non è prevista.
 riga e tutto ciò che i suoi callback hanno fatto eseguono il commit insieme oppure non lo eseguono affatto.
 
 - **`beforeSave`, `beforeDelete`** — se il callback lancia un errore, l'operazione viene rifiutata con un HTTP 400 contenente il tuo messaggio e il codice `CALLBACK_REJECTED`, e la scrittura sul database non viene mai eseguita. Lancia un `RebaseApiError` da `@rebasepro/types` per scegliere autonomamente lo stato — vedi [Callback di entità](/docs/collections/callbacks#beforesave). Un `beforeDelete` che *restituisce* `false` equivale allo stesso rifiuto senza messaggio, e risponde con **403** e tale codice.
-- **`afterRead`** — la riga restituita (o la riga trasformata) è ciò che riceve il chiamante. La sua transazione è `READ ONLY` — vedi [sotto](#afterread-cannot-write).
+- **`afterRead`** — la riga restituita (o la riga trasformata) è ciò che riceve il chiamante, e solo il chiamante: su una scrittura modella la risposta, mentre `afterSave`, `beforeDelete`, `afterDelete` e la cronologia ricevono la riga come memorizzata — un valore mascherato non viene mai registrato né riportato nella colonna. La sua transazione è `READ ONLY` — vedi [sotto](#afterread-cannot-write).
 - **`afterSave`, `afterDelete`** — vengono eseguiti *prima* del commit, attesi con await. Un errore lanciato qui annulla la riga con un rollback e risponde con lo stesso **400 `CALLBACK_REJECTED`**, con `details.stage` che indica l'hook. Mantengono aperta la transazione durante la loro esecuzione, quindi un callback lento equivale a un lock trattenuto.
 - **`afterSaveError`** — viene eseguito quando il salvataggio è fallito, durante la fase di uscita. In una richiesta viene eseguito dopo il rollback della transazione della scrittura fallita, con un `context` in cui ogni chiamata è una transazione a sé, quindi un job che accoda per segnalare l'errore viene conservato. Un errore lanciato da esso viene registrato nei log; il chiamante riceve l'errore del salvataggio stesso.
 
@@ -152,6 +152,23 @@ scritto in base a tale indicazione — ad esempio una chiamata webhook in `after
 tenuto aperta una transazione di database per l'intera durata di un round trip HTTP,
 eseguendo il rollback della riga ogni volta che l'endpoint remoto era irraggiungibile.
 :::
+
+### Quando viene eseguito `afterSaveError`
+
+Segnala un salvataggio fallito **a livello di database o successivamente** —
+dall'istruzione INSERT o UPDATE in poi. Un salvataggio rifiutato prima di quel
+punto non ha mai raggiunto il database, quindi l'hook non ne viene informato.
+
+| Viene eseguito | Non viene eseguito |
+|---|---|
+| Il database rifiuta l'istruzione: una violazione di unicità o foreign key, un check constraint o un trigger, una policy di row-level security (`WRITE_DENIED`) | Un rifiuto di `beforeSave` — l'hook che ha rifiutato è quello che lo sa |
+| `afterRead` o `afterSave` lancia un errore (il chiamante riceve `CALLBACK_REJECTED`) | Una richiesta rifiutata prima del driver: validazione (`VALIDATION_*`), un campo che il chiamante non può scrivere, un permesso mancante |
+| La voce di cronologia non può essere registrata | Una riga che il chiamante non può indirizzare (`404`), uno stamp di tenant che non può impostare |
+| | Il commit viene rifiutato dopo che il salvataggio è stato restituito: `TRANSACTION_ABORTED` (un'istruzione fallita che un callback ha intercettato), oppure un constraint differito verificato al `COMMIT` |
+| | Un'eliminazione — non esiste una controparte per il delete |
+
+In una scrittura bulk o `_batch` viene eseguito per la riga che ha fallito; le
+righe precedenti vengono annullate con il batch e non vengono segnalate.
 
 ### Effetti collaterali che non devono trattenere la transazione
 

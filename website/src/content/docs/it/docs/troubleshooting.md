@@ -79,8 +79,25 @@ DB_PERMISSION_DENIED — Permission denied by the database on "notes"
 
 SQLSTATE `42501`. Può indicare due problemi distinti, e il messaggio li differenzia:
 
-- **Una policy di row-level security (RLS) ha rifiutato la riga.** Il sistema di controllo accessi sta funzionando; il chiamante ha richiesto qualcosa che le sue policy non consentono. Controlla le `securityRules` della collection ed esegui `npx @rebasepro/rls-check` per un controllo in sola lettura di ciò che il database applicherà effettivamente.
-- **Al ruolo manca un `GRANT`.** Nulla nella richiesta potrà risolvere il problema — il ruolo di connessione non può interagire affatto con la tabella. Questo è un problema di deployment.
+- **Una policy di row-level security (RLS) ha rifiutato la riga** — il messaggio
+  qui sopra. Il sistema di controllo accessi sta funzionando; il chiamante ha
+  richiesto qualcosa che le sue policy non consentono. Controlla le
+  `securityRules` della collection ed esegui `npx @rebasepro/rls-check` per un
+  controllo in sola lettura di ciò che il database applicherà effettivamente.
+- **Al ruolo manca un `GRANT`.** Il messaggio nomina l'oggetto invece:
+
+  ```
+  DB_PERMISSION_DENIED — Permission denied by the database: the role this request
+  runs as has no privilege on schema "rebase". That is a missing GRANT to that
+  role, not a row-level security policy.
+  ```
+
+  Nulla nella richiesta potrà risolvere il problema — il ruolo con cui vengono
+  eseguite le richieste non può interagire affatto con quell'oggetto. Il server
+  concede al ruolo di richiesta i privilegi sugli schemi di cui effettua il
+  provisioning, all'avvio; un oggetto creato al di fuori di esso (da un altro
+  ruolo, o in uno schema che nessuna collection dichiara) necessita di un
+  `GRANT` a parte. Questo è un problema di deployment.
 
 Una lettura esclusa da RLS non è un errore: le righe vengono filtrate e si ottiene una pagina vuota. Se una collection risulta vuota per un utente autenticato che dovrebbe visualizzare le righe, il punto da verificare è la policy, non la query.
 

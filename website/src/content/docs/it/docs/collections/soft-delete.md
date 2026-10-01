@@ -76,7 +76,11 @@ di essa restituisce `404`, come fa la riga per ogni lettura predefinita; riprist
 L'operazione inversa non è un aggiornamento. Impostare il campo su un valore viene rifiutato con `400`
 `FIELD_NOT_WRITABLE` — elimina invece la riga — così il permesso `delete`,
 `beforeDelete` e `afterDelete` si applicano sempre. Un upsert può creare una riga
-già contrassegnata, ma non contrassegna mai una riga già memorizzata.
+già contrassegnata, ma non contrassegna mai una riga già memorizzata. Né un
+upsert scrive in una riga nel cestino: quando la sua chiave appartiene a una riga
+contrassegnata, viene rifiutato con `409` `ROW_IN_TRASH` e non viene scritto
+nulla. Ripristina prima la riga, oppure elimina definitivamente con `?hard=true`
+e ripeti l'upsert.
 
 Un'eliminazione tramite un percorso many-to-many, come `DELETE /api/data/posts/1/tags/5`,
 rimuove il collegamento del post 1 al tag. Non esegue il soft delete del tag, che altri

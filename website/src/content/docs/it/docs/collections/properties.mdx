@@ -55,9 +55,11 @@ Tutti i tipi di proprietà condividono le seguenti opzioni:
 :::note[Cosa significa "solo modulo admin"]
 Diverse opzioni di seguito presentano questa dicitura: definiscono il modulo renderizzato dal pannello e
 nient'altro — l'API accetta una scrittura che le ignora e nessun vincolo
-è imposto dietro di esse. Una regola che deve essere rispettata da ogni chiamante è una
-[regola di validazione](/docs/collections/validation-and-conditions/) o una
-[regola di sicurezza](/docs/collections/security-rules/).
+è imposto dietro di esse. Una regola che deve essere rispettata da ogni chiamante dell'API è una
+[regola di validazione](/docs/collections/validation-and-conditions/) — verificata sulle scritture
+REST, socket e MCP, [non su quelle in-process](/docs/collections/validation-and-conditions/#where-validation-runs)
+— oppure una [regola di sicurezza](/docs/collections/security-rules/), che il database
+applica per chiunque.
 :::
 
 ### Configurazione dell'interfaccia utente (`admin`)
@@ -80,6 +82,7 @@ price: {
 |----------|------|-------------|
 | `admin.readOnly` | `boolean` | Impedisce la modifica |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Disabilita con tooltip opzionale |
+| `admin.filledByServer` | `boolean` | Il server compila il campo quando un nuovo record lo lascia vuoto (un hook `beforeSave`). Il modulo lascia passare una creazione senza di esso; resta obbligatorio in modifica, e i controlli del server si applicano comunque |
 | `admin.hideFromCollection` | `boolean` | Nasconde dalla vista a tabella |
 | `admin.columnWidth` | `number` | Larghezza della colonna in pixel (vista a tabella) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Larghezza del campo sulla griglia del modulo a quattro colonne |
@@ -291,6 +294,13 @@ dichiara una [relazione](/docs/collections/relations) se desideri una join.
 `isId` può essere impostato esattamente su una proprietà. Un secondo utilizzo viene rifiutato al caricamento
 della configurazione invece di essere ignorato silenziosamente: le chiavi primarie composite non sono supportate,
 e una configurazione che ne dichiara due verrebbe interpretata come la richiesta di una struttura non supportata da Rebase. Se l'obiettivo era applicare un vincolo di unicità su più colonne, si deve utilizzare un [indice](/docs/backend/indexes) univoco.
+
+Una collection in cui nessuna proprietà dichiara `isId` ottiene una colonna
+`id` propria: `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. Il database
+la compila, quindi una riga creata dal pannello di amministrazione, dalla
+REST API o dall'SDK non ha bisogno di una chiave, e una chiave che invii tu
+viene usata come fornita. Una tabella creata prima che esistesse questo
+default la riceve al prossimo avvio.
 :::
 
 ## Proprietà Number

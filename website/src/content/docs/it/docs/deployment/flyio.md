@@ -101,14 +101,13 @@ Poi `fly open`.
 
 Ciò che `ensure` non fa mai è modificare qualcosa che esiste già: non altera il tipo di una colonna, non elimina nulla e non modifica le etichette di un enum esistente, poiché il riavvio di una macchina non deve rimodellare uno schema come effetto collaterale di un deploy.
 
-Due operazioni richiedono quindi ancora la CLI, eseguita da un checkout o da un job di CI:
+Una sola operazione richiede quindi ancora la CLI, eseguita da un checkout o da un job di CI:
 
 ```bash
 rebase db push
 ```
 
-- **RLS sulle junction table** per le relazioni molti-a-molti.
-- **Qualsiasi modifica che non sia puramente additiva** — una colonna rinominata, un tipo ristretto, un campo rimosso.
+Qualsiasi modifica che non sia puramente additiva — una colonna rinominata, un tipo ristretto, un campo rimosso.
 
 Per un Fly Postgres privato, apri un tunnel con `fly proxy 5432 -a <your-db-app>` e fai puntare `DATABASE_URL` a `localhost:5432`. L'immagine runtime viene fornita senza la CLI, quindi questo comando non viene mai eseguito all'interno della macchina e nemmeno un `release_command` può richiamarlo. Per migrazioni con controllo di versione, esegui il commit dei file di migrazione con `rebase db generate` ed esegui invece `rebase db migrate` come passaggio di rilascio.
 

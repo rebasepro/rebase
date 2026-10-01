@@ -149,10 +149,7 @@ Con `REBASE_MIGRATE_ON_BOOT` impostato sul valore predefinito `ensure`, il runti
 
 Ciò che la procedura di avvio evita deliberatamente è qualsiasi operazione distruttiva: non modifica il tipo di una colonna, non elimina colonne né modifica i valori di un enum esistente. Il riavvio di un container non deve poter alterare lo schema come effetto collaterale.
 
-Due cose richiedono quindi ancora l'esecuzione di [`rebase db push`](/docs/architecture/schema-as-code), avviato da un checkout locale o dalla CI, dove il controllo per i cambiamenti distruttivi e un backup siano a portata di mano:
-
-- la RLS delle tabelle di giunzione per le relazioni molti-a-molti;
-- qualsiasi modifica che non sia puramente additiva.
+Una cosa richiede quindi ancora l'esecuzione di [`rebase db push`](/docs/architecture/schema-as-code), avviato da un checkout locale o dalla CI, dove il controllo per i cambiamenti distruttivi e un backup siano a portata di mano: qualsiasi modifica che non sia puramente additiva — una colonna rinominata, un tipo ristretto, un campo rimosso.
 
 Se il modulo o il file Compose hanno associato Postgres all'interfaccia di loopback (come fanno entrambi), connettiti tramite un tunnel SSH:
 

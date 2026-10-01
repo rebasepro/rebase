@@ -49,6 +49,17 @@ do {
 } while (after);
 ```
 
+`nextCursor` è assente nell'ultima pagina, e in una pagina che nessun cursore può
+descrivere: una ricerca ordinata per rilevanza (`_score`), una ricerca vettoriale
+e una proiezione `fields` che esclude uno dei campi di `orderBy` — il cursore
+viene costruito dai valori di ordinamento dell'ultima riga, e quella riga non li
+porta con sé. In quel caso `meta.hasMore` può essere `true` senza `nextCursor`, e
+il ciclo sopra si interrompe in anticipo: aggiungi i campi di ordinamento a
+`fields`, oppure pagina con `offset`. `iterate()` invocato con un `cursor`
+rifiuta un simile elenco con `cursor-missing` invece di fermarsi. Un ordinamento
+per un [aggregato su una relazione](/docs/sdk/relations/) pagina invece
+correttamente tramite cursore.
+
 Il cursore è **opaco**. Codifica le chiavi di ordinamento *e* i valori dell'ultima riga
 per esse, quindi può solo continuare l'elenco da cui proviene: mantieni `orderBy`
 identico tra le pagine, altrimenti la richiesta verrà rifiutata con

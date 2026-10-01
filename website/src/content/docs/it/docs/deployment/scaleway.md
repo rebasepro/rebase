@@ -84,14 +84,13 @@ Scaleway effettua il provisioning del container e ti fornisce un endpoint pubbli
 
 Ciò che `ensure` non fa mai è modificare qualcosa di già esistente: non modifica il tipo di una colonna, non elimina nulla e non modifica i valori di un enum esistente, poiché il riavvio di un container non deve rimodellare uno schema come effetto collaterale di un deploy.
 
-Due operazioni richiedono quindi ancora l'uso della CLI, eseguita da un checkout locale o da un job di CI con `DATABASE_URL` puntato verso il tuo Managed Database:
+Una sola operazione richiede quindi ancora l'uso della CLI, eseguita da un checkout locale o da un job di CI con `DATABASE_URL` puntato verso il tuo Managed Database:
 
 ```bash
 rebase db push
 ```
 
-- **RLS per le junction table** relative alle relazioni molti-a-molti.
-- **Qualsiasi modifica che non sia puramente additiva**: una colonna rinominata, un tipo con vincoli più restrittivi, un campo rimosso.
+Qualsiasi modifica che non sia puramente additiva: una colonna rinominata, un tipo con vincoli più restrittivi, un campo rimosso.
 
 L'immagine di runtime viene distribuita senza la CLI, quindi questo non viene mai eseguito all'interno del container. Per migrazioni con controllo di versione, effettua il commit dei file di migrazione con `rebase db generate` ed esegui invece `rebase db migrate` come passaggio di rilascio.
 

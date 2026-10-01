@@ -34,6 +34,9 @@ prima del primo avvio.
 - **[Suddivisione in più processi](/docs/deployment/split-processes/)** — un
   bundle come API, livello functions e worker, così una function pesante smette
   di competere con l'API dei dati.
+- **[Eseguire più di un'istanza](/docs/deployment/multiple-instances/)** — lo
+  stato che ogni processo conserva solo per sé, e l'impostazione che lo
+  condivide, prima che una seconda replica riceva traffico.
 
 ## Guide per piattaforma
 

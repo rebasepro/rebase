@@ -67,6 +67,8 @@ rebase generate-sdk
 ```
 
 Mentre `rebase dev` è in esecuzione non serve: rigenera i tipi in `generated/sdk/` all'avvio e a ogni salvataggio sotto `config/collections/`. Esegui tu stesso il comando in CI, in un repository frontend che non ha collection (`rebase generate-sdk --from link`), o ovunque `rebase dev` non sia in esecuzione.
+<span class="since-badge" data-since="0.24">Dalla 0.24</span> per la rigenerazione: sulla 0.23, `rebase dev` lascia i tipi dell'SDK intatti, quindi esegui
+il comando dopo ogni modifica a una collection.
 
 Quindi passa il parametro di tipo `Database` a `createRebaseClient` per ottenere l'autocompletamento completo:
 
@@ -93,7 +95,7 @@ Quando viene fornito `Database`, `createRebaseClient` restituisce un'istanza di 
 
 Una chiave di proprietà scritta da *te* rimane invariata, qualunque sia la sua forma — nulla rinomina un nome da te scelto. Le due chiavi che vengono derivate anziché dichiarate, ovvero la foreign key di una relazione e una colonna letta tramite introspezione, sono in camelCase.
 
-`Row` descrive una lettura, `Insert` una `create()` e `Update` una `update()` — non hanno la stessa forma. Le colonne nullable sono `T | null` su `Row`, la primary key è sempre presente in lettura e non è mai impostabile in un aggiornamento, e il target di un `belongsTo` può essere scritto sia come relazione (`{ author: 5 }`) sia come foreign key (`{ authorId: 5 }`).
+`Row` descrive una lettura, `Insert` una `create()` e `Update` una `update()` — non hanno la stessa forma. Una colonna non obbligatoria è `T | null` su tutte e tre, così una scrittura può azzerarla; la primary key è sempre presente in lettura e non è mai impostabile in un aggiornamento; il target di un `belongsTo` può essere scritto sia come relazione (`{ author: 5 }`) sia come foreign key (`{ authorId: 5 }`); e un'appartenenza `hasMany` o `manyToMany` si scrive come un elenco di id target o di oggetti `{ id }` (`{ tags: ["t-1"] }`), ciascuno con un `_pivot` quando la tabella di giunzione dichiara colonne di payload. Un campo che nessuno può scrivere (`access: { write: [] }`) non compare né su `Insert` né su `Update`.
 
 ## Esempio rapido
 

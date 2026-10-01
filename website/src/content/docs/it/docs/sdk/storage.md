@@ -79,8 +79,31 @@ L'SDK memorizza nella cache gli URL firmati per evitare chiamate ridondanti al s
 
 ### URL privati vs. pubblici
 
-- **I file privati** ottengono un URL con un **token di download a breve durata, limitato al percorso** (`?token=…`, 5 min per impostazione predefinita) — mai il tuo token di accesso. Poiché scade, **non conservare un URL privato**; memorizza il **percorso** del file e richiama `getSignedUrl()` al momento del rendering.
+- **I file privati** ottengono un URL con un **token di download a breve durata, limitato al percorso** (`?token=…`, 5 minuti salvo che il server imposti `STORAGE_DOWNLOAD_TOKEN_TTL`) — mai il tuo token di accesso. Poiché scade, **non conservare un URL privato**; memorizza il **percorso** del file e richiama `getSignedUrl()` al momento del rendering.
 - **I file pubblici** (archiviati sotto il prefisso `public/` — imposta `storage: { public: true }` sulla proprietà, o passa `public: true` a `putObject`) ottengono un URL **stabile, senza token, permanente e memorizzabile nella CDN**, senza andata e ritorno al server. Sono sicuri da memorizzare in un database e da collegare direttamente.
+
+### File dentro un testo
+
+Un testo che incorpora un file — le immagini in un campo markdown — non può
+contenere nemmeno un URL privato, quindi contiene invece un **riferimento di
+storage**: `rebase-storage:posts/cover.png`, con `?storageId=media` quando il
+file si trova in una sorgente nominata. È ciò che scrive l'editor markdown del
+pannello di amministrazione per un'immagine caricata. Scambia i riferimenti con
+URL quando esegui il rendering del testo:
+
+```typescript
+import { resolveStorageReferences } from "@rebasepro/client";
+
+const post = await client.data.collection("posts").findById("post-1");
+const body = await resolveStorageReferences(String(post?.body ?? ""), client);
+// `body` è lo stesso markdown, con ogni riferimento sostituito da un URL nuovo.
+```
+
+Ogni oggetto viene firmato una volta per chiamata, dalla propria sorgente, così
+un'immagine privata continua a funzionare indipendentemente da quanto tempo fa
+è stata caricata. Un riferimento che nomina un oggetto che non esiste più viene
+lasciato com'è. `storageReference(key, storageId?)` ne costruisce uno, per un
+testo che scrivi tu stesso.
 
 ## Scaricare un file
 

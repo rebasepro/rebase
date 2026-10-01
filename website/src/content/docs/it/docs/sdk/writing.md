@@ -142,6 +142,14 @@ riga proveniente da `find()`, dalla cache offline o da un server che non invia a
 `ETag` — e passare `undefined` non invia alcuna precondizione, degradando la chiamata precedente
 a un normale update invece di generare un errore.
 
+Da un browser su un'altra origine — un frontend Vite su una propria porta, un
+host `app.` che chiama un host `api.` — l'`ETag` è leggibile solo perché il
+server lo nomina in `Access-Control-Expose-Headers`. Il runtime di Rebase lo
+fa, insieme a `Retry-After`, `X-Request-ID`, gli header `X-RateLimit-*` e
+`Preference-Applied`. Un backend che collega il proprio `cors()` deve esporre
+lo stesso elenco, altrimenti `etagOf` lì è sempre `undefined` e ogni scrittura
+condizionale parte senza condizione.
+
 ### Omettere la risposta
 
 Ogni scrittura si risolve restituendo la riga che ha scritto. Passa `{ returning: false }` quando
@@ -256,8 +264,8 @@ per più collezioni: una sola richiesta, una sola transazione, tutto o niente.
 const result = await client.batch([
     { op: "create", collection: "orders",
       values: { total: 40 }, ref: "order" },
-    { op: "create", collection: "order_items",
-      values: { order_id: { $ref: "order.id" }, sku: "A-1" } },
+    { op: "create", collection: "orderItems",
+      values: { orderId: { $ref: "order.id" }, sku: "A-1" } },
     { op: "update", collection: "stock",
       id: "A-1", values: { count: { $inc: -1 } } },
     { op: "delete", collection: "carts", id: "c-9" }
@@ -268,7 +276,11 @@ result.meta;  // { operations: 4 }
 ```
 
 `op` può essere `create`, `update`, `upsert` o `delete`, e `collection` restringe
-`values` alla struttura tipizzata generata di `Insert` o `Update` di quella collezione. Ogni
+`values` alla struttura tipizzata generata di `Insert` o `Update` di quella collezione — una colonna
+che la collezione non ha è un errore di compilazione, e lo è anche una creazione a cui manca una
+colonna obbligatoria. `collection` è l'accessor, il nome che prende
+`client.data.<accessor>` (`orderItems` per lo slug `order_items`); il client invia lo slug,
+tramite il dizionario `collections` con cui è stato creato. Ogni
 operazione esegue la pipeline della sua equivalente a riga singola — la stessa
 validazione, callback e sicurezza a livello di riga, con lo stesso utente.
 

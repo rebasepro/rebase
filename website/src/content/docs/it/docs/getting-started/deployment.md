@@ -129,8 +129,7 @@ job di CI puntato al database di produzione:
 pnpm run db:push
 ```
 
-Eseguilo per la RLS delle tabelle di giunzione nelle relazioni molti-a-molti, e
-per qualunque cambiamento che non sia puramente additivo: una colonna
+Eseguilo per qualunque cambiamento che non sia puramente additivo: una colonna
 rinominata, un tipo ristretto, un campo rimosso.
 
 Per un **flusso di lavoro versionato e di squadra**, versiona i file di
@@ -178,7 +177,7 @@ Prima di distribuire in produzione, assicurati di:
 |------|---------|
 | **Primo amministratore** | Imposta `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` **prima del primo avvio**, insieme a `DISABLE_SELF_REGISTRATION=true`. In produzione il primo account registrato non viene promosso — vedi [Il tuo primo amministratore](#il-tuo-primo-amministratore). |
 | **NODE_ENV** | `NODE_ENV=production`. È ciò che chiude la finestra di bootstrap, rifiuta l'archiviazione locale dei file, richiede `CORS_ORIGINS` e disattiva la documentazione OpenAPI. Una distribuzione lasciata al valore predefinito sta girando in modalità sviluppo. |
-| **Schema del database** | L'avvio crea le tabelle delle tue collezioni in modo additivo. Esegui `pnpm run db:push` (o `pnpm run db:migrate`) per la RLS delle tabelle di giunzione e per tutto ciò che non è puramente additivo. |
+| **Schema del database** | L'avvio crea le tabelle delle tue collezioni e la relativa RLS in modo additivo. Esegui `pnpm run db:push` (o `pnpm run db:migrate`) per tutto ciò che non è puramente additivo. |
 | **JWT_SECRET** | Usa una stringa casuale crittograficamente forte (≥ 32 caratteri). Non riutilizzarla mai tra ambienti. |
 | **DATABASE_URL** | Usa un'istanza Postgres gestita (Neon, Supabase, RDS) con TLS abilitato |
 | **CORS_ORIGINS** | Sempre, non solo quando il frontend è su un altro dominio. Il runtime si rifiuta di avviarsi in produzione senza né `CORS_ORIGINS` né `FRONTEND_URL`, perché un'API che indovina le proprie origini consentite prima o poi ne consente una sbagliata. |

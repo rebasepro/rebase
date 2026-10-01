@@ -156,7 +156,7 @@ data[0].authorId;       // "uuid-1234" — still there
 data[0].author?.name;   // "Jane Doe"
 ```
 
-Un tipo `Database` generato tipizza tutti e tre con precisione: `Insert` e `Update` accettano entrambe le sintassi di scrittura, `Row` contiene `authorId` incondizionatamente, mentre `author` è facoltativo su `Row` e **obbligatorio** sulla riga restituita da una lettura con `include` — consulta [Include tipizzati](#typed-includes).
+Un tipo `Database` generato tipizza tutti e tre con precisione: `Insert` e `Update` accettano entrambe le sintassi di scrittura, `Row` contiene `authorId` incondizionatamente, mentre `author` è facoltativo su `Row` — `RowWith<"posts", ["author"]>` è la riga con quel campo resa **obbligatoria**, per una lettura che l'ha richiesto. Consulta [Include tipizzati](#typed-includes).
 
 L'unico caso in cui i tre collassano è una relazione con lo stesso identico nome della propria chiave esterna. In quel caso la riga inclusa viene servita *al posto della* colonna, e il tipo generato lo riflette tipizzando quella chiave per entrambi i casi.
 
@@ -173,7 +173,7 @@ const ok: IncludeFor<"posts"> = { comments: { limit: 5, include: { author: true 
 const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
-`IncludeFor<A>` vincola le chiavi di un include alle relazioni esistenti, a qualsiasi livello. `RowWith<A, I>` è la riga restituita dalla lettura, in cui ogni relazione inclusa viene resa **obbligatoria** — pertanto, dopo aver richiesto l'autore, `row.author.name` non richiede `?.`.
+`IncludeFor<A>` vincola le chiavi di un include alle relazioni esistenti, a qualsiasi livello — e un client tipizzato controlla `include` nello stesso modo, sia in `find({ include })` sia in `.include(...)`, così `posts.include("authr")` è un errore di compilazione invece di un 400 `UNKNOWN_RELATION`. Le righe restituite da una lettura continuano a tipizzare ogni relazione come facoltativa; `RowWith<A, I>` è quella riga con ogni relazione inclusa resa **obbligatoria**, per annotare ciò che leggi — pertanto, dopo aver richiesto l'autore, una `RowWith<"posts", ["author"]>` non richiede `?.` su `row.author.name`.
 
 Senza un `Database` generato, `include` rimane un semplice `string[]` o albero: un tipo di riga scritto a mano non contiene relazioni da verificare e l'errore 400 del server funge da protezione finale.
 
