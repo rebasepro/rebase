@@ -1,5 +1,6 @@
 import { useCollectionRegistryController } from "../../../_cms_internals";
-import { convertDataToEntity, ImportConfig } from "../../../_cms_internals";
+import { convertImportData, ImportConfig, ImportConversionProblems } from "../../../_cms_internals";
+import type { ImportConversionProblem } from "../../../../data_import/utils/data";
 import { useAuthController } from "@rebasepro/app";
 import { CollectionTableBinding } from "../../../../components/CollectionTableBinding/CollectionTableBinding";
 import { useSelectionController } from "../../../../components/CollectionViewBinding/useSelectionController";
@@ -21,17 +22,19 @@ export function CollectionEditorImportDataPreview({
     const authController = useAuthController();
     const registry = useCollectionRegistryController();
     const [loading, setLoading] = useState<boolean>(false);
+    const [problems, setProblems] = useState<ImportConversionProblem[]>([]);
 
     async function loadEntities() {
-        const mappedData = importConfig.importData.map(d => convertDataToEntity(authController,
+        const converted = convertImportData(authController,
             registry,
-            d,
+            importConfig.importData,
             importConfig.idColumn,
             importConfig.headersMapping,
             properties,
             "TEMP_PATH",
-            importConfig.defaultValues));
-        importConfig.setEntities(mappedData);
+            importConfig.defaultValues);
+        importConfig.setEntities(converted.entities);
+        setProblems(converted.problems);
     }
 
     useEffect(() => {
@@ -42,26 +45,31 @@ export function CollectionEditorImportDataPreview({
     if (loading)
         return <CircularProgressCenter/>
 
-    return <CollectionTableBinding
-        title={<div>
-            <Typography variant={"subtitle2"}>Imported data preview</Typography>
-            <Typography variant={"caption"}>Entities with the same id will be overwritten</Typography>
-        </div>}
-        tableController={{
-            data: importConfig.entities,
-            dataLoading: false,
-            noMoreToLoad: false
-        }}
-        endAdornment={<div className={"h-12"}/>}
-        filterable={false}
-        sortable={false}
-        selectionController={selectionController}
-        displayedColumnIds={propertiesOrder.map(p => ({
-            key: p,
-            disabled: false
-        }))}
-        openEntityMode={"side_panel"}
-        properties={properties}
-        enablePopupIcon={false}/>
+    return <div className={"flex flex-col h-full w-full"}>
+        <ImportConversionProblems problems={problems}/>
+        <div className={"flex-1 min-h-0"}>
+            <CollectionTableBinding
+                title={<div>
+                    <Typography variant={"subtitle2"}>Imported data preview</Typography>
+                    <Typography variant={"caption"}>Entities with the same id will be overwritten</Typography>
+                </div>}
+                tableController={{
+                    data: importConfig.entities,
+                    dataLoading: false,
+                    noMoreToLoad: false
+                }}
+                endAdornment={<div className={"h-12"}/>}
+                filterable={false}
+                sortable={false}
+                selectionController={selectionController}
+                displayedColumnIds={propertiesOrder.map(p => ({
+                    key: p,
+                    disabled: false
+                }))}
+                openEntityMode={"side_panel"}
+                properties={properties}
+                enablePopupIcon={false}/>
+        </div>
+    </div>;
 
 }

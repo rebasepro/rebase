@@ -486,6 +486,18 @@ export interface RebaseTranslations {
     save_data: string;
     use_column_as_id: string;
     do_not_import_property: string;
+    import_problems_title: string;
+    import_problems_description: string;
+    import_problems_column: string;
+    import_problems_example: string;
+    import_problems_more: string;
+    import_problem_not_a_number: string;
+    import_problem_number_leading_zero: string;
+    import_problem_number_too_precise: string;
+    import_problem_not_a_boolean: string;
+    import_problem_not_a_date: string;
+    import_problem_ambiguous_date: string;
+    import_problem_not_a_vector: string;
     entities_will_be_overwritten: string;
     data_imported_successfully: string;
 

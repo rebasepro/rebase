@@ -30,11 +30,12 @@ import {
 } from "@rebasepro/ui";
 import { buildEntityPropertiesFromData } from "@rebasepro/inference";
 import { useImportConfig } from "../hooks";
-import { convertDataToEntity, getInferenceType } from "../utils";
+import { convertImportData, getInferenceType, ImportConversionProblem } from "../utils";
 import { guessIdColumn } from "../utils/id_column";
 import { DataNewPropertiesMapping } from "../components/DataNewPropertiesMapping";
 import { ImportFileUpload } from "../components/ImportFileUpload";
 import { ImportSaveInProgress } from "../components/ImportSaveInProgress";
+import { ImportConversionProblems } from "../components/ImportConversionProblems";
 import { ImportConfig } from "../types";
 import { isPrototypePollutingKey, slugify } from "@rebasepro/utils";
 
@@ -379,47 +380,54 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
 }) {
     const authController = useAuthController();
     const collectionRegistry = useCollectionRegistryController();
+    const [problems, setProblems] = React.useState<ImportConversionProblem[]>([]);
     useEffect(() => {
-        const mappedData = importConfig.importData.map(d => convertDataToEntity(
+        const converted = convertImportData(
             authController,
             collectionRegistry,
-            d,
+            importConfig.importData,
             importConfig.idColumn,
             importConfig.headersMapping,
             properties,
             "TEMP_PATH",
             importConfig.defaultValues
-        ));
-        importConfig.setEntities(mappedData);
+        );
+        importConfig.setEntities(converted.entities);
+        setProblems(converted.problems);
     }, []);
 
     const selectionController = useSelectionController();
 
-    return <CollectionTableBinding
-        title={<div>
-            <Typography variant={"subtitle2"}>Imported data preview</Typography>
-            {/* Conditional because it is only true when a column was chosen as
-                the id: without one, every row is created and nothing can be
-                overwritten. With one, the import asks for an upsert — which it
-                did not, back when this sentence was unconditional and false. */}
-            <Typography variant={"caption"}>
-                {importConfig.idColumn
-                    ? "Entities with the same id will be overwritten"
-                    : "All rows will be imported as new entities"}
-            </Typography>
-        </div>}
-        tableController={{
-            data: importConfig.entities,
-            dataLoading: false,
-            noMoreToLoad: false
-        }}
-        enablePopupIcon={false}
-        endAdornment={<div className={"h-12"}/>}
-        filterable={false}
-        sortable={false}
-        openEntityMode={"full_screen"}
-        selectionController={selectionController}
-        properties={properties}/>
+    return <div className={"flex flex-col h-full w-full"}>
+        <ImportConversionProblems problems={problems}/>
+        <div className={"flex-1 min-h-0"}>
+            <CollectionTableBinding
+                title={<div>
+                    <Typography variant={"subtitle2"}>Imported data preview</Typography>
+                    {/* Conditional because it is only true when a column was chosen as
+                        the id: without one, every row is created and nothing can be
+                        overwritten. With one, the import asks for an upsert — which it
+                        did not, back when this sentence was unconditional and false. */}
+                    <Typography variant={"caption"}>
+                        {importConfig.idColumn
+                            ? "Entities with the same id will be overwritten"
+                            : "All rows will be imported as new entities"}
+                    </Typography>
+                </div>}
+                tableController={{
+                    data: importConfig.entities,
+                    dataLoading: false,
+                    noMoreToLoad: false
+                }}
+                enablePopupIcon={false}
+                endAdornment={<div className={"h-12"}/>}
+                filterable={false}
+                sortable={false}
+                openEntityMode={"full_screen"}
+                selectionController={selectionController}
+                properties={properties}/>
+        </div>
+    </div>;
 
 }
 

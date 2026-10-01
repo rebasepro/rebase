@@ -18,8 +18,8 @@ Both are available on every collection. Export can be configured per collection 
 2. Click the **Import** button in the toolbar
 3. Select or drag-and-drop your file
 4. Map file columns to collection properties
-5. Preview the data and resolve any validation errors
-6. Click **Import** to save all entities
+5. Preview the data, including any values that cannot be converted
+6. Click **Save data** to write the rows
 
 ### Supported Formats
 
@@ -35,16 +35,31 @@ The import wizard automatically attempts to match file columns to collection pro
 
 - **Exact matches** are mapped automatically (e.g. `name` → `name`)
 - **Unmatched columns** can be mapped manually or skipped
-- **Type coercion** handles string-to-number, string-to-boolean, and date parsing
+- **Type conversion** turns each cell into the type of the property it maps to, but only when nothing is lost (see below)
 
-### Validation
+### Type conversion
 
-Before importing, the wizard validates all rows against your collection's property definitions:
+A cell is converted only when the property's type can hold exactly what it says:
 
-- Required fields must be present
-- Enum values must match defined options
-- Data types must be compatible (e.g. a text value for a number field is flagged)
-- Validation errors are shown per-row so you can fix them before importing
+| Property type | Converts | Does not convert |
+|---|---|---|
+| Number | `12`, `-3.5`, `10.00`, `1e3` | `02134` (a leading zero would be lost), numbers with more than 15 significant digits, `1,234`, `$5.00`, `12%`, `N/A` |
+| Boolean | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, in any case | anything else |
+| Date | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), written-out dates (`5 Jan 2024`), `05/01/2024`, epoch seconds or milliseconds | text that names no date |
+
+A date without a time is that day in UTC. For dates written as `05/01/2024`, the column decides the order: a first number above 12 makes the column day-first, a second number above 12 makes it month-first. When a column never says, the browser's locale decides, and when it holds both orders, a date that either order could read is not converted.
+
+A blank cell is no value: it sets nothing, and the default you chose for that property applies.
+
+### Values that cannot be imported
+
+The preview lists every cell that does not convert, per column, with how many there are and the first few by row and reason. Those cells are left empty in the imported rows; nothing is turned into `0`, `false` or an empty value without being listed. Go back to map the column to another property, or correct the file and upload it again.
+
+The collection's own rules — required fields, enum options, unique values — are checked by the server as the rows are written, 25 rows at a time. If a row is refused, the import stops and names it; the rows before it are already saved, and **Retry** resumes from the refused row.
+
+### Creating a collection from a file
+
+When you create a collection from a file, each column's type is inferred from its values. A column is a number only if every value in it is a number or text that converts to one exactly, so a column of zip codes, product codes with leading zeros, long SKUs or phone numbers stays text. A column that mixes types (numbers and words, booleans and numbers) is text. Blank cells do not count, so a mostly empty column is not marked required.
 
 ### Import Configuration
 

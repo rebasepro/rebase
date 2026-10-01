@@ -26,7 +26,8 @@ export { ImportFileUpload } from "../data_import/components/ImportFileUpload";
 export { ImportSaveInProgress } from "../data_import/components/ImportSaveInProgress";
 export { useImportConfig } from "../data_import/hooks/useImportConfig";
 export { getInferenceType } from "../data_import/utils/get_import_inference_type";
-export { convertDataToEntity } from "../data_import/utils/data";
+export { convertDataToEntity, convertImportData } from "../data_import/utils/data";
+export { ImportConversionProblems } from "../data_import/components/ImportConversionProblems";
 export { guessIdColumn } from "../data_import/utils/id_column";
 export type { ImportConfig } from "../data_import/types";
 
