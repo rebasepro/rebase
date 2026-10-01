@@ -406,6 +406,22 @@ describe("door parity: one operation, one answer (E2E)", () => {
         if (container) await stopPgContainer(container.containerName);
     }, 30_000);
 
+    /**
+     * The driver refuses an upsert onto a trashed key before the statement
+     * runs; the statement holds the same rule for the row that read did not see
+     * (trashed since, or out of its reach). Driven below the driver, so only
+     * the statement is between the write and the trashed row.
+     */
+    it("the upsert statement itself never writes into a trashed row (DD-1)", async () => {
+        const id = "statement-1";
+        await stage("trashed", id);
+        await expect(driver.dataService.save(
+            "docs", { id, title: "revived?" }, undefined, undefined, { upsert: true }
+        )).rejects.toMatchObject({ statusCode: 409, code: "ROW_IN_TRASH" });
+        const after = await observe(id, { ok: true });
+        expect([after.state, after.title]).toEqual(["trashed", STORED_TITLE]);
+    });
+
     let caseSeq = 0;
     for (const parity of PARITY_CASES) {
         describe(`given a ${parity.given} row, ${parity.name}${parity.finding ? ` (${parity.finding})` : ""}`, () => {

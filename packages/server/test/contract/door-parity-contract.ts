@@ -180,6 +180,30 @@ export const PARITY_CASES: readonly ParityCase[] = [
         }
     },
 
+    // ── upsert ───────────────────────────────────────────────────────────
+    {
+        name: "an upsert on a free key creates the row",
+        given: "absent",
+        when: { op: "upsert", values: { title: "upserted" } },
+        then: { outcome: "created", hooks: saveHooks("new"), history: ["create"], ...live("upserted") }
+    },
+    {
+        name: "an upsert on a live row's key updates that row",
+        given: "live",
+        when: { op: "upsert", values: { title: "upserted" } },
+        then: { outcome: "ok", hooks: saveHooks("existing"), history: ["update"], ...live("upserted") }
+    },
+    {
+        // It answered "created" and wrote into the deleted row: the row stayed
+        // in the trash with the new values, hooks were told it was new, and
+        // history gained a second `create` for a row that already existed.
+        name: "an upsert on a trashed row's key is refused, naming the trash",
+        finding: "DD-1",
+        given: "trashed",
+        when: { op: "upsert", values: { title: "revived?" } },
+        then: { outcome: "conflict", code: "ROW_IN_TRASH", hooks: [], history: [], ...trashed }
+    },
+
     // ── delete ───────────────────────────────────────────────────────────
     {
         name: "a delete of a live row puts it in the trash",

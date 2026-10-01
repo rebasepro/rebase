@@ -187,16 +187,43 @@ describe("an upsert over a stored row is an update of it", () => {
         expect(await rowOf(hidden)).toMatchObject({ title: "gamma", tenant: "b", active: false, created_by: "carol" });
     });
 
-    it("when the statement itself meets the stored row, it sets only what the caller sent", async () => {
-        // A trashed row is invisible to the read that routes an upsert to the
-        // update pipeline, so this reaches the conflict branch of the INSERT —
-        // the path a concurrent insert of the same key takes too.
-        await driverOver(db, BOB_A).save({
+    it("on the key of a row in the trash, is refused and writes nothing", async () => {
+        // This test used a trashed row to reach the INSERT's conflict branch,
+        // because the read that routes an upsert hid it — and so pinned that
+        // the statement wrote into the trash. It is refused now, by name.
+        await expect(driverOver(db, BOB_A).save({
             path: "docs", values: { id: trashed, title: "re-imported", tenant: "a" }, status: "new", upsert: true
+        })).rejects.toMatchObject({ statusCode: 409, code: "ROW_IN_TRASH" });
+
+        expect(await rowOf(trashed)).toMatchObject({ title: "trash", deleted_at: expect.stringMatching(/^2021-01-01/) });
+        expect(seen).toEqual([]);
+        expect(recorded).toEqual([]);
+    });
+
+    it("when the statement itself meets the stored row, it sets only what the caller sent", async () => {
+        // The path a concurrent insert of the same key takes: the read that
+        // routes an upsert found nothing, and the INSERT meets the row anyway.
+        // The race is staged by making that read come back empty.
+        const driver = driverOver(db, BOB_A);
+        Object.defineProperty(driver, "findUpsertTarget", { value: async () => undefined });
+        await driver.save({
+            path: "docs", values: { id: visible, title: "re-imported", tenant: "a" }, status: "new", upsert: true
         });
 
-        const row = await rowOf(trashed);
+        const row = await rowOf(visible);
         expect(row?.title).toBe("re-imported");
         expectCreateFactsKept(row);
+    });
+
+    it("when the statement itself meets a row in the trash, it refuses rather than write into it", async () => {
+        // The same race, onto a trashed row: the statement holds the rule the
+        // read would have.
+        const driver = driverOver(db, BOB_A);
+        Object.defineProperty(driver, "findUpsertTarget", { value: async () => undefined });
+        await expect(driver.save({
+            path: "docs", values: { id: trashed, title: "re-imported", tenant: "a" }, status: "new", upsert: true
+        })).rejects.toMatchObject({ statusCode: 409, code: "ROW_IN_TRASH" });
+
+        expect(await rowOf(trashed)).toMatchObject({ title: "trash" });
     });
 });

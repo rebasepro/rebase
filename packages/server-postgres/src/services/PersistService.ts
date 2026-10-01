@@ -1,4 +1,4 @@
-import { eq, and, sql, SQL } from "drizzle-orm";
+import { eq, and, isNotNull, isNull, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig, JUNCTION_PIVOT_KEY, Properties, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget } from "@rebasepro/types";
@@ -30,6 +30,7 @@ import { ApiError, logger, splitFieldOps } from "@rebasepro/server";
 import { brokenFieldOpBounds, compileFieldOpBounds, compileFieldOps, fieldOpBoundsError } from "./field-op-sql";
 import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, isRowLevelSecurityDenial } from "../utils/pg-error-utils";
 import { explainZeroRowWrite } from "./write-denial";
+import { resolveSoftDelete, rowInTrashError, softDeleteColumn } from "./soft-delete";
 
 /**
  * The top-level properties whose value is stamped once, when the row is
@@ -589,21 +590,37 @@ export class PersistService {
                         // is only known once the INSERT meets it, so the scope
                         // rides along as the conflict-update's own WHERE.
                         const scope = await this.writeScope(collection, effectiveCollectionPath, table);
+                        // And never a row in the trash. The driver refuses an
+                        // upsert onto a trashed key before it gets here (see
+                        // `findUpsertTarget`); this is the same rule held by
+                        // the statement, for the row that read could not see
+                        // or that was trashed since.
+                        const softDelete = resolveSoftDelete(collection);
+                        const trashColumn = softDelete ? softDeleteColumn(collection, table) : undefined;
+                        const writable = trashColumn
+                            ? (scope ? and(scope, isNull(trashColumn)) : isNull(trashColumn))
+                            : scope;
                         const updating = Object.keys(set).length > 0;
                         result = updating
-                            ? await insertQuery.onConflictDoUpdate({ target, set, setWhere: scope }).returning(returningKeys)
+                            ? await insertQuery.onConflictDoUpdate({ target, set, setWhere: writable }).returning(returningKeys)
                             : await insertQuery.onConflictDoNothing({ target }).returning(returningKeys);
 
                         if (result.length === 0) {
                             // The key is taken and the statement changed nothing:
-                            // the stored row is outside the caller's scope, or
-                            // there was nothing to change on it. Asked of the
-                            // row itself, through the same scope, rather than
-                            // falling back to an id the caller may not address —
-                            // which then failed the read-back below as a 500.
+                            // the stored row is outside the caller's scope, in
+                            // the trash, or there was nothing to change on it.
+                            // Asked of the row itself, through the same scope,
+                            // rather than falling back to an id the caller may
+                            // not address — which then failed the read-back
+                            // below as a 500.
                             const keyConditions: SQL[] = target.map((column, i) => eq(column, dataForInsert[targetFields[i]]));
                             if (scope) keyConditions.push(scope);
                             const keyLabel = targetFields.map((field) => String(dataForInsert[field])).join(", ");
+                            if (softDelete && trashColumn) {
+                                const [inTrash] = await tx.select(returningKeys).from(table)
+                                    .where(and(...keyConditions, isNotNull(trashColumn))).limit(1);
+                                if (inTrash) throw rowInTrashError(effectiveCollectionPath, keyLabel, softDelete);
+                            }
                             const missing = `No row "${keyLabel}" in "${effectiveCollectionPath}" to update.`;
                             if (updating) {
                                 throw await explainZeroRowWrite(

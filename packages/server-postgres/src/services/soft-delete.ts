@@ -3,6 +3,7 @@ import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { getTableColumns } from "drizzle-orm";
 import type { CollectionConfig } from "@rebasepro/types";
 import { softDeleteFieldOf } from "@rebasepro/common";
+import { ApiError } from "@rebasepro/server";
 import { toSnakeCase } from "@rebasepro/utils";
 
 /**
@@ -131,4 +132,22 @@ export function andSoftDelete(
     const condition = softDeleteCondition(collection, table, withDeleted);
     if (!condition) return where;
     return where ? and(where, condition) : condition;
+}
+
+/**
+ * The refusal of an upsert whose key belongs to a row in the trash.
+ *
+ * The key is taken — the stamped row still holds it — so the write cannot be a
+ * create, and an upsert is not the operation that brings a deleted row back:
+ * that is the restore, an update setting the field to `null`, which goes
+ * through the update gate and is what history records as one. Left to the
+ * statement, `INSERT … ON CONFLICT DO UPDATE` wrote the new values into the
+ * hidden row and the caller was told "created", with the row still in the trash.
+ */
+export function rowInTrashError(path: string, key: string, softDelete: SoftDeleteField): ApiError {
+    return ApiError.conflict(
+        `"${key}" in "${path}" is in the trash, so an upsert cannot write it. Restore the row first `
+        + `(an update setting '${softDelete.field}' to null), or purge it (a delete with ?hard=true) and upsert again.`,
+        "ROW_IN_TRASH"
+    );
 }

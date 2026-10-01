@@ -47,7 +47,7 @@ import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkDa
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath } from "./services/nested-path";
-import { resolveSoftDelete } from "./services/soft-delete";
+import { resolveSoftDelete, rowInTrashError } from "./services/soft-delete";
 import { currentWriteScope, runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
 import { HistoryService } from "./history/HistoryService";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
@@ -971,16 +971,22 @@ export class PostgresBackendDriver implements DataDriver {
      * The stored row an upsert's key names, if this caller can address it —
      * with its address and the values to update it with.
      *
-     * Read as the caller reads: their policies and `beforeQuery` scope, and
-     * soft-deleted rows hidden, so a row found here is one an update may
-     * target. On the trusted plane for its fields only, like
-     * {@link resolveCallerTenants}: the key columns are the server's to see.
+     * Read as the caller reads: their policies and `beforeQuery` scope. On the
+     * trusted plane for its fields only, like {@link resolveCallerTenants}:
+     * the key columns are the server's to see.
+     *
+     * Soft-deleted rows are read too, and a key one of them holds is refused
+     * with `ROW_IN_TRASH` (see {@link rowInTrashError}). Hidden, it was not
+     * found here, the write went down the create pipeline, and the INSERT's
+     * conflict branch wrote into the trashed row: `201 Created`, hooks told
+     * "new", a second `create` in history, and the row still in the trash.
      *
      * `undefined` when the key is incomplete (the write is a plain insert,
      * which is the persistence layer's rule too), when a key value is not a
      * plain value, or when no such row is visible. None of those can write a
      * stored row wrongly: the statement's own conflict branch sets only what
-     * the caller sent, and only on a row in their scope.
+     * the caller sent, only on a row in their scope, and never on one in the
+     * trash.
      *
      * The values drop the key and the conflict target, which the stored row
      * already has: a natural-key upsert carrying a key the caller invented
@@ -1009,15 +1015,20 @@ export class PostgresBackendDriver implements DataDriver {
             filter[field] = ["==", value];
         }
 
+        const softDelete = resolveSoftDelete(collection);
         const [row] = await withFieldViewer(undefined, () => this.dataService.fetchCollectionForRest(path, {
             filter,
             limit: 1,
-            databaseId: collection.databaseId
+            databaseId: collection.databaseId,
+            withDeleted: softDelete ? true : undefined
         }));
         // The row must be the one the key names. A filter key the table does
         // not have is dropped rather than refused under the process-wide
         // "warn" mode, and an unfiltered `limit: 1` is somebody else's row.
         if (!row || targetFields.some(field => String(row[field]) !== String(key[field]))) return undefined;
+        if (softDelete && row[softDelete.field] !== null && row[softDelete.field] !== undefined) {
+            throw rowInTrashError(path, targetFields.map(field => String(key[field])).join(", "), softDelete);
+        }
 
         const rest: Record<string, unknown> = { ...values };
         for (const field of [...primaryKeys.map(info => info.fieldName), ...targetFields]) delete rest[field];

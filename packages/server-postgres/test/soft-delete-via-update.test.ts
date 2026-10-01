@@ -122,14 +122,15 @@ describe("an update may not stamp the soft-delete field", () => {
         expect(await deletedAtOf(1)).toBeNull();
     });
 
-    it("an upsert whose INSERT meets a stored row leaves the field as it was", async () => {
-        // The trashed row is invisible to the read that routes an upsert to
-        // the update pipeline, so this is the statement's conflict branch.
-        await driverOver(db).save({
+    it("an upsert onto a trashed row's key leaves the row as it was", async () => {
+        // It used to write the title into the trashed row and keep the old
+        // stamp. An upsert does not write into the trash at all now: it is
+        // refused by name, and the stamp and the title both stay.
+        await expect(driverOver(db).save({
             path: "posts", values: { id: 2, title: "re-imported", ...TRASH }, status: "new", upsert: true
-        });
+        })).rejects.toMatchObject({ statusCode: 409, code: "ROW_IN_TRASH" });
 
-        expect(await titleOf(2)).toBe("re-imported");
+        expect(await titleOf(2)).toBe("trashed");
         expect((await deletedAtOf(2))?.startsWith("2025-01-01")).toBe(true);
     });
 
