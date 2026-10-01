@@ -284,12 +284,17 @@ container's job title.
 | `BACKUP_DESTINATION` | Local path, or an `s3://bucket/prefix` / `gs://bucket/prefix` URL. | `./backups` |
 | `BACKUP_RETENTION_DAYS` | Delete backups older than N days. Unset or `0` keeps everything. | — |
 | `BACKUP_KEEP_MINIMUM` | Always retain at least N of the most recent backups, whatever retention says. | — |
-| `PG_DUMP_PATH` | Override the `pg_dump` binary — it must match the server's major version. | — |
+| `PG_DUMP_PATH` | Override the `pg_dump` binary — it must be the server's major version or newer. | — |
 | `PG_RESTORE_PATH` | Override the `pg_restore` binary. | — |
+| `PG_DUMPALL_PATH` | Where `pg_dumpall` lives, when it is not on `PATH`. Without it — and without the PostgreSQL client tools installed — a globals backup fails with an error naming this variable. | — |
+
+The official runtime image (`rebasepro/server`) ships the PostgreSQL 18 client
+tools, so a scheduled backup runs in it against any server up to Postgres 18.
+Outside the image, install them yourself (`apt-get install postgresql-client-18`,
+`brew install libpq`).
 
 Backups contain secrets and PII. Use a private destination with
 encryption-at-rest.
-| `PG_DUMPALL_PATH` | Where `pg_dumpall` lives, when it is not on `PATH`. Without it — and without the PostgreSQL client tools installed — a globals backup fails with an error naming this variable. | — |
 
 ### Bundle delivery
 

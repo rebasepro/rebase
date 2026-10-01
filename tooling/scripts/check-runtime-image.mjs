@@ -359,6 +359,67 @@ if (checked.length === 0) {
     );
 }
 
+// ── The image can dump every Postgres it is shipped beside ───────────────────
+//
+// Scheduled backups run `pg_dump` inside the runtime image, and `pg_dump`
+// refuses a server whose major is newer than its own. The image shipped no
+// client tools at all until the backup cron was found failing every night with
+// "Could not find the 'pg_dump' binary" — so the client is pinned by
+// PG_CLIENT_MAJOR in the Dockerfile, and this holds that pin at or above every
+// Postgres major the compose files a user is handed actually run.
+const DOCKERFILE = "infra/docker/server.Dockerfile";
+const POSTGRES_COMPOSE = [
+    ...USER_FACING_COMPOSE,
+    "packages/cli/templates/eject/docker-compose.custom.yml"
+];
+
+/** `postgres:18-alpine` → 18, `pgvector/pgvector:pg18` → 18, anything else → null. */
+function postgresMajorOf(ref) {
+    const m = /^(?:postgres:|pgvector\/pgvector:pg)(\d+)/.exec(ref);
+    return m ? Number(m[1]) : null;
+}
+
+{
+    const dockerfile = fs.existsSync(path.join(ROOT, DOCKERFILE))
+        ? fs.readFileSync(path.join(ROOT, DOCKERFILE), "utf8")
+        : null;
+    const pinned = dockerfile ? /^ARG PG_CLIENT_MAJOR=(\d+)\s*$/m.exec(dockerfile) : null;
+    const clientMajor = pinned ? Number(pinned[1]) : null;
+
+    if (!dockerfile) {
+        problems.push(`${DOCKERFILE} does not exist — this check is stale, or the image moved`);
+    } else if (clientMajor === null) {
+        problems.push(
+            `${DOCKERFILE} declares no ${YELLOW}ARG PG_CLIENT_MAJOR=<n>${NC}. Scheduled backups run ` +
+            "`pg_dump` inside the image,\n" +
+            "      and without the client tools every run fails with \"Could not find the 'pg_dump' binary\"."
+        );
+    } else if (!/postgresql-client-\$\{PG_CLIENT_MAJOR\}/.test(dockerfile)) {
+        problems.push(
+            `${DOCKERFILE} pins PG_CLIENT_MAJOR=${clientMajor} but never installs ` +
+            "`postgresql-client-${PG_CLIENT_MAJOR}` — the pin governs nothing."
+        );
+    } else {
+        for (const rel of POSTGRES_COMPOSE) {
+            const file = path.join(ROOT, rel);
+            if (!fs.existsSync(file)) {
+                problems.push(`${rel} does not exist — the Postgres-version list in this check is stale`);
+                continue;
+            }
+            for (const ref of imageRefsIn(fs.readFileSync(file, "utf8"))) {
+                const serverMajor = postgresMajorOf(ref);
+                if (serverMajor === null || serverMajor <= clientMajor) continue;
+                problems.push(
+                    `${rel} runs ${YELLOW}${ref}${NC}, but the runtime image's pg_dump is Postgres ` +
+                    `${clientMajor} (${DOCKERFILE}, PG_CLIENT_MAJOR).\n` +
+                    "      pg_dump refuses a newer server, so every scheduled backup of that database would fail. " +
+                    `Raise PG_CLIENT_MAJOR to ${serverMajor}.`
+                );
+            }
+        }
+    }
+}
+
 // ── --live: is the tag actually pullable? ────────────────────────────────────
 
 const argv = process.argv.slice(2);

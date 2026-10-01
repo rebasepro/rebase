@@ -263,6 +263,20 @@ check("mode=url foreign dir", !/could not be unpacked/.test(foreign),
 check("mode=url foreign dir", /listening on port/i.test(foreign),
     `never started serving:\n${foreign.slice(-1500)}`);
 
+// ── 4c. The image can take the backups its docs tell you to schedule ────────
+//
+// `createBackupCron` runs `pg_dump` and `pg_dumpall` inside this process. The
+// image used to ship neither, so every scheduled backup failed with "Could not
+// find the 'pg_dump' binary" — and nothing here had ever asked. Dump the same
+// Postgres the boots above used, from inside the image, as the runtime user.
+console.log(`${DIM}dumping the database from inside the image…${NC}`);
+const dump = docker(["run", "--rm", "--network", NET, "--entrypoint", "sh", IMAGE, "-c",
+    `pg_dump --format=custom --file=/tmp/check.dump ${DB_URL} && pg_restore --list /tmp/check.dump > /dev/null ` +
+    `&& pg_dumpall --globals-only --no-role-passwords --dbname=${DB_URL} > /dev/null && pg_dump --version`]);
+check("backups", dump.status === 0,
+    "the image cannot dump the Postgres it is shipped beside, so scheduled backups fail every run:\n" +
+    `${(dump.stderr || dump.stdout || "").slice(-1200)}`);
+
 // ── 5. And the failure that should still fail ────────────────────────────────
 //
 // A gate that only proves things start can be satisfied by an entrypoint that
@@ -283,5 +297,6 @@ if (problems.length > 0) {
     process.exit(1);
 }
 console.log(`\n${DIM}Booted the built image with a mounted bundle and with a fetched one, ` +
-    `against a real Postgres, and confirmed it still refuses when given neither.${NC}`);
+    `against a real Postgres, dumped that Postgres from inside it, and confirmed it still refuses ` +
+    `when given neither.${NC}`);
 console.log(`${GREEN}✓ the runtime image boots both ways a bundle can arrive.${NC}`);

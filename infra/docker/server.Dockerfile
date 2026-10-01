@@ -131,9 +131,38 @@ FROM node:22-slim AS runtime
 
 # tini reaps zombies and forwards signals, so SIGTERM reaches the process and
 # graceful shutdown actually runs instead of being killed after the grace period.
+#
+# The PostgreSQL client tools are here for scheduled backups. `createBackupCron`
+# runs `pg_dump` (and `pg_dumpall` for the roles sidecar) from inside this
+# process, and the image used to ship neither: a deployment that followed
+# `.env.example` and added the backup cron failed every night with "Could not
+# find the 'pg_dump' binary", while the Backups panel said to wait for the next
+# scheduled run.
+#
+# From the PGDG repository rather than Debian's, because the major matters:
+# `pg_dump` refuses a server newer than itself, Debian ships one fixed major per
+# release, and every compose file a user is handed runs Postgres 18. Keep
+# PG_CLIENT_MAJOR at or above the newest Postgres those files name —
+# `check:runtime-image` fails when it falls behind. A newer client dumps an
+# older server, so raising it never strands anyone.
+#
+# Its bin directory goes first on PATH so `pg_dump` resolves to the real binary
+# rather than Debian's version-picking wrapper. The key is fetched with node,
+# which the base image already has, rather than installing curl for one request.
+ARG PG_CLIENT_MAJOR=18
 RUN apt-get update \
     && apt-get install -y --no-install-recommends tini ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && install -d /usr/share/postgresql-common/pgdg \
+    && node -e "fetch('https://www.postgresql.org/media/keys/ACCC4CF8.asc').then(async r => { if (!r.ok) throw new Error('PGDG key: HTTP ' + r.status); require('fs').writeFileSync('/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc', await r.text()); })" \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends "postgresql-client-${PG_CLIENT_MAJOR}" \
+    && rm -rf /var/lib/apt/lists/* \
+    && "/usr/lib/postgresql/${PG_CLIENT_MAJOR}/bin/pg_dump" --version \
+    && "/usr/lib/postgresql/${PG_CLIENT_MAJOR}/bin/pg_dumpall" --version \
+    && "/usr/lib/postgresql/${PG_CLIENT_MAJOR}/bin/pg_restore" --version
 
 # Where the image keeps its own copy of the framework. The runtime collapses a
 # bundle's duplicate `@rebasepro/server` onto this one after installing the
@@ -142,7 +171,8 @@ RUN apt-get update \
 # initialised and throw "server not initialized yet" on every request.
 ENV NODE_ENV=production \
     PORT=8080 \
-    REBASE_RUNTIME_MODULES=/app/node_modules
+    REBASE_RUNTIME_MODULES=/app/node_modules \
+    PATH=/usr/lib/postgresql/${PG_CLIENT_MAJOR}/bin:$PATH
 
 WORKDIR /app
 

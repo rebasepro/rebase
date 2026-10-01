@@ -74,11 +74,11 @@ this list, in this order.
 | `check:browser-deps` | The other direction: a browser-facing package pulling a server framework into `node_modules` through an auto-installed peer, which neither headless guard sees. | — |
 | `check:baas-types` | A real BaaS project typechecked with `react` mapped to a stub: a React type reached through an alias. | — |
 | `check:ts-expect-error-coverage` | Every file carrying a `@ts-expect-error` is in a tsc program. A directive in a file no program reads is a comment, and the file usually claims the opposite. | Add the file to `tsconfig.tests.json` |
-| `check:runtime-image` | Every container image the shipped files name has a workflow that publishes it. | — |
+| `check:runtime-image` | Every container image the shipped files name has a workflow that publishes it, and the runtime image's `pg_dump` (`PG_CLIENT_MAJOR`) is at least as new as every Postgres those files run. | — |
 | `check:published-schema` | Every shipped `rebase.json` names a `$schema` this repo actually publishes. A moved or renamed schema file 404s, and an editor given a 404 validates nothing and looks fine. | — |
 | `check:runtime-deps` | The packages the runtime image promises to supply are installed there, at a compatible version, with their own dependencies and peers. | — |
 | `check:chart` | The Helm chart lints, renders its three documented topologies, and every refusal in `_validate.tpl` is still reachable. Needs Helm. | — |
-| `check:runtime-image:boots` | The image actually starts, both ways a bundle can arrive, and still refuses when given neither. Needs Docker. | — |
+| `check:runtime-image:boots` | The image actually starts, both ways a bundle can arrive, can `pg_dump` the Postgres beside it, and still refuses when given neither. Needs Docker. | — |
 | `check:names` | A package rename leaking into a bare string, a `.astro` file, an `.env.example` or a Tailwind `@source` path. | — |
 | `check:deps` | Every published package declares what it imports, so it resolves under pnpm's isolated layout and not only under hoisting — and no two of them ask for majors of one dependency that a user cannot install together (chalk 4 and chalk 5 both reached a real install). | — |
 | `check:publishable-set` | The release derives its own package set from the workspace instead of enumerating it. | — |
