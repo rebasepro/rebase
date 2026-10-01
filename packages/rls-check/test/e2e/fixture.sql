@@ -278,6 +278,19 @@ GRANT SELECT ON public.protected_ledger TO authenticated;
 CREATE VIEW public.vuln_ledger_view AS SELECT * FROM public.protected_ledger;
 GRANT SELECT ON public.vuln_ledger_view TO anon, authenticated;
 
+-- The same view made safe, spelled every way Postgres accepts a boolean. It
+-- stores the option verbatim (`security_invoker=1`), and a scanner that only
+-- read `true`/`on` called each of these a critical bypass.
+CREATE VIEW public.secure_ledger_view_invoker_1 WITH (security_invoker = 1)
+    AS SELECT * FROM public.protected_ledger;
+GRANT SELECT ON public.secure_ledger_view_invoker_1 TO anon, authenticated;
+CREATE VIEW public.secure_ledger_view_invoker_yes WITH (security_invoker = yes)
+    AS SELECT * FROM public.protected_ledger;
+GRANT SELECT ON public.secure_ledger_view_invoker_yes TO anon, authenticated;
+CREATE VIEW public.secure_ledger_view_invoker_t WITH (security_invoker = 't')
+    AS SELECT * FROM public.protected_ledger;
+GRANT SELECT ON public.secure_ledger_view_invoker_t TO anon, authenticated;
+
 -- matview-bypasses-rls: a materialized view has no security_invoker option at
 -- all — the rows are already copied out from under the policy.
 CREATE MATERIALIZED VIEW public.vuln_ledger_matview AS SELECT * FROM public.protected_ledger;

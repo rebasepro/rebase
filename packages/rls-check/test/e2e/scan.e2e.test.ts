@@ -80,7 +80,10 @@ const SECURE_OBJECTS = [
     "secure_tenanted",
     "secure_project_members",
     "projects",
-    "people"
+    "people",
+    "secure_ledger_view_invoker_1",
+    "secure_ledger_view_invoker_yes",
+    "secure_ledger_view_invoker_t"
 ];
 
 function objectName(finding: Finding): string {

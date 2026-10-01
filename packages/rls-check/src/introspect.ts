@@ -876,7 +876,7 @@ interface GrantRow extends Record<string, unknown> {
     privilege_type: string;
 }
 
-async function readViews(
+export async function readViews(
     db: Reader,
     schemas: string[],
     serverVersionNum: number
@@ -910,9 +910,59 @@ async function readViews(
         securityInvoker:
             serverVersionNum < 150000 || r.kind === "m"
                 ? null
-                : (r.reloptions ?? []).some((o) => /^security_invoker=(true|on)$/i.test(o)),
+                : reloptionIsOn(r.reloptions, "security_invoker"),
         dependsOn: dependencies.get(JSON.stringify([r.schema, r.name])) ?? []
     }));
+}
+
+/**
+ * Whether a boolean reloption is set on, read the way Postgres reads it.
+ *
+ * Postgres stores a reloption as the text it was given, after checking it with
+ * `parse_bool`, so `WITH (security_invoker = 1)` is stored as
+ * `security_invoker=1` and means on. Matching only `true` and `on` reported such
+ * a view as a critical bypass. A value `parse_bool` would refuse cannot be
+ * stored, so anything unrecognised here is read as off — the direction that
+ * reports rather than hides.
+ */
+function reloptionIsOn(reloptions: string[] | null, name: string): boolean {
+    for (const option of reloptions ?? []) {
+        const eq = option.indexOf("=");
+        if (eq === -1 || option.slice(0, eq).toLowerCase() !== name) continue;
+        return parsePgBool(option.slice(eq + 1)) === true;
+    }
+    return false;
+}
+
+/**
+ * Postgres's `parse_bool`: `true`/`false`, `yes`/`no`, `on`/`off`, `1`/`0`,
+ * case-insensitively, and any unambiguous prefix of the words — `t`, `ye`,
+ * `of` — but not `o`, which could be either. `null` for anything else.
+ */
+export function parsePgBool(raw: string): boolean | null {
+    const value = raw.trim().toLowerCase();
+    if (value.length === 0) return null;
+    const prefixOf = (word: string) => word.startsWith(value);
+    switch (value[0]) {
+        case "t":
+            return prefixOf("true") ? true : null;
+        case "f":
+            return prefixOf("false") ? false : null;
+        case "y":
+            return prefixOf("yes") ? true : null;
+        case "n":
+            return prefixOf("no") ? false : null;
+        case "o":
+            if (value.length < 2) return null;
+            if (prefixOf("on")) return true;
+            return prefixOf("off") ? false : null;
+        case "1":
+            return value.length === 1 ? true : null;
+        case "0":
+            return value.length === 1 ? false : null;
+        default:
+            return null;
+    }
 }
 
 /**
