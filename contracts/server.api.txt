@@ -1087,6 +1087,7 @@ function checkOperation
 function classifyTable
 function collectAllPages
 function cond
+function copyCarriesRelation
 function createDataSourceRegistry
 function createPaginationHelpers { findAll, iterate }
 function createRelationRef
@@ -1116,6 +1117,7 @@ function getArrayResolvedProperties
 function getChildViewDeclaringProperties
 function getChildViewRelationPropertyKeys
 function getColumnName
+function getCopyValues
 function getDeclaredPrimaryKeys
 function getDefaultValueFor
 function getDefaultValueFortype

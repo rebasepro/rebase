@@ -4,7 +4,7 @@ import type { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import type { AuthController } from "@rebasepro/cms-types";
 import { deepEqual as equal } from "fast-equals";
 import { getIn, setIn } from "@rebasepro/forms";
-import { getDefaultValuesFor } from "@rebasepro/common";
+import { getCopyValues, getDefaultValuesFor } from "@rebasepro/common";
 import { isPlainObject, mergeDeep } from "@rebasepro/utils";
 import { z } from "zod";
 
@@ -239,15 +239,10 @@ export function getInitialEntityValues<M extends Record<string, unknown>>(
             const defaultValues = getDefaultValuesFor(properties);
             values = mergeDeep(defaultValues, entity.values ?? {});
         }
-        // When copying, clear ID fields so the database generates new IDs
+        // A copy gets its own key, and leaves behind every relation it could
+        // only take by re-pointing another row — see `getCopyValues`.
         if (status === "copy") {
-            const result = { ...values };
-            for (const [key, property] of Object.entries(properties)) {
-                if (property && "isId" in property && property.isId) {
-                    delete (result as Record<string, unknown>)[key];
-                }
-            }
-            return result;
+            return getCopyValues(collection, values);
         }
         return values;
     } else if (status === "new") {

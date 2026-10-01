@@ -8,7 +8,7 @@ import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary } from "@rebasepro/ui";
 import { AlignLeftIcon, useDebouncedCallback } from "@rebasepro/ui";
-import { getDefaultValuesFor } from "@rebasepro/common";
+import { getCopyValues, getDefaultValuesFor } from "@rebasepro/common";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
 import { useRebaseContext } from "@rebasepro/app";
 
@@ -142,11 +142,14 @@ export function EntityForm<M extends Record<string, unknown>>({
         }
         // Fallback: compute from entity/collection (requires authController from context)
         // In headless mode without computedInitialValues, use entity values or defaults
-        if ((status === "existing" || status === "copy") && entity) {
+        if (status === "copy" && entity) {
+            return getCopyValues(collection, entity.values ?? getDefaultValuesFor(collection.properties));
+        }
+        if (status === "existing" && entity) {
             return entity.values ?? getDefaultValuesFor(collection.properties);
         }
         return getDefaultValuesFor(collection.properties);
-    }, [computedInitialValues, collection.properties, status, entity]);
+    }, [computedInitialValues, collection, status, entity]);
 
     const [localChangesCleared, setLocalChangesCleared] = useState<boolean>(false);
 
