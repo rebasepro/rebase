@@ -236,6 +236,48 @@ describe("the local database", () => {
     });
 });
 
+describe("the browser's online event", () => {
+    // The config documents that with automatic retries off (`syncIntervalMs:
+    // 0`), "`client.offline.sync()`, a sign-in, and the browser's `online`
+    // event still trigger one". The event was wired to the retry timer's
+    // callback, which `0` never sets, so the queue sat there until the app
+    // called `sync()` itself.
+    const holder = globalThis as { window?: unknown };
+    const hadWindow = "window" in holder;
+    const previous = holder.window;
+    beforeEach(() => { holder.window = new EventTarget(); });
+    afterEach(() => {
+        if (hadWindow) holder.window = previous;
+        else delete holder.window;
+    });
+
+    async function settled(check: () => Promise<boolean>): Promise<boolean> {
+        for (let i = 0; i < 50; i++) {
+            if (await check()) return true;
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+        return false;
+    }
+
+    for (const syncIntervalMs of [0, 60_000]) {
+        it(`replays the queue when the connection comes back (syncIntervalMs: ${syncIntervalMs})`, async () => {
+            const server = createFakeServer();
+            const { manager, wrap } = createManager(server, { syncIntervalMs });
+            const posts = wrap("posts");
+            await posts.find();
+            server.state.online = false;
+            await posts.create({ title: "queued" });
+            expect(await manager.api.pending()).toHaveLength(1);
+
+            server.state.online = true;
+            (holder.window as EventTarget).dispatchEvent(new Event("online"));
+
+            expect(await settled(async () => (await manager.api.pending()).length === 0)).toBe(true);
+            expect([...server.table("posts").values()].map((row) => row.title)).toContain("queued");
+        });
+    }
+});
+
 describe("offline writes", () => {
     it("stops attempting the network once it knows the connection is gone", async () => {
         const server = createFakeServer();

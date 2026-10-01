@@ -421,6 +421,9 @@ export class OfflineManager {
         if (maxBackoffMs > 0) {
             this.connectivity.onRetryDue = () => { void this.sync().catch(() => undefined); };
         }
+        // Whatever the retry policy: `0` turns off the timer, not the
+        // browser's word that the connection is back (see `syncIntervalMs`).
+        this.connectivity.onOnline = () => { void this.sync().catch(() => undefined); };
         this.connectivity.onChange((online) => {
             this.patchStatus({ online });
             if (online) this.revalidateAll();

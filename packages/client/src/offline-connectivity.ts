@@ -141,6 +141,12 @@ export class ConnectivityMonitor {
     private readonly clearTimer: (handle: ReturnType<typeof setTimeout>) => void;
     /** Called when the backoff window expires, to drive an automatic retry. */
     onRetryDue?: () => void;
+    /**
+     * Called when the browser says the connection is back. Its own hook rather
+     * than {@link onRetryDue}: a client with automatic retries off sets no retry
+     * callback, and the `online` event has to wake it all the same.
+     */
+    onOnline?: () => void;
 
     private readonly handleOnline = () => {
         // The OS says the interface is back. Trust it enough to try
@@ -151,7 +157,7 @@ export class ConnectivityMonitor {
         this.backoffMs = this.initialBackoffMs;
         this.clearPendingTimer();
         this.setState("online");
-        this.onRetryDue?.();
+        (this.onOnline ?? this.onRetryDue)?.();
     };
     private readonly handleOffline = () => {
         this.setState("offline");
@@ -240,6 +246,7 @@ export class ConnectivityMonitor {
         this.clearPendingTimer();
         this.listeners.clear();
         this.onRetryDue = undefined;
+        this.onOnline = undefined;
     }
 
     private scheduleRetry(delay: number): void {
