@@ -252,6 +252,7 @@ the message names the constraint.
 | `STORAGE_WRITE_FAILED` | 502 | The storage backend refused or dropped the write. | Check its own logs and credentials. |
 | `TRANSFORM_OVERLOADED` | 503 | Too many image transforms are in flight. | Retry; consider a CDN in front. |
 | `UNKNOWN_STORAGE_SOURCE` | 400 / 404 | The request named a storage source (`?storageId=`) this project does not declare. A `bucket` this deployment does not serve is the same code at **404** (on a listing, and on an upload, a folder or a resumable upload to S3 or GCS) — the store is what is missing, and `details` names the buckets and the sources that do exist. Both used to come back as "file not found", identical to a key that is simply absent. | Declare the source in `config/resources.ts`, or check `GET /api/storage/sources`. |
+| `UPLOAD_LOCKED` | 423 | A resumable upload's `PATCH` arrived while another chunk of the same upload was still being received — almost always a client retrying the chunk in flight. It is refused rather than queued, as tusd does. | Ask for the offset with `HEAD /api/storage/tus/:id` and resume from there; tus-js-client backs off and retries on its own. See [TUS resumable uploads](/docs/backend/storage/#tus-resumable-upload-protocol). |
 
 ## Custom functions
 

@@ -13,8 +13,8 @@ into a fresh database without touching the live one.
 
 :::caution[This does not back up your files]
 A backup holds the **database** and nothing else. Uploaded files live in your
-storage backend — an S3 or GCS bucket, or the directory at `STORAGE_PATH` — not
-in Postgres, so a restored database points at files only that backend has.
+[storage backend](/docs/backend/storage/) — an S3 or GCS bucket, or the
+directory at `STORAGE_PATH` — not in Postgres, so a restored database points at files only that backend has.
 Back up the bucket (versioning or replication) or the uploads directory
 separately, on a schedule of its own.
 :::
@@ -37,8 +37,8 @@ rebase db restore ./backups/rebase-app-20260714T030000Z.dump \
 ```
 
 The connection string comes from your project's environment, as for every
-other `rebase db` command: `DATABASE_URL`, falling back to
-`ADMIN_CONNECTION_STRING`.
+other [`rebase db` command](/docs/cli/): `DATABASE_URL`, falling
+back to `ADMIN_CONNECTION_STRING`.
 
 ## What a backup is
 
@@ -146,7 +146,8 @@ bucket or prefix is left alone.
 
 The cron runs `pg_dump` inside the server process.
 <span class="since-badge" data-since="0.24">Since 0.24</span> the official
-runtime image (`rebasepro/server`) ships the PostgreSQL 18 client tools for it;
+runtime image (`rebasepro/server`, see [Self-hosting](/docs/deployment/self-hosting/))
+ships the PostgreSQL 18 client tools for it;
 on 0.23 and earlier it had none, and every scheduled run failed with
 `Could not find the 'pg_dump' binary`. Anywhere else — a VPS, your own image —
 install the client tools yourself (see the next section).
