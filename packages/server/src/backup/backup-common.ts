@@ -101,6 +101,24 @@ export async function listAllObjectKeys(
 }
 
 /**
+ * Whether an object key is one the backup routes may serve: a backup file, at
+ * the destination's prefix and nowhere else.
+ *
+ * The local branch has always been held to the backup directory; this branch
+ * checked only the suffix, so any `.dump` in the bucket — `uploads/x.dump`, a
+ * neighbouring `nightlyish/` prefix — was readable by naming it. A key is taken
+ * as written, so a scheme (`s3://other-bucket/…`, which S3StorageController
+ * would follow) or a `.`/`..`/empty segment (which a filesystem-backed or
+ * S3-compatible store may resolve) is refused rather than interpreted.
+ */
+function isObjectBackupKey(dest: { prefix: string }, key: string): boolean {
+    if (!isBackupFile(key) || /^[a-z][a-z0-9+.-]*:\/\//i.test(key)) return false;
+    const segments = key.split("/");
+    if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) return false;
+    return dest.prefix === "" || key.startsWith(`${dest.prefix}/`);
+}
+
+/**
  * List the backups at a destination as {@link BackupInfo}, newest first.
  * One entry per `.dump`, with its `.globals.sql` sidecar attached as
  * `globalsKey` when there is one.
@@ -190,7 +208,7 @@ export async function readBackupBytes(
     }
 
     if (!storage) return null;
-    if (!isBackupFile(key)) return null;
+    if (!isObjectBackupKey(dest, key)) return null;
     const file = await storage.getObject(key, dest.bucket);
     if (!file) return null;
     return { bytes: new Uint8Array(await file.arrayBuffer()), name: key.split("/").pop() || key };
@@ -223,7 +241,7 @@ export async function openBackupStream(
     }
 
     if (!storage) return null;
-    if (!isBackupFile(key)) return null;
+    if (!isObjectBackupKey(dest, key)) return null;
     const file = await storage.getObject(key, dest.bucket);
     if (!file) return null;
     return { stream: file.stream(), size: file.size, name: key.split("/").pop() || key };

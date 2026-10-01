@@ -6,6 +6,7 @@ import {
     parseBackupDestination,
     parseBackupTimestamp,
     listBackupObjects,
+    openBackupStream,
     readBackupBytes
 } from "./backup-common";
 
@@ -164,6 +165,45 @@ describe("server backup-common", () => {
             expect(list[0].name).toBe("rebase-app-20260928T230000Z.dump");
             expect(list[0].globalsKey).toBe("nightly/rebase-app-20260928T230000Z.globals.sql");
             expect(listObjects.mock.calls.length).toBeGreaterThan(1);
+        });
+    });
+
+    /**
+     * The object-storage branch checked the suffix and nothing else, so an
+     * admin could read any `.dump` in the bucket — `uploads/anything.dump` — by
+     * naming it; the local branch has always been held to the backup directory.
+     */
+    describe("object storage, outside the destination's prefix", () => {
+        const objects: Record<string, string> = {
+            "nightly/rebase-app-20260714T030000Z.dump": "AAA",
+            "uploads/user-file.dump": "SOMEONE ELSE'S",
+            "nightlyish/rebase-app-20260714T030000Z.dump": "NEIGHBOUR"
+        };
+        // As permissive as a real controller can be: S3StorageController reads
+        // an `s3://bucket/key` URL from any bucket, and a filesystem-backed or
+        // S3-compatible store may resolve `..`. The guard must not rely on the
+        // controller refusing either.
+        const storage = {
+            getObject: async (key: string) => {
+                const resolved = path.posix.normalize(key.replace(/^(s3|gs):\/\/[^/]+\//, ""));
+                return resolved in objects ? new File([objects[resolved]], resolved.split("/").pop()!) : null;
+            }
+        } as unknown as StorageController;
+        const dest = parseBackupDestination("s3://bucket/nightly");
+
+        it("reads a backup under the prefix", async () => {
+            expect(await readBackupBytes(dest, "nightly/rebase-app-20260714T030000Z.dump", storage)).not.toBeNull();
+            expect(await openBackupStream(dest, "nightly/rebase-app-20260714T030000Z.dump", storage)).not.toBeNull();
+        });
+
+        it.each([
+            "uploads/user-file.dump",
+            "nightlyish/rebase-app-20260714T030000Z.dump",
+            "nightly/../uploads/user-file.dump",
+            "s3://bucket/uploads/user-file.dump"
+        ])("refuses %s", async (key) => {
+            expect(await readBackupBytes(dest, key, storage)).toBeNull();
+            expect(await openBackupStream(dest, key, storage)).toBeNull();
         });
     });
 
