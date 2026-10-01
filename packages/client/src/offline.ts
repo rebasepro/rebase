@@ -1069,17 +1069,27 @@ data: u.data as AnyRow })),
             listenById: inner.listenById
         };
 
-        // Realtime stays a live server stream — but everything it delivers is
-        // worth keeping, so it feeds the local database on its way past.
+        // Realtime stays a live server stream — everything it delivers feeds
+        // the local database on its way past — but what the app is handed is
+        // the local database's answer, as `observe` hands it. The raw frame
+        // knows nothing of the queue: a frame landing before an offline edit
+        // replayed showed the server's value over the user's own edit, while
+        // `findById` beside it still returned the edit.
+        //
+        // The socket re-authenticates as whoever is signed in, so a frame is
+        // the current user's.
         if (!isUnsupported(inner.listen)) {
             wrapped.listen = (params, onUpdate, onError) => inner.listen(
                 params,
                 (response) => {
-                    // The socket re-authenticates as whoever is signed in, so
-                    // a frame is the current user's.
-                    void this.ingest(slug, response.data ?? [], this.ticket(), isProjection(params))
-                        .then(() => this.notifyCollection(slug, false));
-                    onUpdate(response);
+                    const ticket = this.ticket();
+                    void this.ingest(slug, response.data ?? [], ticket, isProjection(params)).then(() => {
+                        if (!this.isCurrent(ticket)) return;
+                        const snapshot = this.recordSnapshot(slug, params, response, ticket);
+                        const answer = this.answer<M>(slug, params, snapshot);
+                        this.notifyCollection(slug, false);
+                        onUpdate({ ...response, data: answer.data, meta: answer.meta });
+                    });
                 },
                 onError
             );
@@ -1088,8 +1098,22 @@ data: u.data as AnyRow })),
             wrapped.listenById = (id, onUpdate, onError) => inner.listenById(
                 id,
                 (row) => {
-                    if (row) void this.ingest(slug, [row], this.ticket()).then(() => this.notifyCollection(slug, false));
-                    onUpdate(row);
+                    const ticket = this.ticket();
+                    if (!row) {
+                        // Deleted elsewhere. `observeById` always handled this;
+                        // here the row stayed in the local database and was
+                        // served offline. One with a queued write is kept: the
+                        // write decides, when it replays.
+                        if (!this.hasPending(slug, id)) this.removeLocalRow(slug, id, ticket, true);
+                        this.notifyCollection(slug, false);
+                        onUpdate(row);
+                        return;
+                    }
+                    void this.ingest(slug, [row], ticket).then(() => {
+                        if (!this.isCurrent(ticket)) return;
+                        this.notifyCollection(slug, false);
+                        onUpdate(this.localRow<M>(slug, id) ?? row);
+                    });
                 },
                 onError
             );
