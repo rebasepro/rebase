@@ -191,6 +191,10 @@ export interface RebaseTranslations {
     drop_here_create_group: string;
     filter_for_null_values: string;
     value_updated_elsewhere: string;
+    /** Banner over a form whose record someone else deleted while it was open */
+    entity_deleted_elsewhere: string;
+    /** That banner's action: keep the form's values as a new record */
+    save_as_new: string;
     add_property: string;
     edit_name: string;
     this_entity_not_exist: string;

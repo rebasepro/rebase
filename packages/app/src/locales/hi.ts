@@ -211,6 +211,8 @@ export const hi: RebaseTranslations = {
     drop_here_create_group: "नया समूह बनाने के लिए यहां छोड़ें",
     filter_for_null_values: "रिक्त (नल्ल) मानों के लिए फ़िल्टर करें",
     value_updated_elsewhere: "इस मान को कहीं और अपडेट किया गया है",
+    entity_deleted_elsewhere: "यह रिकॉर्ड कहीं और हटा दिया गया है। यहाँ जो दिख रहा है वह सहेजा नहीं गया है; इसे रखने के लिए इसे नए रिकॉर्ड के रूप में सहेजें।",
+    save_as_new: "नए के रूप में सहेजें",
     add_property: "विशेषता (प्रॉपर्टी) जोड़ें",
     edit_name: "{{name}} संपादित करें",
     this_entity_not_exist: "यह इकाई डेटाबेस में मौजूद नहीं है",

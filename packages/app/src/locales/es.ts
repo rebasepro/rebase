@@ -219,6 +219,8 @@ export const es: RebaseTranslations = {
     drop_here_create_group: "Suelta aquí para crear un nuevo grupo",
     filter_for_null_values: "Filtrar por valores nulos",
     value_updated_elsewhere: "Este valor ha sido actualizado en otro lugar",
+    entity_deleted_elsewhere: "Este registro se eliminó en otro lugar. Lo que ves aquí no se ha guardado; guárdalo como un registro nuevo para conservarlo.",
+    save_as_new: "Guardar como nuevo",
     add_property: "Añadir propiedad",
     edit_name: "Editar {{name}}",
     this_entity_not_exist: "Esta entidad no existe en la base de datos",

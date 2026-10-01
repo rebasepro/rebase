@@ -10,6 +10,7 @@ import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBin
 import { EntityViewBinding } from "./EntityViewBinding";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
 import {
+    Alert,
     Button,
     CenteredView,
     CircularProgress,
@@ -59,6 +60,7 @@ import { createFormexStub, getEntityFromCache } from "@rebasepro/app";
 import { usePermissions, useTranslation } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { withListState } from "../util/view_mode";
+import { navigateToEntity } from "../util/navigation_utils";
 import { Link, useNavigate } from "react-router";
 
 import {
@@ -209,13 +211,28 @@ export function EditViewBinding<M extends Record<string, unknown>>({
     const initialStatus = props.copy ? "copy" : (entityId ? "existing" : "new");
     const [status, setStatus] = useState<EntityStatus>(initialStatus);
 
+    // The record as it was last delivered while this view had it open. A live
+    // read that stops delivering it — someone deleted it — is not a record
+    // that was never there, and must not be shown as one: the not-found screen
+    // below used to replace the form mid-edit, taking what had been typed off
+    // the screen and blaming row-level security for it.
+    const [lastSeenEntity, setLastSeenEntity] = useState<Entity<M> | undefined>(undefined);
+    useEffect(() => {
+        if (entity) setLastSeenEntity(entity);
+    }, [entity]);
+    const deletedElsewhere = status === "existing" && !dataLoading && !entity && entityId !== undefined
+        && lastSeenEntity !== undefined && String(lastSeenEntity.id) === String(entityId);
+
+    // The record the form shows: the stored one, or the last one seen of it.
+    const shownEntity = deletedElsewhere ? lastSeenEntity : entity;
+
     const canEdit = useMemo(() => {
         if (status === "new" || status === "copy") {
             return true;
         } else {
-            return entity ? canEditHook(props.collection, props.path, entity ?? null) : undefined;
+            return shownEntity ? canEditHook(props.collection, props.path, shownEntity ?? null) : undefined;
         }
-    }, [canEditHook, entity, status, props.collection, props.path]);
+    }, [canEditHook, shownEntity, status, props.collection, props.path]);
 
     if (!dataLoading && dataLoadingError) {
         return <CenteredView>
@@ -241,7 +258,7 @@ export function EditViewBinding<M extends Record<string, unknown>>({
      */
     const nothingToLookUp = !entityId;
 
-    if (!dataLoading && !initialDirtyValues && !entity && !nothingToLookUp
+    if (!dataLoading && !initialDirtyValues && !entity && !nothingToLookUp && !deletedElsewhere
         && (status === "existing" || status === "copy")) {
         // A `warn`, and only for a real id: an unknown record in the URL is
         // something a person did, not a fault in the panel — the screen below
@@ -265,7 +282,8 @@ export function EditViewBinding<M extends Record<string, unknown>>({
     const content = (
         <EditViewBindingInner<M> {...props}
             entityId={entityId}
-            entity={entity}
+            entity={shownEntity}
+            deletedElsewhere={deletedElsewhere}
             initialDirtyValues={initialDirtyValues as Partial<M>}
             dataLoading={dataLoading}
             status={status}
@@ -302,7 +320,8 @@ export function EditViewBindingInner<M extends Record<string, unknown>>({
     status,
     setStatus,
     formProps,
-    canEdit
+    canEdit,
+    deletedElsewhere
 }: EditViewBindingProps<M> & {
     entity?: Entity<M>,
     initialDirtyValues?: Partial<M>, // dirty cached entity in memory
@@ -310,6 +329,12 @@ export function EditViewBindingInner<M extends Record<string, unknown>>({
     status: EntityStatus,
     setStatus: (status: EntityStatus) => void,
     canEdit?: boolean,
+    /**
+     * The record was deleted by someone else while this form had it open. The
+     * form keeps its values; saving them over the record is no longer
+     * possible, saving them as a new one is.
+     */
+    deletedElsewhere?: boolean,
 }) {
 
     const ResolvedFormActions = useComponentOverride("EditView.FormActions", EditFormActions);
@@ -320,6 +345,7 @@ export function EditViewBindingInner<M extends Record<string, unknown>>({
     const adminContext = useAdminContext();
     const urlController = useUrlController();
     const navigate = useNavigate();
+    const { t } = useTranslation();
 
     const [usedEntity, setUsedEntity] = useState<Entity<M> | undefined>(entity);
 
@@ -541,6 +567,8 @@ parentEntityIds,
         || formContext.disabled
         || formex?.isSubmitting
         || (status === "existing" && !formex?.dirty)
+        // There is no record left to save over.
+        || deletedElsewhere
     );
 
     /**
@@ -571,6 +599,26 @@ parentEntityIds,
         const key = (status === "new" || status === "copy") ? path + "#new" : path + "/" + entityId;
         saveEntityToMemoryCache(key, carried);
     }, [formex, status, path, entityId, usedEntity]);
+
+    /**
+     * The record was deleted elsewhere: open a new one holding what this form
+     * holds, so that nothing typed here is lost. The values travel as the new
+     * form's defaults — the same channel "new with values" uses everywhere —
+     * and they are carried, so leaving this form does not ask about them.
+     */
+    const saveAsNew = useCallback(() => {
+        const values = formex?.values ?? usedEntity?.values;
+        onValuesModified?.(false);
+        navigateToEntity({
+            openEntityMode: layout,
+            collection,
+            path,
+            defaultValues: values,
+            sidePanelController: adminContext.sidePanelController,
+            navigation: urlController,
+            replace: true
+        });
+    }, [formex, usedEntity, onValuesModified, layout, collection, path, adminContext.sidePanelController, urlController]);
 
     const [inspectorTab, setInspectorTab] = useState<InspectorTab | null>(null);
     // A save adds a revision, and the inspector can be open while it happens:
@@ -843,7 +891,13 @@ parentEntityIds,
             Builder={FormBuilder}
             parentCollectionSlugs={parentCollectionSlugs}
             parentEntityIds={parentEntityIds}
-        />
+        >
+            {deletedElsewhere &&
+                <Alert color={"warning"} size={"small"} outerClassName={"w-full mb-4"}
+                    action={<Button size={"small"} variant={"text"} onClick={saveAsNew}>{t("save_as_new")}</Button>}>
+                    {t("entity_deleted_elsewhere")}
+                </Alert>}
+        </ResolvedEntityForm>
     );
 
     const subcollectionTabs = subcollections && subcollections.map((subcollection) => {
