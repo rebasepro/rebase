@@ -1,37 +1,35 @@
 /**
- * Hono middleware for authenticating requests via Service API Keys.
+ * Authenticating requests that present an API key (`rk_`).
  *
- * This middleware is integrated into `createAuthMiddleware()` and
- * activates only when the bearer token starts with `rk_`. It:
+ * {@link resolveApiKey} turns a presented key into the identity it acts as and
+ * the scopes it holds; the HTTP middlewares, the realtime socket and `/mcp`
+ * all call it, so a key means the same thing on every surface.
  *
- * 1. Hashes the token with SHA-256
- * 2. Looks up the hash in the `rebase.api_keys` table
- * 3. Validates the key is not revoked and not expired
- * 4. Sets `c.set("user", ...)` and `c.set("apiKey", ...)` for downstream use
- * 5. Scopes the DataDriver via `withAuth()` using the API key's service identity
+ * - A **service key** acts as `api-key:<id>`, with the RLS roles `service`
+ *   plus whatever it was given, and holds exactly its scopes.
+ * - A **personal key** acts as its owner — their uid and their roles as they
+ *   are *now*, read on every use — and holds its scopes narrowed to what the
+ *   owner's roles still hold. Demote the owner and the key shrinks with them;
+ *   delete the account and the key stops.
  *
- * Authorization is double-gated for API keys: the key's own permission list
- * (checked by the REST generator) is one ceiling, and Postgres RLS is another,
- * independent one — `withAuth()` runs API-key requests as the restricted
- * `rebase_user` role like any other caller. An `admin` key passes RLS via the
- * injected `default_admin` policies; a non-admin key (roles `["service"]`,
- * uid `api-key:<id>`) only sees rows that a policy explicitly grants to the
- * `service` role or to the public. Owner-style policies
- * (`owner_id = rebase.uid()`) never match an API key's synthetic uid.
+ * A key never bypasses RLS: the request's driver is scoped to the identity
+ * like any other caller's, so the scopes are one ceiling and the database's
+ * policies another, independent one.
  *
  * @module
  */
 
 import type { Context, MiddlewareHandler } from "hono";
-import type { DataDriver } from "@rebasepro/types";
+import { intersectScopes, scopesForRoles, scopeGrants, scopeGrantsAny, type DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../../api/types";
 import type { ApiKeyStore } from "./api-key-store";
 import type { ApiKeyMasked } from "./api-key-types";
 import { scopeDataDriver } from "../rls-scope";
 import { extractBearerToken } from "../bearer-token";
-import { httpMethodToOperation, isFunctionAllowed, isStorageAllowed } from "./api-key-permission-guard";
+import { getAccessModel, getKeyOwnerResolver } from "../access";
 import { logger } from "../../utils/logger";
 import { sha256Hex } from "../../utils/portable-crypto";
+import { ApiError, errorHandler } from "../../api/errors";
 
 /**
  * Check whether a token looks like a Rebase API key.
@@ -40,15 +38,84 @@ export function isApiKeyToken(token: string): boolean {
     return token.startsWith("rk_");
 }
 
-/**
- * Hash a plaintext API key token for database lookup.
- *
- * Async because it hashes with WebCrypto rather than `node:crypto` — the sole
- * caller was already awaiting the store lookup this feeds.
- */
-function hashToken(token: string): Promise<string> {
-    return sha256Hex(token);
+/** Who a verified key acts as, and what it may do. */
+export interface ApiKeyIdentity {
+    uid: string;
+    roles: string[];
+    scopes: string[];
+    apiKey: ApiKeyMasked;
 }
+
+/** A presented key that does not authenticate, and why. */
+export interface ApiKeyRefusal {
+    message: string;
+}
+
+/**
+ * Verify a presented key: it exists, is live, and — for a personal key —
+ * personal keys are on and its owner still exists. Records the use.
+ */
+export async function resolveApiKey(store: ApiKeyStore, token: string): Promise<ApiKeyIdentity | ApiKeyRefusal> {
+    const apiKey = await store.findByKeyHash(await sha256Hex(token));
+
+    if (!apiKey) return { message: "Invalid API key" };
+    if (apiKey.revoked_at) return { message: "API key has been revoked" };
+    if (apiKey.expires_at && new Date(apiKey.expires_at) < new Date()) return { message: "API key has expired" };
+
+    let identity: { uid: string; roles: string[]; scopes: string[] };
+    if (apiKey.kind === "personal") {
+        const resolveOwner = getKeyOwnerResolver();
+        if (!resolveOwner || !apiKey.owner_uid) {
+            return { message: "Personal API keys are switched off on this backend" };
+        }
+        const owner = await resolveOwner(apiKey.owner_uid);
+        if (!owner) return { message: "The account this API key acts as no longer exists" };
+        identity = {
+            uid: apiKey.owner_uid,
+            roles: owner.roles,
+            scopes: intersectScopes(apiKey.scopes, scopesForRoles(owner.roles, getAccessModel()))
+        };
+    } else {
+        identity = {
+            uid: `api-key:${apiKey.id}`,
+            roles: ["service", ...apiKey.roles.filter(role => role !== "service")],
+            scopes: apiKey.scopes
+        };
+    }
+
+    // Debounced: every request a busy key makes routes through here, and an
+    // UPDATE per request would serialize on its one row.
+    const lastTouch = lastUsedTouchedAt.get(apiKey.id);
+    const now = Date.now();
+    if (!lastTouch || now - lastTouch >= LAST_USED_DEBOUNCE_MS) {
+        lastUsedTouchedAt.set(apiKey.id, now);
+        store.updateLastUsed(apiKey.id).catch(() => {
+            // Swallowed intentionally — logged inside the store
+        });
+    }
+
+    const masked: ApiKeyMasked = {
+        id: apiKey.id,
+        name: apiKey.name,
+        kind: apiKey.kind,
+        key_prefix: apiKey.key_prefix,
+        scopes: apiKey.scopes,
+        roles: apiKey.roles,
+        owner_uid: apiKey.owner_uid,
+        rate_limit: apiKey.rate_limit,
+        created_by: apiKey.created_by,
+        created_at: apiKey.created_at,
+        updated_at: apiKey.updated_at,
+        last_used_at: apiKey.last_used_at,
+        expires_at: apiKey.expires_at,
+        revoked_at: apiKey.revoked_at
+    };
+    return { ...identity, apiKey: masked };
+}
+
+/** Per-process debounce state for last_used_at touches. */
+const lastUsedTouchedAt = new Map<string, number>();
+const LAST_USED_DEBOUNCE_MS = 60_000;
 
 /**
  * Options for the API key authentication handler.
@@ -59,175 +126,89 @@ export interface ApiKeyAuthOptions {
 }
 
 /**
- * Validate an API key token and populate the Hono context.
+ * Validate an API key token and populate the Hono context: `user`, `apiKey`,
+ * `scopes` and the RLS-scoped `driver`.
  *
- * Returns `true` if the key is valid and context has been populated,
- * or returns an error Response if the key is invalid.
- *
- * This is NOT a standalone middleware — it's called from within
- * `createAuthMiddleware()` when a `rk_` prefixed token is detected.
+ * Returns `true` when the context is populated, or the error Response.
  */
 export async function validateApiKey(
     c: Context<HonoEnv>,
     token: string,
     options: ApiKeyAuthOptions
 ): Promise<Response | true> {
-    const { store, driver } = options;
-
-    const hash = await hashToken(token);
-    const apiKey = await store.findByKeyHash(hash);
-
-    if (!apiKey) {
-        return c.json({
-            error: { message: "Invalid API key",
-code: "UNAUTHORIZED" }
-        }, 401);
+    const resolved = await resolveApiKey(options.store, token);
+    if (!("uid" in resolved)) {
+        return errorHandler(ApiError.unauthenticated(resolved.message), c) as Response;
     }
 
-    // Check revocation
-    if (apiKey.revoked_at) {
-        return c.json({
-            error: { message: "API key has been revoked",
-code: "UNAUTHORIZED" }
-        }, 401);
-    }
+    c.set("user", { uid: resolved.uid, roles: resolved.roles });
+    c.set("apiKey", resolved.apiKey);
+    c.set("scopes", resolved.scopes);
 
-    // Check expiration
-    if (apiKey.expires_at && new Date(apiKey.expires_at) < new Date()) {
-        return c.json({
-            error: { message: "API key has expired",
-code: "UNAUTHORIZED" }
-        }, 401);
-    }
-
-    // Set user identity — API keys represent service accounts
-    const uid = `api-key:${apiKey.id}`;
-    const roles: string[] = apiKey.admin ? ["admin", "service"] : ["service"];
-    c.set("user", { uid,
-roles });
-
-    // Expose masked key metadata for downstream permission checks
-    const masked: ApiKeyMasked = {
-        id: apiKey.id,
-        name: apiKey.name,
-        key_prefix: apiKey.key_prefix,
-        permissions: apiKey.permissions,
-        admin: apiKey.admin,
-        rate_limit: apiKey.rate_limit,
-        created_by: apiKey.created_by,
-        created_at: apiKey.created_at,
-        updated_at: apiKey.updated_at,
-        last_used_at: apiKey.last_used_at,
-        expires_at: apiKey.expires_at,
-        revoked_at: apiKey.revoked_at
-    };
-    // Store apiKey in the context for permission checking in api-generator
-    c.set("apiKey", masked);
-
-    // Scope the DataDriver. API keys do NOT bypass RLS: withAuth() downgrades
-    // to the restricted rebase_user role like every other caller. Admin keys
-    // pass via the default_admin policies; non-admin keys are additionally
-    // bound by whatever the collection policies grant the "service" role.
     try {
-        const scopedDriver = await scopeDataDriver(driver, {
-            uid,
-            roles
-        });
-        c.set("driver", scopedDriver);
+        c.set("driver", await scopeDataDriver(options.driver, {
+            uid: resolved.uid,
+            roles: resolved.roles
+        }));
     } catch (error) {
         logger.error("[AUTH] RLS scoping failed for API key", { error: error });
-        return c.json({
-            error: { message: "Internal authentication error",
-code: "INTERNAL_ERROR" }
-        }, 500);
-    }
-
-    // Touch last_used_at in the background (non-blocking), debounced: every
-    // API-key request on every surface routes through here, and per-request
-    // UPDATEs would serialize on the single api_keys row for a busy key.
-    // Minute-resolution is plenty for a "last used" display.
-    const lastTouch = lastUsedTouchedAt.get(apiKey.id);
-    const now = Date.now();
-    if (!lastTouch || now - lastTouch >= LAST_USED_DEBOUNCE_MS) {
-        lastUsedTouchedAt.set(apiKey.id, now);
-        store.updateLastUsed(apiKey.id).catch(() => {
-            // Swallowed intentionally — logged inside the store
-        });
+        return errorHandler(ApiError.internal("Internal authentication error"), c) as Response;
     }
 
     return true;
 }
 
-/** Per-process debounce state for last_used_at touches. */
-const lastUsedTouchedAt = new Map<string, number>();
-const LAST_USED_DEBOUNCE_MS = 60_000;
-
 /**
- * Shared 403 response for API-key permission denials outside the REST
- * generator (storage and functions guards). One envelope, one code — a
- * change to the error contract happens in one place.
+ * The 403 for a credential that lacks a data-plane scope outside the REST
+ * generator (storage and functions). Names the scope that would grant it.
  */
-function forbidApiKey(c: Context<HonoEnv>, operation: string, resource: string, grantHint: string): Response {
-    return c.json({
-        error: {
-            message: `API key does not have "${operation}" permission for ${resource}. ` +
-                `Grant it with a permission entry like { "collection": "${grantHint}", "operations": ["${operation}"] }.`,
-            code: "API_KEY_FORBIDDEN"
-        }
-    }, 403);
+export function forbidScope(c: Context<HonoEnv>, scope: string, target?: string): Response {
+    const wanted = target !== undefined && target !== "" ? `${scope}:${target}` : scope;
+    return errorHandler(new ApiError(403, "SCOPE_MISSING",
+        `This credential does not hold the "${wanted}" scope.`,
+        { requiredScope: wanted }), c) as Response;
+}
+
+/** Whether this request's caller holds `scope` — on `target` when given. */
+function callerHolds(c: Context<HonoEnv>, scope: string, target?: string): boolean {
+    const narrowed = c.get("scopes");
+    if (!narrowed) return true; // a person: the data plane is theirs, RLS and policies decide
+    return target === undefined ? scopeGrantsAny(narrowed, scope) : scopeGrants(narrowed, scope, target);
 }
 
 /**
- * Permission guard for API-key requests to the storage router.
+ * Scope guard for the resumable-upload routes (`/tus/:id`).
  *
- * Storage previously did not accept API keys at all (`rk_` tokens were
- * misparsed as JWTs and 401'd). Now that the pre-auth middleware
- * authenticates them, this guard decides what they may do: the key needs a
- * `"storage"` permission entry (or the global `"*"` wildcard) covering the
- * operation derived from the HTTP method. Requests not authenticated via an
- * API key pass through to the storage router's own auth gates.
- *
- * TUS resumable-upload routes (`/tus`, `/tus/:id`) are classified as `write`
- * for EVERY method: the protocol's offset check is a GET and its cancel is a
- * DELETE, but both are steps of an upload — a write-scoped key must be able
- * to complete (and abort) its own resumable upload without also holding
- * `read`/`delete` on stored objects.
+ * Every step of an upload — the offset check (HEAD), the chunks (PATCH), the
+ * cancel (DELETE) — is part of writing it, so all of them need
+ * `storage:write`. Which source the upload writes to was checked when it was
+ * created; these steps only reach an upload the same caller owns.
  */
-export function createStorageApiKeyGuard(): MiddlewareHandler<HonoEnv> {
+export function createTusScopeGuard(): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
-        const apiKey = c.get("apiKey") as ApiKeyMasked | undefined;
-        if (!apiKey) return next();
-
-        const isTus = /\/tus(\/|$)/.test(c.req.path);
-        const operation = isTus ? "write" : httpMethodToOperation(c.req.method);
-        if (!isStorageAllowed(apiKey.permissions, operation)) {
-            return forbidApiKey(c, operation, "storage", "storage");
+        if (/\/tus\/[^/]+$/.test(c.req.path) && c.get("user") && !callerHolds(c, "storage:write")) {
+            return forbidScope(c, "storage:write");
         }
-
         return next();
     };
 }
 
 /**
- * Permission guard for API-key requests to the custom-functions router.
+ * Scope guard for the custom-functions router: a narrowed credential needs
+ * `functions:invoke` on the function it calls. The functions index — the
+ * listing at the mount point itself — needs the unqualified scope.
  *
- * The collection permission guard lives in the REST generator and never sees
- * function routes, so before this middleware existed ANY valid API key —
- * however narrowly scoped — could invoke every custom function. This guard
- * closes that: API-key requests must hold a `"functions"`/`"functions/<name>"`
- * permission entry (or the global `"*"` wildcard) for the derived operation.
- *
- * Non-API-key requests (JWT, service key, anonymous) pass through untouched —
- * functions decide their own auth for those, as before.
+ * People pass: what a person may do inside a function is the function's own
+ * business, as it always was.
  *
  * @param mountPrefix - The path the functions router is mounted at
  *                      (e.g. `/api/functions`), used to extract the function
  *                      name from the request path.
  */
-export function createFunctionApiKeyGuard(mountPrefix: string): MiddlewareHandler<HonoEnv> {
+export function createFunctionScopeGuard(mountPrefix: string): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
-        const apiKey = c.get("apiKey") as ApiKeyMasked | undefined;
-        if (!apiKey) return next();
+        const narrowed = c.get("scopes");
+        if (!narrowed) return next();
 
         const path = c.req.path;
         const idx = path.indexOf(mountPrefix);
@@ -239,30 +220,25 @@ export function createFunctionApiKeyGuard(mountPrefix: string): MiddlewareHandle
         } catch {
             // Malformed percent-encoding (e.g. %ZZ) — fall back to the raw
             // segment rather than throwing a 500. It won't match any
-            // functions/<name> entry, so only namespace-wide grants pass.
+            // functions:invoke:<name> grant, so only the unqualified one passes.
             functionName = rawName;
         }
 
-        const operation = httpMethodToOperation(c.req.method);
-        if (!isFunctionAllowed(apiKey.permissions, functionName, operation)) {
-            const resource = functionName ? `function "${functionName}"` : "the functions index";
-            return forbidApiKey(c, operation, resource, `functions${functionName ? `/${functionName}` : ""}`);
-        }
-
+        const allowed = functionName === ""
+            ? scopeGrants(narrowed, "functions:invoke")
+            : scopeGrants(narrowed, "functions:invoke", functionName);
+        if (!allowed) return forbidScope(c, "functions:invoke", functionName);
         return next();
     };
 }
 
 /**
- * Standalone pre-auth middleware for `rk_` bearer tokens.
+ * Pre-auth middleware for `rk_` bearer tokens.
  *
- * Routers whose auth gate is JWT-based (`requireAuth` / `createRequireAuth` —
- * the admin surfaces: admin users/roles, api-keys management, cron, backups,
- * logs, schema editor) don't know about API keys. Mounting this middleware in
- * front of them authenticates `rk_` tokens and populates the request context;
- * the downstream gates then see the already-resolved user and apply their
- * role checks (`requireAdmin`) as usual — so an `admin: true` key passes and
- * a non-admin key is rejected with 403.
+ * Routers whose auth gate is JWT-based (`createRequireAuth` — the admin
+ * surfaces, the key routes) don't know about API keys. Mounted in front of
+ * them, this authenticates `rk_` tokens and populates the request context; the
+ * downstream gates then see the already-resolved caller and check its scopes.
  *
  * Requests without an `rk_` bearer token pass through untouched. An invalid,
  * revoked, or expired `rk_` token is rejected here (401) rather than falling

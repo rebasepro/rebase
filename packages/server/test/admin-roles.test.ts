@@ -1,58 +1,81 @@
-import { describe, it, expect } from "@jest/globals";
-import { ADMINISTRATIVE_ROLES, isAdministrativeRole, hasAdministrativeRole } from "../src/auth/admin-roles";
+import { describe, it, expect, afterEach } from "@jest/globals";
+import { ADMIN_ROLE, ADMIN_SCOPES, EMPTY_ACCESS_MODEL, hasAdminRole, scopeGrants } from "@rebasepro/types";
+import { ADMIN_ROLE_NAME, heldScopesGrant, holdsAdminRole } from "../src/auth/admin-roles";
+import { configureAccess } from "../src/auth/access";
 import { createAuthRoutes } from "../src/auth/routes";
 
+afterEach(() => configureAccess({ model: EMPTY_ACCESS_MODEL }));
+
 /**
- * The registration guard and the admin check have to agree on what "admin"
- * means.
- *
- * They did not. `requireAdmin` accepted `admin` **or** `schema-admin`; the
- * guard refusing a dangerous `defaultRole` compared against `admin` alone. So
- * `AUTH_DEFAULT_ROLE=schema-admin` was accepted at boot and every public
- * registrant became an administrator — with the schema editor and the SQL
- * surfaces, from which real `admin` is one user edit away.
- *
- * The property below is the one that matters and the one that regressed: for
- * every role the admin check honours, the registration guard must refuse it.
- * Asserting it over the shared list means adding a role cannot reopen the gap.
+ * The portable restatement in `auth/admin-roles.ts` — what the custom-function
+ * guards use, because that surface cannot import `@rebasepro/types` — must
+ * answer exactly as the canonical definitions do.
  */
-describe("administrative roles", () => {
-    it("recognises exactly the documented set", () => {
-        expect([...ADMINISTRATIVE_ROLES]).toEqual(["admin", "schema-admin"]);
-        expect(isAdministrativeRole("admin")).toBe(true);
-        expect(isAdministrativeRole("schema-admin")).toBe(true);
-        expect(isAdministrativeRole("editor")).toBe(false);
-        expect(isAdministrativeRole("")).toBe(false);
+describe("the portable admin-role and scope rules", () => {
+    it("name the same admin role", () => {
+        expect(ADMIN_ROLE_NAME).toBe(ADMIN_ROLE);
     });
 
-    it("answers for a list, tolerating null and undefined", () => {
-        expect(hasAdministrativeRole(["viewer", "schema-admin"])).toBe(true);
-        expect(hasAdministrativeRole(["viewer"])).toBe(false);
-        expect(hasAdministrativeRole([])).toBe(false);
-        expect(hasAdministrativeRole(null)).toBe(false);
-        expect(hasAdministrativeRole(undefined)).toBe(false);
+    it.each([
+        [["admin"]],
+        [["viewer", "admin"]],
+        [["viewer"]],
+        [[]],
+        [["admin "]],
+        [["schema-admin"]]
+    ])("agree about %j", (roles) => {
+        expect(holdsAdminRole(roles)).toBe(hasAdminRole(roles));
     });
 
-    describe("registration cannot hand out an administrative role", () => {
-        // The property, over the shared list: no administrative role may be a
-        // default role. `schema-admin` is the one that used to get through.
-        it.each([...ADMINISTRATIVE_ROLES])("refuses defaultRole '%s' at construction", role => {
-            expect(() => createAuthRoutes({ defaultRole: role } as never))
-                .toThrow(/CRITICAL SECURITY ERROR/);
-        });
+    it("tolerate null and undefined", () => {
+        expect(holdsAdminRole(null)).toBe(false);
+        expect(holdsAdminRole(undefined)).toBe(false);
+    });
 
-        it("names the offending role and the whole set in the error", () => {
-            expect(() => createAuthRoutes({ defaultRole: "schema-admin" } as never))
-                .toThrow(/schema-admin/);
-            expect(() => createAuthRoutes({ defaultRole: "schema-admin" } as never))
-                .toThrow(/admin, schema-admin/);
-        });
+    it.each([
+        [["data:read"], "data:read", undefined],
+        [["data:read"], "data:read", "posts"],
+        [["data:read:posts"], "data:read", "posts"],
+        [["data:read:posts"], "data:read", "comments"],
+        [["data:read:posts"], "data:read", undefined],
+        [["data:write"], "data:read", "posts"],
+        [[], "logs:read", undefined]
+    ])("match scopes the same: %j grants %s on %s", (held, scope, target) => {
+        expect(heldScopesGrant(held, scope, target)).toBe(scopeGrants(held, scope, target));
+    });
+});
 
-        it("still allows an ordinary default role", () => {
-            // The control: a guard that refused everything would satisfy the
-            // assertions above without being correct.
-            expect(() => createAuthRoutes({ defaultRole: "editor" } as never))
-                .not.toThrow(/CRITICAL SECURITY ERROR/);
+/**
+ * Every registrant gets the default role, so it may hold nothing a stranger
+ * should: not `admin`, and no declared role with an admin-plane scope.
+ */
+describe("registration cannot hand out an admin-plane scope", () => {
+    it("refuses defaultRole 'admin' at construction", () => {
+        expect(() => createAuthRoutes({ defaultRole: "admin" } as never))
+            .toThrow(/CRITICAL SECURITY ERROR/);
+    });
+
+    it.each([...ADMIN_SCOPES])("refuses a declared default role holding %s", (scope) => {
+        configureAccess({ model: { roles: { member: { scopes: [scope] } }, scopes: {} } });
+        expect(() => createAuthRoutes({ defaultRole: "member" } as never))
+            .toThrow(new RegExp(`CRITICAL SECURITY ERROR.*${scope}`));
+    });
+
+    it("allows a declared default role holding only app scopes", () => {
+        configureAccess({
+            model: {
+                roles: { member: { scopes: ["project:deploy"] } },
+                scopes: { "project:deploy": { label: "Deploy" } }
+            }
         });
+        expect(() => createAuthRoutes({ defaultRole: "member" } as never))
+            .not.toThrow(/CRITICAL SECURITY ERROR/);
+    });
+
+    it("still allows an ordinary default role", () => {
+        // The control: a guard that refused everything would satisfy the
+        // assertions above without being correct.
+        expect(() => createAuthRoutes({ defaultRole: "editor" } as never))
+            .not.toThrow(/CRITICAL SECURITY ERROR/);
     });
 });

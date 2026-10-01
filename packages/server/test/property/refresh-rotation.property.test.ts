@@ -126,7 +126,7 @@ function buildApp(store: MemoryTokenStore) {
         pruneRefreshTokens: store.pruneRefreshTokens.bind(store),
         getTokensValidAfter: store.getTokensValidAfter.bind(store),
         setTokensValidAfter: store.setTokensValidAfter.bind(store),
-        getUserRoles: async () => [{ id: "editor", name: "Editor", isAdmin: false }],
+        getUserRoleIds: async () => ["editor"],
         getUserById: async (id: string) => ({
             id, email: "u@test.com", passwordHash: null, displayName: "U", photoUrl: null,
             emailVerified: true, emailVerificationToken: null, emailVerificationSentAt: null,

@@ -609,25 +609,6 @@ email: "test@example.com" };
             });
         });
 
-        describe("getUserRoles", () => {
-            it("should return roles for user", async () => {
-                mockExecute.mockResolvedValueOnce({
-                    rows: [{ roles: ["admin", "editor"] }]
-                });
-
-                const roles = await userService.getUserRoles("user-123");
-
-                expect(roles).toHaveLength(2);
-                expect(roles[0]).toEqual({
-                    id: "admin",
-                    name: "admin",
-                    isAdmin: true,
-                    defaultPermissions: null,
-                    collectionPermissions: null
-                });
-            });
-        });
-
         describe("getUserRoleIds", () => {
             it("should return role IDs for user", async () => {
                 mockExecute.mockResolvedValueOnce({
@@ -695,11 +676,7 @@ email: "test@example.com" };
 
                 expect(result).toEqual({
                     user: mockUserData({}),
-                    roles: [{ id: "admin",
-                        name: "admin",
-                        isAdmin: true,
-                        defaultPermissions: null,
-                        collectionPermissions: null }]
+                    roles: ["admin"]
                 });
             });
 

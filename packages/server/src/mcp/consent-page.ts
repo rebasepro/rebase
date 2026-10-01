@@ -14,7 +14,7 @@
  *     own login and mentions the third party in small print. The client's name
  *     is attacker-controlled — anyone may register — so it is escaped, length-
  *     capped, and always rendered as a quoted, untrusted string.
- *  2. **Say what is being granted in words**, not scope identifiers. `mcp:read`
+ *  2. **Say what is being granted in words**, not scope identifiers. `data:read`
  *     means nothing to the person deciding.
  *  3. **Say what is NOT being granted.** The interesting property of this
  *     integration is that the grant cannot exceed the user's own access, and

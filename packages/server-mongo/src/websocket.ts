@@ -1,4 +1,4 @@
-import { ANONYMOUS_USER_ID, RealtimeProvider, DataDriver, FetchCollectionProps, FetchOneProps, SaveProps, DeleteProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin, User, AuthAdapter } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, RealtimeProvider, DataDriver, FetchCollectionProps, FetchOneProps, SaveProps, DeleteProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin, User, AuthAdapter, scopeGrants, scopesForRoles, type AdminScope } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
@@ -6,7 +6,7 @@ import { extractUserFromToken, resolveRequireAuth, assertWriteRequestValid, asse
 import type { RebaseAuthConfig } from "@rebasepro/server";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
-import { logger } from "@rebasepro/server";
+import { logger, getAccessModel } from "@rebasepro/server";
 
 /**
  * Normalized user identity for WebSocket sessions — the same shape the Postgres
@@ -40,16 +40,20 @@ interface ClientSession {
 const WS_RATE_LIMIT = 2000;
 const WS_RATE_WINDOW_MS = 60_000;
 
-const ADMIN_ONLY_TYPES = new Set([
-    "EXECUTE_SQL",
-    "FETCH_DATABASES",
-    "FETCH_ROLES",
-    "FETCH_UNMAPPED_TABLES",
-    "FETCH_TABLE_METADATA",
-    "FETCH_CURRENT_DATABASE",
-    "CREATE_BRANCH",
-    "DELETE_BRANCH",
-    "LIST_BRANCHES"
+/**
+ * WebSocket message types on the admin plane, and the scope each needs — the
+ * same verbs and scopes as the Postgres socket.
+ */
+const ADMIN_PLANE_TYPES: ReadonlyMap<string, AdminScope> = new Map<string, AdminScope>([
+    ["EXECUTE_SQL", "database:write"],
+    ["CREATE_BRANCH", "database:write"],
+    ["DELETE_BRANCH", "database:write"],
+    ["FETCH_DATABASES", "database:read"],
+    ["FETCH_ROLES", "database:read"],
+    ["FETCH_UNMAPPED_TABLES", "database:read"],
+    ["FETCH_TABLE_METADATA", "database:read"],
+    ["FETCH_CURRENT_DATABASE", "database:read"],
+    ["LIST_BRANCHES", "database:read"]
 ]);
 
 /**
@@ -84,12 +88,10 @@ function sessionUser(session: ClientSession | undefined): User {
     };
 }
 
-function isAdminSession(session: ClientSession | undefined): boolean {
-    if (!session?.user) return false;
-    // The adapter's own answer first; a role *named* `admin` is only the
-    // fallback for the built-in JWT path.
-    if (session.user.isAdmin) return true;
-    return (session.user.roles ?? []).some((r) => r === "admin");
+/** Everything a session may do: what its roles hold. */
+function sessionScopes(session: ClientSession | undefined): string[] {
+    if (!session?.user) return [];
+    return scopesForRoles(session.user.roles ?? [], getAccessModel());
 }
 
 export function createMongoWebSocket(
@@ -244,10 +246,11 @@ roles: verifiedUser.roles } }));
                     }
                 }
 
-                if (ADMIN_ONLY_TYPES.has(type)) {
+                const adminScope = ADMIN_PLANE_TYPES.get(type);
+                if (adminScope) {
                     const session = clientSessions.get(clientId);
-                    if (!isAdminSession(session)) {
-                        sendError("ERROR", "FORBIDDEN", "Admin access required for this operation");
+                    if (!scopeGrants(sessionScopes(session), adminScope)) {
+                        sendError("ERROR", "SCOPE_MISSING", `This operation needs the "${adminScope}" scope`);
                         return;
                     }
                 }

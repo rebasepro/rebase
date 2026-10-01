@@ -105,7 +105,7 @@ accessExpiresIn: "1h" });
         expect(getUserWithRoles).not.toHaveBeenCalled();
     });
 
-    it("rejects a signed-in non-admin with 403", async () => {
+    it("rejects a signed-in caller without users:read with 403", async () => {
         const { repo, getUserWithRoles } = mockRepo([user("u1", "Priscila")]);
         const app = createAdminUsersRoute({ authRepo: repo });
 
@@ -113,7 +113,7 @@ accessExpiresIn: "1h" });
 
         expect(res.status).toBe(403);
         const raw = await res.text();
-        expect((JSON.parse(raw) as { error: { code: string } }).error.code).toBe("FORBIDDEN");
+        expect((JSON.parse(raw) as { error: { code: string } }).error.code).toBe("SCOPE_MISSING");
         // Nothing about u1 leaked on the way to the refusal.
         expect(getUserWithRoles).not.toHaveBeenCalled();
         expect(raw).not.toContain("Priscila");

@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { ADMINISTRATIVE_ROLES, isAdministrativeRole } from "./admin-roles";
 import { normalizeEmail } from "@rebasepro/common";
 import { ApiError, errorHandler } from "../api/errors";
 import { randomBytes, randomUUID } from "crypto";
@@ -34,6 +33,8 @@ import { isBootstrapWindowOpen, isSteadyStateRegistrationOpen, SETUP_REQUIRED_ME
 import { decideOAuthAutoLink, isRedirectUriAllowed } from "./oauth-signin-policy";
 import { confirmAddressOwnership, identityProfileData } from "./address-ownership";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
+import { ADMIN_ROLE, isAdminScope, parseScope } from "@rebasepro/types";
+import { getAccessModel } from "./access";
 import type { Context } from "hono";
 import { readRefreshToken, redactRefreshToken, clearRefreshCookie } from "./cookie-utils";
 
@@ -183,18 +184,23 @@ function getPasswordResetExpiry(): Date {
 }
 
 export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
-    // Every administrative role, not just the one named "admin". This compared
-    // against `"admin"` alone while `requireAdmin` accepted `schema-admin` too,
-    // so `AUTH_DEFAULT_ROLE=schema-admin` walked past it and handed every public
-    // registrant the schema editor and the SQL surfaces — from which real
-    // `admin` is one user edit away.
-    if (config.defaultRole && isAdministrativeRole(config.defaultRole)) {
-        throw new Error(
-            `CRITICAL SECURITY ERROR: defaultRole cannot be '${config.defaultRole}'. ` +
-            `Administrative privilege escalation via registration is strictly forbidden ` +
-            `(administrative roles: ${ADMINISTRATIVE_ROLES.join(", ")}). ` +
-            "Use the POST /admin/bootstrap endpoint to promote the initial administrator."
-        );
+    // Every registrant gets the default role, so it may carry nothing a
+    // stranger should hold: not `admin`, and no declared role with an
+    // admin-plane scope — from `users:write`, real `admin` is one edit away.
+    if (config.defaultRole) {
+        const declared = getAccessModel().roles;
+        const adminPlane = config.defaultRole === ADMIN_ROLE
+            ? ["every scope"]
+            : Object.prototype.hasOwnProperty.call(declared, config.defaultRole)
+                ? declared[config.defaultRole].scopes.filter(scope => isAdminScope(parseScope(scope)?.scope ?? ""))
+                : [];
+        if (adminPlane.length > 0) {
+            throw new Error(
+                `CRITICAL SECURITY ERROR: defaultRole cannot be '${config.defaultRole}': every registrant would hold ` +
+                `${adminPlane.join(", ")}. Give the default role no admin-plane scopes, and use the ` +
+                "POST /admin/bootstrap endpoint to promote the initial administrator."
+            );
+        }
     }
 
     // Built here rather than per request: `resolveCaptchaVerifier` throws on a
@@ -382,8 +388,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             await assertMfaSatisfied(authRepo, uid);
         }
         const aal = options?.aal ?? "aal1";
-        const roles = await authRepo.getUserRoles(uid);
-        const roleIds = roles.map(r => r.id);
+        const roleIds = await authRepo.getUserRoleIds(uid);
 
         // Is this session a GUEST — anonymous sign-in rather than an account?
         //
@@ -1241,8 +1246,7 @@ message: "Email verified successfully" });
         }
 
         // Generate new tokens
-        const roles = await authRepo.getUserRoles(storedToken.uid);
-        const roleIds = roles.map(r => r.id);
+        const roleIds = await authRepo.getUserRoleIds(storedToken.uid);
 
         // Best-effort: load the user so we can return it in the response, which
         // lets the client restore a session from an httpOnly cookie alone (cold

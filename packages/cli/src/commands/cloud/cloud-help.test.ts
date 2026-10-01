@@ -25,6 +25,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 // than a network request or a prompt. This is the assertion — the expectations
 // below just name it.
 vi.mock("./auth", () => ({ loginCommand: vi.fn(), logoutCommand: vi.fn(), whoamiCommand: vi.fn() }));
+vi.mock("./tokens", () => ({ tokensCommand: vi.fn() }));
 vi.mock("./link", () => ({ linkCommand: vi.fn(), unlinkCommand: vi.fn(), selectOrgCommand: vi.fn(), openCommand: vi.fn() }));
 vi.mock("./projects", () => ({ listProjects: vi.fn(), createProject: vi.fn(), projectInfo: vi.fn(), deleteProject: vi.fn() }));
 vi.mock("./deploy", () => ({ deployCommand: vi.fn(), logsCommand: vi.fn() }));
@@ -63,6 +64,7 @@ const env = await import("./env");
 const projects = await import("./projects");
 const databases = await import("./databases");
 const resources = await import("./resources");
+const tokens = await import("./tokens");
 
 /**
  * The help printers, excluded from the "nothing ran" sweep because calling them
@@ -79,7 +81,7 @@ const PRINTERS: unknown[] = [
 function allHandlers() {
     return [
         ...Object.values(link), ...Object.values(deploy), ...Object.values(projects),
-        ...Object.values(resources), env.envCommand, databases.dbCommand,
+        ...Object.values(resources), env.envCommand, databases.dbCommand, tokens.tokensCommand,
         context.requireProjectRef
     ].filter((f): f is ReturnType<typeof vi.fn> =>
         typeof f === "function" && "mock" in f && !PRINTERS.includes(f));

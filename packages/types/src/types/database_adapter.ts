@@ -27,7 +27,7 @@ import type {
     DatabaseAdmin,
     InitializedDriver,
     RealtimeProvider,
-    RealtimeSocketLimits,
+    RealtimeSocketOptions,
     BootstrappedAuth
 } from "./backend";
 import type { HistoryConfig } from "../controllers/client";
@@ -102,7 +102,7 @@ export interface DatabaseAdapter {
         driver: DataDriver,
         config?: unknown,
         adapter?: import("./auth_adapter").AuthAdapter,
-        limits?: RealtimeSocketLimits,
+        limits?: RealtimeSocketOptions,
     ): Promise<void> | void;
 
     /**

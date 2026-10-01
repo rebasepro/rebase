@@ -23,8 +23,8 @@ import type {
 } from "@rebasepro/types";
 
 import { Hono } from "hono";
+import { hasAdminRole } from "@rebasepro/types";
 import { isAccessTokenRevoked, replaceUserPassword } from "./token-revocation";
-import { hasAdministrativeRole } from "./admin-roles";
 import { verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
@@ -206,7 +206,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             // that fails — see `resolveLiveRoles`.
             const roles = await resolveLiveRoles(payload.uid);
 
-            const isAdmin = hasAdministrativeRole(roles);
+            const isAdmin = hasAdminRole(roles);
 
             return {
                 uid: payload.uid,
@@ -268,7 +268,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
 
             const roles = await resolveLiveRoles(payload.uid);
 
-            const isAdmin = hasAdministrativeRole(roles);
+            const isAdmin = hasAdminRole(roles);
 
             return {
                 uid: payload.uid,

@@ -38,9 +38,12 @@ import {
     protectedResourceMetadata,
     protectedResourceMetadataPath,
     authorizationServerMetadata,
+    scopeList,
+    upgradeStoredMcpScope,
     DEFAULT_MCP_SCOPE
 } from "./oauth-metadata.js";
-import { findTool, toolsForScope, McpToolError, type McpCaller } from "./mcp-tools.js";
+import { findTool, toolsForScopes, McpToolError, MCP_TOOLS, type McpCaller } from "./mcp-tools.js";
+import type { ApiKeyIdentity, ApiKeyRefusal } from "../auth/api-keys/api-key-middleware.js";
 
 /**
  * The protocol revisions this server implements.
@@ -72,6 +75,12 @@ const INTERNAL_ERROR = -32603;
 export const MAX_BATCH_MESSAGES = 20;
 
 export interface McpRoutesConfig {
+    /**
+     * Verify an `rk_` API key, for clients that are configured with a header
+     * rather than an OAuth flow. A key reaches the tools its `data:*` scopes
+     * cover, as whoever it acts as. Absent, only OAuth tokens are accepted.
+     */
+    resolveApiKey?: (token: string) => Promise<ApiKeyIdentity | ApiKeyRefusal>;
     /** The externally reachable origin. */
     publicUrl: string;
     /** Where this router is mounted. */
@@ -176,13 +185,31 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
         const header = c.req.header("authorization") ?? "";
         if (!header.toLowerCase().startsWith("bearer ")) {
             return c.json(
-                { error: "unauthorized", error_description: "An OAuth access token is required." },
+                { error: "unauthorized", error_description: "An OAuth access token or an API key is required." },
                 401,
                 { "WWW-Authenticate": bearerChallenge(config.publicUrl, config.mcpPath, DEFAULT_MCP_SCOPE) }
             );
         }
 
         const token = header.slice(7).trim();
+
+        if (token.startsWith("rk_") && config.resolveApiKey) {
+            const resolved = await config.resolveApiKey(token);
+            if (!("uid" in resolved)) {
+                return c.json(
+                    { error: "invalid_token", error_description: resolved.message },
+                    401,
+                    { "WWW-Authenticate": bearerChallenge(config.publicUrl, config.mcpPath, DEFAULT_MCP_SCOPE) }
+                );
+            }
+            return {
+                uid: resolved.uid,
+                roles: resolved.roles,
+                scopes: resolved.scopes,
+                clientId: `api-key:${resolved.apiKey.id}`
+            };
+        }
+
         // The audience is passed explicitly on every call. `verifyMcpAccessToken`
         // has no default for it, so this is the check the specification requires
         // — a token minted for another Rebase project cannot be spent here.
@@ -198,7 +225,8 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
         return {
             uid: payload.uid,
             roles: payload.roles,
-            scope: payload.scope,
+            // A token issued before the shared vocabulary is read as what it granted.
+            scopes: scopeList(upgradeStoredMcpScope(payload.scope)),
             clientId: payload.clientId
         };
     }
@@ -330,7 +358,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
 
             case "tools/list":
                 return rpcResult(id, {
-                    tools: toolsForScope(caller.scope).map(tool => ({
+                    tools: toolsForScopes(caller.scopes).map(tool => ({
                         name: tool.name,
                         description: tool.description,
                         inputSchema: tool.inputSchema
@@ -355,13 +383,13 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
         const name = typeof params?.name === "string" ? params.name : "";
         const args = (params?.arguments ?? {}) as Record<string, unknown>;
 
-        const tool = findTool(name, caller.scope);
+        const tool = findTool(name, caller.scopes);
         if (!tool) {
             // A tool that exists but is out of scope is reported as a scope
             // problem, not as "unknown" — the client can act on the first and
             // only give up on the second. The HTTP 403 challenge cannot be sent
             // from inside a JSON-RPC result, so the guidance goes in the error.
-            const outOfScope = toolsForScope("mcp:read mcp:write").find(t => t.name === name);
+            const outOfScope = MCP_TOOLS.find(t => t.name === name);
             if (outOfScope) {
                 c.header("WWW-Authenticate", insufficientScopeChallenge(
                     config.publicUrl, config.mcpPath, outOfScope.requiredScope,

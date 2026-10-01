@@ -117,11 +117,13 @@ export {
     providerVerifiedEmail,
     verifyOidcIdToken,
     tryVerifyOidcIdToken,
-    // API-key permission helpers
+    // API keys and scopes
     isApiKeyToken,
     validateApiKey,
     httpMethodToOperation,
-    isOperationAllowed,
+    requireScope,
+    hasScope,
+    callerScopes,
     // Constant-time compare for static secrets — drivers checking a service key
     // must not fall back to ===.
     safeCompare,
@@ -156,14 +158,23 @@ export type {
     AuthMiddlewareOptions,
     AuthResult,
     ApiKey,
+    ApiKeyKind,
     ApiKeyMasked,
-    ApiKeyPermission,
     ApiKeyWithSecret,
     CreateApiKeyRequest,
+    CreatePersonalKeyRequest,
     UpdateApiKeyRequest,
     ApiKeyStore,
-    ApiKeyOperation
+    DataOperation
 } from "./auth";
+// The other request boundaries — the realtime socket and `/mcp` — resolve keys
+// and person scopes with the same functions the HTTP middlewares use.
+export { resolveApiKey, getAccessModel } from "./auth";
+// For an app's own socket or tunnel: a session token or an API key, as one
+// identity with scopes.
+export { verifyCredential } from "./auth/verify-credential";
+export type { VerifiedCredential } from "./auth/verify-credential";
+export type { ApiKeyIdentity, ApiKeyRefusal } from "./auth/api-keys";
 
 // =============================================================================
 // API Layer — public types + error surface only. The `RestApiGenerator`

@@ -90,7 +90,7 @@ function harness(options: {
     });
 
     async function call(name: string, args: Record<string, unknown>) {
-        const { accessToken } = await connectedClient(app, { scope: "mcp:read mcp:write", uid: "admin-1", roles: ["admin"] });
+        const { accessToken } = await connectedClient(app, { scope: "data:read data:write data:delete", uid: "admin-1", roles: ["admin"] });
         const res = await rpc(app, accessToken, {
             jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args }
         });

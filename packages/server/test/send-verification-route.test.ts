@@ -53,7 +53,7 @@ function createApp() {
     const authRepo = {
         getUserById: jest.fn().mockImplementation((id: string) => Promise.resolve(unverifiedUser(id))),
         getUserByEmail: jest.fn().mockResolvedValue(null),
-        getUserRoles: jest.fn().mockResolvedValue([]),
+        getUserRoleIds: jest.fn().mockResolvedValue([]),
         setVerificationToken: jest.fn().mockResolvedValue(undefined),
         listUsersPaginated: jest.fn().mockResolvedValue({ users: [],
 total: 0,

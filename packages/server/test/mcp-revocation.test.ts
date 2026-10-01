@@ -40,7 +40,7 @@ describe("connected applications", () => {
 
         expect(grants).toHaveLength(1);
         expect(grants[0]).toMatchObject({
-            clientId, clientName: "Claude", scope: "mcp:read", activeTokens: 1
+            clientId, clientName: "Claude", scope: "data:read", activeTokens: 1
         });
     });
 
@@ -323,15 +323,18 @@ describe("the consent screen's promise", () => {
 
     it("lists the granted scopes in words, not identifiers", async () => {
         const { app } = buildApp();
-        const { html } = await authorize(app, { scope: "mcp:read mcp:write" });
+        const { html } = await authorize(app, { scope: "data:read data:write data:delete" });
         expect(html).toContain("Read data you already have access to");
-        expect(html).toContain("Create, change and delete data you already have access to");
+        expect(html).toContain("Create and change data you already have access to");
+        expect(html).toContain("Delete data you already have access to");
     });
 
     it("does not offer write in the list when only read was asked for", async () => {
         const { app } = buildApp();
-        const { html } = await authorize(app, { scope: "mcp:read" });
-        expect(html).not.toContain("Create, change and delete");
+        const { html } = await authorize(app, { scope: "data:read" });
+        expect(html).toContain("Read data you already have access to");
+        expect(html).not.toContain("Create and change data");
+        expect(html).not.toContain("Delete data");
     });
 
     it("carries the redirect target nowhere the user can see or edit", async () => {

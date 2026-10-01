@@ -1,5 +1,5 @@
 import type { Transport } from "./transport";
-import { AdminUser } from "@rebasepro/types";
+import type { AdminUser, RoleSummary } from "@rebasepro/types";
 
 export type { AdminUser };
 
@@ -79,7 +79,7 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
     }
 
     async function listRoles() {
-        return transport.request<{ roles: Array<{ id: string; name: string }> }>(
+        return transport.request<{ roles: RoleSummary[] }>(
             adminPath + "/roles",
             { method: "GET" }
         );

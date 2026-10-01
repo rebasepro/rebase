@@ -47,6 +47,14 @@ import {
  * slot over `app.use("/*", requireAuth)`: `use()` only covers routes declared
  * *below* it, so a route appended later above it is silently unprotected.
  *
+ * An API key is a caller too. It reaches this file only if it holds the
+ * `functions:invoke` scope (or `functions:invoke:hello`), it passes
+ * `requireAuth`, and a service key created with `--roles admin` passes
+ * `requireAdmin`. To let a key do one thing here and not another, declare a
+ * scope under `auth.scopes` on the users collection and add
+ * `requireScope("reports:read")` to that route — every signed-in person holds
+ * every app scope, so it narrows keys, not people.
+ *
  * `rebase.dataAsAdmin` gives you admin-level access to your data: it runs as
  * `{ uid: "service", roles: ["admin"] }`, which is **admin-scoped, not an RLS
  * bypass** — your policies are still evaluated, just against that identity. So

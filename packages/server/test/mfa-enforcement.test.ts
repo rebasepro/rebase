@@ -129,9 +129,7 @@ function createHarness(opts: { uid: string; enrolled?: boolean; verified?: boole
 total: 2,
 limit: 1,
 offset: 0 }),
-        getUserRoles: jest.fn().mockResolvedValue([{ id: "editor",
-name: "Editor",
-isAdmin: false }]),
+        getUserRoleIds: jest.fn().mockResolvedValue(["editor"]),
         assignDefaultRole: jest.fn().mockResolvedValue(undefined),
         setUserRoles: jest.fn().mockResolvedValue(undefined),
 

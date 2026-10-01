@@ -16,26 +16,39 @@
  *   RFC 7636  PKCE
  *   OAuth 2.1 draft-ietf-oauth-v2-1
  */
+import { parseScope } from "@rebasepro/types";
 import { sha256Bytes } from "../utils/portable-crypto.js";
 
 /**
- * What a token may do at `/mcp`.
+ * What a token may do at `/mcp`: the data-plane scopes its tools need, in the
+ * vocabulary every other credential uses — `data:read`, `data:write`,
+ * `data:delete` — each narrowable to one collection (`data:read:posts`).
  *
- * Two, and no more. RFC 9728 asks `scopes_supported` to be the minimal set that
- * makes the resource usable, and the MCP specification's scope-minimization
- * guidance points the same way: a client that only needs to read should be able
- * to ask for exactly that, and a consent screen listing eleven fine-grained
- * permissions is one nobody reads.
- *
- * They are not a substitute for RLS. A `mcp:read` token still reads through the
- * user's own policies — the scope decides whether the tool exists for this
- * session, the database decides which rows come back.
+ * They are not a substitute for RLS. A `data:read` token still reads through
+ * the user's own policies — the scope decides whether a tool exists for this
+ * session and which collections it reaches; the database decides which rows
+ * come back.
  */
-export const MCP_SCOPES = ["mcp:read", "mcp:write"] as const;
+export const MCP_SCOPES = ["data:read", "data:write", "data:delete"] as const;
 export type McpScope = (typeof MCP_SCOPES)[number];
 
 /** The scope a client gets when it asks for nothing in particular. */
-export const DEFAULT_MCP_SCOPE = "mcp:read";
+export const DEFAULT_MCP_SCOPE = "data:read";
+
+/**
+ * A scope string as granted before `/mcp` spoke the shared vocabulary, read as
+ * what it granted: `mcp:read` was every read, `mcp:write` every create, change
+ * and delete. Applied to stored refresh grants and to access tokens still in
+ * flight, so a connection made before the change keeps exactly its reach.
+ */
+export function upgradeStoredMcpScope(scope: string): string {
+    const entries = scope.split(/\s+/).filter(Boolean).flatMap(entry => {
+        if (entry === "mcp:read") return ["data:read"];
+        if (entry === "mcp:write") return ["data:write", "data:delete"];
+        return [entry];
+    });
+    return [...new Set(entries)].join(" ");
+}
 
 /**
  * The canonical resource identifier for this server's MCP endpoint.
@@ -231,21 +244,22 @@ export function redirectUriAllowed(candidate: string, registered: string[]): boo
  *
  * An unknown scope is dropped rather than refused. RFC 6749 §3.3 allows either,
  * and dropping is what keeps a client that asks for `openid profile email` out
- * of habit from failing to connect at all — it gets the MCP scopes it is
- * entitled to and none of the ones it invented.
+ * of habit from failing to connect at all — it gets the data scopes it is
+ * entitled to and none of the ones it invented. A collection target is kept:
+ * `data:read:posts` is a narrower grant, never a wider one.
  */
 export function narrowScope(requested: string | undefined | null): string {
     if (!requested) return DEFAULT_MCP_SCOPE;
-    const granted = requested
+    const granted = upgradeStoredMcpScope(requested)
         .split(/\s+/)
         .filter(Boolean)
-        .filter((s): s is McpScope => (MCP_SCOPES as readonly string[]).includes(s));
+        .filter(entry => (MCP_SCOPES as readonly string[]).includes(parseScope(entry)?.scope ?? ""));
     return granted.length ? [...new Set(granted)].join(" ") : DEFAULT_MCP_SCOPE;
 }
 
-/** Does a granted scope string carry this permission? */
-export function scopeAllows(scope: string, needed: McpScope): boolean {
-    return scope.split(/\s+/).filter(Boolean).includes(needed);
+/** A granted scope string as the list of scopes it holds. */
+export function scopeList(scope: string): string[] {
+    return scope.split(/\s+/).filter(Boolean);
 }
 
 /**

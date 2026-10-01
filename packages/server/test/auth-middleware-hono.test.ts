@@ -146,13 +146,13 @@ accessExpiresIn: "1h" });
             expect(res.status).toBe(200);
         });
 
-        it("allows schema-admin users", async () => {
+        it("refuses a role that only sounds administrative", async () => {
             const app = createApp();
             const token = await generateAccessToken("schema-admin-1", ["schema-admin"]);
             const res = await app.request("/admin/dashboard", {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            expect(res.status).toBe(200);
+            expect(res.status).toBe(403);
         });
 
         it("returns 403 for non-admin users", async () => {

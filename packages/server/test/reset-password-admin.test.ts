@@ -81,7 +81,7 @@ accessExpiresIn: "1h" });
             expect(mockEmailService.send).not.toHaveBeenCalled();
         });
 
-        it("rejects a signed-in non-admin with 403", async () => {
+        it("rejects a signed-in caller without users:write with 403", async () => {
             const app = createApp();
             const editorToken = await generateAccessToken("editor-user", ["editor", "viewer"]);
 
@@ -96,7 +96,8 @@ accessExpiresIn: "1h" });
 
             expect(res.status).toBe(403);
             const body = await res.json() as any;
-            expect(body.error.code).toBe("FORBIDDEN");
+            expect(body.error.code).toBe("SCOPE_MISSING");
+            expect(body.error.details.requiredScope).toBe("users:write");
             expect(mockAuthRepo.getUserById).not.toHaveBeenCalled();
             expect(mockAuthRepo.updatePassword).not.toHaveBeenCalled();
         });

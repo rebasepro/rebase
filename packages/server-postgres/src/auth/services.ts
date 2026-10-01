@@ -5,14 +5,11 @@ import { asRebasePgTable, type RebasePgTable } from "../types";
 import { users, refreshTokens, passwordResetTokens, userIdentities, magicLinkTokens } from "../schema/auth-schema";
 import {
     UserRepository,
-    RoleRepository,
     TokenRepository,
     MfaRepository,
     AuthRepository,
     UserData,
     CreateUserData,
-    RoleData,
-    CreateRoleData,
     RefreshTokenInfo,
     RefreshTokenSession,
     PasswordResetTokenInfo,
@@ -22,14 +19,11 @@ import {
     PaginatedUsersResult,
     MfaFactor,
     MfaChallengeInfo,
-    RoleData as Role,
     ApiError
 } from "@rebasepro/server";
 import { toSnakeCase, camelCase } from "@rebasepro/utils";
 import { escapeLikePattern } from "../utils/drizzle-conditions";
 import { extractPgError } from "../utils/pg-error-utils";
-
-export type { Role };
 
 export interface AuthSchemaTables {
     users: RebasePgTable;
@@ -521,29 +515,6 @@ export class UserService implements UserRepository {
     }
 
     /**
-     * Get roles for a user from database (inline TEXT[] column)
-     */
-    async getUserRoles(uid: string): Promise<Role[]> {
-        const usersTableName = this.getQualifiedUsersTableName();
-        const result = await this.db.execute(sql`
-            SELECT roles FROM ${sql.raw(usersTableName)} WHERE id = ${uid}
-        `);
-
-        if (result.rows.length === 0) return [];
-
-        const row = result.rows[0] as { roles: string[] | null };
-        const roleIds = row.roles ?? [];
-
-        return roleIds.map(id => ({
-            id,
-            name: id,
-            isAdmin: id === "admin",
-            defaultPermissions: null,
-            collectionPermissions: null
-        }));
-    }
-
-    /**
      * Get role IDs for a user
      */
     async getUserRoleIds(uid: string): Promise<string[]> {
@@ -586,11 +557,11 @@ export class UserService implements UserRepository {
     /**
      * Get user with their roles
      */
-    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: Role[] } | null> {
+    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: string[] } | null> {
         const user = await this.getUserById(uid);
         if (!user) return null;
 
-        const roles = await this.getUserRoles(uid);
+        const roles = await this.getUserRoleIds(uid);
         return { user,
             roles };
     }
@@ -1237,10 +1208,6 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.userService.getUserByVerificationToken(token);
     }
 
-    async getUserRoles(uid: string): Promise<RoleData[]> {
-        return this.userService.getUserRoles(uid);
-    }
-
     async getUserRoleIds(uid: string): Promise<string[]> {
         return this.userService.getUserRoleIds(uid);
     }
@@ -1253,64 +1220,8 @@ export class PostgresAuthRepository implements AuthRepository {
         await this.userService.assignDefaultRole(uid, roleId);
     }
 
-    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: RoleData[] } | null> {
+    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: string[] } | null> {
         return this.userService.getUserWithRoles(uid);
-    }
-
-    // Role operations (roles are inline on users, synthesized from string IDs)
-
-    async getRoleById(id: string): Promise<RoleData | null> {
-        return {
-            id,
-            name: id,
-            isAdmin: id === "admin",
-            defaultPermissions: null,
-            collectionPermissions: null
-        };
-    }
-
-    async listRoles(): Promise<RoleData[]> {
-        return [
-            { id: "admin",
-name: "Admin",
-isAdmin: true,
-defaultPermissions: null,
-collectionPermissions: null },
-            { id: "editor",
-name: "Editor",
-isAdmin: false,
-defaultPermissions: null,
-collectionPermissions: null },
-            { id: "viewer",
-name: "Viewer",
-isAdmin: false,
-defaultPermissions: null,
-collectionPermissions: null }
-        ];
-    }
-
-    async createRole(_data: CreateRoleData): Promise<RoleData> {
-        return {
-            id: _data.id,
-            name: _data.name,
-            isAdmin: _data.isAdmin ?? false,
-            defaultPermissions: _data.defaultPermissions ?? null,
-            collectionPermissions: _data.collectionPermissions ?? null
-        };
-    }
-
-    async updateRole(id: string, data: Partial<Omit<RoleData, "id">>): Promise<RoleData | null> {
-        return {
-            id,
-            name: data.name ?? id,
-            isAdmin: data.isAdmin ?? (id === "admin"),
-            defaultPermissions: data.defaultPermissions ?? null,
-            collectionPermissions: data.collectionPermissions ?? null
-        };
-    }
-
-    async deleteRole(_id: string): Promise<void> {
-        // No-op: roles are inline strings on users
     }
 
     // Token operations (delegate to PostgresTokenRepository)

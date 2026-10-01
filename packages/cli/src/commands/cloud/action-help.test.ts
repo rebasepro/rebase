@@ -25,6 +25,7 @@ import { DEPLOY_FLAGS } from "./deploy";
 import { ENV_SET_FLAGS } from "./env";
 import { COMPUTE_SET_FLAGS, BILLING_ACTIONS } from "./resources";
 import { LOGIN_FLAGS } from "./auth";
+import { CREATE_TOKEN_FLAGS } from "./tokens";
 
 /**
  * Which spec backs which page.
@@ -83,6 +84,10 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     login: LOGIN_FLAGS,
     logout: {},
     whoami: null,
+    tokens: null,
+    "tokens list": {},
+    "tokens create": CREATE_TOKEN_FLAGS,
+    "tokens revoke": {},
     link: {},
     unlink: null,
     use: null,
@@ -220,7 +225,8 @@ flag: flag[1] });
     for (const [name, spec] of [
         ["deploy.ts", DEPLOY_FLAGS],
         ["projects.ts", CREATE_PROJECT_FLAGS],
-        ["env.ts", ENV_SET_FLAGS]
+        ["env.ts", ENV_SET_FLAGS],
+        ["tokens.ts", CREATE_TOKEN_FLAGS]
     ] as const) {
         for (const flag of Object.keys(spec)) found.push({ file: name,
 flag });

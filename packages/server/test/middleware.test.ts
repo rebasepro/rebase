@@ -328,13 +328,16 @@ roles: ["editor", "admin"] } });
             expect(getStatus()).toBeUndefined(); // No error response
         });
 
-        it("should allow access if user has 'schema-admin' role", async () => {
-            const { c } = createMockContext({ user: { uid: "user-123",
+        it("should block a role that only sounds administrative", async () => {
+            // `admin` is the one role holding every scope; a role declared with
+            // a narrower set is not an administrator.
+            const { c, getStatus } = createMockContext({ user: { uid: "user-123",
 roles: ["schema-admin"] } });
 
             await requireAdmin(c, nextFn);
 
-            expect(nextFn).toHaveBeenCalled();
+            expect(getStatus()).toBe(403);
+            expect(nextFn).not.toHaveBeenCalled();
         });
 
         it("should block access for malformed spoofed string roles", async () => {

@@ -9,6 +9,7 @@
 import arg from "arg";
 import chalk from "chalk";
 import { loginCommand, logoutCommand, whoamiCommand } from "./auth";
+import { tokensCommand } from "./tokens";
 import { linkCommand, unlinkCommand, selectOrgCommand, openCommand } from "./link";
 import { listProjects, createProject, projectInfo, deleteProject, resolveProjectArg } from "./projects";
 import { deployCommand, logsCommand } from "./deploy";
@@ -194,6 +195,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
             break;
         case "whoami":
             await whoamiCommand(rawArgs);
+            break;
+        case "tokens":
+            await tokensCommand(action, rawArgs);
             break;
 
         /* context / link */
@@ -382,7 +386,8 @@ async function deploymentsGroup(action: string | undefined, rawArgs: string[]): 
 export const CLOUD_GROUPS: HelpAction[] = [
     { action: "login", section: "Auth", description: "Sign in to the control plane" },
     { action: "logout", section: "Auth", description: "Sign out" },
-    { action: "whoami", section: "Auth", description: "Show the current session" },
+    { action: "whoami", section: "Auth", description: "Show the current session, or what REBASE_TOKEN may do" },
+    { action: "tokens", section: "Auth", description: "Tokens for CI and agents, each narrowed to one project" },
 
     { action: "link", section: "Project link", args: "[url]", description: "Bind this directory to a cloud project, or straight to a backend URL" },
     { action: "unlink", section: "Project link", description: "Remove the link" },
@@ -434,6 +439,7 @@ function printCloudHelp(): void {
         actions: CLOUD_GROUPS,
         notes: [
             "Most commands act on the linked project (.rebase/cloud.json) unless --project is given.",
+            "With REBASE_TOKEN set (a token from `rebase cloud tokens create`), commands use it instead of your login.",
             "Every group answers `--help` with its own page: actions, arguments and flags.",
             "Docs: https://rebase.pro/docs"
         ]

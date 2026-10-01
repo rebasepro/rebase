@@ -14,7 +14,7 @@ import type { Stats } from "node:fs";
 import { StorageController, type StorageAuthorize, type StorageAuthorizeData, type StorageOperation } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
-import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type DownloadConfig, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
+import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, scopeGrants, type DownloadConfig, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
 import {
     assertUploadWithinPropertyLimits,
     readUploadPropertyContext,
@@ -405,12 +405,30 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * fall open.
      */
     const checkAuthorized = async (
-        c: { get: (k: "user") => { uid: string; email?: string; roles?: string[] } | undefined },
+        c: {
+            get(k: "user"): { uid: string; email?: string; roles?: string[] } | undefined;
+            get(k: "scopes"): string[] | undefined;
+        },
         operation: StorageOperation,
         key: string,
         bucket: string,
         storageId?: string | null
     ): Promise<void> => {
+        // A narrowed credential — an API key, a token — needs the storage
+        // scope for this operation on this source. Here, because only here is
+        // the source known: it may arrive in the query, a form field or the
+        // upload's metadata, and this is where every route has resolved it.
+        const narrowed = c.get("scopes");
+        if (narrowed) {
+            const scope = `storage:${operation === "list" ? "read" : operation}`;
+            const source = canonicalStorageId(storageId);
+            if (!scopeGrants(narrowed, scope, source)) {
+                throw new ApiError(403, "SCOPE_MISSING",
+                    `This credential does not hold "${scope}" for storage source "${source}".`,
+                    { requiredScope: `${scope}:${source}` });
+            }
+        }
+
         if (!authorize) return;
 
         const user = c.get("user") ?? null;

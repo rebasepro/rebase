@@ -16,11 +16,13 @@
  *  - A write can fail with a permission error the tool cannot explain in
  *    detail, because the policy that refused it is not visible from here.
  *
- * `mcp:write` gates whether the mutating tools are *offered* at all. It is a
- * second lock, not the main one — a `mcp:write` token still cannot write a row
- * the user could not write themselves.
+ * The scopes gate which tools are *offered* and which collections each
+ * reaches — `data:write:posts` offers the write tools for `posts` alone. That
+ * is a second lock, not the main one: a `data:write` token still cannot write
+ * a row the user could not write themselves.
  */
 import type { AuthAdapter, CollectionConfig, DataDriver, FilterValues } from "@rebasepro/types";
+import { scopeGrants, scopeGrantsAny } from "@rebasepro/types";
 import { getCollectionDataPath } from "@rebasepro/types";
 import { type FieldViewer, restrictedFieldNames } from "@rebasepro/common";
 import { scopeDataDriver } from "../auth/rls-scope.js";
@@ -36,13 +38,14 @@ import {
     prepareAuthCollectionUpdates
 } from "../api/rest/auth-collection-writes.js";
 import { logger } from "../utils/logger.js";
-import { scopeAllows } from "./oauth-metadata.js";
+import type { McpScope } from "./oauth-metadata.js";
 
 /** The identity a tool call runs as. Comes from the verified access token. */
 export interface McpCaller {
     uid: string;
     roles: string[];
-    scope: string;
+    /** The scopes granted to this connection — `data:read`, `data:write:posts`, … */
+    scopes: string[];
     clientId: string;
 }
 
@@ -62,8 +65,11 @@ export interface McpToolDefinition {
     name: string;
     description: string;
     inputSchema: Record<string, unknown>;
-    /** The scope a caller must hold for this tool to be listed or callable. */
-    requiredScope: "mcp:read" | "mcp:write";
+    /**
+     * The scope a caller must hold — on at least one collection for the tool
+     * to be listed, and on the collection a call names for it to run.
+     */
+    requiredScope: McpScope;
     run(args: Record<string, unknown>, ctx: McpToolContext): Promise<unknown>;
 }
 
@@ -79,11 +85,19 @@ const DEFAULT_ROWS = 25;
  * "the caller may name any table" is how an integration becomes a way to read
  * `rebase.oauth_clients`.
  */
-function resolveCollection(ctx: McpToolContext, raw: unknown): CollectionConfig {
+function resolveCollection(ctx: McpToolContext, raw: unknown, scope: McpScope): CollectionConfig {
     const path = String(raw ?? "");
     const found = ctx.collections.find(c => c.slug === path || getCollectionDataPath(c) === path);
     if (!found) {
         throw new McpToolError(`Unknown collection "${path}". Call list_collections to see what exists.`);
+    }
+    // The scope narrows which collections this connection reaches; RLS then
+    // narrows the rows. A collection outside the grant is named as such, so
+    // the model can tell the person what to reconnect with.
+    if (!scopeGrants(ctx.caller.scopes, scope, found.slug)) {
+        throw new McpToolError(
+            `This connection was not granted "${scope}" on "${collectionPath(found)}". ` +
+            `Reconnect with "${scope}" or "${scope}:${found.slug}" to use it.`);
     }
     return found;
 }
@@ -287,11 +301,11 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         description:
             "List the collections in this project, with their fields. Call this first — every " +
             "other tool takes a collection name from here.",
-        requiredScope: "mcp:read",
+        requiredScope: "data:read",
         inputSchema: { type: "object", properties: {}, additionalProperties: false },
         async run(_args, ctx) {
             return {
-                collections: ctx.collections.map(c => ({
+                collections: ctx.collections.filter(c => scopeGrants(ctx.caller.scopes, "data:read", c.slug)).map(c => ({
                     name: collectionPath(c),
                     title: c.name,
                     description: c.description ?? null,
@@ -325,7 +339,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
         description:
             "Read rows from a collection. Returns only rows the signed-in user is allowed to see, " +
             "so an empty result can mean 'none match' or 'none visible to you'.",
-        requiredScope: "mcp:read",
+        requiredScope: "data:read",
         inputSchema: {
             type: "object",
             properties: {
@@ -344,7 +358,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
             additionalProperties: false
         },
         async run(args, ctx) {
-            const collection = resolveCollection(ctx, args.collection);
+            const collection = resolveCollection(ctx, args.collection, "data:read");
             const viewer = viewerOf(ctx);
             const filter = buildFilter(collection, args.filter, viewer);
             const sortField = args.orderBy
@@ -389,7 +403,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
     {
         name: "get_document",
         description: "Read one row by id. Fails if the signed-in user cannot see it.",
-        requiredScope: "mcp:read",
+        requiredScope: "data:read",
         inputSchema: {
             type: "object",
             properties: {
@@ -400,7 +414,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
             additionalProperties: false
         },
         async run(args, ctx) {
-            const collection = resolveCollection(ctx, args.collection);
+            const collection = resolveCollection(ctx, args.collection, "data:read");
             const driver = await scopedDriver(ctx);
             const row = await driver.fetchOne({
                 path: collectionPath(collection),
@@ -421,7 +435,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
     {
         name: "create_document",
         description: "Create a row. Subject to the same permissions as creating it in the app.",
-        requiredScope: "mcp:write",
+        requiredScope: "data:write",
         inputSchema: {
             type: "object",
             properties: {
@@ -433,7 +447,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
             additionalProperties: false
         },
         async run(args, ctx) {
-            const collection = resolveCollection(ctx, args.collection);
+            const collection = resolveCollection(ctx, args.collection, "data:write");
             const user = await createUser(args, collection, ctx);
             if (user) {
                 logger.info("[mcp] User created", {
@@ -460,7 +474,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
     {
         name: "update_document",
         description: "Change fields on an existing row. Only the fields given are touched.",
-        requiredScope: "mcp:write",
+        requiredScope: "data:write",
         inputSchema: {
             type: "object",
             properties: {
@@ -472,7 +486,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
             additionalProperties: false
         },
         async run(args, ctx) {
-            const collection = resolveCollection(ctx, args.collection);
+            const collection = resolveCollection(ctx, args.collection, "data:write");
             const id = String(args.id);
             // On the auth collection, the adapter's check and stored form: no
             // demoting the last administrator, the email as sign-in looks it up.
@@ -499,7 +513,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
     {
         name: "delete_document",
         description: "Delete a row by id. This cannot be undone.",
-        requiredScope: "mcp:write",
+        requiredScope: "data:delete",
         inputSchema: {
             type: "object",
             properties: {
@@ -510,7 +524,7 @@ export const MCP_TOOLS: McpToolDefinition[] = [
             additionalProperties: false
         },
         async run(args, ctx) {
-            const collection = resolveCollection(ctx, args.collection);
+            const collection = resolveCollection(ctx, args.collection, "data:delete");
             const driver = await scopedDriver(ctx);
             // On the auth collection: the last administrator stays, and
             // `beforeUserDelete` may veto; after, the sessions end and
@@ -528,12 +542,12 @@ export const MCP_TOOLS: McpToolDefinition[] = [
     }
 ];
 
-/** The tools a caller holding `scope` may see and call. */
-export function toolsForScope(scope: string): McpToolDefinition[] {
-    return MCP_TOOLS.filter(tool => scopeAllows(scope, tool.requiredScope));
+/** The tools a caller holding `scopes` may see and call: each needs its scope on at least one collection. */
+export function toolsForScopes(scopes: readonly string[]): McpToolDefinition[] {
+    return MCP_TOOLS.filter(tool => scopeGrantsAny(scopes, tool.requiredScope));
 }
 
 /** Look up a tool by name, honouring scope — an unlisted tool is not callable. */
-export function findTool(name: string, scope: string): McpToolDefinition | undefined {
-    return toolsForScope(scope).find(tool => tool.name === name);
+export function findTool(name: string, scopes: readonly string[]): McpToolDefinition | undefined {
+    return toolsForScopes(scopes).find(tool => tool.name === name);
 }

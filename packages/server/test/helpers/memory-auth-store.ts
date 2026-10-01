@@ -4,7 +4,6 @@ import type {
     MfaChallengeInfo,
     MfaFactor,
     RefreshTokenInfo,
-    RoleData,
     UserData,
     UserIdentityData
 } from "../../src/auth/interfaces";
@@ -54,16 +53,6 @@ export class MemoryAuthStore {
 
     private snapshot(user: UserData): UserData {
         return { ...user };
-    }
-
-    private roleData(uid: string): RoleData[] {
-        return (this.roles.get(uid) ?? []).map(id => ({
-            id,
-            name: id,
-            isAdmin: id === "admin",
-            defaultPermissions: null,
-            collectionPermissions: null
-        }));
     }
 
     private findUserByEmail(email: string): UserData | undefined {
@@ -153,7 +142,6 @@ export class MemoryAuthStore {
             },
             setVerificationToken: async () => undefined,
             getUserByVerificationToken: async () => null,
-            getUserRoles: async (uid) => this.roleData(uid),
             getUserRoleIds: async (uid) => [...(this.roles.get(uid) ?? [])],
             setUserRoles: async (uid, roleIds) => {
                 this.roles.set(uid, [...roleIds]);
@@ -164,7 +152,7 @@ export class MemoryAuthStore {
             },
             getUserWithRoles: async (uid) => {
                 const user = this.users.get(uid);
-                return user ? { user: this.snapshot(user), roles: this.roleData(uid) } : null;
+                return user ? { user: this.snapshot(user), roles: [...(this.roles.get(uid) ?? [])] } : null;
             },
 
             // ── refresh tokens and the revocation mark ──

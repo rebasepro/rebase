@@ -413,9 +413,10 @@ ${chalk.green.bold("AI Agent Skills")}
   ${chalk.blue.bold("skills install")}          Install Rebase agent skills for your AI coding assistant
 
 ${chalk.green.bold("API Keys")}
-  ${chalk.blue.bold("api-keys list")}           List all service API keys
-  ${chalk.blue.bold("api-keys create")}         Create a new scoped API key
-  ${chalk.blue.bold("api-keys revoke")}         Revoke an existing API key
+  ${chalk.blue.bold("api-keys list")}           List the service API keys: kind, scopes, roles
+  ${chalk.blue.bold("api-keys create")}         Create a service key holding the scopes you name
+  ${chalk.blue.bold("api-keys revoke")}         Revoke an API key
+  ${chalk.blue.bold("api-keys scopes")}         List the scopes a key can hold
   ${chalk.blue.bold("api-keys")} ${chalk.gray("--help")}         Show API key command help
 
 ${chalk.green.bold("Usage sharing")}
@@ -425,6 +426,7 @@ ${chalk.green.bold("Rebase Cloud")}
   ${chalk.blue.bold("cloud login")}             Sign in to the hosted control plane
   ${chalk.blue.bold("cloud link")}              Link this directory to a cloud project
   ${chalk.blue.bold("cloud deploy")}            Deploy the linked project + stream logs
+  ${chalk.blue.bold("cloud tokens create")}     A token for CI and agents ${chalk.gray("(used as REBASE_TOKEN)")}
   ${chalk.blue.bold("cloud")} ${chalk.gray("--help")}            Show all cloud commands
 
 ${chalk.green.bold("Options")}

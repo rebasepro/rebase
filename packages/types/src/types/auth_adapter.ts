@@ -76,7 +76,11 @@ export interface AuthenticatedUser {
     photoUrl?: string | null;
     /** Role identifiers the user holds. */
     roles: string[];
-    /** Whether the user has admin privileges. */
+    /**
+     * Whether `roles` includes `admin`. Informational — every authorization
+     * decision reads `roles` and the scopes they hold, so an adapter that
+     * wants a user treated as an administrator gives them the `admin` role.
+     */
     isAdmin: boolean;
     /**
      * Whether this session is a GUEST — anonymous sign-in rather than an
@@ -94,6 +98,12 @@ export interface AuthenticatedUser {
     rawToken?: string;
     /** Extra claims/metadata from the auth provider. */
     claims?: Record<string, unknown>;
+    /**
+     * What this credential may do, when it is narrower than its person — set
+     * for an API key. Absent means everything the user's roles hold
+     * (`scopesForRoles`).
+     */
+    scopes?: string[];
 }
 
 // ─── Capabilities ────────────────────────────────────────────────────────────

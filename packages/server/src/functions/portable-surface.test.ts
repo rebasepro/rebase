@@ -15,6 +15,8 @@ import {
     getRoles,
     hasRole,
     isAdmin,
+    getScopes,
+    hasScope,
     isAuthenticated,
     getDriver,
     requireDriver,
@@ -23,6 +25,7 @@ import {
     requireAuth,
     requireAdmin,
     requireRole,
+    requireScope,
     getEnv,
     env,
     requireEnv,
@@ -39,10 +42,11 @@ import { pendingBackgroundWork, drainBackgroundWork, _resetBackgroundWork } from
  */
 type Identity = Record<string, unknown> | undefined;
 
-function appWith(identity: Identity, opts: { driver?: unknown; requestId?: string } = {}) {
+function appWith(identity: Identity, opts: { driver?: unknown; requestId?: string; scopes?: string[] } = {}) {
     const app = new Hono<HonoEnv>();
     app.use("/*", async (c, next) => {
         if (identity !== undefined) c.set("user", identity as never);
+        if (opts.scopes) c.set("scopes", opts.scopes);
         if (opts.driver !== undefined) c.set("driver", opts.driver as never);
         if (opts.requestId) c.set("requestId", opts.requestId);
         return next();
@@ -115,12 +119,29 @@ describe("identity accessors", () => {
         expect(body.admin).toBe(true);
     });
 
-    it("counts schema-admin as administrative, matching auth/admin-roles", async () => {
+    it("counts only the admin role as administrative", async () => {
         const app = appWith({ uid: "u1", roles: ["schema-admin"] });
         app.get("/", c => c.json({ admin: isAdmin(c), hasEditor: hasRole(c, "editor", "schema-admin") }));
         const body = await (await app.request("/")).json();
-        expect(body.admin).toBe(true);
+        expect(body.admin).toBe(false);
         expect(body.hasEditor).toBe(true);
+    });
+
+    it("reads the caller's scopes the framework resolved", async () => {
+        const app = appWith({ uid: "u1", roles: [] }, { scopes: ["data:read", "project:deploy:p1"] });
+        app.get("/", c => c.json({
+            scopes: getScopes(c),
+            p1: hasScope(c, "project:deploy", "p1"),
+            p2: hasScope(c, "project:deploy", "p2"),
+            any: hasScope(c, "project:deploy")
+        }));
+        expect(await (await app.request("/")).json()).toEqual({
+            scopes: ["data:read", "project:deploy:p1"],
+            p1: true,
+            p2: false,
+            // A grant narrowed to one project does not answer "may you deploy?".
+            any: false
+        });
     });
 
     it("hasRole with no roles named is false, not vacuously true", async () => {
@@ -212,6 +233,27 @@ describe("route guards", () => {
         const refused = await other.request("/");
         expect(refused.status).toBe(403);
         expect((await refused.json()).error.message).toContain("admin, editor");
+    });
+
+    it("requireScope checks the scope on the target the request names", async () => {
+        const narrowed = appWith({ uid: "u1", roles: [] }, { scopes: ["project:deploy:p1"] });
+        narrowed.post("/:project", requireScope("project:deploy", c => c.req.param("project")), c => c.text("ok"));
+        expect((await narrowed.request("/p1", { method: "POST" })).status).toBe(200);
+        const refused = await narrowed.request("/p2", { method: "POST" });
+        expect(refused.status).toBe(403);
+        const body = await refused.json();
+        expect(body.error.code).toBe("SCOPE_MISSING");
+        expect(body.error.details.requiredScope).toBe("project:deploy:p2");
+    });
+
+    it("requireScope separates 401 from 403, and 500 when nothing resolved the caller", async () => {
+        const anonymous = appWith(undefined, { driver: {} });
+        anonymous.get("/", requireScope("project:deploy"), c => c.text("ok"));
+        expect((await anonymous.request("/")).status).toBe(401);
+
+        const bare = new Hono<HonoEnv>();
+        bare.get("/", requireScope("project:deploy"), c => c.text("ok"));
+        expect((await bare.request("/")).status).toBe(500);
     });
 
     it("requireRole() with no roles throws at wiring time, not request time", () => {

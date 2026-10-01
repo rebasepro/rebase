@@ -5,13 +5,10 @@ import { normalizeEmail } from "@rebasepro/common";
 export interface MongoDoc { _id?: string; [key: string]: any; }
 import {
     UserRepository,
-    RoleRepository,
     TokenRepository,
     AuthRepository,
     UserData,
     CreateUserData,
-    RoleData,
-    CreateRoleData,
     RefreshTokenInfo,
     RefreshTokenSession,
     PasswordResetTokenInfo,
@@ -23,8 +20,6 @@ import {
     MfaChallengeInfo,
     ApiError
 } from "@rebasepro/server";
-
-export type Role = RoleData;
 
 function escapeRegExp(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -72,10 +67,6 @@ export class MongoUserService implements UserRepository {
 
     private get userRolesCollection() {
         return this.db.collection<MongoDoc>("rebase_user_roles");
-    }
-
-    private get rolesCollection() {
-        return this.db.collection<MongoDoc>("rebase_roles");
     }
 
     async createUser(data: CreateUserData): Promise<UserData> {
@@ -270,21 +261,6 @@ updatedAt: new Date() } }
         return doc ? toUser(doc) : null;
     }
 
-    async getUserRoles(uid: string): Promise<RoleData[]> {
-        const userRoles = await this.userRolesCollection.find({ uid }).toArray();
-        const roleIds = userRoles.map(ur => ur.roleId);
-        if (roleIds.length === 0) return [];
-
-        const roles = await this.rolesCollection.find({ id: { $in: roleIds } }).toArray();
-        return roles.map(r => ({
-            id: r.id,
-            name: r.name,
-            isAdmin: r.isAdmin ?? false,
-            defaultPermissions: r.defaultPermissions ?? null,
-            collectionPermissions: r.collectionPermissions ?? null
-        }));
-    }
-
     async getUserRoleIds(uid: string): Promise<string[]> {
         const userRoles = await this.userRolesCollection.find({ uid }).toArray();
         return userRoles.map(ur => ur.roleId);
@@ -313,66 +289,12 @@ roleId } },
         );
     }
 
-    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: RoleData[] } | null> {
+    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: string[] } | null> {
         const user = await this.getUserById(uid);
         if (!user) return null;
-        const roles = await this.getUserRoles(uid);
+        const roles = await this.getUserRoleIds(uid);
         return { user,
 roles };
-    }
-}
-
-export class MongoRoleService implements RoleRepository {
-    constructor(private db: Db) {}
-
-    private get collection() {
-        return this.db.collection<MongoDoc>("rebase_roles");
-    }
-
-    async getRoleById(id: string): Promise<RoleData | null> {
-        const doc = await this.collection.findOne({ id });
-        if (!doc) return null;
-        return {
-            id: doc.id,
-            name: doc.name,
-            isAdmin: doc.isAdmin ?? false,
-            defaultPermissions: doc.defaultPermissions ?? null,
-            collectionPermissions: doc.collectionPermissions ?? null
-        };
-    }
-
-    async listRoles(): Promise<RoleData[]> {
-        const docs = await this.collection.find().sort({ name: 1 }).toArray();
-        return docs.map(doc => ({
-            id: doc.id,
-            name: doc.name,
-            isAdmin: doc.isAdmin ?? false,
-            defaultPermissions: doc.defaultPermissions ?? null,
-            collectionPermissions: doc.collectionPermissions ?? null
-        }));
-    }
-
-    async createRole(data: CreateRoleData): Promise<RoleData> {
-        const doc = {
-            _id: data.id,
-            id: data.id,
-            name: data.name,
-            isAdmin: data.isAdmin ?? false,
-            defaultPermissions: data.defaultPermissions ?? null,
-            collectionPermissions: data.collectionPermissions ?? null
-        };
-        await this.collection.insertOne(doc);
-        return { ...doc } as RoleData;
-    }
-
-    async updateRole(id: string, data: Partial<Omit<RoleData, "id">>): Promise<RoleData | null> {
-        await this.collection.updateOne({ id }, { $set: data });
-        return this.getRoleById(id);
-    }
-
-    async deleteRole(id: string): Promise<void> {
-        await this.collection.deleteOne({ id });
-        await this.db.collection("rebase_user_roles").deleteMany({ roleId: id });
     }
 }
 
@@ -634,12 +556,10 @@ export class MongoTokenRepository implements TokenRepository {
 
 export class MongoAuthRepository implements AuthRepository {
     private userService: MongoUserService;
-    private roleService: MongoRoleService;
     private tokenRepository: MongoTokenRepository;
 
     constructor(private db: Db) {
         this.userService = new MongoUserService(db);
-        this.roleService = new MongoRoleService(db);
         this.tokenRepository = new MongoTokenRepository(db);
     }
 
@@ -699,10 +619,6 @@ export class MongoAuthRepository implements AuthRepository {
         return this.userService.getUserByVerificationToken(token);
     }
 
-    async getUserRoles(uid: string): Promise<RoleData[]> {
-        return this.userService.getUserRoles(uid);
-    }
-
     async getUserRoleIds(uid: string): Promise<string[]> {
         return this.userService.getUserRoleIds(uid);
     }
@@ -715,28 +631,8 @@ export class MongoAuthRepository implements AuthRepository {
         await this.userService.assignDefaultRole(uid, roleId);
     }
 
-    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: RoleData[] } | null> {
+    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: string[] } | null> {
         return this.userService.getUserWithRoles(uid);
-    }
-
-    async getRoleById(id: string): Promise<RoleData | null> {
-        return this.roleService.getRoleById(id);
-    }
-
-    async listRoles(): Promise<RoleData[]> {
-        return this.roleService.listRoles();
-    }
-
-    async createRole(data: CreateRoleData): Promise<RoleData> {
-        return this.roleService.createRole(data);
-    }
-
-    async updateRole(id: string, data: Partial<Omit<RoleData, "id">>): Promise<RoleData | null> {
-        return this.roleService.updateRole(id, data);
-    }
-
-    async deleteRole(id: string): Promise<void> {
-        await this.roleService.deleteRole(id);
     }
 
     async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<void> {

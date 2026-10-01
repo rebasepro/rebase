@@ -263,7 +263,7 @@ describe("when it does mount", () => {
             }
         });
         const token = await generateMcpAccessToken({
-            uid: "admin-1", roles: ["admin"], scope: "mcp:read mcp:write", clientId: "mcp_test",
+            uid: "admin-1", roles: ["admin"], scope: "data:read data:write data:delete", clientId: "mcp_test",
             aud: `${PUBLIC_URL}/mcp`, iss: PUBLIC_URL
         }, 3600);
 

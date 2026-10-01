@@ -102,38 +102,6 @@ export interface OAuthProvider<T = unknown> {
 }
 
 /**
- * Role data structure
- */
-export interface RoleData {
-    id: string;
-    name: string;
-    isAdmin: boolean;
-    defaultPermissions: {
-        read?: boolean;
-        create?: boolean;
-        edit?: boolean;
-        delete?: boolean;
-    } | null;
-    collectionPermissions: Record<string, {
-        read?: boolean;
-        create?: boolean;
-        edit?: boolean;
-        delete?: boolean;
-    }> | null;
-}
-
-/**
- * Data for creating a new role
- */
-export interface CreateRoleData {
-    id: string;
-    name: string;
-    isAdmin?: boolean;
-    defaultPermissions?: RoleData["defaultPermissions"];
-    collectionPermissions?: RoleData["collectionPermissions"];
-}
-
-/**
  * Refresh token info
  */
 export interface RefreshTokenInfo {
@@ -356,11 +324,6 @@ export interface UserRepository {
     getUserByVerificationToken(token: string): Promise<UserData | null>;
 
     /**
-     * Get roles for a user
-     */
-    getUserRoles(uid: string): Promise<RoleData[]>;
-
-    /**
      * Get role IDs for a user
      */
     getUserRoleIds(uid: string): Promise<string[]>;
@@ -378,38 +341,7 @@ export interface UserRepository {
     /**
      * Get user with their roles
      */
-    getUserWithRoles(uid: string): Promise<{ user: UserData; roles: RoleData[] } | null>;
-}
-
-/**
- * Abstract role repository interface.
- * Handles all role-related database operations.
- */
-export interface RoleRepository {
-    /**
-     * Get a role by ID
-     */
-    getRoleById(id: string): Promise<RoleData | null>;
-
-    /**
-     * List all roles
-     */
-    listRoles(): Promise<RoleData[]>;
-
-    /**
-     * Create a new role
-     */
-    createRole(data: CreateRoleData): Promise<RoleData>;
-
-    /**
-     * Update a role
-     */
-    updateRole(id: string, data: Partial<Omit<RoleData, "id">>): Promise<RoleData | null>;
-
-    /**
-     * Delete a role
-     */
-    deleteRole(id: string): Promise<void>;
+    getUserWithRoles(uid: string): Promise<{ user: UserData; roles: string[] } | null>;
 }
 
 /**
@@ -702,4 +634,4 @@ export interface MfaRepository {
 /**
  * Combined auth repository interface for convenience
  */
-export interface AuthRepository extends UserRepository, RoleRepository, TokenRepository, MfaRepository { }
+export interface AuthRepository extends UserRepository, TokenRepository, MfaRepository { }

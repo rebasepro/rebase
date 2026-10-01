@@ -83,6 +83,8 @@ export {
     getRoles,
     hasRole,
     isAdmin,
+    getScopes,
+    hasScope,
     isAuthenticated,
     getDriver,
     requireDriver,
@@ -93,7 +95,7 @@ export {
 export type { FunctionUser } from "./context";
 
 // ── Route guards ─────────────────────────────────────────────────────────
-export { requireAuth, requireAdmin, requireRole } from "./guards";
+export { requireAuth, requireAdmin, requireRole, requireScope } from "./guards";
 
 // ── Configuration ────────────────────────────────────────────────────────
 export { getEnv, env, requireEnv, runtimeKey, isNodeRuntime, lazyResource } from "./runtime-env";

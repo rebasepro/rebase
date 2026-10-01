@@ -86,8 +86,12 @@ export { resolveRateLimitStoreKind, RateLimitStoreConfigurationError } from "./r
 export type { RateLimitStoreKind, RateLimitStoreEnv } from "./resolve-rate-limit-store";
 
 // API Keys
-export { createApiKeyStore, createApiKeyRoutes, isApiKeyToken, validateApiKey, httpMethodToOperation, isOperationAllowed } from "./api-keys";
-export type { ApiKey, ApiKeyMasked, ApiKeyPermission, ApiKeyWithSecret, CreateApiKeyRequest, UpdateApiKeyRequest, ApiKeyStore, ApiKeyOperation } from "./api-keys";
+export { createApiKeyStore, createApiKeyRoutes, createPersonalKeyRoutes, isApiKeyToken, resolveApiKey, validateApiKey, httpMethodToOperation } from "./api-keys";
+export type { ApiKey, ApiKeyKind, ApiKeyMasked, ApiKeyWithSecret, CreateApiKeyRequest, CreatePersonalKeyRequest, UpdateApiKeyRequest, ApiKeyStore, DataOperation, KeyTargets } from "./api-keys";
+
+// Scopes
+export { requireScope, requireScopeByMethod, hasScope, callerScopes, getAccessModel, configureAccess, accessModelFromCollections, AccessModelError } from "./access";
+export type { KeyOwnerResolver } from "./access";
 
 // Auth Adapters
 export { createBuiltinAuthAdapter } from "./builtin-auth-adapter";

@@ -790,11 +790,19 @@ export interface DataRateLimitCaller {
 }
 
 /**
- * The data API's request limits, handed to the realtime socket so its frames
- * carry the ones an HTTP request to the same rows does.
+ * What the realtime socket shares with the HTTP data API: its request limits,
+ * so a frame carries the ones an HTTP request to the same rows does, and its
+ * API-key verification, so a key means the same thing on both.
  * @group Backend
  */
-export interface RealtimeSocketLimits {
+export interface RealtimeSocketOptions {
+    /**
+     * Verify an `rk_` API key presented to `AUTHENTICATE`: the identity it acts
+     * as and the scopes it holds, or why it does not authenticate. Absent when
+     * the deployment has no API-key store, and then keys cannot authenticate
+     * the socket.
+     */
+    resolveApiKey?: (token: string) => Promise<{ uid: string; roles: string[]; scopes: string[] } | { message: string }>;
     /**
      * The largest frame accepted, in bytes — the data API's body limit. `0` or
      * less for none. Defaults to the server's default body limit.
@@ -1037,7 +1045,7 @@ export interface BackendBootstrapper {
     /**
      * Initialize WebSocket server for realtime operations.
      */
-    initializeWebsockets?(server: unknown, realtimeService: RealtimeProvider, driver: import("../controllers/data_driver").DataDriver, config?: unknown, authAdapter?: AuthAdapter, limits?: RealtimeSocketLimits): Promise<void> | void;
+    initializeWebsockets?(server: unknown, realtimeService: RealtimeProvider, driver: import("../controllers/data_driver").DataDriver, config?: unknown, authAdapter?: AuthAdapter, limits?: RealtimeSocketOptions): Promise<void> | void;
 }
 
 /**
@@ -1080,8 +1088,6 @@ export interface InitializedDriver {
 export interface BootstrappedAuth {
     /** User management service. */
     userService: unknown;
-    /** Role management service (optional, roles are now simple strings). */
-    roleService?: unknown;
     /** Email service (optional). */
     emailService?: unknown;
     /** Combined Auth Repository for unified token and user management. */

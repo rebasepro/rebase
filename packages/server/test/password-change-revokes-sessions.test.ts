@@ -122,8 +122,6 @@ class MemoryAuthStore {
                 return user ? this.toUserData(user) : null;
             },
             getUserRoleIds: async (uid) => this.users.get(uid)?.roles ?? [],
-            getUserRoles: async (uid) => (this.users.get(uid)?.roles ?? [])
-                .map(id => ({ id, name: id, isAdmin: id === "admin" })),
             getUserWithRoles: async (uid) => {
                 const user = this.users.get(uid);
                 return user

@@ -18,7 +18,7 @@ import {
     base64UrlEncode,
     redirectUriAllowed,
     narrowScope,
-    scopeAllows,
+    upgradeStoredMcpScope,
     bearerChallenge,
     insufficientScopeChallenge,
     resourceMatches,
@@ -221,32 +221,34 @@ describe("redirectUriAllowed", () => {
 
 describe("narrowScope", () => {
     it("defaults to read when nothing is asked for", () => {
-        expect(narrowScope(undefined)).toBe("mcp:read");
-        expect(narrowScope("")).toBe("mcp:read");
+        expect(narrowScope(undefined)).toBe("data:read");
+        expect(narrowScope("")).toBe("data:read");
     });
 
     it("keeps the scopes this server issues", () => {
-        expect(narrowScope("mcp:read mcp:write")).toBe("mcp:read mcp:write");
+        expect(narrowScope("data:read data:write data:delete")).toBe("data:read data:write data:delete");
+    });
+
+    it("keeps a collection target — a narrower grant, never a wider one", () => {
+        expect(narrowScope("data:read:posts data:write:posts")).toBe("data:read:posts data:write:posts");
     });
 
     it("drops scopes it does not issue rather than refusing the request", () => {
-        expect(narrowScope("openid profile mcp:read")).toBe("mcp:read");
+        expect(narrowScope("openid profile data:read")).toBe("data:read");
     });
 
-    it("cannot be tricked into granting write by an unknown scope", () => {
-        expect(narrowScope("mcp:admin mcp:*")).toBe("mcp:read");
+    it("cannot be tricked into granting more by a scope /mcp does not issue", () => {
+        expect(narrowScope("mcp:admin data:* users:write keys:write")).toBe("data:read");
     });
 
     it("de-duplicates", () => {
-        expect(narrowScope("mcp:read mcp:read")).toBe("mcp:read");
+        expect(narrowScope("data:read data:read")).toBe("data:read");
     });
-});
 
-describe("scopeAllows", () => {
-    it("is exact — read does not imply write", () => {
-        expect(scopeAllows("mcp:read", "mcp:read")).toBe(true);
-        expect(scopeAllows("mcp:read", "mcp:write")).toBe(false);
-        expect(scopeAllows("mcp:read mcp:write", "mcp:write")).toBe(true);
+    it("reads a scope granted before the shared vocabulary as what it granted", () => {
+        expect(narrowScope("mcp:read")).toBe("data:read");
+        expect(narrowScope("mcp:read mcp:write")).toBe("data:read data:write data:delete");
+        expect(upgradeStoredMcpScope("mcp:write")).toBe("data:write data:delete");
     });
 });
 
@@ -260,16 +262,16 @@ describe("bearerChallenge", () => {
     });
 
     it("carries a scope hint when one is given", () => {
-        expect(bearerChallenge(HOST, "/mcp", "mcp:read")).toContain('scope="mcp:read"');
+        expect(bearerChallenge(HOST, "/mcp", "data:read")).toContain('scope="data:read"');
     });
 });
 
 describe("insufficientScopeChallenge", () => {
-    const header = insufficientScopeChallenge(HOST, "/mcp", "mcp:write", 'needs "write"');
+    const header = insufficientScopeChallenge(HOST, "/mcp", "data:write", 'needs "write"');
 
     it("names the error and the scope that would satisfy the call", () => {
         expect(header).toContain('error="insufficient_scope"');
-        expect(header).toContain('scope="mcp:write"');
+        expect(header).toContain('scope="data:write"');
         expect(header).toContain("resource_metadata=");
     });
 

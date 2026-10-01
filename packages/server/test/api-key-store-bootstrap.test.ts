@@ -1,7 +1,7 @@
 /**
  * `createApiKeyStore().ensureTable()` under a simultaneous multi-instance boot.
  *
- * `rebase.api_keys` holds key hashes and an `admin` flag and carries no RLS —
+ * `rebase.api_keys` holds key hashes and the scopes each grants, and carries no RLS —
  * it is not a collection — so the `REVOKE` at the end of the bootstrap is the
  * only thing keeping it off the end-user role. It used to sit at the end of one
  * long `try` block, which meant the loser of any create race above it skipped
@@ -56,7 +56,7 @@ afterEach(() => {
 // ─── Tests ──────────────────────────────────────────────────────────
 
 describe("createApiKeyStore().ensureTable — concurrent boot", () => {
-    it("creates the table, its indexes and the admin column, then revokes", async () => {
+    it("creates the table, its indexes and the scope columns, then revokes", async () => {
         const { driver, statements } = recordingDriver();
 
         await createApiKeyStore(driver)!.ensureTable();
@@ -66,8 +66,46 @@ describe("createApiKeyStore().ensureTable — concurrent boot", () => {
         expect(all).toContain("CREATE TABLE IF NOT EXISTS rebase.api_keys");
         expect(all).toContain("CREATE INDEX IF NOT EXISTS idx_api_keys_hash");
         expect(all).toContain("CREATE INDEX IF NOT EXISTS idx_api_keys_prefix");
-        expect(all).toContain("ADD COLUMN IF NOT EXISTS admin");
+        for (const column of ["kind", "scopes", "roles", "owner_uid"]) {
+            expect(all).toContain(`ADD COLUMN IF NOT EXISTS ${column}`);
+        }
         expect(revokesIn(statements)).toHaveLength(1);
+    });
+
+    it("gives every key stored before scopes the scopes it held, and no more", async () => {
+        const updates: unknown[][] = [];
+        const driver = {
+            admin: {
+                executeSql: async (sql: string, options?: { params?: unknown[] }) => {
+                    if (sql.includes("information_schema.columns")) return [{ "?column?": 1 }];
+                    if (sql.includes("WHERE scopes IS NULL") && sql.startsWith("SELECT")) {
+                        return [
+                            { id: "k1", permissions: [{ collection: "posts", operations: ["read", "write"] }], admin: false },
+                            { id: "k2", permissions: "[{\"collection\":\"functions\",\"operations\":[\"read\"]}]", admin: true }
+                        ];
+                    }
+                    if (sql.includes("SET scopes")) updates.push(options?.params ?? []);
+                    return [];
+                }
+            }
+        } as unknown as DataDriver;
+
+        await createApiKeyStore(driver)!.ensureTable();
+
+        expect(updates).toEqual([
+            [JSON.stringify(["data:read:posts", "data:write:posts"]), JSON.stringify([]), "k1"],
+            // A read-only function grant narrows to nothing; the admin flag
+            // becomes the admin RLS role and the surfaces such a key reached.
+            [JSON.stringify(["users:read", "users:write", "schema:read", "schema:write", "backups:read", "cron:read", "cron:write", "logs:read"]), JSON.stringify(["admin"]), "k2"]
+        ]);
+    });
+
+    it("does not backfill a table that never had the old columns", async () => {
+        const { driver, statements } = recordingDriver();
+
+        await createApiKeyStore(driver)!.ensureTable();
+
+        expect(statements.some(s => s.includes("WHERE scopes IS NULL"))).toBe(false);
     });
 
     it("retries a create that lost the race to another instance", async () => {
@@ -127,9 +165,9 @@ describe("createApiKeyStore().ensureTable — concurrent boot", () => {
         expect(revokesIn(statements)[0]).toContain("api_keys");
     });
 
-    it("still revokes when the admin-column migration fails", async () => {
+    it("still revokes when a column migration fails", async () => {
         const { driver, statements } = recordingDriver((sql) => {
-            if (sql.includes("ADD COLUMN IF NOT EXISTS admin")) throw new Error("lock timeout");
+            if (sql.includes("ADD COLUMN IF NOT EXISTS scopes")) throw new Error("lock timeout");
         });
 
         await createApiKeyStore(driver)!.ensureTable();

@@ -1,8 +1,7 @@
 import { MiddlewareHandler, Context } from "hono";
 import type { AuthRepository } from "./interfaces";
 import { isAccessTokenRevoked } from "./token-revocation";
-import { hasAdministrativeRole } from "./admin-roles";
-import { ANONYMOUS_USER_ID, DataDriver, isPublicStoragePath } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, DataDriver, hasAdminRole, isPublicStoragePath } from "@rebasepro/types";
 import { verifyAccessToken, AccessTokenPayload, isJwtConfigured, verifyDownloadToken, type DownloadTokenPayload } from "./jwt";
 import type { HonoEnv } from "../api/types";
 import { ApiError, errorHandler } from "../api/errors";
@@ -242,8 +241,12 @@ roles: ["admin"] } as AccessTokenPayload);
 }
 
 /**
- * Middleware that requires the user to have an admin or schema-admin role.
- * Must be used AFTER requireAuth or on a route where user is guaranteed.
+ * Middleware that requires the user to hold the `admin` role, which holds
+ * every scope. Must be used AFTER requireAuth or on a route where user is
+ * guaranteed.
+ *
+ * Prefer `requireScope` from `./access` for anything a scope names: a scope
+ * can be granted to a narrower role and to a key, and `admin` cannot.
  */
 export const requireAdmin: MiddlewareHandler<HonoEnv> = async (
     c,
@@ -254,8 +257,10 @@ export const requireAdmin: MiddlewareHandler<HonoEnv> = async (
         return refuse(c, ApiError.unauthorized("User not authenticated. requireAuth middleware is missing?"));
     }
 
-    const roles = (typeof user === "object" && user !== null && "roles" in user) ? (user.roles || []) : [];
-    const isAdmin = hasAdministrativeRole(roles as string[]);
+    const roles = typeof user === "object" && user !== null && "roles" in user && Array.isArray(user.roles)
+        ? user.roles.filter((role): role is string => typeof role === "string")
+        : [];
+    const isAdmin = hasAdminRole(roles);
 
     if (!isAdmin) {
         return refuse(c, ApiError.forbidden("Admin privileges required for this operation"));

@@ -268,7 +268,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
                 providerId: "password",
                 isAnonymous: result.user.isAnonymous ?? false,
                 emailVerified: result.user.emailVerified,
-                roles: result.roles.map((r) => r.id),
+                roles: result.roles,
                 metadata: result.user.metadata ?? {}
             }
         });
@@ -333,7 +333,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
                 providerId: "password",
                 isAnonymous: result.user.isAnonymous ?? false,
                 emailVerified: result.user.emailVerified,
-                roles: result.roles.map((r) => r.id),
+                roles: result.roles,
                 metadata: result.user.metadata ?? {}
             }
         });

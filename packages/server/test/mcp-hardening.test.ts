@@ -72,7 +72,7 @@ describe("the bearer gate", () => {
         const [header, payload, signature] = accessToken.split(".");
         const decoded = JSON.parse(Buffer.from(payload, "base64url").toString());
         decoded.uid = "someone-else";
-        decoded.scope = "mcp:read mcp:write";
+        decoded.scope = "data:read data:write data:delete";
         const forged = [
             header,
             Buffer.from(JSON.stringify(decoded)).toString("base64url").replace(/=+$/, ""),
@@ -88,7 +88,7 @@ describe("the bearer gate", () => {
         const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
         const payload = Buffer.from(JSON.stringify({
             purpose: "mcp-access", uid: "user-1", roles: ["admin"],
-            scope: "mcp:read mcp:write", clientId: "x", aud: RESOURCE, iss: "x",
+            scope: "data:read data:write data:delete", clientId: "x", aud: RESOURCE, iss: "x",
             exp: Math.floor(Date.now() / 1000) + 3600
         })).toString("base64url");
 
@@ -295,7 +295,7 @@ describe("JSON-RPC framing", () => {
 /* ── Tool inputs ──────────────────────────────────────────────────── */
 
 describe("tool inputs", () => {
-    async function call(name: string, args: Record<string, unknown>, scope = "mcp:read mcp:write") {
+    async function call(name: string, args: Record<string, unknown>, scope = "data:read data:write data:delete") {
         const { driver, calls } = stubDriver();
         const { app } = buildApp({ driver });
         const { accessToken } = await connectedClient(app, { scope });
@@ -471,7 +471,7 @@ describe("tool inputs", () => {
         const { driver } = stubDriver();
         (driver as unknown as { save: () => Promise<never> }).save = async () => { throw refusal; };
         const { app } = buildApp({ driver });
-        const { accessToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+        const { accessToken } = await connectedClient(app, { scope: "data:read data:write data:delete" });
 
         const res = await rpc(app, accessToken, {
             jsonrpc: "2.0", id: 1, method: "tools/call",
@@ -490,7 +490,7 @@ describe("tool inputs", () => {
             throw ApiError.serviceUnavailable("pool exhausted on replica db-3");
         };
         const { app } = buildApp({ driver });
-        const { accessToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+        const { accessToken } = await connectedClient(app, { scope: "data:read data:write data:delete" });
 
         const res = await rpc(app, accessToken, {
             jsonrpc: "2.0", id: 1, method: "tools/call",
@@ -527,7 +527,7 @@ describe("tool inputs", () => {
     it("scopes the driver on EVERY tool, not just the first", async () => {
         const { driver, scopedAs } = stubDriver();
         const { app } = buildApp({ driver });
-        const { accessToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+        const { accessToken } = await connectedClient(app, { scope: "data:read data:write data:delete" });
 
         const calls = [
             { name: "query_collection", arguments: { collection: "candidates" } },
@@ -550,7 +550,7 @@ describe("tool inputs", () => {
         // `tools/list` and `findTool` must agree, or a model is handed a menu
         // with items the kitchen refuses.
         const { app } = buildApp();
-        const { accessToken } = await connectedClient(app, { scope: "mcp:read" });
+        const { accessToken } = await connectedClient(app, { scope: "data:read" });
         const listed = (await (await rpc(app, accessToken, {
             jsonrpc: "2.0", id: 1, method: "tools/list"
         })).json() as { result: { tools: { name: string }[] } }).result.tools;
@@ -576,7 +576,7 @@ describe("the endpoint carries its own body limit and rate limit", () => {
     it("refuses a body over the limit, before reading it", async () => {
         const { driver, calls } = stubDriver();
         const { app } = buildApp({ driver, maxBodySize: 1024 });
-        const { accessToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+        const { accessToken } = await connectedClient(app, { scope: "data:read data:write data:delete" });
 
         const res = await rpc(app, accessToken, {
             jsonrpc: "2.0", id: 1, method: "tools/call",
@@ -649,7 +649,7 @@ describe("the mutating tools apply the field write rules", () => {
     async function call(name: string, args: Record<string, unknown>, roles = ["recruiter"]) {
         const { driver, calls } = stubDriver();
         const { app } = buildApp({ driver, collections: guarded });
-        const { accessToken } = await connectedClient(app, { scope: "mcp:read mcp:write", roles });
+        const { accessToken } = await connectedClient(app, { scope: "data:read data:write data:delete", roles });
         const res = await rpc(app, accessToken, {
             jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args }
         });
@@ -756,7 +756,7 @@ describe("query_collection applies the field read rules to what it filters and s
     async function query(args: Record<string, unknown>, roles = ["recruiter"]) {
         const { driver, calls } = stubDriver();
         const { app } = buildApp({ driver, collections: guarded });
-        const { accessToken } = await connectedClient(app, { scope: "mcp:read", roles });
+        const { accessToken } = await connectedClient(app, { scope: "data:read", roles });
         const res = await rpc(app, accessToken, {
             jsonrpc: "2.0", id: 1, method: "tools/call",
             params: { name: "query_collection", arguments: { collection: "candidates", ...args } }
@@ -896,7 +896,7 @@ describe("authorize parameter handling", () => {
         const { app } = buildApp();
         const { clientId, code, verifier } = await authorize(app, { scope: "mcp:admin superuser" });
         const { body } = await redeem(app, clientId, code, verifier);
-        expect(body.scope).toBe("mcp:read");
+        expect(body.scope).toBe("data:read");
     });
 });
 
@@ -905,7 +905,7 @@ describe("the decision hop", () => {
         const { app } = buildApp();
         const stale = await signPurposeToken("mcp-authorize-request", {
             clientId: "x", redirectUri: REDIRECT, codeChallenge: "c",
-            codeChallengeMethod: "S256", scope: "mcp:read", resource: RESOURCE
+            codeChallengeMethod: "S256", scope: "data:read", resource: RESOURCE
         }, -1);
 
         const res = await app.request("/api/oauth/authorize/decision", {
@@ -923,7 +923,7 @@ describe("the decision hop", () => {
         const { app } = buildApp();
         const wrong = await signPurposeToken("some-other-hop", {
             clientId: "x", redirectUri: REDIRECT, codeChallenge: "c",
-            codeChallengeMethod: "S256", scope: "mcp:read mcp:write", resource: RESOURCE
+            codeChallengeMethod: "S256", scope: "data:read data:write data:delete", resource: RESOURCE
         }, 600);
 
         const res = await app.request("/api/oauth/authorize/decision", {
@@ -943,7 +943,7 @@ describe("the decision hop", () => {
         const { app } = buildApp();
         const { clientId } = await connectedClient(app);
         const mcpToken = await generateMcpAccessToken({
-            uid: "user-1", roles: [], scope: "mcp:read", clientId, aud: RESOURCE, iss: "x"
+            uid: "user-1", roles: [], scope: "data:read", clientId, aud: RESOURCE, iss: "x"
         }, 3600);
 
         const { requestToken } = await authorize(app, { clientId });
@@ -1081,12 +1081,12 @@ describe("a refresh can narrow the grant but never widen it", () => {
     it("refuses a scope that is not a subset of what was granted", async () => {
         // The bug: the intersection line ended `|| record.scope`, so asking for
         // a scope you do not hold produced an EMPTY intersection and fell back
-        // to the full held scope. A client holding `mcp:write` and asking for
-        // `mcp:read` was handed `mcp:write` — a refresh that widens.
+        // to the full held scope. A client holding `data:write` and asking for
+        // `data:read` was handed `data:write` — a refresh that widens.
         const { app } = buildApp();
-        const { clientId, refreshToken } = await connectedClient(app, { scope: "mcp:read" });
+        const { clientId, refreshToken } = await connectedClient(app, { scope: "data:read" });
 
-        const res = await refreshWith(app, clientId, refreshToken, { scope: "mcp:write" });
+        const res = await refreshWith(app, clientId, refreshToken, { scope: "data:write" });
         expect(res.status).toBe(400);
         expect((await res.json() as { error: string }).error).toBe("invalid_scope");
     });
@@ -1096,39 +1096,39 @@ describe("a refresh can narrow the grant but never widen it", () => {
         // dead, and the client's retry with the same token — the only one it
         // holds — read as a replay and revoked the whole family.
         const { app } = buildApp();
-        const { clientId, refreshToken } = await connectedClient(app, { scope: "mcp:read" });
+        const { clientId, refreshToken } = await connectedClient(app, { scope: "data:read" });
 
-        expect((await refreshWith(app, clientId, refreshToken, { scope: "mcp:write" })).status).toBe(400);
+        expect((await refreshWith(app, clientId, refreshToken, { scope: "data:write" })).status).toBe(400);
 
         const retried = await refreshWith(app, clientId, refreshToken);
         expect(retried.status).toBe(200);
-        expect((await retried.json() as { scope: string }).scope).toBe("mcp:read");
+        expect((await retried.json() as { scope: string }).scope).toBe("data:read");
     });
 
     it("narrows to the intersection when one is asked for", async () => {
         const { app } = buildApp();
-        const { clientId, refreshToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+        const { clientId, refreshToken } = await connectedClient(app, { scope: "data:read data:write data:delete" });
 
-        const res = await refreshWith(app, clientId, refreshToken, { scope: "mcp:read" });
+        const res = await refreshWith(app, clientId, refreshToken, { scope: "data:read" });
         expect(res.status).toBe(200);
-        expect((await res.json() as { scope: string }).scope).toBe("mcp:read");
+        expect((await res.json() as { scope: string }).scope).toBe("data:read");
     });
 
     it("keeps the full grant when no scope is asked for", async () => {
         const { app } = buildApp();
-        const { clientId, refreshToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+        const { clientId, refreshToken } = await connectedClient(app, { scope: "data:read data:write data:delete" });
 
         const res = await refreshWith(app, clientId, refreshToken);
-        expect((await res.json() as { scope: string }).scope).toBe("mcp:read mcp:write");
+        expect((await res.json() as { scope: string }).scope).toBe("data:read data:write data:delete");
     });
 
     it("a narrowed token really has lost the tool", async () => {
         // The scope string in the response is not the assertion worth making —
         // what the token can do is.
         const { app } = buildApp();
-        const { clientId, refreshToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+        const { clientId, refreshToken } = await connectedClient(app, { scope: "data:read data:write data:delete" });
 
-        const narrowed = await refreshWith(app, clientId, refreshToken, { scope: "mcp:read" });
+        const narrowed = await refreshWith(app, clientId, refreshToken, { scope: "data:read" });
         const token = String((await narrowed.json() as Record<string, unknown>).access_token);
 
         const listed = (await (await rpc(app, token, {

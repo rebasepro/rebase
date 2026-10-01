@@ -23,10 +23,13 @@ jest.mock("ws", () => {
  * returns an admin can only ever exercise the happy path.
  */
 const mockExtractUserFromToken = jest.fn<(token: string) => unknown>();
+/** The access model the socket reads person scopes from; tests declare roles on it. */
+let mockAccessModel: { roles: Record<string, { scopes: string[] }>; scopes: Record<string, { label: string }> } = { roles: {}, scopes: {} };
 
 jest.mock("@rebasepro/server", () => {
     return {
         extractUserFromToken: (token: string) => mockExtractUserFromToken(token),
+        getAccessModel: () => mockAccessModel,
         safeCompare: (a: string, b: string) => a === b,
         logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
         // The real predicate, not a stub: the point of the block at the end of
@@ -45,14 +48,14 @@ import {
 } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { resolveRequireAuth } from "../../server/src/auth/require-auth";
-import { createPostgresWebSocket, ADMIN_ONLY_TYPES, PUBLIC_TYPES } from "../src/websocket";
+import { createPostgresWebSocket, ADMIN_PLANE_TYPES, PUBLIC_TYPES } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /*
- * `ADMIN_ONLY_TYPES` is imported, not copied.
+ * `ADMIN_PLANE_TYPES` is imported, not copied.
  *
  * This file used to declare its own list of the same nine strings, under a
  * docblock promising that "adding a privileged verb without a role check fails
@@ -98,6 +101,7 @@ describe("WebSocket Server authorization", () => {
         jest.clearAllMocks();
         mockWssInstance = null;
         mockExtractUserFromToken.mockReturnValue({ uid: "admin-user", roles: ["admin"] });
+        mockAccessModel = { roles: {}, scopes: {} };
 
         mockServer = {} as Server;
         mockRealtimeService = {
@@ -238,11 +242,11 @@ describe("WebSocket Server authorization", () => {
             expect(lastSent(mockWs)).toEqual({
                 type: "ERROR",
                 requestId: "req-editor",
-                payload: { error: { message: "Admin access required for this operation", code: "FORBIDDEN" } }
+                payload: { error: { message: "This operation needs the \"database:write\" scope", code: "SCOPE_MISSING" } }
             });
         });
 
-        it.each([...ADMIN_ONLY_TYPES])("refuses %s from a signed-in non-admin", async (type) => {
+        it.each([...ADMIN_PLANE_TYPES])("refuses %s from a signed-in caller without %s", async (type, scope) => {
             const { mockWs, messageCallback } = await connectAsEditor();
 
             await send(messageCallback, {
@@ -259,7 +263,7 @@ describe("WebSocket Server authorization", () => {
             expect(lastSent(mockWs)).toEqual({
                 type: "ERROR",
                 requestId: `req-${type}`,
-                payload: { error: { message: "Admin access required for this operation", code: "FORBIDDEN" } }
+                payload: { error: { message: `This operation needs the "${scope}" scope`, code: "SCOPE_MISSING" } }
             });
         });
 
@@ -322,6 +326,91 @@ describe("WebSocket Server authorization", () => {
             });
 
             expect(mockDriver.admin.executeSql).toHaveBeenCalledWith("SET ROLE rebase_user", { isolateSession: true });
+        });
+    });
+
+    describe("scopes", () => {
+        it("lets a declared role with database:read inspect, and not run SQL", async () => {
+            mockAccessModel = { roles: { developer: { scopes: ["database:read"] } }, scopes: {} };
+            mockExtractUserFromToken.mockReturnValue({ uid: "dev-1", roles: ["developer"] });
+            (mockDriver.admin.fetchAvailableDatabases as jest.Mock).mockResolvedValue([] as never);
+            const { mockWs, messageCallback } = connect();
+            await send(messageCallback, { type: "AUTHENTICATE", requestId: "a", payload: { token: "t" } });
+
+            await send(messageCallback, { type: "FETCH_DATABASES", requestId: "dbs", payload: {} });
+            expect(mockDriver.admin.fetchAvailableDatabases).toHaveBeenCalled();
+
+            await send(messageCallback, { type: "EXECUTE_SQL", requestId: "sql", payload: { sql: "SELECT 1" } });
+            expect(mockDriver.admin.executeSql).not.toHaveBeenCalled();
+            expect(lastSent(mockWs).payload.error.code).toBe("SCOPE_MISSING");
+        });
+
+        describe("an API key", () => {
+            const withKeys = (resolved: { uid: string; roles: string[]; scopes: string[] } | { message: string }) =>
+                createPostgresWebSocket(mockServer, mockRealtimeService, mockDriver,
+                    { requireAuth: true, jwtSecret: "test-jwt-secret" }, undefined,
+                    { resolveApiKey: async () => resolved });
+
+            it("authenticates the socket with the same verification as HTTP", async () => {
+                withKeys({ uid: "api-key:k1", roles: ["service"], scopes: ["data:read:posts"] });
+                const { mockWs, messageCallback } = connect();
+                await send(messageCallback, { type: "AUTHENTICATE", requestId: "a", payload: { token: "rk_live_x" } });
+                expect(lastSent(mockWs)).toEqual({
+                    type: "AUTH_SUCCESS", requestId: "a", payload: { uid: "api-key:k1", roles: ["service"] }
+                });
+                // Never handed to the JWT verifier.
+                expect(mockExtractUserFromToken).not.toHaveBeenCalled();
+            });
+
+            it("is refused when it does not verify, with the reason", async () => {
+                withKeys({ message: "API key has been revoked" });
+                const { mockWs, messageCallback } = connect();
+                await send(messageCallback, { type: "AUTHENTICATE", requestId: "a", payload: { token: "rk_live_x" } });
+                expect(lastSent(mockWs)).toEqual({
+                    type: "AUTH_ERROR", requestId: "a",
+                    payload: { error: { message: "API key has been revoked", code: "INVALID_TOKEN" } }
+                });
+            });
+
+            it("is refused where the deployment has no key store", async () => {
+                const { mockWs, messageCallback } = connect();
+                await send(messageCallback, { type: "AUTHENTICATE", requestId: "a", payload: { token: "rk_live_x" } });
+                expect(lastSent(mockWs).type).toBe("AUTH_ERROR");
+            });
+
+            it("reads only the collections its data scopes name", async () => {
+                withKeys({ uid: "api-key:k1", roles: ["service"], scopes: ["data:read:posts"] });
+                const { mockWs, messageCallback } = connect();
+                await send(messageCallback, { type: "AUTHENTICATE", requestId: "a", payload: { token: "rk_live_x" } });
+
+                await send(messageCallback, { type: "FETCH_COLLECTION", requestId: "f", payload: { path: "secrets" } });
+                expect(lastSent(mockWs)).toEqual({
+                    type: "ERROR", requestId: "f",
+                    payload: { error: { message: "This API key does not hold the \"data:read:secrets\" scope", code: "SCOPE_MISSING" } }
+                });
+
+                await send(messageCallback, { type: "SAVE", requestId: "s", payload: { path: "posts", values: {} } });
+                expect(lastSent(mockWs).payload.error.message).toContain("data:write:posts");
+
+                await send(messageCallback, { type: "subscribe_collection", requestId: "sub", payload: { path: "secrets" } });
+                expect(lastSent(mockWs).payload.error.code).toBe("SCOPE_MISSING");
+            });
+
+            it("cannot use channels, which no scope covers", async () => {
+                withKeys({ uid: "api-key:k1", roles: ["service"], scopes: ["data:read"] });
+                const { mockWs, messageCallback } = connect();
+                await send(messageCallback, { type: "AUTHENTICATE", requestId: "a", payload: { token: "rk_live_x" } });
+                await send(messageCallback, { type: "join_channel", requestId: "j", payload: { channel: "room" } });
+                expect(lastSent(mockWs).payload.error).toEqual({ message: "An API key cannot use channels", code: "SCOPE_MISSING" });
+            });
+
+            it("cannot reach the admin plane without its scope, even running as admin", async () => {
+                withKeys({ uid: "api-key:k1", roles: ["service", "admin"], scopes: ["data:read"] });
+                const { messageCallback } = connect();
+                await send(messageCallback, { type: "AUTHENTICATE", requestId: "a", payload: { token: "rk_live_x" } });
+                await send(messageCallback, { type: "EXECUTE_SQL", requestId: "sql", payload: { sql: "SELECT 1" } });
+                expect(mockDriver.admin.executeSql).not.toHaveBeenCalled();
+            });
         });
     });
 });
@@ -1002,7 +1091,7 @@ describe("every message type this server handles is in exactly one bucket", () =
     });
 
     it.each(handled)("%s is classified as admin-only or public", (type) => {
-        const admin = ADMIN_ONLY_TYPES.has(type);
+        const admin = ADMIN_PLANE_TYPES.has(type);
         const isPublic = PUBLIC_TYPES.has(type);
         expect(admin || isPublic).toBe(true);
         expect(admin && isPublic).toBe(false);
@@ -1016,7 +1105,7 @@ describe("every message type this server handles is in exactly one bucket", () =
             "FETCH_UNMAPPED_TABLES", "FETCH_TABLE_METADATA", "FETCH_CURRENT_DATABASE",
             "CREATE_BRANCH", "DELETE_BRANCH", "LIST_BRANCHES"
         ]) {
-            expect(ADMIN_ONLY_TYPES.has(type)).toBe(true);
+            expect(ADMIN_PLANE_TYPES.has(type)).toBe(true);
         }
     });
 });

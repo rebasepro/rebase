@@ -78,7 +78,7 @@ describe("the full flow", () => {
         expect(res.status).toBe(200);
         expect(res.headers.get("Cache-Control")).toBe("no-store");
         expect(body.token_type).toBe("Bearer");
-        expect(body.scope).toBe("mcp:read");
+        expect(body.scope).toBe("data:read");
         const token = String(body.access_token);
 
         const init = await rpc(app, token, { jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
@@ -380,7 +380,7 @@ describe("resource-server refusals", () => {
         // a different `aud`, which is exactly the confused-deputy shape.
         const { generateMcpAccessToken } = await import("../src/auth/jwt");
         const foreign = await generateMcpAccessToken({
-            uid: "user-1", roles: [], scope: "mcp:read", clientId: "c",
+            uid: "user-1", roles: [], scope: "data:read", clientId: "c",
             aud: "https://app.medicalmotion.com/mcp", iss: "https://app.medicalmotion.com"
         }, 3600);
 
@@ -399,7 +399,7 @@ describe("resource-server refusals", () => {
     it("does not list write tools for a read-only token", async () => {
         const { driver } = stubDriver();
         const { app } = buildApp({ driver });
-        const { clientId, code, verifier } = await authorize(app, { scope: "mcp:read" });
+        const { clientId, code, verifier } = await authorize(app, { scope: "data:read" });
         const { body } = await redeem(app, clientId, code, verifier);
 
         const list = await rpc(app, String(body.access_token), { jsonrpc: "2.0", id: 1, method: "tools/list" });
@@ -411,7 +411,7 @@ describe("resource-server refusals", () => {
     it("refuses a write call from a read-only token, and says which scope is missing", async () => {
         const { driver } = stubDriver();
         const { app } = buildApp({ driver });
-        const { clientId, code, verifier } = await authorize(app, { scope: "mcp:read" });
+        const { clientId, code, verifier } = await authorize(app, { scope: "data:read" });
         const { body } = await redeem(app, clientId, code, verifier);
 
         const res = await rpc(app, String(body.access_token), {
@@ -419,14 +419,14 @@ describe("resource-server refusals", () => {
             params: { name: "delete_document", arguments: { collection: "candidates", id: "c1" } }
         });
         const payload = await res.json() as { error?: { message: string } };
-        expect(payload.error?.message).toContain("mcp:write");
+        expect(payload.error?.message).toContain("data:delete");
         expect(res.headers.get("WWW-Authenticate")).toContain("insufficient_scope");
     });
 
-    it("offers write tools when mcp:write was granted", async () => {
+    it("offers write tools when data:write was granted", async () => {
         const { driver } = stubDriver();
         const { app } = buildApp({ driver });
-        const { clientId, code, verifier } = await authorize(app, { scope: "mcp:read mcp:write" });
+        const { clientId, code, verifier } = await authorize(app, { scope: "data:read data:write data:delete" });
         const { body } = await redeem(app, clientId, code, verifier);
 
         const list = await rpc(app, String(body.access_token), { jsonrpc: "2.0", id: 1, method: "tools/list" });

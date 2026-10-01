@@ -1,5 +1,5 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
-import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, ResolvedRelation, getCollectionDataPath, isManyToMany, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
+import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, ResolvedRelation, getCollectionDataPath, isManyToMany, scopeGrants, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
@@ -13,9 +13,7 @@ import { resolveConflictTarget } from "./conflict-target";
 import { assertNestedWriteAllowed, type NestedWriteKind } from "./nested-write-access";
 import { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag } from "./etag";
 import { assertRefsResolvable, parseBatchBody, type ParsedBatchOperation } from "./batch";
-import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
-import type { ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
-import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
+import { httpMethodToOperation, type DataOperation } from "../../auth/api-keys/http-operation";
 import {
     assertUserCreationBodyValid,
     completeUserCreations,
@@ -561,9 +559,12 @@ export class RestApiGenerator {
     }
 
     /**
-     * Check API key permissions for a collection operation.
-     * Throws 403 if the key doesn't have the required permission.
-     * No-ops if the request is not authenticated via an API key.
+     * Check a narrowed credential's data scope for a collection operation:
+     * `data:<operation>` on the collection, or unqualified.
+     *
+     * Throws 403 when it is missing. A person's own session holds the whole
+     * data plane — their rows are RLS's to decide — so this only ever refuses
+     * an API key or a token.
      */
     private enforceApiKeyPermission(
         c: { get: (key: string) => unknown; req: { method: string } },
@@ -574,28 +575,30 @@ export class RestApiGenerator {
          * `POST /bulk/delete` is a POST for transport reasons the route's own
          * docblock explains — a body on DELETE is dropped by proxies and by
          * several OpenAPI generators. Deriving the operation from the method
-         * therefore classified it `write`, and a key scoped `["read","write"]`
-         * with `delete` deliberately withheld — the shape the docs recommend
-         * for an agent — deleted every row it named and got a 200. The verb is
-         * a transport detail; the permission is about intent, so the route
+         * would classify it `write`, and a key holding `data:read` and
+         * `data:write` with `data:delete` deliberately withheld — the shape the
+         * docs recommend for an agent — would delete every row it named. The
+         * verb is a transport detail; the scope is about intent, so the route
          * states it.
          */
-        operationOverride?: ApiKeyOperation
+        operationOverride?: DataOperation
     ): void {
-        const apiKey = c.get("apiKey") as ApiKeyMasked | undefined;
-        if (!apiKey) return; // Not an API key request — skip
+        const narrowed = c.get("scopes");
+        if (!Array.isArray(narrowed)) return;
+        const held = narrowed.filter((entry): entry is string => typeof entry === "string");
 
         const operation = operationOverride ?? httpMethodToOperation(c.req.method);
-        if (!isOperationAllowed(apiKey.permissions, collectionSlug, operation)) {
-            throw ApiError.forbidden(
-                `API key does not have "${operation}" permission for collection "${collectionSlug}"`,
-                "API_KEY_FORBIDDEN"
-            );
+        const scope = `data:${operation}`;
+        if (!scopeGrants(held, scope, collectionSlug)) {
+            throw new ApiError(403, "SCOPE_MISSING",
+                `This credential does not hold "${scope}" for collection "${collectionSlug}". ` +
+                `A key needs "${scope}" or "${scope}:${collectionSlug}".`,
+                { requiredScope: `${scope}:${collectionSlug}` });
         }
     }
 
     /**
-     * API key permission check for nested paths.
+     * Data-scope check for nested paths.
      *
      * The operation lands on the collection the path addresses — the target
      * of its last relation — so that is the collection the key must hold the

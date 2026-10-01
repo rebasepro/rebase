@@ -1,21 +1,22 @@
 /**
- * Type definitions for Service API Keys.
+ * Type definitions for API keys.
  *
- * The wire contract — permissions, the masked key, the create/update payloads —
- * lives in `@rebasepro/types`, because the client SDK needs the same shapes and
- * the two declarations had already drifted apart. Only {@link ApiKey}, the
- * database row carrying `key_hash`, is server-side and stays here.
+ * The wire contract — scopes, the masked key, the create/update payloads —
+ * lives in `@rebasepro/types`, because the client SDK needs the same shapes.
+ * Only {@link ApiKey}, the database row carrying `key_hash`, is server-side
+ * and stays here.
  *
  * @module
  */
 
-import type { ApiKeyPermission } from "@rebasepro/types";
+import type { ApiKeyKind } from "@rebasepro/types";
 
 export type {
-    ApiKeyPermission,
+    ApiKeyKind,
     ApiKeyMasked,
     ApiKeyWithSecret,
     CreateApiKeyRequest,
+    CreatePersonalKeyRequest,
     UpdateApiKeyRequest
 } from "@rebasepro/types";
 
@@ -26,19 +27,17 @@ export type {
 export interface ApiKey {
     id: string;
     name: string;
+    kind: ApiKeyKind;
     /** First 12 characters of the plaintext key, for display only. */
     key_prefix: string;
     /** SHA-256 hash of the full plaintext key. */
     key_hash: string;
-    permissions: ApiKeyPermission[];
-    /**
-     * When true, the key is granted the `admin` role: it passes the
-     * admin-gated routes (users, roles, cron, backups, logs, API keys) and
-     * the RLS `default_admin` policies. Non-admin keys carry only the
-     * `service` role — RLS grants them nothing unless a collection policy
-     * explicitly names that role.
-     */
-    admin: boolean;
+    /** `resource:action[:target]` scope strings. */
+    scopes: string[];
+    /** RLS roles a service key runs as, beside `service`. Empty on a personal key. */
+    roles: string[];
+    /** The account a personal key acts as. Null on a service key. */
+    owner_uid: string | null;
     /**
      * Requests per 15-minute window. `null` means "no per-key override" —
      * the data rate limiter then applies its default API-key limit

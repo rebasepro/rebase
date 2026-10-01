@@ -5,7 +5,8 @@ import type { EmailService } from "./email";
 import type { StorageSource } from "./storage";
 import type { CronJobStatus, CronJobLogEntry } from "../types/cron";
 import type { BackupInfo, BackupDestinationKind } from "../types/backup";
-import type { ApiKeysAPI } from "../types/api_keys";
+import type { ApiKeysAPI, PersonalKeysAPI } from "../types/api_keys";
+import type { RoleSummary } from "../types/scopes";
 import type { StorageSourceDefinition } from "../types/storage_source";
 
 
@@ -174,7 +175,8 @@ export interface AdminAPI {
     updateUser(uid: string, data: { email?: string; displayName?: string; password?: string; roles?: string[]; metadata?: Record<string, any> }): Promise<{ user: AdminUser }>;
     deleteUser(uid: string): Promise<{ success: boolean }>;
     resetPassword(uid: string, options?: { password?: string }): Promise<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>;
-    listRoles(): Promise<{ roles: Array<{ id: string; name: string }> }>;
+    /** The built-in `admin` role and the app's declared roles, with the scopes each holds. */
+    listRoles(): Promise<{ roles: RoleSummary[] }>;
     bootstrap(): Promise<{ success: boolean; message: string; user: { uid: string; roles: string[] } }>;
 }
 
@@ -374,8 +376,11 @@ export interface RebaseClient<DB = unknown> {
     /** Custom backend functions API */
     functions?: FunctionsAPI;
 
-    /** Service API keys management API */
+    /** The project's service keys. Requires `keys:read` / `keys:write`. */
     apiKeys?: ApiKeysAPI;
+
+    /** The signed-in person's own API keys, when the backend enables `auth.personalKeys`. */
+    personalKeys?: PersonalKeysAPI;
 
 
     /** Base HTTP URL of the backend server */

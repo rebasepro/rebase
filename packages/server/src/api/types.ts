@@ -35,8 +35,15 @@ export type HonoEnv = {
          */
         recipientEmail?: string;
         driver?: DataDriver;
-        /** Set when the request is authenticated via a Service API Key. */
+        /** Set when the request is authenticated with an API key (`rk_`). */
         apiKey?: ApiKeyMasked;
+        /**
+         * What the caller may do, when its credential is narrower than its
+         * person — an API key or an MCP token. Absent for a person's own
+         * session, who holds what their roles hold. Read it through
+         * `callerScopes` / `hasScope`, which fill in that second case.
+         */
+        scopes?: string[];
         /** Unique request correlation ID (generated or propagated from X-Request-ID header). */
         requestId?: string;
         /**

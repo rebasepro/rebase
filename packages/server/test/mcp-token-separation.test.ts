@@ -34,7 +34,7 @@ describe("MCP access tokens are quarantined from session tokens", () => {
     configureJwt({ secret: "test-secret-for-mcp-token-separation-0123456789", accessExpiresIn: "1h" });
 
     const mint = () => generateMcpAccessToken(
-        { uid: "user-1", roles: ["editor"], scope: "mcp:read", clientId: "client-abc", aud: RESOURCE, iss: ISSUER },
+        { uid: "user-1", roles: ["editor"], scope: "data:read", clientId: "client-abc", aud: RESOURCE, iss: ISSUER },
         3600
     );
 
@@ -59,7 +59,7 @@ describe("MCP access tokens are quarantined from session tokens", () => {
             purpose: MCP_ACCESS_PURPOSE,
             uid: "user-1",
             roles: ["editor"],
-            scope: "mcp:read",
+            scope: "data:read",
             clientId: "client-abc",
             aud: RESOURCE
         });
@@ -70,7 +70,7 @@ describe("audience binding (RFC 8707 / MCP authorization)", () => {
     configureJwt({ secret: "test-secret-for-mcp-token-separation-0123456789", accessExpiresIn: "1h" });
 
     const mintFor = (aud: string) => generateMcpAccessToken(
-        { uid: "user-1", roles: [], scope: "mcp:read", clientId: "c", aud, iss: ISSUER },
+        { uid: "user-1", roles: [], scope: "data:read", clientId: "c", aud, iss: ISSUER },
         3600
     );
 
@@ -104,7 +104,7 @@ describe("audience binding (RFC 8707 / MCP authorization)", () => {
 
     it("refuses an expired token", async () => {
         const expired = await generateMcpAccessToken(
-            { uid: "user-1", roles: [], scope: "mcp:read", clientId: "c", aud: RESOURCE, iss: ISSUER },
+            { uid: "user-1", roles: [], scope: "data:read", clientId: "c", aud: RESOURCE, iss: ISSUER },
             -1
         );
         expect(await verifyMcpAccessToken(expired, RESOURCE)).toBeNull();

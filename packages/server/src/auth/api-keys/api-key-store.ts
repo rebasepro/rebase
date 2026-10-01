@@ -1,5 +1,5 @@
 /**
- * Database operations for Service API Keys.
+ * Database operations for API keys.
  *
  * Uses the DataDriver's `admin.executeSql` capability (same pattern as
  * the cron-store and ensure-tables modules). All data lives in the
@@ -16,17 +16,14 @@ import { logger } from "../../utils/logger";
 import { createDdlBootstrapper } from "../../boot/ddl-bootstrap";
 import type {
     ApiKey,
+    ApiKeyKind,
     ApiKeyMasked,
-    ApiKeyPermission,
     ApiKeyWithSecret,
-    CreateApiKeyRequest,
     UpdateApiKeyRequest
 } from "./api-key-types";
+import { parseStoredPermissions, scopesFromStoredPermissions } from "./legacy-permissions";
 
 const TABLE = "rebase.api_keys";
-
-/** Characters used to generate the random portion of an API key. */
-const HEX_CHARS = "abcdef0123456789";
 
 /**
  * Generate a plaintext API key with the `rk_live_` prefix.
@@ -59,9 +56,11 @@ function toMasked(row: ApiKey): ApiKeyMasked {
     return {
         id: row.id,
         name: row.name,
+        kind: row.kind,
         key_prefix: row.key_prefix,
-        permissions: row.permissions,
-        admin: row.admin,
+        scopes: row.scopes,
+        roles: row.roles,
+        owner_uid: row.owner_uid,
         rate_limit: row.rate_limit,
         created_by: row.created_by,
         created_at: row.created_at,
@@ -72,61 +71,94 @@ function toMasked(row: ApiKey): ApiKeyMasked {
     };
 }
 
+/** A JSONB string array as the driver hands it back: parsed, or JSON text. */
+function stringList(value: unknown): string[] {
+    let raw = value;
+    if (typeof raw === "string") {
+        try {
+            raw = JSON.parse(raw);
+        } catch {
+            return [];
+        }
+    }
+    return Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
 /**
  * Parse a raw DB row into the typed `ApiKey` shape.
  */
 function rowToApiKey(row: Record<string, unknown>): ApiKey {
-    let permissions = (row.permissions ?? []) as ApiKeyPermission[];
-    if (typeof row.permissions === "string") {
-        try {
-            permissions = JSON.parse(row.permissions) as ApiKeyPermission[];
-        } catch {
-            permissions = [];
-        }
-    }
-
+    // A row an older runtime wrote after this one backfilled the table has
+    // no scopes yet; it is read the way the backfill would write it.
+    const grant = row.scopes === null || row.scopes === undefined
+        ? scopesFromStoredPermissions(parseStoredPermissions(row.permissions), row.admin === true)
+        : { scopes: stringList(row.scopes), roles: stringList(row.roles) };
     return {
-        id: row.id as string,
-        name: row.name as string,
-        key_prefix: row.key_prefix as string,
-        key_hash: row.key_hash as string,
-        permissions,
-        admin: Boolean(row.admin),
+        id: String(row.id),
+        name: String(row.name),
+        kind: row.kind === "personal" ? "personal" : "service",
+        key_prefix: String(row.key_prefix),
+        key_hash: String(row.key_hash),
+        scopes: grant.scopes,
+        roles: grant.roles,
+        owner_uid: typeof row.owner_uid === "string" ? row.owner_uid : null,
         rate_limit: row.rate_limit !== null && row.rate_limit !== undefined
             ? Number(row.rate_limit)
             : null,
-        created_by: row.created_by as string,
-        created_at: new Date(row.created_at as string).toISOString(),
-        updated_at: new Date(row.updated_at as string).toISOString(),
-        last_used_at: row.last_used_at ? new Date(row.last_used_at as string).toISOString() : null,
-        expires_at: row.expires_at ? new Date(row.expires_at as string).toISOString() : null,
-        revoked_at: row.revoked_at ? new Date(row.revoked_at as string).toISOString() : null
+        created_by: String(row.created_by),
+        created_at: new Date(String(row.created_at)).toISOString(),
+        updated_at: new Date(String(row.updated_at)).toISOString(),
+        last_used_at: row.last_used_at ? new Date(String(row.last_used_at)).toISOString() : null,
+        expires_at: row.expires_at ? new Date(String(row.expires_at)).toISOString() : null,
+        revoked_at: row.revoked_at ? new Date(String(row.revoked_at)).toISOString() : null
     };
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
+
+/** What a new key row is made of, already validated by the route that asked. */
+export interface NewApiKey {
+    name: string;
+    kind: ApiKeyKind;
+    scopes: string[];
+    /** RLS roles beside `service`. Always empty for a personal key. */
+    roles: string[];
+    /** The account a personal key acts as. */
+    owner_uid: string | null;
+    rate_limit: number | null;
+    expires_at: string | null;
+}
+
+/** Which keys a listing returns. */
+export type ApiKeyFilter =
+    | { kind: "service" }
+    | { kind: "personal"; owner_uid: string };
 
 export interface ApiKeyStore {
     /** Ensure the `rebase.api_keys` table exists. Called once on startup. */
     ensureTable(): Promise<void>;
 
     /** Create a new API key. Returns the full plaintext key exactly once. */
-    createApiKey(request: CreateApiKeyRequest, createdBy: string): Promise<ApiKeyWithSecret>;
+    createApiKey(key: NewApiKey, createdBy: string): Promise<ApiKeyWithSecret>;
 
     /** Look up an API key by its SHA-256 hash. Returns `null` if not found. */
     findByKeyHash(hash: string): Promise<ApiKey | null>;
 
-    /** List all API keys (masked, never includes hash). */
-    listApiKeys(): Promise<ApiKeyMasked[]>;
+    /** List keys (masked, never includes hash), newest first. */
+    listApiKeys(filter: ApiKeyFilter): Promise<ApiKeyMasked[]>;
 
     /** Get a single API key by ID (masked). */
     getApiKeyById(id: string): Promise<ApiKeyMasked | null>;
 
-    /** Update name, permissions, rate_limit, or expires_at. */
+    /** Update name, scopes, roles, rate_limit, or expires_at. */
     updateApiKey(id: string, updates: UpdateApiKeyRequest): Promise<ApiKeyMasked | null>;
 
-    /** Soft-delete: set `revoked_at` to now. */
-    revokeApiKey(id: string): Promise<boolean>;
+    /**
+     * Soft-delete: set `revoked_at` to now. With `owner_uid`, only that
+     * account's personal key is revoked — the answer is false for anyone
+     * else's, so a route can 404 without saying whether the id exists.
+     */
+    revokeApiKey(id: string, owner_uid?: string): Promise<boolean>;
 
     /** Touch `last_used_at` to the current timestamp. */
     updateLastUsed(id: string): Promise<void>;
@@ -149,6 +181,31 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
 
     const ddl = createDdlBootstrapper(exec, "api-key-store");
 
+    /**
+     * Give every row stored before scopes existed the scopes it now holds.
+     *
+     * Idempotent and race-safe: a row is only written while its `scopes` is
+     * still NULL, so two instances backfilling together write the same value
+     * once. The `permissions` and `admin` columns are left as they are, so a
+     * runtime that predates scopes still reads its own keys after a rollback.
+     */
+    async function backfillScopes(): Promise<void> {
+        const rows = await exec(`SELECT id, permissions, admin FROM ${TABLE} WHERE scopes IS NULL`);
+        for (const row of rows) {
+            const { scopes, roles } = scopesFromStoredPermissions(
+                parseStoredPermissions(row.permissions),
+                row.admin === true
+            );
+            await exec(
+                `UPDATE ${TABLE} SET scopes = $1::jsonb, roles = $2::jsonb WHERE id = $3 AND scopes IS NULL`,
+                { params: [JSON.stringify(scopes), JSON.stringify(roles), row.id] }
+            );
+        }
+        if (rows.length > 0) {
+            logger.info(`[api-key-store] Gave ${rows.length} stored API key(s) their scopes.`);
+        }
+    }
+
     return {
         // ── Schema bootstrap ────────────────────────────────────────
         async ensureTable(): Promise<void> {
@@ -163,10 +220,12 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
                 CREATE TABLE IF NOT EXISTS ${TABLE} (
                     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
                     name TEXT NOT NULL,
+                    kind TEXT NOT NULL DEFAULT 'service',
                     key_prefix TEXT NOT NULL,
                     key_hash TEXT NOT NULL UNIQUE,
-                    permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
-                    admin BOOLEAN NOT NULL DEFAULT FALSE,
+                    scopes JSONB,
+                    roles JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    owner_uid TEXT,
                     rate_limit INTEGER,
                     created_by TEXT NOT NULL,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -187,19 +246,28 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
                 ON ${TABLE}(key_prefix)
             `);
 
-            // Migration: add admin column to existing tables. Idempotent in the
-            // same way and raced in the same way — two instances running it
-            // together can deadlock on the table's catalog lock.
-            await ddl.ensureObject(`Adding ${TABLE}.admin`, `
-                ALTER TABLE ${TABLE}
-                ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE
+            // The columns a table created before scopes lacks. Idempotent and
+            // raced like the rest — two instances running them together can
+            // deadlock on the table's catalog lock, which `ensureObject` retries.
+            await ddl.ensureObject(`Adding ${TABLE}.kind`, `
+                ALTER TABLE ${TABLE} ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'service'
+            `);
+            await ddl.ensureObject(`Adding ${TABLE}.scopes`, `
+                ALTER TABLE ${TABLE} ADD COLUMN IF NOT EXISTS scopes JSONB
+            `);
+            await ddl.ensureObject(`Adding ${TABLE}.roles`, `
+                ALTER TABLE ${TABLE} ADD COLUMN IF NOT EXISTS roles JSONB NOT NULL DEFAULT '[]'::jsonb
+            `);
+            await ddl.ensureObject(`Adding ${TABLE}.owner_uid`, `
+                ALTER TABLE ${TABLE} ADD COLUMN IF NOT EXISTS owner_uid TEXT
+            `);
+            await ddl.ensureObject("Creating idx_api_keys_owner", `
+                CREATE INDEX IF NOT EXISTS idx_api_keys_owner
+                ON ${TABLE}(owner_uid) WHERE owner_uid IS NOT NULL
             `);
 
-            // Keyed on what exists, not on who created it. The revoke below used
-            // to sit at the end of one long try block, so an instance that lost
-            // any race above skipped it and reported only that API keys were
-            // unavailable — while the table it had just helped create stayed
-            // reachable by the end-user role.
+            // Keyed on what exists, not on who created it, so an instance that
+            // lost any race above still takes the table off the end-user role.
             if (!await ddl.isReadable(TABLE)) {
                 logger.error(
                     `❌ [api-key-store] ${TABLE} is unavailable — every API-key authenticated ` +
@@ -209,40 +277,49 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
                 return;
             }
 
-            // This table holds key hashes and an `admin` flag, and it has no
-            // RLS — it is not a collection. The Postgres driver grants the
-            // authenticated role DML on everything in `rebase`, including
+            // This table holds key hashes and the scopes each grants, and it
+            // has no RLS — it is not a collection. The Postgres driver grants
+            // the authenticated role DML on everything in `rebase`, including
             // tables (like this one) created after that grant ran, so the
-            // privilege has to come back off. Without it a user-context
-            // query that reached this table could mint itself an admin key.
-            // A security control, so it is re-applied by every instance on
-            // every boot, whatever else went wrong above.
+            // privilege has to come back off. Without it a user-context query
+            // that reached this table could mint itself a key. A security
+            // control, so it is re-applied by every instance on every boot.
             await ddl.step("Revoking end-user access to api_keys", () =>
                 exec(revokeInternalTableSql("rebase", "api_keys")));
+
+            // Only a table that has the old columns has rows to backfill.
+            const legacyColumns = await exec(
+                `SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'rebase' AND table_name = 'api_keys' AND column_name = 'permissions'`
+            );
+            if (legacyColumns.length > 0) {
+                await ddl.step("Backfilling API key scopes", backfillScopes);
+            }
 
             logger.debug("✅ API keys table ready");
         },
 
         // ── Create ──────────────────────────────────────────────────
-        async createApiKey(request: CreateApiKeyRequest, createdBy: string): Promise<ApiKeyWithSecret> {
+        async createApiKey(key: NewApiKey, createdBy: string): Promise<ApiKeyWithSecret> {
             const plaintext = generateApiKey();
             const hash = hashKey(plaintext);
             const prefix = keyPrefix(plaintext);
-            const permissionsJson = JSON.stringify(request.permissions);
 
             const rows = await exec(
-                `INSERT INTO ${TABLE} (name, key_prefix, key_hash, permissions, admin, rate_limit, created_by, expires_at)
-                 VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8)
+                `INSERT INTO ${TABLE} (name, kind, key_prefix, key_hash, scopes, roles, owner_uid, rate_limit, created_by, expires_at)
+                 VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $9, $10)
                  RETURNING *`,
                 { params: [
-                    request.name,
+                    key.name,
+                    key.kind,
                     prefix,
                     hash,
-                    permissionsJson,
-                    request.admin ?? false,
-                    request.rate_limit ?? null,
+                    JSON.stringify(key.scopes),
+                    JSON.stringify(key.kind === "personal" ? [] : key.roles),
+                    key.owner_uid,
+                    key.rate_limit,
                     createdBy,
-                    request.expires_at ?? null
+                    key.expires_at
                 ] }
             );
 
@@ -265,12 +342,20 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
             return rowToApiKey(rows[0]);
         },
 
-        // ── List all (masked) ───────────────────────────────────────
-        async listApiKeys(): Promise<ApiKeyMasked[]> {
-            const rows = await exec(`
-                SELECT * FROM ${TABLE}
-                ORDER BY created_at DESC
-            `);
+        // ── List (masked) ───────────────────────────────────────────
+        async listApiKeys(filter: ApiKeyFilter): Promise<ApiKeyMasked[]> {
+            const rows = filter.kind === "personal"
+                ? await exec(
+                    `SELECT * FROM ${TABLE}
+                     WHERE kind = 'personal' AND owner_uid = $1
+                     ORDER BY created_at DESC`,
+                    { params: [filter.owner_uid] }
+                )
+                : await exec(`
+                    SELECT * FROM ${TABLE}
+                    WHERE kind = 'service'
+                    ORDER BY created_at DESC
+                `);
             return rows.map(r => toMasked(rowToApiKey(r)));
         },
 
@@ -296,13 +381,13 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
                 setClauses.push(`name = $${paramIdx++}`);
                 params.push(updates.name);
             }
-            if (updates.permissions !== undefined) {
-                setClauses.push(`permissions = $${paramIdx++}::jsonb`);
-                params.push(JSON.stringify(updates.permissions));
+            if (updates.scopes !== undefined) {
+                setClauses.push(`scopes = $${paramIdx++}::jsonb`);
+                params.push(JSON.stringify(updates.scopes));
             }
-            if (updates.admin !== undefined) {
-                setClauses.push(`admin = $${paramIdx++}`);
-                params.push(updates.admin);
+            if (updates.roles !== undefined) {
+                setClauses.push(`roles = $${paramIdx++}::jsonb`);
+                params.push(JSON.stringify(updates.roles));
             }
             if (updates.rate_limit !== undefined) {
                 if (updates.rate_limit !== null) {
@@ -333,7 +418,7 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
             const rows = await exec(
                 `UPDATE ${TABLE}
                  SET ${setClauses.join(", ")}
-                 WHERE id = $${paramIdx}
+                 WHERE id = $${paramIdx} AND kind = 'service'
                  RETURNING *`,
                 { params }
             );
@@ -343,14 +428,22 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
         },
 
         // ── Revoke (soft-delete) ────────────────────────────────────
-        async revokeApiKey(id: string): Promise<boolean> {
-            const rows = await exec(
-                `UPDATE ${TABLE}
-                 SET revoked_at = NOW(), updated_at = NOW()
-                 WHERE id = $1 AND revoked_at IS NULL
-                 RETURNING id`,
-                { params: [id] }
-            );
+        async revokeApiKey(id: string, owner_uid?: string): Promise<boolean> {
+            const rows = owner_uid === undefined
+                ? await exec(
+                    `UPDATE ${TABLE}
+                     SET revoked_at = NOW(), updated_at = NOW()
+                     WHERE id = $1 AND kind = 'service' AND revoked_at IS NULL
+                     RETURNING id`,
+                    { params: [id] }
+                )
+                : await exec(
+                    `UPDATE ${TABLE}
+                     SET revoked_at = NOW(), updated_at = NOW()
+                     WHERE id = $1 AND kind = 'personal' AND owner_uid = $2 AND revoked_at IS NULL
+                     RETURNING id`,
+                    { params: [id, owner_uid] }
+                );
             return rows.length > 0;
         },
 

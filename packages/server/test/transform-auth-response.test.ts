@@ -63,14 +63,6 @@ function mockUser(overrides: Partial<{ id: string; email: string; passwordHash: 
     };
 }
 
-function mockRole(id: string, isAdmin = false) {
-    return { id,
-name: id.charAt(0).toUpperCase() + id.slice(1),
-isAdmin,
-defaultPermissions: null,
-collectionPermissions: null };
-}
-
 let mockAuthRepo: jest.Mocked<AuthRepository>;
 
 function createApp(opts: { authHooks?: AuthHooks } = {}) {
@@ -87,7 +79,6 @@ passwordHash: data.passwordHash }))
         ),
         listUsers: jest.fn().mockResolvedValue([]),
         listUsersPaginated: jest.fn().mockResolvedValue({ users: [], total: 0, limit: 2, offset: 0 }),
-        getUserRoles: jest.fn().mockResolvedValue([mockRole("editor")]),
         getUserRoleIds: jest.fn().mockResolvedValue(["editor"]),
         assignDefaultRole: jest.fn().mockResolvedValue(undefined),
         setUserRoles: jest.fn().mockResolvedValue(undefined),
@@ -103,7 +94,7 @@ passwordHash: data.passwordHash }))
         getUserWithRoles: jest.fn().mockImplementation(async (uid) => {
             const user = mockUser({ id: uid });
             return { user,
-roles: [mockRole("editor")] };
+roles: ["editor"] };
         }),
         createRefreshToken: jest.fn().mockResolvedValue(undefined),
         findRefreshTokenByHash: jest.fn().mockResolvedValue(null),

@@ -18,7 +18,9 @@ import {
     buildResourceGraph,
     computeSchemaVersion,
     parseEnvBoolean,
-    resourceKeyOf
+    resourceKeyOf,
+    DEFAULT_STORAGE_SOURCE_KEY,
+    type AdminScope
 } from "@rebasepro/types";
 import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, getEffectiveSecurityRules, assertBeforeQueryIsPostgresOnly } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
@@ -107,7 +109,7 @@ import {
 import { injectCallbackClient } from "./init/callback-client";
 import { handGlobalCallbacksTo } from "./init/global-callbacks";
 import { installUnhandledRejectionHandler } from "./init/process-safety";
-import { configureJwt, hasAsymmetricSigningKey, isJwtConfigured, requireAdmin } from "./auth";
+import { configureJwt, hasAsymmetricSigningKey, isJwtConfigured } from "./auth";
 import { createJwksRoutes } from "./auth/jwks-routes";
 import { readRuntimeVersion } from "./boot/version-skew";
 import { supportsRlsScoping } from "./auth/rls-scope";
@@ -127,9 +129,13 @@ import {
 } from "./storage";
 import type { ApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyStore } from "./auth/api-keys/api-key-store";
-import { createApiKeyRoutes } from "./auth/api-keys/api-key-routes";
-import { createApiKeyPreAuth, createFunctionApiKeyGuard, createStorageApiKeyGuard } from "./auth/api-keys/api-key-middleware";
+import { createApiKeyRoutes, createPersonalKeyRoutes } from "./auth/api-keys/api-key-routes";
+import { createApiKeyPreAuth, createFunctionScopeGuard, createTusScopeGuard, resolveApiKey } from "./auth/api-keys/api-key-middleware";
+import type { KeyTargets } from "./auth/api-keys/key-grant";
 import { createRequireAuth } from "./auth/middleware";
+import { accessModelFromCollections, callerScopes, configureAccess, requireScope, requireScopeByMethod } from "./auth/access";
+import { createScopeRoutes } from "./auth/scope-routes";
+import { configureCredentialStore } from "./auth/verify-credential";
 import { createDataRateLimiter, createDataRateLimitCheck, defaultAuthLimiter, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, setSharedRateLimitStore, type DataRateLimitConfig } from "./auth/rate-limiter";
 import { MemoryRateLimitStore } from "./auth/rate-limit-store";
 import { createSqlRateLimitStore } from "./auth/sql-rate-limit-store";
@@ -1399,6 +1405,19 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
+    // The access model — the app's declared roles and scopes — before anything
+    // that reads it: the registration guard refuses a default role holding an
+    // admin-plane scope, and every scope check consults it. Built from the
+    // users collection's `auth` block; an explicitly configured auth
+    // collection takes precedence over one found among the collections.
+    const explicitAuthCollection = config.auth && !isAuthAdapter(config.auth) ? config.auth.collection : undefined;
+    const accessCollections = explicitAuthCollection ? [explicitAuthCollection, ...activeCollections] : activeCollections;
+    const accessModel = accessModelFromCollections(accessCollections);
+    configureAccess({ model: accessModel });
+    const declaredAuth = accessCollections.find(collection => collection.auth === true
+        || (typeof collection.auth === "object" && collection.auth !== null && collection.auth.enabled === true))?.auth;
+    const personalKeysEnabled = typeof declaredAuth === "object" && declaredAuth !== null && declaredAuth.personalKeys === true;
+
     // 2. Initialize Auth & History via the default driver's bootstrapper
     let authConfigResult: BootstrappedAuth | undefined = undefined;
     let serviceKey: string | undefined;
@@ -1633,19 +1652,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         logger.debug("Service API Keys initialized");
     }
 
-    // Authenticates `rk_` bearer tokens in front of the JWT-based admin gates,
-    // so keys created with `admin: true` genuinely reach the admin surfaces
     // ─── What an administrative gate must re-read, per request ───────────
     //
-    // `requireAdmin` reads `roles` out of the access token, and the token was
-    // minted up to an hour ago. Everything that has happened since — a demotion,
-    // a sign-out-everywhere, a password reset — is invisible to it. The user
-    // management routers already close that by re-reading both from the
-    // database on every request; the gate in front of backups, cron, logs, the
-    // schema editors, the RLS audit, the dev mailbox and the API-key router did
-    // not, which is to say it did not on the surfaces worth the most: a revoked
-    // token still downloaded a full database dump, and a demoted admin could
-    // mint themselves a permanent `admin: true` API key.
+    // An access token was minted up to an hour ago. Everything that has
+    // happened since — a demotion, a sign-out-everywhere, a password reset — is
+    // invisible to a gate that reads its `roles` claim, and the scopes an admin
+    // surface checks come from those roles. So every admin gate re-reads both
+    // from the database on every request: a revoked token must not download a
+    // database dump, and a demoted admin must not mint themselves a key.
     //
     // Same repository, same two questions, wired once here so a new admin
     // surface inherits the answer instead of having to remember it.
@@ -1661,8 +1675,43 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             : undefined
     };
 
-    // (users, roles, api-keys, cron, backups, logs, schema editor) — their
-    // documented behavior. Non-admin keys still fail `requireAdmin` with 403.
+    // A personal key acts as its owner as they are now, so it needs an account
+    // store to read the owner from. With `personalKeys` off — or an external
+    // auth adapter that keeps accounts elsewhere — no resolver is installed and
+    // every personal key is refused, which is also what switching the flag off
+    // does to the keys already minted.
+    if (personalKeysEnabled) {
+        if (typeof adminIdentityRepo?.getUserById === "function" && typeof adminIdentityRepo.getUserRoleIds === "function") {
+            const ownerRepo = adminIdentityRepo;
+            configureAccess({
+                model: accessModel,
+                resolveKeyOwner: async (uid) => {
+                    const user = await ownerRepo.getUserById(uid);
+                    if (!user) return null;
+                    return { roles: await ownerRepo.getUserRoleIds(uid) };
+                }
+            });
+        } else {
+            logger.warn(
+                "[Auth] auth.personalKeys is on, but this backend's auth keeps no account store Rebase can " +
+                "read a key's owner from (an external AuthAdapter). Personal API keys are refused."
+            );
+        }
+    }
+
+    // `verifyCredential` — for an app's own socket or tunnel — checks keys here.
+    configureCredentialStore(apiKeyStore);
+
+    // What a key's scope target may name, read when a key is minted.
+    let servedFunctionNames: string[] = [];
+    const keyTargets: KeyTargets = {
+        collections: () => collectionRegistry.getRawCollections().map(collection => collection.slug),
+        functions: () => servedFunctionNames,
+        buckets: () => storageRegistry?.list() ?? [DEFAULT_STORAGE_SOURCE_KEY]
+    };
+
+    // Authenticates `rk_` bearer tokens in front of the JWT-based admin gates,
+    // so a key holding an admin-plane scope genuinely reaches that surface.
     const apiKeyPreAuth = apiKeyStore
         ? createApiKeyPreAuth({ store: apiKeyStore, driver: defaultDriver })
         : undefined;
@@ -1671,16 +1720,38 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     }
 
     if (apiKeyStore && surfaces.admin) {
-        // Mount API key admin routes
         const apiKeyRoutes = createApiKeyRoutes({
             store: apiKeyStore,
             serviceKey: internalServiceKey,
-            // A key minted here never expires and can carry `admin: true`, so
-            // this is the single most valuable thing a stale token can reach.
+            targets: keyTargets,
+            // A key minted here may outlive the session that minted it, so this
+            // is the single most valuable thing a stale token can reach.
             ...adminGateIdentity
         });
         config.app.route(`${basePath}/admin/api-keys`, apiKeyRoutes);
         logger.debug("API key admin routes mounted", { path: `${basePath}/admin/api-keys` });
+    }
+
+    // Before the auth router, which is mounted on the prefix above this one and
+    // would otherwise see these requests first.
+    if (apiKeyStore && surfaces.auth) {
+        const personalKeyRouter = new Hono<HonoEnv>();
+        if (apiKeyPreAuth) personalKeyRouter.use("/*", apiKeyPreAuth);
+        personalKeyRouter.route("/", createPersonalKeyRoutes({
+            store: apiKeyStore,
+            enabled: personalKeysEnabled,
+            serviceKey: internalServiceKey,
+            targets: keyTargets,
+            ...adminGateIdentity
+        }));
+        config.app.route(`${basePath}/auth/keys`, personalKeyRouter);
+    }
+    if (surfaces.auth) {
+        config.app.route(`${basePath}/auth/scopes`, createScopeRoutes({
+            serviceKey: internalServiceKey,
+            apiKeyPreAuth,
+            ...adminGateIdentity
+        }));
     }
 
     // One rate-limit store shared by the data, functions and storage limiters:
@@ -1980,7 +2051,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                         // server-wide body limit and the data rate limiter do
                         // not reach it; it carries both itself.
                         maxBodySize: config.maxBodySize,
-                        rateLimit: rateLimitConfig
+                        rateLimit: rateLimitConfig,
+                        // A client configured with a header instead of an
+                        // OAuth flow presents a key; its `data:*` scopes decide
+                        // which tools and collections it reaches.
+                        resolveApiKey: apiKeyStore ? (token: string) => resolveApiKey(apiKeyStore, token) : undefined
                     };
 
                     config.app.route("/", createMcpWellKnownRoutes(mcpConfig));
@@ -2031,18 +2106,21 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         isAuthAdapter(config.auth!) || !!(config.auth as RebaseAuthConfig).jwtSecret
     );
     /**
-     * The admin gate itself: an `rk_` admin key, the service key, or a token
-     * whose user is an admin *now* — roles and revocation read from the
-     * database, never off the token. {@link applyAdminGate} puts it on a
-     * router; a surface mounted on a single path (the contract, the private
-     * docs) takes the same list, so "admin" means one thing everywhere.
+     * The admin gate itself: an `rk_` key, the service key, or a person's
+     * token — roles and revocation read from the database, never off the
+     * token — and then the surface's scope. One scope for a surface whose
+     * every route needs the same thing; a `read`/`write` pair for one whose
+     * reads and writes split along the HTTP method. {@link applyAdminGate} puts
+     * it on a router; a surface mounted on a single path (the contract, the
+     * private docs) takes the same list.
      */
-    const adminGate = (): MiddlewareHandler<HonoEnv>[] => [
+    type SurfaceScopes = AdminScope | { read: AdminScope; write: AdminScope };
+    const adminGate = (scopes: SurfaceScopes): MiddlewareHandler<HonoEnv>[] => [
         ...(apiKeyPreAuth ? [apiKeyPreAuth] : []),
         createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity }),
-        requireAdmin
+        typeof scopes === "string" ? requireScope(scopes) : requireScopeByMethod(scopes)
     ];
-    const applyAdminGate = (router: Hono<HonoEnv>, surface: string): void => {
+    const applyAdminGate = (router: Hono<HonoEnv>, surface: string, scopes: SurfaceScopes): void => {
         if (!adminSurfacesGated) {
             // No adapter and no `jwtSecret`: there is no credential this server
             // could check a caller against, so it cannot tell an admin from the
@@ -2069,7 +2147,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }, 501));
             return;
         }
-        router.use("/*", ...adminGate());
+        router.use("/*", ...adminGate(scopes));
     };
 
     // The schema editor rewrites collection files, so it needs a collectionsDir
@@ -2161,7 +2239,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // routes into it; this one is now the same shape.
         const schemaEditorRouter = new Hono<HonoEnv>();
 
-        applyAdminGate(schemaEditorRouter, "Schema editor");
+        applyAdminGate(schemaEditorRouter, "Schema editor", { read: "schema:read", write: "schema:write" });
 
         schemaEditorRouter.get("/status", (c) => c.json(
             schemaEditorOff
@@ -2205,7 +2283,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         if (!canEditSchema) {
             const unconfigured = new Hono<HonoEnv>();
-            applyAdminGate(unconfigured, "Live schema editing");
+            applyAdminGate(unconfigured, "Live schema editing", "schema:read");
             unconfigured.all("/*", (c) => c.json({
                 error: {
                     code: "SCHEMA_EDITING_NO_COLLECTIONS_DIR",
@@ -2230,7 +2308,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 ? await findRepositoryRoot(collectionsDir)
                 : undefined;
             const liveSchemaRouter = new Hono<HonoEnv>();
-            applyAdminGate(liveSchemaRouter, "Live schema editing");
+            // `apply` additionally needs `schema:write` — checked on its route.
+            applyAdminGate(liveSchemaRouter, "Live schema editing", "schema:read");
 
             // Correct for a project in a subdirectory: the generated-artifact
             // paths are relative to the *project*, and the repository resolves
@@ -2491,11 +2570,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // code, leaving uploads without any size cap.
         const storageRouter = new Hono<HonoEnv>();
 
-        // API keys on storage: authenticate `rk_` tokens, then require a
-        // "storage" (or "*") permission entry for the derived operation.
+        // API keys on storage: authenticate `rk_` tokens here; the storage
+        // scope for each operation is checked where the route has resolved the
+        // source it addresses (`checkAuthorized`), and the resumable-upload
+        // steps that follow a create need `storage:write`.
         if (apiKeyPreAuth) {
-            storageRouter.use("/*", apiKeyPreAuth, createStorageApiKeyGuard());
+            storageRouter.use("/*", apiKeyPreAuth);
         }
+        storageRouter.use("/*", createTusScopeGuard());
 
         // Storage shares the data/functions limiter and its store, so a caller
         // has one budget across the product rather than one per router.
@@ -2747,7 +2829,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // Follows the data surface: the document describes the collection routes, so
     // a process that does not serve them would publish a spec for URLs it 404s.
     if (surfaces.data) {
-        await mountOpenApiDocs(config.app, basePath, config.enableSwagger, serverCollections, resolveRequireAuth(config.auth), adminGate());
+        await mountOpenApiDocs(config.app, basePath, config.enableSwagger, serverCollections, resolveRequireAuth(config.auth), adminGate("schema:read"));
     }
 
     // ─── Server-side singleton ────────────────────────────────────────────
@@ -2964,6 +3046,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // that error message.
         const { selectFunctions } = await import("./functions/selection");
         const loadedFunctions = selectFunctions(allFunctions, config.functionsSelection);
+        servedFunctionNames = loadedFunctions.map(fn => fn.name);
         if (loadedFunctions.length !== allFunctions.length) {
             logger.info("Serving a subset of this bundle's functions", {
                 serving: loadedFunctions.map(fn => fn.name),
@@ -3013,10 +3096,19 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }));
         }
 
-        // API-key requests must hold a "functions"/"functions/<name>"
-        // permission (or the "*" wildcard). Without this, any valid key —
-        // however narrowly scoped — could invoke every custom function.
-        functionsRouter.use("/*", createFunctionApiKeyGuard(`${basePath}/functions`));
+        // A narrowed credential must hold `functions:invoke` — unqualified, or
+        // on the function it calls. Without this, any valid key, however
+        // narrowly scoped, could invoke every custom function.
+        functionsRouter.use("/*", createFunctionScopeGuard(`${basePath}/functions`));
+
+        // What the caller holds, resolved for the handler: `getScopes(c)`,
+        // `hasScope(c, …)` and `requireScope(…)` from
+        // `@rebasepro/server/functions` read it without importing the access
+        // model, which that portable surface cannot.
+        functionsRouter.use("/*", async (c, next) => {
+            if (c.get("user") && !c.get("scopes")) c.set("scopes", callerScopes(c));
+            return next();
+        });
 
         // Same per-caller rate limiting as the data API, sharing its
         // store so one caller has one budget. Previously only /api/data
@@ -3132,7 +3224,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const cronRouter = new Hono<HonoEnv>();
 
         // Cron admin routes require authentication + admin role
-        applyAdminGate(cronRouter, "Cron");
+        applyAdminGate(cronRouter, "Cron", { read: "cron:read", write: "cron:write" });
 
         cronRouter.route("/", createCronRoutes(cronScheduler, cronProblems.length));
         if (surfaces.cron) {
@@ -3298,7 +3390,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const { createBackupRoutes, parseBackupDestination } = await import("./backup");
         const backupRouter = new Hono<HonoEnv>();
 
-        applyAdminGate(backupRouter, "Backup");
+        applyAdminGate(backupRouter, "Backup", "backups:read");
 
         backupRouter.route("/", createBackupRoutes({
             getDestination: () => {
@@ -3318,7 +3410,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // the route can sit with the other admin surfaces where it belongs.
     if (surfaces.admin) {
         const rlsAuditRouter = new Hono<HonoEnv>();
-        applyAdminGate(rlsAuditRouter, "RLS audit");
+        applyAdminGate(rlsAuditRouter, "RLS audit", "schema:read");
         rlsAuditRouter.get("/", (c) => c.json(
             rlsAudit
                 ? rlsAudit.status()
@@ -3345,7 +3437,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // Three independent gates, because what this hands out is a working
     // credential — a password-reset token is a login:
     //
-    //  1. `applyAdminGate` — authenticated, and an admin;
+    //  1. `applyAdminGate` — authenticated, and holding `users:write`;
     //  2. there must be a registered sink, which `registerDevEmailSink` refuses
     //     to create under `NODE_ENV=production`;
     //  3. this handler re-checks `NODE_ENV` at request time, so a sink
@@ -3356,7 +3448,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // the panel just called returning "not found" reads as a broken deploy.
     if (surfaces.admin) {
         const devMailRouter = new Hono<HonoEnv>();
-        applyAdminGate(devMailRouter, "Development mailbox");
+        // `users:write`, not a read scope: a captured message carries a working
+        // sign-in or reset link, which is an account to whoever reads it.
+        applyAdminGate(devMailRouter, "Development mailbox", "users:write");
 
         const unavailable = {
             error: {
@@ -3397,7 +3491,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const { default: logsRoutes } = await import("./api/logs-routes");
         const logsRouter = new Hono<HonoEnv>();
 
-        applyAdminGate(logsRouter, "Logs");
+        applyAdminGate(logsRouter, "Logs", "logs:read");
 
         logsRouter.route("/", logsRoutes);
         mountWithLegacyAlias(config.app, logsRouter, {
@@ -3432,7 +3526,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // tried to perform, it is a document that is not there. Configure auth
         // and it returns.
         if (adminSurfacesGated) {
-            contractRouter.use("/contract", ...adminGate());
+            contractRouter.use("/contract", ...adminGate("schema:read"));
         } else {
             contractRouter.all("/contract", (c) => c.json({
                 error: {
@@ -3483,7 +3577,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // body limit, and the same buckets in the same store, so a
             // person's frames and requests spend one allowance.
             maxPayload: config.maxBodySize,
-            dataRateLimit: rateLimitConfig ? createDataRateLimitCheck(rateLimitConfig) : undefined
+            dataRateLimit: rateLimitConfig ? createDataRateLimitCheck(rateLimitConfig) : undefined,
+            // An API key authenticates the socket as it does a request.
+            resolveApiKey: apiKeyStore ? (token: string) => resolveApiKey(apiKeyStore, token) : undefined
         });
     }
 

@@ -2,7 +2,6 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, Db, ObjectId } from "mongodb";
 import {
     MongoUserService,
-    MongoRoleService,
     MongoTokenRepository,
     MongoAuthRepository
 } from "../src/auth/services";
@@ -115,7 +114,6 @@ describe("MongoDB Auth Services", () => {
 
         it("should list and paginate users with search and role filters", async () => {
             const userService = new MongoUserService(db);
-            const roleService = new MongoRoleService(db);
 
             const user1 = await userService.createUser({ email: "alice@rebase.pro",
 displayName: "Alice Smith" });
@@ -127,19 +125,13 @@ displayName: "Bob Jones" });
             expect(searchResult.total).toBe(1);
             expect(searchResult.users[0].id).toBe(user1.id);
 
-            // Test roles mapping. A fresh id: the bootstrap seeds admin,
-            // editor and viewer, so reusing one of those is a duplicate `_id`.
-            await roleService.createRole({ id: "auditor",
-name: "Auditor" });
+            // Test roles mapping. A role is a name on the user: nothing has to
+            // exist elsewhere for it to be assigned and filtered by.
             await userService.setUserRoles(user1.id, ["auditor"]);
 
             const rolesResult = await userService.listUsersPaginated({ roleId: "auditor" });
             expect(rolesResult.total).toBe(1);
             expect(rolesResult.users[0].id).toBe(user1.id);
-
-            const userRoles = await userService.getUserRoles(user1.id);
-            expect(userRoles).toHaveLength(1);
-            expect(userRoles[0].id).toBe("auditor");
 
             const roleIds = await userService.getUserRoleIds(user1.id);
             expect(roleIds).toEqual(["auditor"]);
@@ -192,38 +184,6 @@ name: "Auditor" });
             await expect(repo.hasVerifiedMfaFactors("uid-1")).resolves.toBe(false);
             await expect(repo.getMfaFactors("uid-1")).resolves.toEqual([]);
             await expect(repo.getUnusedRecoveryCodeCount("uid-1")).resolves.toBe(0);
-        });
-    });
-
-    describe("MongoRoleService", () => {
-        it("should manage roles", async () => {
-            const service = new MongoRoleService(db);
-            const roleData = {
-                id: "contributor",
-                name: "Contributor",
-                isAdmin: false,
-                defaultPermissions: null,
-                collectionPermissions: null
-            };
-
-            const role = await service.createRole(roleData);
-            expect(role.id).toBe("contributor");
-            expect(role.name).toBe("Contributor");
-
-            const fetched = await service.getRoleById("contributor");
-            expect(fetched?.id).toBe(role.id);
-            expect(fetched?.name).toBe(role.name);
-
-            const list = await service.listRoles();
-            expect(list.map(r => r.id)).toContain(role.id);
-
-            await service.updateRole("contributor", { name: "Super Contributor" });
-            const updated = await service.getRoleById("contributor");
-            expect(updated?.name).toBe("Super Contributor");
-
-            await service.deleteRole("contributor");
-            const deleted = await service.getRoleById("contributor");
-            expect(deleted).toBeNull();
         });
     });
 

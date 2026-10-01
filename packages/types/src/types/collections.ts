@@ -6,6 +6,7 @@ import type { User } from "../users";
 import type { EmailSendResult } from "../controllers/email";
 import type { Relation } from "./relations";
 import type { SecurityRule } from "./security_rules";
+import type { RoleDefinition, ScopeDefinition } from "./scopes";
 import { getDataSourceCapabilities } from "./data_source";
 import type { WhereFilterOp, FilterValues, FilterPreset } from "./filter-operators";
 import type { SearchConfig } from "./search";
@@ -752,6 +753,31 @@ export type InferCollectionConfigType<S extends CollectionConfig> = S extends Co
 export interface AuthCollectionConfig {
     /** Set to true to mark this collection as the authentication collection. */
     enabled: boolean;
+
+    /**
+     * The app's roles and the admin-plane scopes each holds.
+     *
+     * `admin` is built in — it holds every scope — and cannot be declared. A
+     * role used only by RLS policies needs no entry here. See
+     * {@link RoleDefinition}.
+     */
+    roles?: Record<string, RoleDefinition>;
+
+    /**
+     * Scopes the app defines for its own operations, named `resource:action`
+     * like the built-in ones and checked with `requireScope` in a function.
+     * Every signed-in person holds them; they exist so a key can be narrowed
+     * to one action. See {@link ScopeDefinition}.
+     */
+    scopes?: Record<string, ScopeDefinition>;
+
+    /**
+     * Let every signed-in account mint personal API keys at
+     * `/api/auth/keys`. A personal key acts as its owner and can never hold
+     * a scope its owner does not. Off by default: each one is a long-lived
+     * credential for the account, and an app opts into handing those out.
+     */
+    personalKeys?: boolean;
 
     /**
      * Called when an admin creates a user, through the collection REST API or

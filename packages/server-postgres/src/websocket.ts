@@ -3,15 +3,15 @@ import { BranchingUnsupportedError } from "./services/BranchService";
 import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
-import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeSocketLimits } from "@rebasepro/types";
-import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeSocketOptions } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AdminScope } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
 import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
 import { inspect } from "util";
 import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertUserCreationBodyValid, createUserThroughAuthCollection, type NestedWriteKind } from "@rebasepro/server";
-import { logger } from "@rebasepro/server";
+import { logger, getAccessModel } from "@rebasepro/server";
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
 interface WsAuthConfig {
@@ -33,6 +33,12 @@ interface WsUserIdentity {
     uid: string;
     roles: string[];
     isAdmin: boolean;
+    /**
+     * What this session may do, when its credential narrows its person — an
+     * API key. Absent for a person's own session, who holds what their roles
+     * hold.
+     */
+    scopes?: string[];
     /**
      * Whether this session is a guest — anonymous sign-in rather than an
      * account. Read from the token, because a socket has no request to look
@@ -108,33 +114,45 @@ const CHANNEL_MESSAGE_TYPES = new Set([
 ]);
 
 /**
- * WebSocket message types that require an admin session.
+ * WebSocket message types on the admin plane, and the scope each needs.
  *
- * Exported so the test can READ it. It used to be private, and the test that
- * exists to make "a privileged verb added without a role check" impossible held
- * a hand-typed copy of the same nine strings — so it agreed with itself, and
- * `FETCH_APPLICATION_ROLES` was added to neither. That verb runs
- * `SELECT DISTINCT unnest(roles)` over the users table through `executeSql`,
- * which is the owner connection and not subject to RLS, so any authenticated
- * non-admin could enumerate every role in the project — and any anonymous
- * socket could, on a deployment with `requireAuth: false`.
+ * Exported so the test can READ it. A privileged verb added without a scope
+ * check is what this list exists to make impossible: `PUBLIC_TYPES` below is
+ * its counterpart, and a test asserts that every `case` this file handles
+ * appears in exactly one of the two — so a verb added to neither fails rather
+ * than defaulting to reachable.
  *
- * The list is no longer the whole guarantee. `PUBLIC_TYPES` below is its
- * counterpart, and a test asserts that every `case` this file handles appears
- * in exactly one of the two — so a verb added to neither fails rather than
- * defaulting to reachable.
+ * All of these run on the owner connection, outside RLS. `database:read`
+ * covers the catalogue — including `FETCH_APPLICATION_ROLES`, which runs
+ * `SELECT DISTINCT unnest(roles)` over the users table — and
+ * `database:write` covers running SQL and creating or deleting branches.
  */
-export const ADMIN_ONLY_TYPES = new Set([
-    "EXECUTE_SQL",
-    "FETCH_DATABASES",
-    "FETCH_ROLES",
-    "FETCH_APPLICATION_ROLES",
-    "FETCH_UNMAPPED_TABLES",
-    "FETCH_TABLE_METADATA",
-    "FETCH_CURRENT_DATABASE",
-    "CREATE_BRANCH",
-    "DELETE_BRANCH",
-    "LIST_BRANCHES"
+export const ADMIN_PLANE_TYPES: ReadonlyMap<string, AdminScope> = new Map<string, AdminScope>([
+    ["EXECUTE_SQL", "database:write"],
+    ["CREATE_BRANCH", "database:write"],
+    ["DELETE_BRANCH", "database:write"],
+    ["FETCH_DATABASES", "database:read"],
+    ["FETCH_ROLES", "database:read"],
+    ["FETCH_APPLICATION_ROLES", "database:read"],
+    ["FETCH_UNMAPPED_TABLES", "database:read"],
+    ["FETCH_TABLE_METADATA", "database:read"],
+    ["FETCH_CURRENT_DATABASE", "database:read"],
+    ["LIST_BRANCHES", "database:read"]
+]);
+
+/**
+ * The data scope each data verb needs, for a session whose credential narrows
+ * it. A person's own session holds the whole data plane; RLS decides its rows.
+ */
+const DATA_VERB_SCOPES: ReadonlyMap<string, string> = new Map([
+    ["FETCH_COLLECTION", "data:read"],
+    ["FETCH_ONE", "data:read"],
+    ["COUNT", "data:read"],
+    ["CHECK_UNIQUE_FIELD", "data:read"],
+    ["subscribe_collection", "data:read"],
+    ["subscribe_one", "data:read"],
+    ["SAVE", "data:write"],
+    ["DELETE", "data:delete"]
 ]);
 
 /**
@@ -172,9 +190,6 @@ function extractErrorMessage(error: unknown): string {
 }
 
 /**
- * Check if the current session belongs to an admin user.
- */
-/**
  * Who a socket reads and writes as, for its request frames and its
  * subscriptions alike.
  *
@@ -200,12 +215,25 @@ function sessionAuthContext(session: ClientSession | undefined): SubscriptionAut
     };
 }
 
-function isAdminSession(session: ClientSession | undefined): boolean {
-    if (!session?.user) return false;
-    // Fast path: new adapter-aware sessions set isAdmin directly
-    if (session.user.isAdmin) return true;
-    if (!session.user.roles) return false;
-    return session.user.roles.some((r) => r === "admin");
+/** Everything a session may do: its credential's scopes, or its roles'. */
+function sessionScopes(session: ClientSession | undefined): string[] {
+    if (!session?.user) return [];
+    return session.user.scopes ?? scopesForRoles(session.user.roles, getAccessModel());
+}
+
+/**
+ * The collection a data frame addresses, for a narrowed session's scope check.
+ * A nested path (`authors/1/posts`) answers undefined: its target is a
+ * relation's, not a slug on the wire, so only an unqualified scope covers it.
+ */
+function frameCollection(type: string, payload: unknown): string | undefined {
+    if (typeof payload !== "object" || payload === null) return undefined;
+    let path: unknown = "path" in payload ? payload.path : undefined;
+    if (type === "DELETE" && "row" in payload && typeof payload.row === "object" && payload.row !== null && "path" in payload.row) {
+        path = payload.row.path;
+    }
+    if (typeof path !== "string" || path === "" || isNestedPath(path)) return undefined;
+    return path;
 }
 
 /** A frame's size in bytes, however `ws` delivered it. */
@@ -230,7 +258,7 @@ function connectionOrigin(request: IncomingMessage | undefined): Omit<DataRateLi
 }
 
 /**
- * `limits` are the data API's, for the same rows reached through this door:
+ * `options` carry the data API's limits, for the same rows reached through this door:
  * frames larger than its body limit close the socket with 1009 before they are
  * read, and every data frame counts in the caller's data-API bucket — the one
  * their HTTP requests count in — rather than only in a budget per connection,
@@ -242,7 +270,7 @@ export function createPostgresWebSocket(
     driver: PostgresBackendDriver,
     authConfig?: WsAuthConfig,
     authAdapter?: AuthAdapter,
-    limits?: RealtimeSocketLimits
+    options?: RealtimeSocketOptions
 ) {
     // Session map scoped to this factory invocation — prevents stale sessions
     // leaking across hot reloads or multiple factory calls.
@@ -272,7 +300,7 @@ export function createPostgresWebSocket(
     // `ws` defaults to 100 MiB. The data API refuses a body over its limit
     // before any handler runs; this is the same limit, enforced by `ws` while
     // it reads the frame. `0` is "none" to both.
-    const maxPayload = limits?.maxPayload ?? RUNTIME_DEFAULT_MAX_BODY_SIZE;
+    const maxPayload = options?.maxPayload ?? RUNTIME_DEFAULT_MAX_BODY_SIZE;
     const wss = new WebSocketServer({ server, maxPayload: maxPayload > 0 ? maxPayload : 0 });
 
     // Handle errors on the WSS so that EADDRINUSE from the underlying HTTP
@@ -416,7 +444,22 @@ channelWindowStart: Date.now() });
                     // Fall back to JWT extraction otherwise.
                     let verifiedUser: WsUserIdentity | null = null;
 
-                    if (authAdapter) {
+                    if (token.startsWith("rk_")) {
+                        // An API key: the same verification the HTTP
+                        // middlewares run, so a key means one thing on both.
+                        const resolved = options?.resolveApiKey ? await options.resolveApiKey(token) : undefined;
+                        if (!resolved || !("uid" in resolved)) {
+                            sendError("AUTH_ERROR", "INVALID_TOKEN", resolved?.message ?? "API keys are not enabled on this server");
+                            return;
+                        }
+                        verifiedUser = {
+                            uid: resolved.uid,
+                            roles: resolved.roles,
+                            isAdmin: hasAdminRole(resolved.roles),
+                            isAnonymous: false,
+                            scopes: resolved.scopes
+                        };
+                    } else if (authAdapter) {
                         try {
                             const adapterUser = authAdapter.verifyToken
                                 ? await authAdapter.verifyToken(token)
@@ -457,7 +500,7 @@ channelWindowStart: Date.now() });
                             verifiedUser = {
                                 uid: jwtPayload.uid,
                                 roles: jwtPayload.roles ?? [],
-                                isAdmin: (jwtPayload.roles ?? []).some((r: string) => r === "admin"),
+                                isAdmin: hasAdminRole(jwtPayload.roles ?? []),
                                 isAnonymous: jwtPayload.isAnonymous === true,
                                 claims: jwtPayload.claims
                             };
@@ -499,11 +542,29 @@ roles: verifiedUser.roles }
                     }
                 }
 
-                // Admin-only operations require admin role
-                if (ADMIN_ONLY_TYPES.has(type)) {
+                // Admin-plane verbs need their scope; a narrowed session needs
+                // the data scope for the collection a data frame addresses, and
+                // cannot use channels, which no scope covers.
+                const adminScope = ADMIN_PLANE_TYPES.get(type);
+                if (adminScope) {
                     const session = clientSessions.get(clientId);
-                    if (!isAdminSession(session)) {
-                        sendError("ERROR", "FORBIDDEN", "Admin access required for this operation");
+                    if (!scopeGrants(sessionScopes(session), adminScope)) {
+                        sendError("ERROR", "SCOPE_MISSING", `This operation needs the "${adminScope}" scope`);
+                        return;
+                    }
+                }
+                const narrowedScopes = clientSessions.get(clientId)?.user?.scopes;
+                if (narrowedScopes) {
+                    const dataScope = DATA_VERB_SCOPES.get(type);
+                    if (dataScope) {
+                        const collection = frameCollection(type, payload);
+                        if (!scopeGrants(narrowedScopes, dataScope, collection)) {
+                            const wanted = collection ? `${dataScope}:${collection}` : dataScope;
+                            sendError("ERROR", "SCOPE_MISSING", `This API key does not hold the "${wanted}" scope`);
+                            return;
+                        }
+                    } else if (CHANNEL_MESSAGE_TYPES.has(type)) {
+                        sendError("ERROR", "SCOPE_MISSING", "An API key cannot use channels");
                         return;
                     }
                 }
@@ -514,8 +575,8 @@ roles: verifiedUser.roles }
                 // requests and their other sockets. The counter above is per
                 // connection, so on its own a caller bought budget by
                 // opening sockets.
-                if (limits?.dataRateLimit && PUBLIC_TYPES.has(type)) {
-                    const decision = await limits.dataRateLimit({
+                if (options?.dataRateLimit && PUBLIC_TYPES.has(type)) {
+                    const decision = await options.dataRateLimit({
                         ...origin,
                         uid: clientSessions.get(clientId)?.user?.uid
                     });

@@ -16,7 +16,8 @@ import { isBootstrapWindowOpen, SETUP_REQUIRED_MESSAGE } from "./registration-po
 import { normalizeEmail } from "@rebasepro/common";
 import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
-import { createRequireAuth, requireAdmin } from "./middleware";
+import { createRequireAuth } from "./middleware";
+import { assertMayGrantRoles, assertMayManageAccount, requireScope } from "./access";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import {
@@ -210,7 +211,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
         });
     });
 
-    router.get("/users", requireAdmin, async (c) => {
+    router.get("/users", requireScope("users:read"), async (c) => {
         // `?ids=a,b,c` resolves a known set of users in one round trip. The admin
         // UI needs it to turn the ids stored in `userSelect` columns into names
         // without firing one request per row.
@@ -220,7 +221,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
                 .slice(0, MAX_USER_IDS_PER_LOOKUP);
             const resolved = await Promise.all(ids.map(async (id) => {
                 const result = await authRepo.getUserWithRoles(id);
-                return result ? toAdminUser(result.user, result.roles.map((r) => r.id)) : undefined;
+                return result ? toAdminUser(result.user, result.roles) : undefined;
             }));
             const users = resolved.filter((u): u is AdminUser => u !== undefined);
             return c.json({ users,
@@ -266,7 +267,7 @@ offset: 0 });
         });
     });
 
-    router.get("/users/:uid", requireAdmin, async (c) => {
+    router.get("/users/:uid", requireScope("users:read"), async (c) => {
         const uid = c.req.param("uid");
         const result = await authRepo.getUserWithRoles(uid);
 
@@ -274,15 +275,19 @@ offset: 0 });
             throw ApiError.notFound("User not found");
         }
 
-        const adminUser = toAdminUser(result.user, result.roles.map((r) => r.id));
+        const adminUser = toAdminUser(result.user, result.roles);
         return c.json({ user: adminUser });
     });
 
-    router.post("/users", requireAdmin, async (c) => {
+    router.post("/users", requireScope("users:write"), async (c) => {
         const body = await c.req.json();
         const { email, roles } = body;
         if (!email) {
             throw ApiError.badRequest("Email is required");
+        }
+
+        if (roles !== undefined && Array.isArray(roles)) {
+            assertMayGrantRoles(c, roles.filter((role): role is string => typeof role === "string"));
         }
 
         const existing = await authRepo.getUserByEmail(normalizeEmail(email));
@@ -354,7 +359,7 @@ values: prepResult.values },
         return c.json({ user: adminUser, ...delivery }, 201);
     });
 
-    router.put("/users/:uid", requireAdmin, async (c) => {
+    router.put("/users/:uid", requireScope("users:write"), async (c) => {
         const uid = c.req.param("uid");
         const body = await c.req.json();
         const { password, email, displayName, roles } = body;
@@ -364,9 +369,12 @@ values: prepResult.values },
             throw ApiError.notFound("User not found");
         }
 
-        // Refused before anything is written, so a refused demotion does not
-        // leave the email or password it arrived with applied.
+        // Refused before anything is written, so a refused change does not
+        // leave the email or password it arrived with applied. Nobody edits an
+        // account holding more than they do, nor grants more than they hold.
+        assertMayManageAccount(c, await authRepo.getUserRoleIds(uid));
         if (roles !== undefined && Array.isArray(roles)) {
+            assertMayGrantRoles(c, roles.filter((role): role is string => typeof role === "string"));
             await assertRoleChangesAllowed(authRepo, [{ uid, roles }]);
         }
 
@@ -400,12 +408,12 @@ values: prepResult.values },
         }
 
         const result = await authRepo.getUserWithRoles(uid);
-        const adminUser = toAdminUser(result!.user, result!.roles.map((r) => r.id));
+        const adminUser = toAdminUser(result!.user, result!.roles);
 
         return c.json({ user: adminUser });
     });
 
-    router.delete("/users/:uid", requireAdmin, async (c) => {
+    router.delete("/users/:uid", requireScope("users:write"), async (c) => {
         const uid = c.req.param("uid");
         const authUser = c.get("user") as { uid?: string } | undefined;
 
@@ -418,6 +426,7 @@ values: prepResult.values },
             throw ApiError.notFound("User not found");
         }
 
+        assertMayManageAccount(c, await authRepo.getUserRoleIds(uid));
         await assertUserDeletionsAllowed(authRepo, [uid]);
 
         // The delete hooks fire here, because this is where users are deleted.

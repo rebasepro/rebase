@@ -20,7 +20,7 @@ import { spawn } from "child_process";
 import chalk from "chalk";
 import arg from "arg";
 import inquirer from "inquirer";
-import { createRebaseClient, type AuthStorage } from "@rebasepro/client";
+import { createMemoryStorage, createRebaseClient, type AuthStorage } from "@rebasepro/client";
 import { findProjectRoot } from "../../utils/project";
 import { parseCommandArgs } from "../../utils/args";
 import { cliUserAgent } from "../../utils/version";
@@ -322,6 +322,83 @@ export function createCloudClient(url: string): CloudClient {
     });
 }
 
+/**
+ * The environment variable that authenticates the cloud family with a token
+ * instead of a `cloud login` session — for CI and agents, which have no
+ * terminal to log in at and should not hold a person's password.
+ */
+export const TOKEN_ENV = "REBASE_TOKEN";
+
+/** `REBASE_TOKEN`, trimmed, or undefined when it is unset or blank. */
+export function envToken(): string | undefined {
+    const value = process.env[TOKEN_ENV]?.trim();
+    return value ? value : undefined;
+}
+
+/** The token each token-authenticated client was built with — see {@link freshAccessToken}. */
+const STATIC_TOKENS = new WeakMap<object, string>();
+
+/**
+ * A client that sends `token` as its bearer and nothing else.
+ *
+ * No session: the token is not refreshed, and the credentials file is neither
+ * read nor written — a CI job's token must not become, or replace, the login
+ * of whoever owns the machine. A 401 is answered by {@link explainRefusedToken}
+ * rather than by the SDK's session refresh, because there is no session to
+ * refresh and "log in again" is the wrong remedy for a token.
+ */
+export function createTokenClient(url: string, token: string): CloudClient {
+    const client = createRebaseClient({
+        baseUrl: url,
+        realtime: false,
+        headers: { "User-Agent": cliUserAgent() },
+        token,
+        auth: {
+            storage: createMemoryStorage(),
+            persistSession: false,
+            autoRefresh: false
+        }
+    });
+    client.setOnUnauthorized(() => explainRefusedToken(url, token));
+    STATIC_TOKENS.set(client, token);
+    return client;
+}
+
+/**
+ * Why the control plane answered a token-authenticated request with 401, and
+ * what to do about it. Never returns.
+ *
+ * Two different causes reach the same status. Usually the token itself was
+ * refused — it expired, was revoked, or belongs to another control plane — and
+ * the remedy is a new token. But a few endpoints take only a person's session
+ * (`/auth/me` among them), and those refuse a perfectly good token too. One
+ * request to `/api/auth/scopes`, which accepts a token, tells the two apart, so
+ * neither is answered with the other's remedy.
+ */
+async function explainRefusedToken(url: string, token: string): Promise<never> {
+    let tokenAccepted = false;
+    try {
+        const probe = await fetch(`${url}/api/auth/scopes`, {
+            headers: { Authorization: `Bearer ${token}`, "User-Agent": cliUserAgent() }
+        });
+        tokenAccepted = probe.ok;
+    } catch {
+        // Unreachable: say what is certain — the request was refused.
+    }
+    if (tokenAccepted) {
+        fail(
+            `This command needs a signed-in session, and ${TOKEN_ENV} is an API token.`,
+            `Unset ${TOKEN_ENV} and run ${chalk.bold("rebase cloud login")} to run it.`,
+            "session_required"
+        );
+    }
+    fail(
+        `${TOKEN_ENV} was rejected by ${url}: it has expired, been revoked, or was not issued by this control plane.`,
+        `Create a new one with ${chalk.bold("rebase cloud tokens create")} and put it in ${TOKEN_ENV}.`,
+        "token_rejected"
+    );
+}
+
 /** Two minutes of head-room before a token is treated as expired. */
 const EXPIRY_BUFFER_MS = 120_000;
 
@@ -343,19 +420,47 @@ export interface SessionHolder {
  * token read once at the start of a command that runs for longer than it
  * lives — a deploy's build, a `db connect` left open — is refused by the time
  * it is used, so it is read here at the moment it is sent.
+ *
+ * A client built from `REBASE_TOKEN` has no session; its token is returned
+ * as it is, since there is nothing to refresh it with.
  */
 export async function freshAccessToken(client: SessionHolder): Promise<string> {
+    const fixed = STATIC_TOKENS.get(client);
+    if (fixed) return fixed;
     const session = client.auth.getSession();
     if (session?.accessToken && session.expiresAt > Date.now() + EXPIRY_BUFFER_MS) return session.accessToken;
     return (await client.auth.refreshSession()).accessToken;
 }
 
 /**
- * Return an authenticated client for the resolved host, refreshing the access
- * token if it is close to expiry. Exits with a helpful message when there is no
- * usable session (never logged in, or the refresh token was revoked).
+ * Return an authenticated client for the resolved host.
+ *
+ * With `REBASE_TOKEN` set, that token is the credential for every request and
+ * the stored login is not consulted at all. Otherwise it is the `cloud login`
+ * session — see {@link requireSessionClient}.
  */
 export async function requireClient(rawArgs: string[]): Promise<{ client: CloudClient; url: string }> {
+    const token = envToken();
+    if (!token) return requireSessionClient(rawArgs);
+    // Before anything else: everything downstream of here is a control-plane
+    // call, and a direct-linked directory has no control plane to make it
+    // against.
+    refuseDirectLink(rawArgs);
+    const url = resolveCloudUrl(rawArgs);
+    return { client: createTokenClient(url, token), url };
+}
+
+/**
+ * Return a client holding the `cloud login` session for the resolved host,
+ * refreshing the access token if it is close to expiry, whether or not
+ * `REBASE_TOKEN` is set. Exits with a helpful message when there is no usable
+ * session (never logged in, or the refresh token was revoked).
+ *
+ * For the commands a token cannot run — minting and revoking tokens: a key that
+ * could mint keys could mint its own successor, so the control plane refuses
+ * every key on those routes.
+ */
+export async function requireSessionClient(rawArgs: string[]): Promise<{ client: CloudClient; url: string }> {
     // Before anything else: everything downstream of here is a control-plane
     // call, and a direct-linked directory has no control plane to make it
     // against.
@@ -365,6 +470,13 @@ export async function requireClient(rawArgs: string[]): Promise<{ client: CloudC
     const session = client.auth.getSession();
 
     if (!session || !session.accessToken) {
+        if (envToken()) {
+            fail(
+                `This command needs a signed-in session for ${chalk.cyan(url)}, and ${TOKEN_ENV} is an API token.`,
+                `A token cannot manage tokens. Run ${chalk.bold("rebase cloud login")} first.`,
+                "session_required"
+            );
+        }
         fail(
             `Not logged in to ${chalk.cyan(url)}.`,
             `Run ${chalk.bold("rebase cloud login")} first.`,

@@ -29,9 +29,9 @@
  *
  * @module
  */
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { HonoEnv } from "../api/types";
-import { getUser, isAdmin, getRoles, identityResolved } from "./context";
+import { getUser, isAdmin, getRoles, identityResolved, hasScope } from "./context";
 
 /**
  * The answer to "a guard ran, but no middleware had resolved anything".
@@ -82,15 +82,14 @@ export const requireAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
 };
 
 /**
- * Reject callers without an administrative role with 403.
+ * Reject callers without the `admin` role with 403.
  *
  * Must come **after** {@link requireAuth}: on its own it answers 401 for an
  * anonymous caller, which is right, but pairing them keeps the two failures
  * distinguishable — 401 "who are you", 403 "not you".
  *
- * Administrative means `admin` or `schema-admin`, from the single list in
- * `auth/admin-roles.ts`. Do not compare against `"admin"` by hand; that is the
- * divergence that list exists to prevent.
+ * Prefer {@link requireScope} for anything an app declares a scope for: a
+ * scope can be granted to a narrower role and to a key, and `admin` cannot.
  */
 export const requireAdmin: MiddlewareHandler<HonoEnv> = async (c, next) => {
     const user = getUser(c);
@@ -159,6 +158,52 @@ export function requireRole(...roles: string[]): MiddlewareHandler<HonoEnv> {
             }, 403);
         }
 
+        return next();
+    };
+}
+
+/**
+ * Reject callers who do not hold `scope` with 403.
+ *
+ * `scope` is a built-in scope or one the app declares under `auth.scopes` on
+ * the users collection. `target` narrows it to one resource — a key holding
+ * `project:deploy:p1` passes `requireScope("project:deploy", c => c.req.param("project"))`
+ * for `p1` only — and may be read from the request.
+ *
+ * A signed-in person holds every app scope, so for a person this is no
+ * authorization at all: it narrows API keys and tokens. Decide whether the
+ * person may act in the handler, as you would without it.
+ *
+ * @example
+ * ```ts
+ * app.post("/deploy/:project", requireAuth, requireScope("project:deploy", c => c.req.param("project")), handler);
+ * ```
+ */
+export function requireScope(
+    scope: string,
+    target?: string | ((c: Context<HonoEnv>) => string | undefined)
+): MiddlewareHandler<HonoEnv> {
+    return async (c, next) => {
+        if (!getUser(c)) {
+            if (!identityResolved(c)) return c.json(unresolvedIdentity(), 500);
+            return c.json({
+                error: {
+                    message: "Authentication required",
+                    code: "UNAUTHORIZED"
+                }
+            }, 401);
+        }
+        const resolvedTarget = typeof target === "function" ? target(c) : target;
+        if (!hasScope(c, scope, resolvedTarget)) {
+            const wanted = resolvedTarget !== undefined ? `${scope}:${resolvedTarget}` : scope;
+            return c.json({
+                error: {
+                    message: `This credential does not hold the "${wanted}" scope.`,
+                    code: "SCOPE_MISSING",
+                    details: { requiredScope: wanted }
+                }
+            }, 403);
+        }
         return next();
     };
 }
