@@ -412,6 +412,52 @@ export function resolveEnableSwagger(env: RebaseBootEnv): boolean | undefined {
 export type CorsOriginResolver = (origin: string) => string | null;
 
 /**
+ * An allow-list entry, or an `Origin` header, as the origin it names.
+ *
+ * A browser's `Origin` is always scheme + host + port: lower-cased, no default
+ * port, no path, no trailing slash. The list used to be compared to it
+ * verbatim, so `https://app.example.com/` — the commonest way to write a URL —
+ * or `FRONTEND_URL=https://example.com/admin`, which is also the base for email
+ * links and so routinely carries a path, refused every credentialed request
+ * from the frontend. Anything `URL` cannot parse is kept as written: `*` must
+ * still reach the wildcard refusal below, and an unparseable entry is warned
+ * about at boot.
+ */
+function normalizeOrigin(value: string): string {
+    try {
+        const { origin } = new URL(value);
+        // `null` is what URL reports for schemes with no origin (`file:`,
+        // `data:`). Comparing on it would match every opaque origin at once.
+        return origin === "null" ? value : origin;
+    } catch {
+        return value;
+    }
+}
+
+/**
+ * How many distinct refused origins are named in the log. A browser retries a
+ * refused preflight on every request, so each is named once; past this bound a
+ * stream of forged `Origin` headers would only fill the log and memory.
+ */
+const MAX_NAMED_REFUSALS = 100;
+
+/** Warn once per refused origin, up to {@link MAX_NAMED_REFUSALS}. */
+function refusalReporter(explain: (origin: string) => string): (origin: string) => void {
+    const named = new Set<string>();
+    let saturated = false;
+    return (origin: string) => {
+        if (named.has(origin) || saturated) return;
+        if (named.size >= MAX_NAMED_REFUSALS) {
+            saturated = true;
+            console.warn(`[Rebase] Refused cross-origin requests from ${MAX_NAMED_REFUSALS} distinct origins; not naming any more.`);
+            return;
+        }
+        named.add(origin);
+        console.warn(explain(origin));
+    };
+}
+
+/**
  * Build the CORS origin policy.
  *
  * Production serves an explicit allow-list and nothing else. `loadEnv` already
@@ -426,8 +472,22 @@ export type CorsOriginResolver = (origin: string) => string | null;
  */
 export function resolveCorsOrigin(env: RebaseBootEnv): CorsOriginResolver {
     const isProduction = env.NODE_ENV === "production";
+    const source = env.CORS_ORIGINS ? "CORS_ORIGINS" : "FRONTEND_URL";
     const raw = env.CORS_ORIGINS || env.FRONTEND_URL || "";
-    const allowed = raw.split(",").map(s => s.trim()).filter(Boolean);
+    const entries = raw.split(",").map(s => s.trim()).filter(Boolean);
+    const allowed = entries.map(normalizeOrigin);
+
+    // An entry with no scheme (`app.example.com`) can never equal a browser's
+    // Origin. Not refused — the other entries may be fine, and a boot that
+    // worked yesterday should not stop over it — but said, once, at boot.
+    for (const entry of entries) {
+        if (entry !== "*" && !/^[a-z][a-z0-9+.-]*:\/\//i.test(entry)) {
+            console.warn(
+                `[Rebase] ${source} entry "${entry}" is not an origin and will never match one. ` +
+                "Browsers send scheme://host[:port] — write it as e.g. https://" + entry + "."
+            );
+        }
+    }
 
     if (!isProduction) {
         // Development reflects localhost, **plus** anything the developer
@@ -443,20 +503,17 @@ export function resolveCorsOrigin(env: RebaseBootEnv): CorsOriginResolver {
         // *neither* is still refused: credentials are enabled, so reflecting an
         // arbitrary `Origin` would let any site the developer happens to visit
         // make credentialed requests against the dev server with their session.
-        const denied = new Set<string>();
+        // Once per origin: a refused preflight is retried on every request,
+        // and the message is a fix, not an incident.
+        const refused = refusalReporter(origin =>
+            `[Rebase] Refused a cross-origin request from ${origin}. ` +
+            "In development only localhost is allowed by default. " +
+            `To allow it, set CORS_ORIGINS=${origin} (comma-separated for several).`
+        );
         return (origin: string) => {
             if (!origin) return "*";
-            if (isLocalhostOrigin(origin) || allowed.includes(origin)) return origin;
-            // Once per origin: a refused preflight is retried on every request,
-            // and the message is a fix, not an incident.
-            if (!denied.has(origin)) {
-                denied.add(origin);
-                console.warn(
-                    `[Rebase] Refused a cross-origin request from ${origin}. ` +
-                    "In development only localhost is allowed by default. " +
-                    `To allow it, set CORS_ORIGINS=${origin} (comma-separated for several).`
-                );
-            }
+            if (isLocalhostOrigin(origin) || allowed.includes(normalizeOrigin(origin))) return origin;
+            refused(origin);
             return null;
         };
     }
@@ -479,7 +536,19 @@ export function resolveCorsOrigin(env: RebaseBootEnv): CorsOriginResolver {
         );
     }
 
-    return (origin: string) => (allowed.includes(origin) ? origin : null);
+    // Production said nothing at all about a refusal, so a frontend whose
+    // origin was missing from the list failed in the browser with the server's
+    // log clean. Same once-per-origin line as development, minus the localhost
+    // advice.
+    const refused = refusalReporter(origin =>
+        `[Rebase] Refused a cross-origin request from ${origin}: it is not in ${source}. ` +
+        `If it is your frontend, add it (comma-separated for several).`
+    );
+    return (origin: string) => {
+        if (origin && allowed.includes(normalizeOrigin(origin))) return origin;
+        if (origin) refused(origin);
+        return null;
+    };
 }
 
 /**

@@ -107,6 +107,67 @@ describe("resolveCorsOrigin", () => {
             .toThrow(/cannot be/);
     });
 
+    /**
+     * The list was compared verbatim against the browser's `Origin`, which is
+     * always scheme + host + port, lower-cased, with no path and no trailing
+     * slash. `FRONTEND_URL` is also the base for email links, so it routinely
+     * carries a path (`https://example.com/admin`), and a trailing slash is the
+     * commonest way to write a URL at all — either one refused every
+     * credentialed request from the frontend, and production logged nothing.
+     */
+    it.each([
+        ["a trailing slash", "https://app.example.com/"],
+        ["a path", "https://app.example.com/admin"],
+        ["upper case", "HTTPS://App.Example.com"],
+        ["a default port", "https://app.example.com:443"]
+    ])("matches an entry written with %s", (_, entry) => {
+        const origin = resolveCorsOrigin(env({ NODE_ENV: "production", FRONTEND_URL: entry }));
+        expect(origin("https://app.example.com")).toBe("https://app.example.com");
+        expect(origin("https://evil.example.com")).toBeNull();
+    });
+
+    it("normalizes CORS_ORIGINS entries the same way in development", () => {
+        const origin = resolveCorsOrigin(env({ NODE_ENV: "development", CORS_ORIGINS: "http://192.168.1.5:5173/" }));
+        expect(origin("http://192.168.1.5:5173")).toBe("http://192.168.1.5:5173");
+    });
+
+    it("says why it refused an origin in production too, once per origin", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => { /* capture */ });
+        try {
+            const origin = resolveCorsOrigin(env({ NODE_ENV: "production", CORS_ORIGINS: "https://app.example.com" }));
+            origin("https://www.example.com");
+            origin("https://www.example.com");
+
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(String(warn.mock.calls[0][0])).toContain("https://www.example.com");
+            expect(String(warn.mock.calls[0][0])).toContain("CORS_ORIGINS");
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
+    it("stops naming refused origins after a bound, so a stream of forged ones cannot flood the log", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => { /* capture */ });
+        try {
+            const origin = resolveCorsOrigin(env({ NODE_ENV: "production", CORS_ORIGINS: "https://app.example.com" }));
+            for (let i = 0; i < 500; i++) origin(`https://x${i}.example.com`);
+            expect(warn.mock.calls.length).toBeLessThan(150);
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
+    it("warns at boot about an entry that can never match an Origin", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => { /* capture */ });
+        try {
+            resolveCorsOrigin(env({ NODE_ENV: "production", CORS_ORIGINS: "app.example.com,https://ok.example.com" }));
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(String(warn.mock.calls[0][0])).toContain("app.example.com");
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
     it("ignores blank entries in the list", () => {
         const origin = resolveCorsOrigin(env({
             NODE_ENV: "production",
