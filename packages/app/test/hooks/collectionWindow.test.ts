@@ -241,6 +241,34 @@ describe("CollectionWindow", () => {
         expect(last().loading).toBe(false);
     });
 
+    it.each([false, true])("keeps the rows it shows when the connection drops, and takes the push that follows the reconnect (fallbackToFind: %s)", async (fallbackToFind) => {
+        const collection = new FakeCollection(rowsOf(15));
+        const { last, states } = open(collection, { pageSize: 10, target: 15, fallbackToFind });
+        collection.push!(collection.answer({ limit: 10 }));
+        await until(() => last()?.rows?.length === 15);
+        const reads = collection.reads.length;
+        const lost = Object.assign(new Error("Live updates are paused"), { code: "CONNECTION_LOST" });
+        collection.liveError!(lost);
+        await settle();
+        expect(last().rows?.length).toBe(15);
+        expect(last().error).toBeUndefined();
+        expect(states.some(state => state.error !== undefined)).toBe(false);
+        // Nothing to re-read over a socket that is down.
+        expect(collection.reads.length).toBe(reads);
+
+        collection.rows = rowsOf(15, "after");
+        collection.push!(collection.answer({ limit: 10 }));
+        await until(() => last()?.rows?.[0]?.id === "after0");
+    });
+
+    it("still reports a lost connection before it has shown anything", async () => {
+        const collection = new FakeCollection(rowsOf(5));
+        const { last } = open(collection);
+        const lost = Object.assign(new Error("Live updates are paused"), { code: "CONNECTION_LOST" });
+        collection.liveError!(lost);
+        await until(() => last()?.error === lost);
+    });
+
     it("reads the first page once when the subscription is slow to answer, and the subscription still wins", async () => {
         jest.useFakeTimers();
         try {

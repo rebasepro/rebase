@@ -1,6 +1,8 @@
 import { MAX_LIST_LIMIT } from "@rebasepro/types";
 import type { CollectionAccessor, Entity, FindParams } from "@rebasepro/types";
 
+import { isConnectionLostError } from "../../util/realtime";
+
 /**
  * The part of a read that says *which* rows, without saying how many or from
  * where. The window adds `limit` and `offset` itself, page by page.
@@ -201,6 +203,12 @@ export class CollectionWindow<M extends Record<string, unknown>> {
 
     private receiveLiveError(error: Error): void {
         if (this.disposed) return;
+        // The socket is down, not the data: the SDK keeps the subscription and
+        // its first push after the reconnect carries what changed meanwhile.
+        // Rows already on screen stay there (the connection banner says they
+        // may be stale) instead of turning into an error, as `useCollection`
+        // and `useFetch` already do.
+        if (this.head !== undefined && isConnectionLostError(error)) return;
         if (this.options.fallbackToFind) {
             this.readHeadOnce(true, error);
             return;
