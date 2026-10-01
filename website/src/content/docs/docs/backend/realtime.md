@@ -367,7 +367,7 @@ The typed SDK automatically reconnects when the WebSocket connection drops:
 - **Exponential backoff** — Reconnect delays start at 1 second and double on each attempt, capping at 30 seconds.
 - **Maximum 5 attempts** — After 5 failed reconnection attempts, the client stops trying.
 - **Automatic resubscription** — On successful reconnect, all active subscriptions are re-registered with the server. No manual intervention needed.
-- **Message queuing** — Messages sent while disconnected are queued and delivered after reconnection.
+- **Requests are at-most-once** — A request made while the socket is down waits for it, for up to 30 seconds from the call, and then fails with `REQUEST_TIMEOUT` without ever being sent. A request that was already sent when the connection dropped fails with `CONNECTION_LOST` and is **not** sent again: the server may or may not have run it, and only the caller knows whether running it twice is safe.
 
 You can listen to connection lifecycle events:
 

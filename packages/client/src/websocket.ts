@@ -57,6 +57,37 @@ function frameError(message: WebSocketMessage): RebaseApiError {
     return new RebaseApiError(errorMessage, { code: errorCode, details });
 }
 
+/**
+ * A request whose socket closed after it was written and before the server
+ * answered. The server may have run it. It is not re-sent — see `onclose`.
+ */
+function connectionLostError(): RebaseApiError {
+    return new RebaseApiError(
+        "The realtime connection closed before the server answered. The request may or may not have been applied, and it was not sent again.",
+        { code: "CONNECTION_LOST" }
+    );
+}
+
+/**
+ * A request that got no answer within `requestTimeoutMs` of the call — whether
+ * it waited in the queue for a socket the whole time, or was written and never
+ * answered (a half-open connection looks exactly like that).
+ */
+function requestTimeoutError(written: boolean): RebaseApiError {
+    return new RebaseApiError(
+        written
+            ? "The server did not answer the realtime request in time. It may or may not have been applied."
+            : "The realtime request timed out before it could be sent. It was not applied.",
+        { code: "REQUEST_TIMEOUT" }
+    );
+}
+
+/** A frame waiting in `messageQueue`, carrying the handlers of the promise its caller holds. */
+type QueuedFrame = Record<string, unknown> & {
+    _queuedResolve?: (value: unknown) => void;
+    _queuedReject?: (error: Error) => void;
+};
+
 export interface RebaseWebSocketConfig {
     websocketUrl: string;
     /** Optional auth token getter for WebSocket authentication */
@@ -587,18 +618,22 @@ export class RebaseWebSocketClient {
                 this.suspendSubscribeWatchdogs();
                 this.emit("disconnect");
 
-                // Re-queue pending requests so the UI doesn't hang indefinitely or crash
+                // Every request still waiting here was written to this socket,
+                // so the server may have run it: the answer is what got lost,
+                // not necessarily the request. Re-sending it on the next socket
+                // made socket requests at-least-once — one `save()` made two
+                // rows, and a statement typed into the Studio SQL editor ran
+                // twice behind a single success. They are at-most-once: the
+                // caller is told the outcome is unknown, and decides. Frames
+                // that never reached a socket are still in `messageQueue` and
+                // are not affected.
                 for (const [reqId, request] of this.pendingRequests.entries()) {
+                    this.pendingRequests.delete(reqId);
                     if (reqId.startsWith("auth_")) {
                         request.reject(new Error("Connection closed during authentication"));
-                    } else if (request.message) {
-                        request.message._queuedResolve = request.resolve;
-                        request.message._queuedReject = request.reject;
-                        this.messageQueue.push(request.message);
                     } else {
-                        request.reject(new RebaseApiError("Connection closed"));
+                        request.reject(connectionLostError());
                     }
-                    this.pendingRequests.delete(reqId);
                 }
 
                 this.attemptReconnect();
@@ -1122,29 +1157,80 @@ export class RebaseWebSocketClient {
      * Not part of the stable surface — prefer `client.realtime.channel(name)`.
      */
     public sendMessage(message: Record<string, unknown>): Promise<unknown> {
-        // If already has a requestId (re-sending from queue), use the stored promise handlers
-        const queuedMsg = message as Record<string, unknown> & { _queuedResolve?: (p: unknown) => void; _queuedReject?: (p: Error) => void };
+        // Drained from the queue: its caller already holds a promise.
+        const queuedMsg: QueuedFrame = message;
         if (queuedMsg._queuedResolve && queuedMsg._queuedReject) {
-            return this.doSendMessage(message, queuedMsg._queuedResolve, queuedMsg._queuedReject);
-        }
-
-        if (!this.isConnected || !this.ws) {
-            // The queue is only ever drained by a socket opening, so something
-            // has to open one. Before lazy connect this was guaranteed by the
-            // constructor; now the first frame is what asks for it.
-            this.ensureConnected();
-            // Queue the message and return a promise that will be resolved when actually sent
-            return new Promise<unknown>((resolve, reject) => {
-                const queueable = message as Record<string, unknown> & { _queuedResolve?: (p: unknown) => void; _queuedReject?: (p: Error) => void };
-                queueable._queuedResolve = resolve;
-                queueable._queuedReject = reject;
-                this.messageQueue.push(message);
-            });
+            const resolve = queuedMsg._queuedResolve;
+            const reject = queuedMsg._queuedReject;
+            delete queuedMsg._queuedResolve;
+            delete queuedMsg._queuedReject;
+            return this.doSendMessage(message, resolve, reject);
         }
 
         return new Promise<unknown>((resolve, reject) => {
-            this.doSendMessage(message, resolve, reject);
+            // One deadline per request, armed at the call. It used to be armed
+            // only when the frame was written, so a request queued while the
+            // socket was down had none at all — and when the socket never came
+            // back, its caller's promise stayed pending for the life of the
+            // page. Running it from the call also keeps a request that waited
+            // 25s for a socket from then getting another full 30s.
+            let settled = false;
+            let deadline: ReturnType<typeof setTimeout> | undefined;
+            const onResolve = (value: unknown) => {
+                if (settled) return;
+                settled = true;
+                if (deadline) clearTimeout(deadline);
+                resolve(value);
+            };
+            const onReject = (error: Error) => {
+                if (settled) return;
+                settled = true;
+                if (deadline) clearTimeout(deadline);
+                this.abandonedFrames.add(message);
+                reject(error);
+            };
+            if (this.expectsResponse(message)) {
+                deadline = setTimeout(() => {
+                    const queuedAt = this.messageQueue.indexOf(message);
+                    if (queuedAt >= 0) this.messageQueue.splice(queuedAt, 1);
+                    let written = false;
+                    for (const [requestId, pending] of this.pendingRequests) {
+                        if (pending.message !== message) continue;
+                        this.pendingRequests.delete(requestId);
+                        written = true;
+                    }
+                    onReject(requestTimeoutError(written));
+                }, this.requestTimeoutMs);
+            }
+
+            if (!this.isConnected || !this.ws) {
+                // The queue is only ever drained by a socket opening, so
+                // something has to open one. Before lazy connect this was
+                // guaranteed by the constructor; now the first frame is what
+                // asks for it.
+                this.ensureConnected();
+                queuedMsg._queuedResolve = onResolve;
+                queuedMsg._queuedReject = onReject;
+                this.messageQueue.push(message);
+                return;
+            }
+
+            void this.doSendMessage(message, onResolve, onReject);
         });
+    }
+
+    /**
+     * Frames whose caller has already been answered — timed out, or rejected
+     * by a close. One can still be on its way to the socket (awaiting
+     * authentication), and must not be written after its caller was told it
+     * failed.
+     */
+    private abandonedFrames = new WeakSet<Record<string, unknown>>();
+
+    /** Whether the server answers this frame with a response envelope. */
+    private expectsResponse(message: Record<string, unknown>): boolean {
+        const type = message.type as string;
+        return !(SUBSCRIPTION_MESSAGE_TYPES.has(type) || CHANNEL_MESSAGE_TYPES.has(type));
     }
 
     private async doSendMessage(message: Record<string, unknown>, resolve: (value: unknown) => void, reject: (error: Error) => void): Promise<void> {
@@ -1179,37 +1265,33 @@ export class RebaseWebSocketClient {
             }
         }
 
+        // Its caller gave up while this waited for authentication.
+        if (this.abandonedFrames.has(message)) return;
+
+        // The socket went away while this waited for authentication. Nothing
+        // was written, so it is still safe to send — on the next socket.
+        if (!this.isConnected || !this.ws) {
+            const queueable: QueuedFrame = message;
+            queueable._queuedResolve = resolve;
+            queueable._queuedReject = reject;
+            this.messageQueue.push(message);
+            this.ensureConnected();
+            return;
+        }
+
         const requestId = (message.requestId as string) || `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         message.requestId = requestId;
 
-        const expectsResponse = !(
-            isSubscriptionFrame
-            || CHANNEL_MESSAGE_TYPES.has(message.type as string)
-        );
+        const expectsResponse = this.expectsResponse(message);
 
+        // The deadline is the caller's, armed in `sendMessage`; registering
+        // here only says "written, waiting for its answer".
         if (expectsResponse && !this.pendingRequests.has(requestId)) {
-            const timeoutHandle = setTimeout(() => {
-                if (this.pendingRequests.has(requestId)) {
-                    this.pendingRequests.delete(requestId);
-                    reject(new RebaseApiError("Request timed out"));
-                }
-            }, this.requestTimeoutMs);
-
-            this.pendingRequests.set(requestId, {
-                resolve: (value: unknown) => {
-                    clearTimeout(timeoutHandle);
-                    resolve(value);
-                },
-                reject: (error: Error) => {
-                    clearTimeout(timeoutHandle);
-                    reject(error);
-                },
-                message: message as Record<string, unknown> & { _queuedResolve?: (p: unknown) => void; _queuedReject?: (p: Error) => void }
-            });
+            this.pendingRequests.set(requestId, { resolve, reject, message });
         }
 
         try {
-            this.ws!.send(JSON.stringify(message));
+            this.ws.send(JSON.stringify(message));
             if (!expectsResponse) {
                 resolve(undefined);
             }

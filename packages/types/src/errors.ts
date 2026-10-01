@@ -35,6 +35,20 @@ export type RebaseErrorCode =
     | "OFFLINE"
     | "DB_PERMISSION_DENIED"
     | "SCHEMA_DRIFT"
+    /**
+     * Realtime: the socket closed after a request was written and before the
+     * server answered — the request may or may not have run, and it is never
+     * re-sent. On a live subscription's `onError`: the connection has been
+     * down longer than a blip; the subscription is kept and resumes, with a
+     * fresh `onUpdate`, when the socket is back.
+     */
+    | "CONNECTION_LOST"
+    /**
+     * Realtime: no answer within the request timeout of the call — either it
+     * waited for a socket the whole time and was never sent, or it was written
+     * and never answered.
+     */
+    | "REQUEST_TIMEOUT"
     // `string & {}` keeps the union open while preserving completion on the
     // literals above — a bare `| string` would collapse them and offer nothing.
     | (string & {});

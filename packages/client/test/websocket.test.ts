@@ -347,7 +347,9 @@ payload: { token: "new-token" } })
             const fetchPromise = client.fetchCollection({ path: "users" });
             expect((client as any).messageQueue.length).toBe(1);
 
-            jest.runOnlyPendingTimers();
+            // Just the dial: the request's own deadline is pending too, and
+            // running every pending timer would expire it.
+            jest.advanceTimersByTime(10);
             await Promise.resolve();
 
             const ws = getWs();
@@ -1590,20 +1592,29 @@ id: "1" }, onUpdate, onError);
             });
         });
 
-        it("re-queues pending requests on disconnect", () => {
+        /**
+         * A request written to a socket that then closes may already have run
+         * on the server. Re-queuing it made socket requests at-least-once — a
+         * `SAVE` made two rows on reconnect — so it is rejected instead, and
+         * nothing is queued for the next socket. See
+         * `websocket-at-most-once.test.ts` for the fault-injected versions.
+         */
+        it("rejects in-flight requests on disconnect instead of re-sending them", async () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
 
-            // Start a request
             const promise = client.fetchCollection({ path: "test" });
-            const sentCount = ws.sentMessages.length;
+            const rejected = promise.then(() => undefined, (error: unknown) => error);
+            await Promise.resolve();
+            expect(frames(ws).filter(m => m.type === "FETCH_COLLECTION")).toHaveLength(1);
 
-            // Disconnect
             ws.close();
 
-            // The message should be re-queued
-            expect((client as any).messageQueue.length).toBeGreaterThan(0);
+            const error = await rejected;
+            expect(error).toBeInstanceOf(ApiError);
+            expect((error as ApiError).code).toBe("CONNECTION_LOST");
+            expect((client as any).messageQueue).toHaveLength(0);
         });
 
         it("stops reconnecting after max attempts", () => {
