@@ -33,7 +33,7 @@ import { BackupsView } from "../src/components/Backups/BackupsView";
 const PG_DUMP_MISSING = "Could not find the 'pg_dump' binary.";
 
 describe("Backups panel and the scheduled run", () => {
-    beforeEach(() => list.mockReset());
+    beforeEach(() => { list.mockReset(); });
 
     it("shows a failed last run and its error, even with no backups listed", async () => {
         list.mockResolvedValue({
