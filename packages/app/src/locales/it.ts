@@ -1028,7 +1028,7 @@ export const it: RebaseTranslations = {
     studio_editor_collection_start_saved: "Configurazione predefinita salvata",
     studio_home_duplicate_collection: "Duplicate",
     studio_home_delete: "Delete",
-    studio_home_confirm_delete_no_data: "Non verrà eliminato alcun dato, solo la collezione nel pannello di amministrazione",
+    studio_home_confirm_delete_no_data: "Elimina il file della collezione e la sua voce in index.ts, e ne fa il commit. La tabella e le sue righe restano nel database. Rifiutato finché un'altra collezione fa riferimento a questa.",
     studio_home_collection_deleted: "Collezione eliminata",
     studio_kanban_configure: "Configura Kanban",
     studio_missing_reference_error: "Nessuna collezione per il percorso: {{path}}",

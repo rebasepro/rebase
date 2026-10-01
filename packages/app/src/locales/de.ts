@@ -1028,7 +1028,7 @@ export const de: RebaseTranslations = {
     studio_editor_collection_start_saved: "Standardkonfiguration gespeichert",
     studio_home_duplicate_collection: "Duplicate",
     studio_home_delete: "Delete",
-    studio_home_confirm_delete_no_data: "Es werden keine Daten gelöscht, nur die Sammlung im Adminbereich",
+    studio_home_confirm_delete_no_data: "Löscht die Datei der Sammlung und ihren Eintrag in index.ts und committet das. Die Tabelle und ihre Zeilen bleiben in der Datenbank. Nicht möglich, solange eine andere Sammlung auf diese verweist.",
     studio_home_collection_deleted: "Sammlung gelöscht",
     studio_kanban_configure: "Kanban konfigurieren",
     studio_missing_reference_error: "Keine Sammlung für den Pfad: {{path}}",

@@ -1028,7 +1028,7 @@ export const hi: RebaseTranslations = {
     studio_editor_collection_start_saved: "डिफ़ॉल्ट कॉन्फ़िगरेशन सहेजा गया",
     studio_home_duplicate_collection: "Duplicate",
     studio_home_delete: "Delete",
-    studio_home_confirm_delete_no_data: "इससे कोई डेटा नहीं हटेगा, केवल व्यवस्थापक पैनल का संग्रह हटेगा",
+    studio_home_confirm_delete_no_data: "संग्रह की फ़ाइल और index.ts में उसकी प्रविष्टि हटाता है, और इस बदलाव को commit करता है। तालिका और उसकी पंक्तियाँ डेटाबेस में बनी रहती हैं। जब तक कोई दूसरा संग्रह इससे जुड़ा है, यह अस्वीकार किया जाता है।",
     studio_home_collection_deleted: "संग्रह हटा दिया गया",
     studio_kanban_configure: "Kanban कॉन्फ़िगर करें",
     studio_missing_reference_error: "इस पथ के लिए कोई संग्रह नहीं: {{path}}",

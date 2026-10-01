@@ -1033,7 +1033,7 @@ export const pt: RebaseTranslations = {
     studio_editor_collection_start_saved: "Configuração predefinida guardada",
     studio_home_duplicate_collection: "Duplicate",
     studio_home_delete: "Delete",
-    studio_home_confirm_delete_no_data: "Não serão eliminados dados, apenas a coleção no painel de administração",
+    studio_home_confirm_delete_no_data: "Elimina o ficheiro da coleção e a respetiva entrada em index.ts, e faz commit da alteração. A tabela e as suas linhas permanecem na base de dados. Recusado enquanto outra coleção estiver ligada a esta.",
     studio_home_collection_deleted: "Coleção eliminada",
     studio_kanban_configure: "Configurar o Kanban",
     studio_missing_reference_error: "Não há coleção para o caminho: {{path}}",
