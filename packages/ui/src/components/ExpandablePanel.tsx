@@ -108,6 +108,17 @@ export function ExpandablePanel({
                         role="button"
                         tabIndex={0}
                         aria-expanded={open}
+                        // A role="button" has to answer Enter and Space itself:
+                        // Radix's trigger listens for click only, and a div does
+                        // not turn a key into a click, so the header took focus and
+                        // then ignored the keyboard. Only for keys pressed on the
+                        // header — a control inside the title keeps its own keys.
+                        onKeyDown={(event) => {
+                            if (event.target !== event.currentTarget) return;
+                            if (event.key !== "Enter" && event.key !== " ") return;
+                            event.preventDefault(); // Space would scroll the page
+                            event.currentTarget.click();
+                        }}
                     >
                         {title}
                         <ChevronDownIcon className={cls("transition", open ? "rotate-180" : "")}/>
