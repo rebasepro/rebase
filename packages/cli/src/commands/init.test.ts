@@ -11,7 +11,8 @@ import os from "os";
 import { cp } from "fs/promises";
 import inquirer from "inquirer";
 import net from "net";
-import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS } from "./init.js";
+import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS, scaffoldDirectoryConflicts, scaffoldConflictMessage, initGitRepository, SCAFFOLD_TOLERATED_ENTRIES } from "./init.js";
+import { execFileSync } from "child_process";
 import { SCAFFOLD_DEFAULT_PORT } from "./dev.js";
 
 
@@ -1689,3 +1690,92 @@ describe("the template's install-script allowlists", () => {
         expect(Object.keys(pkg.allowScripts ?? {})).toEqual(["@ariga/atlas"]);
     });
 });
+
+/**
+ * `rebase init .` in a freshly cloned repository.
+ *
+ * `git clone` of an empty GitHub repository — or `git init` — leaves a
+ * directory whose only entry is `.git`, and the help's own example is `rebase
+ * init . --yes --git`. Any entry at all used to count as "not empty", so that
+ * example refused the one directory it is most likely to be typed in, and the
+ * refusal named no way forward. What a directory may already hold is now an
+ * allowlist of entries the scaffold never writes; anything else is a named
+ * conflict with a remedy.
+ */
+describe("scaffolding into an existing directory", () => {
+    it("accepts a directory holding only a repository's metadata", () => {
+        const dir = path.join(tmpDir, "cloned");
+        fs.mkdirSync(dir);
+        execFileSync("git", ["init", "-q"], { cwd: dir });
+        fs.writeFileSync(path.join(dir, ".DS_Store"), "");
+        fs.writeFileSync(path.join(dir, "LICENSE"), "MIT");
+        fs.writeFileSync(path.join(dir, ".gitattributes"), "* text=auto\n");
+        expect(scaffoldDirectoryConflicts(dir)).toEqual([]);
+    });
+
+    it("accepts a directory that does not exist yet, and an empty one", () => {
+        expect(scaffoldDirectoryConflicts(path.join(tmpDir, "nope"))).toEqual([]);
+        const empty = path.join(tmpDir, "empty");
+        fs.mkdirSync(empty);
+        expect(scaffoldDirectoryConflicts(empty)).toEqual([]);
+    });
+
+    it("names every entry it would overwrite or mix with", () => {
+        const dir = path.join(tmpDir, "busy");
+        fs.mkdirSync(dir);
+        fs.mkdirSync(path.join(dir, ".git"));
+        fs.writeFileSync(path.join(dir, "README.md"), "# busy");
+        fs.mkdirSync(path.join(dir, "src"));
+        expect(scaffoldDirectoryConflicts(dir)).toEqual(["README.md", "src/"]);
+    });
+
+    it("tolerates nothing the scaffold itself writes", () => {
+        // The allowlist is only safe because the copy never touches what is on
+        // it. A template that started shipping a LICENSE would silently replace
+        // the user's — so the two lists may never meet.
+        const shipped = new Set<string>();
+        for (const dir of [TEMPLATE_DIR, path.join(findCliRoot(), "templates", "overlays", "baas")]) {
+            for (const entry of fs.readdirSync(dir)) {
+                shipped.add(entry === "gitignore" ? ".gitignore" : entry === "npmrc" ? ".npmrc" : entry);
+            }
+        }
+        expect(shipped.size).toBeGreaterThan(10);
+        for (const entry of SCAFFOLD_TOLERATED_ENTRIES) {
+            expect(shipped.has(entry), `${entry} is tolerated but the template ships it`).toBe(false);
+        }
+    });
+
+    it("refuses with the conflicting names and the ways forward", () => {
+        const text = scaffoldConflictMessage("busy", "busy", ["README.md", "src/"]).join("\n").replace(ANSI_ESCAPES, "");
+        expect(text).toContain("README.md");
+        expect(text).toContain("src/");
+        // Both remedies: somewhere else, or clear the way and rerun.
+        expect(text).toMatch(/rebase init <new-directory>/);
+        expect(text).toMatch(/run .*again/i);
+    });
+
+    it("reuses an existing repository rather than re-initialising it", async () => {
+        const dir = path.join(tmpDir, "repo");
+        fs.mkdirSync(dir);
+        execFileSync("git", ["init", "-q"], { cwd: dir });
+        execFileSync("git", ["symbolic-ref", "HEAD", "refs/heads/trunk"], { cwd: dir });
+        fs.writeFileSync(path.join(dir, "LICENSE"), "MIT");
+        execFileSync("git", ["add", "LICENSE"], { cwd: dir });
+        execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-q", "-m", "first"], { cwd: dir });
+
+        expect(await initGitRepository(dir)).toBe(true);
+        // The branch the user cloned stays theirs, and their history with it.
+        expect(execFileSync("git", ["symbolic-ref", "--short", "HEAD"], { cwd: dir, encoding: "utf8" }).trim()).toBe("trunk");
+        expect(execFileSync("git", ["log", "--format=%s"], { cwd: dir, encoding: "utf8" }).trim()).toBe("first");
+    });
+
+    it("creates a repository on main when there is none", async () => {
+        const dir = path.join(tmpDir, "fresh");
+        fs.mkdirSync(dir);
+        expect(await initGitRepository(dir)).toBe(true);
+        expect(execFileSync("git", ["symbolic-ref", "--short", "HEAD"], { cwd: dir, encoding: "utf8" }).trim()).toBe("main");
+    });
+});
+
+// eslint-disable-next-line no-control-regex
+const ANSI_ESCAPES = /\u001b\[[0-9;]*m/g;

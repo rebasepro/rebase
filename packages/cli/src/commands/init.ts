@@ -564,17 +564,84 @@ async function commitScaffold(targetDirectory: string): Promise<void> {
     }
 }
 
+/**
+ * What a directory may already hold for `rebase init` to scaffold into it.
+ *
+ * `git clone` of an empty repository, or `git init`, leaves exactly `.git` —
+ * and `rebase init . --yes --git` is the help's own example. Counting every
+ * entry as "not empty" refused the one directory that example is most likely
+ * to be typed in. The entries here are a repository's metadata, the files
+ * operating systems drop into any folder, and a licence: none of them is
+ * something the scaffold writes (`init.test.ts` holds the template to that),
+ * so tolerating them can never overwrite anything. Everything else is a
+ * conflict and is named, never merged into.
+ */
+export const SCAFFOLD_TOLERATED_ENTRIES: ReadonlySet<string> = new Set([
+    ".git", ".hg", ".svn", ".gitattributes",
+    ".DS_Store", "Thumbs.db", "desktop.ini",
+    "LICENSE", "LICENSE.md", "LICENSE.txt"
+]);
+
+/** Entries in `dir` the scaffold would overwrite or mix with — `[]` when it may proceed. */
+export function scaffoldDirectoryConflicts(dir: string): string[] {
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir, { withFileTypes: true })
+        .filter(entry => !SCAFFOLD_TOLERATED_ENTRIES.has(entry.name))
+        .map(entry => entry.isDirectory() ? `${entry.name}/` : entry.name)
+        .sort();
+}
+
+/** The refusal for a directory that already holds files, with the two ways forward. */
+export function scaffoldConflictMessage(projectName: string, displayPath: string, conflicts: string[]): string[] {
+    const shown = conflicts.slice(0, 8).join(", ") + (conflicts.length > 8 ? `, and ${conflicts.length - 8} more` : "");
+    return [
+        `${chalk.red.bold("ERROR")} Directory "${projectName}" already holds files a new project would overwrite or mix with: ${shown}`,
+        chalk.yellow(`  Scaffold somewhere new — ${chalk.cyan("rebase init <new-directory>")} — or move those out of ${displayPath || "this directory"} and run this again.`),
+        chalk.gray(`  A repository's own metadata (.git) and a LICENSE are fine to leave in place.`)
+    ];
+}
+
+/**
+ * `git init`, or nothing when the directory is already a repository.
+ *
+ * A cloned repository keeps its branch, its remote and its history: the
+ * scaffold is committed on top of what is there. Only a repository this
+ * function created is pointed at `main`.
+ */
+export async function initGitRepository(targetDirectory: string): Promise<boolean> {
+    if (fs.existsSync(path.join(targetDirectory, ".git"))) {
+        console.log(chalk.gray("  Using the existing git repository..."));
+        return true;
+    }
+    console.log(chalk.gray("  Initializing git repository..."));
+    try {
+        await execa("git", ["init"], { cwd: targetDirectory });
+        // Name the branch `main` rather than inheriting whatever
+        // `init.defaultBranch` is (often still `master`). `git init -b` would
+        // be the obvious way, but it needs git >= 2.28; rewriting HEAD works
+        // on every version and is safe before the first commit.
+        try {
+            await execa("git", ["symbolic-ref", "HEAD", "refs/heads/main"], { cwd: targetDirectory });
+        } catch {
+            // Leave the default branch name; not worth failing the scaffold.
+        }
+        return true;
+    } catch {
+        console.warn(chalk.yellow("  Warning: Failed to initialize git repository"));
+        return false;
+    }
+}
+
 async function createProject(options: InitOptions) {
     const startedAt = Date.now();
-    // Check if directory already exists and is not empty
-    if (fs.existsSync(options.targetDirectory)) {
-        if (fs.readdirSync(options.targetDirectory).length !== 0) {
-            console.error(`${chalk.red.bold("ERROR")} Directory "${options.projectName}" already exists and is not empty`);
-            process.exit(1);
+    const conflicts = scaffoldDirectoryConflicts(options.targetDirectory);
+    if (conflicts.length > 0) {
+        for (const line of scaffoldConflictMessage(options.projectName, formatCdTarget(process.cwd(), options.targetDirectory), conflicts)) {
+            console.error(line);
         }
-    } else {
-        fs.mkdirSync(options.targetDirectory, { recursive: true });
+        process.exit(1);
     }
+    fs.mkdirSync(options.targetDirectory, { recursive: true });
 
     // Verify template exists
     try {
@@ -649,25 +716,7 @@ async function createProject(options: InitOptions) {
 
     // Create the repository now, but commit at the very end — see
     // commitScaffold below for why the two halves are separated.
-    let gitInitialized = false;
-    if (options.git) {
-        console.log(chalk.gray("  Initializing git repository..."));
-        try {
-            await execa("git", ["init"], { cwd: options.targetDirectory });
-            // Name the branch `main` rather than inheriting whatever
-            // `init.defaultBranch` is (often still `master`). `git init -b` would
-            // be the obvious way, but it needs git >= 2.28; rewriting HEAD works
-            // on every version and is safe before the first commit.
-            try {
-                await execa("git", ["symbolic-ref", "HEAD", "refs/heads/main"], { cwd: options.targetDirectory });
-            } catch {
-                // Leave the default branch name; not worth failing the scaffold.
-            }
-            gitInitialized = true;
-        } catch {
-            console.warn(chalk.yellow("  Warning: Failed to initialize git repository"));
-        }
-    }
+    const gitInitialized = options.git ? await initGitRepository(options.targetDirectory) : false;
 
     const { pm, pmCommands } = options;
     const installCmd = pmCommands.install;
