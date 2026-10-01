@@ -1972,11 +1972,21 @@ data: u.data as AnyRow })),
                 // DELETED the local row — the one case where the row does exist
                 // on the server. The user watched their own saved record vanish.
                 if (!(op.generatedId === true && isDuplicateKeyError(error))) throw error;
-                row = await inner.findById(op.id!).catch(() => undefined) as AnyRow | undefined;
-                // The read can fail on its own (offline again, RLS). The row is
-                // known to exist, so keep the local copy rather than rolling
-                // back; the next refresh reconciles it.
-                if (!row) return;
+                // Only a row that reads back under our id proves the 409 was
+                // our own first attempt. A 409 says nothing more than "a
+                // unique constraint refused this": another row holding the
+                // same email answers exactly the same way. The read used to
+                // be trusted when it failed too (`.catch(() => undefined)` and
+                // return) — so a refused create was dropped from the queue as
+                // synced, `onSyncError` never fired, and the record the user
+                // saw saved existed nowhere.
+                //
+                // A read that fails is thrown on: a network error keeps the
+                // write queued, anything else is judged like any other
+                // failure. A read that finds nothing means the conflict was
+                // with some other row, and the original refusal is the answer.
+                row = await inner.findById(op.id!) as AnyRow | undefined;
+                if (!row) throw error;
             }
             await this.adoptServerRow(op, op.id, row);
         } else if (op.type === "createMany") {
