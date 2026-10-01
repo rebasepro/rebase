@@ -345,7 +345,10 @@ describe("POST /tus enforces the same limits, before the first chunk", () => {
         });
         expect(created.status).toBe(201);
 
-        const patched = await app.fetch(new Request(created.headers.get("Location")!, {
+        // Resolved against the endpoint, as a TUS client resolves it: the
+        // server answers a path, so no proxy can put the wrong origin in it.
+        const uploadUrl = new URL(created.headers.get("Location")!, "http://localhost/api/storage/tus");
+        const patched = await app.fetch(new Request(uploadUrl, {
             method: "PATCH",
             headers: { "Upload-Offset": "0", "Content-Type": "application/offset+octet-stream" },
             body: "hi"

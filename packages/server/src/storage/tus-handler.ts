@@ -386,9 +386,15 @@ export class TusHandler {
         };
         this.uploads.set(id, upload);
 
-        // Build absolute Location
-        const reqUrl = new URL(c.req.url);
-        const location = `${reqUrl.origin}${reqUrl.pathname}/${id}`;
+        // A path, not an absolute URL. The origin this process would put in
+        // one is the socket's: `@hono/node-server` reads the scheme from
+        // `socket.encrypted`, so behind a TLS-terminating proxy — Cloud Run, an
+        // ingress, a load balancer, Rebase Cloud — it is `http`, and every PATCH
+        // from an HTTPS page went to a mixed-content URL the browser blocks.
+        // The protocol allows a relative Location and every TUS client resolves
+        // it against the endpoint it called, which is the one origin no proxy
+        // can get wrong. It trusts no forwarded header to be so.
+        const location = `${new URL(c.req.url).pathname}/${id}`;
 
         return new Response(null, {
             status: 201,

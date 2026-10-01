@@ -65,6 +65,30 @@ describe("TUS", () => {
         duplex: "half"
     } as RequestInit);
 
+    describe("the upload URL behind a TLS-terminating proxy", () => {
+        it("resolves to the scheme and host the client used, not the one the socket saw", async () => {
+            // `@hono/node-server` takes the scheme from the socket, so behind
+            // Cloud Run, an ingress or a load balancer the server sees `http`.
+            // An absolute `http://` Location sends every PATCH from an HTTPS
+            // page to a mixed-content URL the browser blocks.
+            const res = await app.request("http://api.example.com/api/storage/tus", {
+                method: "POST",
+                headers: { "Tus-Resumable": "1.0.0", "Upload-Length": "4" }
+            });
+            expect(res.status).toBe(201);
+            const location = res.headers.get("Location")!;
+            const id = location.split("/").pop()!;
+
+            expect(location.startsWith("http:")).toBe(false);
+            // What a TUS client does with it: resolve it against the endpoint it called.
+            expect(new URL(location, "https://api.example.com/api/storage/tus").href)
+                .toBe(`https://api.example.com/api/storage/tus/${id}`);
+
+            const head = await app.request(`http://api.example.com${new URL(location, "http://x").pathname}`, { method: "HEAD" });
+            expect(head.status).toBe(200);
+        });
+    });
+
     describe("two PATCHes at the same offset — a client retrying a stalled chunk", () => {
         it("stores the chunk once, and refuses the second while the first is in flight", async () => {
             const id = await create("docs/report.txt", 10);
