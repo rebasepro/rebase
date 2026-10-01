@@ -172,6 +172,10 @@ export function createLocalGitRepository(options: LocalGitOptions): SchemaEditRe
         async writeFiles(files: SchemaChangeFile[]): Promise<void> {
             for (const file of files) {
                 const absolute = inside(file.path);
+                if (file.deleted) {
+                    await fs.rm(absolute, { force: true });
+                    continue;
+                }
                 await fs.mkdir(path.dirname(absolute), { recursive: true });
                 await fs.writeFile(absolute, file.contents, "utf8");
             }

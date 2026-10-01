@@ -112,6 +112,8 @@ export const DEFAULT_COMMIT_PATHS: SchemaCommitPaths = {
 export interface SchemaChangeFile {
     path: string;
     contents: string;
+    /** The commit removes this file — a deleted collection. `contents` is ignored. */
+    deleted?: boolean;
 }
 
 /**

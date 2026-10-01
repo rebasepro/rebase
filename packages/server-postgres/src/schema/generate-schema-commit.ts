@@ -181,6 +181,7 @@ function subjectOf(classified: ClassifiedChanges): string {
     const collections = [...new Set(changes.map(change => change.collection))].sort();
     const only = changes.length === 1 ? changes[0] : undefined;
     if (only?.kind === "add-collection") return `add the ${only.collection} collection`;
+    if (only?.kind === "remove-collection") return `remove the ${only.collection} collection`;
     if (only?.kind === "add-property") return `add ${only.property} to ${only.collection}`;
     if (only?.kind === "remove-property") return `remove ${only.property} from ${only.collection}`;
     if (changes.length > 0 && changes.every(c => c.kind === "change-security-rules")) {

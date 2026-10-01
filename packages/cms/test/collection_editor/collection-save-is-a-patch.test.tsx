@@ -196,3 +196,21 @@ describe("a collection save", () => {
         });
     });
 });
+
+describe("deleting a collection", () => {
+    it("is planned through the live door as a removal", async () => {
+        const posted = backend(true);
+        render(<Harness/>);
+        await act(async () => { void controller.deleteCollection({ id: "books" }).catch(() => undefined); });
+        await waitFor(() => expect(posted.some(p => p.url.endsWith("/api/admin/schema/plan"))).toBe(true));
+        expect(posted.find(p => p.url.endsWith("/api/admin/schema/plan"))?.body).toEqual({ collectionId: "books", remove: true });
+        expect(posted.some(p => p.url.endsWith("/collection/delete"))).toBe(false);
+    });
+
+    it("goes to the source-only editor when live editing is off", async () => {
+        const posted = backend(false);
+        render(<Harness/>);
+        await run(() => controller.deleteCollection({ id: "books" }));
+        expect(posted.find(p => p.url.endsWith("/collection/delete"))?.body).toEqual({ collectionId: "books" });
+    });
+});

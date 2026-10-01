@@ -1036,7 +1036,7 @@ export const en: RebaseTranslations = {
     studio_editor_collection_start_saved: "Default config saved",
     studio_home_duplicate_collection: "Duplicate",
     studio_home_delete: "Delete",
-    studio_home_confirm_delete_no_data: "This will not delete any data, only the collection in the admin panel",
+    studio_home_confirm_delete_no_data: "Deletes the collection's file and its entry in index.ts, and commits that. The table and its rows stay in the database. Refused while another collection links to this one.",
     studio_home_collection_deleted: "Collection deleted",
     studio_kanban_configure: "Configure Kanban",
     studio_missing_reference_error: "No collection for path: {{path}}",

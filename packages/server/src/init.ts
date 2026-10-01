@@ -2341,6 +2341,23 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                         else await editor.saveCollection(collectionId, edit.collection ?? {}, { partial: false });
                     };
 
+                    // A removal deletes the file and edits `index.ts`; both
+                    // go in the commit, the file as a deletion.
+                    if (change.remove) {
+                        if (remoteRepo) {
+                            throw new Error("Deleting a collection is not available with a remote repository yet. Delete it in the repository instead.");
+                        }
+                        const { AstSchemaEditor } = await import("./api/ast-schema-editor");
+                        const { deleted, changed } = await new AstSchemaEditor(collectionsDir!).deleteCollection(change.collectionId);
+                        return [
+                            { path: nodePath.relative(repositoryRoot!, deleted), contents: "", deleted: true },
+                            ...await Promise.all(changed.map(async file => ({
+                                path: nodePath.relative(repositoryRoot!, file),
+                                contents: await nodeFs.readFile(file, "utf8")
+                            })))
+                        ];
+                    }
+
                     // No source on this machine: fetch it, rewrite it in a
                     // scratch directory, hand back the result. This is the whole
                     // of what kept live schema editing local-only — not
@@ -2389,10 +2406,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                         return [`${dir}/${change.collectionId}.ts`];
                     }
                     if (!collectionsDir || !repositoryRoot) return [];
-                    return [nodePath.relative(
-                        repositoryRoot,
-                        nodePath.join(collectionsDir, `${change.collectionId}.ts`)
-                    )];
+                    return [
+                        nodePath.relative(repositoryRoot, nodePath.join(collectionsDir, `${change.collectionId}.ts`)),
+                        // A removal edits the directory's index too.
+                        ...(change.remove ? [nodePath.relative(repositoryRoot, nodePath.join(collectionsDir, "index.ts"))] : [])
+                    ];
                 }
             }));
 

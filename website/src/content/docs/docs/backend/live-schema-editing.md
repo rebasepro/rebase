@@ -155,6 +155,12 @@ default, which makes every later insert fail until it is dropped or made
 nullable. A change without one (moving a primary key, a relation whose link
 column nothing creates) cannot be written to the source alone.
 
+Deleting a collection from the admin panel takes the same path: `/apply` with
+`"remove": true` and `"sourceOnly": true` deletes the collection's file and its
+entry in `index.ts` and commits both; the table and its rows stay. It is
+refused while another collection imports the file (a relation to it), naming
+the importer — deleting it would stop every collection from loading.
+
 ## What gets committed
 
 Not just the collection file. The Drizzle schema is generated from it, and a

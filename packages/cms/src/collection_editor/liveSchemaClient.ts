@@ -158,6 +158,8 @@ export interface ProposedCollectionChange {
     collection?: Record<string, unknown>;
     /** What changed about an existing one. See the module comment. */
     patch?: CollectionPatch;
+    /** Delete the collection's source — its file and its `index.ts` entry. The table stays. */
+    remove?: true;
 }
 
 export function createLiveSchemaClient(options: LiveSchemaClientOptions) {

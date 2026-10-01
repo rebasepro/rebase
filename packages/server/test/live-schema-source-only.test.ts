@@ -108,3 +108,47 @@ describe("Edit source only", () => {
         expect(events).toEqual([]);
     });
 });
+
+describe("deleting a collection through the live door", () => {
+    it("plans the set without it and hands the writer a removal", async () => {
+        const planned: unknown[][] = [];
+        const written: unknown[] = [];
+        const admin = {
+            planSchemaChange: async (_b: unknown, after: unknown[], options?: { sourceOnly?: boolean }) => {
+                planned.push(after);
+                const change = {
+                    kind: "remove-collection", verdict: "needs-migration", collection: "products",
+                    detail: "Collection \"products\" was removed.",
+                    sourceOnly: "Table \"products\" and every row in it stay in the database, and nothing serves them.",
+                    kept: "table products kept"
+                };
+                const classified = { changes: [change], verdict: "needs-migration", applicable: false };
+                if (!options?.sourceOnly) throw Object.assign(new Error("x"), { classified });
+                return { files: [{ path: "backend/src/schema.generated.ts", contents: "x" }], statements: [], classified, message: "chore(schema): remove the products collection (source only — table products kept)\n" };
+            },
+            executeSql: async () => ({ rows: [] })
+        } as unknown as DatabaseAdmin;
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => { c.set("user", { uid: "u_1", roles: ["admin"] } as never); await next(); });
+        app.route("/api/schema", createLiveSchemaRoutes({
+            getCollections: () => [{ slug: "products", name: "Products", properties: {} } as unknown as CollectionConfig],
+            getAdmin: () => admin,
+            getRepository: () => ({
+                root: "/tmp/p", currentBranch: async () => "main", dirtyPaths: async () => [],
+                writeFiles: async () => undefined, commit: async () => "abc123def456"
+            }),
+            writeSource: async (change) => { written.push(change); return []; }
+        }));
+        const response = await app.fetch(new Request("http://localhost/api/schema/apply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ collectionId: "products", remove: true, sourceOnly: true })
+        }));
+        const body = await response.json() as { summary: string };
+        expect(response.status).toBe(200);
+        expect(planned[0]).toEqual([]);
+        expect(written).toEqual([{ collectionId: "products", remove: true }]);
+        expect(body.summary).toMatch(/table products kept/);
+    });
+});

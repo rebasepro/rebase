@@ -276,8 +276,18 @@ export function useLocalCollectionsConfigController(
                 ? { patch: diffCollections(current, { ...current, ...(collectionData as Record<string, unknown>) }) }
                 : { collection: collectionData as Record<string, unknown> });
         },
+        // Through the live door when there is one: planned (the table and its
+        // rows stay, and the plan says so) and committed source-only, with the
+        // collection's entry in `index.ts` removed alongside the file. It used
+        // to unlink the file and nothing else, which stopped the project from
+        // loading its collections and was never committed.
         deleteCollection: async ({ id }: DeleteCollectionParams) => {
-            await request("/collection/delete", { collectionId: id });
+            const available = await liveSchema.ready();
+            if (!available.enabled) {
+                await request("/collection/delete", { collectionId: id });
+                return;
+            }
+            await liveSchema.reviewChange({ collectionId: id, remove: true });
         },
 
         // Every write below is the difference between the collection as it is

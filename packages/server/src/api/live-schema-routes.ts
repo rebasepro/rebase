@@ -151,6 +151,12 @@ export interface ProposedChange {
     collection?: Record<string, unknown>;
     /** What changed about an existing collection. */
     patch?: CollectionPatch;
+    /**
+     * Delete the collection's source: its file, and its entry in `index.ts`.
+     * Planned like any change — the table and its rows stay, and say so — and
+     * committed source-only.
+     */
+    remove?: true;
 }
 
 /**
@@ -212,6 +218,12 @@ const parseProposed = (body: unknown): ProposedChange => {
             "it may contain only letters, numbers, underscores and hyphens.",
             "INVALID_CHANGE"
         );
+    }
+    if (candidate.remove === true) {
+        if (candidate.collection !== undefined || candidate.patch !== undefined) {
+            throw ApiError.badRequest("A removal carries no `collection` or `patch`.", "INVALID_CHANGE");
+        }
+        return { collectionId: candidate.collectionId, remove: true };
     }
     if (candidate.patch !== undefined) {
         if (candidate.collection !== undefined) {
@@ -312,6 +324,7 @@ export function asPatch(existing: CollectionConfig, change: ProposedChange): Col
  * patch for an existing one.
  */
 function sourceChangeFor(current: CollectionConfig[], change: ProposedChange): ProposedChange {
+    if (change.remove) return change;
     const existing = current.find(collection => collection.slug === change.collectionId);
     if (!existing) return change;
     return { collectionId: change.collectionId, patch: asPatch(existing, change) };
@@ -487,6 +500,12 @@ export function proposedCollections(
     };
 
     const existing = current.find(collection => collection.slug === change.collectionId);
+    if (change.remove) {
+        if (!existing) {
+            throw ApiError.badRequest(`There is no collection "${change.collectionId}" to remove.`, "INVALID_CHANGE");
+        }
+        return current.filter(collection => collection.slug !== change.collectionId);
+    }
     if (change.patch && !existing) {
         throw ApiError.badRequest(
             `There is no collection "${change.collectionId}" to change. A new collection is sent whole, as \`collection\`.`,

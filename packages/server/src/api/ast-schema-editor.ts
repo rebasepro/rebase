@@ -1159,11 +1159,92 @@ export class AstSchemaEditor {
         return undefined;
     }
 
-    public async deleteCollection(collectionId: string) {
+    /**
+     * Delete a collection's file, and take it out of `index.ts`.
+     *
+     * This used to unlink `<slug>.ts` and stop. Every scaffold's `index.ts`
+     * imports every collection, so the next boot failed for the whole project
+     * ("Cannot find module …/tags"), and a collection another one linked to
+     * took that one down with it. Now:
+     *
+     * - a file any other module imports is refused, naming the importers — a
+     *   relation to it has to go first, and that is a change the person makes;
+     * - `index.ts`'s import of it is removed, and so is each place it is listed
+     *   in an array; any other use there is refused, naming the line;
+     * - the file is deleted.
+     *
+     * Only the source. The table and its rows are not touched.
+     *
+     * Returns what changed, as absolute paths, so the caller can commit it.
+     */
+    public async deleteCollection(collectionId: string): Promise<{ deleted: string; changed: string[] }> {
         this.syncWithDisk();
-        const file = this.getCollectionFile(collectionId);
-        if (file) {
-            file.deleteImmediatelySync();
+        const target = this.getCollectionFile(collectionId);
+        if (!target) {
+            throw new Error(`Collection "${collectionId}" has no file at ${path.join(this.collectionsDir, `${collectionId}.ts`)}.`);
         }
+        const targetPath = target.getFilePath();
+        const indexPath = path.join(this.collectionsDir, "index.ts");
+
+        const importers = this.project.getSourceFiles().filter(file =>
+            file !== target && this.declarationsOf(file, targetPath).length > 0);
+        const others = importers.filter(file => file.getFilePath() !== indexPath);
+        if (others.length > 0) {
+            throw new Error(
+                `Cannot delete "${collectionId}": ${others.map(file => path.basename(file.getFilePath())).join(", ")} ` +
+                `${others.length === 1 ? "imports" : "import"} it — a relation to it, most likely. Remove that first; ` +
+                "deleting the file would stop every collection from loading."
+            );
+        }
+
+        const changed: string[] = [];
+        const index = importers.find(file => file.getFilePath() === indexPath);
+        try {
+            if (index) {
+                for (const declaration of this.declarationsOf(index, targetPath)) {
+                    const names = declaration.isKind(SyntaxKind.ImportDeclaration)
+                        ? [
+                            declaration.getDefaultImport()?.getText(),
+                            ...declaration.getNamedImports().map(named => (named.getAliasNode() ?? named.getNameNode()).getText())
+                        ].filter((name): name is string => Boolean(name))
+                        : [];
+                    for (const name of names) {
+                        const uses = index.getDescendantsOfKind(SyntaxKind.Identifier).filter(identifier =>
+                            identifier.getText() === name &&
+                            !identifier.getFirstAncestorByKind(SyntaxKind.ImportDeclaration));
+                        for (const use of uses) {
+                            const array = use.getParentIfKind(SyntaxKind.ArrayLiteralExpression);
+                            if (!array) {
+                                throw new Error(
+                                    `Cannot delete "${collectionId}": index.ts uses \`${name}\` at line ` +
+                                    `${use.getStartLineNumber()} in a way the editor cannot remove. Remove it there first.`
+                                );
+                            }
+                            array.removeElement(use);
+                        }
+                    }
+                    declaration.remove();
+                }
+                changed.push(index.getFilePath());
+            }
+            target.delete();
+            await this.project.save();
+        } catch (err) {
+            if (index && !index.isSaved()) index.refreshFromFileSystemSync();
+            this.syncWithDisk();
+            throw err;
+        }
+        return { deleted: targetPath, changed };
+    }
+
+    /** The import and export declarations in `file` whose relative specifier resolves to `targetPath`. */
+    private declarationsOf(file: SourceFile, targetPath: string) {
+        const stem = (absolute: string) => absolute.replace(/\.(ts|tsx|js|mjs|cjs)$/, "");
+        const target = stem(targetPath);
+        return [...file.getImportDeclarations(), ...file.getExportDeclarations()].filter(declaration => {
+            const specifier = declaration.getModuleSpecifierValue();
+            if (!specifier || !specifier.startsWith(".")) return false;
+            return stem(path.resolve(path.dirname(file.getFilePath()), specifier)) === target;
+        });
     }
 }

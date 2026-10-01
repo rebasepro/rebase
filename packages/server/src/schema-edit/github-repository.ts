@@ -261,6 +261,8 @@ export function createGitHubRepository(options: GitHubRepositoryOptions): Schema
             const tree = await Promise.all(staged
                 .filter(file => paths.includes(file.path))
                 .map(async file => {
+                    // A deleted file is a tree entry with no blob.
+                    if (file.deleted) return { path: file.path, mode: "100644", type: "blob", sha: null };
                     const blob = await call<{ sha: string }>(`${base}/git/blobs`, {
                         method: "POST",
                         auth,

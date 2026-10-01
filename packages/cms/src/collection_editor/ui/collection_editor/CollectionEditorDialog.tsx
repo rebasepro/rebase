@@ -714,6 +714,14 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                 message: "Collection deleted",
                 type: "success"
             });
+        }, (e: unknown) => {
+            setDeleteRequested(false);
+            if (isSchemaChangeCancelled(e)) return;
+            console.error(e);
+            snackbarController.open({
+                type: "error",
+                message: "Error deleting collection: " + (e instanceof Error ? e.message : String(e))
+            });
         });
     };
 
@@ -1030,10 +1038,10 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
             open={deleteRequested}
             onAccept={deleteCollection}
             onCancel={() => setDeleteRequested(false)}
-            title={<>Delete the stored config?</>}
-            body={<> This will <b>not
-                delete any data</b>, only
-                the stored config, and reset to the code state.</>}/>
+            title={<>Delete this collection?</>}
+            body={<>Deletes <code>{collection?.slug}.ts</code> from your collections and its entry in
+                {" "}<code>index.ts</code>, and commits that. The table and its rows stay in the
+                database. Refused while another collection links to this one.</>}/>
 
     </div>
 

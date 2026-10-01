@@ -9,6 +9,7 @@ import { CopyIcon, IconButton, Menu, MenuItem, MoreVerticalIcon, SettingsIcon, T
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { useState } from "react";
 import { useCollectionsConfigController } from "../useCollectionsConfigController";
+import { isSchemaChangeCancelled } from "../liveSchemaClient";
 
 export function HomePageEditorCollectionAction({
     slug,
@@ -53,6 +54,15 @@ export function HomePageEditorCollectionAction({
             snackbarController.open({
                 message: t("studio_home_collection_deleted"),
                 type: "success"
+            });
+        }, (error: unknown) => {
+            setDeleteRequested(false);
+            // Closing the review is an answer, not a failure.
+            if (isSchemaChangeCancelled(error)) return;
+            console.error(error);
+            snackbarController.open({
+                type: "error",
+                message: error instanceof Error ? error.message : String(error)
             });
         });
     };
