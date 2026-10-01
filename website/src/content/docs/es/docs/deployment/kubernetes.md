@@ -154,3 +154,8 @@ realtime: { bus: { type: "postgres" } }
 Establece `sharedState.channelBusConfigured: true` para confirmar que lo has hecho
 — el chart solo lo utiliza para decidir si mostrar una advertencia. Las suscripciones
 habituales a colecciones no se ven afectadas; esas viajan a través de Postgres CDC.
+
+El resto de lo que un proceso guarda para sí mismo — archivos locales, subidas
+reanudables, la caché de transformación de imágenes, el Explorador de logs —
+está listado junto con el ajuste que comparte cada uno en
+[Ejecutar más de una instancia](/docs/deployment/multiple-instances/).

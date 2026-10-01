@@ -80,14 +80,13 @@ Para acceder a una instancia privada de Cloud SQL se necesita `--add-cloudsql-in
 
 Lo que `ensure` nunca hace es modificar algo que ya existe: no altera el tipo de una columna, no elimina nada ni edita las etiquetas de un enum existente, ya que el inicio de una revisión no debe remodelar un esquema como efecto secundario de un despliegue.
 
-Por lo tanto, dos cosas todavía requieren la CLI, ejecutada desde un repositorio clonado o un trabajo de CI:
+Por lo tanto, todavía queda una cosa que requiere la CLI, ejecutada desde un repositorio clonado o un trabajo de CI:
 
 ```bash
 rebase db push
 ```
 
-- **RLS en tablas intermedias (junction tables)** para relaciones de muchos a muchos.
-- **Cualquier cambio que no sea puramente aditivo**: una columna renombrada, un tipo más restrictivo, un campo eliminado.
+Cualquier cambio que no sea puramente aditivo: una columna renombrada, un tipo más restrictivo, un campo eliminado.
 
 Desde tu equipo, conéctate mediante el [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) y apunta `DATABASE_URL` a `localhost`. La imagen del runtime se distribuye sin la CLI, por lo que esto nunca se ejecuta dentro del contenedor de Cloud Run. Para migraciones versionadas, haz commit de los archivos de migración con `rebase db generate` y ejecuta `rebase db migrate` como un paso de release en su lugar.
 

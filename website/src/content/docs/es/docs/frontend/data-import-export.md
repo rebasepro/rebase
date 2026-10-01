@@ -19,8 +19,8 @@ Ambas opciones están disponibles en todas las colecciones. La exportación se p
 2. Haz clic en el botón **Import** en la barra de herramientas
 3. Selecciona o arrastra y suelta tu archivo
 4. Mapea las columnas del archivo con las propiedades de la colección
-5. Obtén una vista previa de los datos y resuelve cualquier error de validación
-6. Haz clic en **Import** para guardar todas las entidades
+5. Obtén una vista previa de los datos, incluidos los valores que no se puedan convertir
+6. Haz clic en **Save data** para escribir las filas
 
 ### Formatos admitidos
 
@@ -36,16 +36,31 @@ El asistente de importación intenta automáticamente hacer coincidir las column
 
 - Las **coincidencias exactas** se mapean automáticamente (p. ej., `name` → `name`)
 - Las **columnas no coincidentes** se pueden mapear manualmente u omitir
-- La **coerción de tipos** gestiona conversiones de cadena a número, de cadena a booleano y el procesamiento de fechas
+- La **conversión de tipos** convierte cada celda al tipo de la propiedad con la que se mapea, pero solo cuando no se pierde nada (ver más abajo)
 
-### Validación
+### Conversión de tipos
 
-Antes de importar, el asistente valida todas las filas con respecto a las definiciones de propiedades de tu colección:
+Una celda se convierte solo cuando el tipo de la propiedad puede contener exactamente lo que dice:
 
-- Los campos obligatorios deben estar presentes
-- Los valores de enumeración (enum) deben coincidir con las opciones definidas
-- Los tipos de datos deben ser compatibles (p. ej., un valor de texto en un campo numérico se marcará)
-- Los errores de validación se muestran fila por fila para que puedas corregirlos antes de importar
+| Tipo de propiedad | Convierte | No convierte |
+|---|---|---|
+| Número | `12`, `-3.5`, `10.00`, `1e3` | `02134` (se perdería el cero inicial), números con más de 15 cifras significativas, `1,234`, `$5.00`, `12%`, `N/A` |
+| Booleano | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, en cualquier combinación de mayúsculas y minúsculas | cualquier otra cosa |
+| Fecha | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), fechas escritas (`5 Jan 2024`), `05/01/2024`, segundos o milisegundos desde el epoch | texto que no nombra ninguna fecha |
+
+Una fecha sin hora es ese día en UTC. Para fechas escritas como `05/01/2024`, la columna decide el orden: un primer número superior a 12 hace que la columna sea día-primero, un segundo número superior a 12 hace que sea mes-primero. Cuando una columna nunca lo indica, decide el idioma/región (locale) del navegador, y cuando contiene ambos órdenes, una fecha que cualquiera de los dos órdenes podría leer no se convierte.
+
+Una celda en blanco no es un valor: no establece nada, y se aplica el valor por defecto que elegiste para esa propiedad.
+
+### Valores que no se pueden importar
+
+La vista previa enumera cada celda que no se convierte, por columna, con cuántas hay y las primeras por fila y motivo. Esas celdas se dejan vacías en las filas importadas; nada se convierte en `0`, `false` o un valor vacío sin aparecer en la lista. Vuelve atrás para mapear la columna con otra propiedad, o corrige el archivo y vuelve a subirlo.
+
+Las propias reglas de la colección — campos obligatorios, opciones de enum, valores únicos — las comprueba el servidor a medida que se escriben las filas, de 25 en 25. Si se rechaza una fila, la importación se detiene y la identifica; las filas anteriores a ella ya están guardadas, y **Retry** continúa desde la fila rechazada.
+
+### Crear una colección a partir de un archivo
+
+Cuando creas una colección a partir de un archivo, el tipo de cada columna se infiere a partir de sus valores. Una columna es numérica solo si todos sus valores son un número o un texto que se convierte en uno exactamente, así que una columna de códigos postales, códigos de producto con ceros iniciales, SKU largos o números de teléfono se queda como texto. Una columna que mezcla tipos (números y palabras, booleanos y números) es texto. Las celdas en blanco no cuentan, así que una columna casi vacía no se marca como obligatoria.
 
 ### Configuración de importación
 

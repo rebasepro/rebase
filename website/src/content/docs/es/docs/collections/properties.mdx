@@ -53,7 +53,7 @@ Todos los tipos de propiedades comparten estas opciones:
 | `conditions` | `PropertyConditions` | Condiciones declarativas de JSON Logic. **Solo para el formulario de administración — no se aplica en la API ni en la base de datos.** |
 
 :::note[Qué significa "solo para el formulario de administración"]
-Varias de las siguientes opciones llevan esa etiqueta: definen la forma del formulario que dibuja el panel y nada más; la API aceptará una escritura que las ignore y no hay ninguna restricción detrás de ellas. Una regla que deba cumplirse para cada llamada es una [regla de validación](/docs/collections/validation-and-conditions/) o una [regla de seguridad](/docs/collections/security-rules/).
+Varias de las siguientes opciones llevan esa etiqueta: definen la forma del formulario que dibuja el panel y nada más; la API aceptará una escritura que las ignore y no hay ninguna restricción detrás de ellas. Una regla que deba cumplirse para cada llamada a la API es una [regla de validación](/docs/collections/validation-and-conditions/) — comprobada en las escrituras por REST, socket y MCP, [no en las escrituras en proceso](/docs/collections/validation-and-conditions/#dónde-se-ejecuta-la-validación) — o una [regla de seguridad](/docs/collections/security-rules/), que la base de datos impone para todos.
 :::
 
 ### Configuración de la interfaz de usuario (`admin`)
@@ -76,6 +76,7 @@ price: {
 |-----------|------|-------------|
 | `admin.readOnly` | `boolean` | Evitar la edición |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Deshabilitar con tooltip opcional |
+| `admin.filledByServer` | `boolean` | El servidor rellena el campo cuando un registro nuevo lo deja vacío (un hook `beforeSave`). El formulario permite crear sin él; sigue siendo obligatorio al editar, y las propias comprobaciones del servidor siguen aplicándose |
 | `admin.hideFromCollection` | `boolean` | Ocultar de la vista de tabla |
 | `admin.columnWidth` | `number` | Ancho de columna en píxeles (vista de tabla) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Ancho del campo en la cuadrícula de formulario de cuatro columnas |
@@ -271,6 +272,13 @@ No hay clave foránea. El uid es una cadena de texto, el almacén de usuarios pu
 
 :::note[Una clave primaria por colección]
 `isId` solo puede ser reclamado por una única propiedad. Una segunda será rechazada al cargar la configuración en lugar de ignorarse silenciosamente: las claves primarias compuestas no son compatibles, y una configuración que declare dos debe interpretarse como una solicitud de algo que Rebase no puede construir. Si lo que deseaba era una restricción de unicidad en varias columnas, eso corresponde a un [índice](/docs/backend/indexes) único.
+
+Una colección en la que ninguna propiedad reclama `isId` recibe una columna
+`id` propia: `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. La base de
+datos la rellena, así que una fila creada desde el panel de administración, la
+API REST o el SDK no necesita una clave, y una clave que sí envíe se usa tal
+cual. Una tabla creada antes de que existiera este valor por defecto lo recibe
+en el siguiente arranque.
 :::
 
 ## Propiedades de tipo Number

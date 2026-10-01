@@ -60,6 +60,20 @@ properties: {
 }
 ```
 
+### Dónde se ejecuta la validación
+
+El servidor comprueba `validation` en el límite de la petición — REST, el
+socket en tiempo real y MCP — sobre lo que envió el emisor, antes de que se
+ejecute `beforeSave`, y responde a una escritura que rompe una regla con un
+400 que nombra todos los campos que fallan. El código de servidor que escribe
+en proceso es de confianza y **no** se comprueba contra estas reglas:
+`rebase.data` y `rebase.dataAsAdmin` en una función o cron job, `context.data`
+en un callback, un script de siembra. Lo que se mantiene ahí es lo que impone
+la base de datos — `required` (NOT NULL), `unique` (un índice único), el tipo
+de un enum y el ancho de una columna `varchar` o `char`. Cualquier otra cosa
+que escriba tu propio código de servidor, compruébala en el código que la
+escribe.
+
 ### Todos los tipos
 
 | Regla | Tipo | Descripción |
@@ -73,7 +87,7 @@ properties: {
 
 | Regla | Tipo | Descripción |
 |------|------|-------------|
-| `min` / `max` | `number` | Mínimo / máximo de caracteres, inclusivo. Un `max` también define el tamaño de la columna: convierte `TEXT` en `VARCHAR(max)`, por lo que reducirlo en una tabla que ya contiene filas más largas es una migración que la base de datos rechazará |
+| `min` / `max` | `number` | Mínimo / máximo de caracteres, inclusivo. Con `columnType: "varchar"` o `"char"`, `max` también define el tamaño de la columna (`VARCHAR(max)`), por lo que reducirlo en una tabla que ya contiene filas más largas es una migración que la base de datos rechazará. La columna por defecto es `TEXT`, que `max` deja sin límite — el único límite es entonces la [comprobación de la petición](#dónde-se-ejecuta-la-validación) del servidor |
 | `length` | `number` | Exactamente esta cantidad de caracteres: un código de país, una referencia de ancho fijo |
 | `matches` | `string \| RegExp` | Un patrón con el que debe coincidir el valor completo. Un string se compila por petición, por lo que uno que no compile se rechazará al arrancar en lugar de convertirse silenciosamente en ninguna regla |
 | `matchesMessage` | `string` | Lo que muestra el formulario cuando `matches` falla |
@@ -151,8 +165,10 @@ que guía a alguien y uno que simplemente lo rechaza.
 :::caution[Las condiciones son comportamiento del formulario]
 **Solo en el formulario de administración; no lo impone la API ni la base de datos.** Se ejecutan en el
 navegador, sobre la entidad que se está editando, y dan forma a lo que ofrece el panel. Una regla
-que deba cumplirse para cualquier invocador pertenece a `validation`, que el servidor
-comprueba, o a una [regla de seguridad](/docs/collections/security-rules/), que la
+que deba cumplirse para cualquier invocador de la API pertenece a `validation`, que el servidor
+comprueba en las escrituras por REST, socket y MCP (no en las
+[escrituras en proceso](#dónde-se-ejecuta-la-validación) de tu propio código de servidor), o a una
+[regla de seguridad](/docs/collections/security-rules/), que la
 base de datos impone para cualquiera: panel, SDK o `curl`.
 :::
 
@@ -164,8 +180,8 @@ Para comportamientos complejos que no se pueden expresar mediante JSON Logic, pu
 price: {
     type: "number",
     name: "Price",
-    dynamicProps: ({ values, user }) => ({
-        disabled: values.is_free === true || !user.roles.includes("admin"),
+    dynamicProps: ({ values, authController }) => ({
+        admin: { disabled: values.is_free === true || !authController.user?.roles?.includes("admin") },
         validation: values.is_free ? {} : { required: true, min: 0 }
     })
 }

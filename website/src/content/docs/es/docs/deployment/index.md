@@ -35,6 +35,9 @@ primer arranque.
 - **[Dividir en varios procesos](/docs/deployment/split-processes/)** — un
   bundle como API, capa de funciones y worker, para que una función pesada deje
   de competir con la API de datos.
+- **[Ejecutar más de una instancia](/docs/deployment/multiple-instances/)** —
+  el estado que cada proceso guarda para sí mismo, y el ajuste que lo
+  comparte, antes de que una segunda réplica reciba tráfico.
 
 ## Guías por plataforma
 

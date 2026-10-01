@@ -51,7 +51,7 @@ Inicia ambas partes al mismo tiempo:
 - **Frontend** — el panel: Rebase CMS y Rebase Studio
 - **Recarga en caliente (hot reload)** para ambos
 
-Ambos puertos se **derivan de la ruta de este proyecto** en lugar de ser fijos, por lo que varios proyectos de Rebase pueden ejecutarse en paralelo. `rebase dev` imprime las dos URL a las que se vinculó: **utiliza esas**, no `localhost:3001` / `localhost:5173`. (`PORT` y `VITE_API_URL` en `.env` configuran `rebase start`, el servidor de producción, y se ignoran aquí). Fija un puerto con `rebase dev --port 3001`.
+Ambos puertos se **derivan de la ruta de este proyecto** en lugar de ser fijos, por lo que varios proyectos de Rebase pueden ejecutarse en paralelo. `rebase dev` imprime las dos URL a las que se vinculó: **utiliza esas**, no `localhost:3001` / `localhost:5173`. (`PORT` y `VITE_API_URL` en `.env` configuran `rebase start`, que ejecuta el bundle compilado, y se ignoran aquí). Fija un puerto con `rebase dev --port 3001`.
 
 ### Flags que vale la pena conocer
 
@@ -80,7 +80,8 @@ Con tu propia base de datos también obtienes los comandos de migración, que la
 pnpm run db:push
 ```
 
-El arranque ya crea las tablas faltantes de forma aditiva, por lo que `db push` se utiliza para las dos cosas que deliberadamente deja de lado: la [RLS](/docs/collections/security-rules/) (seguridad a nivel de fila de PostgreSQL, que es como Rebase controla quién puede leer una fila) en tablas intermedias para relaciones de muchos a muchos, y cualquier cambio que no sea puramente aditivo: una columna renombrada, un tipo más restringido o un campo eliminado.
+El arranque ya crea las tablas faltantes — y sus políticas de
+[RLS](/docs/collections/security-rules/) (seguridad a nivel de fila de PostgreSQL, que es como Rebase controla quién puede leer una fila) — de forma aditiva, por lo que `db push` se utiliza para lo que deliberadamente deja de lado: cualquier cambio que no sea puramente aditivo: una columna renombrada, un tipo más restringido o un campo eliminado.
 
 La estructura del proyecto también incluye un `docker-compose.yml` con un servicio de PostgreSQL, si prefieres un contenedor en lugar de un Postgres instalado en tu sistema:
 
@@ -110,7 +111,7 @@ Cuando abras la URL del frontend que imprimió `rebase dev`, verás la pantalla 
 
 ## Define tu primera colección
 
-Abre `config/collections/` y crea un nuevo archivo. Exporta la colección como el **export por defecto (default export)**; así es como el registro la detecta. El nombre de la tabla es opcional: por defecto usa el slug, así que defínelo solo cuando difieran:
+Abre `config/collections/` y crea un nuevo archivo. Exporta la colección como el **export por defecto (default export)**; así es como la cargan el backend y el panel de administración desde cada archivo del directorio. El nombre de la tabla es opcional: por defecto usa el slug, así que defínelo solo cuando difieran:
 
 ```typescript title="config/collections/products.ts"
 import { defineCollection } from "@rebasepro/cms-types";
@@ -150,7 +151,7 @@ const productsCollection = defineCollection({
 export default productsCollection;
 ```
 
-Luego regístrala en `config/collections/index.ts` para que tanto el backend como el panel de administración la reconozcan:
+Luego añádela al array `collections` de `config/collections/index.ts`. Ese array es un orden de clasificación, no un registro: cada archivo de colección en el directorio se carga —por el backend, el panel de administración y el generador del SDK— tanto si el array lo lista como si no, y el array decide dónde aparece en la navegación. Para eliminar una colección, borra su archivo:
 
 ```typescript title="config/collections/index.ts" {2,5}
 // ...existing imports
@@ -165,9 +166,12 @@ export const collections = [
 
 Guarda el archivo. Eso es todo: `rebase dev` regenera `backend/src/schema.generated.ts` y los tipos del SDK en `generated/sdk/` a partir de tus colecciones, reinicia el backend y el arranque crea la nueva tabla, por lo que tu colección **Products** aparecerá en la navegación.
 
+<span class="since-badge" data-since="0.24">Desde 0.24</span> para los tipos del SDK: en 0.23, `rebase dev` solo regenera el esquema, así que ejecuta
+`rebase generate-sdk` después de cambiar una colección, antes de importar sus tipos.
+
 Lo mismo ocurre con una propiedad añadida a una colección que ya tienes: guarda y la columna estará allí.
 
-`rebase db push` es para los cambios que el arranque deja de lado deliberadamente: una columna renombrada, un tipo restringido, un campo eliminado y RLS en tablas intermedias para relaciones de muchos a muchos. Requiere tu propio PostgreSQL:
+`rebase db push` es para los cambios que el arranque deja de lado deliberadamente: una columna renombrada, un tipo restringido, un campo eliminado. Requiere tu propio PostgreSQL:
 
 ```bash
 pnpm run db:push

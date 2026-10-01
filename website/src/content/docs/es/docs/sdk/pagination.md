@@ -40,6 +40,17 @@ do {
 } while (after);
 ```
 
+`nextCursor` está ausente en la última página, y en una página que ningún
+cursor puede describir: una búsqueda ordenada por relevancia (`_score`), una
+búsqueda vectorial y una proyección `fields` que omite uno de los campos de
+`orderBy` — el cursor se construye a partir de los valores de ordenación de la
+última fila, y esa fila no los lleva. Ahí `meta.hasMore` puede ser `true` sin
+ningún `nextCursor`, y el bucle anterior se detiene antes de tiempo: añade los
+campos de ordenación a `fields`, o pagina por `offset`. `iterate()` con un
+`cursor` rechaza ese listado con `cursor-missing` en lugar de detenerse. Una
+ordenación por una [agregación sobre una relación](/docs/sdk/relations/) sí
+pagina por cursor.
+
 El cursor es **opaco**. Codifica las claves de ordenación *y* los valores de la última fila para ellas, por lo que solo puede continuar la lista de la que provino: mantén `orderBy` idéntico en todas las páginas, o la solicitud será rechazada con `CURSOR_ORDER_MISMATCH` en lugar de buscarse en un orden que nadie solicitó. Una solicitud que no especifique ningún `orderBy` adopta el del cursor, por lo que puedes reenviarlo directamente sin tener que volver a definir el orden.
 
 No intentes analizarlo ni construir uno: la codificación existe sujeta a cambios, y cualquier otra cosa generará un `INVALID_CURSOR`.

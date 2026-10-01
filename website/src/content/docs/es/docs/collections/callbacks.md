@@ -28,7 +28,20 @@ Una colección tiene dos bloques de callbacks, y la única diferencia es qué en
 | Llega al navegador | no — los cuerpos se eliminan del bundle | sí, en su totalidad |
 | Usar para | todo lo siguiente | colecciones con las que el panel se comunica directamente |
 
-**`callbacks` es el que buscas.** Se ejecuta en cada ruta que llega al servidor, por lo que nada lo elude, y su cuerpo nunca sale de la máquina — una clave de API o una lectura de `process.env` allí es segura. El resto de esta página trata sobre `callbacks`.
+**`callbacks` es el que buscas.** Se ejecuta en cada ruta de datos que llega al
+servidor — REST, el SDK, tiempo real, MCP y `rebase.data` — y su cuerpo nunca
+sale de la máquina, por lo que una clave de API o una lectura de `process.env`
+allí es segura. El resto de esta página trata sobre `callbacks`.
+
+Hay un escritor que no es una ruta de datos: **el sistema de autenticación**.
+El registro, el inicio de sesión por OAuth y la gestión de usuarios del
+administrador escriben las filas de usuarios directamente y no ejecutan
+ninguno de sus callbacks, así que un correo de bienvenida en `afterSave` sobre
+`users` nunca se activa en el registro. Cuélgalo de los
+[hooks de autenticación](/docs/backend/authentication/) que se pasan en
+`auth.hooks` — `beforeUserCreate`, `afterUserCreate`, `afterUserDelete` —, que
+requieren un backend con `eject`; el arranque avisa cuando la colección de
+usuarios declara callbacks que el registro no ejecutará.
 
 `admin.browserCallbacks` existe para un caso: una colección en un transporte `direct` o `custom`, que el panel lee y escribe *por sí mismo* sin un servidor Rebase en la ruta de la solicitud. Nada en el lado del servidor ve esas operaciones, por lo que `callbacks` nunca se activará para ellas, y este bloque es el único lugar donde puede residir su lógica de ciclo de vida.
 
@@ -200,7 +213,7 @@ Se llama después de que la fila se escribe y antes del commit, dentro de la mis
 
 ```typescript
 afterSave: async ({
-    values,         // Saved values
+    values,         // Saved values: the row as stored, not afterRead's view of it
     id,             // Entity ID
     previousValues, // Previous values (undefined for new entities)
     status,         // "new" | "existing" | "copy"
@@ -226,11 +239,23 @@ afterSaveError: async ({
 }
 ```
 
+Se ejecuta para un guardado que falló en la base de datos o después de ella —
+no para un rechazo de `beforeSave`, una solicitud rechazada antes de la
+escritura (validación, un permiso faltante, un 404), ni un commit rechazado
+después de que el guardado retornara ([lista completa](/docs/backend/hooks/#cuándo-se-ejecuta-aftersaveerror)).
+
 En una solicitud, se ejecuta una vez que la transacción de la escritura fallida se ha revertido, no dentro de ella. Su `context.data` es uno nuevo, para la misma identidad de quien llama, en el que cada llamada es una transacción propia, por lo que un [job](/docs/backend/jobs), mensaje de cola o webhook que encole se confirma y sobrevive al fallo del que informa. Un error lanzado desde `afterSaveError` se registra en el log, y quien llama sigue recibiendo el error del propio guardado.
 
 ### `afterRead`
 
 Se llama después de leer entidades de la base de datos. Transforma los datos para su visualización.
+
+Da forma a lo que recibe quien llama — la respuesta de una lectura o de una
+escritura, y su frame en tiempo real — y nada más: `afterSave`, `beforeDelete`,
+`afterDelete` y el [historial](/docs/backend/history) obtienen la fila tal
+como se almacenó: un valor enmascarado aquí nunca es lo que registra una
+auditoría ni lo que escribe de vuelta un revert, y un campo añadido aquí nunca
+se escribe.
 
 ```typescript
 afterRead: async ({
@@ -302,7 +327,7 @@ Cada callback recibe un objeto `context` que incluye `context.data` — una capa
 `context.data` utiliza un Proxy de JavaScript, por lo que puedes acceder a cualquier colección mediante su slug como propiedad:
 
 ```typescript
-afterSave: async ({ values, entityId, context }) => {
+afterSave: async ({ values, id, context }) => {
     // Dynamic property access — works for any collection slug
     const jobs = context.data.jobs;
     const users = context.data.users;
@@ -330,26 +355,19 @@ Cada descriptor de acceso a la colección (`context.data.<slug>`) proporciona es
 
 ### Consultar con `.find()`
 
-El método `find()` admite un filtrado avanzado:
+El método `find()` filtra con tuplas `[operator, value]` — la forma tipada de
+la cadena de consulta `?status=eq.published` que lee la API REST:
 
 ```typescript
 afterSave: async ({ values, context }) => {
-    // Simple equality
+    // Equality
     const { data: activeJobs } = await context.data.jobs.find({
-        where: { status: "published" },
+        where: { status: ["==", "published"] },
         limit: 10,
         orderBy: ["createdAt", "desc"]
     });
 
-    // PostgREST-style operators
-    const { data: recentJobs } = await context.data.jobs.find({
-        where: {
-            status: "eq.published",
-            salary: "gte.50000"
-        }
-    });
-
-    // Tuple syntax
+    // Several conditions, AND-ed
     const { data: expensiveJobs } = await context.data.jobs.find({
         where: {
             salary: [">=", 100000],
@@ -361,25 +379,10 @@ afterSave: async ({ values, context }) => {
 
 ### Crear entidades
 
-```typescript
-afterSave: async ({ values, entityId, previousValues, context }) => {
-    // Promote an approved submission to a published job
-    if (values.status === "approved" && previousValues?.status !== "approved") {
-        const newJob = await context.data.jobs.create({
-            title: values.title,
-            description: values.description,
-            company_id: values.company_id,
-            status: "published",
-            source_submission_id: entityId,
-        });
-
-        // Link back to the original submission
-        await context.data["job-submissions"].update(entityId, {
-            promoted_job_id: newJob.id,
-        });
-    }
-}
-```
+`.create()` y `.update()` toman los valores a escribir, con las firmas de
+arriba. [Sincronización de datos entre colecciones](#sincronización-de-datos-entre-colecciones)
+usa ambos: una propuesta aprobada crea un puesto publicado y queda enlazada a
+él.
 
 ### Seguridad: con qué privilegios se ejecuta `context.data`
 
@@ -403,7 +406,9 @@ afterSave: async ({ context }) => {
     // is an admin's reach, not a bypass: a collection whose only rule is
     // `policy.serverContext()` stays closed to it, since that compiles to
     // `rebase.uid() IS NULL` and this accessor's uid is `service`.
-    await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
+    // `dataAsAdmin` is always there server-side; its type allows for the
+    // browser SDK, which has none — hence the `!`.
+    await context.client.dataAsAdmin!.audit_logs.create({ action: "approved" });
 }
 ```
 
@@ -433,10 +438,11 @@ Por lo tanto, la escritura desencadenante y todo lo que escribieron sus callback
 - Lanzar un error desde `afterSave` o `afterDelete` revierte la escritura desencadenante, junto con cada escritura de `context.data` que hicieron los callbacks. A quien llama se le responde **400 `CALLBACK_REJECTED`** con `details.stage` indicando el hook — o con el propio estado del error cuando lleva uno: un `RebaseApiError` que hayas lanzado, el 409 de una infracción de unicidad.
 - Los suscriptores en tiempo real se enteran de la fila solo después del commit, por lo que una escritura que se revirtió nunca se anuncia.
 - Un callback mantiene la transacción abierta mientras se ejecuta, por lo que uno lento representa un bloqueo retenido y una conexión del pool ocupada.
+- Una escritura de `context.data` también ejecuta los callbacks de la colección destino, así que un `afterSave` que actualiza su propia fila se ejecuta de nuevo a sí mismo. Las escrituras anidadas a más de 16 niveles de profundidad se rechazan con **500 `CALLBACK_RECURSION`**, nombrando el hook y la colección, y toda la escritura se revierte. Haz que una escritura así sea condicional, como hace el ejemplo de más abajo.
 
-Deja que un fallo lance un error cuando la escritura desencadenante no deba sobrevivir a él. Captúralo cuando sí deba, pero solo en torno a una **escritura** de `context.data`: una escritura fallida se deshace por sí sola y el resto se confirma.
+Deja que un fallo lance un error cuando la escritura desencadenante no deba sobrevivir a él. Captúralo cuando sí deba, pero solo en torno a una **escritura** de `context.data`: un create, update o delete que la base de datos rechace (una infracción de clave única o foránea, un trigger) se deshace por sí solo y el resto se confirma.
 
-Cualquier otra sentencia que falle en la transacción de la escritura — una consulta, un encolado de job que la base de datos rechazó — aborta esa transacción en Postgres, y capturar el error en JavaScript no lo deshace. La escritura se rechaza con **500 `TRANSACTION_ABORTED`** y no se almacena nada, en lugar de responder con éxito a una escritura que se revirtió. Deja que ese fallo lance un error, o comprueba la condición antes de ejecutar la sentencia.
+Cualquier otra sentencia que falle en la transacción de la escritura — una consulta, la lectura que hace un update o un delete para encontrar su fila (un id que la columna clave no puede contener), un encolado de job que la base de datos rechazó — aborta esa transacción en Postgres, y capturar el error en JavaScript no lo deshace. La escritura se rechaza con **500 `TRANSACTION_ABORTED`** y no se almacena nada, en lugar de responder con éxito a una escritura que se revirtió. Deja que ese fallo lance un error, o comprueba la condición antes de ejecutar la sentencia.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {

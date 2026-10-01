@@ -226,6 +226,30 @@ No tienes que elegir entre Rebase y Drizzle. El bootstrapper compila tus esquema
 ### Drenado ordenado de conexiones
 En entornos serverless u orquestadores (como Kubernetes), la finalización de pods puede provocar conexiones interrumpidas. Implementa siempre manejadores de señales que invoquen `realtimeProvider.stopListening()` (que finaliza el cliente dedicado de pg LISTEN) y `pool.end()` para evitar agotar o fugar conexiones en tu servidor de base de datos.
 
+### CORS para un frontend en el navegador
+Un servidor personalizado tiene su propia configuración de CORS, y un frontend
+en otro origen solo puede leer las cabeceras de respuesta que ese servidor
+expone. Expón las que lee el SDK, o `etagOf(row)` será siempre `undefined` ahí
+— una escritura con `ifMatch` sale entonces sin `If-Match` — y un 429 pierde su
+`Retry-After`:
+
+```typescript
+import express from "express";
+import cors from "cors";
+
+const app = express();
+app.use(cors({
+    origin: ["https://app.example.com"],
+    credentials: true,
+    exposedHeaders: [
+        "ETag", "Retry-After", "X-Request-ID",
+        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
+        "Preference-Applied"
+    ]
+}));
+```
+
+El runtime de Rebase y el backend generado por `eject` ya envían esta lista.
 
 ## Relacionado
 

@@ -392,7 +392,30 @@ const rows = await client.data.orders
 
 Las claves del resultado son **derivadas**, no elegidas: `sum(total)` se devuelve como `sum_total`, y un `count()` simple como `count`. Permitir nombres personalizados requeriría validar que no coincidan con campos de `groupBy` (una regla poco intuitiva que, de omitirse, sobrescribiría valores silenciosamente).
 
-`limit` delimita el número de **grupos** (agrupar por una columna de alta cardinalidad puede generar el equivalente a una tabla completa en una sola respuesta) y se ignora si no hay un `groupBy`, ya que un agregado sin agrupar produce una única fila. `orderBy`, `include` y la paginación no se envían con una agregación: no tiene relaciones que cargar, y el SDK todavía no ordena ni pagina grupos. Por HTTP, una agregación agrupada sí se puede ordenar y paginar — consulte [Agregaciones y búsqueda](/docs/sdk/aggregates-and-search/).
+Los grupos se paginan como las filas de un listado: `limit` los delimita y
+`offset` los salta (agrupar por una columna de alta cardinalidad puede generar
+el equivalente a una tabla completa en una sola respuesta). Una agregación
+agrupada sin `limit` recibe el límite por defecto del listado — **50 grupos**
+por HTTP — así que lea `meta` en el resultado antes de darlo por completo:
+
+```typescript
+const byCustomer = await client.data.orders.aggregate({
+    select: [{ fn: "sum", field: "total" }],
+    groupBy: ["customerId"],
+    limit: 200
+});
+byCustomer.meta; // { limit: 200, offset: 0, hasMore: true } — pagine con offset: 200
+```
+
+El resultado sigue siendo un array de filas; `meta` es una propiedad no
+enumerable sobre él, de modo que una propagación (spread) o un
+`JSON.stringify` solo ven las filas. Está presente siempre que los grupos se
+hayan recortado por un `limit`. Sin un `groupBy` hay una sola fila, `limit` no
+hace nada y `offset` se rechaza. En una función de servidor (`rebase.data`,
+`context.data`), una agregación agrupada sin `limit` devuelve todos los
+grupos. `include` no se envía con una agregación: no tiene relaciones que
+cargar. El SDK todavía no ordena grupos; por HTTP también se pueden ordenar —
+consulte [Agregaciones y búsqueda](/docs/sdk/aggregates-and-search/).
 
 El propósito principal es evitar la descarga de filas para procesarlas en memoria. Calcular los "ingresos por estado" sobre un millón de órdenes requiere aquí una sola consulta y una fila por estado, frente a un `findAll()` con un bucle en otros entornos (lo cual falla con un `limit` y resulta inasumible sin él). Se ejecuta a través del mismo contexto de solicitud que el resto de lecturas, por lo que la seguridad a nivel de fila se aplica a los registros agregados.
 

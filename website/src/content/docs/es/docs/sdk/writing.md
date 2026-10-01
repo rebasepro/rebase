@@ -144,6 +144,14 @@ una fila proveniente de `find()`, de la caché offline o de un servidor que no e
 `ETag`; y pasar `undefined` no envía ninguna precondición, por lo que la llamada anterior
 se degrada a una actualización ordinaria en lugar de lanzar un error.
 
+Desde un navegador en otro origen — un frontend de Vite en su propio puerto,
+un host `app.` que llama a un host `api.` — el `ETag` solo es legible porque
+el servidor lo nombra en `Access-Control-Expose-Headers`. El runtime de Rebase
+lo hace, junto con `Retry-After`, `X-Request-ID`, las cabeceras
+`X-RateLimit-*` y `Preference-Applied`. Un backend que conecta su propio
+`cors()` tiene que exponer la misma lista, o `etagOf` es siempre `undefined`
+ahí y toda escritura condicional sale sin condición.
+
 ### Omitir la respuesta
 
 Cada escritura se resuelve con la fila que escribió. Pasa `{ returning: false }` cuando
@@ -258,8 +266,8 @@ variante entre colecciones: una solicitud, una transacción, todo o nada.
 const result = await client.batch([
     { op: "create", collection: "orders",
       values: { total: 40 }, ref: "order" },
-    { op: "create", collection: "order_items",
-      values: { order_id: { $ref: "order.id" }, sku: "A-1" } },
+    { op: "create", collection: "orderItems",
+      values: { orderId: { $ref: "order.id" }, sku: "A-1" } },
     { op: "update", collection: "stock",
       id: "A-1", values: { count: { $inc: -1 } } },
     { op: "delete", collection: "carts", id: "c-9" }
@@ -270,7 +278,12 @@ result.meta;  // { operations: 4 }
 ```
 
 `op` es `create`, `update`, `upsert` o `delete`, y `collection` restringe
-`values` a la forma `Insert` o `Update` generada de esa colección. Cada
+`values` a la forma `Insert` o `Update` generada de esa colección — una
+columna que la colección no tiene es un error de compilación, y también lo es
+un create al que le falta una obligatoria. `collection` es el accesor, el
+nombre que toma `client.data.<accesor>` (`orderItems` para el slug
+`order_items`); el cliente envía el slug, a través del diccionario
+`collections` con el que se creó. Cada
 operación ejecuta el pipeline que ejecutaría su equivalente de una sola fila:
 la misma validación, callbacks y seguridad a nivel de fila, con el mismo usuario.
 

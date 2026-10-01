@@ -39,7 +39,7 @@ valor antiguo `"content"` y se migra a `"cms"` al leerlo.
 
 ### Collection Editor
 
-Un editor visual de esquemas que te permite crear y modificar colecciones a través de una interfaz de usuario de arrastrar y soltar. Cuando guardas los cambios, utiliza [ts-morph](https://ts-morph.com/) para actualizar tus archivos fuente de TypeScript mediante manipulación de AST — preservando todo el código existente y la lógica personalizada. Es la captura de pantalla del principio de esta página.
+Un editor visual de esquemas que te permite crear y modificar colecciones a través de una interfaz de usuario de arrastrar y soltar. Cuando guardas los cambios, utiliza [ts-morph](https://ts-morph.com/) para escribir en tus archivos fuente de TypeScript las claves que cambiaste — y solo esas —, dejando el resto de cada archivo como estaba: imports, comentarios, formato, handlers, propiedades compartidas. Un cambio a algo que el archivo define en código, como una propiedad importada de otro módulo, se rechaza indicando dónde hacerlo. Es la captura de pantalla del principio de esta página.
 
 El editor está activo dondequiera que se monte Studio — el `<RebaseStudio/>` de un scaffold basta, y no hay ninguna prop que añadir. `collectionEditor` lo ajusta, no lo activa:
 

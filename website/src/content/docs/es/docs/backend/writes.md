@@ -13,6 +13,14 @@ Más allá de los verbos, las rutas de escritura admiten cinco elementos que cam
 
 El cuerpo de una escritura debe ser un objeto JSON. `null`, un número, una cadena o un array es un `400 BAD_REQUEST`.
 
+Una actualización no puede cambiar la clave de una fila. Un cuerpo que nombra
+la clave con otro valor es un `400 KEY_IMMUTABLE`, antes de que se ejecute
+ningún hook y sin que se escriba nada, sea cual sea la vía por la que llega la
+actualización: REST, el socket en tiempo real, MCP o el `rebase.data` en
+proceso. La clave que la fila ya tiene se acepta, como la acepta un formulario
+que devuelve toda la fila. Para mover una fila a una clave nueva, créala ahí y
+elimina la antigua.
+
 ### Idempotencia
 
 `Idempotency-Key: <uuid>` en cualquier escritura significa «si ya has respondido a esta petición exacta, responde de nuevo en lugar de ejecutarla dos veces».
@@ -97,7 +105,7 @@ Especificar un objetivo sin `upsert: true` en una escritura masiva también gene
 
 `?on_conflict=` se rechaza en una creación anidada (`INVALID_CONFLICT_TARGET`). La fila con la que coincidiera podría estar bajo otro padre, y el upsert la movería bajo este. Envíe el upsert a la ruta propia de la colección.
 
-Un upsert que encuentra una fila almacenada es una actualización de ella. El servidor lee la fila que nombra la clave, en el ámbito del emisor de la llamada y dentro de la transacción de la escritura, y ejecuta la actualización ordinaria: se escriben los campos del cuerpo, los que omite conservan sus valores almacenados en lugar de restablecerse a su `defaultValue`, `beforeSave` y `afterSave` ven `status: "existing"` con los valores anteriores, y el historial registra una actualización. Una fila que la lectura no pudo ver, o una insertada de forma concurrente, la sigue capturando `ON CONFLICT … DO UPDATE`, que establece solo lo que escribieron el cuerpo y los hooks, y las marcas `on_update`. Una clave que nombra una fila fuera del ámbito `beforeQuery` del emisor de la llamada responde `404`.
+Un upsert que encuentra una fila almacenada es una actualización de ella. El servidor lee la fila que nombra la clave, en el ámbito del emisor de la llamada y dentro de la transacción de la escritura, y ejecuta la actualización ordinaria: se escriben los campos del cuerpo, los que omite conservan sus valores almacenados en lugar de restablecerse a su `defaultValue`, `beforeSave` y `afterSave` ven `status: "existing"` con los valores anteriores, y el historial registra una actualización. Una fila que la lectura no pudo ver, o una insertada de forma concurrente, la sigue capturando `ON CONFLICT … DO UPDATE`, que establece solo lo que escribieron el cuerpo y los hooks, y las marcas `on_update`. Una clave que nombra una fila fuera del ámbito `beforeQuery` del emisor de la llamada responde `404`. Una clave que pertenece a una fila en la [papelera](/docs/collections/soft-delete/) responde `409 ROW_IN_TRASH` y no escribe nada: restaura la fila primero, o púrgala.
 
 Una fila que ya existía conserva su marca de tiempo `on_create` y su creador `user_on_create`. Un conflicto implica que la creación de la fila es un hecho del pasado, y una reimportación nocturna que restableciera `createdAt` en todo lo que modificara alteraría por completo cualquier consulta de «nuevos esta semana».
 

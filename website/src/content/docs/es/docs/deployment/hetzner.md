@@ -148,10 +148,7 @@ Con `REBASE_MIGRATE_ON_BOOT` en su valor predeterminado de `ensure`, el runtime 
 
 Lo que el arranque deliberadamente nunca hace es algo destructivo: no altera el tipo de una columna, no elimina columnas ni edita una etiqueta enum existente. Un reinicio del contenedor no debe tener la capacidad de remodelar un esquema como efecto secundario.
 
-Por lo tanto, dos cosas todavía requieren [`rebase db push`](/docs/architecture/schema-as-code), ejecutado desde un checkout o CI donde la validación de cambios destructivos y un respaldo estén al alcance:
-
-- RLS en tablas de unión para relaciones many-to-many;
-- cualquier cambio que no sea puramente aditivo.
+Por lo tanto, todavía queda una cosa que requiere [`rebase db push`](/docs/architecture/schema-as-code), ejecutado desde un checkout o CI donde la validación de cambios destructivos y un respaldo estén al alcance: cualquier cambio que no sea puramente aditivo — una columna renombrada, un tipo acotado, un campo eliminado.
 
 Si el módulo o el archivo Compose vincularon Postgres a loopback —ambos lo hacen—, conéctate a través de un túnel SSH:
 

@@ -68,6 +68,16 @@ const ordersCollection = defineCollection({
    - La acción (`create`, `update`, `delete`)
    - Un array de `changed_fields` que muestra qué columnas se modificaron
 
+Los valores son la fila tal como la sirve la API REST: sus columnas, las fechas
+como timestamps, una `belongsTo` como su clave foránea. Eso es lo que escribe
+de vuelta un revert.
+
+En una colección con [soft delete](/docs/collections/soft-delete/), un borrado
+se registra como `delete` y una restauración (la actualización que devuelve el
+campo de soft delete a `null`) como `update`. El historial de una fila sigue
+siendo legible mientras la fila está en la papelera, y revertirla a una
+versión anterior al borrado la restaura.
+
 ### Seguimiento de diferencias e igualdad estructural profunda
 
 Para evitar registrar logs redundantes donde los campos se guardan pero ningún valor cambia, el `HistoryService` realiza una comparación de igualdad estructural profunda (deep equality) en las claves de nivel superior de los valores antiguos y nuevos:

@@ -10,12 +10,12 @@ description: Aplica callbacks de ciclo de vida transversales a cada colección a
 Rebase proporciona dos niveles de callbacks del ciclo de vida de entidades; ambos utilizan el mismo tipo `CollectionCallbacks` de `@rebasepro/types`:
 
 - **[Callbacks por colección](/docs/collections/callbacks)**: Se definen en configuraciones de colección individuales. Se ejecutan únicamente para esa colección.
-- **Callbacks globales**: Se definen en `initializeRebaseBackend({ callbacks })`. Se disparan en **cada** colección, en cada ruta de datos (API REST, WebSocket / tiempo real, `rebase.dataAsAdmin` en el servidor).
+- **Callbacks globales**: Se definen en `initializeRebaseBackend({ callbacks })`. Se disparan en **cada** colección, en cada ruta de datos (API REST, WebSocket / tiempo real, `rebase.dataAsAdmin` en el servidor). El único escritor que no ven es el sistema de autenticación: el registro, el inicio de sesión por OAuth y la gestión de usuarios del administrador escriben las filas de usuario directamente y ejecutan los [hooks de autenticación](/docs/backend/authentication/) (`afterUserCreate`, …) en su lugar.
 
 Utilice callbacks globales para:
 - **Alcance de filas (Row scoping)** — `beforeQuery` en cada colección, de modo que las lecturas de un inquilino se delimiten en un solo lugar en vez de por colección. Solo Postgres: junto a una fuente de datos de MongoDB o Firestore, un `beforeQuery` global rechaza iniciarse en lugar de dejar las lecturas de esa fuente sin delimitar. Consulte [`beforeQuery`](/docs/collections/callbacks#beforequery).
 - **Enmascaramiento de PII** — ofusca campos sensibles para quienes realizan llamadas sin permisos de administrador en todas las colecciones.
-- **Registro de auditoría unificado** — registra cada creación, actualización o eliminación en un solo lugar.
+- **Registro de auditoría unificado** — registra cada creación, actualización o eliminación en un solo lugar. Las cuentas nuevas del registro y de OAuth no están entre ellas; registre esas desde `afterUserCreate`.
 - **Validación transversal** — aplica invariantes que abarcan múltiples colecciones.
 
 :::note
@@ -141,7 +141,7 @@ ofuscación con una excepción silenciosa, por lo que no se ofrece.
 fila y todo lo que hicieron sus callbacks se confirman (commit) juntos o no se confirma nada.
 
 - **`beforeSave`, `beforeDelete`** — si el callback lanza un error (throw), la operación se rechaza con un HTTP 400 que incluye su mensaje y el código `CALLBACK_REJECTED`, y la escritura en la base de datos nunca ocurre. Lance un `RebaseApiError` de `@rebasepro/types` para elegir el estado usted mismo — consulte [Callbacks de entidad](/docs/collections/callbacks#beforesave). Un `beforeDelete` que *devuelve* `false` es el mismo rechazo sin mensaje, y responde **403** con ese código.
-- **`afterRead`** — la fila devuelta (o la fila transformada) es lo que recibe el emisor de la llamada. Su transacción es `READ ONLY` — consulte [más abajo](#afterread-cannot-write).
+- **`afterRead`** — la fila devuelta (o la fila transformada) es lo que recibe el emisor de la llamada, y solo él: en una escritura da forma a la respuesta, mientras que `afterSave`, `beforeDelete`, `afterDelete` y el historial obtienen la fila tal como se almacenó — un valor enmascarado nunca se registra ni se revierte en la columna. Su transacción es `READ ONLY` — consulte [más abajo](#afterread-cannot-write).
 - **`afterSave`, `afterDelete`** — se ejecutan *antes* del commit, con `await`. Si lanzan un error aquí, se revierte (rollback) la fila y se responde con el mismo **400 `CALLBACK_REJECTED`**, con `details.stage` indicando el hook. Mantienen la transacción abierta mientras se ejecutan, por lo que uno lento mantiene un bloqueo activo.
 - **`afterSaveError`** — se ejecuta cuando el guardado falló, en la salida. En una solicitud se ejecuta después de que la transacción de la escritura fallida se haya revertido, con un `context` en el que cada llamada es una transacción propia, de modo que un trabajo que encole para informar del fallo se conserva. Un error que lance se registra en el log; el emisor de la llamada recibe el error del propio guardado.
 
@@ -152,6 +152,23 @@ se escribió en base a esa frase —por ejemplo, una llamada a un webhook en `af
 estado manteniendo una transacción de base de datos abierta durante la duración de un viaje de ida y vuelta HTTP,
 y revirtiendo la fila siempre que el extremo remoto estuviera caído.
 :::
+
+### Cuándo se ejecuta `afterSaveError`
+
+Informa de un guardado que falló **en la base de datos o después de ella** —
+desde la sentencia INSERT o UPDATE en adelante. Un guardado rechazado antes de
+ese punto nunca llegó a la base de datos, así que el hook no se entera.
+
+| Se ejecuta | No se ejecuta |
+|---|---|
+| La base de datos rechaza la sentencia: una violación de clave única o foránea, una restricción de comprobación (check) o un trigger, una política de seguridad a nivel de fila (`WRITE_DENIED`) | Un rechazo de `beforeSave` — el hook que rechazó es el que lo sabe |
+| `afterRead` o `afterSave` lanza un error (el emisor recibe `CALLBACK_REJECTED`) | Una solicitud rechazada antes del driver: validación (`VALIDATION_*`), un campo que el emisor no puede escribir, un permiso faltante |
+| La entrada del historial no se puede registrar | Una fila que el emisor no puede direccionar (`404`), una marca de inquilino que no puede establecer |
+| | El commit se rechaza después de que el guardado retornara: `TRANSACTION_ABORTED` (una sentencia fallida que un callback capturó), o una restricción diferida comprobada en el `COMMIT` |
+| | Una eliminación — no hay contraparte de eliminación |
+
+En una escritura masiva o `_batch` se ejecuta para la fila que falló; las
+filas anteriores a ella se revierten junto con el lote y no se informan.
 
 ### Efectos secundarios que no deben retener la transacción
 

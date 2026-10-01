@@ -86,14 +86,13 @@ Las últimas tres son la forma en que este despliegue obtiene un administrador: 
 
 Lo que `ensure` nunca hace es cambiar algo que ya existe: no altera el tipo de una columna, no elimina nada ni edita las etiquetas de un enum existente, ya que el reinicio de un contenedor no debe remodelar un esquema como efecto secundario de un despliegue.
 
-Por lo tanto, dos cosas todavía requieren la CLI, ejecutada desde una copia del repositorio o un trabajo de CI con `DATABASE_URL` apuntando a tu Flexible Server (añade una regla de firewall que permita tu IP de cliente si es necesario):
+Por lo tanto, todavía queda una cosa que requiere la CLI, ejecutada desde una copia del repositorio o un trabajo de CI con `DATABASE_URL` apuntando a tu Flexible Server (añade una regla de firewall que permita tu IP de cliente si es necesario):
 
 ```bash
 rebase db push
 ```
 
-- **RLS en tablas intermedias (junction tables)** para relaciones many-to-many.
-- **Cualquier cambio que no sea puramente aditivo**: una columna renombrada, un tipo más restringido o un campo eliminado.
+Cualquier cambio que no sea puramente aditivo: una columna renombrada, un tipo más restringido o un campo eliminado.
 
 La imagen de runtime se distribuye sin la CLI, por lo que esto nunca se ejecuta dentro del contenedor. Para migraciones versionadas, haz commit de los archivos de migración con `rebase db generate` y ejecuta `rebase db migrate` como un paso de release en su lugar.
 

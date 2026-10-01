@@ -55,7 +55,7 @@ curl -X PATCH /api/data/invoices/7 -d '{"deletedAt": null}'
 
 Esa actualización es la que llega a una fila marcada. Cualquier otra edición de ella responde `404`, igual que la fila responde a toda lectura por defecto; restáurala primero.
 
-Lo contrario no es una actualización. Establecer el campo en un valor se rechaza con `400` `FIELD_NOT_WRITABLE` — elimina la fila en su lugar —, de modo que el permiso `delete`, `beforeDelete` y `afterDelete` siempre se le aplican. Un upsert puede crear una fila que ya esté marcada, pero nunca marca una que ya estaba almacenada.
+Lo contrario no es una actualización. Establecer el campo en un valor se rechaza con `400` `FIELD_NOT_WRITABLE` — elimina la fila en su lugar —, de modo que el permiso `delete`, `beforeDelete` y `afterDelete` siempre se le aplican. Un upsert puede crear una fila que ya esté marcada, pero nunca marca una que ya estaba almacenada. Tampoco escribe un upsert en una fila que está en la papelera: cuando su clave pertenece a una fila marcada, se rechaza con `409` `ROW_IN_TRASH` y no se escribe nada. Restaura la fila primero, o púrgala con `?hard=true` y vuelve a hacer el upsert.
 
 Una eliminación a través de una ruta muchos a muchos, como `DELETE /api/data/posts/1/tags/5`, elimina el vínculo del post 1 con la etiqueta. No hace un soft delete de la etiqueta, que otros posts siguen usando.
 

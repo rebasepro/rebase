@@ -34,7 +34,7 @@ GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
 
 Los resultados se indexan por función y campo; `count()` se convierte en `count`, `sum(total)` se convierte en `sum_total`.
 
-Los grupos se paginan como las filas de un listado. `limit` los limita, `offset` (o `page`) los salta y `orderBy` los ordena por un campo de `groupBy` o por una clave del resultado. El orden siempre termina en las claves del grupo, así que cada límite de página cae en el mismo lugar. Con un `limit`, la respuesta indica si hay más:
+Los grupos se paginan como las filas de un listado. `limit` los limita, `offset` (o `page`) los salta y `orderBy` los ordena por un campo de `groupBy` o por una clave del resultado. El orden siempre termina en las claves del grupo, así que cada límite de página cae en el mismo lugar. Una agregación agrupada sin `limit` se corta en el límite por defecto del listado (50 grupos), igual que un listado. Con un `limit` — incluido el predeterminado — la respuesta indica si hay más, y el `aggregate()` del SDK lo devuelve como `meta` en el resultado:
 
 ```bash
 GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:desc&limit=20&offset=20

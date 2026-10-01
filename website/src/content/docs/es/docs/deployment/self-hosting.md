@@ -147,16 +147,13 @@ No altera el tipo de una columna, no elimina una tabla ni una columna, y no
 edita las etiquetas de un enum existente, ya que el reinicio de un contenedor no debe ser capaz de
 alterar la estructura de un esquema como efecto secundario de un despliegue.
 
-Por lo tanto, sigue valiendo la pena ejecutar `rebase db push` para las dos cosas que el arranque
-no toca:
+Por lo tanto, sigue valiendo la pena ejecutar `rebase db push` para lo que el arranque
+no toca — cualquier cambio que no sea puramente aditivo: una columna renombrada,
+un tipo más restringido o un campo eliminado.
 
 ```bash
 rebase db push
 ```
-
-- **RLS en tablas de unión (junction tables)** para relaciones de muchos a muchos.
-- **Cualquier cambio que no sea puramente aditivo**: una columna renombrada, un tipo
-  más restringido o un campo eliminado.
 
 Ejecútalo desde una copia local del código o un job de CI, apuntando a la base de datos del despliegue.
 Primero realiza una simulación (dry-run) del cambio, rechaza cambios destructivos sin
@@ -265,6 +262,7 @@ ExecStart=/usr/bin/rebase-server /srv/myapp/dist-bundle
 Restart=always
 Environment=NODE_ENV=production
 Environment=DATABASE_URL=postgresql://rebase:...@127.0.0.1:5432/rebase
+Environment=ALLOW_LOCALHOST_IN_PRODUCTION=true
 Environment=JWT_SECRET=...
 Environment=REBASE_SERVICE_KEY=...
 Environment=CORS_ORIGINS=https://app.example.com
@@ -278,6 +276,13 @@ modo de desarrollo: refleja los orígenes localhost, sirve la especificación Op
 **deja abierta la ventana del primer administrador**, por lo que el primer desconocido que encuentre el
 formulario de registro se convertirá en administrador. Las dos líneas `REBASE_ADMIN_*` son las que
 reemplazan esa ventana; consulta [Tu primer administrador](/docs/getting-started/deployment/#your-first-admin).
+
+`ALLOW_LOCALHOST_IN_PRODUCTION=true` está ahí porque la base de datos está en
+la misma máquina. En producción el runtime rechaza cualquier variable que
+apunte a localhost — en un contenedor, loopback es el propio contenedor, así
+que esa dirección siempre es un error — y esta línea le indica que la
+dirección es intencional. Elimínala cuando la base de datos se ejecute en
+otro lugar.
 
 Es preferible usar `EnvironmentFile=/etc/rebase.env` con permisos 0600 en el archivo
 en lugar de líneas `Environment=` para los secretos: un archivo de unidad tiene permisos de lectura para todos, y
@@ -367,6 +372,37 @@ Expone métricas de Prometheus en `/metrics`: conteo de peticiones e histogramas
 desglosados por superficie de API (data, auth, storage, functions) y colección,
 además de indicadores (gauges) del proceso. Sin un token, el endpoint puede ser leído por cualquiera que alcance
 el puerto, así que define uno a menos que esté en una red privada.
+
+## Cabeceras de seguridad
+
+Toda respuesta lleva `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options:
+nosniff`, una `Referrer-Policy` y `Strict-Transport-Security: max-age=15552000`
+(180 días). La cabecera HSTS omite `includeSubDomains`: eso le diría a los
+navegadores que rechacen HTTP simple en todos los subdominios de tu dominio,
+incluidos los que este servidor no tiene nada que ver, y un navegador la
+mantiene durante todo el tiempo que indique la cabecera. <span class="since-badge" data-since="0.24">Desde 0.24</span>
+Define `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` cuando todos los subdominios sean
+solo HTTPS; hasta la 0.23 inclusive, la cabecera siempre llevaba
+`includeSubDomains`.
+
+Las aplicaciones estáticas — el panel de administración CMS y cualquier
+frontend que sirva el bundle — también llevan `Content-Security-Policy:
+frame-ancestors 'self'; object-src 'none'; base-uri 'self'`. Decide quién
+puede enmarcar la app, descarta los plugins y fija `<base>` a tu origen, y no
+restringe nada más, así que los scripts inline, los workers y el inicio de
+sesión de terceros siguen funcionando. Una respuesta que define su propia
+política la conserva. Para algo más estricto, pon la política en el proxy
+inverso delante del servidor.
+
+## Más de una instancia
+
+Un solo contenedor es lo predeterminado y no necesita nada más. Antes de que
+una segunda réplica reciba tráfico — o un despliegue progresivo (rolling
+deploy) ejecute dos en paralelo — revisa
+[Ejecutar más de una instancia](/docs/deployment/multiple-instances/): los
+límites de tasa, los canales de broadcast, los archivos locales, las subidas
+reanudables y la caché de imágenes son por proceso hasta que un ajuste los
+comparte.
 
 ## Ejecutar funciones en su propio proceso
 

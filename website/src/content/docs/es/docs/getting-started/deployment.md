@@ -130,9 +130,8 @@ job de CI apuntando a la base de datos de producción:
 pnpm run db:push
 ```
 
-Ejecútalo para la RLS de las tablas de unión en relaciones muchos a muchos, y
-para cualquier cambio que no sea puramente aditivo: una columna renombrada, un
-tipo estrechado, un campo eliminado.
+Ejecútalo para cualquier cambio que no sea puramente aditivo: una columna
+renombrada, un tipo estrechado, un campo eliminado.
 
 Para un **flujo de trabajo versionado y en equipo**, versiona ficheros de
 migración con `pnpm run db:generate` y ejecuta `pnpm run db:migrate` como paso
@@ -178,7 +177,7 @@ Antes de desplegar en producción, asegúrate de:
 |------|---------|
 | **Primer administrador** | Define `REBASE_ADMIN_EMAIL` y `REBASE_ADMIN_PASSWORD` **antes del primer arranque**, junto con `DISABLE_SELF_REGISTRATION=true`. En producción la primera cuenta registrada no se promueve — consulta [Tu primer administrador](#tu-primer-administrador). |
 | **NODE_ENV** | `NODE_ENV=production`. Es lo que cierra la ventana de bootstrap, rechaza el almacenamiento local de ficheros, exige `CORS_ORIGINS` y apaga la documentación OpenAPI. Un despliegue que se queda con el valor por defecto está corriendo en modo desarrollo. |
-| **Esquema de la base de datos** | El arranque crea las tablas de tus colecciones de forma aditiva. Ejecuta `pnpm run db:push` (o `pnpm run db:migrate`) para la RLS de las tablas de unión y para todo lo que no sea puramente aditivo. |
+| **Esquema de la base de datos** | El arranque crea las tablas de tus colecciones y su RLS de forma aditiva. Ejecuta `pnpm run db:push` (o `pnpm run db:migrate`) para todo lo que no sea puramente aditivo. |
 | **JWT_SECRET** | Usa una cadena aleatoria criptográficamente fuerte (≥ 32 caracteres). Nunca la reutilices entre entornos. |
 | **DATABASE_URL** | Usa una instancia de Postgres gestionada (Neon, Supabase, RDS) con TLS habilitado |
 | **CORS_ORIGINS** | Siempre, no solo cuando el frontend está en otro dominio. El runtime se niega a arrancar en producción sin `CORS_ORIGINS` ni `FRONTEND_URL`, porque una API que adivina sus orígenes permitidos acaba permitiendo el equivocado. |

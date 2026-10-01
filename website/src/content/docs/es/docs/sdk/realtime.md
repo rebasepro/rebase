@@ -9,7 +9,7 @@ description: Suscríbete a cambios de datos en vivo con el SDK tipado de Rebase 
 
 El SDK tipado de Rebase proporciona suscripciones a datos en tiempo real mediante WebSocket. Cuando los registros cambian en el servidor, las callbacks suscritas se ejecutan inmediatamente con los datos actualizados.
 
-La conexión WebSocket se establece automáticamente cuando hay una `websocketUrl` disponible (derivada de `baseUrl` por defecto). La reconexión y la renovación de tokens se gestionan de forma transparente.
+La conexión WebSocket se establece automáticamente cuando hay una `websocketUrl` disponible (derivada de `baseUrl` por defecto). La reconexión y la renovación de tokens se gestionan por ti. Una interrupción que dure más de unos 15 segundos se informa una vez, al `onError` de cada suscripción, como `CONNECTION_LOST` — consulta [Autenticación y reconexión](#autenticación-y-reconexión).
 
 ## Suscribirse a una colección
 
@@ -180,7 +180,29 @@ El cliente WebSocket gestiona la autenticación automáticamente:
 
 - Al **iniciar sesión** o **renovar el token**, el nuevo token se envía a un socket ya abierto a través de un mensaje `authenticate`. Si no hay ninguno abierto, no ocurre nada: iniciar sesión no es una solicitud de tiempo real, y un socket abierto más tarde se autentica por sí mismo.
 - Al **cerrar sesión**, la conexión WebSocket se desconecta. El cliente sigue siendo utilizable; una suscripción posterior se reconecta de forma anónima.
-- Si la conexión se cae, el cliente **se reconecta automáticamente** y restablece todas las suscripciones activas.
+- Si la conexión se cae, el cliente **se reconecta automáticamente** y restablece todas las suscripciones activas. Nunca deja de intentarlo mientras exista una suscripción o un canal al que se haya unido; el retraso entre intentos crece hasta un máximo de 30 segundos.
+- Si la conexión permanece caída durante más de unos 15 segundos, se llama **una vez** al `onError` de cada suscripción (y al `onError` de cada canal al que se haya unido) con un `RebaseApiError` cuyo `code` es `CONNECTION_LOST`. La suscripción no termina: sigue mostrando lo que tienes, márcalo como posiblemente desactualizado, y espera. Cuando el socket vuelve, el siguiente `onUpdate` de la suscripción lleva todo lo escrito en el ínterin.
+- `client.ws.state` es el estado de la conexión — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` o `closed` — y `client.ws.onStateChange(listener)` se notifica de cada cambio. `disconnected` es el estado en el que se ha informado `CONNECTION_LOST`.
+- Las solicitudes enviadas por el socket son **como mucho una vez**. Una que se envió cuando la conexión se cayó falla con `CONNECTION_LOST` y nunca se reenvía, ya que el servidor puede haberla ejecutado ya. Una que sigue esperando un socket tras 30 segundos falla con `REQUEST_TIMEOUT` sin llegar a enviarse.
+
+```typescript
+import { RebaseApiError } from "@rebasepro/client";
+
+const unsubscribe = client.data.orders.listen(
+    { where: { status: ["==", "open"] } },
+    (response) => {
+        setOrders(response.data);
+        setStale(false);
+    },
+    (error) => {
+        if (error instanceof RebaseApiError && error.code === "CONNECTION_LOST") {
+            setStale(true); // keep the rows; the next update clears it
+            return;
+        }
+        setError(error);
+    }
+);
+```
 
 No se requiere una gestión manual de tokens: la integración entre `client.auth` y la capa WebSocket se maneja internamente.
 

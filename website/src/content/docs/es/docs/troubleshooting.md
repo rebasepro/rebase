@@ -79,8 +79,20 @@ DB_PERMISSION_DENIED — Permission denied by the database on "notes"
 
 SQLSTATE `42501`. Se producen dos problemas distintos bajo este código, y el mensaje los diferencia:
 
-- **Una directiva de seguridad a nivel de fila (RLS) denegó la fila.** El sistema de control de acceso está funcionando; el emisor solicitó algo que sus políticas no permiten. Revisa las `securityRules` de la colección y ejecuta `npx @rebasepro/rls-check` para realizar una auditoría de solo lectura sobre lo que la base de datos realmente aplicará.
-- **El rol carece de un `GRANT`.** Nada en la solicitud ayudará: el rol de conexión no puede acceder a la tabla en absoluto. Este es un problema de despliegue.
+- **Una directiva de seguridad a nivel de fila (RLS) denegó la fila** — el mensaje de arriba. El sistema de control de acceso está funcionando; el emisor solicitó algo que sus políticas no permiten. Revisa las `securityRules` de la colección y ejecuta `npx @rebasepro/rls-check` para realizar una auditoría de solo lectura sobre lo que la base de datos realmente aplicará.
+- **El rol carece de un `GRANT`.** El mensaje nombra el objeto en su lugar:
+
+  ```
+  DB_PERMISSION_DENIED — Permission denied by the database: the role this request
+  runs as has no privilege on schema "rebase". That is a missing GRANT to that
+  role, not a row-level security policy.
+  ```
+
+  Nada en la solicitud ayudará: el rol con el que se ejecutan las peticiones no
+  puede acceder a ese objeto en absoluto. El servidor otorga su rol de
+  solicitud sobre los esquemas que aprovisiona, en el arranque; un objeto
+  creado fuera de eso (por otro rol, o en un esquema que ninguna colección
+  declara) necesita un `GRANT` propio. Este es un problema de despliegue.
 
 Una lectura excluida por RLS no es un error: las filas se filtran y obtienes una página vacía. Si una colección se lee como vacía para un usuario autenticado que debería ver filas, el lugar donde mirar es la política, no la consulta.
 

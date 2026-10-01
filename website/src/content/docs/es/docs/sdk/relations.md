@@ -177,8 +177,8 @@ data[0].author?.name;   // "Jane Doe"
 
 Un tipo `Database` generado tipa las tres con precisión: `Insert` y `Update` aceptan
 cualquiera de las dos formas de escritura, `Row` tiene `authorId` incondicionalmente, y `author` es
-opcional en `Row` y **obligatorio** en la fila que devuelve una lectura con `include` —
-consulta [Includes tipados](#typed-includes).
+opcional en `Row` — `RowWith<"posts", ["author"]>` es la fila con ella
+**obligatoria**, para una lectura que la haya pedido. Consulta [Includes tipados](#typed-includes).
 
 El único caso en el que las tres coinciden es una relación nombrada idénticamente a su
 propia clave foránea. En ese caso, la fila incluida se sirve *sobre* la columna, y el
@@ -199,9 +199,13 @@ const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
 `IncludeFor<A>` restringe las claves de un include a relaciones existentes, en cada
-nivel. `RowWith<A, I>` es la fila devuelta por esa lectura, con cada relación incluida
-convertida en **obligatoria**, de modo que después de solicitar el autor, `row.author.name`
-no necesita `?.`.
+nivel — y un cliente tipado comprueba `include` de la misma manera, tanto en `find({ include })`
+como en `.include(...)`, de modo que `posts.include("authr")` es un error de
+compilación en lugar de un `400 UNKNOWN_RELATION`. Las filas que devuelve una lectura
+siguen tipando cada relación como opcional; `RowWith<A, I>` es esa misma fila con cada
+relación incluida convertida en **obligatoria**, para anotar lo que leíste — de modo
+que después de solicitar el autor, un `RowWith<"posts", ["author"]>` no necesita `?.`
+en `row.author.name`.
 
 Sin un `Database` generado, `include` sigue siendo un `string[]` simple o un árbol: un
 tipo de fila escrito a mano no tiene relaciones con las que contrastarse, y el error

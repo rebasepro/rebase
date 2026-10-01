@@ -85,14 +85,13 @@ AWS gestiona la terminación TLS, proporcionándole una URL `https` lista para u
 
 Lo que `ensure` nunca hace es cambiar algo que ya existe: no altera el tipo de una columna, no elimina nada ni edita las etiquetas de un enum existente, ya que el reinicio de un contenedor no debe remodelar un esquema como efecto secundario de un despliegue.
 
-Por lo tanto, dos cosas siguen requiriendo la CLI, ejecutada desde una copia local del código o una tarea de CI con `DATABASE_URL` apuntando a RDS:
+Por lo tanto, todavía queda una cosa que requiere la CLI, ejecutada desde una copia local del código o una tarea de CI con `DATABASE_URL` apuntando a RDS:
 
 ```bash
 rebase db push
 ```
 
-- **RLS en tablas intermedias (junction tables)** para relaciones de muchos a muchos.
-- **Cualquier cambio que no sea puramente aditivo**: una columna renombrada, un tipo más restrictivo, un campo eliminado.
+Cualquier cambio que no sea puramente aditivo: una columna renombrada, un tipo más restrictivo, un campo eliminado.
 
 Si la instancia es privada, ejecútelo desde CI o desde un host bastión dentro de la misma VPC. La imagen del runtime se distribuye sin la CLI, por lo que esto nunca se ejecuta dentro del contenedor de App Runner. Para migraciones versionadas, confirme los archivos de migración con `rebase db generate` y ejecute `rebase db migrate` como un paso de la versión (release step).
 

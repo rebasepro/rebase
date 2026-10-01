@@ -206,6 +206,9 @@ la configuración) siempre que más de un proceso sirva websockets.
 **Escalado a cero.** Nada de lo aquí descrito escala un proceso hasta cero ni inicia uno
 bajo demanda. Esa es una capacidad de la plataforma, no del runtime.
 
+Todo lo demás que un proceso guarda para sí mismo está en una sola lista:
+[Ejecutar más de una instancia](/docs/deployment/multiple-instances/).
+
 ## Desplegar una unidad por separado
 
 Todo lo anterior divide *dónde se ejecuta el trabajo*. Todo se sigue distribuyendo como una

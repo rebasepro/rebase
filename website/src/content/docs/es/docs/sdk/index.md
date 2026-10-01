@@ -67,6 +67,8 @@ rebase generate-sdk
 ```
 
 Mientras `rebase dev` está en ejecución no hace falta: regenera los tipos en `generated/sdk/` al arrancar y en cada guardado bajo `config/collections/`. Ejecuta el comando tú mismo en CI, en un repositorio de frontend que no tiene colecciones (`rebase generate-sdk --from link`), o en cualquier lugar donde `rebase dev` no se esté ejecutando.
+<span class="since-badge" data-since="0.24">Desde 0.24</span> para la regeneración: en 0.23, `rebase dev` deja los tipos del SDK como están, así que ejecuta
+el comando después de cada cambio de colección.
 
 Luego pasa el parámetro de tipo `Database` a `createRebaseClient` para obtener autocompletado completo:
 
@@ -93,7 +95,7 @@ Cuando se proporciona `Database`, `createRebaseClient` devuelve una instancia de
 
 Una clave de propiedad que *tú* escribiste es tu clave, cualquiera que sea su formato — nada renombra un nombre que hayas elegido. Las dos claves que se derivan en lugar de declararse, la clave foránea de una relación y una columna leída mediante introspección, están en camelCase.
 
-`Row` describe una lectura, `Insert` un `create()` y `Update` un `update()` — no tienen la misma forma. Las columnas que admiten valores nulos son `T | null` en `Row`, la clave primaria siempre está presente en una lectura y nunca se puede establecer en una actualización, y un destino `belongsTo` se puede escribir tanto como la relación (`{ author: 5 }`) o como su clave foránea (`{ authorId: 5 }`).
+`Row` describe una lectura, `Insert` un `create()` y `Update` un `update()` — no tienen la misma forma. Una columna que no es obligatoria es `T | null` en las tres, de modo que una escritura pueda vaciarla; la clave primaria siempre está presente en una lectura y nunca se puede establecer en una actualización; un destino `belongsTo` se puede escribir tanto como la relación (`{ author: 5 }`) o como su clave foránea (`{ authorId: 5 }`); y una pertenencia `hasMany` o `manyToMany` se escribe como una lista de ids de destino u objetos `{ id }` (`{ tags: ["t-1"] }`), cada uno con un `_pivot` cuando la tabla de unión declara columnas de payload. Un campo que nadie puede escribir (`access: { write: [] }`) no está ni en `Insert` ni en `Update`.
 
 ## Ejemplo rápido
 
