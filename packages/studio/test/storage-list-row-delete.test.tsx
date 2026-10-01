@@ -5,6 +5,7 @@ import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { StorageListResult } from "@rebasepro/types";
+import { useEnTranslation } from "./en-translation";
 
 /**
  * Deleting a file from a row of the storage browser's list view.
@@ -24,6 +25,7 @@ const defaultSource = {
 };
 
 jest.mock("@rebasepro/app", () => ({
+    useTranslation: () => useEnTranslation(),
     useStorageSource: () => defaultSource,
     useStorageSources: () => ({ registry: {}, sources: { default: defaultSource } }),
     useSnackbarController: () => ({ open: jest.fn() }),
@@ -68,7 +70,7 @@ describe("the list view's row delete", () => {
 
         fireEvent.click(within(row as HTMLElement).getByRole("button"));
 
-        const prompt = await screen.findByText(/Are you sure you want to delete "logo.png"/);
+        const prompt = await screen.findByText(/Are you sure you want to delete “logo.png”/);
         expect(defaultSource.deleteObject).not.toHaveBeenCalled();
 
         let dialog: HTMLElement | null = prompt.parentElement;

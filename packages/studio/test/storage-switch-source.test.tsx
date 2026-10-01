@@ -5,6 +5,7 @@ import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { StorageListResult } from "@rebasepro/types";
+import { useEnTranslation } from "./en-translation";
 
 /**
  * Switching the storage browser to another storage source.
@@ -30,6 +31,7 @@ const defaultSource = source(["default/logo.png"]);
 const mediaSource = source(["default/logo.png", "default/other.png"]);
 
 jest.mock("@rebasepro/app", () => ({
+    useTranslation: () => useEnTranslation(),
     useStorageSource: () => defaultSource,
     useStorageSources: () => ({
         registry: { media: { key: "media", label: "Media" } },
@@ -48,7 +50,7 @@ jest.mock("react-router", () => ({
 
 import { StorageView } from "../src/components/StorageView/StorageView";
 
-const previewPrompt = /Are you sure you want to delete "logo.png"/;
+const previewPrompt = /Are you sure you want to delete “logo.png”/;
 
 describe("switching storage source", () => {
     it("closes the preview and drops the selection made in the other source", async () => {
@@ -76,7 +78,7 @@ describe("switching storage source", () => {
         fireEvent.change(screen.getByRole("combobox"), { target: { value: "media" } });
         fireEvent.click(await screen.findByText("other.png"));
 
-        const prompt = await screen.findByText(/Are you sure you want to delete "other.png"/);
+        const prompt = await screen.findByText(/Are you sure you want to delete “other.png”/);
         let dialog: HTMLElement | null = prompt.parentElement;
         while (dialog && !within(dialog).queryByRole("button", { name: "Delete" })) dialog = dialog.parentElement;
         expect(dialog).not.toBeNull();

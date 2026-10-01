@@ -5,6 +5,7 @@ import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { StorageListResult } from "@rebasepro/types";
+import { useEnTranslation } from "./en-translation";
 
 /**
  * "New folder" in the storage browser, with a second storage source picked.
@@ -27,6 +28,7 @@ const defaultSource = source();
 const mediaSource = source();
 
 jest.mock("@rebasepro/app", () => ({
+    useTranslation: () => useEnTranslation(),
     useStorageSource: () => defaultSource,
     useStorageSources: () => ({
         registry: { media: { key: "media", label: "Media" } },

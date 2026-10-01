@@ -205,7 +205,5 @@
   "packages/studio/src/components/SQLEditor/MonacoEditor.tsx::studio_schema_delete_from": 1,
   "packages/studio/src/components/SQLEditor/MonacoEditor.tsx::studio_schema_insert_into": 1,
   "packages/studio/src/components/SQLEditor/SQLEditor.tsx::studio_sql_executing_query": 1,
-  "packages/studio/src/components/StorageView/StorageView.tsx::download": 1,
-  "packages/studio/src/components/StorageView/StorageView.tsx::studio_scope_storage_write_label": 1,
   "packages/studio/src/components/StudioHomePage.tsx::studio_sql_database": 3
 }
