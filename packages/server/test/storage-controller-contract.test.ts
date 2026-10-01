@@ -241,6 +241,41 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
         expect(prefixes).toEqual(["pages/sub"]);
     });
 
+    // ── The SDK door ───────────────────────────────────────────────────
+
+    /** The client SDK, talking to this router in-process. */
+    const sdk = () => createStorage(createTransport({
+        baseUrl: "http://localhost",
+        fetch: (input, init) => Promise.resolve(app.request(input instanceof Request ? input : String(input), init))
+    }));
+
+    it("reads and deletes an object by the storageUrl it was stored under", async () => {
+        // What a property with `includeBucketUrl: true` keeps in its column.
+        const storage = sdk();
+        const stored = await storage.putObject({ file: textFile("a.txt", "by url"), key: "byurl/a.txt" });
+        expect(stored.storageUrl).toMatch(/^(local|s3|gs):\/\//);
+
+        const signed = await storage.getSignedUrl(stored.storageUrl);
+        expect(signed.fileNotFound).toBeFalsy();
+        const res = await app.request(signed.url!);
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("by url");
+
+        await storage.deleteObject(stored.storageUrl);
+        expect(await h.controller.getObject("byurl/a.txt")).toBeNull();
+    });
+
+    it("serves a public object by its storageUrl without a token", async () => {
+        const storage = sdk();
+        const stored = await storage.putObject({ file: textFile("b.txt", "public by url"), key: "byurl/b.txt", public: true });
+
+        const signed = await storage.getSignedUrl(stored.storageUrl);
+        expect(signed.url).not.toContain("token=");
+        const res = await app.request(signed.url!);
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("public by url");
+    });
+
     it("reads back what it stored, and nothing for a missing key", async () => {
         await h.controller.putObject({ file: textFile("a.txt", "hello", "text/plain"), key: "rt/a.txt" });
         const object = await h.controller.getObject("rt/a.txt");

@@ -172,7 +172,10 @@ alsoNope: null } as any
             });
         });
 
-        it("strips s3:// prefix", async () => {
+        it("strips s3:// and the source's own bucket", async () => {
+            // An `s3://` storageUrl's bucket is the source's own, and the
+            // routes address its objects by key — sent along, it was read as
+            // part of the key and nothing was found.
             const storage = createStorage(mockTransport);
 
             mockTransport.request.mockResolvedValueOnce({ data: {} });
@@ -180,7 +183,7 @@ alsoNope: null } as any
 
             await storage.getSignedUrl("s3://bucket/file.jpg");
 
-            expect(mockTransport.request).toHaveBeenCalledWith("/storage/metadata/bucket/file.jpg");
+            expect(mockTransport.request).toHaveBeenCalledWith("/storage/metadata/file.jpg");
         });
 
         it("does not duplicate bucket prefix if already present", async () => {
@@ -372,7 +375,7 @@ fileNotFound: true });
             );
         });
 
-        it("strips s3:// prefix", async () => {
+        it("strips s3:// and the source's own bucket", async () => {
             const storage = createStorage(mockTransport);
             const mockBlob = new Blob(["x"]);
 
@@ -385,7 +388,7 @@ fileNotFound: true });
             await storage.getObject("s3://bucket/file.dat");
 
             expect(mockTransport.fetchFn).toHaveBeenCalledWith(
-                "http://localhost:3000/api/storage/file/bucket/file.dat?token=token",
+                "http://localhost:3000/api/storage/file/file.dat?token=token",
                 expect.any(Object)
             );
         });

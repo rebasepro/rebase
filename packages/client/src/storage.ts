@@ -31,6 +31,35 @@ export function encodeStorageKey(key: string): string {
     return key.split("/").map(encodeURIComponent).join("/");
 }
 
+/**
+ * The path the storage routes address an object by, from a key or from the
+ * `storageUrl` an upload returned (`<scheme>://<bucket>/<key>`, which is what a
+ * property with `includeBucketUrl: true` keeps in its column).
+ *
+ * The routes address a source's objects by key. On S3 and GCS the bucket in a
+ * `storageUrl` is always the source's own — the server refuses any other — so
+ * it is dropped: sent along, `s3://acme-media/products/a.png` reached the
+ * server as the key `acme-media/products/a.png`, the preview found nothing and
+ * a delete reported success while the object stayed. It worked on local disk
+ * only, because `local://default/<key>` happens to carry the one bucket
+ * segment the routes recognise — which is kept, as is any other local bucket.
+ */
+export function storageObjectPath(keyOrUrl: string, bucket?: string): string {
+    let filePath = keyOrUrl;
+    const scheme = /^(local|s3|gs):\/\//.exec(filePath);
+    if (scheme) {
+        filePath = filePath.substring(scheme[0].length);
+        if (scheme[1] !== "local") {
+            const slash = filePath.indexOf("/");
+            if (slash > 0) filePath = filePath.substring(slash + 1);
+        }
+    }
+    if (bucket && filePath && !filePath.startsWith(bucket)) {
+        filePath = `${bucket}/${filePath}`;
+    }
+    return filePath;
+}
+
 export function createStorage(transport: Transport, storageId?: string): StorageSource {
     const urlsCache = new Map<string, { config: DownloadConfig; expiresAt?: number }>();
 
@@ -117,15 +146,7 @@ export function createStorage(transport: Transport, storageId?: string): Storage
             urlsCache.delete(cacheKey);
         }
 
-        let filePath = keyOrUrl;
-
-        if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://") || filePath.startsWith("gs://"))) {
-            filePath = filePath.substring(filePath.indexOf("://") + 3);
-        }
-
-        if (bucket && filePath && !filePath.startsWith(bucket)) {
-            filePath = `${bucket}/${filePath}`;
-        }
+        const filePath = storageObjectPath(keyOrUrl, bucket);
 
         if (!filePath || filePath.trim() === "" || filePath === "/") {
             return { url: null, fileNotFound: true };
@@ -212,15 +233,7 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         key: string,
         bucket?: string
     ): Promise<void> {
-        let filePath = key;
-
-        if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://") || filePath.startsWith("gs://"))) {
-            filePath = filePath.substring(filePath.indexOf("://") + 3);
-        }
-
-        if (bucket && filePath && !filePath.startsWith(bucket)) {
-            filePath = `${bucket}/${filePath}`;
-        }
+        const filePath = storageObjectPath(key, bucket);
 
         if (!filePath || filePath.trim() === "" || filePath === "/") {
             return;
