@@ -4043,3 +4043,43 @@ reaching the same rows through a path none of the per-door fixes touched. The
 transaction finding is class 57's sibling at the database: the error was caught,
 so nothing looked wrong, and the database quietly refused to keep what the
 request reported saved.
+
+### Sweep — 2026-10-01, by system instead of by package
+
+The two passes above sliced the tree by package, and the next topical audit
+(permissions) still found a batch: the problems lived between packages. This
+pass sliced by **system** — the seventeen of `docs/audits/systems.json` — and
+asked each one the questions of `docs/audits/CHARTER.md` across every door into
+it. Sixteen read-only auditors (permissions was being rebuilt in parallel and
+was left to that work), then one fixer per system with the same rules as before;
+one commit per finding, test seen red, fix mutation-checked
+(`git log 11adfaa2a..` on `sweep/2026-10-01`). Unfixed findings went to the
+nightly audit routine's backlog, not to a list.
+
+| system | found (C/H/M/L) | fixed | notable | left open |
+|---|---|---|---|---|
+| data doors | 17 (0/2/8/7) | 5 + door-parity kit | upsert onto a trashed row edited the hidden row and answered 201; `include` + `fields` dropped the relation on REST but not on `listen()` | DD-6, 8–17; socket reads still serve the admin view model (decision) |
+| schema pipeline | 18 (1/2/10/5) | 7 | `db push` applied lossy type changes unasked — the detector glued Atlas's header onto the first statement, and 55 unit tests used hand-written plans; introspect → push did not round-trip | SCHEMA-6–8, 11–15, 17–18; `hasOne` UNIQUE (decided, not built) |
+| Studio + schema editing | 36 (1/6/21/8) | 16 | SQL console edited the wrong row of a JOIN; a panel save deleted code it could not serialise; the change classifier missed most physical changes | -8, -11, -14–17, -21–26 |
+| identity | 24 (0/4/12/8) | 0 | verify-email link as an account-takeover step; a deleted user's revoked tokens worked again | all — the auth files were being rewritten by the permissions work |
+| realtime + offline | 18 + 23 re-checked (0/9/9/2) | 13 + offline H1/H3/H4 | CDC NOTIFY carried whole rows (password hashes) to any database login; the client stopped reconnecting after ~60 s; 1000 identical subscribers cost 2002 pool acquisitions for one insert (now 4) | RTO-8, 11, 12, 15, 16; offline H2, M3 |
+| storage | 22 (0/3/13/6) | 12 | S3/GCS reported the read time as mtime — no 304, a new rendition object per GET; markdown images embedded a 300 s token | STORAGE-4 (anonymous read via a non-canonical path — middleware), 6, 10, 11, 13–15, 18–22 |
+| server logic | 14 (2/1/8/3) | 7 | queues and topics dead in every running backend (a module registry split across two copies); history recorded `afterRead`'s masked view, so a revert wrote the mask | -5 (DD), -9–14 |
+| CLI journey | 17 (1/7/9/0) | 11 | `init .` refused a fresh clone; every collection save restarted `rebase dev` twice | CLIJ-10–15 |
+| CMS views | 13 (0/1/9/3) | 7 | table, list and card views stopped at row 1,000 | CMSV-2, 9–13 |
+| CMS forms | 27 (1/4/14/8) | 9 | duplicating a record moved the original's children to the copy; `conditions` were never evaluated | 6–9, 11, 13, 14, 17–27 |
+| UI kit | 24 (0/3/9/12) | 9 | dialogs never took focus; no visible focus ring on filled buttons and switches | UIKIT-8 rest, 10–24, kit strings |
+| SDK + types | 24 (0/3/10/11) | 13 | `upsert()` was a plain INSERT over HTTP; no `Access-Control-Expose-Headers`, so `ifMatch` was silently dropped cross-origin | SDK-8, 11, 12, 14–18, 20–23 |
+| server ops | 16 (0/2/8/6) | 12 | the self-hosting systemd example could not boot; the runtime image had no `pg_dump`, so scheduled backups never ran | -5, -7, -12, -13, -16 |
+| docs vs code | 24 (0/4/13/7) | 10 | the quickstart's first collection could not hold a row (implicit key with no default) | DOCS-13–20, 24 |
+| gates | 18 (0/3/7/8) | 9 | one failing e2e package hid the rest; the CLI e2e had been red on main for three days | GATES-7, 10–14, 16–18; gating main (decision) |
+| MCP, AI, rls-check | 33 (2/7/17/7) | 23 | the CMS import silently corrupted data (nested keys dropped, `"02134"` → 2134); rls-check graded a Supabase anonymous bypass as clean | AIX-11–15, 21–24, 33 |
+
+**What the pass says.** Ask a system rather than a package and the findings
+change shape: three of the worst (the CDC payload, the module-registry split,
+the `db push` gate) had passing suites whose fixtures were written by hand —
+a stub driver, a single loaded module, a plan without Atlas's header — so the
+test agreed with the code and neither met the thing it stood in for. The new
+guards run the real thing: real Atlas output, two copies of `@rebasepro/types`,
+a LISTEN as a role with no grants, one contract suite over all three storage
+controllers, and the door-parity kit over six doors on real Postgres.
