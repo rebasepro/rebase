@@ -222,6 +222,8 @@ export interface RebaseTranslations {
     form_in_sync: string;
     /** Tooltip/alert shown when form has validation errors */
     fix_errors_before_saving?: string;
+    /** Above the fields a save went through with: untouched values that already broke a rule. */
+    form_predating_rule_violations: string;
 
     admin: string;
     home: string;
@@ -504,6 +506,8 @@ export interface RebaseTranslations {
     import_problem_not_a_date: string;
     import_problem_ambiguous_date: string;
     import_problem_not_a_vector: string;
+    import_problem_not_a_map: string;
+    import_problem_not_a_geopoint: string;
     entities_will_be_overwritten: string;
     data_imported_successfully: string;
 
