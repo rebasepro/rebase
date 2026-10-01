@@ -90,6 +90,8 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
 
     const handleClear = (e: React.MouseEvent) => {
         e.preventDefault();
+        // A disabled field is read-only, its adornments included.
+        if (disabled) return;
         setInternalValue("");
         setIsTyping(false);
         onChange?.(null);
@@ -347,9 +349,17 @@ hour12: false,
                 />
                 {pickerButton && <IconButton
                     size={adornmentSize}
+                    aria-label="Open calendar"
+                    disabled={disabled}
                     onClick={(e) => {
                         e.stopPropagation();
-                        inputRef.current?.showPicker();
+                        try {
+                            inputRef.current?.showPicker();
+                        } catch {
+                            // The browser refuses (a disabled or read-only input, or
+                            // no user activation): there is no picker to open, and
+                            // the field still takes typing.
+                        }
                     }}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-surface-accent-500!"
                 >
@@ -358,6 +368,8 @@ hour12: false,
                 {clearable && value && (
                     <IconButton
                         size={adornmentSize}
+                        aria-label="Clear date"
+                        disabled={disabled}
                         onClick={handleClear}
                         className="absolute right-14 top-1/2 transform -translate-y-1/2 text-surface-accent-400 "
                     >
