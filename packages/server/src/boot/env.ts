@@ -76,7 +76,13 @@ export const bootEnvExtension = z.object({
      * default.
      */
     REBASE_METRICS_TOKEN: z.string().optional(),
-    LOG_LEVEL: z.enum(["error", "warn", "info", "debug", ""]).optional(),
+    // Case and surrounding space are not part of the value, as the logger
+    // (`getMinLevel`) already reads it: `LOG_LEVEL=DEBUG` used to turn debug
+    // logging on and then fail the boot here.
+    LOG_LEVEL: z.preprocess(
+        v => (typeof v === "string" ? v.trim().toLowerCase() : v),
+        z.enum(["error", "warn", "info", "debug", ""]).optional()
+    ),
 
     // ── Storage access control ───────────────────────────────────────────────
     /** Serve stored objects to unauthenticated readers. */

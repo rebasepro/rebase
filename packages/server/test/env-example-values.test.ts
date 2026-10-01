@@ -35,7 +35,9 @@ function enumLabels(field: z.ZodType): string[] | undefined {
         } else if (current instanceof z.ZodDefault) {
             current = current.removeDefault() as z.ZodType;
         } else if (current instanceof z.ZodPipe) {
-            current = current.in as z.ZodType;
+            // `.transform()` puts the enum on the way in; `z.preprocess()` puts
+            // it on the way out, after a normalising step (LOG_LEVEL).
+            current = (current.in instanceof z.ZodTransform ? current.out : current.in) as z.ZodType;
         } else {
             return undefined;
         }

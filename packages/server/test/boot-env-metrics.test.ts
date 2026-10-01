@@ -403,3 +403,33 @@ describe("loadBootEnv", () => {
         });
     });
 });
+
+/**
+ * `LOG_LEVEL=DEBUG` was honoured by the logger, which lower-cases it, and then
+ * refused by the environment schema — so a boot printed debug lines and died
+ * with `LOG_LEVEL: Invalid option`. One reading of the variable, in both places.
+ */
+describe("LOG_LEVEL", () => {
+    const originalEnv = { ...process.env };
+    afterEach(() => {
+        process.env = { ...originalEnv };
+    });
+
+    it.each([["DEBUG", "debug"], ["Warn", "warn"], [" info ", "info"]])("accepts %j as the logger does", (value, level) => {
+        process.env = {
+            DATABASE_URL: "postgresql://db.example.com:5432/app",
+            JWT_SECRET: "a-secret-that-is-long-enough-for-the-check-1234",
+            LOG_LEVEL: value
+        };
+        expect(loadBootEnv().LOG_LEVEL).toBe(level);
+    });
+
+    it("still refuses a level that does not exist", () => {
+        process.env = {
+            DATABASE_URL: "postgresql://db.example.com:5432/app",
+            JWT_SECRET: "a-secret-that-is-long-enough-for-the-check-1234",
+            LOG_LEVEL: "verbose"
+        };
+        expect(() => loadBootEnv()).toThrow(/LOG_LEVEL/);
+    });
+});

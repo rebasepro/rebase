@@ -86,7 +86,7 @@ export function setLogLevel(level?: LogLevel): void {
 
 function getMinLevel(): LogLevel {
     if (configuredLevel) return configuredLevel;
-    const env = (hostEnv().LOG_LEVEL || "info").toLowerCase();
+    const env = (hostEnv().LOG_LEVEL || "info").trim().toLowerCase();
     if (env in LOG_PRIORITY) return env as LogLevel;
     return "info";
 }
