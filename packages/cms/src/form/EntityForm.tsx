@@ -3,6 +3,7 @@ import type { AdditionalFieldDelegateProps } from "@rebasepro/cms-types";
 import type { FormContext, PropertyFieldBindingProps } from "../types/fields";
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
+import type { Properties, Property } from "@rebasepro/types";
 import type { EntityFormProps } from "../types/components/EntityFormProps";
 import { deepEqual as equal } from "fast-equals";
 
@@ -10,7 +11,7 @@ import { ErrorBoundary, isKeyHandled } from "@rebasepro/ui";
 import { AlignLeftIcon, useDebouncedCallback } from "@rebasepro/ui";
 import { getCopyValues, getDefaultValuesFor } from "@rebasepro/common";
 import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
-import { useAuthController, useCustomizationController, useRebaseContext } from "@rebasepro/app";
+import { useAuthController, useCustomizationController, useRebaseContext, useTranslation } from "@rebasepro/app";
 
 import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
 import type { ResolvedFormField } from "@rebasepro/app";
@@ -118,6 +119,12 @@ export function EntityForm<M extends Record<string, unknown>>({
      * effect that follows the baseline, below.
      */
     const [underlyingChanges, setUnderlyingChanges] = useState<Record<string, unknown>>({});
+
+    /**
+     * Rules the stored record already broke, on fields this edit leaves alone —
+     * shown, and not held against the save. Keyed like `formex.errors`.
+     */
+    const [predatingViolations, setPredatingViolations] = useState<Record<string, unknown>>({});
 
     const initialEntityId: string | number | undefined = useMemo(() => {
         if (status === "new" || status === "copy") {
@@ -231,9 +238,27 @@ export function EntityForm<M extends Record<string, unknown>>({
         },
         onValuesChangeDeferred: onValuesChangeDeferredProp,
         validation: async (values): Promise<Record<string, string>> => {
-            const result = await validationSchemaFor(values).safeParseAsync(values);
-            if (result.success) return {};
-            return zodToFormErrors(result.error);
+            const errors = await validationErrorsFor(values);
+            if (status !== "existing" || !entity?.values || Object.keys(errors).length === 0) {
+                setPredatingViolations({});
+                return errors;
+            }
+            // A record stored before a rule existed still breaks it, and the
+            // server — which judges only what is sent — would take an
+            // unrelated edit. So a field the user did not change, that the
+            // stored record already broke, is a warning and not a refusal. A
+            // field they changed must be valid, and so must one their edit
+            // made invalid: a rule that reads the edited value is the edit's.
+            const edited = getChangedProperties<M>(values, entity.values as Partial<M>);
+            const storedErrors = await validationErrorsFor(entity.values as M);
+            const blocking: Record<string, string> = {};
+            const predating: Record<string, string> = {};
+            for (const [key, error] of Object.entries(errors)) {
+                if (!(key in edited) && key in storedErrors) predating[key] = error;
+                else blocking[key] = error;
+            }
+            setPredatingViolations(predating);
+            return blocking;
         }
     });
     const formex: FormexController<M> = formexProp ?? internalFormex;
@@ -394,6 +419,12 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const authController = useAuthController();
     const customizationController = useCustomizationController();
+    const { t } = useTranslation();
+
+    async function validationErrorsFor(values: M): Promise<Record<string, string>> {
+        const result = await validationSchemaFor(values).safeParseAsync(values);
+        return result.success ? {} : zodToFormErrors(result.error);
+    }
 
     /**
      * What the save is judged against: the properties as the form shows them
@@ -687,6 +718,11 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const hasFormErrors = Object.keys(formex.errors).length > 0 && formex.submitCount > 0;
 
+    const predatingViolationLines = useMemo(
+        () => errorLines(predatingViolations, collection.properties),
+        [predatingViolations, collection.properties]
+    );
+
     const formView = <ErrorBoundary>
         <>
             {beforeFields}
@@ -710,6 +746,17 @@ export function EntityForm<M extends Record<string, unknown>>({
             {hasFormErrors && <Alert color={"error"} size={"small"} outerClassName={"w-full mt-2"}>
                 Please fix the highlighted errors before saving.
             </Alert>}
+
+            {predatingViolationLines.length > 0 &&
+                <Alert color={"warning"} size={"small"} outerClassName={"w-full mt-2"}>
+                    <Typography variant={"caption"} component={"div"}>
+                        {t("form_predating_rule_violations")}
+                    </Typography>
+                    <ul className={"list-disc pl-5 mt-1"}>
+                        {predatingViolationLines.map(({ path: errorPath, label, message }) =>
+                            <li key={errorPath}><Typography variant={"caption"}>{`${label}: ${message}`}</Typography></li>)}
+                    </ul>
+                </Alert>}
 
             {formContext && <>
                 <div ref={formRef}>
@@ -862,4 +909,29 @@ function useOnAutoSave<M extends Record<string, unknown>>(autoSave: undefined | 
             save(formex.values);
         }
     }, [autoSave, formex.values]);
+}
+
+/**
+ * A nested error map — the shape `zodToFormErrors` builds — as one line per
+ * failing field, labelled with the property's name.
+ */
+function errorLines(
+    errors: Record<string, unknown>,
+    properties: Properties
+): { path: string; label: string; message: string }[] {
+    const lines: { path: string; label: string; message: string }[] = [];
+    const walk = (value: unknown, path: string[], label: string[], props: Properties | undefined) => {
+        if (typeof value === "string") {
+            lines.push({ path: path.join("."), label: label.join(" › "), message: value });
+            return;
+        }
+        if (!value || typeof value !== "object") return;
+        for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+            const property = props?.[key] as Property | undefined;
+            const childProps = property?.type === "map" ? property.properties as Properties | undefined : undefined;
+            walk(child, [...path, key], [...label, property?.name ?? key], childProps);
+        }
+    };
+    walk(errors, [], [], properties);
+    return lines;
 }

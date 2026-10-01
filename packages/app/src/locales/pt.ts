@@ -124,6 +124,7 @@ export const pt: RebaseTranslations = {
     form_modified: "Este formulário foi modificado",
     form_in_sync: "O formulário atual está sincronizado com a base de dados",
     fix_errors_before_saving: "Corrija os erros destacados antes de guardar",
+    form_predating_rule_violations: "Alguns campos que não alterou não cumprem as regras atuais. Não impedem a gravação:",
 
     admin: "Administrador",
     home: "Início",

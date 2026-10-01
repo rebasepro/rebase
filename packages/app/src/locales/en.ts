@@ -127,6 +127,7 @@ export const en: RebaseTranslations = {
     form_modified: "This form has been modified",
     form_in_sync: "The current form is in sync with the database",
     fix_errors_before_saving: "Fix highlighted errors before saving",
+    form_predating_rule_violations: "Some fields you did not change do not meet their current rules. They do not block saving:",
 
     admin: "Admin",
     home: "Home",

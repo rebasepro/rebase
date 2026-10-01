@@ -119,6 +119,7 @@ export const hi: RebaseTranslations = {
     form_modified: "इस फ़ॉर्म में बदलाव किए गए हैं",
     form_in_sync: "वर्तमान फ़ॉर्म डेटाबेस के साथ सिंक में है",
     fix_errors_before_saving: "सहेजने से पहले हाइलाइट की गई त्रुटियों को ठीक करें",
+    form_predating_rule_violations: "कुछ फ़ील्ड जिन्हें आपने नहीं बदला, अपने मौजूदा नियमों को पूरा नहीं करते। वे सहेजने से नहीं रोकते:",
 
     admin: "एडमिन",
     home: "होम",
