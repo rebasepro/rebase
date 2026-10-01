@@ -131,6 +131,31 @@ export function writeMcpConfig(agentKey: AgentKey, projectDir: string): McpWrite
     return { file: mcp.file, status: write() };
 }
 
+/**
+ * Whether the agent's project-level config already registers the Rebase
+ * server: `null` for an agent that has no such config, `false` when the file
+ * is missing or does not name it. Reads only — for the hint `rebase skills
+ * install` prints when it was not asked to write one.
+ */
+export function mcpServerRegistered(agentKey: AgentKey, projectDir: string): boolean | null {
+    const mcp = AGENTS[agentKey].mcp;
+    if (!mcp) return null;
+    const filePath = path.join(projectDir, mcp.file);
+    if (!fs.existsSync(filePath)) return false;
+    const text = fs.readFileSync(filePath, "utf-8");
+    if (mcp.format === "codexToml") {
+        return new RegExp(`^\\s*\\[mcp_servers\\.(?:${MCP_SERVER_NAME}|"${MCP_SERVER_NAME}")\\]`, "m").test(text);
+    }
+    try {
+        const doc: unknown = JSON.parse(text);
+        const servers = isRecord(doc) ? doc[mcp.format === "vscode" ? "servers" : "mcpServers"] : undefined;
+        return isRecord(servers) && MCP_SERVER_NAME in servers;
+    } catch {
+        // Not plain JSON (comments): cannot tell, so do not nag.
+        return null;
+    }
+}
+
 /** What `configureAgents` did for one agent. */
 export interface AgentSetupResult {
     agent: AgentKey;

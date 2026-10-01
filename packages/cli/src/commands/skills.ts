@@ -527,20 +527,25 @@ export async function skillsCommand(subcommand: string | undefined, rawArgs: str
  * given.
  */
 export function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
+    return parseSkillsInstallLine(rawArgs).agents;
+}
+
+/** `rebase skills install`'s whole line: the agents it names, and `--mcp`. */
+export function parseSkillsInstallLine(rawArgs: string[]): { agents: AgentKey[] | null; mcp: boolean } {
     // Strict, and before anything is written. This used to scan `rawArgs` for
     // `--agent` and ignore every other token, so `rebase skills install
     // --frobnicate --agent claude` exited 0 after writing 21 files — the CLI's
     // other families reject an unknown flag, and an installer is the last place
     // to guess what the person meant.
     const { flags } = parseCommandArgs({
-        spec: { "--agent": [String], "-a": "--agent" },
+        spec: { "--agent": [String], "-a": "--agent", "--mcp": Boolean },
         rawArgs,
         commandWords: 2,
         command: "skills install",
         maxPositionals: 0
     });
 
-    return resolveAgentNames(flags["--agent"] ?? []);
+    return { agents: resolveAgentNames(flags["--agent"] ?? []), mcp: flags["--mcp"] === true };
 }
 
 /**
@@ -575,7 +580,7 @@ export function resolveAgentNames(values: readonly string[]): AgentKey[] | null 
 async function skillsInstall(rawArgs: string[] = []) {
     // Parse the line before anything else touches the disk: a bad flag must
     // cost nothing, and everything below this writes or resolves paths.
-    const namedAgents = parseAgentFlags(rawArgs);
+    const { agents: namedAgents, mcp: withMcp } = parseSkillsInstallLine(rawArgs);
 
     // The project root, not the cwd. Agent skills belong beside the repository's
     // other agent configuration — `.claude/`, `.cursor/` — which is both what
@@ -657,9 +662,39 @@ async function skillsInstall(rawArgs: string[] = []) {
         console.log(`  ${chalk.green("✓")} ${chalk.bold(agent.label)} — ${result.skills} skills installed${withAssets} to ${chalk.gray(shown)}`);
     }
 
+    // The MCP server, as `rebase init --agent` registers it. Imported here
+    // rather than at the top: agent-setup imports this module.
+    const { MCP_SERVER_NAME, mcpServerRegistered, writeMcpConfig } = await import("./agent-setup");
+    const shownFile = (file: string) => path.relative(process.cwd(), path.join(projectDir, file)) || file;
+    if (withMcp) {
+        console.log("");
+        for (const agentKey of agents) {
+            const agent = AGENTS[agentKey];
+            const result = writeMcpConfig(agentKey, projectDir);
+            if (!result) {
+                console.log(chalk.gray(`  · ${agent.label} has no project-level MCP config — add @rebasepro/mcp in its MCP settings.`));
+            } else if (result.status === "added") {
+                console.log(`  ${chalk.green("✓")} ${chalk.bold(agent.label)} — MCP server in ${chalk.gray(shownFile(result.file))}`);
+            } else if (result.status === "present") {
+                console.log(`  ${chalk.green("✓")} ${chalk.bold(agent.label)} — MCP server already in ${chalk.gray(shownFile(result.file))}`);
+            } else {
+                console.log(chalk.yellow(`  ! ${agent.label}: ${shownFile(result.file)} is not plain JSON, so it was left alone — add the "${MCP_SERVER_NAME}" server by hand.`));
+            }
+        }
+    }
+
     console.log("");
     console.log(chalk.gray("  Skills are project-local. Commit them to share with your team."));
     console.log(chalk.gray("  Re-run this command anytime to update to the latest skills."));
+    if (!withMcp) {
+        // Only the agents whose config does not have the server yet: on a
+        // project `init --agent` set up, a refresh says nothing about it.
+        const missing = agents.filter(agentKey => mcpServerRegistered(agentKey, projectDir) === false);
+        if (missing.length > 0) {
+            console.log(chalk.gray("  To register the Rebase MCP server for them too, as `rebase init --agent` does:"));
+            console.log(`    ${chalk.cyan(`rebase skills install --agent ${missing.join(",")} --mcp`)}`);
+        }
+    }
     console.log("");
 }
 
@@ -675,6 +710,9 @@ ${chalk.green.bold("Subcommands")}
                Supports: ${Object.values(AGENTS).map(a => a.label).join(", ")}
 
 ${chalk.green.bold("Options")}
+  ${chalk.blue("--mcp")}         Also register the Rebase MCP server in each agent's project config
+                (.mcp.json, .cursor/mcp.json, …), as ${chalk.cyan("rebase init --agent")} does.
+                Servers already in the file are kept.
   ${chalk.blue("--agent, -a")}   Agent(s) to install for, skipping detection and the prompt.
                 Repeat the flag or pass a comma-separated list, or ${chalk.bold("all")}.
                 Required without a TTY: detection looks for an agent's own
@@ -687,6 +725,7 @@ ${chalk.green.bold("Examples")}
   ${chalk.cyan("rebase skills install")}
   ${chalk.cyan("rebase skills install --agent claude")}
   ${chalk.cyan("rebase skills install --agent claude,cursor")}
+  ${chalk.cyan("rebase skills install --agent cursor --mcp")}   ${chalk.gray("# skills + the MCP server")}
   ${chalk.cyan("rebase skills install --agent all")}   ${chalk.gray("# scripted / CI")}
 `);
 }
