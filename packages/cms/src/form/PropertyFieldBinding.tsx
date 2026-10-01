@@ -12,6 +12,7 @@ import { Field, FormexFieldProps, getIn } from "@rebasepro/forms";
 
 ;
 import { ReadOnlyFieldBinding } from "./field_bindings/ReadOnlyFieldBinding";
+import { resolveFormProperty } from "./resolve_form_properties";
 
 import { isPropertyBuilder, resolveProperty } from "@rebasepro/common";
 import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
@@ -101,7 +102,8 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
             {(fieldProps) => {
 
                 let Component: ComponentType<FieldProps<Property, any, any>> | undefined;
-                const resolvedProperty = resolveProperty({
+                // `dynamicProps` and `conditions` both, as the save judges it.
+                const resolvedProperty = resolveFormProperty({
                     propertyKey,
                     property: property,
                     values: fieldProps.form.values,

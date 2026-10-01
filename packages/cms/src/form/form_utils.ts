@@ -4,7 +4,7 @@ import type { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import type { AuthController } from "@rebasepro/cms-types";
 import { deepEqual as equal } from "fast-equals";
 import { getIn, setIn } from "@rebasepro/forms";
-import { getCopyValues, getDefaultValuesFor } from "@rebasepro/common";
+import { buildConditionContext, evaluateCondition, getCopyValues, getDefaultValuesFor } from "@rebasepro/common";
 import { isPlainObject, mergeDeep } from "@rebasepro/utils";
 import { z } from "zod";
 
@@ -222,6 +222,33 @@ export function getEditHandoffValues<M extends Record<string, unknown>>({
     return Object.keys(changes).length > 0 ? changes : undefined;
 }
 
+/**
+ * A new record's values with each top-level `conditions.defaultValue` applied —
+ * the rule evaluated against the declared defaults, as a new record has nothing
+ * else yet. Without it the rule was documented, editable in Studio, and never
+ * read: a new record opened with the static default.
+ */
+function withConditionalDefaults<M extends Record<string, unknown>>(
+    values: Partial<EntityValues<M>>,
+    properties: AdminCollection["properties"],
+    path: string,
+    authController: AuthController
+): Partial<EntityValues<M>> {
+    let result = values;
+    for (const [key, property] of Object.entries(properties ?? {})) {
+        const rule = property?.conditions?.defaultValue;
+        if (rule === undefined) continue;
+        const context = buildConditionContext({
+            propertyKey: key,
+            values: values as Record<string, unknown>,
+            path,
+            authController
+        });
+        result = { ...result, [key]: evaluateCondition(rule, context) };
+    }
+    return result;
+}
+
 export function getInitialEntityValues<M extends Record<string, unknown>>(
     authController: AuthController,
     collection: AdminCollection,
@@ -246,7 +273,7 @@ export function getInitialEntityValues<M extends Record<string, unknown>>(
         }
         return values;
     } else if (status === "new") {
-        return getDefaultValuesFor(properties);
+        return withConditionalDefaults(getDefaultValuesFor(properties), properties, path, authController);
     } else {
         console.error({
             status,

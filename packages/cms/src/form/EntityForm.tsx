@@ -9,8 +9,8 @@ import { deepEqual as equal } from "fast-equals";
 import { ErrorBoundary, isKeyHandled } from "@rebasepro/ui";
 import { AlignLeftIcon, useDebouncedCallback } from "@rebasepro/ui";
 import { getCopyValues, getDefaultValuesFor } from "@rebasepro/common";
-import { isDisabled, isReadOnly } from "@rebasepro/app";
-import { useRebaseContext } from "@rebasepro/app";
+import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
+import { useAuthController, useCustomizationController, useRebaseContext } from "@rebasepro/app";
 
 import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
 import type { ResolvedFormField } from "@rebasepro/app";
@@ -26,6 +26,7 @@ import { PropertyFieldBinding } from "./PropertyFieldBinding";
 import { flattenKeys } from "@rebasepro/app";
 import { ErrorFocus } from "./components/ErrorFocus";
 import { applyValueTransforms, CustomFieldValidator, getEntitySchema } from "./validation";
+import { resolveFormProperty, resolvePropertiesForValidation } from "./resolve_form_properties";
 import { EntityFormActions } from "./EntityFormActions";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
@@ -230,8 +231,7 @@ export function EntityForm<M extends Record<string, unknown>>({
         },
         onValuesChangeDeferred: onValuesChangeDeferredProp,
         validation: async (values): Promise<Record<string, string>> => {
-            if (!validationSchema) return {};
-            const result = await validationSchema.safeParseAsync(values);
+            const result = await validationSchemaFor(values).safeParseAsync(values);
             if (result.success) return {};
             return zodToFormErrors(result.error);
         }
@@ -392,11 +392,29 @@ export function EntityForm<M extends Record<string, unknown>>({
         return defaultUniqueFieldValidator;
     }, [uniqueFieldValidatorProp, defaultUniqueFieldValidator]);
 
-    const validationSchema = useMemo(() => getEntitySchema(
-        entityId,
-        collection.properties,
-        uniqueFieldValidator),
-        [entityId, collection.properties, uniqueFieldValidator]);
+    const authController = useAuthController();
+    const customizationController = useCustomizationController();
+
+    /**
+     * What the save is judged against: the properties as the form shows them
+     * for these values — `dynamicProps` and `conditions` applied — and only
+     * the ones the user can change. Built per call because both depend on the
+     * values being judged.
+     */
+    function validationSchemaFor(values: M) {
+        return getEntitySchema(
+            entityId,
+            resolvePropertiesForValidation<M>({
+                properties: collection.properties,
+                values,
+                previousValues: baseInitialValues as Partial<M>,
+                path,
+                entityId,
+                propertyConfigs: customizationController.propertyConfigs,
+                authController
+            }),
+            uniqueFieldValidator);
+    }
 
     useOnAutoSave(autoSave, formex, lastSavedValues, save);
 
@@ -548,6 +566,22 @@ export function EntityForm<M extends Record<string, unknown>>({
         if (!property) {
             console.warn(`Property ${field.key} not found in collection ${collection.name} in properties or additional fields. Skipping.`);
             return null;
+        }
+        // A field a rule hides for these values takes its label with it: the
+        // binding renders nothing, and a heading over nothing is worse.
+        if (property.conditions?.hidden) {
+            const shown = resolveFormProperty({
+                propertyKey: field.key,
+                property,
+                values: formex.values,
+                previousValues: baseInitialValues as Partial<M>,
+                path,
+                entityId,
+                propertyConfigs: customizationController.propertyConfigs,
+                ignoreMissingFields: true,
+                authController
+            });
+            if (!shown || isHidden(shown)) return null;
         }
 
         const underlyingValueHasChanged: boolean =

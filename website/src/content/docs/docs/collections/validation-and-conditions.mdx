@@ -177,8 +177,8 @@ For complex behavior that can't be expressed via JSON Logic, you can use `dynami
 price: {
     type: "number",
     name: "Price",
-    dynamicProps: ({ values, user }) => ({
-        disabled: values.is_free === true || !user.roles.includes("admin"),
+    dynamicProps: ({ values, authController }) => ({
+        admin: { disabled: values.is_free === true || !authController.user?.roles?.includes("admin") },
         validation: values.is_free ? {} : { required: true, min: 0 }
     })
 }

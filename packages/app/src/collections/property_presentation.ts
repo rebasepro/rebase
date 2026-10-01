@@ -3,23 +3,20 @@
  *
  * These read a property's admin block — `readOnly`, `disabled.hidden`, the
  * declarative `conditions` — and lived in `@rebasepro/common`, which is on the
- * backend's dependency path. Nothing in core ever called them: `isReadOnly` and
- * `isHidden` are used only by the panel, and `applyPropertyConditions` has no
- * production caller at all.
+ * backend's dependency path. Nothing in core ever called them: `isReadOnly`,
+ * `isHidden` and `applyPropertyConditions` are the panel's alone.
  *
- * That last one is worth knowing about rather than assuming: the collection editor
- * has a whole Conditions UI, `serializable_utils` persists what it writes, and
- * `BaseProperty.conditions` documents itself as "evaluated at runtime like property
- * builders" — but the evaluator below is reached only from its own tests. It lives
- * here because here is where it would be called from once it is wired up.
+ * `applyPropertyConditions` is called by the record form, through
+ * `resolveFormProperty`, both where a field is laid out and where the form is
+ * judged on save — so a rule the collection editor writes hides, disables and
+ * requires what it says it does, and a field it hides is not held against the
+ * save. Until that was wired, the evaluator was reached only from its own tests.
  *
- * The one part of `conditions` that *is* applied is the literal case:
- * `hidden`/`readOnly`/`disabled` stated as a plain boolean rather than as a rule.
- * A literal needs no context, so `isHidden`/`isReadOnly`/`isDisabled` can answer
- * it directly, and those three gates are consulted everywhere a field is laid
- * out. A *rule* still is not evaluated anywhere in production — the split is
- * deliberate, not an oversight: it is the difference between a condition that
- * needs an entity to be evaluated against and one that does not.
+ * A condition may also be a literal: `hidden`/`readOnly`/`disabled` stated as a
+ * plain boolean rather than as a rule. A literal needs no context, so
+ * `isHidden`/`isReadOnly`/`isDisabled` answer it directly, and those three
+ * gates are consulted everywhere a field is laid out — including places with
+ * no entity to evaluate a rule against.
  */
 import type { ConditionContext, ConditionRule, EnumValueConfig, Property, PropertyConditions, ReferenceProperty } from "@rebasepro/types";
 import type { AdminArrayOptions, AdminReferenceOptions } from "@rebasepro/cms-types";
@@ -78,6 +75,10 @@ export function applyPropertyConditions(
     if (!conditions) return property;
 
     const result = { ...property };
+    // The admin block is the collection's own object, shared by every record
+    // the form opens. Written into in place, a rule that disabled one record's
+    // field disabled it for every record after, whatever their values.
+    if (result.admin) result.admin = { ...result.admin };
 
     // ═══════════════════════════════════════════════════════════════════════
     // FIELD STATE CONDITIONS
@@ -124,11 +125,29 @@ export function applyPropertyConditions(
 
     // Evaluate required condition
     if (conditions.required !== undefined) {
-        const isRequired = evaluateCondition(conditions.required, context) as boolean;
+        const isRequired = Boolean(evaluateCondition(conditions.required, context));
         result.validation = {
             ...result.validation,
-            required: isRequired as boolean | undefined,
-            requiredMessage: conditions.requiredMessage
+            required: isRequired,
+            requiredMessage: conditions.requiredMessage ?? result.validation?.requiredMessage
+        };
+    }
+
+    // A bound for a number's value, a string's length or an array's size —
+    // the same `validation.min`/`max` each of those types already reads.
+    if ((conditions.min !== undefined || conditions.max !== undefined)
+        && (result.type === "number" || result.type === "string" || result.type === "array")) {
+        const bound = (rule: PropertyConditions["min"]): number | undefined => {
+            if (rule === undefined) return undefined;
+            const value = evaluateCondition(rule, context);
+            return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+        };
+        const min = bound(conditions.min);
+        const max = bound(conditions.max);
+        result.validation = {
+            ...result.validation,
+            ...(min !== undefined ? { min } : {}),
+            ...(max !== undefined ? { max } : {})
         };
     }
 
@@ -181,6 +200,23 @@ export function applyPropertyConditions(
             result.admin = result.admin || {};
             (result.admin as AdminArrayOptions).sortable = evaluateCondition(conditions.sortable, context) as boolean;
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // STORAGE CONDITIONS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    if (result.type === "string" && result.storage && (conditions.acceptedFiles !== undefined || conditions.maxFileSize !== undefined)) {
+        const storage = { ...result.storage };
+        if (conditions.acceptedFiles !== undefined) {
+            const accepted = objectToArray(evaluateCondition(conditions.acceptedFiles, context));
+            if (accepted.length > 0) storage.acceptedFiles = accepted;
+        }
+        if (conditions.maxFileSize !== undefined) {
+            const maxSize = evaluateCondition(conditions.maxFileSize, context);
+            if (typeof maxSize === "number" && Number.isFinite(maxSize)) storage.maxSize = maxSize;
+        }
+        result.storage = storage;
     }
 
     return result;

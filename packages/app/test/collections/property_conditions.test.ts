@@ -548,11 +548,68 @@ describe("literal conditions", () => {
     });
 
     it("takes a literal through the rule evaluator unchanged", () => {
-        // `applyPropertyConditions` is not wired up in production, but when it is
-        // it must not hand a boolean to json-logic and get a rule's answer.
+        // It must not hand a boolean to json-logic and get a rule's answer.
         const result = applyPropertyConditions(p({ hidden: true }), baseContextForLiterals);
         expect(result.admin?.disabled).toMatchObject({ hidden: true });
         expect(applyPropertyConditions(p({ hidden: false }), baseContextForLiterals).admin?.disabled)
             .toBeUndefined();
+    });
+});
+
+describe("applyPropertyConditions — what the record form reads", () => {
+    const context = (values: Record<string, unknown>): ConditionContext => ({
+        ...baseContextForLiterals,
+        values
+    });
+
+    it("never writes into the collection's own admin block", () => {
+        // Shared by every record the form opens: a rule that disabled one
+        // record's field must not disable it for the next one.
+        const admin = { description: "shared" };
+        const property = {
+            type: "string",
+            admin,
+            conditions: { disabled: { "==": [{ var: "values.locked" }, true] }, readOnly: true }
+        } as unknown as Property;
+        applyPropertyConditions(property, context({ locked: true }));
+        expect(admin).toEqual({ description: "shared" });
+        expect(applyPropertyConditions(property, context({ locked: false })).admin?.disabled).toBeUndefined();
+    });
+
+    it("applies a min and a max rule as the validation bounds", () => {
+        const property = {
+            type: "number",
+            validation: { required: true },
+            conditions: { min: { if: [{ var: "values.wholesale" }, 10, 1] }, max: 100 }
+        } as unknown as Property;
+        expect(applyPropertyConditions(property, context({ wholesale: true })).validation)
+            .toEqual({ required: true, min: 10, max: 100 });
+        expect(applyPropertyConditions(property, context({ wholesale: false })).validation)
+            .toEqual({ required: true, min: 1, max: 100 });
+    });
+
+    it("keeps the declared required message when the rule names none", () => {
+        const property = {
+            type: "string",
+            validation: { requiredMessage: "Give it a name" },
+            conditions: { required: true }
+        } as unknown as Property;
+        expect(applyPropertyConditions(property, context({})).validation)
+            .toEqual({ required: true, requiredMessage: "Give it a name" });
+    });
+
+    it("applies the accepted file types and size limit to an upload", () => {
+        const storage = { storagePath: "docs", acceptedFiles: ["image/*"] };
+        const property = {
+            type: "string",
+            storage,
+            conditions: {
+                acceptedFiles: { if: [{ var: "values.pdf" }, ["application/pdf"], ["image/*"]] },
+                maxFileSize: 1024
+            }
+        } as unknown as Property;
+        const result = applyPropertyConditions(property, context({ pdf: true }));
+        expect(result.type === "string" && result.storage).toEqual({ storagePath: "docs", acceptedFiles: ["application/pdf"], maxSize: 1024 });
+        expect(storage).toEqual({ storagePath: "docs", acceptedFiles: ["image/*"] });
     });
 });
