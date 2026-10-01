@@ -124,7 +124,7 @@ this list, in this order.
 
 | Script | What it protects | Bank / fix |
 |---|---|---|
-| `check:api-surface` | The public export surface of every package, as a committed contract. | `pnpm write:api-surface` |
+| `check:api-surface` | The public export surface of the runtime-provided packages, as a committed contract. A removed export or a lost member fails; an addition passes and the check writes it into the baseline, so it shows in the diff beside the export — commit it. The stable release banks whatever is left before its bump check; the canary runs `--strict`, which refuses an unbanked addition. | `pnpm write:api-surface` |
 | `check:types-headless:dts` | The same guard's declaration half: the built `.d.ts`, where thirteen shipped files began with `import React`. Refuses to run when a core package has no `dist`, rather than scanning nothing and passing. | — |
 | `check:dts` | Published `.d.ts` resolve under `nodenext`, where they were silently `any`. | — |
 | `check:templates` | The scaffolded collection files compile, once per preset, laid out as `rebase init` lays them out. | — |

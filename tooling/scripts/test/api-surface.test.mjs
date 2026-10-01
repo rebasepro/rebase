@@ -112,21 +112,67 @@ test("the gate exits non-zero when only the singleton lost a member", () => {
     assert.equal(run.status, 1, `expected a failing exit code, got ${run.status}\n${run.stdout}${run.stderr}`);
 });
 
-test("a gained member fails too, so the baseline cannot drift a member at a time", () => {
-    // `CollectionSubscriptionConfig` gained `searchExplain` with this gate green,
-    // because only whole new *exports* counted as an addition.
+/** Run the gate with its output captured. */
+function runGate(options) {
     const messages = [];
-    const log = console.log;
-    console.log = (...args) => messages.push(args.join(" "));
-    let code;
+    const { log, error } = console;
+    console.log = console.error = (...args) => messages.push(args.join(" "));
     try {
-        code = checkApiSurface({ baseline: baselineOf(after), targets: [before] });
+        return { code: checkApiSurface(options), output: messages.join("\n") };
     } finally {
         console.log = log;
+        console.error = error;
     }
+}
+
+test("a gained member passes and is banked, so the baseline cannot drift a member at a time", () => {
+    // `CollectionSubscriptionConfig` gained `searchExplain` with this gate green,
+    // because only whole new *exports* counted as an addition — so an addition
+    // has to reach the baseline. It used to get there by failing the build until
+    // somebody ran `write:api-surface`, which kept main red for four pushes over
+    // exports that cannot break anything. Now the gate writes it, and the diff
+    // carries it into the commit beside the export.
+    const baseline = baselineOf(after);
+    const { code, output } = runGate({ baseline, targets: [before] });
+
+    assert.equal(code, 0, "an addition breaks no deployed bundle");
+    assert.match(output, /const rebase — gained email/, "and it is still reported");
+    assert.equal(fs.readFileSync(baseline, "utf8"), renderAll([before]), "the addition is written into the baseline");
+});
+
+test("under --strict an unbanked addition fails, and nothing is written", () => {
+    // The release path. The bump check compares the baseline committed at the
+    // last tag with this one, so an export that ships without being banked is
+    // one whose later removal no gate can see.
+    const baseline = baselineOf(after);
+    const committed = fs.readFileSync(baseline, "utf8");
+    const { code, output } = runGate({ baseline, targets: [before], strict: true });
+
     assert.equal(code, 1);
-    assert.match(messages.join("\n"), /const rebase — gained email/);
-    assert.match(messages.join("\n"), /Additions only — no contract break/);
+    assert.match(output, /const rebase — gained email/);
+    assert.match(output, /pnpm write:api-surface/);
+    assert.equal(fs.readFileSync(baseline, "utf8"), committed);
+});
+
+test("a removal is never banked, even beside an addition", () => {
+    // A surface that gains one thing and loses another fails as a break and
+    // leaves the committed baseline alone: the removal is what a person has to
+    // decide about, and writing the file would bank it along with the addition.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "api-surface-"));
+    const baseline = path.join(dir, "fixture.api.txt");
+    const committed = renderAll([before])
+        // the build has `email` and the baseline does not: an addition…
+        .replace("const rebase { auth, dataAsAdmin, email }", "const rebase { auth, dataAsAdmin }")
+        // …and the baseline has an export the build does not: a removal.
+        .concat("function goneFromTheBuild\n");
+    fs.writeFileSync(baseline, committed);
+
+    const { code, output } = runGate({ baseline, targets: [before] });
+
+    assert.equal(code, 1);
+    assert.match(output, /REMOVED[\s\S]*goneFromTheBuild/);
+    assert.match(output, /gained email/);
+    assert.equal(fs.readFileSync(baseline, "utf8"), committed, "nothing written when anything was removed");
 });
 
 /**

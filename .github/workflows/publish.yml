@@ -135,6 +135,15 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
+      # `check:api-surface` passes an ADDITION to the runtime API surface on
+      # every push, and banks it locally; it only has to reach the committed
+      # baseline before something ships it. A canary commits nothing back, so it
+      # cannot bank — and an export published unbanked is one whose later removal
+      # no gate can see, because the release check compares committed baselines.
+      # `--strict` refuses that: bank with `pnpm write:api-surface` and commit.
+      - name: Every export this canary publishes is banked
+        run: pnpm run check:api-surface --strict
+
       # ── Canary version ──────────────────────────────────────
       # Derived from the last release tag, the same source the stable job reads,
       # so the two cannot disagree about what shipped.
@@ -488,6 +497,16 @@ jobs:
       # release actually did and refuses a breaking one that is not at least a
       # minor with a declared `### Breaking` section. Before "Stamp changelog" on
       # purpose: the section it reads is still `[Unreleased]` at this point.
+      #
+      # It reads the API baseline, so bank first. `check:api-surface` passes an
+      # addition on every push without it being committed; verify-stable has
+      # already failed this run on any removal or lost member, so all this can
+      # write is additions — and the release commit below (`git add -A`) carries
+      # the file, so every export this release ships is in the baseline at its
+      # tag, where the next release's check will look for it.
+      - name: Bank the API surface this release ships
+        run: pnpm run write:api-surface
+
       - name: Bump level matches the diff
         run: node tooling/scripts/check-release-bump.mjs "${{ steps.version.outputs.version }}" --from "v${{ steps.version.outputs.current }}"
 

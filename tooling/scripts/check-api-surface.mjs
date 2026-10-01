@@ -17,15 +17,32 @@
  *   * CHANGED  — a member disappeared from a class/interface. Same failure mode
  *                one level down, and just as invisible to a build that already
  *                happened.
- *   * ADDED    — safe. Regenerate the baseline and commit it. Counts a gained
- *                member as well as a gained export: for a while it counted only
- *                the latter, and the baseline drifted a member at a time.
+ *   * ADDED    — safe. Counts a gained member as well as a gained export: for
+ *                a while it counted only the latter, and the baseline drifted a
+ *                member at a time.
  *
- * A run that only adds still fails, so the baseline cannot drift silently — but
- * it fails with "regenerate", not with "you broke the contract".
+ * A run that only adds PASSES, and banks the addition: the baseline file is
+ * rewritten in place, so the working tree shows it beside the new export and
+ * it goes into the same commit. It used to fail with "regenerate", which kept
+ * main red for four pushes in September over exports that cannot break a
+ * deployed bundle — and a gate that is red for a reason nobody needs to act on
+ * teaches everyone to read red as noise. Under GitHub Actions the additions are
+ * also a `::notice`, so a commit that forgot the file says so in the run.
  *
- *     pnpm check:api-surface
- *     pnpm write:api-surface   # after an intentional change
+ * What still has to be true is that every export a RELEASE ships is in the
+ * baseline committed at its tag: `check-release-bump.mjs` compares two committed
+ * baselines, so an export released unbanked is one whose later removal nothing
+ * can see. The stable release banks it (`write:api-surface` before the bump
+ * check; the release commit carries the file), and the canary — which commits
+ * nothing back — runs this with `--strict`, where an unbanked addition fails.
+ *
+ * A removal or a change is never written. Those still fail, with the same
+ * rationale as before, and `pnpm write:api-surface` is still how a deliberate
+ * one is banked.
+ *
+ *     pnpm check:api-surface              # banks additions, fails on a break
+ *     pnpm check:api-surface --strict     # an unbanked addition fails too
+ *     pnpm write:api-surface              # bank anything, after an intentional break
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -109,8 +126,10 @@ export function classify(beforeText, afterText) {
  * gate's own tests can drive it over a fixture surface — see
  * `tooling/scripts/test/api-surface.test.mjs`. `baseline` and `targets` are parameters
  * for the same reason; the defaults are the real ones.
+ *
+ * `strict` refuses an unbanked addition instead of banking it (the canary).
  */
-export function checkApiSurface({ baseline = BASELINE, targets } = {}) {
+export function checkApiSurface({ baseline = BASELINE, targets, strict = false } = {}) {
     if (!fs.existsSync(baseline)) {
         console.error(
             `No API surface baseline at ${rel(baseline)}.\n` +
@@ -158,7 +177,8 @@ export function checkApiSurface({ baseline = BASELINE, targets } = {}) {
         for (const key of changed) console.error(`    ${key}`);
     }
     if (added.length) {
-        console.log(`\n${breaking ? "" : "✗ "}${added.length} export(s) added:\n`);
+        const mark = breaking ? "" : strict ? "✗ " : "+ ";
+        console.log(`\n${mark}${added.length} export(s) added:\n`);
         for (const key of added) console.log(`    ${key}`);
     }
 
@@ -173,15 +193,35 @@ export function checkApiSurface({ baseline = BASELINE, targets } = {}) {
             "major so old bundles resolve onto the old image instead of this one, then\n" +
             "regenerate with `pnpm write:api-surface`.\n"
         );
-    } else {
+        return 1;
+    }
+
+    if (strict) {
+        console.error(
+            "\nAdditions only — no contract break, but not banked. Under --strict the\n" +
+            "baseline has to name everything this build exports before it ships: the\n" +
+            "release check compares committed baselines, and an export published\n" +
+            "without being banked is one whose later removal nothing can see.\n\n" +
+            "    pnpm write:api-surface      # then commit contracts/server.api.txt\n"
+        );
+        return 1;
+    }
+
+    fs.writeFileSync(baseline, current);
+    console.log(
+        `\nAdditions only — no contract break. Banked into ${rel(baseline)};\n` +
+        "commit it with the change that added them.\n"
+    );
+    if (process.env.GITHUB_ACTIONS) {
+        // One line: a workflow command ends at the newline.
         console.log(
-            "\nAdditions only — no contract break. Regenerate the baseline and commit it:\n" +
-            "    pnpm write:api-surface\n"
+            `::notice title=API surface::${added.length} addition(s) not in the committed ${rel(baseline)} ` +
+            "(they pass, and the release banks them). Run `pnpm check:api-surface` locally and commit the file."
         );
     }
-    return 1;
+    return 0;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    process.exit(checkApiSurface());
+    process.exit(checkApiSurface({ strict: process.argv.includes("--strict") }));
 }

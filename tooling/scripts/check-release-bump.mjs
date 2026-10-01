@@ -60,8 +60,11 @@
  *
  * Comparison is committed baseline against committed baseline at the previous
  * tag. It deliberately does not re-render the surface from `dist`:
- * `check:api-surface` already guarantees the committed baseline matches the build
- * on every PR, so this needs no build and cannot disagree with that gate.
+ * `check:api-surface` fails every push whose build removed or changed something
+ * the committed baseline has, so this needs no build and cannot disagree with
+ * that gate. Additions pass that gate without being committed; the stable
+ * release runs `write:api-surface` before this and its commit carries the file,
+ * so the baseline at each tag names everything that release shipped.
  *
  * An axis whose artifact did not exist at the previous tag is reported as
  * unguarded rather than passed over, because a silent axis and a clean axis look
