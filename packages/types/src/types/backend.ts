@@ -402,6 +402,27 @@ export interface RealtimeProvider {
      * Called during graceful shutdown before closing database connections.
      */
     stopListening?(): Promise<void>;
+
+    /**
+     * The long-lived connections realtime depends on, for `/health`. A change
+     * feed that has gone quiet — a half-open LISTEN connection — loses every
+     * external and cross-instance change while writes through this instance
+     * still look live, so it is reported rather than inferred.
+     */
+    health?(): RealtimeListenerHealth[];
+}
+
+/**
+ * One long-lived realtime connection, as `/health` reports it.
+ * @group Backend
+ */
+export interface RealtimeListenerHealth {
+    /** What it carries — `"cdc"`, `"cross-instance"`, `"channel-bus"`. */
+    name: string;
+    /** Listening on a connection that answered its last heartbeat. */
+    connected: boolean;
+    /** When (epoch ms) it went down, while it is down. */
+    downSince?: number;
 }
 
 // =============================================================================

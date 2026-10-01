@@ -1,6 +1,6 @@
 import { logger } from "@rebasepro/server";
 import { CDC_CHANNEL } from "./trigger-cdc";
-import { PgNotifyListener } from "../pg-notify-listener";
+import { PgNotifyListener, type PgNotifyListenerStatus } from "../pg-notify-listener";
 
 /**
  * A single database change captured by the CDC triggers and delivered over the
@@ -110,5 +110,14 @@ export class CdcListener {
     /** Stop listening and release the connection. */
     async stop(): Promise<void> {
         await this.listener.stop();
+    }
+
+    /** Listening on a connection that answered its last heartbeat — see {@link PgNotifyListener}. */
+    get connected(): boolean {
+        return this.listener.connected;
+    }
+
+    status(): PgNotifyListenerStatus {
+        return this.listener.status();
     }
 }

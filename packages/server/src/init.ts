@@ -3547,7 +3547,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const authSchemaCheck = authConfigResult?.schemaHealthCheck;
     const healthCheck = createHealthCheck(
         defaultDriver,
-        authSchemaCheck ? () => authSchemaCheck.call(authConfigResult) : undefined
+        authSchemaCheck ? () => authSchemaCheck.call(authConfigResult) : undefined,
+        Object.values(realtimeServices)
     );
 
     // ── Scheduled RLS audit ───────────────────────────────────────────────

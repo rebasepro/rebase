@@ -191,6 +191,12 @@ export function createRoutedRealtimeService(opts: RoutedRealtimeOptions): WsReal
 
         async stopListening() {
             await Promise.all(all().map((p) => p.stopListening?.()));
+        },
+
+        // Every source's connections, named by the source they belong to.
+        health() {
+            return Object.entries(providers).flatMap(([key, p]) =>
+                (p.health?.() ?? []).map((listener) => ({ ...listener, name: `${key}:${listener.name}` })));
         }
     };
 }

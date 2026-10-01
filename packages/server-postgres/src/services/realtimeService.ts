@@ -22,8 +22,8 @@ import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collect
 import { isNestedPath } from "./nested-path";
 import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
 import { ChannelPresenceStore } from "./channel-presence";
-import { ChannelBus, ChannelBusFrame, MemoryChannelBus, frameByteLength } from "./channel-bus";
-import type { ChannelHistoryEntry, ChannelRetentionRule, User } from "@rebasepro/types";
+import { ChannelBus, ChannelBusFrame, MemoryChannelBus, PostgresChannelBus, frameByteLength } from "./channel-bus";
+import type { ChannelHistoryEntry, ChannelRetentionRule, RealtimeListenerHealth, User } from "@rebasepro/types";
 import { unref } from "@rebasepro/utils";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
@@ -2944,9 +2944,29 @@ lastSeen: Date.now() });
     // Database-level Change Data Capture (CDC)
     // =============================================================================
 
-    /** Whether database-level change capture is currently the active source. */
+    /**
+     * Whether database-level change capture is the source and is listening.
+     *
+     * Configured is not enough: a CDC connection that went half-open used to
+     * leave this `true` while nothing arrived. False while the connection is
+     * down and being replaced.
+     */
     public isCdcActive(): boolean {
-        return this.cdcActive;
+        return this.cdcActive && this.cdcListener?.connected === true;
+    }
+
+    /** The LISTEN connections this service depends on — see `RealtimeProvider.health`. */
+    health(): RealtimeListenerHealth[] {
+        const listeners: RealtimeListenerHealth[] = [];
+        if (this.cdcActive && this.cdcListener) {
+            const { connected, downSince } = this.cdcListener.status();
+            listeners.push({ name: "cdc", connected, ...(downSince !== undefined ? { downSince } : {}) });
+        }
+        const bus = this.bus instanceof PostgresChannelBus ? this.bus.status() : undefined;
+        if (bus) {
+            listeners.push({ name: "channel-bus", connected: bus.connected, ...(bus.downSince !== undefined ? { downSince: bus.downSince } : {}) });
+        }
+        return listeners;
     }
 
     /**

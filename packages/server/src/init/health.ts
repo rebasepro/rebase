@@ -1,4 +1,4 @@
-import { AuthSchemaHealth, DataDriver, HealthCheckResult, isSQLAdmin } from "@rebasepro/types";
+import { AuthSchemaHealth, DataDriver, HealthCheckResult, RealtimeListenerHealth, RealtimeProvider, isSQLAdmin } from "@rebasepro/types";
 import { describeCauseChain, logger, redactSensitiveText } from "../utils/logger";
 
 /**
@@ -10,9 +10,26 @@ import { describeCauseChain, logger, redactSensitiveText } from "../utils/logger
  *   check. Reporting that as healthy is what lets an orchestrator keep routing
  *   traffic to a server that cannot authenticate anyone.
  */
+/**
+ * How long a realtime LISTEN connection may be down before `/health` says so.
+ *
+ * A dropped connection is replaced within seconds, and a pod that reports
+ * itself degraded over that would shed traffic for nothing. One still down
+ * after this is not reconnecting: every external and cross-instance change is
+ * being lost while writes through this pod still look live, which is the
+ * failure an orchestrator should route around.
+ */
+export const REALTIME_LISTENER_GRACE_MS = 60_000;
+
+/**
+ * @param realtimeProviders — optional; each reports the LISTEN connections it
+ *   depends on. One down past {@link REALTIME_LISTENER_GRACE_MS} makes the
+ *   check unhealthy; one down for less is reported but not failed on.
+ */
 export function createHealthCheck(
     defaultDriver: DataDriver,
-    authSchemaCheck?: () => Promise<AuthSchemaHealth>
+    authSchemaCheck?: () => Promise<AuthSchemaHealth>,
+    realtimeProviders: RealtimeProvider[] = []
 ): () => Promise<HealthCheckResult> {
     return async (): Promise<HealthCheckResult> => {
         const start = performance.now();
@@ -39,6 +56,21 @@ export function createHealthCheck(
                     healthy: false,
                     latencyMs,
                     details: { authSchema: auth }
+                };
+            }
+
+            const listeners: RealtimeListenerHealth[] = realtimeProviders.flatMap((provider) => provider.health?.() ?? []);
+            const down = listeners.filter((listener) => !listener.connected);
+            if (down.length > 0) {
+                const now = Date.now();
+                const stuck = down.filter((listener) => now - (listener.downSince ?? now) >= REALTIME_LISTENER_GRACE_MS);
+                if (stuck.length > 0) {
+                    logger.error("Health check failed: realtime is not receiving changes", { listeners: stuck });
+                }
+                return {
+                    healthy: stuck.length === 0,
+                    latencyMs,
+                    details: { realtime: { listeners } }
                 };
             }
 

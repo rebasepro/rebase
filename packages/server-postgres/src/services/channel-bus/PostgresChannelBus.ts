@@ -29,7 +29,7 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
-import { PgNotifyListener } from "../pg-notify-listener";
+import { PgNotifyListener, type PgNotifyListenerStatus } from "../pg-notify-listener";
 import { ChannelBus, ChannelBusFrame, ChannelBusHandler, frameByteLength } from "./ChannelBus";
 import { unref } from "@rebasepro/utils";
 
@@ -151,6 +151,11 @@ export class PostgresChannelBus implements ChannelBus {
             this.pending.push({ frame, bytes, resolve, reject });
             this.pendingBytes += bytes;
         });
+    }
+
+    /** The LISTEN connection's state, for `/health` — see {@link PgNotifyListener}. */
+    status(): PgNotifyListenerStatus | undefined {
+        return this.listener?.status();
     }
 
     async stop(): Promise<void> {
