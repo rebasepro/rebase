@@ -163,3 +163,19 @@ describe("a patch through the live door", () => {
         expect(editor.relation.target().slug).toBe("authors");
     });
 });
+
+describe("the commit message of an edit that changes no schema", () => {
+    it("names the collection and what changed, rather than saying nothing changed", async () => {
+        const { post } = harness();
+        const response = await post("/plan", {
+            collectionId: "posts",
+            patch: [
+                { op: "set", path: ["name"], value: "Articles" },
+                { op: "set", path: ["admin", "icon"], value: "Book" }
+            ]
+        });
+        const body = await response.json() as { message: string };
+        expect(body.message).not.toMatch(/no change/);
+        expect(body.message.split("\n")[0]).toBe("chore(schema): edit posts — admin.icon, name");
+    });
+});

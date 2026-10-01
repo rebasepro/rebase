@@ -47,7 +47,9 @@ export type SchemaChangeKind =
     /** A column's DEFAULT is set, changed or dropped. */
     | "change-default"
     /** The proposed collections cannot be planned at all. */
-    | "invalid-collection";
+    | "invalid-collection"
+    /** A collection's row-level security policies change. */
+    | "change-security-rules";
 
 export interface SchemaChange {
     kind: SchemaChangeKind;

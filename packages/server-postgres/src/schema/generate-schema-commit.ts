@@ -163,11 +163,15 @@ export function commitMessage(classified: ClassifiedChanges): string {
     const added = changes.filter(c => c.kind === "add-collection").map(c => c.collection);
     const properties = changes.filter(c => c.kind === "add-property");
 
+    const rules = changes.filter(c => c.kind === "change-security-rules");
+
     let subject: string;
     if (added.length === 1 && changes.length === 1) {
         subject = `add the ${added[0]} collection`;
     } else if (properties.length === 1 && changes.length === 1) {
         subject = `add ${properties[0].property} to ${properties[0].collection}`;
+    } else if (rules.length === changes.length) {
+        subject = `change the security rules of ${collections.join(", ")}`;
     } else if (collections.length === 1) {
         subject = `${changes.length} change(s) to ${collections[0]}`;
     } else {

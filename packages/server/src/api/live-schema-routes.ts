@@ -554,6 +554,23 @@ async function planOrRefusal(
 }
 
 /**
+ * The commit message, naming what changed when the schema did not.
+ *
+ * The planner describes schema changes, and for an edit that has none — a
+ * renamed collection, a new icon, a reordered list — it said
+ * `chore(schema): no change` over a commit that changed the collection file.
+ * The patch knows what changed, so the subject says it.
+ */
+function messageFor(change: ProposedChange, plan: SchemaChangePlan): string {
+    if (plan.classified.changes.length > 0) return plan.message;
+    const paths = (change.patch ?? []).map(op => op.path.join("."));
+    const shown = paths.length > 5 ? [...paths.slice(0, 5), `and ${paths.length - 5} more`] : paths;
+    return paths.length > 0
+        ? `chore(schema): edit ${change.collectionId} — ${shown.join(", ")}\n`
+        : `chore(schema): edit ${change.collectionId}\n`;
+}
+
+/**
  * What still has to happen after this change lands, if anything.
  *
  * Only one thing so far, and it is the one that would otherwise be silent: a
@@ -726,7 +743,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             changes: plan.classified.changes,
             statements: plan.statements,
             files: plan.files.map(file => file.path),
-            message: plan.message,
+            message: messageFor(sourceChangeFor(before, change), plan),
             // A change can be applicable and still leave something the config
             // asks for unenforced. That is not a refusal, so it does not belong
             // in `changes` — but it is the one thing on this response somebody
@@ -783,7 +800,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
 
         try {
             const result = await applySchemaChange({
-                plan,
+                plan: { ...plan, message: messageFor(sourceChangeFor(before, change), plan) },
                 repository,
                 // Handed down rather than called here. Writing the source first
                 // and passing the files over is what made every change fail:

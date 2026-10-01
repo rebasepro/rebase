@@ -56,3 +56,26 @@ describe("the receipt of a change whose DDL failed", () => {
         expect(screen.getByText(/may have been changed in part/)).toBeTruthy();
     });
 });
+
+describe("a plan that commits a change and runs nothing", () => {
+    it("does not say there is no change to make when a security rule changes", () => {
+        render(<SchemaChangeDialog
+            open
+            collectionId="posts"
+            plan={{
+                applicable: true,
+                verdict: "safe",
+                changes: [{ kind: "change-security-rules", verdict: "safe", collection: "posts", detail: "Who can read posts changes." }],
+                statements: [],
+                files: ["config/collections/posts.ts"],
+                message: "feat(schema): change the security rules of posts",
+                withheldConstraints: []
+            }}
+            applying={false}
+            onConfirm={() => undefined}
+            onClose={() => undefined}
+        />);
+        expect(screen.queryByText(/there is no schema change to make/)).toBeNull();
+        expect(screen.getByText(/when it takes effect/)).toBeTruthy();
+    });
+});

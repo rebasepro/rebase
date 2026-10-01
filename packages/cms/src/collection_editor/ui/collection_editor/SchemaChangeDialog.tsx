@@ -306,11 +306,17 @@ export function SchemaChangeDialog({
     // A document database runs nothing; so does a relational change that only
     // moves source. Both are a commit, and calling either one "apply" would be
     // describing something that does not happen.
+    // A plan with changes and no statements still changes something — a
+    // security rule takes effect when the server next starts — so "there is
+    // no schema change to make" is said only when there is none.
     const copy = verdict === "safe" && commitOnly
         ? {
             title: "Ready to commit",
-            body: "This changes what your project declares. Nothing runs against the database — " +
-                "there is no schema change to make.",
+            body: plan && plan.changes.length > 0
+                ? "Nothing runs against the database now. Each change below says what it does and " +
+                    "when it takes effect."
+                : "This changes what your project declares. Nothing runs against the database — " +
+                    "there is no schema change to make.",
             color: "info" as const
         }
         : verdict
@@ -364,8 +370,8 @@ export function SchemaChangeDialog({
 
                         {plan.changes.length === 0 && (
                             <Typography variant="body2" color="secondary">
-                                Nothing here changes the shape of your data. The collection source
-                                is still rewritten and committed.
+                                Nothing here changes the shape of your data. Only the collection
+                                source changes, and it is committed.
                             </Typography>
                         )}
 

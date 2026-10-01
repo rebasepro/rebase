@@ -325,7 +325,10 @@ export function classifyCollectionChanges(
         });
     }
 
-    if (plans?.before) classifyJunctions(plans.before, plans.after, previous, next, changes);
+    if (plans?.before) {
+        classifyJunctions(plans.before, plans.after, previous, next, changes);
+        classifySecurityRules(plans.before, plans.after, changes);
+    }
 
     const verdict = changes.reduce<ChangeVerdict>(
         (worst, change) => (VERDICT_RANK[change.verdict] > VERDICT_RANK[worst] ? change.verdict : worst),
@@ -942,6 +945,48 @@ function classifyJunctions(
             verdict: "safe",
             collection: slugs[0] ?? "",
             detail: `Creates junction table "${table.qualified}", empty.`
+        });
+    }
+}
+
+/**
+ * A table whose compiled policies differ — a security rule added, removed or
+ * changed.
+ *
+ * Safe: the policies are replaced wholesale whenever the server starts
+ * (`ensureCollectionPolicies`), and nothing about the table's data changes.
+ * But it is a change, with an effect on who can read what, and it was planned
+ * as none and committed as `chore(schema): no change`.
+ *
+ * Compared as compiled policies rather than as rules, so a rule spelled
+ * differently into the same policy is not a change, and one whose meaning
+ * changed is — a policy's name embeds a hash of what it does.
+ */
+function classifySecurityRules(before: SchemaPlan, after: SchemaPlan, changes: SchemaChange[]): void {
+    const policyKey = (table: TablePlan) => JSON.stringify(
+        table.policies.map(({ name, operation, mode, roles, using, withCheck }) =>
+            ({ name, operation, mode, roles, using, withCheck }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+    );
+    for (const table of after.tables) {
+        if (table.kind !== "collection" || !table.slug) continue;
+        const was = before.tables.find(t => t.qualified === table.qualified && t.kind === "collection");
+        if (!was || policyKey(was) === policyKey(table)) continue;
+        const names = (plan: TablePlan) => new Set(plan.policies.map(p => p.name));
+        const added = [...names(table)].filter(name => !names(was).has(name)).length;
+        const removed = [...names(was)].filter(name => !names(table).has(name)).length;
+        const counts = [
+            added > 0 ? `${added} ${added === 1 ? "policy" : "policies"} added` : "",
+            removed > 0 ? `${removed} removed` : ""
+        ].filter(Boolean).join(", ");
+        changes.push({
+            kind: "change-security-rules",
+            verdict: "safe",
+            collection: table.slug,
+            detail:
+                `Who can read and write "${table.qualified}" changes${counts ? ` (${counts})` : ""}. Row-level ` +
+                "security policies are replaced at the server's next start — at once under `rebase dev`, which " +
+                "restarts on the commit, and at the next deploy elsewhere. Until then the old policies apply."
         });
     }
 }
