@@ -51,6 +51,7 @@ import { acceptsAutoLimit, buildExplainSql, needsDestructiveConfirmation, quoteI
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
+import type { SqlScriptNotice } from "@rebasepro/types";
 
 export type { SQLEditorColumnInfo, TableInfo };
 
@@ -282,7 +283,13 @@ export const SQLEditor = () => {
          * name, and the table column it was read from. An edit is written
          * back by this, and refused without it.
          */
-        lastProvenance: ResultProvenance | null
+        lastProvenance: ResultProvenance | null,
+        /**
+         * What the database said while the last run ran — `there is no
+         * transaction in progress` for a ROLLBACK that ended nothing, which
+         * otherwise reads as a plain success.
+         */
+        notices: SqlScriptNotice[]
     }>>(() => {
         const projectPrefixSync = getStoragePrefix(client?.baseUrl);
         // This runs during the first render, so anything it throws takes the
@@ -303,7 +310,8 @@ export const SQLEditor = () => {
             execTime: null,
             lastExecutedSql: null,
             lastExecutedConnection: null,
-            lastProvenance: null
+            lastProvenance: null,
+            notices: []
         }));
         if (restored.length > 0) return restored;
         return [{
@@ -318,7 +326,8 @@ export const SQLEditor = () => {
             execTime: null,
             lastExecutedSql: null,
             lastExecutedConnection: null,
-            lastProvenance: null
+            lastProvenance: null,
+            notices: []
         }];
     });
     const [activeTabId, setActiveTabId] = useState<string>(() => {
@@ -772,7 +781,8 @@ role: connection.role });
             execTime: null,
             lastExecutedSql: null,
             lastExecutedConnection: null,
-            lastProvenance: null
+            lastProvenance: null,
+            notices: []
         }]);
         setActiveTabId(newId);
     };
@@ -837,7 +847,8 @@ error: null,
 results: null,
 lastExecutedSql: null,
 lastExecutedConnection: null,
-lastProvenance: null });
+lastProvenance: null,
+notices: [] });
         const start = performance.now();
         try {
             if (databaseAdmin?.executeSql) {
@@ -867,7 +878,8 @@ execTime: Math.round(performance.now() - start) });
 
         updateActiveTab({ loading: true,
 error: null,
-results: null });
+results: null,
+notices: [] });
         const start = performance.now();
 
         try {
@@ -887,7 +899,8 @@ results: null });
                     lastExecutedConnection: connection,
                     lastProvenance: run
                         ? { columns: run.columns, tables: run.tables }
-                        : { columns: Object.keys(rows[0] ?? {}).map(name => ({ name })), tables: [] }
+                        : { columns: Object.keys(rows[0] ?? {}).map(name => ({ name })), tables: [] },
+                    notices: run?.notices ?? []
                 });
 
                 if (history[history.length - 1] !== activeTab.sql) {
@@ -1526,6 +1539,15 @@ isFavorite: !s.isFavorite } : s));
                                     <div className={cls("p-2 px-4 bg-surface-raised border-b shrink-0 flex items-center", defaultBorderMixin)}>
                                         <Typography variant="caption" className="font-semibold text-text-disabled dark:text-text-disabled-dark uppercase tracking-widest text-[10px]">{t("studio_sql_query_results")}</Typography>
                                     </div>
+                                    {!loading && activeTab.notices.length > 0 && (
+                                        <div className="px-4 pt-2 flex flex-col gap-1 shrink-0">
+                                            {activeTab.notices.map((notice, index) => (
+                                                <Alert key={index} color="warning" size="small">
+                                                    {`${notice.severity}: ${notice.message}`}
+                                                </Alert>
+                                            ))}
+                                        </div>
+                                    )}
                                     <div className="flex-grow flex flex-col min-h-0 overflow-hidden">
                                         {renderResults()}
                                     </div>

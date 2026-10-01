@@ -1,4 +1,4 @@
-import type { SqlScriptColumn, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
+import type { SqlScriptColumn, SqlScriptNotice, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
 
 /**
  * Read an `EXECUTE_SQL_SUCCESS` payload for a script run as a
@@ -15,7 +15,8 @@ export function readSqlScriptResult(payload: unknown): SqlScriptResult {
         ? record.columns.map(readColumn).filter(isDefined)
         : Object.keys(rows[0] ?? {}).map((name): SqlScriptColumn => ({ name }));
     const tables = Array.isArray(record?.tables) ? record.tables.map(readTable).filter(isDefined) : [];
-    const result: SqlScriptResult = { rows, columns, tables };
+    const notices = Array.isArray(record?.notices) ? record.notices.map(readNotice).filter(isDefined) : [];
+    const result: SqlScriptResult = { rows, columns, tables, notices };
     if (typeof record?.command === "string") result.command = record.command;
     if (typeof record?.rowCount === "number") result.rowCount = record.rowCount;
     return result;
@@ -72,4 +73,10 @@ function readTable(value: unknown): SqlScriptTable | undefined {
         // tables that inherit it is not one a key finds a single row in.
         hasInheritors: record.hasInheritors !== false
     };
+}
+
+function readNotice(value: unknown): SqlScriptNotice | undefined {
+    const record = asRecord(value);
+    if (typeof record?.message !== "string") return undefined;
+    return { severity: typeof record.severity === "string" ? record.severity : "NOTICE", message: record.message };
 }

@@ -524,6 +524,17 @@ export interface SqlScriptTable {
 }
 
 /**
+ * Something the database said while a script ran: `there is no transaction in
+ * progress` for a ROLLBACK with nothing to end, a `RAISE NOTICE`.
+ *
+ * @group Admin
+ */
+export interface SqlScriptNotice {
+    severity: string;
+    message: string;
+}
+
+/**
  * What a SQL script a person wrote returned. See {@link SQLAdmin.runSqlScript}.
  *
  * @group Admin
@@ -544,6 +555,8 @@ export interface SqlScriptResult {
     command?: string;
     /** How many rows the last statement returned or changed, when its command reports a count. */
     rowCount?: number;
+    /** What the database said while the script ran, in order. */
+    notices: SqlScriptNotice[];
 }
 
 /**
@@ -572,7 +585,9 @@ export interface SQLAdmin {
      * of it. Values come back as the database's text, and each column says
      * which table column it was read from, when the database says so: what
      * the console needs to write a cell back to the row it came from and to
-     * no other.
+     * no other. A script that leaves a transaction open is refused, and the
+     * transaction rolled back: nothing outlives the run to be committed or
+     * rolled back by a later one.
      */
     runSqlScript?(sql: string, options?: { database?: string; role?: string }): Promise<SqlScriptResult>;
 

@@ -100,7 +100,8 @@ describe("runSqlScript", () => {
                     { schema: "public", table: "authors", kind: "table", primaryKey: ["id"], hasInheritors: false }
                 ],
                 command: "SELECT",
-                rowCount: 1
+                rowCount: 1,
+                notices: [{ severity: "WARNING", message: "there is no transaction in progress" }]
             }
         }) });
 
@@ -115,7 +116,8 @@ describe("runSqlScript", () => {
                 { schema: "public", table: "authors", kind: "table", primaryKey: ["id"], hasInheritors: false }
             ],
             command: "SELECT",
-            rowCount: 1
+            rowCount: 1,
+            notices: [{ severity: "WARNING", message: "there is no transaction in progress" }]
         });
     });
 });
@@ -127,6 +129,7 @@ describe("readSqlScriptResult", () => {
         expect(result.rows).toEqual([{ id: "7", status: "new", tags: "[\"a\"]", note: null }]);
         expect(result.columns).toEqual([{ name: "id" }, { name: "status" }, { name: "tags" }, { name: "note" }]);
         expect(result.tables).toEqual([]);
+        expect(result.notices).toEqual([]);
     });
 
     it("drops a source it cannot read, and reads an unknown inheritance as the unsafe answer", () => {

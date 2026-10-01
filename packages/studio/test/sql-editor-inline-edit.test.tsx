@@ -40,12 +40,14 @@ const scripts: Record<string, SqlScriptResult> = {
     [ORDERS]: {
         rows: [{ id: "7", status: "new" }],
         columns: [readFrom("id", "orders"), readFrom("status", "orders")],
-        tables: [tableOf("orders")]
+        tables: [tableOf("orders")],
+        notices: []
     },
     [POSTS_WITH_AUTHORS]: {
         rows: [{ id: "1", name: "new" }],
         columns: [readFrom("id", "posts"), readFrom("name", "authors")],
-        tables: [tableOf("posts"), tableOf("authors")]
+        tables: [tableOf("posts"), tableOf("authors")],
+        notices: []
     }
 };
 
@@ -58,7 +60,7 @@ const executeSql = jest.fn(async (sql: string, _options?: ExecuteOptions): Promi
     return scriptFor(sql)?.rows ?? [];
 });
 const runSqlScript = jest.fn(async (sql: string, _options?: ExecuteOptions): Promise<SqlScriptResult> =>
-    scriptFor(sql) ?? { rows: [], columns: [], tables: [] });
+    scriptFor(sql) ?? { rows: [], columns: [], tables: [], notices: [] });
 const databaseAdmin: Record<string, unknown> = {
     executeSql,
     runSqlScript,

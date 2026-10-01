@@ -7,6 +7,7 @@ import { Pool } from "pg";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { SqlTransactionLeftOpenError } from "../src/services/sql-script";
 
 /**
  * SQL a person typed runs on a session that is put back before anyone else
@@ -119,5 +120,47 @@ describe("on a pool", () => {
         await driver.executeSql("BEGIN; SELECT 1/0", { isolateSession: true }).catch(() => undefined);
 
         expect(connection.release).toHaveBeenCalledWith(true);
+    });
+    it("rolls back a transaction the SQL left open, refuses the run, and still reuses the connection", async () => {
+        let status = "I";
+        connection.query.mockImplementation((async (query: unknown) => {
+            const text = typeof query === "string" ? query : (query as { text: string }).text;
+            statements.push(text);
+            if (text.startsWith("BEGIN")) status = "T";
+            if (text === "ROLLBACK") status = "I";
+            return { rows: [], fields: [], rowCount: 0, command: "SELECT" };
+        }) as never);
+        Object.assign(connection, { getTransactionStatus: () => status });
+        const driver = driverOver(drizzleNodePg(pool));
+
+        await expect(driver.executeSql("BEGIN; UPDATE accounts SET balance = 0", { isolateSession: true }))
+            .rejects.toBeInstanceOf(SqlTransactionLeftOpenError);
+
+        expect(statements).toEqual([
+            "BEGIN; UPDATE accounts SET balance = 0",
+            "ROLLBACK",
+            "SET SESSION AUTHORIZATION DEFAULT",
+            "RESET ALL"
+        ]);
+        expect(connection.release.mock.calls[0][0]).toBeFalsy();
+    });
+
+    it("assumes the role for the whole session, not inside a transaction a COMMIT can end", async () => {
+        connection.query.mockImplementation((async (query: unknown) => {
+            const text = typeof query === "string" ? query : (query as { text: string }).text;
+            statements.push(text);
+            return { rows: text.includes("current_user") ? [{ role: "postgres" }] : [], fields: [], rowCount: 0, command: "SELECT" };
+        }) as never);
+        const driver = driverOver(drizzleNodePg(pool));
+
+        await driver.executeSql("SELECT 1; COMMIT; CREATE TABLE x (id int)", { role: "probe_role", isolateSession: true });
+
+        expect(statements).toEqual([
+            "SELECT current_user AS role",
+            "SET ROLE \"probe_role\"",
+            "SELECT 1; COMMIT; CREATE TABLE x (id int)",
+            "SET SESSION AUTHORIZATION DEFAULT",
+            "RESET ALL"
+        ]);
     });
 });

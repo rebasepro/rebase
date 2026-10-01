@@ -57,7 +57,7 @@ import { applyAuthContext } from "./security/rls-enforcement";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
-import { runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
+import { onOwnSession, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
 
 /**
  * Has an operator opted out of database role switching entirely?
@@ -91,14 +91,6 @@ export function effectiveSqlRole(requestedRole?: string): string {
 
 /** How {@link effectiveSqlRole} names "whatever role the connection holds". */
 export const CONNECTION_OWNER = "<connection owner>";
-
-/**
- * What puts a session back after caller SQL: the session user and role, then
- * every setting. Two statements, because the extended protocol refuses a
- * multi-command string. Pinned settings (`search_path` from the connection's
- * startup options) come back as they were pinned.
- */
-const RESET_SESSION_STATEMENTS = ["SET SESSION AUTHORIZATION DEFAULT", "RESET ALL"] as const;
 
 /**
  * A statement named a database role the connection cannot assume.
@@ -2265,7 +2257,8 @@ export class PostgresBackendDriver implements DataDriver {
         if (options?.isolateSession) {
             return this.onIsolatedSession(
                 this.getTargetDb(options.database),
-                (db) => this.executeSqlOn(db, sqlText, options)
+                options.role,
+                (db, role) => this.executeSqlOn(db, sqlText, { ...options, role })
             );
         }
         if (!options?.database && !options?.role) {
@@ -2344,16 +2337,21 @@ export class PostgresBackendDriver implements DataDriver {
      * connection in N, until a restart. `SET SESSION AUTHORIZATION DEFAULT`
      * clears the role as well, which `RESET ALL` does not.
      *
-     * A connection that cannot be reset — the statement left a transaction
-     * open or aborted — is destroyed rather than returned. A handle that is
-     * already one session (PGlite in process, a single client) is reset in
-     * place.
+     * On a pool, `role` is assumed for the whole session, and a transaction
+     * the SQL leaves open is rolled back and the run refused — see
+     * `onOwnSession`. `fn` is then handed no role: there is nothing left to
+     * switch. A handle that is already one session (PGlite in process, a
+     * single client) is reset in place, and `fn` switches the role itself.
      */
-    private async onIsolatedSession<T>(targetDb: DrizzleClient, fn: (db: DrizzleClient) => Promise<T>): Promise<T> {
+    private async onIsolatedSession<T>(
+        targetDb: DrizzleClient,
+        role: string | undefined,
+        fn: (db: DrizzleClient, role: string | undefined) => Promise<T>
+    ): Promise<T> {
         const pool = "$client" in targetDb ? targetDb.$client : undefined;
         if (!(pool instanceof Pool)) {
             try {
-                return await fn(targetDb);
+                return await fn(targetDb, role);
             } finally {
                 for (const statement of RESET_SESSION_STATEMENTS) {
                     await targetDb.execute(drizzleSql.raw(statement)).catch((error: unknown) =>
@@ -2361,18 +2359,11 @@ export class PostgresBackendDriver implements DataDriver {
                 }
             }
         }
-        const connection = await pool.connect();
-        let reusable = true;
-        try {
-            return await fn(drizzle(connection));
-        } finally {
-            try {
-                for (const statement of RESET_SESSION_STATEMENTS) await connection.query(statement);
-            } catch {
-                reusable = false;
-            }
-            connection.release(reusable ? undefined : true);
-        }
+        return onOwnSession(
+            pool,
+            { assumeRole: role ? (connection) => this.assumeSessionRole(connection, role) : undefined },
+            (connection) => fn(drizzle(connection), undefined)
+        );
     }
 
     private async executeSqlOn(targetDb: DrizzleClient, sqlText: string, options?: {

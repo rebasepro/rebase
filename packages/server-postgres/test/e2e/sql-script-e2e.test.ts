@@ -43,6 +43,10 @@ beforeAll(async () => {
         CREATE SCHEMA archive;
         CREATE TABLE archive.orders (order_no int PRIMARY KEY, status text);
         CREATE TABLE order_items (order_id int, item_id int, quantity int, PRIMARY KEY (order_id, item_id));
+        CREATE TABLE accounts (id int PRIMARY KEY, balance int);
+        INSERT INTO accounts VALUES (1, 100);
+        CREATE ROLE console_reader NOLOGIN;
+        GRANT SELECT ON ALL TABLES IN SCHEMA public TO console_reader;
         INSERT INTO authors VALUES (1, 'Ada', NULL), (2, 'Grace', 1);
         INSERT INTO posts VALUES
             (1, 2, 'First', '{red,"two words"}', '\\x0102', '{"a": [1, 2]}', 12.30, '2026-01-02 03:04:05.123456'),
@@ -164,5 +168,84 @@ describe("what a script returns", () => {
 
         const again = await driver.runSqlScript("SELECT tags, body, meta, price, published_at FROM posts WHERE id = 1");
         expect(again.rows).toEqual(read.rows);
+    });
+});
+
+/**
+ * A transaction split across runs was silently not one. Each run gets a
+ * session of its own, so `BEGIN`, then `UPDATE accounts SET balance = 0`, then
+ * `ROLLBACK` — three runs — committed the update, and all three said success:
+ * the `BEGIN` session was destroyed with its transaction, the UPDATE committed
+ * on its own, and the ROLLBACK's "there is no transaction in progress" was a
+ * warning nobody showed.
+ */
+describe("a transaction and the run it began in", () => {
+    const balance = async () => (await pool.query("SELECT balance FROM accounts WHERE id = 1")).rows[0].balance;
+
+    it("refuses a run that leaves a transaction open, and keeps nothing it did", async () => {
+        await expect(driver.runSqlScript("BEGIN; UPDATE accounts SET balance = 0 WHERE id = 1"))
+            .rejects.toThrow(/began a transaction and did not end it[\s\S]*rolled back/);
+        expect(await balance()).toBe(100);
+
+        await expect(driver.runSqlScript("BEGIN")).rejects.toThrow(/did not end it/);
+    });
+
+    it("says a ROLLBACK or COMMIT with nothing to end did nothing", async () => {
+        const rollback = await driver.runSqlScript("ROLLBACK");
+        expect(rollback.notices).toEqual([{ severity: "WARNING", message: "there is no transaction in progress" }]);
+
+        const commit = await driver.runSqlScript("COMMIT");
+        expect(commit.notices).toEqual([{ severity: "WARNING", message: "there is no transaction in progress" }]);
+    });
+
+    it("keeps a transaction that begins and ends in one run", async () => {
+        await driver.runSqlScript("BEGIN; UPDATE accounts SET balance = 50 WHERE id = 1; COMMIT");
+        expect(await balance()).toBe(50);
+        await driver.runSqlScript("BEGIN; UPDATE accounts SET balance = 0 WHERE id = 1; ROLLBACK");
+        expect(await balance()).toBe(50);
+        await pool.query("UPDATE accounts SET balance = 100 WHERE id = 1");
+    });
+
+    it("rolls back the transaction a failed run began, and says so", async () => {
+        await expect(driver.runSqlScript("BEGIN; UPDATE accounts SET balance = 0 WHERE id = 1; SELECT 1/0"))
+            .rejects.toThrow(/division by zero[\s\S]*rolled back/);
+        expect(await balance()).toBe(100);
+    });
+
+    it("runs every statement as the role picked, a COMMIT in the middle included", async () => {
+        const result = await driver.runSqlScript(
+            "SELECT current_user AS before_commit; COMMIT; SELECT current_user AS after_commit",
+            { role: "console_reader" }
+        );
+        expect(result.rows).toEqual([{ after_commit: "console_reader" }]);
+
+        await expect(driver.runSqlScript("SELECT 1; COMMIT; CREATE TABLE made_by_reader (id int)", { role: "console_reader" }))
+            .rejects.toThrow(/permission denied/);
+    });
+
+    it("leaves the next run on that pool its own session: no role, no setting, no transaction", async () => {
+        await driver.runSqlScript("SET ROLE console_reader; SELECT set_config('app.leak', 'yes', false)");
+        const after = await pool.query("SELECT current_user AS who, current_setting('app.leak', true) AS leak, now() = statement_timestamp() AS fresh");
+        expect(after.rows[0].who).not.toBe("console_reader");
+        expect(after.rows[0].leak).not.toBe("yes");
+    });
+});
+
+/**
+ * The plain `executeSql` door, with `isolateSession` — what the socket runs for
+ * a client that does not ask for a script: the same refusal, and the role held
+ * for the whole session.
+ */
+describe("executeSql on a session of its own", () => {
+    it("refuses a transaction left open, and runs as the role past a COMMIT", async () => {
+        await expect(driver.executeSql("BEGIN; UPDATE accounts SET balance = 0 WHERE id = 1", { isolateSession: true }))
+            .rejects.toThrow(/did not end it/);
+        expect((await pool.query("SELECT balance FROM accounts WHERE id = 1")).rows[0].balance).toBe(100);
+
+        // Drizzle wraps the database's error; the socket reports the cause.
+        await expect(driver.executeSql("SELECT 1; COMMIT; CREATE TABLE made_by_reader (id int)", { role: "console_reader", isolateSession: true }))
+            .rejects.toMatchObject({ cause: expect.objectContaining({ message: expect.stringMatching(/permission denied/) }) });
+        await expect(driver.executeSql("BEGIN; SELECT 1/0", { isolateSession: true }))
+            .rejects.toMatchObject({ cause: expect.objectContaining({ message: expect.stringMatching(/division by zero[\s\S]*rolled back/) }) });
     });
 });

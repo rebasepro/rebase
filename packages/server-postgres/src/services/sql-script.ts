@@ -1,5 +1,5 @@
 import type { Connection, Pool, PoolClient, Submittable } from "pg";
-import type { SqlScriptColumn, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
+import type { SqlScriptColumn, SqlScriptNotice, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 
 /**
@@ -241,55 +241,160 @@ async function describeColumns(connection: PoolClient, fields: WireField[]): Pro
     }
 }
 
-/** What puts a session back after a script: the session user and role, then every setting. */
-const RESET_SESSION_STATEMENTS = ["SET SESSION AUTHORIZATION DEFAULT", "RESET ALL"] as const;
+/**
+ * What puts a session back after caller SQL: the session user and role, then
+ * every setting. Two statements, because the extended protocol refuses a
+ * multi-command string. Pinned settings (`search_path` from the connection's
+ * startup options) come back as they were pinned.
+ */
+export const RESET_SESSION_STATEMENTS = ["SET SESSION AUTHORIZATION DEFAULT", "RESET ALL"] as const;
 
-export interface RunSqlScriptOptions {
+/**
+ * A connection's transaction state, as its last ReadyForQuery reported it:
+ * `I` idle, `T` in a transaction, `E` in a failed one. `null` when the client
+ * does not say (node-postgres has since 8.16; the package requires 8.22).
+ */
+export function transactionStatus(connection: object): string | null {
+    if (!("getTransactionStatus" in connection) || typeof connection.getTransactionStatus !== "function") return null;
+    const status: unknown = connection.getTransactionStatus();
+    return typeof status === "string" ? status : null;
+}
+
+/**
+ * SQL a person ran began a transaction and did not end it.
+ *
+ * Each run is a session of its own, so a transaction cannot outlive the run
+ * that began it: a `BEGIN` alone, then an `UPDATE` in the next run, then a
+ * `ROLLBACK` in a third, committed the UPDATE and reported three successes.
+ * Refused instead, with the transaction rolled back.
+ */
+export class SqlTransactionLeftOpenError extends Error {
+    readonly code = "SQL_TRANSACTION_LEFT_OPEN";
+
+    constructor() {
+        super(
+            "This SQL began a transaction and did not end it, so it was rolled back: nothing it did was kept. " +
+            "Each run is a session of its own, and a transaction cannot outlive the run that began it — " +
+            "put the BEGIN and its COMMIT (or ROLLBACK) in the same run."
+        );
+        this.name = "SqlTransactionLeftOpenError";
+    }
+}
+
+export interface OwnSessionOptions {
     /**
-     * Put the session in the role the script runs as. Called once, before the
-     * script, on the script's own session — so the role holds for every
-     * statement of it, a `COMMIT` in the middle included.
+     * Put the session in the role the SQL runs as. Called once, before it, at
+     * session level — so the role holds for every statement, a `COMMIT` in the
+     * middle included. `SET LOCAL ROLE` inside a wrapping transaction did not:
+     * the caller's `COMMIT` ended that transaction, and every statement after
+     * it ran as the connection owner.
      */
     assumeRole?: (connection: PoolClient) => Promise<void>;
 }
 
 /**
- * Run `sql` on a connection of its own from `pool`, reset that connection, and
- * return what the last statement returned with each column's provenance.
+ * Run `work` — SQL a person wrote — on a connection of its own from `pool`,
+ * and put the connection back the way it was handed out.
+ *
+ * A transaction the SQL left open is rolled back, and the run refused with
+ * {@link SqlTransactionLeftOpenError}; a run that failed with one open says
+ * that it was rolled back. The session is then reset — role, session
+ * authorization, settings — and destroyed instead when it cannot be. Last,
+ * `afterReset` reads what it needs on the clean session, as the owner.
  */
-export async function runSqlScriptOnPool(pool: Pool, sql: string, options: RunSqlScriptOptions = {}): Promise<SqlScriptResult> {
+export async function onOwnSession<T>(
+    pool: Pool,
+    options: OwnSessionOptions,
+    work: (connection: PoolClient) => Promise<T>,
+    afterReset?: (connection: PoolClient, value: T) => Promise<T>
+): Promise<T> {
     const connection = await pool.connect();
     let reusable = true;
     try {
-        let statements: StatementOutcome[];
+        let outcome: { value: T } | { error: unknown };
         try {
             await options.assumeRole?.(connection);
-            const run = new ScriptRun(sql);
-            connection.query(run);
-            statements = await run.done;
-        } finally {
+            outcome = { value: await work(connection) };
+        } catch (error: unknown) {
+            outcome = { error };
+        }
+
+        let leftOpen = false;
+        const status = transactionStatus(connection);
+        if (status === "T" || status === "E") {
+            leftOpen = true;
+            try {
+                await connection.query("ROLLBACK");
+            } catch {
+                reusable = false;
+            }
+        }
+        if (reusable) {
             try {
                 for (const statement of RESET_SESSION_STATEMENTS) await connection.query(statement);
             } catch {
-                // A session that cannot be reset — an open or failed transaction
-                // — is destroyed rather than handed to the next request.
                 reusable = false;
             }
         }
 
-        const last: StatementOutcome = statements[statements.length - 1] ?? { fields: [], rows: [] };
-        const { columns, tables } = reusable
-            ? await describeColumns(connection, last.fields)
-            : { columns: last.fields.map(field => ({ name: field.name })), tables: [] };
-        return {
-            rows: last.rows,
-            columns,
-            tables,
-            ...parseCommandTag(last.tag)
-        };
+        if ("error" in outcome) {
+            // The database's own error, kept, and told what became of the
+            // transaction. On the deepest cause: that is the message the
+            // socket reports, so a note on a wrapper would never be read.
+            if (leftOpen) {
+                const reported = deepestCause(outcome.error);
+                if (reported) reported.message = `${reported.message}. The transaction this run began was rolled back: nothing it did was kept.`;
+            }
+            throw outcome.error;
+        }
+        if (leftOpen) throw new SqlTransactionLeftOpenError();
+        return afterReset && reusable ? await afterReset(connection, outcome.value) : outcome.value;
     } finally {
         connection.release(reusable ? undefined : true);
     }
+}
+
+/** The innermost `Error` of a `cause` chain — Drizzle wraps the database's error in its own. */
+function deepestCause(error: unknown): Error | undefined {
+    let deepest: Error | undefined;
+    for (let current: unknown = error; current instanceof Error; current = current.cause) deepest = current;
+    return deepest;
+}
+
+/** How many notices one run keeps; a loop that raises one per row is not a report. */
+const MAX_NOTICES = 100;
+
+/**
+ * Run `sql` on a connection of its own from `pool` and return what the last
+ * statement returned, with each column's provenance and what the database
+ * said along the way — `there is no transaction in progress` for a ROLLBACK
+ * with nothing to roll back, which used to read as success.
+ */
+export async function runSqlScriptOnPool(pool: Pool, sql: string, options: OwnSessionOptions = {}): Promise<SqlScriptResult> {
+    const notices: SqlScriptNotice[] = [];
+    const run = await onOwnSession(pool, options, async (connection) => {
+        const listen = (notice: { severity?: string; message?: string }) => {
+            if (notices.length < MAX_NOTICES) notices.push({ severity: notice.severity ?? "NOTICE", message: notice.message ?? "" });
+        };
+        connection.on("notice", listen);
+        try {
+            const script = new ScriptRun(sql);
+            connection.query(script);
+            const statements = await script.done;
+            const last: StatementOutcome = statements[statements.length - 1] ?? { fields: [], rows: [] };
+            return { last, described: { columns: last.fields.map((field): SqlScriptColumn => ({ name: field.name })), tables: [] as SqlScriptTable[] } };
+        } finally {
+            connection.removeListener("notice", listen);
+        }
+    }, async (connection, value) => ({ ...value, described: await describeColumns(connection, value.last.fields) }));
+
+    return {
+        rows: run.last.rows,
+        columns: run.described.columns,
+        tables: run.described.tables,
+        ...parseCommandTag(run.last.tag),
+        notices
+    };
 }
 
 /**
@@ -302,7 +407,8 @@ export function sqlScriptResultFromRows(rows: Record<string, unknown>[]): SqlScr
     return {
         rows: rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, valueAsText(value)]))),
         columns: names.map(name => ({ name })),
-        tables: []
+        tables: [],
+        notices: []
     };
 }
 

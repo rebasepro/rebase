@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
-import { describe, expect, it, jest, beforeEach } from "@jest/globals";
+import { describe, expect, it, jest, beforeEach, afterEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { en } from "../../app/src/locales/en";
 
@@ -15,7 +15,7 @@ import { en } from "../../app/src/locales/en";
  */
 
 const executeSql = jest.fn<(sql: string, options?: unknown) => Promise<unknown>>(async () => []);
-const databaseAdmin = {
+const databaseAdmin: Record<string, unknown> = {
     executeSql,
     fetchAvailableDatabases: async () => ["postgres"],
     fetchAvailableRoles: async () => ["postgres"],
@@ -235,5 +235,46 @@ describe("the destructive-statement confirmation", () => {
         await run("DELETE FROM posts WHERE id = 1");
         await waitFor(() => expect(sent()).toEqual(["DELETE FROM posts WHERE id = 1"]));
         expect(screen.queryByRole("dialog")).toBeNull();
+    });
+});
+
+/**
+ * A ROLLBACK or COMMIT with no transaction to end did nothing, and the console
+ * said "Success": Postgres's "there is no transaction in progress" is a
+ * warning, and nothing showed warnings. A transaction split across runs
+ * relied on exactly that — `BEGIN`, an UPDATE, then a `ROLLBACK` that ended
+ * nothing, so the UPDATE stayed.
+ */
+describe("what the database says while a script runs", () => {
+    afterEach(() => {
+        delete databaseAdmin.runSqlScript;
+    });
+
+    it("shows a ROLLBACK that ended nothing as the warning it is", async () => {
+        databaseAdmin.runSqlScript = jest.fn(async () => ({
+            rows: [],
+            columns: [],
+            tables: [],
+            command: "ROLLBACK",
+            notices: [{ severity: "WARNING", message: "there is no transaction in progress" }]
+        }));
+        render(<SQLEditor/>);
+        await typeSql("ROLLBACK");
+
+        fireEvent.click(screen.getByRole("button", { name: label("studio_sql_run") }));
+
+        expect(await screen.findByText("WARNING: there is no transaction in progress")).toBeTruthy();
+    });
+
+    it("shows the refusal of a run that left a transaction open", async () => {
+        databaseAdmin.runSqlScript = jest.fn(async () => {
+            throw new Error("This SQL began a transaction and did not end it, so it was rolled back: nothing it did was kept.");
+        });
+        render(<SQLEditor/>);
+        await typeSql("BEGIN");
+
+        fireEvent.click(screen.getByRole("button", { name: label("studio_sql_run") }));
+
+        expect(await screen.findByText(/did not end it/)).toBeTruthy();
     });
 });
