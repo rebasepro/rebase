@@ -184,6 +184,17 @@ describe("the REST read surface", () => {
             expect((body.data as unknown[]).length).toBe(2);
         });
 
+        it("reports meta.offset as a number on every page, 0 when none was asked for", async () => {
+            // `PaginationMeta.offset` is typed `number`, and the in-process door
+            // always sets it. REST sent it only when the request carried
+            // `offset` or `page`, so `meta.offset + meta.limit` was NaN on the
+            // first page and the next request was refused with INVALID_OFFSET.
+            const offsetOf = async (url: string) => ((await json(url)).body.meta as Record<string, unknown>).offset;
+            expect(await offsetOf("/posts?limit=1")).toBe(0);
+            expect(await offsetOf("/posts?limit=1&offset=3")).toBe(3);
+            expect(await offsetOf(`/posts?limit=2&after=${encodeURIComponent(cursor)}`)).toBe(0);
+        });
+
         it("serves the page without the probe row", async () => {
             fetchCollectionForRest.mockResolvedValue([{ id: "1" }, { id: "2" }, { id: "3" }]);
             const { body } = await json(`/posts?limit=2&after=${encodeURIComponent(cursor)}`);

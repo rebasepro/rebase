@@ -2092,7 +2092,10 @@ id };
             meta: {
                 ...(distinctRead ? {} : { total }),
                 limit: queryOptions.limit,
-                offset: queryOptions.offset,
+                // Always a number, as `PaginationMeta` types it and the
+                // in-process door sends it: left off when the request named
+                // none, `meta.offset + meta.limit` was NaN on the first page.
+                offset: queryOptions.offset ?? 0,
                 hasMore,
                 ...(nextCursor && { nextCursor })
             }
