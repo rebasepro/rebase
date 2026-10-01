@@ -7,12 +7,11 @@
  * as an *edit*, not as the local-changes banner asking whether to apply changes
  * that were made a second earlier and never abandoned.
  */
-import { mergeDeep } from "@rebasepro/utils";
 import {
-    extractTouchedValues,
     getEditHandoffValues,
+    getTouchedPropertyValues,
     getUnappliedLocalChanges,
-    removeEmptyContainers
+    overlayEdit
 } from "../../src/form/form_utils";
 
 type Product = {
@@ -38,7 +37,7 @@ const stored: Partial<Product> = {
  * change, and that is the copy the receiving form finds.
  */
 function backupFor(values: Partial<Product>, touched: Record<string, boolean>) {
-    return removeEmptyContainers(extractTouchedValues(values, touched)) as Partial<Product>;
+    return getTouchedPropertyValues(values, touched) as Partial<Product>;
 }
 
 describe("what a layout change carries", () => {
@@ -114,7 +113,8 @@ describe("what a layout change carries", () => {
             touched: { "dimensions.height": true },
             storedValues: stored
         });
-        expect(carried).toEqual({ dimensions: { height: 120 } });
+        // Whole: a property is the unit an edit is carried and written in.
+        expect(carried).toEqual({ dimensions: { width: 40, height: 120 } });
     });
 });
 
@@ -136,7 +136,7 @@ describe("the local-changes banner across a layout change", () => {
         });
 
         // The receiving form: the stored record, plus the edit handed to it.
-        const openingValues = mergeDeep(stored, carried!);
+        const openingValues = overlayEdit(stored, carried!);
         expect(openingValues.price).toBe(120);
 
         expect(getUnappliedLocalChanges(backupFor(values, touched), openingValues)).toBeUndefined();
@@ -159,7 +159,7 @@ describe("the local-changes banner across a layout change", () => {
             touched,
             storedValues: stored
         });
-        const openingValues = mergeDeep(stored, carried!);
+        const openingValues = overlayEdit(stored, carried!);
         expect(openingValues.dimensions).toEqual({
             width: 40,
             height: 120
@@ -179,5 +179,57 @@ describe("the local-changes banner across a layout change", () => {
         expect(getUnappliedLocalChanges(backup, stored)).toEqual(
             expect.objectContaining({ price: 120 })
         );
+    });
+});
+
+describe("an edit that removed something arrives without it", () => {
+    type Page = {
+        title: string;
+        sections: { heading: string; body: string }[];
+        attrs: Record<string, string>;
+    };
+    const page: Page = {
+        title: "Home",
+        sections: [
+            { heading: "A", body: "a" },
+            { heading: "B", body: "b" },
+            { heading: "C", body: "c" }
+        ],
+        attrs: { color: "red", size: "L" }
+    };
+    const edited: Page = {
+        ...page,
+        sections: [{ heading: "C", body: "c" }],
+        attrs: { color: "red" }
+    };
+
+    it("across a layout change: the shrunk list and the deleted key stay gone", () => {
+        const carried = getEditHandoffValues<Page>({
+            status: "existing",
+            dirty: true,
+            values: edited,
+            // What the array and key-value editors mark, plus a nested edit.
+            touched: { sections: true, "sections.0.heading": true, attrs: true },
+            storedValues: page
+        });
+        expect(overlayEdit(page, carried!)).toEqual(edited);
+    });
+
+    it("when a draft is restored: the same", () => {
+        const backup = getTouchedPropertyValues(edited, { sections: true, attrs: true });
+        const unapplied = getUnappliedLocalChanges(backup, page);
+        expect(overlayEdit(page, unapplied!)).toEqual(edited);
+    });
+
+    it("a reordered list keeps each item's own fields", () => {
+        const reordered = { ...page, sections: [{ heading: "B" } as Page["sections"][number], page.sections[0]] };
+        const carried = getEditHandoffValues<Page>({
+            status: "existing",
+            dirty: true,
+            values: reordered,
+            touched: { sections: true },
+            storedValues: page
+        });
+        expect(overlayEdit(page, carried!).sections).toEqual([{ heading: "B" }, { heading: "A", body: "a" }]);
     });
 });

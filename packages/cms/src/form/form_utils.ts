@@ -25,6 +25,47 @@ export function extractTouchedValues(values: unknown, touched: Record<string, bo
 }
 
 /**
+ * The edit to carry or back up: each top-level property the user touched,
+ * **whole** — the same unit a save writes.
+ *
+ * `extractTouchedValues` builds a tree of only the touched paths, which is a
+ * diff, and a diff cannot say "this item is gone": a list that shrank from
+ * three items to one, or a key-value map with a key deleted, came back whole
+ * when the diff was merged onto the stored record. Carrying the property whole
+ * and overlaying it (see {@link overlayEdit}) shows exactly what the user left.
+ *
+ * Which properties count is still decided by the touched tree with its ghost
+ * containers removed, so a field merely focused carries nothing.
+ */
+export function getTouchedPropertyValues<M extends Record<string, unknown>>(
+    values: Partial<M>,
+    touched: Record<string, boolean>
+): Partial<M> {
+    const touchedTree = removeEmptyContainers(extractTouchedValues(values, touched ?? {}));
+    const result: Record<string, unknown> = {};
+    if (!touchedTree || typeof touchedTree !== "object") return result as Partial<M>;
+    for (const key of Object.keys(touchedTree)) {
+        if (Object.prototype.hasOwnProperty.call(values, key)) {
+            result[key] = (values as Record<string, unknown>)[key];
+        }
+    }
+    return result as Partial<M>;
+}
+
+/**
+ * What a form shows when an edit is laid over `base`: each property the edit
+ * carries replaces the base's, whole.
+ *
+ * Not `mergeDeep`, which merged arrays of maps index by index and kept the base
+ * items past the edit's length, and kept map keys the edit had dropped — so a
+ * deleted section or key came back when the edit changed layout or a draft was
+ * restored, in a form that then read as clean.
+ */
+export function overlayEdit<M extends Record<string, unknown>>(base: Partial<M>, edit: Partial<M>): Partial<M> {
+    return { ...base, ...edit };
+}
+
+/**
  * Recursively removes empty plain objects `{}` and empty arrays `[]` from a value tree.
  * This prevents ghost containers created by `setIn` intermediate path construction
  * (e.g. `{ address: {} }` when only `address.city` was touched but value is undefined)
@@ -159,12 +200,18 @@ export function getUnappliedLocalChanges<M extends Record<string, unknown>>(
     backupValues: Partial<M>,
     openingValues: Partial<M>
 ): Partial<M> | undefined {
-    const changes = getChanges(backupValues, openingValues);
-    const cleaned = removeEmptyContainers(changes);
-    if (!cleaned || typeof cleaned !== "object" || Object.keys(cleaned).length === 0) {
-        return undefined;
+    if (!backupValues || typeof backupValues !== "object") return undefined;
+    // The backup holds whole properties (see `getTouchedPropertyValues`), so
+    // each one is compared whole and offered whole: a diff of it could not say
+    // that a key was deleted, and `overlayEdit` lays down what it is given as
+    // the property's entire value.
+    const unapplied: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(backupValues)) {
+        if (!equal(value, (openingValues as Record<string, unknown> | undefined)?.[key])) {
+            unapplied[key] = value;
+        }
     }
-    return cleaned as Partial<M>;
+    return Object.keys(unapplied).length > 0 ? unapplied as Partial<M> : undefined;
 }
 
 /**
@@ -209,8 +256,8 @@ export function getEditHandoffValues<M extends Record<string, unknown>>({
 
     if (!dirty) return undefined;
 
-    const touchedValues = removeEmptyContainers(extractTouchedValues(values, touched ?? {})) as Partial<M> | undefined;
-    if (touchedValues && Object.keys(touchedValues).length > 0) {
+    const touchedValues = getTouchedPropertyValues(values, touched ?? {});
+    if (Object.keys(touchedValues).length > 0) {
         return touchedValues;
     }
 
@@ -218,7 +265,7 @@ export function getEditHandoffValues<M extends Record<string, unknown>>({
     // a custom field that writes through `setFieldValue` without the blur that
     // marks it. Diffing against the stored record still finds it, and dropping
     // it here would hand over a form that opens clean over an edit.
-    const changes = getChanges(values, storedValues ?? {});
+    const changes = getChangedProperties(values, storedValues ?? {});
     return Object.keys(changes).length > 0 ? changes : undefined;
 }
 

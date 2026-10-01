@@ -32,12 +32,11 @@ import { useSidePanel } from "../hooks/useSidePanel";
 import { useAdminContext } from "../hooks/useAdminContext";
 import { EntityForm } from "./EntityForm";
 import {
-    extractTouchedValues,
-    removeEmptyContainers,
     getInitialEntityValues,
+    getTouchedPropertyValues,
     getUnappliedLocalChanges,
+    overlayEdit
 } from "./form_utils";
-import { mergeDeep } from "@rebasepro/utils";
 
 /**
  * Props for the admin-connected EntityFormBinding wrapper.
@@ -138,7 +137,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
     // blind, since nothing here exercises that path.
     const computedInitialValues = useMemo(() => {
         return autoApplyLocalChanges && localChangesDataRaw
-            ? mergeDeep(baseInitialValues, localChangesDataRaw as Partial<M>)
+            ? overlayEdit(baseInitialValues, localChangesDataRaw as Partial<M>)
             : baseInitialValues;
     }, [autoApplyLocalChanges, localChangesDataRaw, baseInitialValues]);
 
@@ -148,7 +147,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
         // the layout this one replaced. See {@link getUnappliedLocalChanges} for
         // why the banner is measured against that and not against the baseline.
         const openingValues = initialDirtyValues
-            ? mergeDeep(computedInitialValues, initialDirtyValues)
+            ? overlayEdit(computedInitialValues, initialDirtyValues)
             : computedInitialValues;
         return getUnappliedLocalChanges(
             localChangesDataRaw as Partial<M>,
@@ -193,8 +192,8 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
     const onValuesChangeDeferred = useCallback((values: M, controller: FormexController<M>) => {
         const key = (status === "new" || status === "copy") ? path + "#new" : path + "/" + entityId;
         if (controller.dirty) {
-            const touchedValues = removeEmptyContainers(extractTouchedValues(values, controller.touched));
-            if (touchedValues && Object.keys(touchedValues).length > 0) {
+            const touchedValues = getTouchedPropertyValues(values, controller.touched);
+            if (Object.keys(touchedValues).length > 0) {
                 saveEntityToCache(key, touchedValues);
             } else {
                 removeEntityFromCache(key);

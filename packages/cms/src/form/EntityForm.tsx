@@ -33,9 +33,9 @@ import type { EntityFormActionsProps } from "../types/components/EntityFormActio
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
 import { useUndoableDiscard } from "./useUndoableDiscard";
 
-import { mergeDeep } from "@rebasepro/utils";
 import {
     getChangedProperties,
+    overlayEdit,
     zodToFormErrors
 } from "./form_utils";
 
@@ -213,7 +213,7 @@ export function EntityForm<M extends Record<string, unknown>>({
      */
     const initialModifiedValues = useRef(
         initialDirtyValues && Object.keys(initialDirtyValues).length > 0
-            ? mergeDeep(baseInitialValues, initialDirtyValues)
+            ? overlayEdit(baseInitialValues as Partial<M>, initialDirtyValues as Partial<M>)
             : undefined
     ).current;
 

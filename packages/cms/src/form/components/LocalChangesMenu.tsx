@@ -23,7 +23,7 @@ import { useSnackbarController, useTranslation } from "@rebasepro/app";
 import { flattenKeys, removeEntityFromCache } from "@rebasepro/app";
 ;
 import { PropertyCollectionView } from "../../components/PropertyCollectionView";
-import { mergeDeep } from "@rebasepro/utils";
+import { overlayEdit } from "../form_utils";
 
 interface LocalChangesMenuProps<M extends Record<string, unknown>> {
     cacheKey: string;
@@ -55,7 +55,9 @@ export function LocalChangesMenu<M extends Record<string, unknown>>({
     };
 
     const handleApply = () => {
-        const mergedValues = mergeDeep(formex.values, cachedData, true);
+        // Each cached property whole, over what the form holds — see
+        // `overlayEdit` for why not a deep merge.
+        const mergedValues = overlayEdit(formex.values, cachedData) as M;
         const touched = { ...formex.touched };
         const cachedKeys = flattenKeys(cachedData);
         cachedKeys.forEach((key) => {
