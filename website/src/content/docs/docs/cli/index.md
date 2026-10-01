@@ -14,11 +14,7 @@ The Rebase CLI (`rebase`) manages your project from scaffolding to deployment.
 pnpm add -g @rebasepro/cli
 ```
 
-Or use via `pnpm dlx`:
-
-```bash
-pnpm dlx @rebasepro/cli <command>
-```
+Or run any command without installing it: `pnpm dlx @rebasepro/cli <command>`.
 
 ## Machine-readable output
 
@@ -108,12 +104,10 @@ Run the built bundle the way a deployment runs it:
 rebase start
 ```
 
-Reads `PORT` and the rest of `.env`, unlike `rebase dev`, and runs in whatever
-`NODE_ENV` the shell or `.env` sets. A scaffolded `.env` says `development`, so
-development behaviour stays on — the first account to register becomes the
-admin — and `rebase start` says so at the top of its output. For a production
-server, run it with `NODE_ENV=production`. Point it at a bundle elsewhere with
-`rebase start --bundle ./dist-bundle`.
+Reads `PORT` and the rest of `.env`, unlike `rebase dev`, in the `NODE_ENV` they
+set. A scaffolded `.env` says `development`, so the first account to register
+still becomes the admin, and `rebase start` says so at the top; set `NODE_ENV=production`
+for a production server. `rebase start --bundle ./dist-bundle` runs a bundle elsewhere.
 
 ### `rebase apps list`
 
@@ -193,9 +187,8 @@ rebase db backups list                  # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
-`backup` runs `pg_dump`; `restore` runs `pg_restore`, destructive, so it requires
-`--yes`. Scheduling, the roles file that travels with each dump and the restore
-procedure are in [Backups and restore](/docs/deployment/backups/).
+`backup` runs `pg_dump`; `restore` runs `pg_restore` and, being destructive, needs `--yes`.
+Scheduling, the roles file that travels with each dump, and the restore procedure are in [Backups and restore](/docs/deployment/backups/).
 
 ### `rebase db pull`
 

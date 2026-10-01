@@ -395,67 +395,10 @@ Each source's `key` must match a backend key registered in the server's `storage
 
 ## Caching and CDNs
 
-Every object is proxied through the server rather than redirected to a signed
-URL — a signed URL breaks on mixed content (an HTTPS page, an HTTP MinIO) and on
-endpoints only the cluster can reach. So the response headers are what make
-caching work.
-
-Each response carries a weak `ETag` and `Last-Modified`, built from the object's
-size and modification time. A client that already holds the object sends
-`If-None-Match` and gets **304 with no body**, so a repeat load costs a round
-trip instead of a transfer.
-
-`Cache-Control` depends on who may read the object:
-
-| Object | Header |
-|---|---|
-| Under the `public/` prefix, or `publicRead: true` | `public, max-age=60, stale-while-revalidate=86400, must-revalidate` |
-| Anything else | `private, max-age=60, must-revalidate` |
-| Image transforms | the same, with `max-age=3600` |
-
-`private` is deliberate: an object that needed credentials to fetch must not be
-stored by a shared cache, or a CDN can hand one user's file to the next caller.
-`Vary: Authorization` is sent for the same reason.
-
-Nothing is ever marked `immutable`. A storage key can be overwritten — writing
-to an existing key is an ordinary operation — so a promise never to revalidate
-would make a replaced file invisible until the window lapsed.
-
-### Seeking in audio and video
-
-Every object response carries `Accept-Ranges: bytes`, and a `Range` request is
-answered with `206 Partial Content` and a `Content-Range`. Without it a browser
-will not offer to seek in a media element served from here — and Safari refuses
-to play a `<video>` whose first response is not a `206` — so for media this is
-the difference between a working player and a broken one.
-
-- One range per request: `bytes=0-499`, `bytes=500-`, `bytes=-500`. That is what
-  browsers send for playback.
-- Multiple ranges in one header are answered with the whole object and a `200`,
-  which is always legal. Nothing that matters sends them.
-- A range starting past the end is a `416` with `Content-Range: bytes */<size>`,
-  not a silent whole-file response.
-- Revalidation wins over a range: a request carrying both `If-None-Match` and
-  `Range` gets the `304`.
-
-On local storage only the requested slice is read from disk. On S3 and GCS the
-object is still fetched whole — a `StorageController` has no ranged read — so the
-saving is on the response, not upstream.
-
-### Putting a CDN in front
-
-Because public objects are `public` with a `stale-while-revalidate` window and a
-validator, any ordinary reverse proxy or CDN can cache them with no extra
-configuration. Point it at the API origin and let it honour the headers.
-
-Two things to configure on the CDN itself:
-
-- **Respect `Vary: Authorization`**, or do not cache authenticated routes at all.
-  A CDN that ignores `Vary` and caches `private` responses is the failure this
-  header exists to prevent.
-- **Expect revalidation.** The short `max-age` means the CDN will re-ask
-  regularly; those requests are cheap 304s, and they are what keeps an
-  overwritten object from being served stale.
+Every object is proxied through the server, with an `ETag` for cheap
+revalidation, a `Cache-Control` that depends on who may read it, and byte ranges
+for seeking in audio and video. [Storage caching and CDNs](/docs/backend/storage-caching/)
+has the headers, and what to configure on a CDN in front.
 
 ## Production Tips
 
@@ -469,7 +412,7 @@ Set `STORAGE_TYPE=s3` or `gcs`. If a **durable volume** really is mounted at `ST
 
 - Mount a **persistent volume** if using local storage on Docker/Kubernetes, and set `FORCE_LOCAL_STORAGE=true`
 - Use **S3** or compatible (R2, MinIO), or **GCS**, for production deployments
-- Configure a **CDN** (CloudFront, Cloudflare) in front of your bucket for performance
+- Configure a **CDN** (CloudFront, Cloudflare) in front for performance — see [Putting a CDN in front](/docs/backend/storage-caching/#putting-a-cdn-in-front)
 - **Any app with storage in production must declare an access model** — see below.
   Not just multi-tenant ones: the server *refuses to boot* without one.
 

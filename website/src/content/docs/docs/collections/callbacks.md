@@ -29,19 +29,17 @@ executes them.
 | Use for | everything below | collections the panel talks to directly |
 
 **`callbacks` is the one you want.** It runs on every data path that reaches
-the server — REST, the SDK, realtime, MCP and `rebase.data` — so none of them
-routes around it, and its body never leaves the machine — an API key or a
-`process.env` read there is safe. The rest of this page is about `callbacks`.
+the server — REST, the SDK, realtime, MCP and `rebase.data` — and its body never
+leaves the machine, so an API key or a `process.env` read there is safe. The
+rest of this page is about `callbacks`.
 
 One writer is not a data path: **the auth system**. Registration, OAuth sign-in
-and the admin's user management write the users collection's rows directly, and
-run none of its `beforeSave`, `afterSave`, `beforeDelete` or `afterDelete`, so a
-welcome email in `afterSave` on `users` never fires on sign-up. Hang those side
-effects on the
-[auth hooks](/docs/backend/authentication/) — `afterUserCreate`,
-`beforeUserCreate`, `afterUserDelete` — instead. They are functions passed in
-`auth.hooks`, so they take an ejected backend; boot warns when the users
-collection declares callbacks that sign-up will not run.
+and the admin's user management write the users rows directly and run none of
+their callbacks, so a welcome email in `afterSave` on `users` never fires on
+sign-up. Hang it on the [auth hooks](/docs/backend/authentication/) passed in
+`auth.hooks` — `beforeUserCreate`, `afterUserCreate`, `afterUserDelete` — which
+take an ejected backend; boot warns when the users collection declares callbacks
+sign-up will not run.
 
 `admin.browserCallbacks` exists for one case: a collection on a `direct` or
 `custom` transport, which the panel reads and writes *itself* with no Rebase
@@ -284,8 +282,7 @@ afterSaveError: async ({
 
 It runs for a save that failed at the database or after it — not for a
 `beforeSave` refusal, a request refused before the write (validation, a missing
-permission, a 404), or a commit that is refused after the save returned. The
-full list is in [Hooks](/docs/backend/hooks/#when-aftersaveerror-runs).
+permission, a 404), or a commit refused after the save returned ([full list](/docs/backend/hooks/#when-aftersaveerror-runs)).
 
 On a request, it runs once the failed write's transaction has rolled back, not
 inside it. Its `context.data` is a fresh one for the same caller, where each call
@@ -297,11 +294,11 @@ webhook it enqueues commits and survives the failure it reports. A throw from
 
 Called after reading entities from the database. Transform the data for display.
 
-It shapes what a caller receives — the response to a read or a write, and its
-realtime frame — and nothing else. `afterSave`, `beforeDelete`, `afterDelete`
-and [history](/docs/backend/history) get the row as stored, so a value masked
-here is never what an audit entry records or what a revert writes back, and a
-computed field added here never reaches a write.
+It shapes what a caller receives — a read's or a write's response, and its
+realtime frame — and nothing else: `afterSave`, `beforeDelete`, `afterDelete` and
+[history](/docs/backend/history) get the row as stored: a value masked here is
+never what an audit records or a revert writes back, and a field added here is
+never written.
 
 ```typescript
 afterRead: async ({
@@ -425,25 +422,9 @@ afterSave: async ({ values, context }) => {
 
 ### Creating Entities
 
-```typescript
-afterSave: async ({ values, id, previousValues, context }) => {
-    // Promote an approved submission to a published job
-    if (values.status === "approved" && previousValues?.status !== "approved") {
-        const newJob = await context.data.jobs.create({
-            title: values.title,
-            description: values.description,
-            company_id: values.company_id,
-            status: "published",
-            source_submission_id: id,
-        });
-
-        // Link back to the original submission
-        await context.data["job-submissions"].update(id, {
-            promoted_job_id: newJob.id,
-        });
-    }
-}
-```
+`.create()` and `.update()` take the values to write, with the signatures above.
+[Syncing Data Between Collections](#syncing-data-between-collections) uses both:
+an approved submission creates a published job and is linked back to it.
 
 ### Security: which privileges `context.data` runs with
 
@@ -467,8 +448,8 @@ afterSave: async ({ context }) => {
     // is an admin's reach, not a bypass: a collection whose only rule is
     // `policy.serverContext()` stays closed to it, since that compiles to
     // `rebase.uid() IS NULL` and this accessor's uid is `service`.
-    // `dataAsAdmin` is always there on the server, where `callbacks` run; its
-    // type allows for the browser SDK, which has none — hence the `!`.
+    // `dataAsAdmin` is always there server-side; its type allows for the
+    // browser SDK, which has none — hence the `!`.
     await context.client.dataAsAdmin!.audit_logs.create({ action: "approved" });
 }
 ```

@@ -21,19 +21,11 @@ see [The remote endpoint](#the-remote-endpoint).
 
 ## Connecting a client
 
-The server runs from your project: `@rebasepro/mcp` is a devDependency of every
-project `rebase init` scaffolds, pinned to the same version as the CLI and the
-backend it drives, and each block below starts that copy through the project's
-package manager (`pnpm exec rebase-mcp`; `npx --no rebase-mcp` in an npm
-project). A server fetched from npm at every start would run ahead of the
-project it acts on. Every block below is the whole integration.
-
-In a project made before this, add it once — `rebase skills install --mcp`
-does, or by hand:
-
-```bash
-pnpm add -D @rebasepro/mcp
-```
+The server runs from your project: `@rebasepro/mcp` is a devDependency every
+`rebase init` scaffold pins with the CLI, and each block below — the whole
+integration — starts that copy (`pnpm exec rebase-mcp`, or `npx --no rebase-mcp`
+in an npm project), never a newer one from npm. An older project adds it once,
+with `rebase skills install --mcp` or `pnpm add -D @rebasepro/mcp`.
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> `rebase init` writes the block for each agent you pick when it
 [sets up your AI coding agents](/docs/ai/skills#set-up-by-rebase-init), keeping
@@ -137,9 +129,8 @@ an explicit transport:
 ```
 
 **Windsurf** reads MCP servers only from its user-level config, so there is no
-project file to write. Add the server in Windsurf's MCP settings, started from
-the project — `"command": "pnpm", "args": ["--dir", "/absolute/path/to/your/project", "exec", "rebase-mcp"]`
-— with the same absolute path as `REBASE_PROJECT_DIR`.
+project file to write. Add the server in its MCP settings as `"command": "pnpm"`,
+`"args": ["--dir", "/absolute/path/to/your/project", "exec", "rebase-mcp"]`, with that path as `REBASE_PROJECT_DIR`.
 
 Any MCP client that can spawn a stdio server works; the shape is the same.
 
@@ -366,10 +357,8 @@ shaped like a marker is broken with a zero-width space, so a row that prints
 `<<<END_UNTRUSTED_DATA>>>` cannot end the envelope early and put what follows it
 outside.
 
-The [remote endpoint](#the-remote-endpoint) fences every tool result the same
-way, and says so in its `initialize` instructions and in the description of each
-tool that returns rows. Its `structuredContent` carries the plain result, which
-is data by type.
+The [remote endpoint](#the-remote-endpoint) fences its tool results the same
+way and says so to the client; its `structuredContent` carries the plain result.
 
 It is a marker, not a sandbox. An assistant holding these tools is only as safe
 as the content you let it read.
@@ -572,21 +561,17 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   `create_document`, `update_document` and `delete_document`. A scope decides
   which tools are offered, not which rows: an empty list can be RLS working, and
   `mcp:write` still cannot write a row the person could not.
-- **The SDK's vocabulary, REST's answers.** The tools take the arguments the SDK
-  and the local server take — `where` (`{"status": ["==", "paid"]}`), `orderBy`
-  (`["created_at", "desc"]` or `"created_at:desc"`), `limit`, `offset`,
-  `searchString`, and `data` for a write — and read through the same path as
-  `GET /api/data/<collection>`. A row comes back exactly as REST serves it (dates
-  as ISO strings, a `belongsTo` as its foreign key, e.g. `authorId`), so a row
-  read can be sent back in an update unchanged. `query_collection` answers
-  REST's list body, `{ data, meta }` with `meta.total` and `meta.hasMore`;
-  `count_documents` answers `{ count }`. `list_collections` describes each
-  collection with the JSON Schemas REST's OpenAPI document publishes for it:
-  `row` (required fields, enum values, foreign keys) and `create` (what
-  `create_document` takes), plus `softDeleteField` where rows go to a trash. A `limit` above 1000 is refused, as on
-  REST, and so is an argument a tool does not declare. An edit or delete of a
-  row in the trash is refused, as REST refuses it with a 404; setting the
-  soft-delete field back to `null` restores it.
+- **The SDK's vocabulary, REST's answers.** The tools take what the SDK takes —
+  `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` or
+  `"created_at:desc"`), `limit`, `offset`, `searchString`, and `data` for a
+  write — and read through `GET /api/data/<collection>`'s path, so a row comes
+  back as REST serves it (ISO dates, a `belongsTo` as its foreign key, e.g.
+  `authorId`) and can be sent back in an update unchanged. `query_collection`
+  answers `{ data, meta }` with `meta.total` and `meta.hasMore`, `count_documents`
+  `{ count }`, and `list_collections` each collection's OpenAPI `row` and
+  `create` schemas, plus `softDeleteField` where rows go to a trash. As on REST,
+  a `limit` above 1000, an undeclared argument and an edit or delete of a trashed
+  row (404) are refused; setting the soft-delete field to `null` restores it.
 - **A token for this endpoint only.** An MCP access token is refused by
   `/api/data`, `/api/admin` and the WebSocket, so connecting an assistant does not
   hand it a session.
