@@ -9,7 +9,7 @@ description: Abonnez-vous aux modifications de données en direct avec le SDK ty
 
 Le SDK typé de Rebase fournit des abonnements aux données en temps réel via WebSocket. Lorsque des enregistrements changent sur le serveur, vos rappels (callbacks) abonnés se déclenchent immédiatement avec les données mises à jour.
 
-La connexion WebSocket est établie automatiquement lorsqu'une `websocketUrl` est disponible (dérivée de `baseUrl` par défaut). La reconnexion et le rafraîchissement des jetons sont gérés de manière transparente.
+La connexion WebSocket est établie automatiquement lorsqu'une `websocketUrl` est disponible (dérivée de `baseUrl` par défaut). La reconnexion et le rafraîchissement des jetons sont pris en charge pour vous. Une coupure qui dure plus d'environ 15 secondes est signalée une seule fois, à l'`onError` de chaque abonnement, sous la forme `CONNECTION_LOST` — voir [Authentification et reconnexion](#authentification-et-reconnexion).
 
 ## S'abonner à une collection
 
@@ -209,7 +209,29 @@ Le client WebSocket gère l'authentification automatiquement :
 
 - Lors de la **connexion** ou du **rafraîchissement de jeton**, le nouveau jeton est envoyé à un socket déjà ouvert via un message `authenticate`. Si aucun socket n'est ouvert, rien ne se passe — se connecter n'est pas une demande d'activation du temps réel, et un socket ouvert ultérieurement s'authentifie de lui-même.
 - Lors de la **déconnexion**, la connexion WebSocket est coupée. Le client reste utilisable ; un abonnement ultérieur se reconnectera de façon anonyme.
-- Si la connexion est perdue, le client **se reconnecte automatiquement** et rétablit tous les abonnements actifs.
+- Si la connexion est perdue, le client **se reconnecte automatiquement** et rétablit tous les abonnements actifs. Il n'arrête jamais d'essayer tant qu'il existe un abonnement ou un canal rejoint ; le délai entre les tentatives croît jusqu'à 30 secondes au maximum.
+- Si la connexion reste coupée pendant plus d'environ 15 secondes, l'`onError` de chaque abonnement (et celui de chaque canal rejoint) est appelé **une seule fois** avec une `RebaseApiError` dont le `code` est `CONNECTION_LOST`. L'abonnement n'est pas terminé : continuez à afficher ce que vous avez, marquez-le comme potentiellement obsolète, et attendez. Une fois le socket de retour, le prochain `onUpdate` de l'abonnement porte tout ce qui a été écrit pendant ce temps.
+- `client.ws.state` est l'état de la connexion — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` ou `closed` — et `client.ws.onStateChange(listener)` est informé de chaque changement. `disconnected` est l'état dans lequel `CONNECTION_LOST` a été signalé.
+- Les requêtes envoyées sur le socket sont **au plus une fois (at-most-once)**. Celle qui était en cours d'envoi au moment de la coupure échoue avec `CONNECTION_LOST` et n'est jamais renvoyée, car le serveur l'a peut-être déjà exécutée. Celle qui attend toujours un socket après 30 secondes échoue avec `REQUEST_TIMEOUT` sans avoir été envoyée.
+
+```typescript
+import { RebaseApiError } from "@rebasepro/client";
+
+const unsubscribe = client.data.orders.listen(
+    { where: { status: ["==", "open"] } },
+    (response) => {
+        setOrders(response.data);
+        setStale(false);
+    },
+    (error) => {
+        if (error instanceof RebaseApiError && error.code === "CONNECTION_LOST") {
+            setStale(true); // keep the rows; the next update clears it
+            return;
+        }
+        setError(error);
+    }
+);
+```
 
 Aucune gestion manuelle des jetons n'est nécessaire — l'intégration entre `client.auth` et la couche WebSocket est gérée en interne.
 

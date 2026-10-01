@@ -19,8 +19,8 @@ Les deux fonctionnalités sont disponibles sur chaque collection. L'exportation 
 2. Cliquez sur le bouton **Import** dans la barre d'outils
 3. Sélectionnez ou glissez-déposez votre fichier
 4. Mappez les colonnes du fichier aux propriétés de la collection
-5. Prévisualisez les données et corrigez les éventuelles erreurs de validation
-6. Cliquez sur **Import** pour enregistrer toutes les entités
+5. Prévisualisez les données, y compris les valeurs qui ne peuvent pas être converties
+6. Cliquez sur **Save data** pour écrire les lignes
 
 ### Formats pris en charge
 
@@ -36,16 +36,31 @@ L'assistant d'importation tente automatiquement de faire correspondre les colonn
 
 - Les **correspondances exactes** sont mappées automatiquement (par ex. `name` → `name`)
 - Les **colonnes non reconnues** peuvent être mappées manuellement ou ignorées
-- La **coercition de type** gère la conversion de chaîne en nombre, de chaîne en booléen ainsi que l'analyse des dates
+- La **conversion de type** transforme chaque cellule dans le type de la propriété à laquelle elle est associée, mais uniquement lorsque rien n'est perdu (voir ci-dessous)
 
-### Validation
+### Conversion de type
 
-Avant l'importation, l'assistant valide toutes les lignes par rapport aux définitions de propriétés de votre collection :
+Une cellule n'est convertie que lorsque le type de la propriété peut contenir exactement ce qu'elle indique :
 
-- Les champs obligatoires doivent être présents
-- Les valeurs énumérées doivent correspondre aux options définies
-- Les types de données doivent être compatibles (par exemple, une valeur textuelle pour un champ numérique sera signalée)
-- Les erreurs de validation sont affichées ligne par ligne afin que vous puissiez les corriger avant l'importation
+| Type de propriété | Convertit | Ne convertit pas |
+|---|---|---|
+| Nombre | `12`, `-3.5`, `10.00`, `1e3` | `02134` (un zéro initial serait perdu), les nombres de plus de 15 chiffres significatifs, `1,234`, `$5.00`, `12%`, `N/A` |
+| Booléen | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, quelle que soit la casse | tout le reste |
+| Date | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), dates en toutes lettres (`5 Jan 2024`), `05/01/2024`, secondes ou millisecondes epoch | un texte qui ne désigne aucune date |
+
+Une date sans heure correspond à ce jour-là en UTC. Pour les dates écrites `05/01/2024`, c'est la colonne qui décide de l'ordre : un premier nombre supérieur à 12 fait de la colonne un format jour-mois, un second nombre supérieur à 12 en fait un format mois-jour. Quand une colonne ne le précise jamais, c'est la locale du navigateur qui décide, et quand elle contient les deux ordres, une date que l'un ou l'autre ordre pourrait lire n'est pas convertie.
+
+Une cellule vide n'est pas une valeur : elle ne définit rien, et la valeur par défaut choisie pour cette propriété s'applique.
+
+### Valeurs qui ne peuvent pas être importées
+
+L'aperçu liste chaque cellule qui ne se convertit pas, par colonne, avec leur nombre et les premières d'entre elles par ligne et par raison. Ces cellules sont laissées vides dans les lignes importées ; rien n'est transformé en `0`, `false` ou une valeur vide sans être listé. Revenez en arrière pour associer la colonne à une autre propriété, ou corrigez le fichier et téléchargez-le à nouveau.
+
+Les propres règles de la collection — champs obligatoires, options d'énumération, valeurs uniques — sont vérifiées par le serveur au fur et à mesure que les lignes sont écrites, par lots de 25. Si une ligne est refusée, l'importation s'arrête et la désigne ; les lignes qui la précèdent sont déjà enregistrées, et **Retry** reprend à partir de la ligne refusée.
+
+### Créer une collection à partir d'un fichier
+
+Lorsque vous créez une collection à partir d'un fichier, le type de chaque colonne est déduit de ses valeurs. Une colonne n'est un nombre que si chacune de ses valeurs est un nombre, ou un texte qui se convertit en un nombre exactement, si bien qu'une colonne de codes postaux, de codes produits à zéros initiaux, de longs SKU ou de numéros de téléphone reste du texte. Une colonne qui mélange les types (nombres et mots, booléens et nombres) est du texte. Les cellules vides ne comptent pas, si bien qu'une colonne majoritairement vide n'est pas marquée comme obligatoire.
 
 ### Configuration de l'importation
 

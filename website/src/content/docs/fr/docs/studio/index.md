@@ -39,7 +39,7 @@ un navigateur qui a utilisé le panneau avant 0.17.0 détient l'ancienne valeur
 
 ### Éditeur de collection
 
-Un éditeur de schéma visuel qui vous permet de créer et de modifier des collections via une interface utilisateur glisser-déposer. Lorsque vous enregistrez les modifications, il utilise [ts-morph](https://ts-morph.com/) pour mettre à jour vos fichiers sources TypeScript via la manipulation d'AST — en préservant tout le code existant et la logique personnalisée. C'est la capture d'écran en haut de cette page.
+Un éditeur de schéma visuel qui vous permet de créer et de modifier des collections via une interface utilisateur glisser-déposer. Lorsque vous enregistrez les modifications, il utilise [ts-morph](https://ts-morph.com/) pour écrire les clés que vous avez modifiées — et uniquement celles-ci — dans vos fichiers sources TypeScript, en laissant le reste de chaque fichier tel qu'il était : imports, commentaires, mise en forme, gestionnaires, propriétés partagées. Une modification portant sur quelque chose que le fichier définit en code, comme une propriété importée d'un autre module, est refusée avec l'endroit où l'effectuer. C'est la capture d'écran en haut de cette page.
 
 L'éditeur est actif partout où Studio est monté — le `<RebaseStudio/>` d'un scaffold suffit, et il n'y a aucune prop à ajouter. `collectionEditor` le règle, il ne l'active pas :
 

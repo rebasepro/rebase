@@ -55,9 +55,11 @@ Tous les types de propriétés partagent ces options :
 :::note[Ce que signifie « formulaire d'administration uniquement »]
 Plusieurs options ci-dessous portent cette mention : elles configurent le formulaire généré par le panneau et
 rien d'autre — l'API accepte une écriture qui les ignore, et aucune contrainte
-ne les applique en base. Une règle qui doit s'appliquer à chaque appelant est une
-[règle de validation](/docs/collections/validation-and-conditions/) ou une
-[règle de sécurité](/docs/collections/security-rules/).
+ne les applique en base. Une règle qui doit s'appliquer à chaque appelant de l'API est une
+[règle de validation](/docs/collections/validation-and-conditions/) — vérifiée sur les
+écritures REST, socket et MCP, [mais pas sur les écritures internes au processus](/docs/collections/validation-and-conditions/#where-validation-runs)
+— ou une [règle de sécurité](/docs/collections/security-rules/), que la base de
+données applique pour tout le monde.
 :::
 
 ### Configuration de l'interface utilisateur (`admin`)
@@ -80,6 +82,7 @@ price: {
 |-----------|------|-------------|
 | `admin.readOnly` | `boolean` | Empêche la modification |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Désactive avec infobulle optionnelle |
+| `admin.filledByServer` | `boolean` | Le serveur remplit le champ lorsqu'un nouvel enregistrement le laisse vide (un hook `beforeSave`). Le formulaire laisse passer une création sans lui ; il reste requis à l'édition, et les propres vérifications du serveur continuent de s'appliquer |
 | `admin.hideFromCollection` | `boolean` | Masque de la vue en tableau |
 | `admin.columnWidth` | `number` | Largeur de colonne en pixels (vue en tableau) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Largeur du champ sur la grille de formulaire à quatre colonnes |
@@ -296,6 +299,8 @@ chargement de la configuration plutôt qu'ignorée silencieusement : les clés p
 une configuration en déclarant deux doit être interprétée comme une demande que Rebase ne peut pas satisfaire. Si
 vous souhaitiez définir une contrainte d'unicité sur plusieurs colonnes, il s'agit d'un
 [index](/docs/backend/indexes) unique.
+
+Une collection dont aucune propriété ne revendique `isId` reçoit sa propre colonne `id` : `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. La base de données la remplit, si bien qu'une ligne créée depuis le panneau d'administration, l'API REST ou le SDK n'a besoin d'aucune clé, et une clé que vous envoyez vous-même est utilisée telle quelle. Une table créée avant l'existence de cette valeur par défaut la reçoit au démarrage suivant.
 :::
 
 ## Propriétés numériques (Number)

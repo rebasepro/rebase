@@ -126,12 +126,21 @@ export const enums = {  };
 export const relations = {  };
 ```
 
-Two things in there are worth reading twice. The `id` column you did not
-declare: every collection gets a `text` primary key unless a property claims
-`isId`. And the `pgPolicy` block: row level security is enabled on every table,
-and those baseline policies are what keep the trusted server context and the
-`admin` role able to read it at all — see
-[Security Rules](/docs/collections/security-rules).
+Trois choses méritent d'être lues deux fois. La colonne `id` que vous n'avez pas
+déclarée : chaque collection reçoit une clé primaire `text`, sauf si une propriété
+revendique `isId`, et la base de données la remplit avec un uuid
+(`gen_random_uuid()::text`), si bien qu'une ligne créée depuis le panneau
+d'administration, l'API REST ou le SDK n'a besoin d'aucune clé propre. Une clé que vous
+envoyez vous-même est utilisée telle quelle. Le bloc `pgPolicy` : la sécurité au
+niveau des lignes est activée sur chaque table, et ces politiques de base sont ce
+qui permet au contexte serveur de confiance et au rôle `admin` de la lire malgré
+tout — voir les [Règles de sécurité](/docs/collections/security-rules). Et
+`active`, qui porte la `defaultValue` que vous avez écrite comme valeur par
+défaut de **colonne** : une `defaultValue` littérale se compile en un vrai
+`DEFAULT`, de sorte qu'une ligne insérée par l'API REST, un script de seed ou
+`psql` la reçoit elle aussi, pas seulement celle saisie dans le panneau
+d'administration. Une valeur par défaut de type `reference` ou `vector` n'est pas
+un littéral de colonne et reste une valeur au niveau de l'application.
 
 Ce qui produit ce SQL :
 

@@ -68,6 +68,16 @@ const ordersCollection = defineCollection({
    - L'action (`create`, `update`, `delete`)
    - Un tableau de `changed_fields` indiquant les colonnes qui ont été modifiées
 
+Les valeurs sont la ligne telle que l'API REST la fournit : ses colonnes, les
+dates en timestamps, une relation `belongsTo` sous sa clé étrangère. C'est ce
+qu'un retour en arrière (revert) réécrit.
+
+Sur une collection avec le [soft delete](/docs/collections/soft-delete/), une
+suppression est enregistrée comme `delete` et une restauration (la mise à jour
+qui remet le champ de soft delete à `null`) comme `update`. L'historique d'une
+ligne reste lisible pendant qu'elle est dans la corbeille, et revenir à une
+version antérieure à la suppression la restaure.
+
 ### Suivi des différences et égalité structurelle en profondeur
 
 Pour éviter d'enregistrer des journaux redondants lorsque des champs sont enregistrés sans changement de valeur, le `HistoryService` effectue une comparaison d'égalité structurelle en profondeur (deep equality) sur les clés de premier niveau des anciennes et nouvelles valeurs :

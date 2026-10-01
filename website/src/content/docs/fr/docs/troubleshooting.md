@@ -120,14 +120,27 @@ DB_PERMISSION_DENIED — Permission denied by the database on "notes"
 SQLSTATE `42501`. Deux problèmes distincts peuvent survenir sous ce code, et le
 message les différencie :
 
-- **Une stratégie de sécurité au niveau des lignes (RLS) a refusé la ligne.**
-  Le système de contrôle d'accès fonctionne ; l'appelant a demandé une action que
-  ses règles n'autorisent pas. Vérifiez les `securityRules` de la collection, et
-  exécutez `npx @rebasepro/rls-check` pour effectuer un audit en lecture seule
-  de ce que la base de données appliquera réellement.
-- **Le rôle ne dispose pas des privilèges nécessaires (`GRANT`).** Rien dans la
-  requête ne pourra corriger cela — le rôle de connexion ne peut pas du tout
-  accéder à la table. Il s'agit d'un problème de déploiement.
+- **Une stratégie de sécurité au niveau des lignes (RLS) a refusé la ligne** —
+  le message ci-dessus. Le système de contrôle d'accès fonctionne ; l'appelant a
+  demandé une action que ses règles n'autorisent pas. Vérifiez les
+  `securityRules` de la collection, et exécutez `npx @rebasepro/rls-check` pour
+  effectuer un audit en lecture seule de ce que la base de données appliquera
+  réellement.
+- **Le rôle ne dispose pas des privilèges nécessaires (`GRANT`).** Le message
+  nomme alors l'objet concerné :
+
+  ```
+  DB_PERMISSION_DENIED — Permission denied by the database: the role this request
+  runs as has no privilege on schema "rebase". That is a missing GRANT to that
+  role, not a row-level security policy.
+  ```
+
+  Rien dans la requête ne pourra corriger cela — le rôle sous lequel les requêtes
+  s'exécutent ne peut absolument pas accéder à cet objet. Le serveur accorde à
+  son rôle de requête les droits sur les schémas qu'il provisionne, au démarrage ;
+  un objet créé en dehors de ceux-ci (par un autre rôle, ou dans un schéma
+  qu'aucune collection ne déclare) nécessite son propre `GRANT`. Il s'agit d'un
+  problème de déploiement.
 
 Une lecture exclue par RLS n'est pas considérée comme une erreur : les lignes
 sont filtrées et vous obtenez une page vide. Si une collection apparaît vide pour

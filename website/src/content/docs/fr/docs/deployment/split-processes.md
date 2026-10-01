@@ -206,6 +206,9 @@ la configuration) dès que plus d'un processus dessert des websockets.
 **Le scale to zero (mise à l'échelle vers zéro).** Rien ici ne permet de réduire un processus à zéro ou d'en instancier un
 à la demande. C'est une capacité de la plateforme, pas du runtime.
 
+Tout le reste de ce qu'un processus garde pour lui se trouve sur une seule liste :
+[Exécuter plus d'une instance](/docs/deployment/multiple-instances/).
+
 ## Déployer une unité de manière autonome
 
 Tout ce qui a été décrit ci-dessus sépare *l'endroit où s'exécute le travail*. L'ensemble est toujours livré sous

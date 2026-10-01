@@ -59,7 +59,7 @@ Il démarre les deux parties ensemble :
 Les deux ports sont **dérivés du chemin de ce projet** plutôt que d'être fixes, ce qui permet à plusieurs
 projets Rebase de fonctionner côte à côte. `rebase dev` affiche les deux URL associées —
 **utilisez celles-ci**, et non `localhost:3001` / `localhost:5173`. (`PORT` et `VITE_API_URL`
-dans `.env` configurent `rebase start`, le serveur de production, et sont ignorés ici.)
+dans `.env` configurent `rebase start`, qui exécute le bundle compilé, et sont ignorés ici.)
 Fixez un port avec `rebase dev --port 3001`.
 
 ### Options utiles à connaître
@@ -95,11 +95,10 @@ pour comparaison, alors que PGlite n'en dessert qu'une seule :
 pnpm run db:push
 ```
 
-Le démarrage crée déjà les tables manquantes de manière additive, `db push` sert donc pour les deux
-cas délibérément laissés de côté : le [RLS](/docs/collections/security-rules/) (Row-Level Security de PostgreSQL,
-mécanisme par lequel Rebase contrôle qui peut lire une ligne) sur les tables de jonction
-pour les relations plusieurs-à-plusieurs, et toute modification qui n'est pas purement additive — une colonne renommée, un
-type restreint, un champ supprimé.
+Le démarrage crée déjà les tables manquantes — et leurs politiques [RLS](/docs/collections/security-rules/)
+(Row-Level Security de PostgreSQL, mécanisme par lequel Rebase contrôle qui peut lire une ligne) —
+de manière additive, donc `db push` sert pour ce qu'il laisse délibérément de côté : toute modification
+qui n'est pas purement additive — une colonne renommée, un type restreint, un champ supprimé.
 
 Le scaffold fournit également un fichier `docker-compose.yml` avec un service PostgreSQL, si vous
 préférez un conteneur à une installation locale de Postgres :
@@ -130,7 +129,7 @@ Lorsque vous ouvrez l'URL frontend affichée par `rebase dev`, vous verrez l'éc
 
 ## Définir votre première collection
 
-Ouvrez `config/collections/` et créez un nouveau fichier. Exportez la collection en tant qu'**export par défaut** — c'est ainsi que le registre la détecte. Le nom de la table est optionnel : il utilise par défaut le slug, ne le définissez donc que lorsqu'ils diffèrent :
+Ouvrez `config/collections/` et créez un nouveau fichier. Exportez la collection en tant qu'**export par défaut** — c'est ce que le backend et le panneau d'administration chargent depuis chaque fichier du répertoire. Le nom de la table est optionnel : il utilise par défaut le slug, ne le définissez donc que lorsqu'ils diffèrent :
 
 ```typescript title="config/collections/products.ts"
 import { defineCollection } from "@rebasepro/cms-types";
@@ -170,7 +169,7 @@ const productsCollection = defineCollection({
 export default productsCollection;
 ```
 
-Ensuite, enregistrez-la dans `config/collections/index.ts` afin que le backend et le panneau d'administration en aient connaissance :
+Ajoutez-la ensuite au tableau `collections` dans `config/collections/index.ts`. Ce tableau est un ordre de tri, pas un registre : chaque fichier de collection du répertoire est chargé — par le backend, le panneau d'administration et le générateur de SDK — qu'il figure ou non dans le tableau, et le tableau décide seulement de sa place dans la navigation. Pour supprimer une collection, supprimez son fichier :
 
 ```typescript title="config/collections/index.ts" {2,5}
 // ...existing imports
@@ -188,12 +187,14 @@ Enregistrez le fichier. C'est tout ce qu'il y a à faire : `rebase dev` régén�
 collections, redémarre le backend, et le démarrage crée la nouvelle table — votre collection
 **Products** apparaît alors dans la navigation.
 
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> pour les types du SDK : sur la 0.23, `rebase dev` ne régénère que le schéma, exécutez donc
+`rebase generate-sdk` après une modification de collection avant d'importer ses types.
+
 Il en va de même pour une propriété ajoutée à une collection existante : sauvegardez,
 et la colonne est créée.
 
 `rebase db push` est réservé aux modifications que le démarrage ignore délibérément — une colonne
-renommée, un type restreint, un champ supprimé, et le RLS sur les tables de jonction pour les
-relations plusieurs-à-plusieurs. Cela nécessite votre propre PostgreSQL :
+renommée, un type restreint, un champ supprimé. Cela nécessite votre propre PostgreSQL :
 
 ```bash
 pnpm run db:push

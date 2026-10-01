@@ -13,6 +13,14 @@ Au-delà des verbes, les routes d'écriture acceptent cinq éléments qui modifi
 
 Le corps d'une écriture doit être un objet JSON. `null`, un nombre, une chaîne ou un tableau donne un `400 BAD_REQUEST`.
 
+Une mise à jour ne peut pas changer la clé d'une ligne. Un corps qui nomme la clé
+avec une autre valeur donne un `400 KEY_IMMUTABLE`, avant l'exécution de tout hook
+et sans rien écrire, quel que soit le chemin par lequel la mise à jour arrive :
+REST, le socket temps réel, MCP ou `rebase.data` en interne. La clé que la ligne
+possède déjà est acceptée, comme l'envoie un formulaire qui renvoie la ligne
+entière. Pour déplacer une ligne vers une nouvelle clé, créez-la à cet
+emplacement puis supprimez l'ancienne.
+
 ### Idempotence
 
 `Idempotency-Key: <uuid>` sur n'importe quelle écriture signifie « si vous avez déjà répondu à cette requête exacte, renvoyez la même réponse plutôt que de l'exécuter deux fois ».
@@ -97,7 +105,7 @@ Indiquer une cible sans `upsert: true` lors d'une écriture en masse renvoie ég
 
 `?on_conflict=` est refusé sur une création imbriquée (`INVALID_CONFLICT_TARGET`). La ligne qu'il trouverait pourrait se trouver sous un autre parent, et l'upsert la déplacerait sous celui-ci. Envoyez l'upsert à la route propre de la collection.
 
-Un upsert qui rencontre une ligne stockée est une mise à jour de celle-ci. Le serveur lit la ligne désignée par la clé, dans la portée de l'appelant et au sein de la transaction de l'écriture, puis exécute la mise à jour ordinaire : les champs du corps sont écrits, ceux qu'il omet conservent leurs valeurs stockées au lieu d'être réinitialisés à leur `defaultValue`, `beforeSave` et `afterSave` voient `status: "existing"` avec les valeurs précédentes, et l'historique enregistre une mise à jour. Une ligne que la lecture n'a pas pu voir, ou une ligne insérée de manière concurrente, est tout de même interceptée par `ON CONFLICT … DO UPDATE`, qui ne définit que ce que le corps et les hooks ont écrit, ainsi que les horodatages `on_update`. Une clé qui désigne une ligne hors de la portée `beforeQuery` de l'appelant répond `404`.
+Un upsert qui rencontre une ligne stockée est une mise à jour de celle-ci. Le serveur lit la ligne désignée par la clé, dans la portée de l'appelant et au sein de la transaction de l'écriture, puis exécute la mise à jour ordinaire : les champs du corps sont écrits, ceux qu'il omet conservent leurs valeurs stockées au lieu d'être réinitialisés à leur `defaultValue`, `beforeSave` et `afterSave` voient `status: "existing"` avec les valeurs précédentes, et l'historique enregistre une mise à jour. Une ligne que la lecture n'a pas pu voir, ou une ligne insérée de manière concurrente, est tout de même interceptée par `ON CONFLICT … DO UPDATE`, qui ne définit que ce que le corps et les hooks ont écrit, ainsi que les horodatages `on_update`. Une clé qui désigne une ligne hors de la portée `beforeQuery` de l'appelant répond `404`. Une clé qui appartient à une ligne dans la [corbeille](/docs/collections/soft-delete/) répond `409 ROW_IN_TRASH` et n'écrit rien : restaurez d'abord la ligne, ou purgez-la.
 
 Une ligne qui existait déjà conserve son horodatage `on_create` et son créateur `user_on_create`. Un conflit signifie que la création de la ligne est un fait passé, et un réimport nocturne réinitialisant `createdAt` sur chaque élément touché fausserait toutes les requêtes du type « nouveautés de la semaine ».
 

@@ -226,6 +226,30 @@ Vous n'avez pas à choisir entre Rebase et Drizzle. Le bootstrapper compile vos 
 ### Vidange propre des connexions (Graceful Connection Draining)
 Dans les environnements serverless ou les orchestrateurs (comme Kubernetes), la terminaison de pods peut entraîner des connexions interrompues. Implémentez toujours des gestionnaires de signaux qui appellent `realtimeProvider.stopListening()` (ce qui met fin au client pg LISTEN dédié) et `pool.end()` afin d'éviter la fuite d'emplacements de connexion sur votre serveur de base de données.
 
+### CORS pour un frontend navigateur
+Un serveur personnalisé possède sa propre configuration CORS, et un frontend sur une
+autre origine ne peut lire que les en-têtes de réponse qu'elle expose. Exposez ceux
+que le SDK lit, sans quoi `etagOf(row)` y vaut toujours `undefined` — une écriture
+`ifMatch` part alors sans `If-Match` — et un 429 perd son `Retry-After` :
+
+```typescript
+import express from "express";
+import cors from "cors";
+
+const app = express();
+app.use(cors({
+    origin: ["https://app.example.com"],
+    credentials: true,
+    exposedHeaders: [
+        "ETag", "Retry-After", "X-Request-ID",
+        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
+        "Preference-Applied"
+    ]
+}));
+```
+
+Le runtime Rebase et le backend éjecté envoient déjà cette liste.
+
 ## Liens connexes
 
 - [Backend Overview](/docs/backend/) — où réside chaque option lorsque le runtime démarre à la place

@@ -177,8 +177,8 @@ data[0].author?.name;   // "Jane Doe"
 
 Un type `Database` généré type précisément les trois : `Insert` et `Update` acceptent
 l'une ou l'autre des syntaxes d'écriture, `Row` possède `authorId` sans condition, et `author` est
-facultatif sur `Row` et **requis** sur la ligne renvoyée par une lecture avec `include` —
-voir [Includes typés](#typed-includes).
+facultatif sur `Row` — `RowWith<"posts", ["author"]>` est la ligne avec cette relation
+**requise**, pour une lecture qui l'a demandée. Voir [Includes typés](#typed-includes).
 
 Le seul cas où les trois formes se confondent est celui d'une relation nommée de manière identique à sa propre
 clé étrangère. Dans ce cas, la ligne incluse est servie *par-dessus* la colonne, et le
@@ -199,9 +199,12 @@ const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
 `IncludeFor<A>` restreint les clés d'un include aux relations existantes, à chaque
-niveau. `RowWith<A, I>` est la ligne que cette lecture renvoie, où chaque relation incluse
-est rendue **requise** — ainsi, après avoir demandé l'auteur, `row.author.name`
-n'a pas besoin de `?.`.
+niveau — et un client typé vérifie `include` de la même manière, dans `find({ include })`
+et dans `.include(...)`, si bien que `posts.include("authr")` est une erreur de compilation plutôt
+qu'une 400 `UNKNOWN_RELATION`. Les lignes qu'une lecture renvoie continuent de typer chaque relation
+comme facultative ; `RowWith<A, I>` est cette ligne avec chaque relation incluse rendue
+**requise**, pour annoter ce que vous lisez — ainsi, après avoir demandé l'auteur,
+un `RowWith<"posts", ["author"]>` n'a besoin d'aucun `?.` sur `row.author.name`.
 
 Sans `Database` généré, `include` reste un simple `string[]` ou un arbre : un
 type de ligne écrit manuellement ne contient aucune relation à valider, et le code

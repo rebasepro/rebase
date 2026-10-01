@@ -147,7 +147,9 @@ const client = createRebaseClient({
 });
 ```
 
-La cascade est étroite : un `update` est écarté en même temps que l'écriture qu'il modifiait, car il ne peut échouer que de la même manière. Un `create` ou un `delete` ultérieur portant sur la même ligne se suffit à lui-même et est conservé.
+La cascade est étroite : un `update` est écarté en même temps que l'écriture qu'il modifiait, car il ne peut échouer que de la même manière. Un `create` ou un `delete` ultérieur portant sur la même ligne se suffit à lui-même et est conservé. Une écriture écartée n'a jamais été envoyée, et elle est signalée avec une `RebaseApiError` dont le `code` est `DEPENDENCY_REJECTED` et dont la `cause` est le refus qui l'a condamnée, ce qui permet de la distinguer de l'écriture que le serveur a réellement refusée.
+
+Des modifications consécutives sur une même ligne pendant la déconnexion sont fusionnées en une seule écriture mise en file d'attente, de sorte qu'un formulaire en cours de saisie ne fait pas grossir la file. Si le serveur refuse l'écriture fusionnée en raison de son contenu (un 400, 403 ou 422 — par exemple un champ supprimé par un changement de schéma pendant que l'utilisateur était hors ligne), le moteur la scinde à nouveau en modifications séparées et rejoue chacune d'elles. Seule la modification que le serveur refuse est annulée et signalée ; les autres sont conservées.
 
 Un échec simplement temporaire — un 429, un 503, une connexion coupée — n'est pas un rejet. Ces écritures restent en file d'attente et sont réessayées ; ce n'est qu'après `maxRetries` reports qu'une écriture est annulée.
 

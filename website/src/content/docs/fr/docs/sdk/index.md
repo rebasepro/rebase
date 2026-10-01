@@ -70,6 +70,8 @@ Pendant que `rebase dev` tourne, vous n'en avez pas besoin : il régénère les 
 `generated/sdk/` au démarrage et à chaque enregistrement sous `config/collections/`. Lancez
 vous-même la commande en CI, dans un dépôt frontend sans collections
 (`rebase generate-sdk --from link`), ou partout où `rebase dev` ne tourne pas.
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> pour la régénération : sur la 0.23, `rebase dev` laisse les types du SDK inchangés, exécutez donc
+la commande après chaque modification de collection.
 
 Passez ensuite le paramètre de type `Database` à `createRebaseClient` pour bénéficier d'une autocomplétion complète :
 
@@ -96,7 +98,7 @@ Lorsque `Database` est fourni, `createRebaseClient` renvoie une instance de `Cre
 
 Une clé de propriété que *vous* avez écrite est votre clé, quelle que soit sa forme — rien ne renomme un nom que vous avez choisi. Les deux clés qui sont dérivées plutôt que déclarées — la clé étrangère d'une relation et une colonne récupérée par introspection — sont en camelCase.
 
-`Row` décrit une lecture, `Insert` un `create()` et `Update` un `update()` — ils n'ont pas la même structure. Les colonnes pouvant être nulles sont `T | null` sur `Row`, la clé primaire est toujours présente lors d'une lecture et ne peut jamais être modifiée lors d'une mise à jour, et une cible `belongsTo` peut être écrite soit sous forme de relation (`{ author: 5 }`), soit sous forme de sa clé étrangère (`{ authorId: 5 }`).
+`Row` décrit une lecture, `Insert` un `create()` et `Update` un `update()` — ils n'ont pas la même structure. Une colonne qui n'est pas obligatoire est `T | null` sur les trois, ce qui permet à une écriture de la vider ; la clé primaire est toujours présente lors d'une lecture et ne peut jamais être définie lors d'une mise à jour ; une cible `belongsTo` peut être écrite soit sous forme de relation (`{ author: 5 }`), soit sous forme de sa clé étrangère (`{ authorId: 5 }`) ; et une appartenance `hasMany` ou `manyToMany` s'écrit comme une liste d'identifiants cibles ou d'objets `{ id }` (`{ tags: ["t-1"] }`), chacun portant un `_pivot` lorsque la table de jonction déclare des colonnes de charge utile. Un champ que personne n'a le droit d'écrire (`access: { write: [] }`) ne figure ni sur `Insert` ni sur `Update`.
 
 ## Exemple rapide
 

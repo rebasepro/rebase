@@ -46,6 +46,21 @@ avant le premier commit du projet. En CI, ou avec `--yes`, spécifiez-les nommé
 rebase init my-app --yes --agent claude,cursor
 ```
 
+## Un projet existant
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> `rebase init` refuse un répertoire qui contient déjà un projet. Un projet
+créé avant l'existence de la configuration des agents — ou dont l'auteur a refusé l'invite —
+obtient donc la même configuration via `rebase skills install --mcp` : les compétences, et le
+[serveur MCP](/docs/ai/mcp) enregistré dans la configuration de projet de chaque agent. Les serveurs
+déjà présents dans le fichier sont conservés, et une nouvelle exécution laisse l'entrée Rebase inchangée.
+
+```bash
+rebase skills install --agent cursor --mcp
+```
+
+Sans `--mcp`, la commande écrit uniquement les compétences, et nomme les agents dont la
+configuration ne possède pas encore le serveur.
+
 ## Quel assistant
 
 La commande accepte l'option `--agent` (ou `-a`), répétable et séparée par des virgules :

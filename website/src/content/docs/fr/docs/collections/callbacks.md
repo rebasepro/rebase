@@ -28,7 +28,9 @@ Une collection comporte deux blocs de callbacks, et la seule différence réside
 | Atteint le navigateur | non — les corps sont supprimés du bundle | oui, intégralement |
 | Utiliser pour | tout ce qui suit | les collections avec lesquelles le panneau communique directement |
 
-**`callbacks` est celui qu'il vous faut.** Il s'exécute sur chaque chemin qui atteint le serveur, de sorte que rien ne peut le contourner, et son corps ne quitte jamais la machine — une clé d'API ou une lecture de `process.env` y est en sécurité. Le reste de cette page concerne `callbacks`.
+**`callbacks` est celui qu'il vous faut.** Il s'exécute sur chaque chemin de données qui atteint le serveur — REST, le SDK, le temps réel, MCP et `rebase.data` — et son corps ne quitte jamais la machine, donc une clé d'API ou une lecture de `process.env` y est en sécurité. Le reste de cette page concerne `callbacks`.
+
+Un point d'écriture n'est pas un chemin de données : **le système d'authentification**. L'inscription, la connexion OAuth et la gestion des utilisateurs par un administrateur écrivent directement les lignes `users` et n'exécutent aucun de leurs callbacks, si bien qu'un e-mail de bienvenue dans `afterSave` sur `users` ne se déclenche jamais à l'inscription. Accrochez-le aux [hooks d'authentification](/docs/backend/authentication/) passés dans `auth.hooks` — `beforeUserCreate`, `afterUserCreate`, `afterUserDelete` — qui prennent un backend éjecté ; le démarrage avertit lorsque la collection users déclare des callbacks que l'inscription n'exécutera pas.
 
 `admin.browserCallbacks` existe pour un cas particulier : une collection sur un transport `direct` ou `custom`, que le panneau lit et écrit *lui-même* sans aucun serveur Rebase dans le chemin de la requête. Rien côté serveur ne voit ces opérations, donc `callbacks` ne peut jamais se déclencher pour elles, et ce bloc est le seul endroit où leur logique de cycle de vie peut résider.
 
@@ -200,7 +202,7 @@ Appelé après l'écriture de la ligne et avant le commit, au sein de la même t
 
 ```typescript
 afterSave: async ({
-    values,         // Saved values
+    values,         // Saved values: the row as stored, not afterRead's view of it
     id,             // Entity ID
     previousValues, // Previous values (undefined for new entities)
     status,         // "new" | "existing" | "copy"
@@ -226,11 +228,15 @@ afterSaveError: async ({
 }
 ```
 
+Il s'exécute pour un enregistrement qui a échoué au niveau de la base de données ou après celle-ci — pas pour un refus par `beforeSave`, une requête refusée avant l'écriture (validation, permission manquante, 404), ou un commit refusé après le retour de l'enregistrement ([liste complète](/docs/backend/hooks/#when-aftersaveerror-runs)).
+
 Lors d'une requête, il s'exécute une fois la transaction de l'écriture en échec annulée (rollback), et non à l'intérieur de celle-ci. Son `context.data` est un nouveau contexte pour le même appelant, dans lequel chaque appel est une transaction à part entière ; un [job](/docs/backend/jobs), un message de file d'attente ou un webhook qu'il met en file d'attente est donc validé (commit) et survit à l'échec qu'il signale. Une exception levée par `afterSaveError` est journalisée, et l'appelant reçoit toujours l'erreur propre à l'enregistrement.
 
 ### `afterRead`
 
 Appelé après la lecture des entités depuis la base de données. Transformez les données pour l'affichage.
+
+Il façonne ce que reçoit l'appelant — la réponse d'une lecture ou d'une écriture, et sa trame temps réel — et rien d'autre : `afterSave`, `beforeDelete`, `afterDelete` et l'[historique](/docs/backend/history) reçoivent la ligne telle que stockée : une valeur masquée ici n'est jamais ce qu'un audit enregistre ou ce qu'un retour en arrière réécrit, et un champ ajouté ici n'est jamais écrit.
 
 ```typescript
 afterRead: async ({
@@ -302,7 +308,7 @@ Chaque callback reçoit un objet `context` qui inclut `context.data` — une cou
 `context.data` utilise un Proxy JavaScript, vous pouvez donc accéder à n'importe quelle collection via son slug en tant que propriété :
 
 ```typescript
-afterSave: async ({ values, entityId, context }) => {
+afterSave: async ({ values, id, context }) => {
     // Dynamic property access — works for any collection slug
     const jobs = context.data.jobs;
     const users = context.data.users;
@@ -330,26 +336,18 @@ Chaque accesseur de collection (`context.data.<slug>`) fournit ces méthodes :
 
 ### Interroger avec `.find()`
 
-La méthode `find()` prend en charge des filtres avancés :
+La méthode `find()` filtre avec des tuples `[operator, value]` — la forme typée de la chaîne de requête `?status=eq.published` que l'API REST lit :
 
 ```typescript
 afterSave: async ({ values, context }) => {
-    // Simple equality
+    // Equality
     const { data: activeJobs } = await context.data.jobs.find({
-        where: { status: "published" },
+        where: { status: ["==", "published"] },
         limit: 10,
         orderBy: ["createdAt", "desc"]
     });
 
-    // PostgREST-style operators
-    const { data: recentJobs } = await context.data.jobs.find({
-        where: {
-            status: "eq.published",
-            salary: "gte.50000"
-        }
-    });
-
-    // Tuple syntax
+    // Several conditions, AND-ed
     const { data: expensiveJobs } = await context.data.jobs.find({
         where: {
             salary: [">=", 100000],
@@ -361,25 +359,7 @@ afterSave: async ({ values, context }) => {
 
 ### Créer des entités
 
-```typescript
-afterSave: async ({ values, entityId, previousValues, context }) => {
-    // Promote an approved submission to a published job
-    if (values.status === "approved" && previousValues?.status !== "approved") {
-        const newJob = await context.data.jobs.create({
-            title: values.title,
-            description: values.description,
-            company_id: values.company_id,
-            status: "published",
-            source_submission_id: entityId,
-        });
-
-        // Link back to the original submission
-        await context.data["job-submissions"].update(entityId, {
-            promoted_job_id: newJob.id,
-        });
-    }
-}
-```
+`.create()` et `.update()` prennent les valeurs à écrire, avec les signatures ci-dessus. [Synchroniser des données entre collections](#synchroniser-des-données-entre-collections) utilise les deux : une soumission approuvée crée une offre publiée et est reliée à celle-ci en retour.
 
 ### Sécurité : avec quels privilèges `context.data` s'exécute-t-il
 
@@ -403,7 +383,9 @@ afterSave: async ({ context }) => {
     // is an admin's reach, not a bypass: a collection whose only rule is
     // `policy.serverContext()` stays closed to it, since that compiles to
     // `rebase.uid() IS NULL` and this accessor's uid is `service`.
-    await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
+    // `dataAsAdmin` is always there server-side; its type allows for the
+    // browser SDK, which has none — hence the `!`.
+    await context.client.dataAsAdmin!.audit_logs.create({ action: "approved" });
 }
 ```
 
@@ -433,10 +415,11 @@ Ainsi, l'écriture déclencheuse et tout ce que ses callbacks ont écrit sont va
 - Une exception levée depuis `afterSave` ou `afterDelete` annule (rollback) l'écriture déclencheuse ainsi que chaque écriture `context.data` effectuée par les callbacks. L'appelant reçoit la réponse **400 `CALLBACK_REJECTED`** avec `details.stage` indiquant le nom du hook — ou avec le propre statut de l'erreur lorsqu'elle en comporte un : une `RebaseApiError` que vous avez levée, un 409 de violation d'unicité.
 - Les abonnés en temps réel ne sont informés de la ligne qu'après le commit, de sorte qu'une écriture annulée n'est jamais annoncée.
 - Un callback maintient la transaction ouverte pendant son exécution, donc un callback lent équivaut à un verrou maintenu et une connexion du pool monopolisée.
+- Une écriture `context.data` exécute aussi les callbacks de la collection ciblée, donc un `afterSave` qui met à jour sa propre ligne se redéclenche lui-même. Les écritures imbriquées sur plus de 16 niveaux sont refusées avec **500 `CALLBACK_RECURSION`**, qui nomme le hook et la collection, et l'écriture entière est annulée (rollback). Rendez une telle écriture conditionnelle, comme le fait l'exemple ci-dessous.
 
-Laissez une défaillance lever une exception lorsque l'écriture déclencheuse ne doit pas lui survivre. Interceptez-la lorsqu'elle le doit, mais uniquement autour d'une **écriture** `context.data` : une écriture qui a échoué est annulée isolément, et le reste est validé.
+Laissez une défaillance lever une exception lorsque l'écriture déclencheuse ne doit pas lui survivre. Interceptez-la lorsqu'elle le doit, mais uniquement autour d'une **écriture** `context.data` : une création, une mise à jour ou une suppression que la base de données refuse (violation d'unicité ou de clé étrangère, déclencheur) est annulée isolément, et le reste est validé.
 
-Toute autre instruction qui échoue dans la transaction de l'écriture — une recherche, une mise en file d'attente de job refusée par la base de données — interrompt cette transaction dans Postgres, et intercepter l'erreur en JavaScript n'y change rien. L'écriture est refusée avec **500 `TRANSACTION_ABORTED`** et rien n'est enregistré, plutôt que de répondre par un succès pour une écriture qui a été annulée. Laissez un tel échec lever une exception, ou vérifiez la condition avant d'exécuter l'instruction.
+Toute autre instruction qui échoue dans la transaction de l'écriture — une recherche, la lecture qu'une mise à jour ou une suppression effectue pour trouver sa ligne (un id que la colonne de clé ne peut pas contenir), une mise en file d'attente de job refusée par la base de données — interrompt cette transaction dans Postgres, et intercepter l'erreur en JavaScript n'y change rien. L'écriture est refusée avec **500 `TRANSACTION_ABORTED`** et rien n'est enregistré, plutôt que de répondre par un succès pour une écriture qui a été annulée. Laissez un tel échec lever une exception, ou vérifiez la condition avant d'exécuter l'instruction.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {

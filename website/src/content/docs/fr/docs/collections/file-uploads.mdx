@@ -15,7 +15,7 @@ Cette distinction a plus d'importance qu'il n'y paraît. La majeure partie de `s
 lue par le module de téléversement du panneau d'administration en direction de l'API, de sorte
 qu'une écriture ne provenant pas d'un formulaire n'y passe pas — ces options portent
 l'étiquette ci-dessous. Les deux options qui déterminent ce qu'un fichier peut *être*,
-`maxSize` et `acceptedFiles`, font exception : le serveur les vérifie à chaque téléversement.
+`maxSize` et `acceptedFiles`, font exception : le serveur les vérifie à chaque téléversement dans le `storagePath` de la propriété.
 
 ## Un seul fichier
 
@@ -57,12 +57,12 @@ Tout ce qui se trouve à l'intérieur de `storage`.
 
 | Propriété | Type | Description |
 |-----------|------|-------------|
-| `storagePath` | `string \| function` | **Requis.** Emplacement du fichier dans le bucket. Une chaîne avec des variables de substitution — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — ou une fonction dépendant du contexte du téléversement. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données :** c'est le téléverseur du panneau qui le résout, et `client.storage.upload()` définit sa propre clé |
+| `storagePath` | `string \| function` | **Requis.** Emplacement du fichier dans le bucket. Une chaîne avec des variables de substitution — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — ou une fonction dépendant du contexte du téléversement. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données :** c'est le téléverseur du panneau qui le résout, et `client.storage.upload()` définit sa propre clé. Un chemin sous forme de chaîne est aussi l'endroit où le serveur applique à chaque téléversement les `maxSize` et `acceptedFiles` de cette propriété |
 | `fileName` | `string \| function` | Le nom de fichier de l'objet téléversé, avec les mêmes variables de substitution. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
 | `storageSource` | `string` | Le bucket enregistré à utiliser, lorsqu'un projet en compte plusieurs. Le handle `bucket("media")` fonctionne ici également |
 | `public` | `boolean` | Stocker sous le préfixe public et distribuer via une URL stable, sans token et pouvant être mise en cache. `false` par défaut, ce qui correspond à des objets privés et des URL signées à courte durée de vie |
-| `acceptedFiles` | `FileType[]` | Types MIME acceptés par cette propriété. La syntaxe avec astérisque fonctionne — `image/*`. **Appliqué par le serveur**, et pas seulement par le sélecteur de fichiers |
-| `maxSize` | `number` | Taille maximale de fichier acceptée, en octets. **Appliqué par le serveur**, aussi bien pour les téléversements standards que pour les téléversements reprenables |
+| `acceptedFiles` | `FileType[]` | Types MIME acceptés par cette propriété. La syntaxe avec astérisque fonctionne — `image/*`. **Appliqué par le serveur** pour chaque téléversement dans le `storagePath` de la propriété — voir [Ce que le serveur vérifie](#ce-que-le-serveur-vérifie) |
+| `maxSize` | `number` | Taille maximale de fichier acceptée, en octets. **Appliqué par le serveur**, comme `acceptedFiles`, aussi bien pour les téléversements standards que pour les téléversements reprenables |
 | `metadata` | `Record<string, unknown>` | Métadonnées de l'objet à stocker avec le fichier |
 | `includeBucketUrl` | `boolean` | Écrire `s3://my-bucket/path/to/file.png` dans la colonne au lieu de `path/to/file.png`. `false` par défaut |
 | `storeUrl` | `boolean` | Écrire l'URL de téléchargement dans la colonne au lieu de la clé. `false` par défaut, et il est conseillé de le laisser ainsi : une URL contenant un token cesse de fonctionner dès que le token expire, et la référence d'origine est alors perdue |
@@ -88,16 +88,32 @@ ignorait tout de la propriété à laquelle le fichier était destiné ; ainsi, 
 contournant le sélecteur pouvait déposer un exécutable de 40 Mo dans le bucket des avatars sans
 que la configuration stipulant le contraire ne soit jamais consultée.
 
-Les deux sont désormais vérifiés côté serveur, par rapport à la propriété indiquée par le téléversement.
-Un téléversement qui n'indique aucune propriété — un client plus ancien, un appel direct —
-se rabat toujours sur la limite globale, car une requête sans contexte de propriété ne dispose
-d'aucune règle de propriété à vérifier, et la refuser casserait les clients antérieurs à cette évolution.
+Les deux sont désormais vérifiés par le serveur par rapport à **l'endroit où le fichier atterrit**. Le `storagePath` d'une propriété est l'endroit où vont ses fichiers, c'est donc aussi là que s'appliquent ses limites : tout téléversement dont la clé est un fichier directement sous ce chemin — depuis le panneau, `client.storage.putObject`, un téléversement reprenable, le navigateur de stockage de Studio ou `curl` — les respecte, qu'il nomme la propriété ou non, sur la source de stockage propre à la propriété. Les variables de substitution correspondent à ce que le panneau y inscrirait : `{entityId}`, `{rand}`, `{file}` et autres représentent un seul segment de chemin, `{path}` un nombre quelconque. Le chemin d'une propriété `public: true` se trouve sous `public/`.
+
+- Plusieurs propriétés partageant un même chemin : un fichier accepté par l'une d'elles est accepté.
+- Un téléversement qui nomme aussi sa propriété (`collection` + `property`, comme les envoie `putObject({ context })`) est également soumis à cette propriété. Nommer une propriété plus permissive ne débloque pas le chemin d'une propriété plus stricte.
+- Un `storagePath` écrit sous forme de fonction ne peut pas être lu sans l'exécuter, il n'a donc aucune règle côté serveur : ces limites ne s'appliquent qu'aux téléversements qui nomment la propriété.
+- Un chemin qu'aucune propriété ne revendique est soumis uniquement à la limite propre à la source (`STORAGE_MAX_FILE_SIZE`).
+
+### Images dans un champ markdown
+
+Une propriété markdown (`admin.markdown: true`) dotée d'un bloc `storage` accepte les téléversements d'images dans son éditeur. Le texte stocke chaque image comme une **référence de stockage** — `![](rebase-storage:posts/abc_cover.png)` — et non comme une URL : l'URL d'un fichier privé porte un token de téléchargement qui expire en quelques minutes, alors que le texte, lui, est enregistré. L'éditeur et les aperçus du panneau d'administration échangent chaque référence contre une URL fraîche au moment de l'affichage ; un site qui restitue le champ fait de même avec `resolveStorageReferences(text, client)` — voir [Fichiers à l'intérieur d'un texte](/docs/sdk/storage#files-inside-text).
+
+Un texte enregistré avant ce changement contient les URL elles-mêmes, et leurs tokens ont expiré ; réinsérez ces images pour stocker des références.
 
 ### Où le fichier est autorisé à aller
 
 `storagePath` est une valeur par défaut, pas une limite stricte : rien sur le serveur ne
 confine un téléversement à ce préfixe. Déterminer qui peut écrire où relève du rôle des
 règles d'autorisation de stockage — voir [Storage](/docs/backend/storage).
+
+### Les fichiers ne sont jamais supprimés pour vous
+
+Vider un champ de fichier, remplacer son fichier, ou supprimer la ligne à laquelle il appartient laisse l'objet stocké où il est. Chaque téléversement reçoit sa propre clé, si bien qu'un remplacement écrit un nouvel objet plutôt que d'écraser l'ancien, et rien ne supprime le précédent : deux lignes peuvent partager la même clé, donc le panneau ne peut pas savoir qu'un fichier est inutilisé. Les objets qu'aucune ligne ne référence restent dans le bucket, et sont facturés, jusqu'à ce que vous les supprimiez — depuis le navigateur de stockage de Studio, avec `client.storage.deleteObject(key)`, ou avec une règle de cycle de vie sur le bucket.
+
+### Déplacer une propriété vers une autre source de stockage
+
+Un champ de fichier stocke la clé de l'objet, pas sa source. Modifier le `storageSource` d'une propriété fait pointer chaque valeur existante vers la nouvelle source, où ces clés n'existent pas, de sorte que les aperçus des fichiers téléversés avant le changement répondent « introuvable ». Copiez les objets vers la nouvelle source sous les mêmes clés avant de modifier la propriété — avec l'outillage propre au fournisseur, comme `aws s3 sync` ou `gcloud storage cp` — ou conservez l'ancienne source pour les fichiers existants.
 
 ## Prochaines étapes
 

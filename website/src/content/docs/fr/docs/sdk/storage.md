@@ -79,8 +79,22 @@ Le SDK met en cache les URL signées pour éviter les appels serveur redondants.
 
 ### URL privées vs. publiques
 
-- **Les fichiers privés** obtiennent une URL avec un **token de téléchargement à courte durée de vie, limité au chemin** (`?token=…`, 5 min par défaut) — jamais votre token d'accès. Comme il expire, **ne conservez pas d'URL privée** ; stockez le **chemin** du fichier et rappelez `getSignedUrl()` au moment du rendu.
+- **Les fichiers privés** obtiennent une URL avec un **token de téléchargement à courte durée de vie, limité au chemin** (`?token=…`, 5 minutes sauf si le serveur définit `STORAGE_DOWNLOAD_TOKEN_TTL`) — jamais votre token d'accès. Comme il expire, **ne conservez pas d'URL privée** ; stockez le **chemin** du fichier et rappelez `getSignedUrl()` au moment du rendu.
 - **Les fichiers publics** (stockés sous le préfixe `public/` — définissez `storage: { public: true }` sur la propriété, ou passez `public: true` à `putObject`) obtiennent une URL **stable, sans token, permanente et cacheable par CDN**, sans aller-retour serveur. Ils peuvent être stockés en toute sécurité dans une base de données et liés directement.
+
+### Fichiers à l'intérieur d'un texte
+
+Un texte qui intègre un fichier — les images d'un champ markdown — ne peut pas non plus contenir une URL privée, il contient donc à la place une **référence de stockage** : `rebase-storage:posts/cover.png`, avec `?storageId=media` lorsque le fichier se trouve dans une source nommée. C'est ce que l'éditeur markdown du panneau d'administration écrit pour une image téléversée. Échangez les références contre des URL au moment de restituer le texte :
+
+```typescript
+import { resolveStorageReferences } from "@rebasepro/client";
+
+const post = await client.data.collection("posts").findById("post-1");
+const body = await resolveStorageReferences(String(post?.body ?? ""), client);
+// `body` is the same markdown, each reference replaced by a fresh URL.
+```
+
+Chaque objet est signé une fois par appel, depuis sa propre source, de sorte qu'une image privée continue de fonctionner quelle que soit l'ancienneté du téléversement. Une référence qui nomme un objet qui n'existe plus est laissée telle quelle. `storageReference(key, storageId?)` en construit une, pour un texte que vous écrivez vous-même.
 
 ## Télécharger un fichier
 

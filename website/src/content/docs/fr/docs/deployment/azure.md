@@ -86,14 +86,13 @@ Les trois dernières variables permettent à ce déploiement d'obtenir un admini
 
 Ce que `ensure` ne fait jamais, en revanche, c'est modifier un élément existant : il ne change pas le type d'une colonne, ne supprime rien et ne modifie pas les libellés d'un enum existant, car le redémarrage d'un conteneur ne doit pas modifier la structure d'un schéma comme effet secondaire d'un déploiement.
 
-Deux opérations nécessitent donc toujours la CLI, exécutée depuis un clone local ou un job CI avec `DATABASE_URL` pointant vers votre Flexible Server (ajoutez une règle de pare-feu autorisant l'IP de votre client si nécessaire) :
+Une seule chose nécessite donc encore la CLI, exécutée depuis un clone local ou un job CI avec `DATABASE_URL` pointant vers votre Flexible Server (ajoutez une règle de pare-feu autorisant l'IP de votre client si nécessaire) :
 
 ```bash
 rebase db push
 ```
 
-- **La RLS des tables de jonction** pour les relations plusieurs-à-plusieurs.
-- **Toute modification qui n'est pas purement additive** — une colonne renommée, un type restreint, un champ supprimé.
+Toute modification qui n'est pas purement additive — une colonne renommée, un type restreint, un champ supprimé.
 
 L'image de runtime étant distribuée sans la CLI, ces commandes ne s'exécutent jamais à l'intérieur du conteneur. Pour les migrations versionnées, validez les fichiers de migration avec `rebase db generate` et exécutez `rebase db migrate` comme étape de release.
 

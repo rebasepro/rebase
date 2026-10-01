@@ -130,8 +130,7 @@ depuis un checkout ou un job CI pointé sur la base de données de production :
 pnpm run db:push
 ```
 
-Exécutez-le pour la RLS des tables de jonction sur les relations
-plusieurs-à-plusieurs, et pour tout changement qui n'est pas purement additif :
+Exécutez-le pour tout changement qui n'est pas purement additif :
 une colonne renommée, un type rétréci, un champ supprimé.
 
 Pour un **workflow versionné et en équipe**, validez des fichiers de migration
@@ -179,7 +178,7 @@ Avant de déployer en production, assurez-vous de :
 |------|---------|
 | **Premier administrateur** | Définissez `REBASE_ADMIN_EMAIL` et `REBASE_ADMIN_PASSWORD` **avant le premier démarrage**, ainsi que `DISABLE_SELF_REGISTRATION=true`. En production, le premier compte inscrit n'est pas promu — voir [Votre premier administrateur](#votre-premier-administrateur). |
 | **NODE_ENV** | `NODE_ENV=production`. C'est ce qui ferme la fenêtre d'amorçage, refuse le stockage de fichiers local, exige `CORS_ORIGINS` et coupe la documentation OpenAPI. Un déploiement resté sur la valeur par défaut tourne en mode développement. |
-| **Schéma de base de données** | Le démarrage crée vos tables de collections de façon additive. Exécutez `pnpm run db:push` (ou `pnpm run db:migrate`) pour la RLS des tables de jonction et pour tout ce qui n'est pas purement additif. |
+| **Schéma de base de données** | Le démarrage crée vos tables de collections et leur RLS de façon additive. Exécutez `pnpm run db:push` (ou `pnpm run db:migrate`) pour tout ce qui n'est pas purement additif. |
 | **JWT_SECRET** | Utilisez une chaîne aléatoire cryptographiquement forte (≥ 32 caractères). Ne la réutilisez jamais entre environnements. |
 | **DATABASE_URL** | Utilisez une instance Postgres gérée (Neon, Supabase, RDS) avec TLS activé |
 | **CORS_ORIGINS** | Toujours, pas seulement quand le frontend est sur un autre domaine. Le runtime refuse de démarrer en production sans `CORS_ORIGINS` ni `FRONTEND_URL`, car une API qui devine ses origines autorisées finit par autoriser la mauvaise. |

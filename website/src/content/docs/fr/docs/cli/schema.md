@@ -47,8 +47,8 @@ rebase schema generate
 
 | Flag | Description |
 |------|-------------|
-| `--collections, -c` | Chemin vers le répertoire des collections (par défaut : `config/collections/`) |
-| `--output, -o` | Chemin de sortie pour le fichier de schéma généré |
+| `--collections, -c` | Répertoire des collections (par défaut : `config/collections/`) ; les chemins relatifs sont résolus depuis l'endroit où vous lancez la commande |
+| `--output, -o` | Chemin de sortie pour le fichier de schéma généré ; les chemins relatifs sont résolus depuis l'endroit où vous lancez la commande |
 | `--watch, -w` | Surveiller les changements et régénérer automatiquement |
 
 Le **mode watch** est utile pendant le développement — modifiez un fichier de collection et le schéma est régénéré instantanément :
@@ -77,6 +77,8 @@ rebase schema introspect
 | `--output, -o` | Répertoire de sortie pour les fichiers de collections générés |
 
 C'est utile lors de l'adoption de Rebase sur une base de données existante — introspectez d'abord, puis personnalisez les collections générées.
+
+**Introspecter, puis pousser, ne change rien.** Les propriétés générées indiquent exactement ce qu'est chaque colonne — `columnType`, `precision`/`scale`, `defaultValue`, `required`, l'`isId` d'une clé (`"increment"` pour une identité entière, `columnType: "serial"` pour un serial, `"manual"` pour une clé sans valeur par défaut), l'`onDelete` d'une relation, et le bloc `search` d'une collection relu depuis la colonne qu'il a construite — si bien que `rebase db push --dry-run` juste après une introspection ne planifie aucun changement. Lorsqu'aucune propriété ne peut représenter une colonne — un `timestamp` sans fuseau horaire, un `interval`, un `inet`, un type enum qui ne s'appelle pas `<table>_<column>`, une valeur par défaut comme `CURRENT_DATE` — l'introspection le signale, colonne par colonne, dans le terminal et en tête du fichier, avec ce qu'un push lui ferait et, quand il en existe une, l'instruction qui les met en accord (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Une table dont la clé porte sur plusieurs colonnes est laissée de côté, avec sa raison : une collection lit une ligne par une seule colonne de clé, et `db push` laisse intacte une table qui n'est pas une collection.
 
 ### `rebase db push`
 
@@ -196,7 +198,7 @@ rebase generate-sdk
 ```
 
 **Ce qu'elle fait :**
-- Lit les collections depuis `config/collections/` (prend en charge les exports de baril `index.ts` ou les fichiers individuels)
+- Lit chaque fichier de collection dans `config/collections/` — les fichiers que le backend sert, qu'ils soient listés ou non par le baril `index.ts` — et s'arrête sur celui qui ne se charge pas
 - Génère des types TypeScript pour toutes les entités dans `generated/sdk/`
 - Produit un fichier `database.types.ts` à utiliser avec `createRebaseClient<Database>()`
 
@@ -206,7 +208,7 @@ rebase generate-sdk
 
 | Flag | Description |
 |------|-------------|
-| `-c`, `--collections-dir` | Chemin vers le répertoire des collections (par défaut : `config/collections/`) |
+| `-c`, `--collections` | Répertoire des collections (par défaut : `config/collections/`) ; les chemins relatifs sont résolus depuis l'endroit où vous lancez la commande. `--collections-dir` est également accepté. |
 | `-o`, `--output` | Répertoire de sortie pour le SDK (par défaut : `generated/sdk/`) |
 | `--from <link\|url>` | Lit le schéma depuis un projet en cours d'exécution plutôt que depuis le code local. `link` utilise le projet lié à ce checkout. |
 | `--token` | Jeton Bearer pour le point de terminaison de contrat (par défaut : `$REBASE_SERVICE_KEY`) |

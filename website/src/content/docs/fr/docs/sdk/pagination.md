@@ -49,6 +49,16 @@ do {
 } while (after);
 ```
 
+`nextCursor` est absent sur la dernière page, et sur une page qu'aucun curseur ne
+peut décrire : une recherche triée par pertinence (`_score`), une recherche
+vectorielle, et une projection `fields` qui omet un des champs de `orderBy` — le
+curseur est construit à partir des valeurs de tri de la dernière ligne, et cette
+ligne ne les porte pas. Là, `meta.hasMore` peut valoir `true` sans `nextCursor`,
+et la boucle ci-dessus s'arrête prématurément : ajoutez les champs de tri à
+`fields`, ou paginez par `offset`. `iterate()` appelé avec un `cursor` refuse un
+tel listage avec `cursor-missing` plutôt que de s'arrêter. Un tri par un
+[agrégat sur une relation](/docs/sdk/relations/) se pagine bien par curseur.
+
 Le curseur est **opaque**. Il encode les clés de tri *et* les valeurs correspondantes de la dernière
 ligne, de sorte qu'il ne peut que poursuivre la liste dont il provient : conservez un `orderBy`
 identique d'une page à l'autre, sinon la requête est rejetée avec

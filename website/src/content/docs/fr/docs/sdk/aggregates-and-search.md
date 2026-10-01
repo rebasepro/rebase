@@ -39,8 +39,11 @@ Les résultats sont indexés par fonction et par champ — `count()` devient `co
 Les groupes se paginent comme les lignes d'un listage. `limit` les borne,
 `offset` (ou `page`) les saute et `orderBy` les trie par un champ de `groupBy`
 ou une clé de résultat. L'ordre se termine toujours sur les clés de groupe, donc
-chaque limite de page tombe au même endroit. Avec un `limit`, la réponse indique
-s'il en reste :
+chaque limite de page tombe au même endroit. Un agrégat groupé sans `limit` est
+tronqué à la valeur par défaut d'un listage (50 groupes), comme un listage
+ordinaire. Avec un `limit` — y compris celle par défaut — la réponse indique
+s'il en reste, et `aggregate()` du SDK le restitue sous forme de `meta` sur le
+résultat :
 
 ```bash
 GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:desc&limit=20&offset=20

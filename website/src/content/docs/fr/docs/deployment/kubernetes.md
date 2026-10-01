@@ -162,3 +162,7 @@ Définissez `sharedState.channelBusConfigured: true` pour confirmer que vous l'a
 configuré — le chart ne l'utilise que pour décider d'émettre un avertissement ou
 non. Les abonnements classiques aux collections ne sont pas affectés ; ceux-ci
 transitent par le CDC de Postgres.
+
+Le reste de ce qu'un processus garde pour lui — fichiers locaux, téléversements avec reprise,
+cache de transformation d'image, Logs Explorer — est répertorié avec le réglage qui partage
+chacun dans [Exécuter plus d'une instance](/docs/deployment/multiple-instances/).

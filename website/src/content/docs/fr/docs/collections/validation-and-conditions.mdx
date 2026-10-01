@@ -60,6 +60,10 @@ properties: {
 }
 ```
 
+### Où s'exécute la validation
+
+Le serveur vérifie `validation` à la frontière de la requête — REST, le socket temps réel et MCP — sur ce que l'appelant a envoyé, avant l'exécution de `beforeSave`, et répond à une écriture qui enfreint une règle par une 400 nommant chaque champ en défaut. Le code serveur qui écrit en interne au processus est de confiance et n'est **pas** vérifié par rapport à ces règles : `rebase.data` et `rebase.dataAsAdmin` dans une fonction ou une tâche cron, `context.data` dans un callback, un script de seed. Ce qui s'applique là-bas est ce que la base de données impose elle-même — `required` (NOT NULL), `unique` (un index unique), le type d'un enum, et la largeur d'une colonne `varchar` ou `char`. Tout ce que votre code serveur écrit d'autre, vérifiez-le dans le code qui l'écrit.
+
 ### Tous les types
 
 | Règle | Type | Description |
@@ -73,7 +77,7 @@ properties: {
 
 | Règle | Type | Description |
 |------|------|-------------|
-| `min` / `max` | `number` | Nombre minimum / maximum de caractères, inclusif. Un `max` dimensionne également la colonne : il transforme `TEXT` en `VARCHAR(max)`, donc le réduire sur une table contenant déjà des lignes plus longues est une migration que la base de données refusera |
+| `min` / `max` | `number` | Nombre minimum / maximum de caractères, inclusif. Avec `columnType: "varchar"` ou `"char"`, `max` dimensionne également la colonne (`VARCHAR(max)`), donc le réduire sur une table contenant déjà des lignes plus longues est une migration que la base de données refusera. La colonne par défaut est `TEXT`, que `max` laisse illimitée — la limite n'est alors imposée que par la [vérification de requête](#où-sexécute-la-validation) du serveur |
 | `length` | `number` | Exactement ce nombre de caractères — un code pays, une référence à longueur fixe |
 | `matches` | `string \| RegExp` | Un motif que la valeur entière doit respecter. Une chaîne est compilée par requête, donc une chaîne qui ne compile pas est rejetée au démarrage plutôt que de devenir silencieusement une règle inactive |
 | `matchesMessage` | `string` | Le message affiché par le formulaire lorsque `matches` échoue |
@@ -151,8 +155,9 @@ qui guide l'utilisateur et un formulaire qui le bloque.
 :::caution[Les conditions relèvent du comportement du formulaire]
 **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** Elles s'exécutent dans le
 navigateur, sur l'entité en cours de modification, et définissent ce que le panneau propose. Une règle
-qui doit s'appliquer à tous les appelants doit se trouver dans `validation`, qui est vérifié par le serveur,
-ou dans une [règle de sécurité](/docs/collections/security-rules/), que la base
+qui doit s'appliquer à chaque appelant de l'API doit se trouver dans `validation`, que le serveur
+vérifie sur les écritures REST, socket et MCP (mais pas sur les [écritures internes au processus](#où-sexécute-la-validation)
+de votre propre code serveur), ou dans une [règle de sécurité](/docs/collections/security-rules/), que la base
 de données applique pour tout le monde — panneau, SDK ou `curl`.
 :::
 
@@ -164,8 +169,8 @@ Pour les comportements complexes qui ne peuvent pas être exprimés via JSON Log
 price: {
     type: "number",
     name: "Price",
-    dynamicProps: ({ values, user }) => ({
-        disabled: values.is_free === true || !user.roles.includes("admin"),
+    dynamicProps: ({ values, authController }) => ({
+        admin: { disabled: values.is_free === true || !authController.user?.roles?.includes("admin") },
         validation: values.is_free ? {} : { required: true, min: 0 }
     })
 }

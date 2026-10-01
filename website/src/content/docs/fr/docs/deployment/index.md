@@ -35,6 +35,9 @@ administrateur avant le premier démarrage.
 - **[Découpage en plusieurs processus](/docs/deployment/split-processes/)** — un
   bundle en API, couche de fonctions et worker, pour qu'une fonction lourde
   cesse de concurrencer l'API de données.
+- **[Exécuter plus d'une instance](/docs/deployment/multiple-instances/)** —
+  l'état que chaque processus garde pour lui, et le réglage qui le partage,
+  avant qu'une seconde réplique ne prenne du trafic.
 
 ## Guides par plateforme
 

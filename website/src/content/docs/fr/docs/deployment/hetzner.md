@@ -141,10 +141,7 @@ Avec `REBASE_MIGRATE_ON_BOOT` à sa valeur par défaut `ensure`, le runtime prov
 
 Ce que le démarrage ne fait délibérément jamais, c'est quoi que ce soit de destructif : il ne modifie pas le type d'une colonne, ne supprime aucune colonne et n'édite aucun libellé d'enum existant. Un redémarrage de conteneur ne doit pas pouvoir remodeler un schéma par effet secondaire.
 
-Deux opérations nécessitent donc toujours [`rebase db push`](/docs/architecture/schema-as-code), exécuté depuis une copie de travail locale ou un pipeline CI où la validation des changements destructifs et une sauvegarde sont à portée de main :
-
-- les politiques RLS des tables de jonction pour les relations plusieurs-à-plusieurs ;
-- toute modification qui n'est pas purement additive.
+Une seule chose nécessite donc encore [`rebase db push`](/docs/architecture/schema-as-code), exécuté depuis une copie de travail locale ou un pipeline CI où la validation des changements destructifs et une sauvegarde sont à portée de main : toute modification qui n'est pas purement additive — une colonne renommée, un type restreint, un champ supprimé.
 
 Si le module ou le fichier Compose lie Postgres à l'interface de bouclage (loopback) — ce que font les deux —, accédez-y via un tunnel SSH :
 

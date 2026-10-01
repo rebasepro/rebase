@@ -10,12 +10,12 @@ description: Appliquez des callbacks de cycle de vie transversaux à chaque coll
 Rebase propose deux niveaux de callbacks de cycle de vie des entités — tous deux utilisent le même type `CollectionCallbacks` issu de `@rebasepro/types` :
 
 - **[Callbacks par collection](/docs/collections/callbacks)** : Définis sur les configurations de collections individuelles. Ils s'exécutent uniquement pour cette collection.
-- **Callbacks globaux** : Définis sur `initializeRebaseBackend({ callbacks })`. Ils se déclenchent sur **chaque** collection, sur chaque chemin de données (API REST, WebSocket / temps réel, `rebase.dataAsAdmin` côté serveur).
+- **Callbacks globaux** : Définis sur `initializeRebaseBackend({ callbacks })`. Ils se déclenchent sur **chaque** collection, sur chaque chemin de données (API REST, WebSocket / temps réel, `rebase.dataAsAdmin` côté serveur). Le seul point d'écriture qu'ils ne voient pas est le système d'authentification : l'inscription, la connexion OAuth et la gestion des utilisateurs par un administrateur écrivent directement les lignes utilisateur et déclenchent à la place les [hooks d'authentification](/docs/backend/authentication/) (`afterUserCreate`, …).
 
 Utilisez les callbacks globaux pour :
 - **Le ciblage des lignes (Row scoping)** — `beforeQuery` sur chaque collection, afin que les lectures d'un tenant soient restreintes à un seul endroit plutôt que par collection. Postgres uniquement : à côté d'une source de données MongoDB ou Firestore, un `beforeQuery` global refusera de démarrer plutôt que de laisser les lectures de cette source sans restriction. Voir [`beforeQuery`](/docs/collections/callbacks#beforequery).
 - **Le masquage des données personnelles (PII)** — masquer les champs sensibles pour les appelants non-administrateurs sur l'ensemble des collections.
-- **La journalisation d'audit unifiée** — consigner chaque création, mise à jour ou suppression à un emplacement unique.
+- **La journalisation d'audit unifiée** — consigner chaque création, mise à jour ou suppression à un emplacement unique. Les nouveaux comptes créés par inscription ou OAuth n'en font pas partie ; journalisez-les depuis `afterUserCreate`.
 - **La validation transversale** — appliquer des invariants qui s'étendent sur plusieurs collections.
 
 :::note
@@ -141,13 +141,32 @@ de masquage avec une exception silencieuse, ce qui n'est donc pas proposé.
 ligne et tout ce que ses callbacks ont effectué sont validés ensemble ou pas du tout.
 
 - **`beforeSave`, `beforeDelete`** — si le callback lève une exception, l'opération est rejetée avec une erreur HTTP 400 contenant votre message et le code `CALLBACK_REJECTED`, et l'écriture en base de données n'a jamais lieu. Lancez une `RebaseApiError` issue de `@rebasepro/types` pour choisir vous-même le statut — voir [Callbacks d'entité](/docs/collections/callbacks#beforesave). Un `beforeDelete` qui *renvoie* `false` équivaut au même refus sans message, et répond **403** avec ce code.
-- **`afterRead`** — la ligne renvoyée (ou la ligne transformée) est ce que l'appelant reçoit. Sa transaction est en lecture seule (`READ ONLY`) — voir [ci-dessous](#afterread-cannot-write).
+- **`afterRead`** — la ligne renvoyée (ou la ligne transformée) est ce que l'appelant reçoit, et uniquement lui : lors d'une écriture, elle façonne la réponse, tandis qu'`afterSave`, `beforeDelete`, `afterDelete` et l'historique reçoivent la ligne telle que stockée — une valeur masquée n'est jamais enregistrée ni réinjectée dans la colonne. Sa transaction est en lecture seule (`READ ONLY`) — voir [ci-dessous](#afterread-cannot-write).
 - **`afterSave`, `afterDelete`** — s'exécutent *avant* le commit, avec attente (`await`). Une exception levée ici annule la ligne (rollback) et répond avec la même erreur **400 `CALLBACK_REJECTED`**, avec `details.stage` indiquant le nom du hook. Ils maintiennent la transaction ouverte pendant leur exécution ; un hook lent correspond donc à un verrou conservé.
 - **`afterSaveError`** — s'exécute lorsque l'enregistrement a échoué, sur le chemin de sortie. Lors d'une requête, il s'exécute après l'annulation (rollback) de la transaction de l'écriture en échec, avec un `context` dont chaque appel est une transaction à part entière ; un job qu'il met en file d'attente pour signaler l'échec est donc conservé. Une exception levée par ce callback est journalisée ; l'appelant reçoit l'erreur propre à l'enregistrement.
 
 :::caution[Cette page indiquait auparavant le contraire]
 Des versions antérieures indiquaient qu'`afterSave` et `afterDelete` « s'exécutent après la validation de la transaction » et « ne bloquent pas la réponse HTTP ». Cela n'a jamais été le cas. Le code qui a été écrit en se basant sur cette affirmation — un appel de webhook dans `afterSave`, par exemple — a maintenu une transaction de base de données ouverte pendant toute la durée d'un aller-retour HTTP, et a annulé la ligne chaque fois que le service distant était indisponible.
 :::
+
+### Quand `afterSaveError` s'exécute
+
+Il signale un enregistrement qui a échoué **au niveau de la base de données ou
+après celle-ci** — à partir de l'instruction INSERT ou UPDATE. Un enregistrement
+refusé avant ce point n'a jamais atteint la base de données, et le hook n'en est
+donc pas informé.
+
+| S'exécute | Ne s'exécute pas |
+|---|---|
+| La base de données refuse l'instruction : violation d'unicité ou de clé étrangère, contrainte de vérification ou déclencheur, politique de sécurité au niveau des lignes (`WRITE_DENIED`) | Un refus par `beforeSave` — le hook qui a refusé est celui qui le sait |
+| `afterRead` ou `afterSave` lève une exception (l'appelant reçoit `CALLBACK_REJECTED`) | Une requête refusée avant le pilote : validation (`VALIDATION_*`), un champ que l'appelant n'a pas le droit d'écrire, une permission manquante |
+| L'entrée d'historique ne peut pas être enregistrée | Une ligne que l'appelant ne peut pas adresser (`404`), un marquage de tenant qu'il n'a pas le droit de définir |
+| | Le commit est refusé après le retour de l'enregistrement : `TRANSACTION_ABORTED` (une instruction en échec qu'un callback a interceptée), ou une contrainte différée vérifiée au `COMMIT` |
+| | Une suppression — il n'existe pas d'équivalent pour la suppression |
+
+Dans une écriture en masse ou `_batch`, il s'exécute pour la ligne qui a échoué ;
+les lignes qui la précèdent sont annulées (rollback) avec le lot et ne sont pas
+signalées.
 
 ### Effets de bord qui ne doivent pas maintenir la transaction ouverte
 

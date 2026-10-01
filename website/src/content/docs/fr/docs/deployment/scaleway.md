@@ -84,14 +84,13 @@ Scaleway provisionne le conteneur et vous attribue un point de terminaison publi
 
 Le mode `ensure` ne modifie jamais ce qui existe déjà : il ne change pas le type d'une colonne, ne supprime rien et ne modifie pas les valeurs d'un enum existant, car un redémarrage de conteneur ne doit pas altérer un schéma comme effet de bord d'un déploiement.
 
-Deux opérations nécessitent donc toujours l'utilisation de la CLI, exécutée depuis un clone local ou un job CI avec `DATABASE_URL` pointant vers votre base de données managée :
+Une seule chose nécessite donc encore la CLI, exécutée depuis un clone local ou un job CI avec `DATABASE_URL` pointant vers votre base de données managée :
 
 ```bash
 rebase db push
 ```
 
-- **La RLS des tables de jonction** pour les relations many-to-many.
-- **Toute modification qui n'est pas strictement additive** — une colonne renommée, un type restreint, un champ supprimé.
+Toute modification qui n'est pas strictement additive — une colonne renommée, un type restreint, un champ supprimé.
 
 L'image runtime étant fournie sans la CLI, ces actions ne s'exécutent jamais dans le conteneur. Pour des migrations versionnées, committez les fichiers de migration à l'aide de `rebase db generate` et exécutez `rebase db migrate` lors d'une étape de publication (release step).
 
