@@ -1303,6 +1303,21 @@ in the app looks dead under it, and the "fix" it endorses is the wrong one. A
 keystroke targets the focused element. Test the propagation path you actually
 have.
 
+**Then the selector failed exactly as predicted (2026-10-01).** A kit `Menu` is
+`role="menu"` and a `Select` list `role="listbox"`: Escape to dismiss either
+inside the split record view closed the record too, and the inspector's
+document-capture listener — registered when it opened, before the dropdown —
+ran ahead of the dropdown's and closed itself as well. The rule now is one
+property of the event rather than a list of markup: **a handler that acts on a
+key calls `preventDefault()`; a global handler checks `isKeyHandled(event)`
+(from `@rebasepro/ui`) first and does nothing if it is true, and listens in the
+bubble phase.** Every Radix layer already claims the Escape it consumes that
+way, from `document` in the capture phase, so it has run before any bubble
+listener whatever the mount order. Shortcuts other than Escape follow focus: a
+key whose target is inside a dialog, menu or list is that layer's. Pinned in
+`escape_yields_to_open_layer.test.tsx` and the last case of
+`escape_key_ownership.test.tsx`; the rule is in `.agent/workflows/ui-components.md`.
+
 ---
 
 ## 31. A quantity read from outside, parsed but never checked

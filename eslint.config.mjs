@@ -77,6 +77,99 @@ const lucideIconNumericSize = {
 };
 
 /** @type {import("eslint").Linter.Config[]} */
+/**
+ * A global key listener — `keydown`/`keyup` on `window` or `document` — must
+ * yield to a key something above it already acted on, or, if it listens in the
+ * capture phase as a layer of its own, claim the key it acts on.
+ *
+ * One Escape, several listeners: the split view closes the record, the
+ * inspector closes itself, every dropdown closes itself. They used to decide
+ * precedence by asking the DOM for an open `role="dialog"`, which missed every
+ * layer that is not a dialog — Escape to dismiss a menu or a select list closed
+ * the record underneath too. The rule (`.agent/workflows/ui-components.md`,
+ * "Keyboard ownership"): a handler that acts calls `preventDefault()`, and a
+ * global handler checks `isKeyHandled(event)` from @rebasepro/ui first. Radix
+ * layers listen on `document` in the capture phase and claim the Escape they
+ * consume, so a bubble listener that checks sees it, whatever mounted first.
+ *
+ * Satisfied by a handler whose body mentions `isKeyHandled(` or
+ * `defaultPrevented`; a capture-phase handler may instead call
+ * `preventDefault()` on the keys it acts on. A handler the rule cannot see (a
+ * prop, an imported function) is reported too: pass an inline function or a
+ * local one.
+ */
+const globalKeyHandlerYields = {
+    meta: {
+        type: "problem",
+        messages: {
+            noYield: "A global {{event}} listener on `{{target}}` acts without checking whether a layer above already handled the key. Return early on `isKeyHandled(event)` from @rebasepro/ui and listen in the bubble phase (see \"Keyboard ownership\" in .agent/workflows/ui-components.md).",
+            captureNoClaim: "A capture-phase {{event}} listener on `{{target}}` runs before every layer that opens later. Either listen in the bubble phase and return early on `isKeyHandled(event)`, or — if this is a layer of its own — call `event.preventDefault()` on the keys it acts on so the handlers underneath can yield.",
+            unseen: "Cannot see this {{event}} listener's body. Pass an inline or local function so the yield rule (`isKeyHandled`) can be checked.",
+            domQuery: "Asking the DOM whether an overlay is open misses every layer that is not a dialog. Check `isKeyHandled(event)` from @rebasepro/ui instead (see \"Keyboard ownership\" in .agent/workflows/ui-components.md)."
+        },
+        schema: []
+    },
+    create(context) {
+        const KEY_EVENTS = new Set(["keydown", "keyup", "keypress"]);
+        const sourceCode = context.sourceCode;
+        const isGlobal = (node) => node && node.type === "Identifier" && (node.name === "window" || node.name === "document");
+        const isCapture = (node) => {
+            if (!node) return false;
+            if (node.type === "Literal") return node.value === true;
+            if (node.type === "ObjectExpression") {
+                return node.properties.some((p) => p.type === "Property" && p.key && (p.key.name === "capture" || p.key.value === "capture")
+                    && p.value.type === "Literal" && p.value.value === true);
+            }
+            return false;
+        };
+        const handlerText = (node, scopeNode) => {
+            if (!node) return undefined;
+            if (node.type === "ArrowFunctionExpression" || node.type === "FunctionExpression") return sourceCode.getText(node);
+            if (node.type !== "Identifier") return undefined;
+            for (let scope = sourceCode.getScope(scopeNode); scope; scope = scope.upper) {
+                const variable = scope.set.get(node.name);
+                if (!variable) continue;
+                for (const def of variable.defs) {
+                    if (def.node.type === "FunctionDeclaration") return sourceCode.getText(def.node);
+                    if (def.node.type === "VariableDeclarator" && def.node.init) return sourceCode.getText(def.node.init);
+                }
+                return undefined;
+            }
+            return undefined;
+        };
+        return {
+            CallExpression(node) {
+                const callee = node.callee;
+                if (callee.type !== "MemberExpression" || callee.property.type !== "Identifier") return;
+
+                if ((callee.property.name === "querySelector" || callee.property.name === "querySelectorAll")
+                    && node.arguments[0]?.type === "Literal" && typeof node.arguments[0].value === "string"
+                    && /role=["']?dialog["']?\]\[data-state=["']?open/.test(node.arguments[0].value)) {
+                    context.report({ node, messageId: "domQuery" });
+                    return;
+                }
+
+                if (callee.property.name !== "addEventListener" || !isGlobal(callee.object)) return;
+                const [eventArg, handlerArg, optionsArg] = node.arguments;
+                if (eventArg?.type !== "Literal" || !KEY_EVENTS.has(eventArg.value)) return;
+                const data = { event: eventArg.value, target: callee.object.name };
+                const text = handlerText(handlerArg, node);
+                if (text === undefined) {
+                    context.report({ node, messageId: "unseen", data });
+                    return;
+                }
+                if (/\bisKeyHandled\(|\.defaultPrevented\b/.test(text)) return;
+                if (isCapture(optionsArg)) {
+                    if (/\.preventDefault\(\)/.test(text)) return;
+                    context.report({ node, messageId: "captureNoClaim", data });
+                    return;
+                }
+                context.report({ node, messageId: "noYield", data });
+            }
+        };
+    }
+};
+
 export default [
     {
         ignores: [
@@ -180,7 +273,12 @@ export default [
 
         plugins: {
             "react-hooks": pluginReactHooks,
-            rebase: { rules: { "lucide-icon-numeric-size": lucideIconNumericSize } }
+            rebase: {
+                rules: {
+                    "lucide-icon-numeric-size": lucideIconNumericSize,
+                    "global-key-handler-yields": globalKeyHandlerYields
+                }
+            }
         },
 
         languageOptions: {
@@ -277,6 +375,15 @@ export default [
             "@typescript-eslint/no-inferrable-types": "warn",
             "@typescript-eslint/ban-ts-comment": "warn",
             "@typescript-eslint/no-explicit-any": "off"
+        }
+    },
+    {
+        // The browser admin's global key listeners. See `globalKeyHandlerYields`
+        // at the top of this file. Not the Firebase package: its login view is
+        // an independent screen with no layers above it.
+        files: ["packages/{ui,cms,studio,app,forms,plugin-ai,plugin-insights}/src/**/*.{ts,tsx}"],
+        rules: {
+            "rebase/global-key-handler-yields": "error"
         }
     },
     {

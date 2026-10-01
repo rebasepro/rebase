@@ -52,6 +52,22 @@ description: Rules for creating UI components in the Rebase codebase
 
 ---
 
+## Keyboard Ownership (MANDATORY)
+
+One keystroke, several listeners: the split view closes the record on Escape, the inspector closes itself, every dropdown and dialog closes itself. The rule that decides who acts:
+
+1. **A handler that acts on a key calls `event.preventDefault()`.** Every kit overlay (`Dialog`, `Sheet`, `Popover`, `Menu`, `Select`, `MultiSelect`) is a Radix layer and already does this for the Escape that closes it.
+2. **A global key handler** (a `keydown` listener on `window` or `document`) **checks `isKeyHandled(event)` from `@rebasepro/ui` first, and returns if it is true.** It also covers an IME composition in progress.
+3. **Global handlers listen in the bubble phase.** Radix layers listen on `document` in the capture phase, so they have run before any bubble listener — whatever mounted first. A capture listener added before a layer opened runs ahead of it and cannot see its claim. Only a layer of your own, sitting above everything while it is open, belongs in the capture phase, and it must call `preventDefault()` when it acts.
+4. **Never ask the DOM whether an overlay is open** (`document.querySelector('[role="dialog"][data-state="open"]')`). A menu is `role="menu"`, a select list `role="listbox"`, and the list is never finished. For shortcuts other than Escape, ask where focus is: a key whose target is inside a dialog, menu or list belongs to that layer.
+
+## Dialogs
+
+- A `Dialog` or `Sheet` focuses its own container when it opens (pass `initialFocus` to focus a field instead) and returns focus to its opener when it closes. Do not add `autoFocus` to the first field to compensate.
+- A click on the backdrop does **not** close a dialog by default: a record or form dialog holds work. A picker — a dialog whose only job is to choose something, where closing loses nothing — passes `dismissOnBackdrop`. Give every dialog an `onOpenChange` so Escape closes it.
+
+---
+
 ## Responsive Layout Rules (MANDATORY)
 
 1. **Container-aware, not viewport-aware**: Use `ResizeObserver` on the actual container, NOT media queries, for adaptive layout. This ensures correct behavior inside split panels, side panels, and nested layouts.

@@ -37,7 +37,8 @@ import {
     SunIcon,
     SunMoonIcon,
     TextField,
-    Typography
+    Typography,
+    isKeyHandled
 } from "@rebasepro/ui";
 import { User } from "@rebasepro/types";
 import { AuthControllerExtended, MfaFactorSummary } from "@rebasepro/cms-types";
@@ -961,7 +962,8 @@ function LoginForm({
     useEffect(() => {
         if (!document) return;
         const escFunction = (event: KeyboardEvent) => {
-            if (event.key === "Escape") {
+            if (event.key === "Escape" && !isKeyHandled(event)) {
+                event.preventDefault();
                 onClose();
             }
         };
@@ -1604,7 +1606,8 @@ function ForgotPasswordForm({
     useEffect(() => {
         if (!document) return;
         const escFunction = (event: KeyboardEvent) => {
-            if (event.key === "Escape") {
+            if (event.key === "Escape" && !isKeyHandled(event)) {
+                event.preventDefault();
                 onClose();
             }
         };

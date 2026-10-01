@@ -39,7 +39,8 @@ import {
     Typography,
     UploadCloudIcon,
     VideoIcon,
-    XIcon
+    XIcon,
+    isKeyHandled
 } from "@rebasepro/ui";
 import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiBase, useApiConfig } from "@rebasepro/app";
 import { DEFAULT_STORAGE_SOURCE_KEY, type StorageListResult } from "@rebasepro/types";
@@ -926,6 +927,9 @@ message: e instanceof Error ? e.message : String(e) });
         const handler = (e: KeyboardEvent) => {
             // Don't handle shortcuts when a dialog is open
             if (deleteDialogOpen || uploadDialogOpen || newFolderDialogOpen) return;
+            // Nor a key a layer above already acted on — Escape that closed a
+            // menu must not also clear the selection.
+            if (isKeyHandled(e)) return;
             // Cmd/Ctrl+A: select all
             if ((e.metaKey || e.ctrlKey) && e.key === "a") {
                 e.preventDefault();

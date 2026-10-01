@@ -6,7 +6,7 @@ import { CollectionSize, EntityTableController, SelectedCellProps, AdminCollecti
 import { CellRendererParams, VirtualTable, VirtualTableColumn, VirtualTableFilterValues, VirtualTableSortKey, OnRowClickParams } from "@rebasepro/ui";
 import { DEFAULT_PAGE_SIZE, DataCollectionTableController, OnCellValueChange, OnColumnResizeParams } from "@rebasepro/app";
 import { FilterFormFieldProps } from "@rebasepro/ui";
-import { useOutsideAlerter } from "@rebasepro/ui";
+import { isKeyHandled, useOutsideAlerter } from "@rebasepro/ui";
 import { SelectableTableContext } from "./SelectableTableContext";
 import { getRowHeight } from "@rebasepro/app";
 import { FilterFieldBinding } from "./filters/FilterFieldBinding";
@@ -215,7 +215,9 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
     // on ESC key press
     useEffect(() => {
         const escFunction = (event: KeyboardEvent) => {
-            if (event.key !== "Escape") return;
+            // A layer above the table already acted on this Escape (kit rule:
+            // it called preventDefault) — closing it is the whole of the key.
+            if (event.key !== "Escape" || isKeyHandled(event)) return;
             // A key pressed inside something the table opened — a cell's
             // dropdown, portaled out of the table — is that layer's Escape: it
             // closes the list and leaves the cell selected. The next one, from

@@ -7,6 +7,7 @@ import { DetailViewBinding } from "../DetailViewBinding";
 import {
     cls,
     defaultBorderMixin,
+    isKeyHandled,
     ResizablePanels
 } from "@rebasepro/ui";
 import { useLargeLayout, UnsavedChangesDialog, useNavigationBlocker } from "@rebasepro/app";
@@ -76,6 +77,10 @@ function isTextEntryTarget(target: HTMLElement | null): boolean {
  */
 function isListShortcutTarget(target: HTMLElement | null, detailPanel: HTMLElement | null): boolean {
     if (!target || target === document.body) return true;
+    // Focus inside a layer opened above the page — a dialog, a menu, a select
+    // list — means the keystroke is that layer's. A modal traps focus, so this
+    // is also what keeps a bare `j` from moving the list behind an open dialog.
+    if (target.closest('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) return false;
     return !detailPanel?.contains(target);
 }
 
@@ -283,8 +288,11 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
         const handleKeyDown = (e: KeyboardEvent) => {
             const target = e.target as HTMLElement | null;
 
-            // Radix overlays own the keyboard while they are open — including Escape.
-            if (document.querySelector('[role="dialog"][data-state="open"]')) return;
+            // A layer above the record — a dialog, a menu, a select list, the
+            // inspector — claims the key it acts on with preventDefault(). Asking
+            // the DOM for an open `role="dialog"` instead missed every layer that
+            // is not a dialog, so Escape on an open dropdown closed the record too.
+            if (isKeyHandled(e)) return;
 
             if (e.key === "Escape") {
                 if (!selectedEntityId) return;

@@ -6,7 +6,7 @@ import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import type { EntityFormProps } from "../types/components/EntityFormProps";
 import { deepEqual as equal } from "fast-equals";
 
-import { ErrorBoundary } from "@rebasepro/ui";
+import { ErrorBoundary, isKeyHandled } from "@rebasepro/ui";
 import { AlignLeftIcon, useDebouncedCallback } from "@rebasepro/ui";
 import { getCopyValues, getDefaultValuesFor } from "@rebasepro/common";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
@@ -241,6 +241,8 @@ export function EntityForm<M extends Record<string, unknown>>({
     useEffect(() => {
 
         const handleKeyDown = (e: KeyboardEvent) => {
+            // A layer above the form (a dialog, a menu) already acted on it.
+            if (isKeyHandled(e)) return;
             const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "z";
             const isRedo =
                 ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "z") ||

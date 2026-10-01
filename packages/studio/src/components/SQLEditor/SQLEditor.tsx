@@ -19,6 +19,7 @@ import {
     IconButton,
     iconSize,
     InputLabel,
+    isKeyHandled,
     Menu,
     MenuIcon,
     MenuItem,
@@ -915,6 +916,8 @@ role: selectedRole });
     // Global keybindings
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // A layer above the editor (a dialog, a menu) already acted on it.
+            if (isKeyHandled(e)) return;
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 // If we are in an input or textarea (except the code editor which handles its own), we might not want to run
                 const activeElement = document.activeElement;

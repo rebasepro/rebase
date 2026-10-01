@@ -9,6 +9,7 @@ import {
     ErrorBoundary,
     IconButton,
     iconSize,
+    isKeyHandled,
     lazyChunk,
     Tab,
     Tabs,
@@ -78,32 +79,30 @@ export function EntityInspector({
 
     // Escape closes the inspector, and only the inspector.
     //
-    // The split view holds its own Escape listener for as long as a record is
-    // selected, and closing the record panel is a navigation — so an Escape
-    // meant for this panel was taking the whole record with it. On `window` in
-    // the bubble phase, as this listener used to be, `stopPropagation` cannot
-    // prevent that: it governs an event's travel *between* elements and says
-    // nothing about the other listeners on the element it is called from. Both
-    // ran, and the split's ran first, because it registered first — this one
-    // only exists while the inspector is open, which is always later.
+    // The split view holds its own Escape listener (`window`, bubble) for as
+    // long as a record is selected, and closing the record panel is a
+    // navigation — so an Escape meant for this panel used to take the whole
+    // record with it. The kit's rule settles it without depending on who
+    // mounted first: this listener is on `document` in the bubble phase, which
+    // every keystroke reaches before `window`; it acts only when nothing above
+    // has handled the key (`isKeyHandled`), and marks it handled when it does,
+    // so the split view leaves the record alone.
     //
-    // Capture on `document` is the idiom that holds regardless of mount order:
-    // it runs on the way down, before anything bubbles back to `window`, and
-    // there `stopPropagation` is enough. It is what the relation and user
-    // selectors already use to own the key while their popovers are open.
-    // Pinned in escape_key_ownership.test.tsx; see docs/bug-classes.md.
+    // Bubble, not capture. A menu or select list opened over the record is a
+    // Radix layer listening on `document` in the capture phase, and it calls
+    // preventDefault() on the Escape that closes it. A capture listener here,
+    // registered when the inspector opened — before that layer — ran first and
+    // could not see the claim: Escape on the dropdown closed the inspector too.
+    // Pinned in escape_yields_to_open_layer.test.tsx; see docs/bug-classes.md.
     useEffect(() => {
         if (!open) return;
         const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key !== "Escape") return;
-            // A Radix overlay opened from inside the inspector is above it and
-            // owns the key first — the same rule the split view applies.
-            if (document.querySelector('[role="dialog"][data-state="open"]')) return;
-            e.stopPropagation();
+            if (e.key !== "Escape" || isKeyHandled(e)) return;
+            e.preventDefault();
             onClose();
         };
-        document.addEventListener("keydown", onKeyDown, true);
-        return () => document.removeEventListener("keydown", onKeyDown, true);
+        document.addEventListener("keydown", onKeyDown);
+        return () => document.removeEventListener("keydown", onKeyDown);
     }, [open, onClose]);
 
     if (!open) return null;

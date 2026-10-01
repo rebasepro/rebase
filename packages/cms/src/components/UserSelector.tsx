@@ -358,8 +358,12 @@ export const UserSelector = React.forwardRef<
                 setIsPopoverOpen(false);
             }
 
+            // A layer of its own, so capture phase — and it claims the Escape
+            // it acts on, so the record view underneath leaves the record open.
             function handleKey(ev: KeyboardEvent) {
-                if (ev.key === "Escape") setIsPopoverOpen(false);
+                if (ev.key !== "Escape") return;
+                ev.preventDefault();
+                setIsPopoverOpen(false);
             }
 
             document.addEventListener("mousedown", handlePointerDown, true);

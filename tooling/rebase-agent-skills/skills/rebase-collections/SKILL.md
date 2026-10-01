@@ -682,7 +682,7 @@ title: {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | `"varchar"` | Database column type |
-| `isId` | `boolean \| "manual" \| "uuid" \| "cuid" \| string` | — | Mark as primary key with generation strategy |
+| `isId` | `boolean \| "manual" \| "uuid" \| string` | — | Mark as primary key with generation strategy |
 | `enum` | `EnumValues` | — | Dropdown/picklist values |
 | `admin.multiline` | `boolean` | `false` | Multi-line text area |
 | `admin.markdown` | `boolean` | `false` | Markdown editor with preview. Uses the `RichTextEditor` component (`import { RichTextEditor } from "@rebasepro/cms/editor"`) — a full WYSIWYG editor supporting Markdown, JSON, and HTML output. |
@@ -698,9 +698,16 @@ title: {
 | Value | Behavior |
 |-------|----------|
 | `true` / `"manual"` | User-defined ID, must be entered manually |
-| `"uuid"` | Auto-generated UUID via `gen_random_uuid()` |
-| `"cuid"` | Auto-generated CUID |
-| Any other string | Raw SQL default expression, e.g. `"nanoid()"` |
+| `"uuid"` | Auto-generated UUID via `gen_random_uuid()` (a `uuid` column) |
+| Any other string | Raw SQL default expression, e.g. `"nanoid()"`. The function must exist — nothing creates it |
+
+`"cuid"` is refused at config load: there is no `cuid()` function in Postgres, so
+boot stops with an error naming the property. Use `"uuid"`, or a SQL strategy
+whose function you create in a migration.
+
+A collection where no property has `isId` gets an implicit
+`id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`: the database fills it, so
+creating a row needs no key from the admin form, REST or the SDK.
 
 ### String Validation
 

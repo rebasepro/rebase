@@ -119,4 +119,34 @@ describe("claiming a global key", () => {
         window.removeEventListener("keydown", onWindowBubble);
         document.removeEventListener("keydown", onDocumentCapture, true);
     });
+
+    it("a bubble listener that skips handled keys yields to a layer that opened after it", () => {
+        const ran: string[] = [];
+        // The inspector: registered when it opened, on document, bubble phase.
+        const panel = (e: KeyboardEvent) => {
+            if (e.defaultPrevented) return; // the kit's isKeyHandled
+            ran.push("panel");
+            e.preventDefault();
+        };
+        document.addEventListener("keydown", panel);
+        // A Radix layer opened later inside it: document, capture phase, and it
+        // calls preventDefault() on the Escape it consumes.
+        const layer = (e: KeyboardEvent) => {
+            ran.push("layer");
+            e.preventDefault();
+        };
+        document.addEventListener("keydown", layer, true);
+
+        fire();
+
+        // Capture runs before bubble whatever the registration order, and the
+        // claim is a property of the event, not of its path — so it holds
+        // across elements and phases, where stopPropagation held only across
+        // elements. A capture listener in the panel's place would have run
+        // first, before the layer could claim anything.
+        expect(ran).toEqual(["layer"]);
+
+        document.removeEventListener("keydown", panel);
+        document.removeEventListener("keydown", layer, true);
+    });
 });

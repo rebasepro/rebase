@@ -38,6 +38,7 @@ export type { PortalContainerContextType, PortalContainerProviderProps } from ".
 // Lower-level utilities (used by framework packages)
 // =============================================================================
 export { debounce } from "./util/debounce";
+export { isKeyHandled } from "./util/keys";
 export type { Cancelable } from "./util/debounce";
 
 // =============================================================================

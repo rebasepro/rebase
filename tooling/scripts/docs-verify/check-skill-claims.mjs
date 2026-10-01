@@ -438,6 +438,77 @@ function checkScaffoldPaths(root, findings) {
     }
 }
 
+/**
+ * The `isId` strategies config load refuses, read out of `validate-config.ts`:
+ * every `property.isId === "<x>"` test whose block opens with `collect.error(`.
+ */
+export function refusedIdStrategies(root) {
+    const validate = read(root, "packages/server/src/collections/validate-config.ts");
+    return new Set(
+        [...validate.matchAll(/property\.isId\s*===\s*"([^"]+)"\s*\)\s*\{\s*collect\.error\(/g)].map((m) => m[1])
+    );
+}
+
+/** The English docs, the skills and the scaffold's agent instructions. */
+const ID_STRATEGY_SURFACES = [
+    `${SKILLS}/**/*.md`,
+    "website/src/content/docs/docs/**/*.md",
+    "website/src/content/docs/docs/**/*.mdx",
+    "packages/cli/templates/template/ai-instructions.md"
+];
+
+/**
+ * Every `isId` strategy a skill or page offers is one config load accepts.
+ *
+ * `rebase-collections` listed `"cuid"` as "Auto-generated CUID" in its strategy
+ * table and its `isId` type, while `validate-config` refuses it — so an agent
+ * that followed the skill wrote a collection whose first boot failed. The
+ * refusal set is read from the validator, so a strategy refused tomorrow is
+ * caught in the skill that still offers it today.
+ *
+ * A line is about `isId` when it names it, or sits under a heading that does
+ * (a strategy table's rows name only the value). Naming a refused strategy
+ * there is a finding unless the line says it is refused — the correction has
+ * to be able to spell the name. The changelog is history, and exempt.
+ */
+export function checkIdStrategies(root, findings = []) {
+    const refused = refusedIdStrategies(root);
+    if (!refused.size) {
+        findings.push({
+            file: "packages/server/src/collections/validate-config.ts",
+            message:
+                "no refused `isId` strategy found (`property.isId === \"…\"` then `collect.error(`) — " +
+                "the isId-strategy rule is not running. If the refusal moved, point refusedIdStrategies at it."
+        });
+        return findings;
+    }
+    const files = ID_STRATEGY_SURFACES.flatMap((pattern) => globSync(pattern, { cwd: root }))
+        .filter((rel) => !/CHANGELOG\.md$/.test(rel));
+    const saysRefused = /refus|reject|not supported|cannot|can't|fails? (?:at|on)/i;
+    for (const rel of files) {
+        const lines = read(root, rel).split("\n");
+        const skip = ignoredLines(lines);
+        let heading = "";
+        lines.forEach((line, i) => {
+            if (/^#{1,6}\s/.test(line)) heading = line;
+            if (skip.has(i + 1)) return;
+            if (!/isId/.test(line) && !/isId/.test(heading)) return;
+            for (const strategy of refused) {
+                if (!new RegExp(`["'\`]${strategy}["'\`]`).test(line)) continue;
+                if (saysRefused.test(line)) continue;
+                findings.push({
+                    file: `${rel}:${i + 1}`,
+                    message:
+                        `offers \`isId: "${strategy}"\`, which config load refuses ` +
+                        "(packages/server/src/collections/validate-config.ts) — a collection written from this " +
+                        "line fails its first boot. Drop it, or say it is refused."
+                });
+            }
+        });
+    }
+    return findings;
+}
+
 /** Counts a skill states about something this repository can count. */
 function checkCounts(root, findings) {
     const studio = read(root, "packages/studio/src/components/RebaseStudio.tsx");
@@ -496,6 +567,7 @@ export function checkSkillClaims(root) {
     checkScaffoldPaths(root, findings);
     checkDbSubcommandCoverage(root, findings);
     checkAdminModes(root, findings);
+    checkIdStrategies(root, findings);
 
     return { findings, scanned };
 }
