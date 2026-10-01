@@ -169,3 +169,29 @@ describe("finishing a sign-in that answered MFA_REQUIRED", () => {
         expect(authorizationOf("/auth/mfa/challenge")).toEqual(["Bearer held-access"]);
     });
 });
+
+describe("a mistyped step-up code on a held session", () => {
+    it("is sent once, and does not refresh the session", async () => {
+        // The challenge claims an attempt before it judges the code, and allows
+        // five. Treating its 401 INVALID_CODE as an expired token refreshed the
+        // session (rotating the refresh token, emitting TOKEN_REFRESHED) and
+        // resent the same wrong code — two attempts per typo, so the third typo
+        // exhausted a challenge documented as allowing five.
+        const { auth, transport, calls, events } = setup({
+            "/auth/login": [() => tokenResponse("held-access")],
+            "/auth/mfa/challenge/verify": [() => errorResponse(401, "INVALID_CODE")]
+        });
+        // What `createRebaseClient` wires.
+        transport.setOnUnauthorized(() => auth.handleUnauthorized());
+        await auth.signInWithEmail("u1@example.test", "pw");
+        events.length = 0;
+
+        const refusal = await auth.mfa.verifyChallenge("ch1", "000000").catch((e: unknown) => e);
+
+        expect((refusal as RebaseApiError).code).toBe("INVALID_CODE");
+        expect(calls.filter(c => c.path === "/auth/mfa/challenge/verify")).toHaveLength(1);
+        expect(calls.filter(c => c.path === "/auth/refresh")).toHaveLength(0);
+        expect(events).toEqual([]);
+        expect(auth.getSession()?.accessToken).toBe("held-access");
+    });
+});

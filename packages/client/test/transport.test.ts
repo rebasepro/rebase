@@ -705,6 +705,60 @@ status: 200,
             expect(secondCallHeaders["Authorization"]).toBe("Bearer refreshed-token");
         });
 
+        // A 401 is not always about the token. `/auth/change-password` answers
+        // 401 INVALID_CREDENTIALS for a wrong current password, and an MFA
+        // challenge 401 INVALID_CODE for a mistyped code — and the challenge
+        // claims an attempt before judging the code. Refreshing and resending
+        // those rotated the session, double-hit the rate limiters, and spent
+        // two of the challenge's five attempts on every typo.
+        describe("only a token 401 is refreshed and resent", () => {
+            const answer401 = (code?: string) => ({
+                ok: false,
+                status: 401,
+                statusText: "Unauthorized",
+                text: async () => JSON.stringify({ error: { message: "nope", ...(code ? { code } : {}) } })
+            });
+
+            it.each(["INVALID_CREDENTIALS", "INVALID_CODE", "CHALLENGE_EXHAUSTED", "MFA_REQUIRED"])(
+                "surfaces %s as it is, without a refresh or a second send",
+                async (code) => {
+                    const onUnauthorized = jest.fn<() => Promise<boolean>>().mockResolvedValue(true);
+                    const transport = createTransport({
+                        baseUrl: "http://localhost",
+                        onUnauthorized,
+                        fetch: fetchMock as typeof globalThis.fetch
+                    });
+                    fetchMock.mockResolvedValueOnce(answer401(code));
+
+                    await expect(transport.request("/auth/mfa/challenge/verify", { method: "POST" }))
+                        .rejects.toMatchObject({ status: 401, code });
+                    expect(onUnauthorized).not.toHaveBeenCalled();
+                    expect(fetchMock).toHaveBeenCalledTimes(1);
+                }
+            );
+
+            it.each(["UNAUTHORIZED", "INVALID_TOKEN", "TOKEN_EXPIRED", "SESSION_REVOKED", undefined])(
+                "refreshes and resends on %s",
+                async (code) => {
+                    // No code at all is a 401 from an older server, a proxy or
+                    // anything that does not speak the envelope: the token is
+                    // the likeliest cause, so it is treated as one.
+                    const onUnauthorized = jest.fn<() => Promise<boolean>>().mockResolvedValueOnce(true);
+                    const transport = createTransport({
+                        baseUrl: "http://localhost",
+                        onUnauthorized,
+                        fetch: fetchMock as typeof globalThis.fetch
+                    });
+                    fetchMock.mockResolvedValueOnce(answer401(code));
+                    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, text: async () => JSON.stringify({ ok: 1 }) });
+
+                    await expect(transport.request("/data/posts")).resolves.toEqual({ ok: 1 });
+                    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+                    expect(fetchMock).toHaveBeenCalledTimes(2);
+                }
+            );
+        });
+
         it("does not retry 401 when no onUnauthorized is configured", async () => {
             const transport = createTransport({
                 baseUrl: "http://localhost",

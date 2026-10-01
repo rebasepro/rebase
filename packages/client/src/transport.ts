@@ -333,6 +333,32 @@ export function buildAggregateQueryString(params: AggregateParams): string {
 }
 
 /**
+ * The 401 codes that mean "the credential on this request is no good", which a
+ * refreshed token can fix.
+ *
+ * The rest of the 401s are answers about something the caller *sent*: a wrong
+ * current password (`INVALID_CREDENTIALS`), a mistyped MFA code (`INVALID_CODE`,
+ * `CHALLENGE_EXHAUSTED`), a sign-in that needs a second factor
+ * (`MFA_REQUIRED`). Refreshing and resending one of those rotated the session
+ * for nothing, sent the same wrong answer twice — and an MFA challenge claims
+ * an attempt before it judges the code, so every typo cost two of its five.
+ */
+const TOKEN_REFUSAL_CODES = new Set(["UNAUTHORIZED", "INVALID_TOKEN", "TOKEN_EXPIRED", "SESSION_REVOKED"]);
+
+/**
+ * Whether a 401's body says the token was the problem.
+ *
+ * A 401 with no code at all counts: it is what an older server, a proxy or
+ * anything not speaking the envelope sends, and there the token is the
+ * likeliest cause — refreshing is what this client always did with it.
+ */
+function isTokenRefusal(body: Record<string, unknown>): boolean {
+    const error = body?.error;
+    const code = error && typeof error === "object" ? (error as Record<string, unknown>).code : undefined;
+    return typeof code !== "string" || code === "" || TOKEN_REFUSAL_CODES.has(code);
+}
+
+/**
  * Response metadata a caller can ask for, filled in by `request`.
  *
  * An out-parameter rather than a second return value, because every one of the
@@ -637,7 +663,7 @@ headers });
             }
         }
 
-        if (res.status === 401 && onUnauthorizedHandler) {
+        if (res.status === 401 && onUnauthorizedHandler && isTokenRefusal(body)) {
             const retried = await onUnauthorizedHandler();
             if (retried) {
                 let retryToken = token;
