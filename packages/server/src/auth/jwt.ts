@@ -455,7 +455,10 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
             })()
         };
     } catch (error) {
-        logger.error("[JWT] Verification failed", { error: error, detail: token.substring(0, 15) });
+        // No part of the token. A bearer that fails here may be the service key
+        // or an API key, and its first characters were going into the log of
+        // every refused request.
+        logger.error("[JWT] Verification failed", { error: error });
         return null;
     }
 }
@@ -570,6 +573,13 @@ export interface DownloadTokenPayload {
      * existed are read.
      */
     storageId: string;
+    /**
+     * An opaque mark of the user who minted the token, for rate limiting only:
+     * a read that spends the token is charged to that user's allowance rather
+     * than to the reader's address. A hash, because the token travels in a URL.
+     * Absent for a token minted for nobody.
+     */
+    rl?: string;
 }
 
 /**
@@ -592,7 +602,9 @@ export interface DownloadTokenPayload {
 export async function generateDownloadToken(
     path: string,
     expiresInSeconds: number = 300,
-    storageId?: string | null
+    storageId?: string | null,
+    /** The user minting it, so the reads it buys are charged to them. */
+    principal?: string | null
 ): Promise<string> {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
@@ -601,13 +613,19 @@ export async function generateDownloadToken(
     const payload: DownloadTokenPayload = {
         purpose: "file-read",
         path,
-        storageId: canonicalStorageId(storageId)
+        storageId: canonicalStorageId(storageId),
+        ...(principal ? { rl: await downloadTokenRateLimitMark(principal) } : {})
     };
 
     return signJwt({ ...payload }, jwtConfig.secret, {
         expiresIn: expiresInSeconds,
         algorithm: "HS256"
     });
+}
+
+/** See {@link DownloadTokenPayload.rl}. */
+async function downloadTokenRateLimitMark(principal: string): Promise<string> {
+    return (await sha256Hex(`download-token-rl:${principal}`)).slice(0, 32);
 }
 
 /**
@@ -633,7 +651,8 @@ export async function verifyDownloadToken(token: string): Promise<DownloadTokenP
                 path: decoded.path,
                 storageId: canonicalStorageId(
                     typeof decoded.storageId === "string" ? decoded.storageId : null
-                )
+                ),
+                ...(typeof decoded.rl === "string" ? { rl: decoded.rl } : {})
             };
         }
         return null;

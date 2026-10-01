@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { createDataRateLimiter, createDataRateLimitCheck } from "../src/auth/rate-limiter";
 import { MemoryRateLimitStore, RateLimitStore } from "../src/auth/rate-limit-store";
@@ -382,6 +382,85 @@ describe("createDataRateLimiter — identity with no auth middleware ahead of it
         // Same IP, different person: their own budget, not the first one's.
         expect((await hitWith(app, { authorization: `Bearer ${two}` })).status).toBe(200);
         expect((await hitWith(app, { authorization: `Bearer ${one}` })).status).toBe(429);
+    });
+
+    /**
+     * An `<img src=…/file/x?token=…>` carries no Authorization header, so a
+     * signed-in editor's thumbnails were bucketed by IP at the anonymous
+     * allowance — 300 per 15 minutes for everyone behind one office NAT, and
+     * the 301st image load a 429 while the same editor's API calls went
+     * through. The download token now carries an opaque mark of the user who
+     * minted it, and the read is charged to that user.
+     */
+    it("charges a download-token read to the user who minted it, not to the address", async () => {
+        const { configureJwt, generateDownloadToken } = await import("../src/auth/jwt");
+        configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });
+        const editor = await generateDownloadToken("default/a.png", 300, undefined, "editor-1");
+        const other = await generateDownloadToken("default/a.png", 300, undefined, "editor-2");
+
+        const app = bareApp({ anonymous: 1, user: 3 });
+        const read = (token: string) => app.fetch(new Request(`http://localhost/file?token=${token}`, { headers: { "x-real-ip": "9.9.9.9" } }));
+
+        expect((await read(editor)).status).toBe(200);
+        expect((await read(editor)).status).toBe(200);
+        expect((await read(editor)).status).toBe(200);
+        expect((await read(editor)).status).toBe(429);
+        // Same address, another editor: their own allowance.
+        expect((await read(other)).status).toBe(200);
+    });
+
+    it("keeps the minting user out of the token in the clear", async () => {
+        const { configureJwt, generateDownloadToken } = await import("../src/auth/jwt");
+        configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });
+        const token = await generateDownloadToken("default/a.png", 300, undefined, "editor-with-a-findable-uid");
+        const payload = Buffer.from(token.split(".")[1], "base64url").toString("utf-8");
+        expect(payload).not.toContain("editor-with-a-findable-uid");
+    });
+
+    it("charges a download token minted for nobody to the address, as before", async () => {
+        const { configureJwt, generateDownloadToken } = await import("../src/auth/jwt");
+        configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });
+        const token = await generateDownloadToken("default/a.png", 300);
+
+        const app = bareApp({ anonymous: 1, user: 50 });
+        const read = () => app.fetch(new Request(`http://localhost/file?token=${token}`, { headers: { "x-real-ip": "9.9.9.9" } }));
+        expect((await read()).status).toBe(200);
+        expect((await read()).status).toBe(429);
+    });
+
+    /**
+     * `rebase.storage` in functions and cron sends the internal service key,
+     * which is not a JWT, and the storage router's limiter runs before any auth
+     * middleware has put the service identity on the context — so a cron job
+     * processing 300 files got 429s, and every call logged a verification
+     * failure carrying the first characters of the key.
+     */
+    it("never limits the service key, recognised before any auth middleware", async () => {
+        const { configureJwt } = await import("../src/auth/jwt");
+        configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });
+        const serviceKey = "svc_" + "k".repeat(60);
+
+        const app = bareApp({ anonymous: 1, user: 1, serviceKey });
+
+        for (let i = 0; i < 5; i++) {
+            expect((await hitWith(app, { authorization: `Bearer ${serviceKey}` })).status).toBe(200);
+        }
+        // A key that is not the service key buys nothing.
+        expect((await hitWith(app, { authorization: `Bearer ${serviceKey}x` })).status).toBe(200);
+        expect((await hitWith(app, { authorization: `Bearer ${serviceKey}x` })).status).toBe(429);
+    });
+
+    it("never writes any part of a refused token to the log", async () => {
+        const { configureJwt, verifyAccessToken } = await import("../src/auth/jwt");
+        const { logger } = await import("../src/utils/logger");
+        configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });
+        const error = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+        try {
+            expect(await verifyAccessToken("svc_secretsecretsecret")).toBeNull();
+            expect(JSON.stringify(error.mock.calls)).not.toContain("svc_secret");
+        } finally {
+            error.mockRestore();
+        }
     });
 
     it("still buckets an unverifiable token by IP, so a forged one buys nothing", async () => {

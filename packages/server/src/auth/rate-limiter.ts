@@ -4,7 +4,8 @@ import { isAnonymousUid, type DataRateLimitCaller } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { MemoryRateLimitStore, RateLimitDecision, RateLimitStore } from "./rate-limit-store";
 import { extractBearerToken } from "./bearer-token";
-import { isJwtConfigured, verifyAccessToken } from "./jwt";
+import { isJwtConfigured, verifyAccessToken, verifyDownloadToken } from "./jwt";
+import { safeCompare } from "./crypto-utils";
 import { SERVICE_IDENTITY } from "./rls-scope";
 import { logger } from "../utils/logger";
 
@@ -476,6 +477,12 @@ export interface DataRateLimitConfig {
     anonymousFunctions?: number | null;
     /** Share counts across replicas. Defaults to this process's memory. */
     store?: RateLimitStore;
+    /**
+     * The deployment's service key, recognised as a Bearer before any auth
+     * middleware has run — the storage router's limiter runs ahead of its
+     * routes' auth — and never limited. See {@link dataRateLimitBuckets}.
+     */
+    serviceKey?: string;
 }
 
 /** @see DataRateLimitConfig.anonymousFunctions */
@@ -537,17 +544,36 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
         // throw rather than return null.
         if (!isJwtConfigured()) return undefined;
         const token = extractBearerToken(c.req.header("authorization"));
-        if (token === undefined) return undefined;
+        if (token === undefined) {
+            // A file read by download token — an `<img src=…?token=…>`, which
+            // carries no header. Charged to the user who minted the token, under
+            // a mark of its own: bucketed by address, a page of thumbnails spent
+            // the anonymous allowance of everyone behind the same NAT.
+            const queryToken = c.req.query("token");
+            if (!queryToken) return undefined;
+            const grant = await verifyDownloadToken(queryToken);
+            return grant?.rl ? `file:${grant.rl}` : undefined;
+        }
         const payload = await verifyAccessToken(token);
         if (!payload?.uid || isAnonymousUid(payload.uid)) return undefined;
         return payload.uid;
     };
 
+    const isServiceKey = (c: Parameters<MiddlewareHandler<HonoEnv>>[0]): boolean => {
+        if (!config.serviceKey) return false;
+        const token = extractBearerToken(c.req.header("authorization"));
+        return token !== undefined && safeCompare(token, config.serviceKey);
+    };
+
     const bucketOf = async (c: Parameters<MiddlewareHandler<HonoEnv>>[0]): Promise<DataRateLimitBucket | null> => {
         // The service key is not a caller to bound — see `dataRateLimitBuckets`.
-        // Read off the context, where the auth middleware put it.
+        // Read off the context, where the auth middleware put it — or, where no
+        // auth middleware has run yet, off the request itself. It is not a JWT,
+        // so verifying it as one bucketed `rebase.storage` from cron by address
+        // and logged a refusal per call.
         const serviceIdentity = c.get("user") as { uid?: string } | undefined;
         if (serviceIdentity?.uid === SERVICE_IDENTITY.uid) return null;
+        if (isServiceKey(c)) return null;
         const apiKey = c.get("apiKey") as { id: string; rate_limit?: number | null } | undefined;
         return bucketFor({
             apiKey,

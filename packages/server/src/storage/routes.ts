@@ -14,7 +14,7 @@ import type { Stats } from "node:fs";
 import { StorageController, type StorageAuthorize, type StorageAuthorizeData, type StorageOperation } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
-import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type DownloadConfig, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
+import { DEFAULT_STORAGE_SOURCE_KEY, isAnonymousUid, isPublicStoragePath, type DownloadConfig, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
 import {
     assertUploadWithinPathLimits,
     assertUploadWithinPropertyLimits,
@@ -1028,7 +1028,15 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 // hook above was asked about one object; a key is only unique
                 // within its own source, so a token that named the path alone
                 // would spend against the same key in every other one.
-                downloadConfig.metadata.token = await generateDownloadToken(scopedPath, downloadTokenTtl, storageId);
+                // Minted for this user, so the reads it buys are charged to
+                // their rate-limit allowance and not to the reader's address.
+                const minter = principal?.uid;
+                downloadConfig.metadata.token = await generateDownloadToken(
+                    scopedPath,
+                    downloadTokenTtl,
+                    storageId,
+                    minter && minter !== "public" && !isAnonymousUid(minter) ? minter : undefined
+                );
                 downloadConfig.metadata.tokenExpiresIn = downloadTokenTtl;
             }
         }

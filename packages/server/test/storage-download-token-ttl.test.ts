@@ -59,6 +59,21 @@ describe("the download token's lifetime", () => {
         expect(exp - iat).toBe(3600);
     });
 
+    it("marks the token with the user who minted it, for the rate limiter", async () => {
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.use("*", async (c, next) => {
+            c.set("user", { uid: "editor-1", roles: ["editor"] });
+            await next();
+        });
+        app.route("/api/storage", createStorageRoutes({ controller, requireAuth: false }));
+        const res = await app.request("/api/storage/metadata/videos/a.mp4");
+        const { token } = (await res.json() as { data: { token: string } }).data;
+        const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf-8")) as { rl?: string };
+        expect(typeof payload.rl).toBe("string");
+        expect(JSON.stringify(payload)).not.toContain("editor-1");
+    });
+
     it.each([0, -1, 1.5, 604801, Number.NaN])("refuses %s when the routes are built", (ttl) => {
         expect(() => createStorageRoutes({ controller, requireAuth: false, downloadTokenTtlSeconds: ttl }))
             .toThrow(/download token/i);

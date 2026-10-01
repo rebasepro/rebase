@@ -1725,7 +1725,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     setSharedRateLimitStore(sharedRateLimitStore);
     const rateLimitConfig: DataRateLimitConfig | undefined =
         config.rateLimit?.enabled !== false
-            ? { ...config.rateLimit, store: rateLimitStore }
+            ? { ...config.rateLimit, store: rateLimitStore, serviceKey: internalServiceKey }
             : undefined;
 
     // 3. Initialize Storage
