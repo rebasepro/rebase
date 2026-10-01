@@ -6,18 +6,19 @@ type TextFieldChangeEvent = React.ChangeEvent<HTMLInputElement | HTMLTextAreaEle
 
 export function DebouncedTextField<T extends string | number>(props: TextFieldProps<T>) {
 
-    const [internalValue, setInternalValue] = useState<T | string>(props.value ?? "");
-    const lastSentValueRef = useRef<T | string>(props.value ?? "");
+    const { value, onChange, name, onKeyDown, onBlur } = props;
+    const [internalValue, setInternalValue] = useState<T | string>(value ?? "");
+    const lastSentValueRef = useRef<T | string>(value ?? "");
     const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     // Sync state with props.value when it changes externally
     useEffect(() => {
-        const externalValue = props.value ?? "";
+        const externalValue = value ?? "";
         if (externalValue !== lastSentValueRef.current) {
             setInternalValue(externalValue);
             lastSentValueRef.current = externalValue;
         }
-    }, [props.value]);
+    }, [value]);
 
     // A value still waiting on the timer when the field unmounts is reported,
     // not dropped: a dialog that closes on Enter unmounts the field it was
@@ -33,24 +34,24 @@ export function DebouncedTextField<T extends string | number>(props: TextFieldPr
         };
     }, []);
 
-    const flushChange = useCallback((value: T | string, event?: TextFieldChangeEvent) => {
+    const flushChange = useCallback((next: T | string, event?: TextFieldChangeEvent) => {
         if (timerRef.current) {
             clearTimeout(timerRef.current);
             timerRef.current = undefined;
         }
-        if (value !== props.value && props.onChange) {
-            lastSentValueRef.current = value;
+        if (next !== value && onChange) {
+            lastSentValueRef.current = next;
             const e = {
                 ...event,
                 target: {
                     ...event?.target,
-                    value: value,
-                    name: props.name
+                    value: next,
+                    name
                 }
             } as TextFieldChangeEvent;
-            props.onChange(e);
+            onChange(e);
         }
-    }, [props.value, props.onChange, props.name]);
+    }, [value, onChange, name]);
 
     const internalOnChange = useCallback((event: TextFieldChangeEvent) => {
         const newValue = event.target.value;
@@ -78,13 +79,13 @@ export function DebouncedTextField<T extends string | number>(props: TextFieldPr
     // implicit submission, and React renders the change in between.
     const internalOnKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if (event.key === "Enter" && timerRef.current) flushChange(internalValue);
-        props.onKeyDown?.(event as React.KeyboardEvent<HTMLInputElement>);
-    }, [internalValue, flushChange, props.onKeyDown]);
+        onKeyDown?.(event as React.KeyboardEvent<HTMLInputElement>);
+    }, [internalValue, flushChange, onKeyDown]);
 
     const internalOnBlur = useCallback((event: React.FocusEvent<HTMLInputElement>) => {
         flushChange(internalValue, event as TextFieldChangeEvent);
-        props.onBlur?.(event);
-    }, [internalValue, flushChange, props.onBlur]);
+        onBlur?.(event);
+    }, [internalValue, flushChange, onBlur]);
 
     return <TextField {...props}
         onChange={internalOnChange}

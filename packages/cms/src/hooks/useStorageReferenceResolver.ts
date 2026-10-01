@@ -30,6 +30,10 @@ export function useStorageReferenceResolver(): (target: StorageReferenceTarget) 
         if (!source) return null;
         const config = await source.getSignedUrl(key);
         return config.fileNotFound ? null : config.url;
+    // `sourceKeys` is read nowhere inside, on purpose: it gives the resolver a
+    // new identity when a source is added or removed, so a preview that found
+    // no source for its reference resolves again once that source arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-identify on the set of sources, not on the map
     }, [defaultSource, sourceKeys]);
 }
 
