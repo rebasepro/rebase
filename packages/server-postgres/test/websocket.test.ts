@@ -798,6 +798,30 @@ describe("WebSocket Server SQL audit line", () => {
         expect(entry.uid).toBe("admin-user");
         expect(entry.requestId).toBe("req-audit");
     });
+
+    /**
+     * The statement itself was written verbatim, so a password set from the
+     * console landed in the production logs: the logger redacts by key name,
+     * and the password was inside the `sql` value.
+     */
+    it("masks the literals a statement carries — a password among them — and keeps its shape", async () => {
+        const connectionCallback = mockWssInstance.on.mock.calls.find((call: any[]) => call[0] === "connection")[1];
+        const mockWs = { on: jest.fn(), send: jest.fn() } as any;
+        connectionCallback(mockWs);
+        const messageCallback = mockWs.on.mock.calls.find((call: any[]) => call[0] === "message")[1];
+        await messageCallback(Buffer.from(JSON.stringify({ type: "AUTHENTICATE", requestId: "auth", payload: { token: "t" } })));
+        await messageCallback(Buffer.from(JSON.stringify({
+            type: "EXECUTE_SQL",
+            requestId: "req-password",
+            payload: { sql: "ALTER ROLE app WITH LOGIN PASSWORD 'hunter2'" }
+        })));
+
+        const entry = mockLogger.info.mock.calls.find(
+            (call: any[]) => call[0] === "[SQL Audit] WebSocket SQL execution"
+        )![1] as Record<string, unknown>;
+        expect(JSON.stringify(entry)).not.toContain("hunter2");
+        expect(entry.sql).toBe("ALTER ROLE app WITH LOGIN PASSWORD '***'");
+    });
 });
 
 

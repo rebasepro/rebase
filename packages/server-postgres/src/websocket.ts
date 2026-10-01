@@ -5,6 +5,7 @@ import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
 import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketLimits, WebSocketMessage } from "@rebasepro/types";
 import type { SqlScriptResult } from "@rebasepro/types";
+import { redactSqlLiterals } from "./utils/sql-redaction";
 import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
@@ -968,8 +969,14 @@ colors: true }));
                             // whatever row the operator was touching. (stdout is
                             // not an audit sink either; a real trail belongs in
                             // a table with an actor and a retention policy.)
+                            //
+                            // And for the same reason the values written inline
+                            // as literals are masked: `ALTER ROLE app PASSWORD
+                            // '…'` put the password in the production logs.
+                            // Masked before the cut, so the cut cannot land
+                            // inside a literal and keep half of it.
                             logger.info("[SQL Audit] WebSocket SQL execution", {
-                                sql: typeof sql === "string" ? sql.substring(0, 500) : String(sql),
+                                sql: redactSqlLiterals(String(sql)).substring(0, 500),
                                 database: options?.database,
                                 role: options?.role,
                                 // The role the statement asked for is above;
