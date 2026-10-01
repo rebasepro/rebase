@@ -79,8 +79,24 @@ DB_PERMISSION_DENIED — Permission denied by the database on "notes"
 
 SQLSTATE `42501`. Zwei verschiedene Probleme treten darunter auf, und die Meldung unterscheidet sie:
 
-- **Eine Row-Level-Security-Policy hat die Zeile verweigert.** Das Zugriffskontrollsystem funktioniert; der Aufrufer hat etwas angefordert, das seine Richtlinien nicht erlauben. Überprüfen Sie die `securityRules` der Collection und führen Sie `npx @rebasepro/rls-check` für ein schreibgeschütztes Audit dessen aus, was die Datenbank tatsächlich durchsetzt.
-- **Der Rolle fehlt ein `GRANT`.** Nichts an der Anfrage wird helfen – die Verbindungsrolle darf die Tabelle überhaupt nicht anrühren. Dies ist ein Deployment-Problem.
+- **Eine Row-Level-Security-Policy hat die Zeile verweigert** — die obige Meldung. Das
+  Zugriffskontrollsystem funktioniert; der Aufrufer hat etwas angefordert, das seine
+  Richtlinien nicht erlauben. Überprüfen Sie die `securityRules` der Collection und führen Sie
+  `npx @rebasepro/rls-check` für ein schreibgeschütztes Audit dessen aus, was die Datenbank
+  tatsächlich durchsetzt.
+- **Der Rolle fehlt ein `GRANT`.** Die Meldung benennt statt dessen das Objekt:
+
+  ```
+  DB_PERMISSION_DENIED — Permission denied by the database: the role this request
+  runs as has no privilege on schema "rebase". That is a missing GRANT to that
+  role, not a row-level security policy.
+  ```
+
+  Nichts an der Anfrage wird helfen – die Rolle, als die Anfragen laufen, darf dieses Objekt
+  überhaupt nicht anrühren. Der Server gewährt seiner Request-Rolle beim Start Rechte auf den
+  Schemas, die er bereitstellt; ein Objekt, das außerhalb davon angelegt wurde (von einer
+  anderen Rolle, oder in einem Schema, das keine Collection deklariert), braucht ein eigenes
+  `GRANT`. Dies ist ein Deployment-Problem.
 
 Ein Lesevorgang, den RLS ausschließt, ist kein Fehler: Die Zeilen werden gefiltert und Sie erhalten eine leere Seite. Wenn eine Collection für einen angemeldeten Benutzer, der Zeilen sehen sollte, als leer gelesen wird, ist die Policy der Ansatzpunkt, nicht die Abfrage.
 

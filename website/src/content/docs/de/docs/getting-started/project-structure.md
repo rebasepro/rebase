@@ -33,9 +33,9 @@ my-app/
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
 │
 ├── config/                 # Shared by the backend and the admin panel
-│   ├── index.ts            # Re-exports what the runtime reads (collections, storageAuthorize)
+│   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here
 │   ├── collections/        # Your data model
-│   │   ├── index.ts        # Exports `collections` and the default security rules
+│   │   ├── index.ts        # Sort order (`collections`) and `defaultSecurityRules` — not a registry
 │   │   ├── posts.ts        # Example collections
 │   │   └── users.ts        # The auth collection
 │   ├── resources.ts        # What this project needs from wherever it runs
@@ -199,8 +199,9 @@ const productsCollection = defineCollection({
     }
 });
 
-// The default export is what the registry picks up — every collection in the
-// scaffold is written this way.
+// The default export is what the loader picks up — every file in this directory
+// is loaded, listed in index.ts or not, and every collection in the scaffold is
+// written this way.
 export default productsCollection;
 ```
 
@@ -218,6 +219,9 @@ die Datei `backend/src/schema.generated.ts` und die SDK-Typen in `generated/sdk/
 generiert und das Backend neu gestartet; beim Hochfahren werden fehlende Tabellen und
 Spalten automatisch erstellt. Außerhalb von `rebase dev` entsprechen diese Schritte
 `rebase schema generate` und `rebase generate-sdk`.
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> für die SDK-Typen: Unter 0.23
+generiert `rebase dev` nur das Schema neu, und `rebase generate-sdk` ist ein eigener Schritt.
 
 ## Nächste Schritte
 

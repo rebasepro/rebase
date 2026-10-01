@@ -48,6 +48,15 @@ do {
 } while (after);
 ```
 
+`nextCursor` fehlt auf der letzten Seite, und auf einer Seite, die kein Cursor beschreiben kann:
+einer nach Relevanz sortierten Suche (`_score`), einer Vektorsuche und einer `fields`-Projektion,
+die eines der `orderBy`-Felder auslässt — der Cursor wird aus den Sortierwerten der letzten Zeile
+gebaut, und diese Zeile trägt sie dann nicht. Dort kann `meta.hasMore` `true` sein, ohne dass es
+ein `nextCursor` gibt, und die obige Schleife stoppt vorzeitig: Fügen Sie die Sortierfelder zu
+`fields` hinzu, oder paginieren Sie per `offset`. `iterate()` mit einem `cursor` weist eine solche
+Auflistung mit `cursor-missing` ab, statt einfach zu stoppen. Eine Sortierung nach einem
+[Aggregat über eine Relation](/docs/sdk/relations/) paginiert dagegen per Cursor.
+
 Der Cursor ist **opak**. Er kodiert die Sortierschlüssel *und* die Werte der letzten Zeile für diese
 Schlüssel, sodass er nur die Auflistung fortsetzen kann, aus der er stammt: Behalten Sie `orderBy` über
 alle Seiten hinweg identisch bei, andernfalls wird die Anfrage mit `CURSOR_ORDER_MISMATCH` abgelehnt,

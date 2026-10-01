@@ -35,6 +35,9 @@ Administrator vor dem ersten Start festlegen.
 - **[Aufteilung in mehrere Prozesse](/docs/deployment/split-processes/)** — ein
   Bundle als API, Functions-Ebene und Worker, damit eine rechenintensive
   Function nicht mehr mit der Daten-API konkurriert.
+- **[Mehr als eine Instanz ausführen](/docs/deployment/multiple-instances/)** —
+  der Zustand, den jeder Prozess für sich behält, und die Einstellung, die ihn
+  teilt, bevor eine zweite Replik Traffic übernimmt.
 
 ## Plattform-Anleitungen
 

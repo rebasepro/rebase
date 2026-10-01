@@ -39,8 +39,11 @@ Die Ergebnisse sind nach Funktion und Feld benannt — `count()` wird zu `count`
 Gruppen werden wie die Zeilen einer Auflistung paginiert. `limit` begrenzt sie,
 `offset` (oder `page`) überspringt sie, und `orderBy` sortiert sie nach einem
 `groupBy`-Feld oder einem Ergebnisschlüssel. Die Reihenfolge endet immer auf den
-Gruppenschlüsseln, sodass jede Seitengrenze an derselben Stelle liegt. Mit einem
-`limit` sagt die Antwort, ob es weitere gibt:
+Gruppenschlüsseln, sodass jede Seitengrenze an derselben Stelle liegt. Ein gruppiertes
+Aggregat ohne `limit` wird beim Standardwert einer Auflistung gekappt (50 Gruppen),
+genauso wie eine Auflistung. Mit einem `limit` — auch dem Standardwert — sagt die
+Antwort, ob es weitere gibt, und das SDK gibt dies über `aggregate()` als `meta` im
+Ergebnis zurück:
 
 ```bash
 GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:desc&limit=20&offset=20

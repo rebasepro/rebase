@@ -68,6 +68,10 @@ const ordersCollection = defineCollection({
    - Der Aktion (`create`, `update`, `delete`)
    - Einem Array aus `changed_fields`, das zeigt, welche Spalten geändert wurden
 
+Die Werte sind die Zeile, so wie die REST-API sie liefert: ihre Spalten, Daten als Zeitstempel, eine `belongsTo`-Relation als ihr Fremdschlüssel. Das ist es, was ein Revert zurückschreibt.
+
+Bei einer Collection mit [Soft Delete](/docs/collections/soft-delete/) wird ein Löschen als `delete` aufgezeichnet und eine Wiederherstellung (das Update, das das Soft-Delete-Feld wieder auf `null` setzt) als `update`. Die Historie einer Zeile bleibt lesbar, während sich die Zeile im Papierkorb befindet, und ein Revert auf eine Version von vor dem Löschen stellt sie wieder her.
+
 ### Diff-Tracking & strukturelle Deep Equality
 
 Um redundante Protokolle zu vermeiden, wenn Felder gespeichert werden, sich aber keine Werte ändern, führt der `HistoryService` einen strukturellen Deep-Equality-Vergleich auf den Top-Level-Schlüsseln der alten und neuen Werte durch:

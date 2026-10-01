@@ -147,7 +147,9 @@ const client = createRebaseClient({
 });
 ```
 
-Die Kaskade ist eng gefasst: Ein `update` wird zusammen mit dem Schreibvorgang verworfen, den es bearbeitet hat, weil es nur auf dieselbe Weise scheitern kann. Ein späteres `create` oder `delete` für dieselbe Zeile steht für sich und bleibt erhalten.
+Die Kaskade ist eng gefasst: Ein `update` wird zusammen mit dem Schreibvorgang verworfen, den es bearbeitet hat, weil es nur auf dieselbe Weise scheitern kann. Ein späteres `create` oder `delete` für dieselbe Zeile steht für sich und bleibt erhalten. Ein verworfener Schreibvorgang wurde nie gesendet und wird mit einem `RebaseApiError` gemeldet, dessen `code` `DEPENDENCY_REJECTED` ist und dessen `cause` die Ablehnung ist, die ihn zu Fall brachte — so lässt er sich von dem Schreibvorgang unterscheiden, den der Server tatsächlich abgelehnt hat.
+
+Aufeinanderfolgende Bearbeitungen einer Zeile im Offline-Zustand werden zu einem einzigen eingereihten Schreibvorgang zusammengeführt, sodass ein Formular, in das gerade getippt wird, die Warteschlange nicht wachsen lässt. Lehnt der Server den zusammengeführten Schreibvorgang wegen seines Inhalts ab (ein 400, 403 oder 422 — etwa ein Feld, das durch eine Schema-Änderung entfernt wurde, während der Benutzer offline war), teilt die Engine ihn wieder in die einzelnen Bearbeitungen auf und spielt jede erneut ab. Nur die Bearbeitung, die der Server ablehnt, wird zurückgerollt und gemeldet; die anderen bleiben erhalten.
 
 Ein Fehlschlag, der lediglich vorübergehend ist — ein 429, ein 503, eine abgebrochene Verbindung —, ist keine Ablehnung. Solche bleiben in der Warteschlange und werden erneut versucht; erst nach `maxRetries` Zurückstellungen wird ein Schreibvorgang zurückgerollt.
 

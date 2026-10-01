@@ -28,7 +28,9 @@ Eine Kollektion verfügt über zwei Callback-Blöcke; der einzige Unterschied be
 | Erreicht den Browser | nein — Funktionskörper werden aus dem Bundle entfernt | ja, vollständig |
 | Verwenden für | alles Nachfolgende | Kollektionen, mit denen das Panel direkt kommuniziert |
 
-**`callbacks` ist der Block, den Sie verwenden sollten.** Er wird auf jedem Pfad ausgeführt, der den Server erreicht, sodass nichts an ihm vorbeigeführt werden kann, und sein Code verlässt die Maschine niemals — ein API-Schlüssel oder ein Aufruf von `process.env` ist dort sicher. Der Rest dieser Seite behandelt `callbacks`.
+**`callbacks` ist der Block, den Sie verwenden sollten.** Er wird auf jedem Datenpfad ausgeführt, der den Server erreicht — REST, das SDK, Realtime, MCP und `rebase.data` —, und sein Code verlässt die Maschine niemals, sodass ein API-Schlüssel oder ein Aufruf von `process.env` dort sicher ist. Der Rest dieser Seite behandelt `callbacks`.
+
+Ein Writer ist kein Datenpfad: **das Auth-System**. Registrierung, OAuth-Anmeldung und die Benutzerverwaltung des Admins schreiben die Users-Zeilen direkt und führen keinen ihrer Callbacks aus, sodass eine Willkommens-E-Mail in `afterSave` auf `users` bei der Registrierung niemals ausgelöst wird. Hängen Sie sie an die [Auth-Hooks](/docs/backend/authentication/) an, die bei `auth.hooks` übergeben werden — `beforeUserCreate`, `afterUserCreate`, `afterUserDelete` — wofür ein ejected Backend nötig ist; der Start warnt, wenn die Users-Collection Callbacks deklariert, die bei der Registrierung nicht ausgeführt werden.
 
 `admin.browserCallbacks` existiert für einen bestimmten Fall: eine Kollektion über einen `direct`- oder `custom`-Transport, welche das Panel *selbst* liest und beschreibt, ohne dass sich ein Rebase-Server im Request-Pfad befindet. Da serverseitig nichts von diesen Operationen mitbekommt, kann `callbacks` für sie niemals ausgelöst werden, und dieser Block ist der einzige Ort, an dem ihre Lifecycle-Logik existieren kann.
 
@@ -200,7 +202,7 @@ Wird aufgerufen, nachdem die Zeile geschrieben wurde und vor dem Commit, innerha
 
 ```typescript
 afterSave: async ({
-    values,         // Saved values
+    values,         // Saved values: the row as stored, not afterRead's view of it
     id,             // Entity ID
     previousValues, // Previous values (undefined for new entities)
     status,         // "new" | "existing" | "copy"
@@ -226,11 +228,15 @@ afterSaveError: async ({
 }
 ```
 
+Er wird für einen Speichervorgang ausgeführt, der auf Datenbankebene oder danach fehlgeschlagen ist — nicht für eine `beforeSave`-Ablehnung, eine vor dem Schreibvorgang abgelehnte Anfrage (Validierung, eine fehlende Berechtigung, ein 404) oder einen nach der Rückkehr des Speichervorgangs abgelehnten Commit ([vollständige Liste](/docs/backend/hooks/#when-aftersaveerror-runs)).
+
 Bei einem Request läuft er, sobald die Transaktion des fehlgeschlagenen Schreibvorgangs zurückgerollt wurde, nicht innerhalb dieser. Sein `context.data` ist ein neues für denselben Aufrufer, in dem jeder Aufruf eine eigene Transaktion ist, sodass ein [Job](/docs/backend/jobs), eine Queue-Nachricht oder ein Webhook, den er einreiht, committet wird und den Fehler, den er meldet, überdauert. Ein Fehler (Throw) aus `afterSaveError` wird protokolliert, und der Aufrufer erhält weiterhin den eigenen Fehler des Speichervorgangs.
 
 ### `afterRead`
 
 Wird nach dem Lesen von Entitäten aus der Datenbank aufgerufen. Transformieren Sie die Daten für die Anzeige.
+
+Sie formt das, was ein Aufrufer erhält — die Antwort eines Lese- oder Schreibvorgangs sowie dessen Realtime-Frame — und nichts sonst: `afterSave`, `beforeDelete`, `afterDelete` und die [Historie](/docs/backend/history) erhalten die Zeile so, wie sie gespeichert ist: Ein hier maskierter Wert ist nie das, was ein Audit aufzeichnet oder ein Revert zurückschreibt, und ein hier hinzugefügtes Feld wird nie geschrieben.
 
 ```typescript
 afterRead: async ({
@@ -302,7 +308,7 @@ Jeder Callback erhält ein `context`-Objekt, das `context.data` enthält — ein
 `context.data` verwendet einen JavaScript-Proxy, sodass Sie über den Slug als Eigenschaft auf jede Kollektion zugreifen können:
 
 ```typescript
-afterSave: async ({ values, entityId, context }) => {
+afterSave: async ({ values, id, context }) => {
     // Dynamic property access — works for any collection slug
     const jobs = context.data.jobs;
     const users = context.data.users;
@@ -330,26 +336,18 @@ Jeder Kollektions-Accessor (`context.data.<slug>`) stellt die folgenden Methoden
 
 ### Abfragen mit `.find()`
 
-Die `find()`-Methode unterstützt umfangreiche Filterfunktionen:
+Die `find()`-Methode filtert mit `[operator, value]`-Tupeln — der typisierten Form des Query-Strings `?status=eq.published`, den die REST-API liest:
 
 ```typescript
 afterSave: async ({ values, context }) => {
-    // Simple equality
+    // Equality
     const { data: activeJobs } = await context.data.jobs.find({
-        where: { status: "published" },
+        where: { status: ["==", "published"] },
         limit: 10,
         orderBy: ["createdAt", "desc"]
     });
 
-    // PostgREST-style operators
-    const { data: recentJobs } = await context.data.jobs.find({
-        where: {
-            status: "eq.published",
-            salary: "gte.50000"
-        }
-    });
-
-    // Tuple syntax
+    // Several conditions, AND-ed
     const { data: expensiveJobs } = await context.data.jobs.find({
         where: {
             salary: [">=", 100000],
@@ -361,25 +359,7 @@ afterSave: async ({ values, context }) => {
 
 ### Entitäten erstellen
 
-```typescript
-afterSave: async ({ values, entityId, previousValues, context }) => {
-    // Promote an approved submission to a published job
-    if (values.status === "approved" && previousValues?.status !== "approved") {
-        const newJob = await context.data.jobs.create({
-            title: values.title,
-            description: values.description,
-            company_id: values.company_id,
-            status: "published",
-            source_submission_id: entityId,
-        });
-
-        // Link back to the original submission
-        await context.data["job-submissions"].update(entityId, {
-            promoted_job_id: newJob.id,
-        });
-    }
-}
-```
+`.create()` und `.update()` erwarten die zu schreibenden Werte, mit den oben genannten Signaturen. [Daten zwischen Kollektionen synchronisieren](#syncing-data-between-collections) verwendet beide: Eine genehmigte Einreichung erstellt einen veröffentlichten Job und wird mit ihm verknüpft.
 
 ### Sicherheit: Mit welchen Berechtigungen `context.data` ausgeführt wird
 
@@ -403,7 +383,9 @@ afterSave: async ({ context }) => {
     // is an admin's reach, not a bypass: a collection whose only rule is
     // `policy.serverContext()` stays closed to it, since that compiles to
     // `rebase.uid() IS NULL` and this accessor's uid is `service`.
-    await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
+    // `dataAsAdmin` is always there server-side; its type allows for the
+    // browser SDK, which has none — hence the `!`.
+    await context.client.dataAsAdmin!.audit_logs.create({ action: "approved" });
 }
 ```
 
@@ -433,10 +415,11 @@ Der auslösende Schreibvorgang und alles, was seine Callbacks geschrieben haben,
 - Ein Fehler (Throw) in `afterSave` oder `afterDelete` rollt den auslösenden Schreibvorgang sowie jeden `context.data`-Schreibvorgang der Callbacks zurück. Der Aufrufer erhält **400 `CALLBACK_REJECTED`** mit `details.stage`, das den jeweiligen Hook benennt — oder den spezifischen Fehlerstatus, falls vorhanden: ein von Ihnen geworfener `RebaseApiError`, der 409-Fehler einer Eindeutigkeitsverletzung.
 - Realtime-Abonnenten erfahren erst nach dem Commit von der Zeile; ein zurückgerollter Schreibvorgang wird also niemals angekündigt.
 - Ein Callback hält die Transaktion während seiner Ausführung offen. Ein langsamer Callback bedeutet daher eine gehaltene Sperre und eine blockierte Verbindung im Connection-Pool.
+- Ein `context.data`-Schreibvorgang führt auch die Callbacks der Zielkollektion aus, sodass ein `afterSave`, das seine eigene Zeile aktualisiert, sich selbst erneut ausführt. Schreibvorgänge, die mehr als 16 Ebenen tief verschachtelt sind, werden mit **500 `CALLBACK_RECURSION`** abgelehnt, unter Angabe des Hooks und der Collection, und der gesamte Schreibvorgang wird zurückgerollt. Machen Sie einen solchen Schreibvorgang bedingt, wie es das Beispiel unten tut.
 
-Lassen Sie einen Fehler werfen, wenn der auslösende Schreibvorgang diesen nicht überstehen soll. Fangen Sie ihn ab, wenn er überstehen soll, aber nur um einen `context.data`-**Schreibvorgang** herum: Ein fehlgeschlagener Schreibvorgang wird isoliert rückgängig gemacht, und der Rest wird committet.
+Lassen Sie einen Fehler werfen, wenn der auslösende Schreibvorgang diesen nicht überstehen soll. Fangen Sie ihn ab, wenn er überstehen soll, aber nur um einen `context.data`-**Schreibvorgang** herum: Ein Create, Update oder Delete, das die Datenbank ablehnt (eine Unique- oder Foreign-Key-Verletzung, ein Trigger), wird isoliert rückgängig gemacht, und der Rest wird committet.
 
-Jede andere Anweisung, die auf der Transaktion des Schreibvorgangs fehlschlägt — eine Abfrage, ein von der Datenbank abgelehntes Einreihen eines Jobs —, bricht diese Transaktion in Postgres ab, und das Abfangen des Fehlers in JavaScript macht das nicht rückgängig. Der Schreibvorgang wird mit **500 `TRANSACTION_ABORTED`** abgelehnt und nichts wird gespeichert, statt Erfolg für einen Schreibvorgang zu melden, der zurückgerollt wurde. Lassen Sie einen solchen Fehler werfen, oder prüfen Sie die Bedingung, bevor Sie die Anweisung ausführen.
+Jede andere Anweisung, die auf der Transaktion des Schreibvorgangs fehlschlägt — eine Abfrage, der Lesevorgang, den ein Update oder Delete zum Auffinden seiner Zeile durchführt (eine ID, die die Schlüsselspalte nicht aufnehmen kann), ein von der Datenbank abgelehntes Einreihen eines Jobs —, bricht diese Transaktion in Postgres ab, und das Abfangen des Fehlers in JavaScript macht das nicht rückgängig. Der Schreibvorgang wird mit **500 `TRANSACTION_ABORTED`** abgelehnt und nichts wird gespeichert, statt Erfolg für einen Schreibvorgang zu melden, der zurückgerollt wurde. Lassen Sie einen solchen Fehler werfen, oder prüfen Sie die Bedingung, bevor Sie die Anweisung ausführen.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {

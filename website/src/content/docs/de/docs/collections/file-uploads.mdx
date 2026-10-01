@@ -15,7 +15,7 @@ Diese Trennung ist wichtiger, als es scheint. Der Großteil von `storage` wird v
 des Admin-Panels auf dem Weg zur API gelesen, sodass ein Schreibvorgang, der nicht von einem
 Formular stammt, diesen nicht durchläuft – diese Optionen tragen den unten stehenden Hinweis. Die beiden
 Optionen, die bestimmen, was eine Datei *sein* darf – `maxSize` und `acceptedFiles` –, sind die Ausnahme:
-Der Server prüft sie bei jedem Upload.
+Der Server prüft sie bei jedem Upload in den `storagePath` der Eigenschaft.
 
 ## Eine Datei
 
@@ -57,12 +57,12 @@ Alles innerhalb von `storage`.
 
 | Eigenschaft | Typ | Beschreibung |
 |---|---|---|
-| `storagePath` | `string \| function` | **Erforderlich.** Wohin im Bucket die Datei gespeichert wird. Ein String mit Platzhaltern – `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` – oder eine Funktion des Upload-Kontexts. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen:** Der Uploader des Panels löst dies auf, und `client.storage.upload()` vergibt einen eigenen Schlüssel. |
+| `storagePath` | `string \| function` | **Erforderlich.** Wohin im Bucket die Datei gespeichert wird. Ein String mit Platzhaltern – `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` – oder eine Funktion des Upload-Kontexts. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen:** Der Uploader des Panels löst dies auf, und `client.storage.upload()` vergibt einen eigenen Schlüssel. Ein als String angegebener Pfad ist zugleich der Ort, an dem der Server jeden Upload an das `maxSize`- und `acceptedFiles`-Limit dieser Eigenschaft bindet. |
 | `fileName` | `string \| function` | Der Dateiname des hochgeladenen Objekts mit denselben Platzhaltern. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
 | `storageSource` | `string` | Welcher registrierte Bucket verwendet werden soll, wenn ein Projekt mehr als einen hat. Das `bucket("media")`-Handle funktioniert hier ebenfalls. |
 | `public` | `boolean` | Unter dem öffentlichen Präfix speichern und über eine stabile, tokenlose, cachebare URL bereitstellen. Standardmäßig `false`, was private Objekte und kurzlebige signierte URLs bedeutet. |
-| `acceptedFiles` | `FileType[]` | MIME-Typen, die diese Eigenschaft akzeptiert. Die Sternchen-Form funktioniert – `image/*`. **Wird vom Server erzwungen**, nicht nur von der Dateiauswahl. |
-| `maxSize` | `number` | Größte akzeptierte Datei in Bytes. **Wird vom Server erzwungen**, sowohl bei normalen als auch bei fortsetzbaren (resumable) Upload-Pfaden. |
+| `acceptedFiles` | `FileType[]` | MIME-Typen, die diese Eigenschaft akzeptiert. Die Sternchen-Form funktioniert – `image/*`. **Wird vom Server erzwungen** für jeden Upload in den `storagePath` der Eigenschaft — siehe [Was der Server prüft](#what-the-server-checks). |
+| `maxSize` | `number` | Größte akzeptierte Datei in Bytes. **Wird vom Server erzwungen**, ebenso wie `acceptedFiles`, sowohl bei normalen als auch bei fortsetzbaren (resumable) Upload-Pfaden. |
 | `metadata` | `Record<string, unknown>` | Objekt-Metadaten, die zusammen mit der Datei gespeichert werden sollen. |
 | `includeBucketUrl` | `boolean` | Schreibt `s3://my-bucket/path/to/file.png` in die Spalte anstelle von `path/to/file.png`. Standardmäßig `false`. |
 | `storeUrl` | `boolean` | Schreibt die Download-URL in die Spalte anstelle des Keys. Standardmäßig `false`, und es empfiehlt sich, dies so zu belassen: Eine URL, die ein Token enthält, funktioniert nicht mehr, sobald das Token abläuft, womit die ursprüngliche Referenz verloren ist. |
@@ -88,17 +88,63 @@ nichts über die Eigenschaft, für die eine Datei bestimmt war. Ein `curl -F fil
 am Dateiauswahldialog vorbei platzierte somit eine 40-MB-Binärdatei im Avatar-Bucket, und die
 Konfiguration, die etwas anderes vorgab, wurde nie abgefragt.
 
-Beide werden nun serverseitig anhand der Eigenschaft geprüft, die beim Upload angegeben wird. Bei
-einem Upload, der keine Eigenschaft benennt – etwa durch einen älteren Client oder einen direkten
-Aufruf –, wird weiterhin auf die globale Begrenzung zurückgegriffen, da für eine Anfrage ohne
-Eigenschaftskontext keine Eigenschaftsregel geprüft werden kann und eine Verweigerung ältere
-Clients beeinträchtigen würde.
+Beide werden nun vom Server anhand **des Orts, an dem die Datei landet**, geprüft. Der `storagePath`
+einer Eigenschaft ist dort, wohin ihre Dateien gehen, also ist es auch dort, wo ihre Limits greifen:
+Jeder Upload, dessen Schlüssel eine Datei direkt unter diesem Pfad ist – aus dem Panel,
+`client.storage.putObject`, einem fortsetzbaren Upload, Studios Storage-Browser oder `curl` –
+erfüllt sie, unabhängig davon, ob er die Eigenschaft benennt, auf der eigenen Storage-Quelle der
+Eigenschaft. Platzhalter entsprechen dem, was das Panel einsetzen würde: `{entityId}`, `{rand}`,
+`{file}` und Ähnliches stehen für ein einzelnes Pfadsegment, `{path}` für eine beliebige Anzahl. Der
+Pfad einer Eigenschaft mit `public: true` liegt unter `public/`.
+
+- Mehrere Eigenschaften, die sich einen Pfad teilen: Eine Datei, die eine von ihnen akzeptiert, wird akzeptiert.
+- Ein Upload, der zusätzlich seine Eigenschaft benennt (`collection` + `property`, so wie
+  `putObject({ context })` sie sendet), wird auch an diese Eigenschaft gebunden. Eine lockerere
+  Eigenschaft zu benennen, schaltet den Pfad einer strengeren nicht frei.
+- Ein als Funktion geschriebener `storagePath` kann nicht gelesen werden, ohne ihn auszuführen,
+  daher gibt es für ihn keine serverseitige Regel: Diese Limits greifen nur für Uploads, die die
+  Eigenschaft benennen.
+- Ein Pfad, den keine Eigenschaft beansprucht, unterliegt allein dem eigenen Limit der Quelle
+  (`STORAGE_MAX_FILE_SIZE`).
+
+### Bilder in einem Markdown-Feld
+
+Eine Markdown-Eigenschaft (`admin.markdown: true`) mit einem `storage`-Block nimmt in ihrem Editor
+Bild-Uploads an. Der Text speichert jedes Bild als **Storage-Referenz** —
+`![](rebase-storage:posts/abc_cover.png)` — nicht als URL: Die URL einer privaten Datei trägt ein
+Download-Token, das innerhalb von Minuten abläuft, während der Text gespeichert bleibt. Der Editor
+und die Vorschauen des Admin-Panels tauschen jede Referenz beim Anzeigen gegen eine frische URL
+aus; eine Website, die das Feld rendert, tut dasselbe mit `resolveStorageReferences(text, client)`
+— siehe [Dateien innerhalb von Text](/docs/sdk/storage#files-inside-text).
+
+Text, der vor dieser Änderung gespeichert wurde, enthält die URLs selbst, und deren Tokens sind
+inzwischen abgelaufen; fügen Sie diese Bilder erneut ein, damit Referenzen gespeichert werden.
 
 ### Wohin die Datei gespeichert werden darf
 
 `storagePath` ist ein Standardwert, keine feste Begrenzung: Nichts auf dem Server beschränkt
 einen Upload auf dieses Präfix. Zu entscheiden, wer wohin schreiben darf, ist Aufgabe von
 Storage-Autorisierungsregeln – siehe [Storage](/docs/backend/storage).
+
+### Dateien werden nie automatisch gelöscht
+
+Ein Dateifeld zu leeren, seine Datei zu ersetzen oder die Zeile zu löschen, zu der es gehört, lässt
+das gespeicherte Objekt unangetastet. Jeder Upload erhält einen eigenen Schlüssel, sodass ein Ersatz
+ein neues Objekt schreibt, statt das alte zu überschreiben, und nichts entfernt das vorherige: Zwei
+Zeilen können denselben Schlüssel halten, daher kann das Panel nicht wissen, dass eine Datei ungenutzt
+ist. Objekte, auf die keine Zeile mehr verweist, bleiben im Bucket – und werden weiterhin abgerechnet
+–, bis Sie sie löschen: über Studios Storage-Browser, mit `client.storage.deleteObject(key)` oder mit
+einer Lifecycle-Regel auf dem Bucket.
+
+### Eine Eigenschaft zu einer anderen Storage-Quelle verschieben
+
+Ein Dateifeld speichert den Schlüssel des Objekts, nicht dessen Quelle. Die `storageSource` einer
+Eigenschaft zu ändern, lässt jeden vorhandenen Wert auf die neue Quelle zeigen, in der diese
+Schlüssel nicht existieren, sodass Vorschauen von Dateien, die vor der Änderung hochgeladen wurden,
+mit „nicht gefunden“ antworten. Kopieren Sie die Objekte unter denselben Schlüsseln in die neue
+Quelle, bevor Sie die Eigenschaft ändern — mit dem eigenen Werkzeug des Anbieters, etwa
+`aws s3 sync` oder `gcloud storage cp` — oder behalten Sie die alte Quelle für die bestehenden
+Dateien.
 
 ## Nächste Schritte
 

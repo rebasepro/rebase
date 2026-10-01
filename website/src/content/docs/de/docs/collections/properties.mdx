@@ -56,8 +56,10 @@ Alle Eigenschaftstypen teilen diese Optionen:
 Mehrere der unten stehenden Optionen tragen diese Kennzeichnung: Sie bestimmen
 das vom Panel dargestellte Formular und sonst nichts – die API akzeptiert Schreibvorgänge,
 die sie ignorieren, und es steht kein Constraint dahinter. Eine Regel, die für
-jeden Aufrufer gelten muss, ist eine [Validierungsregel](/docs/collections/validation-and-conditions/)
-oder eine [Sicherheitsregel](/docs/collections/security-rules/).
+jeden API-Aufrufer gelten muss, ist eine [Validierungsregel](/docs/collections/validation-and-conditions/)
+— geprüft bei REST-, Socket- und MCP-Schreibvorgängen, [nicht bei prozessinternen](/docs/collections/validation-and-conditions/#where-validation-runs)
+— oder eine [Sicherheitsregel](/docs/collections/security-rules/), die von der Datenbank für alle
+durchgesetzt wird.
 :::
 
 ### UI-Konfiguration (`admin`)
@@ -80,6 +82,7 @@ price: {
 |----------|------|-------------|
 | `admin.readOnly` | `boolean` | Bearbeitung verhindern |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Deaktivieren mit optionalem Tooltip |
+| `admin.filledByServer` | `boolean` | Der Server befüllt das Feld, wenn ein neuer Datensatz es leer lässt (ein `beforeSave`-Hook). Das Formular lässt eine Erstellung ohne dieses Feld durch; beim Bearbeiten bleibt es erforderlich, und die eigenen Prüfungen des Servers gelten weiterhin |
 | `admin.hideFromCollection` | `boolean` | In der Tabellenansicht ausblenden |
 | `admin.columnWidth` | `number` | Spaltenbreite in Pixeln (Tabellenansicht) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Feldbreite im vierspaltigen Formularraster |
@@ -297,6 +300,12 @@ der Konfiguration abgelehnt und nicht stillschweigend ignoriert: Zusammengesetzt
 Primärschlüssel werden nicht unterstützt, und eine Konfiguration, die zwei deklariert,
 verlangt etwas, das Rebase nicht erstellen kann. Wenn Sie einen Eindeutigkeits-Constraint
 über mehrere Spalten hinweg wollten, ist das ein eindeutiger [Index](/docs/backend/indexes).
+
+Eine Collection, bei der keine Eigenschaft `isId` beansprucht, erhält eine eigene `id`-Spalte:
+`TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. Die Datenbank befüllt sie, sodass eine über das
+Admin-Panel, die REST-API oder das SDK erstellte Zeile keinen Schlüssel braucht, und ein Schlüssel,
+den Sie selbst mitsenden, wird so verwendet, wie er ist. Eine Tabelle, die erstellt wurde, bevor
+dieser Default existierte, erhält ihn beim nächsten Start.
 :::
 
 ## Number-Eigenschaften

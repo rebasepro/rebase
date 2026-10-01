@@ -71,6 +71,9 @@ Solange `rebase dev` läuft, ist das nicht nötig: Es generiert die Typen in
 Selbst ausführen müssen Sie den Befehl in CI, in einem Frontend-Repository ohne
 Collections (`rebase generate-sdk --from link`) oder überall dort, wo `rebase dev`
 nicht läuft.
+<span class="since-badge" data-since="0.24">Seit 0.24</span> für die Neugenerierung: Unter 0.23
+lässt `rebase dev` die SDK-Typen unberührt, führen Sie den Befehl daher nach jeder
+Collection-Änderung aus.
 
 Übergeben Sie anschließend den Typparameter `Database` an `createRebaseClient` für vollständige Autovervollständigung:
 
@@ -97,7 +100,7 @@ Wenn `Database` übergeben wird, gibt `createRebaseClient` eine Instanz von `Cre
 
 Ein von *Ihnen* geschriebener Property-Schlüssel bleibt Ihr Schlüssel, unabhängig von seiner Schreibweise — nichts benennt einen von Ihnen gewählten Namen um. Die beiden Schlüssel, die eher abgeleitet als deklariert werden – der Fremdschlüssel einer Relation und eine durch Introspektion zurückgelesene Spalte –, sind in camelCase gehalten.
 
-`Row` beschreibt einen Lesevorgang, `Insert` ein `create()` und `Update` ein `update()` — sie haben nicht dieselbe Struktur. Nullable-Spalten sind auf `Row` als `T | null` definiert, der Primärschlüssel ist bei einem Lesevorgang immer vorhanden und bei einem Update niemals setzbar, und ein `belongsTo`-Ziel kann entweder als Relation (`{ author: 5 }`) oder als Fremdschlüssel (`{ authorId: 5 }`) geschrieben werden.
+`Row` beschreibt einen Lesevorgang, `Insert` ein `create()` und `Update` ein `update()` — sie haben nicht dieselbe Struktur. Eine Spalte, die nicht erforderlich ist, ist bei allen drei als `T | null` definiert, sodass ein Schreibvorgang sie leeren kann; der Primärschlüssel ist bei einem Lesevorgang immer vorhanden und bei einem Update niemals setzbar; ein `belongsTo`-Ziel kann entweder als Relation (`{ author: 5 }`) oder als Fremdschlüssel (`{ authorId: 5 }`) geschrieben werden; und eine `hasMany`- oder `manyToMany`-Mitgliedschaft wird als Liste von Ziel-IDs oder `{ id }`-Objekten geschrieben (`{ tags: ["t-1"] }`), jedes mit einem `_pivot`, wenn die Zwischentabelle (Junction) Payload-Spalten deklariert. Ein Feld, das niemand schreiben darf (`access: { write: [] }`), ist weder in `Insert` noch in `Update` enthalten.
 
 ## Kurzes Beispiel
 

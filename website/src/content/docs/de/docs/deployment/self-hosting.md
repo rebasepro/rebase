@@ -147,16 +147,13 @@ Was `ensure` ganz bewusst niemals tut, ist das Ändern bereits vorhandener Struk
 Enum-Werte – denn ein Container-Neustart darf nicht in der Lage sein, ein Schema als
 Nebeneffekt eines Deployments umzustrukturieren.
 
-Daher ist die Ausführung von `rebase db push` für die beiden Dinge, die der Startvorgang
-unberührt lässt, weiterhin sinnvoll:
+Daher ist die Ausführung von `rebase db push` weiterhin sinnvoll, für das, was der Startvorgang
+unberührt lässt – jede Änderung, die nicht rein additiv ist: eine umbenannte Spalte, ein
+eingeschränkter Typ, ein entferntes Feld.
 
 ```bash
 rebase db push
 ```
-
-- **RLS für Verknüpfungstabellen (Junction-Tables)** bei Many-to-Many-Beziehungen.
-- **Alle Änderungen, die nicht rein additiv sind** – eine umbenannte Spalte, ein eingeschränkter
-  Typ, ein entferntes Feld.
 
 Führen Sie dies aus einem Repository-Checkout oder einem CI-Job aus, der auf die Datenbank
 des Deployments verweist. Der Befehl führt zunächst einen Probelauf (Dry-Run) der Änderung durch,
@@ -266,6 +263,7 @@ ExecStart=/usr/bin/rebase-server /srv/myapp/dist-bundle
 Restart=always
 Environment=NODE_ENV=production
 Environment=DATABASE_URL=postgresql://rebase:...@127.0.0.1:5432/rebase
+Environment=ALLOW_LOCALHOST_IN_PRODUCTION=true
 Environment=JWT_SECRET=...
 Environment=REBASE_SERVICE_KEY=...
 Environment=CORS_ORIGINS=https://app.example.com
@@ -279,6 +277,12 @@ im Entwicklungsmodus: Er spiegelt localhost-Origins wider, stellt die OpenAPI-Sp
 **lässt das First-Admin-Fenster offen** – sodass der erste Fremde, der das
 Registrierungsformular findet, Administrator wird. Die beiden `REBASE_ADMIN_*`-Zeilen ersetzen
 dieses Fenster; siehe [Ihr erster Admin](/docs/getting-started/deployment/#your-first-admin).
+
+`ALLOW_LOCALHOST_IN_PRODUCTION=true` steht hier, weil die Datenbank auf derselben Maschine
+läuft. In der Produktion verweigert die Runtime jede Variable, die auf localhost verweist – in
+einem Container ist Loopback der Container selbst, daher ist diese Adresse dort immer ein Fehler
+– und diese Zeile sagt ihr, dass die Adresse so gewollt ist. Lassen Sie sie weg, wenn die
+Datenbank anderswo läuft.
 
 Bevorzugen Sie `EnvironmentFile=/etc/rebase.env` mit Dateirechten 0600 gegenüber
 `Environment=`-Zeilen für Secrets: Eine Unit-Datei ist für alle lesbar, und
@@ -368,6 +372,32 @@ Stellt Prometheus-Metriken unter `/metrics` bereit: Anfragezähler und Latenz-Hi
 aufgeschlüsselt nach API-Bereich (data, auth, storage, functions) und Collection, sowie
 Prozess-Gauges. Ohne Token ist der Endpunkt für jeden lesbar, der den Port erreichen kann.
 Setzen Sie daher einen Token, sofern sich der Dienst nicht in einem privaten Netzwerk befindet.
+
+## Sicherheits-Header
+
+Jede Antwort trägt `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, eine
+`Referrer-Policy` und `Strict-Transport-Security: max-age=15552000` (180 Tage). Der HSTS-Header
+lässt `includeSubDomains` aus: Das würde Browsern sagen, einfaches HTTP auf jeder Subdomain Ihrer
+Domain abzulehnen, einschließlich solcher, mit denen dieser Server nichts zu tun hat, und ein
+Browser behält dies, solange der Header es vorgibt.
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Setzen Sie
+`REBASE_HSTS_INCLUDE_SUBDOMAINS=true`, wenn jede Subdomain ausschließlich HTTPS verwendet; bis
+einschließlich 0.23 trug der Header immer `includeSubDomains`.
+
+Die statischen Apps — das CMS-Admin und jedes Frontend, das das Bundle ausliefert — tragen
+außerdem `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri 'self'`.
+Das entscheidet, wer die App framen darf, schließt Plugins aus und bindet `<base>` an Ihren
+Origin, schränkt aber sonst nichts ein, sodass Inline-Scripts, Worker und Drittanbieter-Sign-in
+weiter funktionieren. Eine Antwort, die ihre eigene Policy setzt, behält diese. Für etwas
+Strengeres legen Sie die Policy auf den vorgeschalteten Reverse-Proxy.
+
+## Mehr als eine Instanz
+
+Ein Container ist der Standard und braucht nichts weiter. Bevor eine zweite Replik Traffic
+übernimmt — oder ein Rolling Deployment zwei nebeneinander laufen lässt — gehen Sie
+[Mehr als eine Instanz ausführen](/docs/deployment/multiple-instances/) durch: Rate-Limits,
+Broadcast-Kanäle, lokale Dateien, fortsetzbare Uploads und der Bild-Cache sind pro Prozess, bis
+eine Einstellung sie teilt.
 
 ## Funktionen in einem eigenen Prozess ausführen
 

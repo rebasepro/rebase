@@ -201,6 +201,9 @@ WebSockets bereitstellt.
 **Scale-to-Zero.** Nichts davon skaliert einen Prozess auf null herunter oder startet bei Bedarf einen
 neuen. Das ist eine Plattformfunktion und keine Eigenschaft der Runtime.
 
+Alles andere, was ein Prozess für sich behält, steht auf einer einzigen Liste:
+[Mehr als eine Instanz ausführen](/docs/deployment/multiple-instances/).
+
 ## Eine einzelne Einheit separat veröffentlichen
 
 Alles oben Genannte teilt auf, *wo die Arbeit ausgeführt wird*. Das Gesamtsystem wird weiterhin als ein

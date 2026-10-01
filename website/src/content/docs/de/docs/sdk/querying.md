@@ -392,7 +392,29 @@ const rows = await client.data.orders
 
 Ergebnisschlüssel werden **abgeleitet**, nicht frei gewählt: `sum(total)` wird als `sum_total` zurückgegeben, ein einfaches `count()` als `count`. Eine freie Benennung würde erfordern zu prüfen, dass der Name nicht gleichzeitig ein `groupBy`-Feld ist – eine Regel, die kaum jemand erwarten würde, und ein stillschweigend überschriebener Wert, wenn dies ungeprüft bliebe.
 
-`limit` begrenzt die Anzahl der **Gruppen** (eine Gruppierung nach einer Spalte mit hoher Kardinalität entspräche dem gesamten Inhalt einer Tabelle in einer einzigen Antwort) und wird ohne `groupBy` ignoriert, da ein ungruppiertes Aggregat aus genau einer Zeile besteht. `orderBy`, `include` und Paginierung werden bei einem Aggregat nicht gesendet: Es hat keine Relationen zum Laden, und das SDK sortiert und paginiert Gruppen noch nicht. Über HTTP lässt sich ein gruppiertes Aggregat sortieren und paginieren — siehe [Aggregate und Suche](/docs/sdk/aggregates-and-search/).
+Gruppen werden wie die Zeilen einer Auflistung paginiert: `limit` begrenzt sie, und `offset`
+überspringt sie (eine Gruppierung nach einer Spalte mit hoher Kardinalität entspräche dem
+gesamten Inhalt einer Tabelle in einer einzigen Antwort). Ein gruppiertes Aggregat ohne `limit`
+erhält den Standardwert einer Auflistung — **50 Gruppen** über HTTP —, lesen Sie daher `meta`
+im Ergebnis, bevor Sie darauf vertrauen, dass es vollständig ist:
+
+```typescript
+const byCustomer = await client.data.orders.aggregate({
+    select: [{ fn: "sum", field: "total" }],
+    groupBy: ["customerId"],
+    limit: 200
+});
+byCustomer.meta; // { limit: 200, offset: 0, hasMore: true } — page on with offset: 200
+```
+
+Das Ergebnis ist weiterhin ein Array von Zeilen; `meta` ist eine nicht-enumerierbare Eigenschaft
+darauf, sodass ein Spread oder ein `JSON.stringify` nur die Zeilen sieht. Es ist immer dann
+vorhanden, wenn die Gruppen bei einem `limit` gekappt wurden. Ohne `groupBy` gibt es genau eine
+Zeile, `limit` bewirkt nichts und `offset` wird abgelehnt. In einer Server-Function
+(`rebase.data`, `context.data`) liefert ein gruppiertes Aggregat ohne `limit` jede Gruppe.
+`include` wird bei einem Aggregat nicht gesendet: Es hat keine Relationen zum Laden. Das SDK
+sortiert Gruppen noch nicht; über HTTP lassen sie sich ebenfalls sortieren — siehe
+[Aggregate und Suche](/docs/sdk/aggregates-and-search/).
 
 Der eigentliche Sinn besteht darin, Zeilen nicht erst abrufen zu müssen, um sie anschließend zu aggregieren. „Umsatz nach Status“ über eine Million Bestellungen ist hier eine einzige Abfrage mit einer Zeile pro Status – anderswo hingegen ein `findAll()` samt Schleife, was bei einem `limit` falsch und ohne ein solches nicht tragbar ist. Die Ausführung erfolgt über denselben anforderungsbezogenen Handle wie jeder andere Lesevorgang, sodass Row-Level Security auch für die aggregierten Zeilen gilt.
 

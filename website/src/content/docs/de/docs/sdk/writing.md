@@ -143,6 +143,13 @@ Zeile aus `find()`, aus dem Offline-Cache oder von einem Server, der kein `ETag`
 Übergabe von `undefined` sendet keine Vorbedingung, sodass der obige Aufruf zu einem gewöhnlichen
 Update herabgestuft wird, anstatt einen Fehler zu werfen.
 
+Von einem Browser auf einem anderen Origin aus — ein Vite-Frontend auf eigenem Port, ein
+`app.`-Host, der einen `api.`-Host aufruft — ist das `ETag` nur lesbar, weil der Server es in
+`Access-Control-Expose-Headers` benennt. Die Rebase-Runtime tut dies, zusammen mit
+`Retry-After`, `X-Request-ID`, den `X-RateLimit-*`-Headern und `Preference-Applied`. Ein
+Backend, das sein eigenes `cors()` verdrahtet, muss dieselbe Liste freigeben, sonst ist
+`etagOf` dort immer `undefined`, und jeder bedingte Schreibvorgang geht unbedingt hinaus.
+
 ### Antwort überspringen
 
 Jeder Schreibvorgang löst zu der Zeile auf, die geschrieben wurde. Übergeben Sie `{ returning: false }`,
@@ -259,8 +266,8 @@ ist die kollektionsübergreifende Variante: eine Anfrage, eine Transaktion, alle
 const result = await client.batch([
     { op: "create", collection: "orders",
       values: { total: 40 }, ref: "order" },
-    { op: "create", collection: "order_items",
-      values: { order_id: { $ref: "order.id" }, sku: "A-1" } },
+    { op: "create", collection: "orderItems",
+      values: { orderId: { $ref: "order.id" }, sku: "A-1" } },
     { op: "update", collection: "stock",
       id: "A-1", values: { count: { $inc: -1 } } },
     { op: "delete", collection: "carts", id: "c-9" }
@@ -271,9 +278,12 @@ result.meta;  // { operations: 4 }
 ```
 
 `op` ist `create`, `update`, `upsert` oder `delete`, und `collection` schränkt `values` auf den
-generierten `Insert`- oder `Update`-Typ dieser Kollektion ein. Jede Operation durchläuft die gleiche
-Pipeline wie ihr Einzelzeilen-Äquivalent – dieselbe Validierung, dieselben Callbacks und dieselbe
-Row-Level Security, als derselbe Benutzer.
+generierten `Insert`- oder `Update`-Typ dieser Kollektion ein — eine Spalte, die die Kollektion
+nicht hat, ist ein Compile-Fehler, ebenso ein Create, dem eine erforderliche fehlt. `collection`
+ist der Accessor, der Name, den `client.data.<accessor>` annimmt (`orderItems` für den Slug
+`order_items`); der Client sendet den Slug, über das `collections`-Dictionary, mit dem er
+erstellt wurde. Jede Operation durchläuft die gleiche Pipeline wie ihr Einzelzeilen-Äquivalent –
+dieselbe Validierung, dieselben Callbacks und dieselbe Row-Level Security, als derselbe Benutzer.
 
 ### `$ref`
 

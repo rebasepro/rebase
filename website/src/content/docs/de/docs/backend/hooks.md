@@ -10,12 +10,12 @@ description: Wenden Sie querschnittliche Lifecycle-Callbacks auf Serverebene mit
 Rebase bietet zwei Ebenen für Entity-Lifecycle-Callbacks – beide verwenden denselben `CollectionCallbacks`-Typ aus `@rebasepro/types`:
 
 - **[Callbacks pro Collection](/docs/collections/callbacks)**: Werden in einzelnen Collection-Konfigurationen definiert. Sie werden nur für diese Collection ausgeführt.
-- **Globale Callbacks**: Werden bei `initializeRebaseBackend({ callbacks })` definiert. Sie werden bei **jeder** Collection und auf jedem Datenpfad ausgelöst (REST-API, WebSocket / Realtime, serverseitiges `rebase.dataAsAdmin`).
+- **Globale Callbacks**: Werden bei `initializeRebaseBackend({ callbacks })` definiert. Sie werden bei **jeder** Collection und auf jedem Datenpfad ausgelöst (REST-API, WebSocket / Realtime, serverseitiges `rebase.dataAsAdmin`). Der einzige Writer, den sie nicht sehen, ist das Auth-System: Registrierung, OAuth-Anmeldung und die Admin-Benutzerverwaltung schreiben Benutzerzeilen direkt und lösen stattdessen die [Auth-Hooks](/docs/backend/authentication/) (`afterUserCreate`, …) aus.
 
 Verwenden Sie globale Callbacks für:
 - **Row-Scoping** — `beforeQuery` auf jeder Collection, sodass Lesezugriffe eines Mandanten an einer zentralen Stelle statt pro Collection eingegrenzt werden. Nur Postgres: Neben einer MongoDB- oder Firestore-Datenquelle verweigert ein globales `beforeQuery` den Start, anstatt die Lesezugriffe dieser Quelle uneingeschränkt zu lassen. Siehe [`beforeQuery`](/docs/collections/callbacks#beforequery).
 - **PII-Maskierung** — Ausblenden sensibler Felder für Nicht-Admin-Aufrufer über alle Collections hinweg.
-- **Einheitliches Audit-Logging** — Protokollieren jeder Erstellung, Aktualisierung oder Löschung an einem zentralen Ort.
+- **Einheitliches Audit-Logging** — Protokollieren jeder Erstellung, Aktualisierung oder Löschung an einem zentralen Ort. Neue Konten aus Registrierung und OAuth gehören nicht dazu; protokollieren Sie diese über `afterUserCreate`.
 - **Querschnittliche Validierung** — Durchsetzen von Invarianten, die mehrere Collections umfassen.
 
 :::note
@@ -142,9 +142,23 @@ keine „Fire-and-Forget“-Ebene: Die Zeile und alles, was ihre Callbacks getan
 zusammen committet oder gar nicht.
 
 - **`beforeSave`, `beforeDelete`** — Wenn der Callback einen Fehler auslöst (throw), wird die Operation mit einem HTTP 400 abgelehnt, der Ihre Nachricht und den Code `CALLBACK_REJECTED` enthält, und der Schreibvorgang in die Datenbank findet niemals statt. Werfen Sie einen `RebaseApiError` aus `@rebasepro/types`, um den Status selbst zu wählen – siehe [Entity-Callbacks](/docs/collections/callbacks#beforesave). Ein `beforeDelete`, das `false` *zurückgibt*, stellt dieselbe Verweigerung ohne Nachricht dar und antwortet mit **403** und diesem Code.
-- **`afterRead`** — Die zurückgegebene Zeile (oder transformierte Zeile) ist das, was der Aufrufer erhält. Ihre Transaktion ist `READ ONLY` – siehe [unten](#afterread-kann-nicht-schreiben).
+- **`afterRead`** — Die zurückgegebene Zeile (oder transformierte Zeile) ist das, was der Aufrufer erhält, und zwar nur der Aufrufer: Bei einem Schreibvorgang formt sie die Antwort, während `afterSave`, `beforeDelete`, `afterDelete` und die Historie die Zeile so erhalten, wie sie gespeichert ist — ein maskierter Wert wird nie aufgezeichnet oder in die Spalte zurück revertiert. Ihre Transaktion ist `READ ONLY` – siehe [unten](#afterread-kann-nicht-schreiben).
 - **`afterSave`, `afterDelete`** — Werden *vor* dem Commit ausgeführt und abgewartet. Ein Fehler (throw) an dieser Stelle rollt die Zeile zurück und antwortet ebenfalls mit **400 `CALLBACK_REJECTED`**, wobei `details.stage` den Hook benennt. Sie halten die Transaktion während ihrer Ausführung offen; ein langsamer Hook blockiert somit Sperren (Locks).
 - **`afterSaveError`** — Wird ausgeführt, wenn das Speichern fehlgeschlagen ist, auf dem Rückweg. Bei einem Request läuft er, nachdem die Transaktion des fehlgeschlagenen Schreibvorgangs zurückgerollt wurde, mit einem `context`, dessen Aufrufe jeweils eine eigene Transaktion sind, sodass ein Job, den er einreiht, um den Fehler zu melden, erhalten bleibt. Ein Fehler (throw) aus ihm wird protokolliert; der Aufrufer erhält den eigenen Fehler des Speichervorgangs.
+
+### Wann `afterSaveError` ausgeführt wird
+
+Er meldet einen Speichervorgang, der **auf Datenbankebene oder danach** fehlgeschlagen ist — ab dem INSERT- oder UPDATE-Statement. Ein Speichervorgang, der vor diesem Punkt abgelehnt wurde, hat die Datenbank nie erreicht, daher wird der Hook darüber nicht informiert.
+
+| Wird ausgeführt | Wird nicht ausgeführt |
+|---|---|
+| Die Datenbank weist das Statement zurück: eine Unique- oder Foreign-Key-Verletzung, ein Check-Constraint oder Trigger, eine Row-Level-Security-Policy (`WRITE_DENIED`) | Eine `beforeSave`-Ablehnung — der Hook, der abgelehnt hat, ist derjenige, der es weiß |
+| `afterRead` oder `afterSave` wirft einen Fehler (der Aufrufer erhält `CALLBACK_REJECTED`) | Eine Anfrage, die vor dem Treiber abgelehnt wurde: Validierung (`VALIDATION_*`), ein Feld, das der Aufrufer nicht schreiben darf, eine fehlende Berechtigung |
+| Der Historie-Eintrag kann nicht aufgezeichnet werden | Eine Zeile, die der Aufrufer nicht adressieren kann (`404`), ein Mandanten-Stempel, den er nicht setzen darf |
+| | Der Commit wird abgelehnt, nachdem der Speichervorgang zurückgekehrt ist: `TRANSACTION_ABORTED` (ein fehlgeschlagenes Statement, das ein Callback abgefangen hat), oder ein aufgeschobener Constraint, der bei `COMMIT` geprüft wird |
+| | Ein Löschvorgang — dafür gibt es kein Gegenstück |
+
+Bei einem Bulk- oder `_batch`-Schreibvorgang wird er für die Zeile ausgeführt, die fehlgeschlagen ist; die Zeilen davor werden mit dem Batch zurückgerollt und nicht gemeldet.
 
 :::caution[Diese Seite besagte früher das Gegenteil]
 Frühere Versionen besagten, dass `afterSave` und `afterDelete` „nach dem Commit der Transaktion ausgeführt werden“

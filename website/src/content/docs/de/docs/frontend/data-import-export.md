@@ -19,8 +19,8 @@ Beide Funktionen sind für jede Collection verfügbar. Der Export kann pro Colle
 2. Klicken Sie in der Symbolleiste auf die Schaltfläche **Import**
 3. Wählen Sie Ihre Datei aus oder ziehen Sie sie per Drag-and-Drop hinein
 4. Weisen Sie die Dateispalten den Collection-Eigenschaften zu
-5. Überprüfen Sie die Daten in der Vorschau und beheben Sie etwaige Validierungsfehler
-6. Klicken Sie auf **Import**, um alle Entitäten zu speichern
+5. Zeigen Sie die Daten in der Vorschau an, einschließlich aller Werte, die nicht umgewandelt werden können
+6. Klicken Sie auf **Save data**, um die Zeilen zu schreiben
 
 ### Unterstützte Formate
 
@@ -36,16 +36,47 @@ Der Import-Assistent versucht automatisch, Dateispalten anhand des Namens mit Co
 
 - **Exakte Übereinstimmungen** werden automatisch zugeordnet (z. B. `name` → `name`)
 - **Nicht zugeordnete Spalten** können manuell zugeordnet oder übersprungen werden
-- **Typumwandlung (Type Coercion)** übernimmt String-zu-Zahl, String-zu-Boolean und das Parsen von Datumsangaben
+- **Typumwandlung** wandelt jede Zelle in den Typ der Eigenschaft um, der sie zugeordnet ist, aber nur, wenn dabei nichts verloren geht (siehe unten)
 
-### Validierung
+### Typumwandlung
 
-Vor dem Import validiert der Assistent alle Zeilen anhand der Eigenschaftsdefinitionen Ihrer Collection:
+Eine Zelle wird nur umgewandelt, wenn der Typ der Eigenschaft exakt das aufnehmen kann, was sie angibt:
 
-- Erforderliche Felder müssen vorhanden sein
-- Enum-Werte müssen mit den definierten Optionen übereinstimmen
-- Datentypen müssen kompatibel sein (z. B. wird ein Textwert für ein Zahlenfeld markiert)
-- Validierungsfehler werden pro Zeile angezeigt, sodass Sie diese vor dem Import beheben können
+| Eigenschaftstyp | Wird umgewandelt | Wird nicht umgewandelt |
+|---|---|---|
+| Number | `12`, `-3.5`, `10.00`, `1e3` | `02134` (eine führende Null würde verloren gehen), Zahlen mit mehr als 15 signifikanten Stellen, `1,234`, `$5.00`, `12%`, `N/A` |
+| Boolean | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, in beliebiger Schreibweise | alles andere |
+| Date | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), ausgeschriebene Daten (`5 Jan 2024`), `05/01/2024`, Epoch-Sekunden oder -Millisekunden | Text, der kein Datum benennt |
+
+Ein Datum ohne Uhrzeit ist dieser Tag in UTC. Bei Daten in der Form `05/01/2024` entscheidet die
+Spalte über die Reihenfolge: Eine erste Zahl über 12 macht die Spalte tagzuerst, eine zweite Zahl
+über 12 macht sie monatzuerst. Wenn eine Spalte dies nie verrät, entscheidet die Locale des
+Browsers, und wenn sie beide Reihenfolgen enthält, wird ein Datum, das beide Lesarten zulässt,
+nicht umgewandelt.
+
+Eine leere Zelle ist kein Wert: Sie setzt nichts, und der Default, den Sie für diese Eigenschaft
+gewählt haben, greift.
+
+### Werte, die nicht importiert werden können
+
+Die Vorschau listet jede Zelle auf, die nicht umgewandelt wird, pro Spalte, mit der Anzahl und den
+ersten paar nach Zeile und Grund. Diese Zellen bleiben in den importierten Zeilen leer; nichts wird
+zu `0`, `false` oder einem leeren Wert, ohne aufgelistet zu werden. Gehen Sie zurück, um die Spalte
+einer anderen Eigenschaft zuzuordnen, oder korrigieren Sie die Datei und laden Sie sie erneut hoch.
+
+Die eigenen Regeln der Collection — Pflichtfelder, Enum-Optionen, eindeutige Werte — werden vom
+Server beim Schreiben der Zeilen geprüft, 25 Zeilen auf einmal. Wird eine Zeile abgelehnt, stoppt
+der Import und benennt sie; die Zeilen davor sind bereits gespeichert, und **Retry** setzt ab der
+abgelehnten Zeile fort.
+
+### Eine Collection aus einer Datei erstellen
+
+Wenn Sie eine Collection aus einer Datei erstellen, wird der Typ jeder Spalte aus ihren Werten
+abgeleitet. Eine Spalte ist nur dann eine Zahl, wenn jeder Wert darin eine Zahl oder Text ist, der
+sich exakt in eine umwandeln lässt; eine Spalte mit Postleitzahlen, Produktcodes mit führenden
+Nullen, langen SKUs oder Telefonnummern bleibt daher Text. Eine Spalte, die Typen mischt (Zahlen
+und Wörter, Booleans und Zahlen), ist Text. Leere Zellen zählen nicht, sodass eine größtenteils
+leere Spalte nicht als erforderlich markiert wird.
 
 ### Import-Konfiguration
 

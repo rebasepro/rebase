@@ -112,3 +112,5 @@ realtime: { bus: { type: "postgres" } }
 ```
 
 Setzen Sie `sharedState.channelBusConfigured: true`, um zu bestätigen, dass Sie dies getan haben – das Chart nutzt dies nur, um zu entscheiden, ob eine Warnung ausgegeben werden soll. Reguläre Collection-Abonnements sind davon nicht betroffen; diese laufen über Postgres CDC.
+
+Der Rest dessen, was ein Prozess für sich behält – lokale Dateien, fortsetzbare Uploads, der Bild-Transformations-Cache, der Logs Explorer – ist zusammen mit der Einstellung, die jeweils für das Teilen sorgt, unter [Mehr als eine Instanz ausführen](/docs/deployment/multiple-instances/) aufgeführt.

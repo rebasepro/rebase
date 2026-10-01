@@ -466,7 +466,8 @@ const invoices = defineCollection({
         // Default filter — users can change it
         defaultFilter: { active: ["==", true] },
 
-        // Fixed filter — cannot be changed
+        // Fixed filter — cannot be changed; filters the user applies
+        // on other fields combine with it
         fixedFilter: { tenantId: ["==", currentTenantId] },
 
         // Default sort
@@ -474,6 +475,9 @@ const invoices = defineCollection({
     }
 });
 ```
+
+Der Nutzer kann eine Collection mit `fixedFilter` weiterhin filtern: Was er auf anderen Feldern
+anwendet, wird per AND damit verknüpft, und die fixierten Felder bleiben gesperrt.
 
 Ein `fixedFilter` schränkt lediglich ein, was das Panel *anfordert*; er ist keine Sicherheitsgrenze. Was
 ein Aufrufer tatsächlich lesen darf, bestimmt eine [Sicherheitsregel](/docs/collections/security-rules),

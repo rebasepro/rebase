@@ -36,6 +36,16 @@ Die gefundenen Agents sind bereits vorausgewählt. Für jeden, den du beibehält
 rebase init my-app --yes --agent claude,cursor
 ```
 
+## Ein bestehendes Projekt
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> `rebase init` verweigert ein Verzeichnis, das bereits ein Projekt enthält. Ein Projekt, das entstand, bevor es die Agent-Einrichtung gab – oder dessen Autor die Abfrage abgelehnt hat – erhält über `rebase skills install --mcp` dieselbe Einrichtung: die Skills und den in der Projektkonfiguration jedes Agents registrierten [MCP-Server](/docs/ai/mcp). Server, die bereits in der Datei stehen, bleiben erhalten, und ein erneuter Lauf lässt den Rebase-Eintrag unverändert.
+
+```bash
+rebase skills install --agent cursor --mcp
+```
+
+Ohne `--mcp` schreibt der Befehl nur die Skills und nennt die Agents, in deren Konfiguration der Server noch fehlt.
+
 ## Welcher Assistent
 
 Der Befehl akzeptiert `--agent` (oder `-a`), wiederholbar und kommagetrennt:

@@ -141,10 +141,7 @@ Wenn `REBASE_MIGRATE_ON_BOOT` auf dem Standardwert `ensure` steht, richtet die R
 
 Was der Boot-Vorgang ganz bewusst niemals tut, sind destruktive Änderungen: Er ändert weder Spaltentypen noch löscht er Spalten oder bearbeitet bestehende Enum-Werte. Ein Container-Neustart darf niemals als Nebeneffekt das Schema umgestalten können.
 
-Zwei Dinge erfordern daher weiterhin [`rebase db push`](/docs/architecture/schema-as-code), ausgeführt aus einem lokalen Checkout oder der CI, wo Absicherungen gegen destruktive Änderungen und Backups griffbereit sind:
-
-- RLS für Junction-Tabellen bei Many-to-Many-Relationen;
-- jede Änderung, die nicht rein additiv ist.
+Eine Sache erfordert daher weiterhin [`rebase db push`](/docs/architecture/schema-as-code), ausgeführt aus einem lokalen Checkout oder der CI, wo Absicherungen gegen destruktive Änderungen und Backups griffbereit sind: jede Änderung, die nicht rein additiv ist – eine umbenannte Spalte, ein eingeschränkter Typ, ein entferntes Feld.
 
 Wenn das Modul oder die Compose-Datei Postgres an das Loopback-Interface gebunden hat – was beide tun –, greifen Sie über einen SSH-Tunnel darauf zu:
 

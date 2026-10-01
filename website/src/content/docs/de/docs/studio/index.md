@@ -40,7 +40,7 @@ migriert.
 
 ### Sammlungs-Editor
 
-Ein visueller Schema-Editor, mit dem Sie Sammlungen über eine Drag-and-Drop-Benutzeroberfläche erstellen und ändern können. Wenn Sie Änderungen speichern, verwendet er [ts-morph](https://ts-morph.com/), um Ihre TypeScript-Quelldateien über AST-Manipulation zu aktualisieren – wobei der gesamte vorhandene Code und die benutzerdefinierte Logik erhalten bleiben. Er ist der Screenshot oben auf dieser Seite.
+Ein visueller Schema-Editor, mit dem Sie Sammlungen über eine Drag-and-Drop-Benutzeroberfläche erstellen und ändern können. Wenn Sie Änderungen speichern, verwendet er [ts-morph](https://ts-morph.com/), um die geänderten Schlüssel – und nur diese – in Ihre TypeScript-Quelldateien zu schreiben, wobei der Rest jeder Datei unverändert bleibt: Imports, Kommentare, Formatierung, Handler, geteilte Properties. Eine Änderung an etwas, das die Datei im Code definiert, etwa eine aus einem anderen Modul importierte Property, wird verweigert, mit dem Hinweis, wo sie vorzunehmen ist. Er ist der Screenshot oben auf dieser Seite.
 
 Der Editor ist überall dort aktiv, wo Studio eingebunden ist — das `<RebaseStudio/>` eines Scaffolds genügt, und es gibt keine Prop, die man hinzufügen müsste. `collectionEditor` stellt ihn ein, statt ihn einzuschalten:
 

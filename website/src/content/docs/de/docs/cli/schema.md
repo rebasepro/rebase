@@ -47,8 +47,8 @@ rebase schema generate
 
 | Flag | Beschreibung |
 |------|-------------|
-| `--collections, -c` | Pfad zum Collections-Verzeichnis (Standard: `config/collections/`) |
-| `--output, -o` | Ausgabepfad für die generierte Schemadatei |
+| `--collections, -c` | Collections-Verzeichnis (Standard: `config/collections/`); relative Pfade werden ausgehend vom Verzeichnis aufgelöst, in dem Sie den Befehl ausführen |
+| `--output, -o` | Ausgabepfad für die generierte Schemadatei; relative Pfade werden ausgehend vom Verzeichnis aufgelöst, in dem Sie den Befehl ausführen |
 | `--watch, -w` | Auf Änderungen achten und automatisch neu generieren |
 
 Der **Watch-Modus** ist während der Entwicklung nützlich — bearbeiten Sie eine Collection-Datei und das Schema wird sofort neu generiert:
@@ -77,6 +77,8 @@ rebase schema introspect
 | `--output, -o` | Ausgabeverzeichnis für die generierten Collection-Dateien |
 
 Dies ist nützlich, wenn Sie Rebase auf einer bestehenden Datenbank einführen — zuerst introspizieren, dann die generierten Collections anpassen.
+
+**Introspektion, gefolgt von Push, ändert nichts.** Die generierten Eigenschaften geben exakt an, was jede Spalte ist — `columnType`, `precision`/`scale`, `defaultValue`, `required`, das `isId` eines Schlüssels (`"increment"` für eine ganzzahlige Identity, `columnType: "serial"` für ein Serial, `"manual"` für einen Schlüssel ohne Default), das `onDelete` einer Relation sowie der `search`-Block einer Collection, zurückgelesen aus der Spalte, die er aufgebaut hat — daher plant `rebase db push --dry-run` direkt nach einer Introspektion keine Änderungen. Wo keine Eigenschaft eine Spalte vollständig abbilden kann — ein `timestamp` ohne Zeitzone, ein `interval`, ein `inet`, ein Enum-Typ, der nicht `<table>_<column>` heißt, ein Default wie `CURRENT_DATE` — weist die Introspektion pro Spalte darauf hin, im Terminal und am Anfang der Datei, mit dem, was ein Push damit tun würde, und, wenn vorhanden, dem Statement, das die beiden in Übereinstimmung bringt (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Eine Tabelle, deren Schlüssel aus mehr als einer Spalte besteht, wird mit ihrem Grund ausgelassen: Eine Collection liest eine Zeile über eine einzelne Schlüsselspalte, und `db push` lässt eine Tabelle, die keine Collection ist, unangetastet.
 
 ### `rebase db push`
 
@@ -196,7 +198,7 @@ rebase generate-sdk
 ```
 
 **Was er tut:**
-- Liest Collections aus `config/collections/` (unterstützt `index.ts`-Barrel-Exports oder einzelne Dateien)
+- Liest jede Collection-Datei in `config/collections/` — die Dateien, die das Backend ausliefert, unabhängig davon, ob der `index.ts`-Barrel sie auflistet — und bricht bei einer Datei ab, die nicht geladen werden kann
 - Generiert TypeScript-Typen für alle Entitäten in `generated/sdk/`
 - Erzeugt eine `database.types.ts`-Datei zur Verwendung mit `createRebaseClient<Database>()`
 
@@ -209,7 +211,7 @@ Repository ohne Collections (siehe `--from` unten) oder überall dort, wo
 
 | Flag | Beschreibung |
 |------|-------------|
-| `-c`, `--collections-dir` | Pfad zum Collections-Verzeichnis (Standard: `config/collections/`) |
+| `-c`, `--collections` | Collections-Verzeichnis (Standard: `config/collections/`); relative Pfade werden ausgehend vom Verzeichnis aufgelöst, in dem Sie den Befehl ausführen. `--collections-dir` wird ebenfalls akzeptiert. |
 | `-o`, `--output` | Ausgabeverzeichnis für das SDK (Standard: `generated/sdk/`) |
 | `--from <link\|url>` | Liest das Schema von einem laufenden Projekt statt aus lokalem Quellcode. `link` verwendet das verknüpfte Projekt dieses Checkouts. |
 | `--token` | Bearer-Token für den Contract-Endpunkt (Standard: `$REBASE_SERVICE_KEY`) |

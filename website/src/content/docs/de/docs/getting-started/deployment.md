@@ -130,9 +130,8 @@ CI-Job, der auf die Produktionsdatenbank zeigt:
 pnpm run db:push
 ```
 
-Führen Sie das für die RLS von Verbindungstabellen bei
-Viele-zu-viele-Beziehungen aus, und für jede Änderung, die nicht rein additiv
-ist — eine umbenannte Spalte, ein verengter Typ, ein entferntes Feld.
+Führen Sie das für jede Änderung aus, die nicht rein additiv ist — eine
+umbenannte Spalte, ein verengter Typ, ein entferntes Feld.
 
 Für einen **versionierten Team-Workflow** committen Sie stattdessen
 Migrationsdateien mit `pnpm run db:generate` und führen `pnpm run db:migrate` als
@@ -178,7 +177,7 @@ Bevor Sie in die Produktion bereitstellen, stellen Sie sicher:
 |------|---------|
 | **Erster Administrator** | Setzen Sie `REBASE_ADMIN_EMAIL` und `REBASE_ADMIN_PASSWORD` **vor dem ersten Start**, dazu `DISABLE_SELF_REGISTRATION=true`. In der Produktion wird das erste registrierte Konto nicht befördert — siehe [Ihr erster Administrator](#ihr-erster-administrator). |
 | **NODE_ENV** | `NODE_ENV=production`. Das ist es, was das Bootstrap-Fenster schließt, lokalen Dateispeicher ablehnt, `CORS_ORIGINS` verlangt und die OpenAPI-Doku abschaltet. Eine Bereitstellung, die auf dem Standardwert bleibt, läuft im Entwicklungsmodus. |
-| **Datenbankschema** | Der Start legt Ihre Collection-Tabellen additiv an. Führen Sie `pnpm run db:push` (oder `pnpm run db:migrate`) für die RLS von Verbindungstabellen aus und für alles, was nicht rein additiv ist. |
+| **Datenbankschema** | Der Start legt Ihre Collection-Tabellen und deren RLS additiv an. Führen Sie `pnpm run db:push` (oder `pnpm run db:migrate`) für alles aus, was nicht rein additiv ist. |
 | **JWT_SECRET** | Verwenden Sie eine kryptografisch starke Zufallszeichenkette (≥ 32 Zeichen). Niemals über Umgebungen hinweg wiederverwenden. |
 | **DATABASE_URL** | Verwenden Sie eine verwaltete Postgres-Instanz (Neon, Supabase, RDS) mit aktiviertem TLS |
 | **CORS_ORIGINS** | Immer, nicht nur wenn das Frontend auf einer anderen Domain liegt. Die Laufzeitumgebung verweigert den Start in der Produktion, wenn weder `CORS_ORIGINS` noch `FRONTEND_URL` gesetzt ist, denn eine API, die ihre erlaubten Origins errät, erlaubt irgendwann die falsche. |

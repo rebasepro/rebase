@@ -228,6 +228,26 @@ Sie müssen sich nicht zwischen Rebase und Drizzle entscheiden. Der Bootstrapper
 ### Geordnetes Schließen von Verbindungen (Graceful Connection Draining)
 In serverlosen Umgebungen oder Orchestratoren (wie Kubernetes) kann das Beenden von Pods zu unterbrochenen Verbindungen führen. Implementieren Sie stets Signal-Handler, die `realtimeProvider.stopListening()` (wodurch der dedizierte pg LISTEN-Client beendet wird) und `pool.end()` aufrufen, um das Blockieren ungenutzter Verbindungsslots auf Ihrem Datenbankserver zu verhindern.
 
+### CORS für ein Browser-Frontend
+Ein eigener Server besitzt seine eigene CORS-Konfiguration, und ein Frontend auf einem anderen Origin kann nur die Response-Header lesen, die er freigibt. Geben Sie die frei, die das SDK liest, sonst ist `etagOf(row)` dort immer `undefined` — ein `ifMatch`-Schreibvorgang geht dann ohne `If-Match` hinaus — und ein 429 verliert sein `Retry-After`:
+
+```typescript
+import express from "express";
+import cors from "cors";
+
+const app = express();
+app.use(cors({
+    origin: ["https://app.example.com"],
+    credentials: true,
+    exposedHeaders: [
+        "ETag", "Retry-After", "X-Request-ID",
+        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
+        "Preference-Applied"
+    ]
+}));
+```
+
+Die Rebase-Runtime und das ejected Backend senden diese Liste bereits.
 
 ## Verwandte Themen
 

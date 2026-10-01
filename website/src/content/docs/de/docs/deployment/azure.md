@@ -86,14 +86,13 @@ Azure Container Apps bietet eine serverlose Container-Umgebung mit integriertem 
 
 Was `ensure` niemals tut, ist das Ändern von Bestehendem: Es ändert keinen Spaltentyp, löscht nichts und bearbeitet keine bestehenden Enum-Labels, da ein Container-Neustart ein Schema niemals als Nebeneffekt eines Deployments umstrukturieren darf.
 
-Zwei Dinge erfordern daher weiterhin die CLI, ausgeführt aus einem Checkout oder einem CI-Job mit `DATABASE_URL` auf Ihren Flexible Server gerichtet (fügen Sie bei Bedarf eine Firewall-Regel für Ihre Client-IP hinzu):
+Eine Sache erfordert daher weiterhin die CLI, ausgeführt aus einem Checkout oder einem CI-Job mit `DATABASE_URL` auf Ihren Flexible Server gerichtet (fügen Sie bei Bedarf eine Firewall-Regel für Ihre Client-IP hinzu):
 
 ```bash
 rebase db push
 ```
 
-- **Junction-Table RLS** für Many-to-Many-Relationen.
-- **Jede Änderung, die nicht rein additiv ist** – eine umbenannte Spalte, ein eingeschränkter Typ, ein entferntes Feld.
+Jede Änderung, die nicht rein additiv ist – eine umbenannte Spalte, ein eingeschränkter Typ, ein entferntes Feld.
 
 Das Runtime-Image wird ohne die CLI ausgeliefert, sodass dies niemals innerhalb des Containers ausgeführt wird. Für versionierte Migrationen committen Sie Migrationsdateien mit `rebase db generate` und führen stattdessen `rebase db migrate` als Release-Schritt aus.
 

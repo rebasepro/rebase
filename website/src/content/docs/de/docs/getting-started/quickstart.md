@@ -59,7 +59,7 @@ Es startet beide Teile zusammen:
 Beide Ports werden **aus dem Pfad dieses Projekts abgeleitet** statt fest vorgegeben zu sein, sodass mehrere
 Rebase-Projekte nebeneinander laufen können. `rebase dev` gibt die beiden gebundenen URLs aus —
 **verwenden Sie diese**, nicht `localhost:3001` / `localhost:5173`. (`PORT` und `VITE_API_URL`
-in der `.env` konfigurieren `rebase start`, den Produktionsserver, und werden hier ignoriert.)
+in der `.env` konfigurieren `rebase start`, das den gebauten Bundle ausführt, und werden hier ignoriert.)
 Einen Port können Sie mit `rebase dev --port 3001` festlegen.
 
 ### Nützliche Flags
@@ -94,12 +94,11 @@ für den Vergleich, und PGlite stellt exakt eine bereit:
 pnpm run db:push
 ```
 
-Der Bootvorgang erstellt fehlende Tabellen bereits additiv. `db push` ist daher für die zwei
-Dinge gedacht, die bewusst unberührt gelassen werden: Junction-Table-
-[RLS](/docs/collections/security-rules/) — PostgreSQLs Row-Level Security, womit
-Rebase steuert, wer eine Zeile lesen darf — bei Many-to-Many-Relationen,
-sowie alle Änderungen, die nicht rein additiv sind — eine umbenannte Spalte, ein
-eingeschränkter Typ oder ein entferntes Feld.
+Der Bootvorgang erstellt fehlende Tabellen — und ihre
+[RLS](/docs/collections/security-rules/)-Policies, PostgreSQLs Row-Level Security, womit
+Rebase steuert, wer eine Zeile lesen darf — bereits additiv, daher ist `db push` für das
+gedacht, was er bewusst unberührt lässt: jede Änderung, die nicht rein additiv ist — eine
+umbenannte Spalte, ein eingeschränkter Typ, ein entferntes Feld.
 
 Das Gerüst enthält außerdem eine `docker-compose.yml` mit einem PostgreSQL-Dienst, falls Sie
 einen Container anstelle eines lokal installierten Postgres bevorzugen:
@@ -130,7 +129,7 @@ Wenn Sie die Frontend-URL öffnen, die `rebase dev` ausgegeben hat, sehen Sie de
 
 ## Ihre erste Collection definieren
 
-Öffnen Sie `config/collections/` und erstellen Sie eine neue Datei. Exportieren Sie die Collection als **Default-Export** — so wird sie von der Registry erfasst. Der Tabellenname ist optional: Er entspricht standardmäßig dem Slug, setzen Sie ihn also nur, wenn sie voneinander abweichen:
+Öffnen Sie `config/collections/` und erstellen Sie eine neue Datei. Exportieren Sie die Collection als **Default-Export** — das ist es, was Backend und Admin-Panel aus jeder Datei im Verzeichnis laden. Der Tabellenname ist optional: Er entspricht standardmäßig dem Slug, setzen Sie ihn also nur, wenn sie voneinander abweichen:
 
 ```typescript title="config/collections/products.ts"
 import { defineCollection } from "@rebasepro/cms-types";
@@ -170,7 +169,7 @@ const productsCollection = defineCollection({
 export default productsCollection;
 ```
 
-Registrieren Sie sie anschließend in `config/collections/index.ts`, damit sowohl das Backend als auch das Admin-Panel davon wissen:
+Fügen Sie sie anschließend dem `collections`-Array in `config/collections/index.ts` hinzu. Dieses Array ist eine Sortierreihenfolge, keine Registry: Jede Collection-Datei im Verzeichnis wird geladen — vom Backend, dem Admin-Panel und dem SDK-Generator —, ob das Array sie auflistet oder nicht, und das Array entscheidet, wo sie in der Navigation erscheint. Um eine Collection zu entfernen, löschen Sie ihre Datei:
 
 ```typescript title="config/collections/index.ts" {2,5}
 // ...existing imports
@@ -189,12 +188,15 @@ Collections, startet das Backend neu
 und der Bootvorgang erstellt die neue Tabelle — sodass Ihre Collection **Products** in der
 Navigation erscheint.
 
+<span class="since-badge" data-since="0.24">Seit 0.24</span> für die SDK-Typen: Unter 0.23
+generiert `rebase dev` nur das Schema neu, führen Sie daher nach einer Collection-Änderung
+`rebase generate-sdk` aus, bevor Sie deren Typen importieren.
+
 Dasselbe gilt für eine Property, die einer bereits vorhandenen Collection hinzugefügt wird: Speichern,
 und die Spalte ist vorhanden.
 
 `rebase db push` wird für Änderungen benötigt, die der Bootvorgang bewusst auslässt — eine umbenannte
-Spalte, ein eingeschränkter Typ, ein entferntes Feld und Junction-Table-RLS bei
-Many-to-Many-Relationen. Dafür wird ein eigenes PostgreSQL benötigt:
+Spalte, ein eingeschränkter Typ, ein entferntes Feld. Dafür wird ein eigenes PostgreSQL benötigt:
 
 ```bash
 pnpm run db:push

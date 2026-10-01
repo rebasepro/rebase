@@ -60,6 +60,18 @@ properties: {
 }
 ```
 
+### Wo die Validierung ausgeführt wird
+
+Der Server prüft `validation` an der Anfragegrenze — REST, der Realtime-Socket und MCP — anhand
+dessen, was der Aufrufer gesendet hat, bevor `beforeSave` läuft, und beantwortet einen
+Schreibvorgang, der eine Regel verletzt, mit einem 400, das jedes fehlschlagende Feld benennt.
+Serverseitiger Code, der prozessintern schreibt, ist vertrauenswürdig und wird **nicht** gegen diese
+Regeln geprüft: `rebase.data` und `rebase.dataAsAdmin` in einer Funktion oder einem Cron-Job,
+`context.data` in einem Callback, ein Seed-Skript. Was dort gilt, ist das, was die Datenbank
+erzwingt — `required` (NOT NULL), `unique` (ein Unique-Index), der Typ eines Enums und die Breite
+einer `varchar`- oder `char`-Spalte. Alles andere, das Ihr Servercode schreibt, prüfen Sie im Code,
+der es schreibt.
+
 ### Alle Typen
 
 | Regel | Typ | Beschreibung |
@@ -73,7 +85,7 @@ properties: {
 
 | Regel | Typ | Beschreibung |
 |-------|-----|--------------|
-| `min` / `max` | `number` | Mindest- / Höchstanzahl von Zeichen, inklusive. Ein `max` bestimmt auch die Spaltengröße: Es wandelt `TEXT` in `VARCHAR(max)` um; eine Verringerung auf einer Tabelle, die bereits längere Zeilen enthält, ist eine Migration, die die Datenbank verweigert |
+| `min` / `max` | `number` | Mindest- / Höchstanzahl von Zeichen, inklusive. Mit `columnType: "varchar"` oder `"char"` bestimmt `max` auch die Spaltengröße (`VARCHAR(max)`); eine Verringerung auf einer Tabelle, die bereits längere Zeilen enthält, ist eine Migration, die die Datenbank verweigert. Die Standardspalte ist `TEXT`, die `max` unbegrenzt lässt — die Grenze liegt dann allein in der [Anfrageprüfung](#where-validation-runs) des Servers |
 | `length` | `number` | Genau diese Anzahl von Zeichen – ein Ländercode, eine Referenz mit fester Breite |
 | `matches` | `string \| RegExp` | Ein Muster, dem der gesamte Wert entsprechen muss. Ein String wird pro Anfrage kompiliert; ein nicht kompilierbarer String wird daher beim Start abgelehnt, anstatt stillschweigend ignoriert zu werden |
 | `matchesMessage` | `string` | Was das Formular anzeigt, wenn `matches` fehlschlägt |
@@ -151,8 +163,9 @@ Formular, das jemanden anleitet, und einem, das ihn abweist.
 :::caution[Bedingungen betreffen nur das Formularverhalten]
 **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** Sie laufen im
 Browser auf der bearbeiteten Entität und bestimmen, was das Panel anbietet. Eine Regel,
-die für jeden Aufrufer gelten muss, gehört in `validation`, was der Server
-prüft, oder in eine [Sicherheitsregel](/docs/collections/security-rules/), welche die
+die für jeden API-Aufrufer gelten muss, gehört in `validation`, was der Server bei REST-,
+Socket- und MCP-Schreibvorgängen prüft (nicht bei den [prozessinternen Schreibvorgängen](#where-validation-runs)
+Ihres eigenen Servercodes), oder in eine [Sicherheitsregel](/docs/collections/security-rules/), welche die
 Datenbank für jeden erzwingt – Panel, SDK oder `curl`.
 :::
 
@@ -164,8 +177,8 @@ Für komplexes Verhalten, das nicht über JSON Logic ausgedrückt werden kann, k
 price: {
     type: "number",
     name: "Price",
-    dynamicProps: ({ values, user }) => ({
-        disabled: values.is_free === true || !user.roles.includes("admin"),
+    dynamicProps: ({ values, authController }) => ({
+        admin: { disabled: values.is_free === true || !authController.user?.roles?.includes("admin") },
         validation: values.is_free ? {} : { required: true, min: 0 }
     })
 }

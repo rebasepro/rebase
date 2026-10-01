@@ -84,14 +84,13 @@ Scaleway stellt den Container bereit und liefert Ihnen einen öffentlichen Endpu
 
 Was `ensure` niemals tut, ist etwas bereits Vorhandenes zu ändern: Es ändert weder einen Spaltentyp, noch löscht es etwas oder bearbeitet die Labels eines bestehenden Enums, da ein Container-Neustart ein Schema nicht als Nebeneffekt eines Deployments umstrukturieren darf.
 
-Für zwei Dinge ist daher weiterhin die CLI erforderlich, die aus einem lokalen Checkout oder einem CI-Job ausgeführt wird, wobei `DATABASE_URL` auf Ihre Managed Database verweist:
+Für eine Sache ist daher weiterhin die CLI erforderlich, die aus einem lokalen Checkout oder einem CI-Job ausgeführt wird, wobei `DATABASE_URL` auf Ihre Managed Database verweist:
 
 ```bash
 rebase db push
 ```
 
-- **RLS für Verknüpfungstabellen (Junction Tables)** bei Many-to-Many-Relationen.
-- **Jede Änderung, die nicht rein additiv ist** – eine umbenannte Spalte, ein eingeschränkter Typ, ein entferntes Feld.
+Jede Änderung, die nicht rein additiv ist – eine umbenannte Spalte, ein eingeschränkter Typ, ein entferntes Feld.
 
 Das Runtime-Image wird ohne die CLI ausgeliefert, daher wird dies niemals innerhalb des Containers ausgeführt. Für versionierte Migrationen committen Sie Migrationsdateien mit `rebase db generate` und führen stattdessen `rebase db migrate` als Release-Schritt aus.
 
