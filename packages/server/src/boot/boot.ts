@@ -30,7 +30,7 @@ import { serveSPA } from "../serve-spa";
 import { installShutdownHandlers } from "../init/shutdown";
 import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
 
-import { loadBootEnv, resolveCorsOptions, resolveEnableSwagger, type RebaseBootEnv } from "./env";
+import { bootEnvExtension, loadBootEnv, resolveCorsOptions, resolveEnableSwagger, type RebaseBootEnv } from "./env";
 import { numericEnvVar } from "../env";
 import { resolveRole, RoleConfigurationError } from "./role";
 import { FunctionSelectionError } from "../functions/selection";
@@ -632,16 +632,16 @@ function readStaticPort(): number {
 
 /**
  * REBASE_HSTS_INCLUDE_SUBDOMAINS for the static-only path, which reads its few
- * variables directly rather than through the backend's schema. Validated the
- * same way: a value that is neither true nor false refuses the boot rather than
- * quietly meaning one of them.
+ * variables directly rather than through the backend's whole schema. This one
+ * goes through the backend's own field, so it is read and validated the same
+ * way on both paths: a value that is neither true nor false refuses the boot
+ * rather than quietly meaning one of them.
  */
 function readHstsIncludeSubDomains(): boolean {
-    const raw = process.env.REBASE_HSTS_INCLUDE_SUBDOMAINS;
-    if (raw === undefined || raw === "") return false;
-    if (raw === "true" || raw === "false") return raw === "true";
+    const parsed = bootEnvExtension.pick({ REBASE_HSTS_INCLUDE_SUBDOMAINS: true }).safeParse(process.env);
+    if (parsed.success) return parsed.data.REBASE_HSTS_INCLUDE_SUBDOMAINS;
     throw new BundleError(
-        `The environment is not valid:\n  REBASE_HSTS_INCLUDE_SUBDOMAINS: expected "true" or "false", got "${raw}"`,
+        `The environment is not valid:\n  REBASE_HSTS_INCLUDE_SUBDOMAINS: expected "true" or "false"`,
         "See https://rebase.pro/docs/getting-started/configuration/ for the variables a deployment reads."
     );
 }

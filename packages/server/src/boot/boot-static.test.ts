@@ -157,6 +157,32 @@ describe("security headers on a static app", () => {
         expect((await headers("/")).get("strict-transport-security")).toBe("max-age=15552000");
     });
 
+    /** Boot the same bundle again with REBASE_HSTS_INCLUDE_SUBDOMAINS set to `value`. */
+    async function bootWithHsts(value: string): Promise<BootedRuntime> {
+        const previous = process.env.REBASE_HSTS_INCLUDE_SUBDOMAINS;
+        process.env.REBASE_HSTS_INCLUDE_SUBDOMAINS = value;
+        try {
+            return await bootFromBundle({ bundleDir: path.join(scratch, "dist-bundle"), listen: false, handleSignals: false });
+        } finally {
+            if (previous === undefined) delete process.env.REBASE_HSTS_INCLUDE_SUBDOMAINS;
+            else process.env.REBASE_HSTS_INCLUDE_SUBDOMAINS = previous;
+        }
+    }
+
+    it("adds includeSubDomains when asked, read the way the backend reads it", async () => {
+        const runtime = await bootWithHsts("true");
+        try {
+            const res = await runtime.app.fetch(new Request("http://localhost/"));
+            expect(res.headers.get("strict-transport-security")).toBe("max-age=15552000; includeSubDomains");
+        } finally {
+            await runtime.shutdown().catch(() => {});
+        }
+    });
+
+    it("refuses to boot on a value that is neither true nor false", async () => {
+        await expect(bootWithHsts("yes")).rejects.toThrow(/REBASE_HSTS_INCLUDE_SUBDOMAINS: expected "true" or "false"/);
+    });
+
     it("sends a conservative CSP on the page and its deep links", async () => {
         for (const url of ["/", "/admin", "/admin/collections/posts", "/assets/app.js"]) {
             const csp = (await headers(url)).get("content-security-policy");
