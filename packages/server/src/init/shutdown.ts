@@ -14,6 +14,12 @@ interface ShutdownConfig {
     /** The stop `MetricsHistory.start()` returned: its interval writes to the pool. */
     stopMetricsSampler?: () => void;
     realtimeServices: Record<string, RealtimeProvider>;
+    /**
+     * End the responses that stay open until their client leaves — the Logs
+     * Explorer's SSE tail. `server.close()` waits for every open connection, so
+     * one of these left open held the shutdown to its force timeout.
+     */
+    closeLongLivedResponses?: () => void;
 }
 
 /**
@@ -111,7 +117,9 @@ export function installShutdownHandlers(
                 await onCleanup();
             }
             clearTimeout(forceTimer);
-            logger.info("Graceful shutdown complete.");
+            // Not "graceful": when the drain had to be forced, the line before
+            // this one says so, and "graceful" right after it contradicted it.
+            logger.info("Shutdown complete.");
             exit(0);
         } catch (err) {
             logger.error("Error during shutdown cleanup:", { error: err instanceof Error ? err : new Error(String(err)) });
@@ -153,7 +161,13 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
             // step that hangs must not be what decides when it starts counting.
             const forceTimer = timeoutMs > 0
                 ? setTimeout(() => {
-                    logger.warn(`Forced shutdown after ${timeoutMs / 1000}s timeout`);
+                    logger.warn(
+                        `Forced shutdown after ${timeoutMs / 1000}s timeout: a teardown step hung, or the HTTP ` +
+                        "server still had requests open. Closing the remaining connections."
+                    );
+                    // So the process can actually end: an open socket holds the
+                    // event loop, and the cleanup after this closes the pool.
+                    config.server.closeAllConnections?.();
                     resolve();
                 }, timeoutMs)
                 : undefined;
@@ -245,8 +259,23 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                     }
                 }
 
-                // 3. Close the HTTP server (stop accepting, drain in-flight)
+                // 3. Close the HTTP server (stop accepting, drain in-flight).
+                //
+                // Streams first: an open SSE tail is a request that is never
+                // "in flight" towards an end, and `close()` would wait on it
+                // until the force timer — the WebSockets get the same treatment
+                // in the realtime teardown above.
+                config.closeLongLivedResponses?.();
+                // `close()` closes the connections that are idle when it is
+                // called, and only those. A keep-alive connection whose response
+                // finishes a moment later — a stream just ended above, a request
+                // that was in flight — then holds the server open for the whole
+                // keep-alive timeout. Sweep the idle ones until it has closed;
+                // a connection still serving a request is never touched.
+                const sweepIdle = setInterval(() => config.server.closeIdleConnections?.(), 100);
+                sweepIdle.unref();
                 config.server.close(() => {
+                    clearInterval(sweepIdle);
                     logger.info("HTTP server closed");
                     clearTimeout(forceTimer);
                     resolve();

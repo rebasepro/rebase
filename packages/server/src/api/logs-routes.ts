@@ -319,7 +319,19 @@ export interface LogStreamTiming {
     maxPending?: number;
 }
 
-export function createLogsRoutes(timing: LogStreamTiming = {}): Hono<HonoEnv> {
+/** What ends the stream from the server's side. */
+export interface LogsRoutesOptions {
+    /**
+     * Aborted when the backend shuts down. Every open stream ends then, rather
+     * than when its client happens to leave: `server.close()` waits on every
+     * open connection, so one Studio → Logs tab held a SIGTERM for the whole
+     * force timeout — longer than Cloud Run's or `docker stop`'s grace period,
+     * which killed the process before the pool was closed.
+     */
+    closeSignal?: AbortSignal;
+}
+
+export function createLogsRoutes(timing: LogStreamTiming = {}, options: LogsRoutesOptions = {}): Hono<HonoEnv> {
     // Here rather than at module load: the ring exists whether or not anything
     // reads it, but there is no reason to fill it on a process that serves no
     // logs surface. Idempotent, so the repeated calls a split deployment makes
@@ -453,6 +465,12 @@ export function createLogsRoutes(timing: LogStreamTiming = {}): Hono<HonoEnv> {
             };
             c.req.raw.signal.addEventListener("abort", abortOnDisconnect, { once: true });
             if (c.req.raw.signal.aborted) abortOnDisconnect();
+            // The server going away ends it the same way, for the same reason
+            // the client going away does — and a stream opened after shutdown
+            // began still sends its snapshot, then ends.
+            const closeSignal = options.closeSignal;
+            closeSignal?.addEventListener("abort", abortOnDisconnect, { once: true });
+            if (closeSignal?.aborted) abortOnDisconnect();
 
             try {
                 await stream.writeSSE({
@@ -493,6 +511,7 @@ export function createLogsRoutes(timing: LogStreamTiming = {}): Hono<HonoEnv> {
             } finally {
                 unsubscribe();
                 c.req.raw.signal.removeEventListener("abort", abortOnDisconnect);
+                closeSignal?.removeEventListener("abort", abortOnDisconnect);
             }
         });
     });

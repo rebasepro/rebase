@@ -3325,6 +3325,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // route below closes over this binding rather than its value.
     let rlsAudit: RlsAudit | undefined;
 
+    // Aborted by this backend's shutdown, ending every response that would
+    // otherwise stay open until its client left — see `createShutdown`.
+    const longLivedResponses = new AbortController();
+
     // 6b. Mount Backup admin routes (for the Studio Backups panel).
     // Read the destination lazily from env so config changes don't need a
     // rebuild. Only enabled when BACKUP_DESTINATION is set.
@@ -3433,12 +3437,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // paths, status codes and correlation IDs, so they are admin-only — the same
     // posture as the cron and backup admin routes above.
     if (surfaces.admin) {
-        const { default: logsRoutes } = await import("./api/logs-routes");
+        const { createLogsRoutes } = await import("./api/logs-routes");
         const logsRouter = new Hono<HonoEnv>();
 
         applyAdminGate(logsRouter, "Logs");
 
-        logsRouter.route("/", logsRoutes);
+        // Per backend, not the module's shared instance: its streams end when
+        // this backend shuts down (see `closeLongLivedResponses` below).
+        logsRouter.route("/", createLogsRoutes({}, { closeSignal: longLivedResponses.signal }));
         mountWithLegacyAlias(config.app, logsRouter, {
             canonical: `${basePath}/admin/logs`,
             legacy: `${basePath}/logs`,
@@ -3555,7 +3561,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         jobQueue,
         rlsAudit,
         stopMetricsSampler,
-        realtimeServices
+        realtimeServices,
+        closeLongLivedResponses: () => longLivedResponses.abort()
     });
 
     /**
