@@ -53,6 +53,28 @@ function valueAt(obj: unknown, path: string): unknown {
 }
 
 /**
+ * Whether an imported value is the file's value: the same, the text a CSV
+ * cell was written as (a canonical `10.5` cell arrives as a number and a text
+ * property gives back `"10.5"`), or the number a text spells when the number
+ * keeps all of it (`10.00` → 10, but never `02134` → 2134 or a SKU rounded).
+ */
+function sameValue(out: unknown, original: unknown): boolean {
+    if (JSON.stringify(out) === JSON.stringify(original)) return true;
+    if (typeof out === "string" && (typeof original === "number" || typeof original === "boolean")) {
+        return String(original) === out;
+    }
+    if (typeof out === "number" && typeof original === "string") {
+        const text = original.trim();
+        const digits = text.split(/[eE]/)[0].replace(/\D/g, "").replace(/^0+/, "");
+        return Number(text) === out && !/^-?0\d/.test(text) && digits.length <= 15;
+    }
+    if (Array.isArray(out) && Array.isArray(original)) {
+        return out.length === original.length && out.every((item, i) => sameValue(item, original[i]));
+    }
+    return false;
+}
+
+/**
  * Every non-blank cell of the file, and what the imported row holds for it,
  * where the two differ — empty when nothing was lost or changed on the way.
  */
@@ -65,7 +87,7 @@ export function lostCells(result: Awaited<ReturnType<typeof importIntoNewCollect
             if (value === "" || value === null || value === undefined) continue;
             const mapped = Object.hasOwn(result.headersMapping, key) ? result.headersMapping[key] : key;
             const out = mapped ? valueAt(result.entities[i].values, mapped) : undefined;
-            if (JSON.stringify(out) !== JSON.stringify(value)) {
+            if (!sameValue(out, value)) {
                 lost.push(`row ${i} '${key}': ${JSON.stringify(value)} -> ${JSON.stringify(out)}`);
             }
         }

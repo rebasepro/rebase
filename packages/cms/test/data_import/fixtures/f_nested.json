@@ -1,0 +1,6 @@
+[
+ {"title":"a","meta":{"author":"x","tags":["t1","t2"]},"items":[{"sku":"s1","qty":1},{"sku":"s2","qty":2}],"mixed":[1,"two",true],"empty":[],"geo":{"lat":1.5,"lng":2.5}},
+ {"title":"b","meta":{"author":"y","editor":"z"},"items":[{"sku":"s3","price":9.5}],"mixed":["a","b"],"empty":[],"extra":"only-in-row-2"},
+ {"title":"c","meta":{"published":true},"items":[],"mixed":[2,3],"empty":[],"geo":null},
+ {"title":"d","meta":null,"items":[{"sku":"s4","qty":"3"}],"mixed":[],"empty":[], "extra":"x"}
+]

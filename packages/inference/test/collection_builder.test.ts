@@ -250,3 +250,82 @@ describe("buildEntityPropertiesFromData with prototype-named columns", () => {
         expect(Object.hasOwn(Object.prototype.toString, "string")).toBe(false);
     });
 });
+
+// ─────────────────────────────────────────────────────────────
+// A column is only inferred as a type its values convert to unchanged
+// ─────────────────────────────────────────────────────────────
+describe("buildEntityPropertiesFromData never infers a type that loses a value", () => {
+    /**
+     * A CSV cell is read as a number only when its text is the canonical JSON
+     * of one, so `02134`, a 20-digit SKU and `N/A` arrive as text beside the
+     * column's real numbers. The majority vote then called the column a
+     * number, and the import ran `Number()` on the text: `02134` became 2134,
+     * the SKU lost its last digits, and `N/A` became null — silently.
+     */
+    const typeOf = async (values: unknown[]) =>
+        (await buildEntityPropertiesFromData(values.map(value => ({ value })), inferType)).value;
+
+    it.each([
+        ["zip codes with a leading zero", ["02134", 10001, 94105]],
+        ["SKUs beyond a double's precision", ["12345678901234567890", 111, 222, 333]],
+        ["a 16-digit id", ["9007199254740993", 1, 2, 3]],
+        ["a number column with N/A and dashes", [10.5, "N/A", 12, "-", 13.25, 14, 15, 16]],
+        ["phone numbers", ["555-1234", 5551234567, "+15551234567", 5559876543]],
+        ["thousands separators", ["1,234", 999, 3000, 4000]],
+        ["numbers and booleans", [1, 0, true, 1]],
+        ["text and booleans", [true, false, "maybe", true]]
+    ])("%s → string", async (_, values) => {
+        expect((await typeOf(values)).type).toBe("string");
+    });
+
+    it("a column whose text spells its numbers exactly is a number", async () => {
+        // `10.00` is not canonical JSON, so it arrives as text; as a number it
+        // is 10 and nothing is lost.
+        expect((await typeOf(["10.00", 12.5, "9.99", 5.25, "1e3"])).type).toBe("number");
+    });
+
+    it("an array mixing numbers, text and booleans holds strings", async () => {
+        const properties = await buildEntityPropertiesFromData([
+            { mixed: [1, "two", true] },
+            { mixed: ["a", "b"] },
+            { mixed: [2, 3] }
+        ], inferType);
+        expect(properties.mixed).toMatchObject({ type: "array", of: { type: "string" } });
+    });
+
+    it("an array of numbers stays an array of numbers", async () => {
+        const properties = await buildEntityPropertiesFromData([{ n: [1, 2] }, { n: [3] }], inferType);
+        expect(properties.n).toMatchObject({ type: "array", of: { type: "number" } });
+    });
+});
+
+// ─────────────────────────────────────────────────────────────
+// A blank cell is no value
+// ─────────────────────────────────────────────────────────────
+describe("buildEntityPropertiesFromData reads a blank cell as no value", () => {
+    /**
+     * A CSV reader hands over `""` for an empty cell where a spreadsheet
+     * reader hands over nothing, and the import writes neither. Counted as a
+     * value, a column that is 99% blank was `required` with `""` in its enum,
+     * and the import then refused the 99 rows it was inferred from.
+     */
+    const rows = Array.from({ length: 100 }, (_, i) => ({ name: `user${i}`, nickname: i === 42 ? "Bob" : "", score: i }));
+
+    it("a mostly blank column is neither required nor an enum with a blank option", async () => {
+        const properties = await buildEntityPropertiesFromData(rows, inferType);
+        expect(properties.nickname.type).toBe("string");
+        expect(properties.nickname.validation?.required).toBeUndefined();
+        expect(JSON.stringify(properties.nickname)).not.toContain("\"id\":\"\"");
+    });
+
+    it("infers the same properties whether the reader omits blanks or keeps them", async () => {
+        const omitted = rows.map(row => Object.fromEntries(Object.entries(row).filter(([, v]) => v !== "")));
+        expect(await buildEntityPropertiesFromData(rows, inferType))
+            .toEqual(await buildEntityPropertiesFromData(omitted, inferType));
+    });
+
+    it("a number column with a blank cell is still a number", async () => {
+        const properties = await buildEntityPropertiesFromData([{ n: 1 }, { n: "" }, { n: 3 }], inferType);
+        expect(properties.n.type).toBe("number");
+    });
+});

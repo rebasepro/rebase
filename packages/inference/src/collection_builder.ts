@@ -9,6 +9,7 @@ import { buildStringProperty } from "./builders/string_property_builder";
 import { buildValidation } from "./builders/validation_builder";
 import { buildReferenceProperty } from "./builders/reference_property_builder";
 import { extractEnumFromValues, mergeDeep, prettifyIdentifier, resolveEnumValues } from "./util";
+import { readNumberExactly } from "./numbers";
 import { DataType, EnumValues, Properties, Property, StringProperty, Vector } from "@rebasepro/types";
 
 export type InferenceTypeBuilder = (value: unknown) => DataType;
@@ -169,6 +170,16 @@ function increaseTypeCount(
     }
 }
 
+/**
+ * A cell nobody filled in. A CSV reader hands over `""` for it where a
+ * spreadsheet reader hands over nothing, and the import writes neither — so it
+ * is no value here either: it casts no vote for the column's type and does not
+ * count towards `required` or an enum.
+ */
+function isBlank(value: unknown): boolean {
+    return value === null || value === undefined || value === "";
+}
+
 function increaseMapTypeCount(
     typesCountRecord: TypesCountRecord,
     key: string,
@@ -183,8 +194,7 @@ function increaseMapTypeCount(
         typesCountRecord[key] = typesCount;
     }
 
-    if (fieldValue != null) {
-        // Check that fieldValue is not null or undefined before proceeding
+    if (!isBlank(fieldValue)) {
         const type = getType(fieldValue);
         increaseTypeCount(type, typesCount, fieldValue, getType);
     }
@@ -223,12 +233,13 @@ function increaseValuesCount(
     } else if (type === "array") {
         if (Array.isArray(fieldValue)) {
             fieldValue.forEach((value) => {
+                if (isBlank(value)) return;
                 valuesRecord.values.push(value);
                 valuesRecord.valuesCount.set(value, (valuesRecord.valuesCount.get(value) ?? 0) + 1);
             });
         }
     } else {
-        if (fieldValue !== null && fieldValue !== undefined) {
+        if (!isBlank(fieldValue)) {
             valuesRecord.values.push(fieldValue);
             valuesRecord.valuesCount.set(fieldValue, (valuesRecord.valuesCount.get(fieldValue) ?? 0) + 1);
         }
@@ -260,7 +271,36 @@ function getHighestRecordCount(record: TypesCountRecord): number {
         .reduce((a, b) => Math.max(a, b), 0);
 }
 
-function getMostProbableType(typesCount: TypesCount): DataType {
+/**
+ * The types a cell can be converted between: the import turns any of them into
+ * text without loss, and text back into one of them only when the text spells
+ * it.
+ */
+const SCALAR_TYPES: ReadonlySet<string> = new Set(["string", "number", "boolean", "date"]);
+
+/**
+ * A column's type, from the votes its values cast.
+ *
+ * When the votes mix scalar types — numbers beside text, booleans beside
+ * numbers — the majority is not an answer: converting the minority to it
+ * changes them (`02134` → 2134, a 20-digit SKU rounded, `N/A` → nothing,
+ * 2 → `false`). Such a column is text, which holds every one of them as
+ * written. The one exception is numbers beside text that spells numbers
+ * exactly (`10.00`, `1e3`): that column is a number, and nothing is lost.
+ *
+ * @param values every non-blank value the votes were cast for, when known;
+ * without them, a mix of numbers and text is text.
+ */
+function getMostProbableType(typesCount: TypesCount, values?: unknown[]): DataType {
+    const scalarTypes = Object.entries(typesCount)
+        .filter(([type, count]) => SCALAR_TYPES.has(type) && Number(count) > 0)
+        .map(([type]) => type);
+    if (scalarTypes.length > 1) {
+        const numbersBesideNumericText = scalarTypes.every(type => type === "number" || type === "string")
+            && values !== undefined
+            && values.every(value => typeof value !== "string" || readNumberExactly(value) !== undefined);
+        return numbersBesideNumericText ? "number" : "string";
+    }
     let highestCount = -1;
     let probableType: DataType = "string"; // default
     Object.entries(typesCount).forEach(([type, count]) => {
@@ -316,7 +356,8 @@ function buildPropertyFromCount(
         };
     } else if (mostProbableType === "array") {
         const arrayTypesCount = typesCount.array as TypesCount;
-        const arrayMostProbableType = getMostProbableType(arrayTypesCount);
+        // The values recorded for an array column are its items.
+        const arrayMostProbableType = getMostProbableType(arrayTypesCount, valuesResult?.values);
         const of = buildPropertyFromCount(
             key,
             totalDocsCount,
@@ -367,13 +408,14 @@ function buildPropertiesFromCount(
 ): Properties {
     const res: Properties = {};
     Object.entries(typesCountRecord).forEach(([key, typesCount]) => {
-        const mostProbableType = getMostProbableType(typesCount);
+        const valuesEntry = valuesCountRecord ? ownEntry(valuesCountRecord, key) : undefined;
+        const mostProbableType = getMostProbableType(typesCount, valuesEntry?.values);
         res[key] = buildPropertyFromCount(
             key,
             totalDocsCount,
             mostProbableType,
             typesCount,
-            valuesCountRecord ? ownEntry(valuesCountRecord, key) : undefined
+            valuesEntry
         );
     });
     return res;
@@ -402,10 +444,10 @@ function getMostProbableTypeInArray(
         // null and `increaseTypeCount` then skipping falsy map values; now that
         // null infers as "string" the skip has to be explicit, or every array
         // with a gap in it would drift towards "string".
-        if (value === null || value === undefined) return;
+        if (isBlank(value)) return;
         increaseTypeCount(getType(value), typesCount, value, getType);
     });
-    return getMostProbableType(typesCount);
+    return getMostProbableType(typesCount, array.filter(value => !isBlank(value)));
 }
 
 function checkTypesCountHighVariability(typesCount: TypesCount) {
