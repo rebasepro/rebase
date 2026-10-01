@@ -8,6 +8,7 @@ import {
     isRebaseManagedPolicy,
     listAnd,
     managedPolicyFix,
+    policiesFor,
     policyTargetsExposedRole,
     qi,
     qrel,
@@ -152,12 +153,8 @@ function callersOf(snapshot: DbSnapshot, policy: DbPolicy): string[] {
  * restrictive policies together have to apply to every caller it lets in.
  */
 function restrictiveGate(snapshot: DbSnapshot, policy: DbPolicy): string[] | null {
-    const gates = snapshot.policies.filter(
-        (p) =>
-            !p.permissive &&
-            p.schema === policy.schema &&
-            p.table === policy.table &&
-            (p.command === "ALL" || p.command === policy.command)
+    const gates = policiesFor(snapshot, policy.schema, policy.table).filter(
+        (p) => !p.permissive && (p.command === "ALL" || p.command === policy.command)
     );
     const callers = callersOf(snapshot, policy);
     if (callers.length === 0) return null;

@@ -6,7 +6,7 @@
  * noise, and noise is what gets a tool like this uninstalled — so the helpers
  * below err towards "no" whenever the catalog is ambiguous.
  */
-import type { DbGrant, DbPolicy, DbRelation, DbSnapshot, Finding, Severity } from "../types";
+import type { DbForeignKey, DbGrant, DbPolicy, DbRelation, DbRole, DbSnapshot, Finding, Severity } from "../types";
 
 export const SEVERITY_ORDER: Severity[] = ["info", "low", "medium", "high", "critical"];
 
@@ -25,6 +25,65 @@ export const isPublicRole = (role: string): boolean => role.toLowerCase() === "p
 export const sameRole = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 
 // ---------------------------------------------------------------------------
+// Lookups
+// ---------------------------------------------------------------------------
+
+/**
+ * The snapshot's arrays, grouped by a key, built once per array.
+ *
+ * Every check asks "the grants / relation / policies of *this* table", once
+ * per table and per exposed role, and the sort asks it inside its comparator.
+ * Answered by walking the whole array, a 20,000-table catalog took 81 s of
+ * JavaScript after 0.4 s of introspection. Grouped once, the same scan is
+ * linear.
+ *
+ * Keyed on the array itself, so a snapshot built by hand in a test gets its own
+ * index, and on its length, so an array pushed to after a first lookup is
+ * re-indexed rather than answered stale. A snapshot is otherwise read-only once
+ * the checks run on it — which they always assumed.
+ */
+type Index<T> = { length: number; groups: Map<string, T[]> };
+
+function grouped<T>(cache: WeakMap<readonly T[], Index<T>>, items: readonly T[], key: (item: T) => string): Map<string, T[]> {
+    const hit = cache.get(items);
+    if (hit && hit.length === items.length) return hit.groups;
+
+    const groups = new Map<string, T[]>();
+    for (const item of items) {
+        const k = key(item);
+        const list = groups.get(k);
+        if (list) list.push(item);
+        else groups.set(k, [item]);
+    }
+    cache.set(items, { length: items.length, groups });
+    return groups;
+}
+
+/** A NUL cannot appear in a Postgres identifier, so it cannot make two pairs collide. */
+const pairKey = (schema: string, name: string): string => `${schema}\u0000${name}`;
+
+const RELATIONS = new WeakMap<readonly DbRelation[], Index<DbRelation>>();
+const GRANTS = new WeakMap<readonly DbGrant[], Index<DbGrant>>();
+const POLICIES = new WeakMap<readonly DbPolicy[], Index<DbPolicy>>();
+const FOREIGN_KEYS = new WeakMap<readonly DbForeignKey[], Index<DbForeignKey>>();
+const ROLES = new WeakMap<readonly DbRole[], Index<DbRole>>();
+
+/** Every grant on one relation, in snapshot order. */
+export function grantsOn(snapshot: DbSnapshot, schema: string, table: string): readonly DbGrant[] {
+    return grouped(GRANTS, snapshot.grants, (g) => pairKey(g.schema, g.table)).get(pairKey(schema, table)) ?? [];
+}
+
+/** The foreign keys declared on one table, in snapshot order. */
+export function foreignKeysOf(snapshot: DbSnapshot, schema: string, table: string): readonly DbForeignKey[] {
+    return grouped(FOREIGN_KEYS, snapshot.foreignKeys, (fk) => pairKey(fk.schema, fk.table)).get(pairKey(schema, table)) ?? [];
+}
+
+/** A role by name, compared the way {@link sameRole} compares. */
+export function roleNamed(snapshot: DbSnapshot, name: string): DbRole | undefined {
+    return grouped(ROLES, snapshot.roles, (r) => r.name.toLowerCase()).get(name.toLowerCase())?.[0];
+}
+
+// ---------------------------------------------------------------------------
 // Roles
 // ---------------------------------------------------------------------------
 
@@ -39,7 +98,7 @@ export const sameRole = (a: string, b: string): boolean => a.toLowerCase() === b
  */
 export function rolesUsableBy(snapshot: DbSnapshot, role: string): Set<string> {
     const out = new Set<string>(["public", role.toLowerCase()]);
-    const def = snapshot.roles.find((r) => sameRole(r.name, role));
+    const def = roleNamed(snapshot, role);
     for (const m of def?.memberOf ?? []) out.add(m.toLowerCase());
     return out;
 }
@@ -53,8 +112,7 @@ export function effectivePrivileges(
 ): Set<Privilege> {
     const via = rolesUsableBy(snapshot, role);
     const out = new Set<Privilege>();
-    for (const g of snapshot.grants) {
-        if (g.schema !== schema || g.table !== table) continue;
+    for (const g of grantsOn(snapshot, schema, table)) {
         if (!via.has(g.grantee.toLowerCase())) continue;
         for (const p of g.privileges) out.add(p);
     }
@@ -122,11 +180,11 @@ export function scannedForeignTables(snapshot: DbSnapshot): DbRelation[] {
 }
 
 export function relationAt(snapshot: DbSnapshot, schema: string, name: string): DbRelation | undefined {
-    return snapshot.relations.find((r) => r.schema === schema && r.name === name);
+    return grouped(RELATIONS, snapshot.relations, (r) => pairKey(r.schema, r.name)).get(pairKey(schema, name))?.[0];
 }
 
 export function policiesFor(snapshot: DbSnapshot, schema: string, table: string): DbPolicy[] {
-    return snapshot.policies.filter((p) => p.schema === schema && p.table === table);
+    return [...(grouped(POLICIES, snapshot.policies, (p) => pairKey(p.schema, p.table)).get(pairKey(schema, table)) ?? [])];
 }
 
 export const hasColumn = (r: DbRelation, name: string): boolean =>
@@ -194,8 +252,8 @@ export function revokesReaching(
     privileges: Privilege[]
 ): string[] {
     const reaching = new Set(exposed.flatMap((role) => [...rolesUsableBy(snapshot, role)]));
-    return snapshot.grants
-        .filter((g) => g.schema === schema && g.table === table && reaching.has(g.grantee.toLowerCase()))
+    return grantsOn(snapshot, schema, table)
+        .filter((g) => reaching.has(g.grantee.toLowerCase()))
         .map((g) => ({ grantee: g.grantee, held: privileges.filter((p) => g.privileges.includes(p)) }))
         .filter((g) => g.held.length > 0)
         .map((g) => `REVOKE ${g.held.join(", ")} ON ${qrel(schema, table)} FROM ${qrole(g.grantee)};`);

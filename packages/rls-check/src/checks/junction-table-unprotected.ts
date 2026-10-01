@@ -1,6 +1,6 @@
 import type { Check, DbRelation, DbSnapshot, Finding } from "../types";
 
-import { finding, qi, qrel, relationAt, scannedTables } from "./util";
+import { finding, foreignKeysOf, qi, qrel, relationAt, scannedTables } from "./util";
 
 const ID = "junction-table-unprotected";
 
@@ -37,9 +37,7 @@ export const junctionTableUnprotected: Check = {
         for (const rel of scannedTables(snapshot)) {
             if (rel.rlsEnabled) continue;
 
-            const fks = snapshot.foreignKeys.filter(
-                (fk) => fk.schema === rel.schema && fk.table === rel.name
-            );
+            const fks = foreignKeysOf(snapshot, rel.schema, rel.name);
             if (fks.length !== 2) continue;
 
             const endpoints = fks.map((fk) => `${fk.refSchema}.${fk.refTable}`);
