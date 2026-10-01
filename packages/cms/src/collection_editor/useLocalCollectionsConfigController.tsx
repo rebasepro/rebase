@@ -181,16 +181,7 @@ export function useLocalCollectionsConfigController(
     const liveSchema = useLiveSchemaEditing({
         baseUrl: `${String(clientBaseUrl).replace(/\/$/, "")}${clientApiPath}/admin/schema`,
         getAuthToken: resolveToken,
-        authKey,
-        // The fallback the dialog offers when a change cannot be applied —
-        // removing a property, most often, which the ensure path has no way to
-        // carry out. Writing the source and leaving the database alone is what
-        // the editor did before any of this existed.
-        writeSourceOnly: async ({ collectionId, collection, patch }) => {
-            await request("/collection/save", patch
-                ? { collectionId, patch }
-                : { collectionId, collectionData: collection ?? {} });
-        }
+        authKey
     });
 
     /**

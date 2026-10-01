@@ -85,6 +85,12 @@ export interface SchemaCommitInput {
      * a statement that applies and one that is rejected.
      */
     existing?: ExistingSchema;
+    /**
+     * Plan a commit of the source alone — "Edit source only". An unapplicable
+     * change is not refused: it is committed with no statements, under a
+     * message that names what the database keeps.
+     */
+    sourceOnly?: boolean;
 }
 
 export interface SchemaCommit {
@@ -154,32 +160,42 @@ export function additiveStatements(
         .filter(statement => !previous.has(statement));
 }
 
+/**
+ * The commit of an "Edit source only": what changed in the source, and what
+ * the database keeps — `chore(schema): remove sku from products (source only —
+ * column products.sku kept)`. The body lists what each change leaves behind.
+ */
+export function sourceOnlyCommitMessage(classified: ClassifiedChanges): string {
+    const blocking = classified.changes.filter(change => change.verdict !== "safe");
+    const kept = blocking.map(change => change.kept).filter(Boolean).join("; ");
+    const subject = `${subjectOf(classified)} (source only — ${kept || "the database is unchanged"})`;
+    const body = classified.changes.map(change =>
+        `- ${change.detail}${change.sourceOnly && change.verdict !== "safe" ? `\n  Left in the database: ${change.sourceOnly}` : ""}`
+    ).join("\n");
+    return `chore(schema): ${subject}\n\n${body}\n`;
+}
+
+/** What a commit is about, in the words of its subject line. */
+function subjectOf(classified: ClassifiedChanges): string {
+    const { changes } = classified;
+    const collections = [...new Set(changes.map(change => change.collection))].sort();
+    const only = changes.length === 1 ? changes[0] : undefined;
+    if (only?.kind === "add-collection") return `add the ${only.collection} collection`;
+    if (only?.kind === "add-property") return `add ${only.property} to ${only.collection}`;
+    if (only?.kind === "remove-property") return `remove ${only.property} from ${only.collection}`;
+    if (changes.length > 0 && changes.every(c => c.kind === "change-security-rules")) {
+        return `change the security rules of ${collections.join(", ")}`;
+    }
+    if (collections.length === 1) return `${changes.length} change(s) to ${collections[0]}`;
+    return `${changes.length} change(s) across ${collections.length} collections`;
+}
+
 /** A commit message that says what changed rather than that something did. */
 export function commitMessage(classified: ClassifiedChanges): string {
     const { changes } = classified;
     if (changes.length === 0) return "chore(schema): no change";
-
-    const collections = [...new Set(changes.map(change => change.collection))].sort();
-    const added = changes.filter(c => c.kind === "add-collection").map(c => c.collection);
-    const properties = changes.filter(c => c.kind === "add-property");
-
-    const rules = changes.filter(c => c.kind === "change-security-rules");
-
-    let subject: string;
-    if (added.length === 1 && changes.length === 1) {
-        subject = `add the ${added[0]} collection`;
-    } else if (properties.length === 1 && changes.length === 1) {
-        subject = `add ${properties[0].property} to ${properties[0].collection}`;
-    } else if (rules.length === changes.length) {
-        subject = `change the security rules of ${collections.join(", ")}`;
-    } else if (collections.length === 1) {
-        subject = `${changes.length} change(s) to ${collections[0]}`;
-    } else {
-        subject = `${changes.length} change(s) across ${collections.length} collections`;
-    }
-
     const body = changes.map(change => `- ${change.detail}`).join("\n");
-    return `feat(schema): ${subject}\n\n${body}\n`;
+    return `feat(schema): ${subjectOf(classified)}\n\n${body}\n`;
 }
 
 /**
@@ -198,6 +214,28 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
     // not get the same latitude.
     const options: EnsureOptions = { constraints: "converge" };
     const classified = classifyCollectionChanges(input.before, input.after, input.existing);
+
+    if (input.sourceOnly) {
+        // A change with no account of what it leaves behind is one that may
+        // not be written to the source alone — see `sourceOnlyOf`.
+        const unoffered = classified.changes.filter(change => change.verdict !== "safe" && !change.sourceOnly);
+        if (unoffered.length > 0) {
+            throw new SchemaCommitError(
+                "This change cannot be written to the collection source alone:\n" +
+                unoffered.map(change => `  • ${change.detail}${change.remedy ? `\n    ${change.remedy}` : ""}`).join("\n"),
+                classified
+            );
+        }
+        // Nothing runs: the source is committed, the database is left as it
+        // is, and the message says what it keeps.
+        return {
+            files: [...(input.sourceFiles ?? []), { path: paths.schemaFile, contents: generateSchema(input.after) }],
+            statements: [],
+            classified,
+            message: sourceOnlyCommitMessage(classified),
+            withheldConstraints: []
+        };
+    }
 
     if (!classified.applicable) {
         const blocking = classified.changes.filter(change => change.verdict !== "safe");

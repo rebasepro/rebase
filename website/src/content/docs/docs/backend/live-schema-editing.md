@@ -142,6 +142,19 @@ and are not refused:
 - **Setting, changing or dropping a default** binds future writes only. It is
   `safe`, and applied with `ALTER COLUMN … SET DEFAULT` / `DROP DEFAULT`.
 
+### Edit source only
+
+A refused change can still be written to your collection source and committed,
+leaving the database as it is — removing a property you no longer serve is the
+usual case. Post `/apply` with `"sourceOnly": true`. Nothing runs; the commit
+message names what the database keeps, for example
+`chore(schema): remove sku from products (source only — column products.sku kept)`,
+and each change in the plan carries a `sourceOnly` sentence saying what it
+leaves behind — including when a column left behind is `NOT NULL` with no
+default, which makes every later insert fail until it is dropped or made
+nullable. A change without one (moving a primary key, a relation whose link
+column nothing creates) cannot be written to the source alone.
+
 ## What gets committed
 
 Not just the collection file. The Drizzle schema is generated from it, and a

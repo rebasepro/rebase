@@ -159,6 +159,13 @@ export interface SchemaEditInput {
      * can derive them (`<collectionsDir>/<id>.ts`) without writing anything.
      */
     sourcePaths?: string[];
+    /**
+     * "Edit source only": commit the source and the generated schema for a
+     * change the database cannot take, and run nothing. The plan is committed
+     * whatever its verdict; the caller has checked that every refused change
+     * says what it leaves behind.
+     */
+    sourceOnly?: boolean;
 }
 
 export interface SchemaEditResult {
@@ -169,6 +176,8 @@ export interface SchemaEditResult {
     };
     /** True when the DDL ran. False means committed and pending a boot. */
     applied: boolean;
+    /** Committed as "Edit source only": nothing was meant to run. */
+    sourceOnly?: boolean;
     /** Why the apply did not run, when it did not. Never a reason to fail. */
     applyError?: string;
     /**
@@ -218,7 +227,7 @@ export class DirtyWorkingTreeError extends Error {
 export async function applySchemaChange(input: SchemaEditInput): Promise<SchemaEditResult> {
     const commit = input.plan;
 
-    if (!commit.classified.applicable) {
+    if (!commit.classified.applicable && !input.sourceOnly) {
         const blocking = commit.classified.changes.filter(change => change.verdict !== "safe");
         throw new UnapplicableChangeError(
             "This change cannot be applied to a running database:\n" +
@@ -288,6 +297,21 @@ export async function applySchemaChange(input: SchemaEditInput): Promise<SchemaE
     const paths = files.map(file => file.path);
 
     const committed = { sha, branch, files: paths };
+
+    if (input.sourceOnly) {
+        const kept = commit.classified.changes.map(change => change.kept).filter(Boolean).join("; ");
+        return {
+            committed,
+            applied: false,
+            sourceOnly: true,
+            appliedStatements: 0,
+            statements: [],
+            classified: commit.classified,
+            summary:
+                `Committed ${sha.slice(0, 9)} on ${branch} — source only. Nothing ran against the database` +
+                (kept ? `: ${kept}.` : ".")
+        };
+    }
 
     if (commit.statements.length === 0) {
         return {

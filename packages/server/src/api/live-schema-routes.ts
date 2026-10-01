@@ -571,6 +571,41 @@ function messageFor(change: ProposedChange, plan: SchemaChangePlan): string {
 }
 
 /**
+ * The plan of an "Edit source only", or a refusal of one.
+ *
+ * Every change the database cannot take has to say what it leaves behind
+ * (`sourceOnly`). One that does not is one that may not be written to the
+ * source alone — a primary key moved, a relation reading a column nothing
+ * creates, a proposal the planner refuses — because the project it leaves
+ * does not start, or reads its data as the wrong type.
+ */
+async function planSourceOnly(
+    admin: SchemaEditingAdmin,
+    before: CollectionConfig[],
+    after: CollectionConfig[],
+    paths: Partial<SchemaCommitPaths> | undefined
+): Promise<SchemaChangePlan> {
+    let plan: SchemaChangePlan;
+    try {
+        plan = await admin.planSchemaChange(before, after, { paths, sourceOnly: true });
+    } catch (err) {
+        const classified = isRecord(err) ? err.classified : undefined;
+        if (!isClassification(classified)) throw err;
+        plan = { files: [], statements: [], classified, message: "" };
+    }
+    const unoffered = plan.classified.changes.filter(change => change.verdict !== "safe" && !change.sourceOnly);
+    if (unoffered.length > 0 || plan.files.length === 0) {
+        throw ApiError.badRequest(
+            "This change cannot be written to the collection source alone:\n" +
+            unoffered.map(c => `  • ${c.detail}${c.remedy ? `\n    ${c.remedy}` : ""}`).join("\n"),
+            "SCHEMA_CHANGE_UNAPPLICABLE",
+            { changes: plan.classified.changes }
+        );
+    }
+    return plan;
+}
+
+/**
  * What still has to happen after this change lands, if anything.
  *
  * Only one thing so far, and it is the one that would otherwise be silent: a
@@ -754,7 +789,13 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
     });
 
     router.post("/apply", async (c) => {
-        const change = parseProposed(await readBody(c));
+        const body = await readBody(c);
+        const change = parseProposed(body);
+        // "Edit source only": commit the collection and the generated schema
+        // for a change the database cannot take, and run nothing. It used to
+        // be a write through the source-only editor that was never committed,
+        // which every later apply then met as somebody else's work — 409.
+        const sourceOnly = isRecord(body) && body.sourceOnly === true;
         const admin = requirePlanner();
 
         // Applying is the second privilege, and the admin gate in front of this
@@ -787,8 +828,10 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         // a change that turns out to be unapplicable must be refused *first* —
         // otherwise a rejected edit still leaves a rewritten collection file
         // behind, and the refusal reads as "nothing happened" when something did.
-        const plan = await planOrRefusal(admin, before, after, config.commitPaths);
-        if (!plan.classified.applicable) {
+        const plan = sourceOnly
+            ? await planSourceOnly(admin, before, after, config.commitPaths)
+            : await planOrRefusal(admin, before, after, config.commitPaths);
+        if (!plan.classified.applicable && !sourceOnly) {
             const blocking = plan.classified.changes.filter(c => c.verdict !== "safe");
             throw ApiError.badRequest(
                 "This change cannot be applied to a running database:\n" +
@@ -800,7 +843,10 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
 
         try {
             const result = await applySchemaChange({
-                plan: { ...plan, message: messageFor(sourceChangeFor(before, change), plan) },
+                plan: sourceOnly
+                    ? { ...plan, statements: [] }
+                    : { ...plan, message: messageFor(sourceChangeFor(before, change), plan) },
+                sourceOnly,
                 repository,
                 // Handed down rather than called here. Writing the source first
                 // and passing the files over is what made every change fail:

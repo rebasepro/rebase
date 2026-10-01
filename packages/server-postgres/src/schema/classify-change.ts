@@ -134,7 +134,26 @@ export interface SchemaFacts {
     enumValues?: Map<string, string[]>;
     /** `schema.table.column` → the type Postgres reports for it (`udt_name`). */
     columnTypes?: Map<string, string>;
+    /** `schema.table.column` of every column that has a DEFAULT. */
+    columnDefaults?: Set<string>;
 }
+
+/**
+ * The warning a column left behind needs when nothing will write it any more:
+ * NOT NULL with no default rejects every insert that omits it — which, once no
+ * property names it, is every insert. The `products.sku` case of 2026-09-08,
+ * where the demo seed died with 23502 and left every later table empty.
+ */
+function orphanedNotNullWarning(table: string, column: string, facts: SchemaFacts | undefined): string {
+    const key = `${table}.${column}`;
+    if (!facts?.notNullColumns?.has(key) || facts.columnDefaults?.has(key)) return "";
+    const [schema, bare] = table.split(".");
+    return ` "${column}" is NOT NULL with no default, so every insert into "${table}" fails until it is ` +
+        `dropped or made nullable — ALTER TABLE "${schema}"."${bare}" ALTER COLUMN "${column}" DROP NOT NULL.`;
+}
+
+/** `products.sku`: the bare table and column, the way a commit subject names it. */
+const shortColumn = (collection: CollectionConfig, column: string): string => `${getTableName(collection)}.${column}`;
 
 /** Whether the table behind a collection exists and is empty. */
 const tableIsEmpty = (collection: CollectionConfig, facts?: SchemaFacts): boolean => {
@@ -306,7 +325,7 @@ export function classifyCollectionChanges(
         }
         classifyProperties(was, collection, changes, facts, plans);
         if (plans) {
-            classifyTable(was, collection, collectionTableOf(plans.before, was), collectionTableOf(plans.after, collection), changes);
+            classifyTable(was, collection, collectionTableOf(plans.before, was), collectionTableOf(plans.after, collection), changes, facts);
         }
     }
 
@@ -330,12 +349,62 @@ export function classifyCollectionChanges(
         classifySecurityRules(plans.before, plans.after, changes);
     }
 
+    for (const change of changes) {
+        if (change.verdict === "safe" || change.sourceOnly) continue;
+        Object.assign(change, sourceOnlyOf(change, previous.get(change.collection)));
+    }
+
     const verdict = changes.reduce<ChangeVerdict>(
         (worst, change) => (VERDICT_RANK[change.verdict] > VERDICT_RANK[worst] ? change.verdict : worst),
         "safe"
     );
 
     return { changes, verdict, applicable: verdict === "safe" };
+}
+
+/**
+ * What "Edit source only" leaves behind for the kinds whose consequence does
+ * not depend on the column at hand. A kind with no entry here, and no text
+ * from where it was classified, is not offered source-only: a primary key
+ * moved in the source alone, a relation reading a column nobody creates, a
+ * column of the wrong type re-used, a proposal the planner refuses — each
+ * leaves a project that does not start or reads its data wrong.
+ */
+function sourceOnlyOf(change: SchemaChange, was: CollectionConfig | undefined): Pick<SchemaChange, "sourceOnly" | "kept"> {
+    const table = was ? getTableName(was) : change.collection;
+    switch (change.kind) {
+        case "remove-collection":
+            return {
+                sourceOnly: `Table "${table}" and every row in it stay in the database, and nothing serves them.`,
+                kept: `table ${table} kept`
+            };
+        case "rename-table":
+            return {
+                sourceOnly: `The collection reads a new table, which the next start creates empty; every row stays in "${table}".`,
+                kept: `rows stay in ${table}`
+            };
+        case "change-required":
+            return {
+                sourceOnly: `The column keeps accepting nulls; it is required in the panel only, until every row has a value and the constraint is added.`,
+                kept: `${table}.${change.property ?? ""} still nullable`
+            };
+        case "add-property":
+            return change.verdict === "diverges"
+                ? {
+                    sourceOnly: "The next start adds the column nullable: it is required in the panel only, until every row has a value and the constraint is added.",
+                    kept: `${table}.${change.property ?? ""} added nullable`
+                }
+                : {};
+        case "add-enum-value":
+            return { sourceOnly: "The value is added to the type when the server next starts.", kept: "enum value added at next start" };
+        case "remove-enum-value":
+            return {
+                sourceOnly: "The type keeps the value, and the rows holding it keep it — the panel will show them as an unknown value.",
+                kept: "enum value kept"
+            };
+        default:
+            return {};
+    }
 }
 
 /** A change on this property already refuses it — a second refusal would only repeat it. */
@@ -399,7 +468,7 @@ function classifyProperties(
 
     for (const [name, prop] of Object.entries(previous)) {
         if (next[name] || renamedFrom.has(name)) continue;
-        classifyRemovedProperty(slug, before, after, name, prop, changes, plans);
+        classifyRemovedProperty(slug, before, after, name, prop, changes, plans, facts);
     }
 }
 
@@ -575,7 +644,8 @@ function classifyRemovedProperty(
     name: string,
     prop: Property,
     changes: SchemaChange[],
-    plans: Plans | undefined
+    plans: Plans | undefined,
+    facts: SchemaFacts | undefined
 ): void {
     const footprint = footprintOf(plans?.before, before, name, prop);
     // Only what the proposal no longer has is dropped. A column another
@@ -601,6 +671,8 @@ function classifyRemovedProperty(
         });
         return;
     }
+    const table = qualifiedTable(before);
+    const warnings = dropped.columns.map(c => orphanedNotNullWarning(table, c.column, facts)).join("");
     changes.push({
         kind: "remove-property",
         verdict: "needs-migration",
@@ -610,7 +682,14 @@ function classifyRemovedProperty(
             `"${name}" was removed, which would drop ${describeFootprint(dropped)} and the data in it.`,
         remedy:
             "The ensure path never drops anything. Remove it in a migration you have read, or " +
-            "leave the column and stop exposing the property."
+            "leave the column and stop exposing the property.",
+        sourceOnly:
+            `${describeFootprint(dropped)} stays in the database, holding its data, and nothing reads or ` +
+            `writes it.${warnings}`,
+        kept: [
+            ...dropped.columns.map(c => `column ${shortColumn(before, c.column)} kept`),
+            ...dropped.junctions.map(j => `junction ${j.table} kept`)
+        ].join(", ")
     });
 }
 
@@ -641,7 +720,12 @@ function classifyProperty(
                 remedy:
                     "The ensure path only renames a column through its legacy-name path, which this is " +
                     "not. Rename it in a migration, or the old column stays and the new one is created " +
-                    "empty beside it."
+                    "empty beside it.",
+                sourceOnly:
+                    `The data stays in "${beforeColumn}". The next start adds "${afterColumn}" empty, and every ` +
+                    `row already there reads blank until the values are copied across.` +
+                    orphanedNotNullWarning(qualifiedTable(collection), beforeColumn, facts),
+                kept: `data stays in ${shortColumn(collection, beforeColumn)}`
             });
         }
     }
@@ -672,7 +756,11 @@ function classifyProperty(
                     "different place for each, and the ones already stored are not moved.",
                 remedy:
                     "Move the links in a migration you have read — copy them into the new place — then change " +
-                    "the relation to match."
+                    "the relation to match.",
+                sourceOnly:
+                    `The links stay where the ${was.kind} kept them, and the ${is.kind} reads its own place, which ` +
+                    "starts empty — the relation reads as empty until they are moved.",
+                kept: `links of ${slug}.${name} not moved`
             });
             return;
         }
@@ -741,7 +829,8 @@ function classifyTable(
     collection: CollectionConfig,
     before: TablePlan | undefined,
     after: TablePlan | undefined,
-    changes: SchemaChange[]
+    changes: SchemaChange[],
+    facts: SchemaFacts | undefined
 ): void {
     if (!before || !after) return;
     const slug = collection.slug ?? "";
@@ -773,7 +862,11 @@ function classifyTable(
                     `${typeText(was)} to ${typeText(column)}.`,
                 remedy:
                     "There is no ALTER COLUMN TYPE in the ensure path, and a cast can fail on data that " +
-                    "is already there. Change it in a migration."
+                    "is already there. Change it in a migration.",
+                sourceOnly:
+                    `Column "${column.column}" keeps its type, ${typeText(was)}: the property is read and written ` +
+                    `through it, and a value ${typeText(was)} cannot hold is refused.`,
+                kept: `column ${shortColumn(collection, column.column)} stays ${typeText(was)}`
             });
             continue;
         }
@@ -798,7 +891,11 @@ function classifyTable(
                 remedy: column.unique
                     ? `The ensure path never constrains an existing column. Check for duplicates, then ALTER TABLE ` +
                       `"${after.schema}"."${after.table}" ADD UNIQUE ("${column.column}") in a migration.`
-                    : `Drop it in a migration: ALTER TABLE "${after.schema}"."${after.table}" DROP CONSTRAINT …`
+                    : `Drop it in a migration: ALTER TABLE "${after.schema}"."${after.table}" DROP CONSTRAINT …`,
+                sourceOnly: column.unique
+                    ? `"${column.column}" keeps accepting duplicates until the constraint is added.`
+                    : `The UNIQUE constraint on "${column.column}" stays and keeps refusing duplicates.`,
+                kept: `${shortColumn(collection, column.column)} uniqueness unchanged`
             });
         }
         const fkWas = foreignKeyText(was.foreignKey);
@@ -825,7 +922,9 @@ function classifyTable(
                           `(${fkWas}) stays and keeps refusing values.`,
                     remedy:
                         "Drop and re-create the constraint in a migration you have read — ALTER TABLE … DROP " +
-                        "CONSTRAINT, then ADD CONSTRAINT."
+                        "CONSTRAINT, then ADD CONSTRAINT.",
+                    sourceOnly: `The constraint on "${column.column}" stays as it is: ${fkWas}.`,
+                    kept: `foreign key on ${shortColumn(collection, column.column)} unchanged`
                 });
             }
         }
@@ -862,7 +961,11 @@ function classifyTable(
                 : `Column "${column.column}" is no longer part of "${slug}", which would drop it and its data.`,
             remedy:
                 "Move the data in a migration you have read, or keep the relation's column where it is " +
-                "(`localKey`)."
+                "(`localKey`).",
+            sourceOnly:
+                `Column "${column.column}" stays, holding its data, and nothing reads or writes it.` +
+                orphanedNotNullWarning(after.qualified, column.column, facts),
+            kept: `column ${shortColumn(collection, column.column)} kept`
         });
     }
 
@@ -882,7 +985,9 @@ function classifyTable(
             detail: index.unique
                 ? `Unique index "${index.indexName}" is no longer declared, but it stays and keeps refusing duplicates.`
                 : `Index "${index.indexName}" is no longer declared; it stays in the database until it is dropped.`,
-            remedy: index.unique ? `Drop it in a migration: DROP INDEX "${after.schema}"."${index.indexName}".` : undefined
+            remedy: index.unique ? `Drop it in a migration: DROP INDEX "${after.schema}"."${index.indexName}".` : undefined,
+            sourceOnly: index.unique ? `Index "${index.indexName}" stays and keeps refusing duplicates.` : undefined,
+            kept: index.unique ? `index ${index.indexName} kept` : undefined
         });
     }
     for (const trigger of before.triggers) {
@@ -894,7 +999,9 @@ function classifyTable(
             detail:
                 `"${trigger.column}" is no longer stamped on update, but trigger "${trigger.name}" stays and ` +
                 "keeps stamping it.",
-            remedy: `Drop it in a migration: DROP TRIGGER "${trigger.name}" ON "${after.schema}"."${after.table}".`
+            remedy: `Drop it in a migration: DROP TRIGGER "${trigger.name}" ON "${after.schema}"."${after.table}".`,
+            sourceOnly: `Trigger "${trigger.name}" stays and keeps stamping "${trigger.column}" on every update.`,
+            kept: `trigger ${trigger.name} kept`
         });
     }
     for (const trigger of after.triggers) {
@@ -932,7 +1039,9 @@ function classifyJunctions(
             verdict: "needs-migration",
             collection: slugs[0] ?? "",
             detail: `Junction table "${table.qualified}" is no longer declared, which would drop it and every link in it.`,
-            remedy: "The ensure path never drops a table. Drop it in a migration you have read, or keep the relation."
+            remedy: "The ensure path never drops a table. Drop it in a migration you have read, or keep the relation.",
+            sourceOnly: `Junction table "${table.qualified}" stays, holding its links, and nothing reads it.`,
+            kept: `junction ${table.table} kept`
         });
     }
     for (const table of after.tables) {

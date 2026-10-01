@@ -240,11 +240,11 @@ function partialApplyHeading(result: LiveSchemaResult): string {
 function Applied({ result }: { result: LiveSchemaResult }) {
     return (
         <div className="flex flex-col gap-4">
-            <Alert color={result.applied ? "success" : "warning"}>
+            <Alert color={result.applied || result.sourceOnly ? "success" : "warning"}>
                 <Typography variant="body2">{result.summary}</Typography>
             </Alert>
 
-            {!result.applied && result.applyError && (
+            {!result.applied && !result.sourceOnly && result.applyError && (
                 // Deliberately not an error state. The commit landed, which is
                 // the durable half; the database is now behind the repository,
                 // which is where every project sits between an edit and a
@@ -326,7 +326,7 @@ export function SchemaChangeDialog({
     return (
         <Dialog open={open} onOpenChange={value => { if (!value) onClose(); }} maxWidth="3xl">
             <DialogTitle className="flex items-center gap-2">
-                {result ? "Schema change applied" : "Review schema change"}
+                {result ? (result.sourceOnly ? "Schema change committed" : "Schema change applied") : "Review schema change"}
                 <code className="text-sm font-normal text-text-secondary dark:text-text-secondary-dark">
                     {collectionId}
                 </code>
@@ -376,12 +376,22 @@ export function SchemaChangeDialog({
                         )}
 
                         {!plan.applicable && onSourceOnly && (
-                            <Typography variant="body2" color="secondary">
-                                You can still write the change to your collection source and leave
-                                the database as it is — the editor’s behaviour before this preview
-                                existed. The column stays, holding whatever is in it, and nothing
-                                serves it.
-                            </Typography>
+                            // Said per change: what a removal leaves behind is
+                            // not what a type change or a new required field
+                            // does, and the one that breaks every insert has to
+                            // be on screen before the button is pressed.
+                            <Alert color="warning">
+                                <Typography variant="body2" className="font-medium mb-1">
+                                    Edit source only: commit the collection, leave the database
+                                </Typography>
+                                <ul className="space-y-1">
+                                    {plan.changes.filter(change => change.verdict !== "safe" && change.sourceOnly).map((change, index) => (
+                                        <li key={`${change.property ?? change.collection}.${index}`} className="text-sm">
+                                            {change.sourceOnly}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </Alert>
                         )}
 
                         {plan.changes.length > 0 && (

@@ -47,7 +47,9 @@ const REFUSED_PLAN: LiveSchemaPlan = {
         collection: "posts",
         property: "subtitle",
         detail: '"subtitle" was removed, which would drop column "subtitle" and its data.',
-        remedy: "The ensure path never drops a column."
+        remedy: "The ensure path never drops a column.",
+        sourceOnly: 'column "subtitle" stays in the database, holding its data, and nothing reads or writes it.',
+        kept: "column posts.subtitle kept"
     }],
     statements: [],
     files: [],
@@ -81,12 +83,11 @@ function fakeClient(over: Partial<LiveSchemaClient> = {}): LiveSchemaClient {
  * on screen to be pressed. `start` is exposed so a test can begin a review and
  * then interact with what appears.
  */
-function Harness({ client, writeSourceOnly, onSettled }: {
+function Harness({ client, onSettled }: {
     client: LiveSchemaClient;
-    writeSourceOnly?: (c: typeof change) => Promise<void>;
     onSettled: (outcome: "resolved" | "rejected", err?: unknown) => void;
 }) {
-    const live = useLiveSchemaEditing({ baseUrl: "/api/admin/schema", client, writeSourceOnly });
+    const live = useLiveSchemaEditing({ baseUrl: "/api/admin/schema", client });
     return (
         <div>
             <button onClick={() => {
@@ -164,23 +165,49 @@ describe("reviewing a schema change", () => {
         expect(confirm?.disabled).toBe(true);
     });
 
-    it("offers the source-only fallback for a refused change", async () => {
+    // This pinned a source-only write that was never committed — which every
+    // later "Commit and apply" then met as somebody else's work, 409. It is a
+    // commit now, through the same door, and says what the database keeps.
+    it("offers the source-only fallback for a refused change, and commits it", async () => {
         // Removing a property can never be applied — the ensure path has no
         // DROP COLUMN — and refusing the whole save over it would mean a dev
         // could not delete a field from a collection they are still designing.
-        const client = fakeClient({ plan: jest.fn(async () => REFUSED_PLAN) as never });
-        const writeSourceOnly = jest.fn(async () => {});
+        const client = fakeClient({
+            plan: jest.fn(async () => REFUSED_PLAN) as never,
+            apply: jest.fn(async () => ({
+                ...APPLIED,
+                applied: false,
+                sourceOnly: true,
+                statements: [],
+                summary: "Committed abc123def on main — source only. Nothing ran against the database: column posts.subtitle kept."
+            })) as never
+        });
         const settled = jest.fn();
-        render(<Harness client={client} writeSourceOnly={writeSourceOnly} onSettled={settled}/>);
+        render(<Harness client={client} onSettled={settled}/>);
 
         await start();
         await waitFor(() => expect(screen.getByText("Edit source only")).toBeTruthy());
+        // What it leaves behind, for this change rather than in general.
+        expect(screen.getByText(/stays in the database, holding its data/)).toBeTruthy();
 
         await act(async () => { screen.getByText("Edit source only").click(); });
 
         await waitFor(() => expect(settled).toHaveBeenCalledWith("resolved"));
-        expect(writeSourceOnly).toHaveBeenCalledWith(change);
-        expect(client.apply).not.toHaveBeenCalled();
+        expect(client.apply).toHaveBeenCalledWith({ ...change, sourceOnly: true });
+        expect(screen.getByText(/source only/)).toBeTruthy();
+    });
+
+    it("does not offer it for a change that may not be written to the source alone", async () => {
+        const client = fakeClient({
+            plan: jest.fn(async () => ({
+                ...REFUSED_PLAN,
+                changes: [{ ...REFUSED_PLAN.changes[0], kind: "change-primary-key", sourceOnly: undefined }]
+            })) as never
+        });
+        render(<Harness client={client} onSettled={jest.fn()}/>);
+        await start();
+        await waitFor(() => expect(screen.getByText("This needs a migration")).toBeTruthy());
+        expect(screen.queryByText("Edit source only")).toBeNull();
     });
 
     it("shows a withheld constraint apart from the changes", async () => {

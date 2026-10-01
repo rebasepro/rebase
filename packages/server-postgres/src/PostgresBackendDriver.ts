@@ -421,6 +421,7 @@ export class PostgresBackendDriver implements DataDriver {
                 before: before as CollectionConfig[],
                 after: after as CollectionConfig[],
                 paths: options?.paths,
+                sourceOnly: options?.sourceOnly,
                 existing: await readSchemaFactsFor(
                     this.schemaFactsQueryable(),
                     after as CollectionConfig[]

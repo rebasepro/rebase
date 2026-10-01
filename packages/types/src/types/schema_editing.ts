@@ -62,6 +62,15 @@ export interface SchemaChange {
     detail: string;
     /** What to do instead, when the verdict is not `safe`. */
     remedy?: string;
+    /**
+     * What "Edit source only" leaves behind for this change: the collection is
+     * committed and the database is not touched. Absent on a change that may
+     * not be written source-only at all — one that would leave a project that
+     * does not start, or reads its data as the wrong type.
+     */
+    sourceOnly?: string;
+    /** The same, in a few words for a commit subject: `column products.sku kept`. */
+    kept?: string;
 }
 
 export interface ClassifiedSchemaChanges {
@@ -164,6 +173,14 @@ export interface SchemaEditingAdmin {
     planSchemaChange(
         before: unknown[],
         after: unknown[],
-        options?: { paths?: Partial<SchemaCommitPaths> }
+        options?: {
+            paths?: Partial<SchemaCommitPaths>;
+            /**
+             * Plan a commit of the source alone — "Edit source only": never
+             * rejects an unapplicable change, carries no statements, and its
+             * message names what is left in the database.
+             */
+            sourceOnly?: boolean;
+        }
     ): Promise<SchemaChangePlan>;
 }

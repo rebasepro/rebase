@@ -39,6 +39,12 @@ export interface LiveSchemaPlan {
         property?: string;
         detail: string;
         remedy?: string;
+        /**
+         * What "Edit source only" leaves behind for this change. Absent on a
+         * change that may not be written to the source alone.
+         */
+        sourceOnly?: string;
+        kept?: string;
     }>;
     statements: string[];
     files: string[];
@@ -64,6 +70,8 @@ export interface LiveSchemaPlan {
 
 export interface LiveSchemaResult {
     applied: boolean;
+    /** Committed as "Edit source only": nothing was meant to run. */
+    sourceOnly?: boolean;
     applyError?: string;
     /**
      * How many statements ran before the one that failed. The statements run
@@ -156,7 +164,7 @@ export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
     const doFetch = options.fetchImpl ?? fetch;
     const base = options.baseUrl.replace(/\/$/, "");
 
-    const post = async <T>(path: string, body: ProposedCollectionChange): Promise<T> => {
+    const post = async <T>(path: string, body: ProposedCollectionChange & { sourceOnly?: boolean }): Promise<T> => {
         const token = await options.getAuthToken?.();
         const headers: Record<string, string> = { "Content-Type": "application/json" };
         if (token) headers.Authorization = `Bearer ${token}`;
@@ -243,8 +251,11 @@ export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
         /** What the change would do. No side effects. */
         plan: (change: ProposedCollectionChange) => post<LiveSchemaPlan>("/plan", change),
 
-        /** Commit the change, then apply it. */
-        apply: (change: ProposedCollectionChange) => post<LiveSchemaResult>("/apply", change)
+        /**
+         * Commit the change, then apply it — or, with `sourceOnly`, commit it
+         * and run nothing ("Edit source only").
+         */
+        apply: (change: ProposedCollectionChange & { sourceOnly?: boolean }) => post<LiveSchemaResult>("/apply", change)
     };
 }
 

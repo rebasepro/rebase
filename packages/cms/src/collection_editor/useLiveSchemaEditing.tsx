@@ -57,13 +57,6 @@ export interface UseLiveSchemaEditingOptions {
      * survive a sign-in.
      */
     authKey?: string | null;
-    /**
-     * Write the collection source and leave the database alone — what the
-     * editor did before this existed. Offered in the dialog when a change is
-     * refused, so a dev can still delete a field from a collection they are
-     * designing. Omit it and the fallback is not offered.
-     */
-    writeSourceOnly?: (change: ProposedCollectionChange) => Promise<void>;
     /** Swappable for the tests, which have no server. */
     client?: LiveSchemaClient;
 }
@@ -105,7 +98,7 @@ export interface LiveSchemaEditing {
 }
 
 export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): LiveSchemaEditing {
-    const { baseUrl, authKey, writeSourceOnly } = options;
+    const { baseUrl, authKey } = options;
 
     const optionsRef = useRef(options);
     optionsRef.current = options;
@@ -251,19 +244,37 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
         );
     }, [client, pending]);
 
+    /**
+     * "Edit source only": commit the collection, run nothing.
+     *
+     * Through the same door as an apply, so it is committed. It used to be a
+     * write through the source-only editor that nobody committed, which every
+     * later "Commit and apply" met as somebody else's work — 409, with the
+     * dialog never saying why.
+     */
     const onSourceOnly = useCallback(() => {
-        if (!pending || !writeSourceOnly) return;
+        if (!pending) return;
         setApplying(true);
         setApplyError(undefined);
         const settle = pending;
-        void writeSourceOnly(settle.change).then(
-            () => { clear(); settle.resolve(); },
+        void client.apply({ ...settle.change, sourceOnly: true }).then(
+            answer => {
+                setResult(answer);
+                setApplying(false);
+                settle.resolve();
+                setPending(undefined);
+            },
             (err: unknown) => {
                 setApplying(false);
                 setApplyError(err instanceof Error ? err.message : String(err));
             }
         );
-    }, [pending, writeSourceOnly, clear]);
+    }, [client, pending]);
+
+    // Offered only when every refused change says what it would leave behind.
+    // One that does not may not be written to the source alone.
+    const sourceOnlyOffered = Boolean(plan && !plan.applicable &&
+        plan.changes.filter(change => change.verdict !== "safe").every(change => change.sourceOnly));
 
     const onClose = useCallback(() => {
         // Escape and the backdrop reach this too, and the Cancel *button* is the
@@ -297,7 +308,7 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
                     applyError={applyError}
                     onConfirm={onConfirm}
                     onRetry={planError ? onRetry : undefined}
-                    onSourceOnly={writeSourceOnly ? onSourceOnly : undefined}
+                    onSourceOnly={sourceOnlyOffered ? onSourceOnly : undefined}
                     onClose={onClose}
                     applyRefusedBecause={
                         status && !status.canApply ? status.applyRefusedBecause : undefined
