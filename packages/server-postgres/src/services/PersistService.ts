@@ -195,7 +195,7 @@ export class PersistService {
 
         const parsedIdObj = parseIdValues(id, idInfoArray);
 
-        const conditions = [];
+        const conditions: SQL[] = [];
         for (const info of idInfoArray) {
             const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
             if (!field) {
