@@ -378,3 +378,38 @@ describe("summarizeChanges", () => {
         expect(summary.indexOf("needs-migration")).toBeLessThan(summary.indexOf("safe"));
     });
 });
+
+/**
+ * A property added over a column the database already has — left behind by an
+ * earlier "Edit source only" removal. `ADD COLUMN IF NOT EXISTS` is a no-op
+ * there, so the plan said "adds column" while nothing ran, and a property of
+ * another type read the old values as its own.
+ */
+describe("a property added over a column that is already there", () => {
+    const withColumn = (type: string, rows = true): SchemaFacts & { columnTypes: Map<string, string> } => ({
+        ...database({ rows, columns: ["id", "title", "subtitle"] }),
+        columnTypes: new Map([["public.posts.subtitle", type]])
+    });
+
+    it("says it re-uses the column, when the types agree", () => {
+        const change = only(
+            [collection("posts", { title: str() })],
+            [collection("posts", { title: str(), subtitle: str() })],
+            withColumn("text")
+        );
+        expect(change).toMatchObject({ kind: "add-property", verdict: "safe" });
+        expect(change.detail).toMatch(/re-uses column "subtitle"/);
+        expect(change.detail).not.toMatch(/adds column/);
+    });
+
+    it("refuses when the column holds another type", () => {
+        const change = only(
+            [collection("posts", { title: str() })],
+            [collection("posts", { title: str(), subtitle: { type: "number", name: "N" } })],
+            withColumn("text")
+        );
+        expect(change).toMatchObject({ kind: "add-property", verdict: "needs-migration" });
+        expect(change.detail).toMatch(/text/);
+        expect(change.detail).toMatch(/NUMERIC/);
+    });
+});

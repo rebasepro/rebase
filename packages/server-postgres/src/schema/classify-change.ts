@@ -70,6 +70,7 @@ import { findRelation, getTableName, resolveCollectionRelations } from "@rebasep
 import { resolveColumnName } from "./column-plan-helpers";
 import { planSchema } from "./plan/plan-schema";
 import { renderPgType } from "./plan/render-ddl";
+import { typesAgree } from "./column-type-drift";
 import type { ColumnPlan, ForeignKeyPlan, SchemaPlan, TablePlan } from "./plan/types";
 
 /**
@@ -131,6 +132,8 @@ export interface SchemaFacts {
     notNullColumns?: Set<string>;
     /** `schema.typename` → the values that type currently holds. */
     enumValues?: Map<string, string[]>;
+    /** `schema.table.column` → the type Postgres reports for it (`udt_name`). */
+    columnTypes?: Map<string, string>;
 }
 
 /** Whether the table behind a collection exists and is empty. */
@@ -385,7 +388,7 @@ function classifyProperties(
         }
         const old = previous[name];
         if (!old) {
-            classifyAddedProperty(slug, after, name, prop, changes, empty, plans);
+            classifyAddedProperty(slug, after, name, prop, changes, empty, plans, facts);
             continue;
         }
         classifyProperty(slug, after, name, old, prop, changes, facts, plans);
@@ -404,11 +407,13 @@ function classifyAddedProperty(
     prop: Property,
     changes: SchemaChange[],
     empty: boolean,
-    plans: Plans | undefined
+    plans: Plans | undefined,
+    facts: SchemaFacts | undefined
 ): void {
     const footprint = footprintOf(plans?.after, collection, name, prop);
     const physical = footprint.columns.length > 0;
     if (refuseUnbackedRelation(slug, collection, name, prop, changes, plans)) return;
+    if (reusesLeftoverColumn(slug, collection, name, prop, footprint, changes, empty, facts)) return;
 
     // A NOT NULL is checked against rows that are already there, so whether
     // this is safe is a question about the data, not about the configuration.
@@ -450,6 +455,75 @@ function classifyAddedProperty(
               "can take because it holds no rows."
             : `New ${isRequired(prop) ? "required" : "optional"} property "${name}" — ${adds}.`
     });
+}
+
+/**
+ * A property added over a column the database already has.
+ *
+ * "Edit source only" removes a property and leaves its column — that is what
+ * it is for — so the same name can come back later over a column holding the
+ * old values. `ADD COLUMN IF NOT EXISTS` is then a no-op: the plan said "adds
+ * column", nothing ran, and a property of another type read the old values as
+ * its own. Re-using a column of the same type is fine and is said; a column of
+ * another type needs converting first.
+ */
+function reusesLeftoverColumn(
+    slug: string,
+    collection: CollectionConfig,
+    name: string,
+    prop: Property,
+    footprint: Footprint,
+    changes: SchemaChange[],
+    empty: boolean,
+    facts: SchemaFacts | undefined
+): boolean {
+    const table = qualifiedTable(collection);
+    const present = facts?.tables.get(table);
+    const leftover = footprint.columns.filter(column => present?.has(column.column));
+    if (leftover.length === 0) return false;
+
+    for (const column of leftover) {
+        const actual = facts?.columnTypes?.get(`${table}.${column.column}`);
+        const declared = renderPgType(column.type);
+        if (actual && !typesAgree(declared, actual)) {
+            changes.push({
+                kind: "add-property",
+                verdict: "needs-migration",
+                collection: slug,
+                property: name,
+                detail:
+                    `"${name}" would use column "${column.column}", which is already there as ${actual} — ` +
+                    `left by an earlier removal — while "${name}" declares ${declared}. The values in it ` +
+                    "would be read as the wrong type.",
+                remedy:
+                    `Drop or convert "${column.column}" in a migration you have read, or give "${name}" ` +
+                    "another `columnName`."
+            });
+            return true;
+        }
+    }
+    const columns = leftover.map(c => `"${c.column}"`).join(", ");
+    changes.push(isRequired(prop) && !empty
+        ? {
+            kind: "add-property",
+            verdict: "diverges",
+            collection: slug,
+            property: name,
+            detail:
+                `"${name}" re-uses column ${columns}, which is already there with the values an earlier ` +
+                "property left in it, and is required — NOT NULL would be checked against those rows.",
+            remedy: "Add it optional, backfill the rows with no value, then make it required."
+        }
+        : {
+            kind: "add-property",
+            verdict: "safe",
+            collection: slug,
+            property: name,
+            detail:
+                `New ${isRequired(prop) ? "required" : "optional"} property "${name}" — re-uses column ` +
+                `${columns}, which is already there and keeps the values an earlier property left in it.`
+        });
+    return true;
 }
 
 /**
