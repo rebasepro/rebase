@@ -140,8 +140,6 @@ const saveHooks = (status: "new" | "existing") => [`beforeSave:${status}`, `afte
 const everyDoor = (why: string): Partial<Record<Door, string>> =>
     Object.fromEntries(DOORS.map(door => [door, why]));
 
-const DD3_HOOK_BEFORE_404 = "DD-3: the pre-write read refuses only under a `beforeQuery`, "
-    + "so `beforeSave` runs for a row that is not there before the 404";
 const DD4_DELETE_ENTRY = "DD-4: a delete records the admin view model (`{ __type: \"date\" }`) as its history entry";
 const deleteHooks = ["beforeDelete", "afterDelete"];
 
@@ -172,12 +170,29 @@ export const PARITY_CASES: readonly ParityCase[] = [
         name: "an update of a key no row has",
         given: "absent",
         when: { op: "update", values: { title: "ghost" } },
-        then: { outcome: "not-found", code: "NOT_FOUND", hooks: [], history: [], ...absent },
-        pending: {
-            socket: DD3_HOOK_BEFORE_404,
-            mcp: DD3_HOOK_BEFORE_404,
-            data: DD3_HOOK_BEFORE_404
-        }
+        // REST answered before any hook; the socket, MCP and `driver.data`
+        // ran `beforeSave` for a row that is not there, then answered 404.
+        then: { outcome: "not-found", code: "NOT_FOUND", hooks: [], history: [], ...absent }
+    },
+    {
+        // REST answered 404, as the soft-delete page says; the socket, MCP and
+        // `driver.data` edited the hidden row, ran its hooks and wrote history.
+        name: "an update of a trashed row, other than a restore, is a 404",
+        finding: "DD-3",
+        given: "trashed",
+        when: { op: "update", values: { title: "edited-while-trashed" } },
+        then: { outcome: "not-found", code: "NOT_FOUND", hooks: [], history: [], ...trashed }
+    },
+    {
+        // Every door restored the row and none recorded it: the read of the
+        // previous values hid the trashed row, and history skips an update it
+        // has nothing to compare with — so the trail said "deleted" while the
+        // row was live.
+        name: "a restore of a trashed row is an update, recorded as one",
+        finding: "DD-4",
+        given: "trashed",
+        when: { op: "update", values: { deletedAt: null } },
+        then: { outcome: "updated", hooks: saveHooks("existing"), history: ["update"], ...live() }
     },
 
     // ── upsert ───────────────────────────────────────────────────────────

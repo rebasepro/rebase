@@ -1,6 +1,5 @@
 import { DataService } from "./services/dataService";
 import { createStampKeys } from "./services/PersistService";
-import { hasBeforeQuery } from "./services/read-scope";
 import { BranchService } from "./services/BranchService";
 import { RealtimeService, type SubscriptionAuthContext } from "./services/realtimeService";
 import { DatabasePoolManager } from "./databasePoolManager";
@@ -968,6 +967,20 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     /**
+     * Where an update reads the row it addresses before writing it.
+     *
+     * The path itself, except through a many-to-many relation: there the path
+     * names the parent's set, and an update may *link* a row that exists but is
+     * not in that set yet (the persistence layer attaches it). Read through the
+     * path, such a row is absent, so it is read from its own collection.
+     */
+    private storedRowPath(path: string): string {
+        if (!isNestedPath(path)) return path;
+        const hop = resolveNestedPath(path, this.registry);
+        return hop && isJunctionBackedRelation(hop.relation) ? hop.targetCollection.slug : path;
+    }
+
+    /**
      * The stored row an upsert's key names, if this caller can address it —
      * with its address and the values to update it with.
      *
@@ -1106,29 +1119,40 @@ export class PostgresBackendDriver implements DataDriver {
         // happened.
         let previousValuesForHistory: Partial<M> | undefined;
         if (status === "existing" && id) {
-            // A row this caller's `beforeQuery` excludes is not a row they may
-            // update, and the refusal belongs *here* — before the write —
-            // rather than at the read-back below.
+            // An update addresses a row the caller can read, and a key that
+            // reads as nothing is a 404 — answered *here*, before any hook runs
+            // and before the write, as `delete` answers it. The read is the
+            // caller's: their policies, their `beforeQuery`, and the trash
+            // hidden. So a row in the trash is a 404 too, unless this update
+            // is its restore (`restoresSoftDeletedRow`), which is the one edit
+            // that reaches a stamped row.
             //
-            // Without this the update lands and the post-save walk, which is
-            // narrowed like every other read, then finds nothing and throws
-            // "Could not fetch row after save.": a 500 quoting an internal step,
-            // for a row the caller was never allowed to address. On the request
-            // path the surrounding transaction rolls the write back, so the data
-            // was safe and the report was wrong; on an in-process save through
-            // the base driver there is no transaction to roll back, and the
-            // write stayed. `delete` has always answered a clean 404 here, and
-            // this is the same answer to the same question.
+            // This used to refuse only when the collection declared a
+            // `beforeQuery`, and REST's own pre-read was the rule everywhere
+            // else. Every other door wrote straight through: the socket, MCP
+            // and `driver.data` ran `beforeSave` for a key no row has before
+            // the 404, and edited a trashed row — hooks, history and all —
+            // that REST answered 404 for. And a restore read its previous
+            // values with the trash hidden, found none, and history skipped
+            // the update it had nothing to compare with: every restore went
+            // unrecorded, and the trail said "deleted" for a live row.
             //
-            // Gated on the hook being declared so that nothing changes for a
-            // collection without one: the read below stays best-effort history
-            // enrichment, and a `fetchOneForRest` that cannot resolve a key is
-            // still not a reason to fail a write.
-            const gateOnScope = hasBeforeQuery(this.registry, resolvedCollection);
+            // Through a many-to-many path an update can also *link* a row
+            // that exists but is not linked yet, so there the row is read from
+            // its own collection. A read that fails for another reason (a
+            // collection whose key the registry cannot resolve) stays
+            // best-effort enrichment and is not a reason to fail a write.
             try {
-                const existing = await this.dataService.getFetchService()
-                    .fetchOneForRest(path, id, undefined, resolvedCollection?.databaseId);
-                if (!existing && gateOnScope) {
+                const existing = await this.dataService.getFetchService().fetchOneForRest(
+                    this.storedRowPath(path), id, undefined, resolvedCollection?.databaseId,
+                    {
+                        withDeleted: restoresSoftDeletedRow(
+                            resolvedCollection as CollectionConfig | undefined,
+                            values as Record<string, unknown>
+                        ) ? true : undefined
+                    }
+                );
+                if (!existing) {
                     throw ApiError.notFound(`No row "${id}" in "${path}" to update.`);
                 }
                 if (existing) {
