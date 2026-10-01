@@ -438,6 +438,8 @@ export const fr: RebaseTranslations = {
     import_problem_not_a_date: "n'est pas une date",
     import_problem_ambiguous_date: "peut être jour/mois ou mois/jour",
     import_problem_not_a_vector: "n'est pas une liste de nombres",
+    import_problem_not_a_map: "n'est pas une map (le JSON d'un objet était attendu)",
+    import_problem_not_a_geopoint: "n'est pas un géopoint ({\"latitude\": …, \"longitude\": …} était attendu)",
     entities_will_be_overwritten: "Les entités avec le même identifiant seront écrasées",
     data_imported_successfully: "Données importées avec succès",
     export: "Exporter",

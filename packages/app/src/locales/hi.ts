@@ -438,6 +438,8 @@ export const hi: RebaseTranslations = {
     import_problem_not_a_date: "तारीख नहीं है",
     import_problem_ambiguous_date: "दिन/महीना या महीना/दिन हो सकता है",
     import_problem_not_a_vector: "संख्याओं की सूची नहीं है",
+    import_problem_not_a_map: "मैप नहीं है (किसी ऑब्जेक्ट का JSON अपेक्षित था)",
+    import_problem_not_a_geopoint: "जियोपॉइंट नहीं है ({\"latitude\": …, \"longitude\": …} अपेक्षित था)",
     entities_will_be_overwritten: "समान ID वाली इकाइयों को अधिलेखित (overwritten) किया जाएगा",
     data_imported_successfully: "डेटा सफलतापूर्वक आयात किया गया",
     export: "निर्यात (Export)",

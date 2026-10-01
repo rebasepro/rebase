@@ -1,5 +1,5 @@
 import { getPropertyInPath } from "../../util";
-import { DataType, Entity, EntityReference, CollectionRegistryController, Properties, Property, Vector } from "@rebasepro/types";
+import { DataType, Entity, EntityReference, CollectionRegistryController, GeoPoint, Properties, Property, Vector } from "@rebasepro/types";
 import { AuthController, AdminCollection } from "@rebasepro/cms-types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { unflattenObject } from "./transforms";
@@ -17,7 +17,9 @@ export type ImportProblemReason =
     | "not_a_boolean"
     | "not_a_date"
     | "ambiguous_date"
-    | "not_a_vector";
+    | "not_a_vector"
+    | "not_a_map"
+    | "not_a_geopoint";
 
 /**
  * A cell the import could not convert to the type of the property it maps
@@ -220,6 +222,21 @@ export function processValueMapping(authController: AuthController,
         return new Vector(numbers as number[]);
     }
 
+    if ((to === "map" || to === "geopoint") && typeof value === "string") {
+        // The export writes a map and a geopoint as the JSON of the object —
+        // and each item of an array of maps the same way — so that is what a
+        // cell holding one reads as. Kept as text, a map was stored as a JSON
+        // string and a geopoint refused the whole batch at the server.
+        if (value.trim() === "") return null;
+        const parsed = readJsonObjectCell(value);
+        if (to === "map") return parsed ?? refuse("not_a_map");
+        const { latitude, longitude } = parsed ?? {};
+        return typeof latitude === "number" && typeof longitude === "number"
+            && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180
+            ? new GeoPoint(latitude, longitude)
+            : refuse("not_a_geopoint");
+    }
+
     if (from === "string" && to === "array" && typeof value === "string") {
         return processValueMapping(authController, splitListCell(value), navigation, usedProperty, onProblem, dateOrder);
     } else if (from === "string" && to === "boolean" && typeof value === "string") {
@@ -293,6 +310,20 @@ databaseId });
     }
 
     return value;
+}
+
+/** A cell holding the JSON of an object, read; `undefined` for anything else. */
+function readJsonObjectCell(cell: string): Record<string, unknown> | undefined {
+    const trimmed = cell.trim();
+    if (!trimmed.startsWith("{")) return undefined;
+    try {
+        const parsed: unknown = JSON.parse(trimmed);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+            ? parsed as Record<string, unknown>
+            : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 /**
