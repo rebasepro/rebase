@@ -147,7 +147,9 @@ const client = createRebaseClient({
 });
 ```
 
-A cascata é estreita: um `update` é descartado junto com a escrita que ele editava, porque só pode falhar da mesma maneira. Um `create` ou `delete` posterior para a mesma linha se sustenta por conta própria e é mantido.
+A cascata é estreita: um `update` é descartado junto com a escrita que ele editava, porque só pode falhar da mesma maneira. Um `create` ou `delete` posterior para a mesma linha se sustenta por conta própria e é mantido. Uma escrita descartada nunca foi enviada, e é reportada com um `RebaseApiError` cujo `code` é `DEPENDENCY_REJECTED` e cujo `cause` é a recusa que a condenou, para que você possa distingui-la da escrita que o servidor de fato recusou.
+
+Edições consecutivas em uma mesma linha enquanto offline são mescladas em uma única escrita na fila, para que um formulário sendo digitado não faça a fila crescer. Se o servidor recusar a escrita mesclada por causa do seu conteúdo (um 400, 403 ou 422 — por exemplo, um campo removido por uma alteração de esquema enquanto o usuário estava offline), o motor a divide novamente nas edições separadas e reproduz cada uma. Apenas a edição que o servidor recusa é revertida e reportada; as demais são mantidas.
 
 Uma falha que é meramente temporária — um 429, um 503, uma conexão interrompida — não é uma rejeição. Essas permanecem na fila e são repetidas; somente após `maxRetries` adiamentos uma escrita é revertida.
 

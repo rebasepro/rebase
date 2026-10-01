@@ -110,12 +110,24 @@ DB_PERMISSION_DENIED — Permission denied by the database on "notes"
 SQLSTATE `42501`. Dois problemas diferentes ocorrem sob esse código, e a mensagem
 os distingue:
 
-- **Uma política de segurança em nível de linha (RLS) recusou a linha.** O sistema de controle de acesso
-  está funcionando; o chamador solicitou algo que suas políticas não permitem. Verifique
-  as `securityRules` da coleção e execute `npx @rebasepro/rls-check` para uma
-  auditoria somente leitura do que o banco de dados realmente aplicará.
-- **A role não possui um `GRANT`.** Nada na requisição resolverá o problema — a
-  role de conexão não pode acessar a tabela de forma alguma. Trata-se de um problema de implantação.
+- **Uma política de segurança em nível de linha (RLS) recusou a linha** — a
+  mensagem acima. O sistema de controle de acesso está funcionando; o chamador
+  solicitou algo que suas políticas não permitem. Verifique as `securityRules`
+  da coleção e execute `npx @rebasepro/rls-check` para uma auditoria somente
+  leitura do que o banco de dados realmente aplicará.
+- **A role não possui um `GRANT`.** A mensagem nomeia o objeto em vez disso:
+
+  ```
+  DB_PERMISSION_DENIED — Permission denied by the database: the role this request
+  runs as has no privilege on schema "rebase". That is a missing GRANT to that
+  role, not a row-level security policy.
+  ```
+
+  Nada na requisição resolverá o problema — a role sob a qual as requisições
+  rodam não pode acessar aquele objeto de forma alguma. O servidor concede à sua
+  role de requisição acesso aos schemas que ele provisiona, no arranque; um
+  objeto criado fora disso (por outra role, ou em um schema que nenhuma coleção
+  declara) precisa de um `GRANT` próprio. Trata-se de um problema de implantação.
 
 Uma leitura excluída por RLS não é um erro: as linhas são filtradas e você recebe uma
 página vazia. Se uma coleção parecer vazia para um usuário autenticado que deveria ver

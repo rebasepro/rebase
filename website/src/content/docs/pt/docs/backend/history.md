@@ -68,6 +68,16 @@ const ordersCollection = defineCollection({
    - A ação (`create`, `update`, `delete`)
    - Um array de `changed_fields` mostrando quais colunas foram modificadas
 
+Os valores são a linha como a API REST a serve: suas colunas, datas como
+timestamps, um `belongsTo` como sua chave estrangeira. É isso que um revert
+grava de volta.
+
+Em uma coleção com [soft delete](/docs/collections/soft-delete/), uma exclusão
+é registrada como `delete` e uma restauração (a atualização que redefine o
+campo de soft delete para `null`) como `update`. O histórico de uma linha
+permanece legível enquanto ela está na lixeira, e revertê-la para uma versão
+anterior à exclusão a restaura.
+
 ### Rastreamento de Diffs e Igualdade Estrutural Profunda
 
 Para evitar o registro de logs redundantes onde campos são salvos mas nenhum valor é alterado, o `HistoryService` realiza uma comparação de igualdade estrutural profunda (deep equality) nas chaves de nível superior dos valores antigos e novos:

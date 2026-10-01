@@ -47,8 +47,8 @@ rebase schema generate
 
 | Flag | Descrição |
 |------|-------------|
-| `--collections, -c` | Caminho para o diretório de coleções (padrão: `config/collections/`) |
-| `--output, -o` | Caminho de saída para o arquivo de esquema gerado |
+| `--collections, -c` | Diretório de coleções (padrão: `config/collections/`); caminhos relativos são resolvidos a partir de onde você executa o comando |
+| `--output, -o` | Caminho de saída para o arquivo de esquema gerado; caminhos relativos são resolvidos a partir de onde você executa o comando |
 | `--watch, -w` | Observar mudanças e regenerar automaticamente |
 
 O **modo watch** é útil durante o desenvolvimento — edite um arquivo de coleção e o esquema é regenerado instantaneamente:
@@ -77,6 +77,8 @@ rebase schema introspect
 | `--output, -o` | Diretório de saída para os arquivos de coleção gerados |
 
 Isso é útil ao adotar a Rebase em um banco de dados existente — faça a introspecção primeiro, depois personalize as coleções geradas.
+
+**Introspectar e depois fazer push não muda nada.** As propriedades geradas dizem exatamente o que cada coluna é — `columnType`, `precision`/`scale`, `defaultValue`, `required`, o `isId` de uma chave (`"increment"` para uma identity inteira, `columnType: "serial"` para uma serial, `"manual"` para uma chave sem default), o `onDelete` de uma relação, e o bloco `search` de uma coleção lido de volta a partir da coluna que ele construiu — então `rebase db push --dry-run` logo depois de uma introspecção não planeja nenhuma mudança. Onde nenhuma propriedade consegue descrever uma coluna — um `timestamp` sem fuso horário, um `interval`, um `inet`, um tipo enum que não se chama `<table>_<column>`, um default como `CURRENT_DATE` — a introspecção avisa, por coluna, no terminal e no topo do arquivo, com o que um push faria com ela e, quando existir, a instrução que faz as duas coisas coincidirem (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Uma tabela com chave composta por mais de uma coluna é deixada de fora com o motivo: uma coleção lê uma linha por uma única coluna de chave, e o `db push` deixa em paz uma tabela que não é uma coleção.
 
 ### `rebase db push`
 
@@ -196,7 +198,7 @@ rebase generate-sdk
 ```
 
 **O que ele faz:**
-- Lê as coleções de `config/collections/` (suporta exports de barril `index.ts` ou arquivos individuais)
+- Lê todo arquivo de coleção em `config/collections/` — os arquivos que o backend serve, listados ou não no barril `index.ts` — e para no primeiro que não carregar
 - Gera tipos TypeScript para todas as entidades em `generated/sdk/`
 - Produz um arquivo `database.types.ts` para uso com `createRebaseClient<Database>()`
 
@@ -208,7 +210,7 @@ coleções (veja `--from` abaixo), ou onde quer que o `rebase dev` não esteja e
 
 | Flag | Descrição |
 |------|-------------|
-| `-c`, `--collections-dir` | Caminho para o diretório de coleções (padrão: `config/collections/`) |
+| `-c`, `--collections` | Diretório de coleções (padrão: `config/collections/`); caminhos relativos são resolvidos a partir de onde você executa o comando. `--collections-dir` também é aceito. |
 | `-o`, `--output` | Diretório de saída para o SDK (padrão: `generated/sdk/`) |
 | `--from <link\|url>` | Lê o esquema de um projeto em execução em vez do código local. `link` usa o projeto vinculado a este checkout. |
 | `--token` | Token Bearer para o endpoint de contrato (padrão: `$REBASE_SERVICE_KEY`) |

@@ -76,7 +76,10 @@ Essa atualização é a única que alcança uma linha marcada. Qualquer outra ed
 O inverso não é uma atualização. Definir o campo com um valor é recusado com `400`
 `FIELD_NOT_WRITABLE` — exclua a linha em vez disso — de modo que a permissão `delete`,
 `beforeDelete` e `afterDelete` sempre se aplicam a ela. Um upsert pode criar uma linha
-que já esteja marcada, mas nunca marca uma que já estava armazenada.
+que já esteja marcada, mas nunca marca uma que já estava armazenada. Tampouco um
+upsert escreve em uma linha na lixeira: quando sua chave pertence a uma linha
+marcada, ele é recusado com `409` `ROW_IN_TRASH` e nada é escrito. Restaure a
+linha primeiro, ou a expurgue com `?hard=true` e faça o upsert novamente.
 
 Uma exclusão por um caminho muitos-para-muitos, como `DELETE /api/data/posts/1/tags/5`,
 remove o vínculo do post 1 com a tag. Ela não faz soft delete da tag, que outros

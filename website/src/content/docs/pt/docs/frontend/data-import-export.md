@@ -19,8 +19,8 @@ Ambos estão disponíveis em todas as coleções. A exportação pode ser config
 2. Clique no botão **Importar** na barra de ferramentas
 3. Selecione ou arraste e solte seu arquivo
 4. Mapeie as colunas do arquivo para as propriedades da coleção
-5. Pré-visualize os dados e resolva eventuais erros de validação
-6. Clique em **Importar** para salvar todas as entidades
+5. Pré-visualize os dados, incluindo quaisquer valores que não possam ser convertidos
+6. Clique em **Salvar dados** para gravar as linhas
 
 ### Formatos Suportados
 
@@ -36,16 +36,31 @@ O assistente de importação tenta corresponder automaticamente as colunas do ar
 
 - **Correspondências exatas** são mapeadas automaticamente (ex.: `name` → `name`)
 - **Colunas não correspondidas** podem ser mapeadas manualmente ou ignoradas
-- **Coerção de tipos** lida com conversões de string para número, string para booleano e análise de datas
+- **Conversão de tipos** transforma cada célula no tipo da propriedade à qual ela é mapeada, mas apenas quando nada é perdido (veja abaixo)
 
-### Validação
+### Conversão de tipos
 
-Antes de importar, o assistente valida todas as linhas em relação às definições de propriedade da sua coleção:
+Uma célula só é convertida quando o tipo da propriedade consegue conter exatamente o que ela diz:
 
-- Campos obrigatórios devem estar presentes
-- Valores de enum devem corresponder às opções definidas
-- Tipos de dados devem ser compatíveis (ex.: um valor de texto em um campo numérico é sinalizado)
-- Erros de validação são exibidos linha por linha para que você possa corrigi-los antes de importar
+| Tipo de propriedade | Converte | Não converte |
+|---|---|---|
+| Número | `12`, `-3.5`, `10.00`, `1e3` | `02134` (um zero à esquerda seria perdido), números com mais de 15 dígitos significativos, `1,234`, `$5.00`, `12%`, `N/A` |
+| Booleano | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, em qualquer caixa | qualquer outra coisa |
+| Data | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), datas escritas por extenso (`5 Jan 2024`), `05/01/2024`, segundos ou milissegundos epoch | texto que não nomeia uma data |
+
+Uma data sem horário é esse dia em UTC. Para datas escritas como `05/01/2024`, a coluna decide a ordem: um primeiro número acima de 12 torna a coluna dia-primeiro, um segundo número acima de 12 torna-a mês-primeiro. Quando uma coluna nunca o indica, o locale do navegador decide, e quando ela contém as duas ordens, uma data que qualquer uma das ordens poderia ler não é convertida.
+
+Uma célula em branco não é um valor: ela não define nada, e o padrão que você escolheu para essa propriedade se aplica.
+
+### Valores que não podem ser importados
+
+A pré-visualização lista cada célula que não é convertida, por coluna, com quantas existem e as primeiras por linha e motivo. Essas células são deixadas vazias nas linhas importadas; nada é transformado em `0`, `false` ou um valor vazio sem ser listado. Volte para mapear a coluna para outra propriedade, ou corrija o arquivo e envie-o novamente.
+
+As próprias regras da coleção — campos obrigatórios, opções de enum, valores únicos — são verificadas pelo servidor conforme as linhas são gravadas, 25 linhas por vez. Se uma linha for recusada, a importação para e a identifica; as linhas anteriores a ela já estão salvas, e **Tentar novamente** retoma a partir da linha recusada.
+
+### Criando uma coleção a partir de um arquivo
+
+Ao criar uma coleção a partir de um arquivo, o tipo de cada coluna é inferido a partir de seus valores. Uma coluna só é numérica se todo valor nela for um número ou texto que se converte exatamente em um, então uma coluna de CEPs, códigos de produto com zeros à esquerda, SKUs longos ou números de telefone permanece texto. Uma coluna que mistura tipos (números e palavras, booleanos e números) é texto. Células em branco não contam, então uma coluna majoritariamente vazia não é marcada como obrigatória.
 
 ### Configuração de Importação
 

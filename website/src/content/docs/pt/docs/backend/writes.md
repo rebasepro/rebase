@@ -21,6 +21,14 @@ então tudo nesta seção vale para elas também, exceto `?on_conflict=`.
 O corpo de uma escrita precisa ser um objeto JSON. `null`, um número, uma string ou
 um array resulta em `400 BAD_REQUEST`.
 
+Uma atualização não pode alterar a chave de uma linha. Um corpo que nomeia a
+chave com outro valor resulta em `400 KEY_IMMUTABLE`, antes de qualquer hook
+rodar e sem nada escrito, seja qual for o caminho pelo qual a atualização
+chega: REST, o socket de tempo real, MCP ou o `rebase.data` em processo. A
+chave que a linha já tem é aceita, como a de um formulário que envia a linha
+inteira de volta. Para mover uma linha para uma nova chave, crie-a lá e exclua
+a antiga.
+
 ### Idempotência
 
 `Idempotency-Key: <uuid>` em qualquer escrita significa "se você já respondeu a esta
@@ -162,7 +170,9 @@ mantêm seus valores armazenados em vez de serem redefinidos para seu `defaultVa
 e o histórico registra uma atualização. Uma linha que a leitura não conseguiu ver, ou uma inserida
 concorrentemente, ainda é capturada por `ON CONFLICT … DO UPDATE`, que define apenas o que
 o corpo e os hooks escreveram, além dos carimbos `on_update`. Uma chave que indica uma linha
-fora do escopo `beforeQuery` do chamador responde `404`.
+fora do escopo `beforeQuery` do chamador responde `404`. Uma chave que pertence a
+uma linha na [lixeira](/docs/collections/soft-delete/) responde `409 ROW_IN_TRASH`
+e nada é escrito: restaure a linha primeiro, ou a expurgue.
 
 Uma linha que já existia mantém seu timestamp `on_create` e seu criador
 `user_on_create`. Um conflito significa que a criação da linha é um fato do

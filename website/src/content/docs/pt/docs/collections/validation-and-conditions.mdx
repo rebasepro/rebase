@@ -60,6 +60,19 @@ properties: {
 }
 ```
 
+### Onde a validação é executada
+
+O servidor verifica o `validation` na fronteira da requisição — REST, o socket
+realtime e MCP — sobre o que o chamador enviou, antes de o `beforeSave`
+executar, e responde com um 400 nomeando todo campo que falhar, a uma escrita
+que infrinja uma regra. O código do servidor que escreve em processo é
+confiável e **não** é verificado contra essas regras: `rebase.data` e
+`rebase.dataAsAdmin` em uma function ou cron job, `context.data` em um
+callback, um script de seed. O que vale ali é o que o banco de dados impõe —
+`required` (NOT NULL), `unique` (um índice único), o tipo de um enum e a
+largura de uma coluna `varchar` ou `char`. Qualquer outra coisa que seu código
+de servidor grave, verifique no próprio código que a escreve.
+
 ### Todos os tipos
 
 | Regra | Tipo | Descrição |
@@ -73,7 +86,7 @@ properties: {
 
 | Regra | Tipo | Descrição |
 |------|------|-------------|
-| `min` / `max` | `number` | Quantidade mínima / máxima de caracteres, inclusivo. Um `max` também dimensiona a coluna: ele transforma `TEXT` em `VARCHAR(max)`, portanto diminuí-lo em uma tabela que já contém linhas mais longas é uma migração que o banco de dados recusa |
+| `min` / `max` | `number` | Quantidade mínima / máxima de caracteres, inclusivo. Com `columnType: "varchar"` ou `"char"`, `max` também dimensiona a coluna (`VARCHAR(max)`), portanto diminuí-lo em uma tabela que já contém linhas mais longas é uma migração que o banco de dados recusa. A coluna padrão é `TEXT`, que `max` deixa sem limite — o limite então fica apenas a cargo da [verificação de requisição](#onde-a-validação-é-executada) do servidor |
 | `length` | `number` | Exatamente essa quantidade de caracteres — um código de país, uma referência de largura fixa |
 | `matches` | `string \| RegExp` | Um padrão com o qual todo o valor deve corresponder. Uma string é compilada por requisição, portanto, uma que não compilar é rejeitada na inicialização em vez de silenciosamente se tornar nenhuma regra |
 | `matchesMessage` | `string` | O que o formulário exibe quando `matches` falha |
@@ -151,8 +164,10 @@ que está orientando alguém e um que o está recusando.
 :::caution[Condições são comportamento de formulário]
 **Apenas formulário de admin — não aplicado pela API ou pelo banco de dados.** Elas são
 executadas no navegador, na entidade que está sendo editada, e moldam o que o painel oferece. Uma
-regra que deve valer para todos os chamadores pertence a `validation`, que o servidor
-verifica, ou em uma [regra de segurança](/docs/collections/security-rules/), que o
+regra que deve valer para todo chamador da API pertence a `validation`, que o
+servidor verifica nas gravações via REST, socket e MCP (mas não nas
+[escritas em processo](#onde-a-validação-é-executada) do seu próprio código de
+servidor), ou em uma [regra de segurança](/docs/collections/security-rules/), que o
 banco de dados aplica para qualquer um — painel, SDK ou `curl`.
 :::
 
@@ -164,8 +179,8 @@ Para comportamentos complexos que não podem ser expressos via JSON Logic, você
 price: {
     type: "number",
     name: "Price",
-    dynamicProps: ({ values, user }) => ({
-        disabled: values.is_free === true || !user.roles.includes("admin"),
+    dynamicProps: ({ values, authController }) => ({
+        admin: { disabled: values.is_free === true || !authController.user?.roles?.includes("admin") },
         validation: values.is_free ? {} : { required: true, min: 0 }
     })
 }

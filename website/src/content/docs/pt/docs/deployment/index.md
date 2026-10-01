@@ -34,6 +34,9 @@ administrador antes do primeiro boot.
 - **[Dividir em vários processos](/docs/deployment/split-processes/)** — um
   bundle como API, camada de functions e worker, para que uma function pesada
   deixe de competir com a API de dados.
+- **[Executando mais de uma instância](/docs/deployment/multiple-instances/)**
+  — o estado que cada processo mantém só para si, e a configuração que o
+  compartilha, antes de uma segunda réplica receber tráfego.
 
 ## Guias por plataforma
 

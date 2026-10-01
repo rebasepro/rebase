@@ -156,7 +156,7 @@ data[0].authorId;       // "uuid-1234" — still there
 data[0].author?.name;   // "Jane Doe"
 ```
 
-Um `Database` gerado tipa os três com precisão: `Insert` e `Update` aceitam qualquer uma das sintaxes de escrita, `Row` possui `authorId` incondicionalmente, e `author` é opcional em `Row` e **obrigatório** na linha retornada por uma leitura com `include` — consulte [Includes tipados](#typed-includes).
+Um `Database` gerado tipa os três com precisão: `Insert` e `Update` aceitam qualquer uma das sintaxes de escrita, `Row` possui `authorId` incondicionalmente, e `author` é opcional em `Row` — `RowWith<"posts", ["author"]>` é a linha com ele **obrigatório**, para uma leitura que o solicitou. Consulte [Includes tipados](#typed-includes).
 
 O único caso em que os três se sobrepõem é uma relação nomeada de forma idêntica à sua própria chave estrangeira. Nesse caso, a linha incluída é servida *sobre* a coluna, e o tipo gerado reflete isso tipando essa chave como ambos.
 
@@ -173,7 +173,7 @@ const ok: IncludeFor<"posts"> = { comments: { limit: 5, include: { author: true 
 const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
-`IncludeFor<A>` restringe as chaves de um include às relações que existem, em todos os níveis. `RowWith<A, I>` é a linha retornada pela leitura, com todas as relações incluídas definidas como **obrigatórias** — portanto, após solicitar o autor, `row.author.name` não precisa de `?.`.
+`IncludeFor<A>` restringe as chaves de um include às relações que existem, em todos os níveis — e um cliente tipado verifica o `include` da mesma forma, em `find({ include })` e em `.include(...)`, então `posts.include("authr")` é um erro de compilação em vez de um 400 `UNKNOWN_RELATION`. As linhas retornadas por uma leitura continuam tipando cada relação como opcional; `RowWith<A, I>` é essa linha com todas as relações incluídas definidas como **obrigatórias**, para anotar o que você leu — portanto, após solicitar o autor, um `RowWith<"posts", ["author"]>` não precisa de `?.` em `row.author.name`.
 
 Sem um `Database` gerado, o `include` permanece como um simples `string[]` ou árvore: um tipo de linha escrito manualmente não possui relações definidas para verificação, e o erro 400 do servidor serve como a barreira de proteção.
 

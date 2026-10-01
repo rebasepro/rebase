@@ -128,9 +128,8 @@ apontado para o banco de dados de produção:
 pnpm run db:push
 ```
 
-Rode isso para a RLS das tabelas de junção em relações muitos-para-muitos, e para
-qualquer mudança que não seja puramente aditiva: uma coluna renomeada, um tipo
-estreitado, um campo removido.
+Rode isso para qualquer mudança que não seja puramente aditiva: uma coluna
+renomeada, um tipo estreitado, um campo removido.
 
 Para um **fluxo de trabalho versionado e em equipe**, versione arquivos de
 migração com `pnpm run db:generate` e rode `pnpm run db:migrate` como passo de
@@ -176,7 +175,7 @@ Antes de implantar em produção, garanta:
 |------|---------|
 | **Primeiro administrador** | Defina `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` **antes do primeiro arranque**, junto com `DISABLE_SELF_REGISTRATION=true`. Em produção, a primeira conta registrada não é promovida — veja [Seu primeiro administrador](#seu-primeiro-administrador). |
 | **NODE_ENV** | `NODE_ENV=production`. É o que fecha a janela de bootstrap, recusa o armazenamento local de arquivos, exige `CORS_ORIGINS` e desliga a documentação OpenAPI. Uma implantação deixada no valor padrão está rodando em modo de desenvolvimento. |
-| **Esquema do banco de dados** | O arranque cria as tabelas das suas coleções de forma aditiva. Rode `pnpm run db:push` (ou `pnpm run db:migrate`) para a RLS das tabelas de junção e para tudo que não seja puramente aditivo. |
+| **Esquema do banco de dados** | O arranque cria as tabelas das suas coleções e a RLS delas de forma aditiva. Rode `pnpm run db:push` (ou `pnpm run db:migrate`) para tudo que não seja puramente aditivo. |
 | **JWT_SECRET** | Use uma string aleatória criptograficamente forte (≥ 32 caracteres). Nunca reutilize entre ambientes. |
 | **DATABASE_URL** | Use uma instância Postgres gerenciada (Neon, Supabase, RDS) com TLS habilitado |
 | **CORS_ORIGINS** | Sempre, não só quando o frontend está em outro domínio. O runtime se recusa a iniciar em produção sem `CORS_ORIGINS` nem `FRONTEND_URL`, porque uma API que adivinha as suas origens permitidas acaba permitindo a errada. |

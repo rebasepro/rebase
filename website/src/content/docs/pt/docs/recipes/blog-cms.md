@@ -219,10 +219,14 @@ export const articlesCollection = defineCollection({
 
 ## Configuração
 
-1. Adicione todas as três coleções ao seu `config/collections/index.ts`
-2. Execute `rebase schema generate`
-3. Execute `rebase db push`
-4. Reinicie o servidor de desenvolvimento
+1. Salve os três arquivos em `config/collections/`. Adicione-os ao array
+   `collections` em `config/collections/index.ts` para escolher onde eles
+   aparecem na navegação — cada arquivo do diretório é carregado de qualquer
+   forma.
+2. Com o `rebase dev` em execução, é só isso: salvar regenera o esquema,
+   reinicia o backend, e o arranque cria as tabelas, a tabela de junção e suas
+   políticas de row-level security. Fora do `rebase dev`, contra seu próprio
+   PostgreSQL, execute `rebase schema generate` e depois `rebase db push`.
 
 Agora você tem um CMS de blog totalmente funcional com:
 - Gerenciamento de autores com upload de avatares

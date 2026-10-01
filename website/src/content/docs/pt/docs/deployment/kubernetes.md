@@ -112,3 +112,5 @@ realtime: { bus: { type: "postgres" } }
 ```
 
 Defina `sharedState.channelBusConfigured: true` para declarar que você o configurou — o chart usa isso apenas para decidir se deve emitir um aviso. Assinaturas comuns de coleções não são afetadas; elas trafegam pelo CDC do Postgres.
+
+O restante do que um processo mantém só para si — arquivos locais, uploads retomáveis, o cache de transformação de imagens, o Logs Explorer — está listado com a configuração que compartilha cada um em [Executando mais de uma instância](/docs/deployment/multiple-instances/).

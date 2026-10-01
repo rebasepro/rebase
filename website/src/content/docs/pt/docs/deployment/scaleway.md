@@ -84,14 +84,13 @@ A Scaleway provisionará o contêiner e disponibilizará um endpoint público (e
 
 O que o `ensure` nunca faz é modificar algo já existente: ele não altera tipos de colunas, não remove nenhum item e não altera os valores de enums já existentes, pois a reinicialização de um contêiner não deve remodelar um schema como efeito colateral de um deploy.
 
-Por esse motivo, duas tarefas ainda exigem o uso da CLI, executada a partir de uma cópia do código ou de um job de CI com a variável `DATABASE_URL` apontando para o seu Managed Database:
+Por esse motivo, uma tarefa ainda exige o uso da CLI, executada a partir de uma cópia do código ou de um job de CI com a variável `DATABASE_URL` apontando para o seu Managed Database:
 
 ```bash
 rebase db push
 ```
 
-- **RLS de tabelas associativas (junction tables)** para relações de muitos-para-muitos.
-- **Qualquer alteração que não seja puramente cumulativa** — renomeação de colunas, restrição de tipos ou remoção de campos.
+Qualquer alteração que não seja puramente cumulativa — renomeação de colunas, restrição de tipos ou remoção de campos.
 
 A imagem de runtime é distribuída sem a CLI, portanto, essas operações nunca são executadas dentro do contêiner. Para migrações versionadas, faça o commit dos arquivos de migração com `rebase db generate` e execute `rebase db migrate` como uma etapa da pipeline de release.
 

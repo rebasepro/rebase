@@ -391,7 +391,30 @@ const rows = await client.data.orders
 
 As chaves do resultado são **derivadas**, não escolhidas: `sum(total)` retorna como `sum_total`, um `count()` puro como `count`. Permitir a personalização dos nomes exigiria validar se o nome escolhido não coincide com um campo do `groupBy` — uma regra que ninguém adivinharia, gerando sobrescrita silenciosa de valores caso não fosse verificada.
 
-`limit` restringe o número de **grupos** (agrupar por uma coluna de alta cardinalidade retornaria uma tabela inteira de linhas em uma só resposta) e é ignorado sem um `groupBy`, já que uma agregação sem agrupamento é sempre uma única linha. `orderBy`, `include` e parâmetros de página não são enviados com uma agregação: ela não tem relações para carregar, e o SDK ainda não ordena nem pagina grupos. Via HTTP, uma agregação agrupada pode ser ordenada e paginada — veja [Agregações e busca](/docs/sdk/aggregates-and-search/).
+Os grupos são paginados como as linhas de uma listagem: `limit` os limita e
+`offset` os pula (agrupar por uma coluna de alta cardinalidade retornaria uma
+tabela inteira de linhas em uma só resposta). Uma agregação agrupada sem
+`limit` recebe o padrão de uma listagem — **50 grupos** via HTTP — então leia
+o `meta` do resultado antes de confiar que ele está completo:
+
+```typescript
+const byCustomer = await client.data.orders.aggregate({
+    select: [{ fn: "sum", field: "total" }],
+    groupBy: ["customerId"],
+    limit: 200
+});
+byCustomer.meta; // { limit: 200, offset: 0, hasMore: true } — pagine com offset: 200
+```
+
+O resultado continua sendo um array de linhas; `meta` é uma propriedade não
+enumerável nele, então um spread ou um `JSON.stringify` só vê as linhas. Ela
+está presente sempre que os grupos foram cortados em um `limit`. Sem um
+`groupBy` há uma única linha, `limit` não faz nada e `offset` é recusado. Em
+uma function de servidor (`rebase.data`, `context.data`) uma agregação
+agrupada sem `limit` retorna todos os grupos. `include` não é enviado com uma
+agregação: ela não tem relações para carregar. O SDK ainda não ordena grupos;
+via HTTP eles também podem ser ordenados — veja
+[Agregações e busca](/docs/sdk/aggregates-and-search/).
 
 O objetivo principal é evitar a busca de linhas apenas para reduzi-las na aplicação. "Receita por status" em um milhão de pedidos é resolvido aqui com uma consulta e uma linha por status, enquanto em outros lugares exigiria um `findAll()` com um loop — o que é incorreto com um `limit` e impraticável sem ele. Essa operação é executada sob o mesmo handle de requisição de qualquer outra leitura, garantindo a aplicação de row-level security às linhas agregadas.
 

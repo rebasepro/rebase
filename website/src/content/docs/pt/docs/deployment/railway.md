@@ -73,14 +73,13 @@ O Railway define `PORT` e o runtime vincula-se a ela, portanto não há porta pa
 
 O que o `ensure` nunca faz é alterar algo que já existe: ele não altera o tipo de uma coluna, não exclui nada nem edita os rótulos de um enum existente, pois o reinício de um contêiner não deve remodelar um schema como efeito colateral de um deploy.
 
-Portanto, duas coisas ainda exigem a CLI, executada a partir de um checkout ou de um job de CI:
+Portanto, uma coisa ainda exige a CLI, executada a partir de um checkout ou de um job de CI:
 
 ```bash
 rebase db push
 ```
 
-- **RLS em tabelas de junção** para relações muitos-para-muitos.
-- **Qualquer alteração que não seja puramente aditiva** — uma coluna renomeada, um tipo restringido, um campo removido.
+Qualquer alteração que não seja puramente aditiva — uma coluna renomeada, um tipo restringido, um campo removido.
 
 Aponte `DATABASE_URL` para a string de conexão **pública** do seu serviço Postgres (widget do Postgres → **Connect**); a URL interna referenciada só é acessível de dentro do Railway. A imagem de runtime é distribuída sem a CLI, portanto isso nunca é executado dentro do contêiner. Para migrações versionadas, faça commit dos arquivos de migração com `rebase db generate` e execute `rebase db migrate` como uma etapa de release.
 

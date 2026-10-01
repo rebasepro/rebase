@@ -79,8 +79,31 @@ O SDK armazena em cache as URLs assinadas para evitar chamadas redundantes ao se
 
 ### URLs privadas vs. públicas
 
-- **Arquivos privados** recebem uma URL com um **token de download de curta duração e restrito ao caminho** (`?token=…`, 5 min por padrão) — nunca seu token de acesso. Como ele expira, **não persista uma URL privada**; armazene o **caminho** do arquivo e chame `getSignedUrl()` novamente ao renderizá-lo.
+- **Arquivos privados** recebem uma URL com um **token de download de curta duração e restrito ao caminho** (`?token=…`, 5 minutos a menos que o servidor defina `STORAGE_DOWNLOAD_TOKEN_TTL`) — nunca seu token de acesso. Como ele expira, **não persista uma URL privada**; armazene o **caminho** do arquivo e chame `getSignedUrl()` novamente ao renderizá-lo.
 - **Arquivos públicos** (armazenados sob o prefixo `public/` — defina `storage: { public: true }` na propriedade, ou passe `public: true` para `putObject`) recebem uma URL **estável, sem token, permanente e cacheável por CDN**, sem ida e volta ao servidor. São seguros para armazenar em um banco de dados e vincular diretamente.
+
+### Arquivos dentro de texto
+
+Um texto que incorpora um arquivo — as imagens em um campo markdown — também
+não pode conter uma URL privada, então ele contém uma **referência de
+storage**: `rebase-storage:posts/cover.png`, com `?storageId=media` quando o
+arquivo está em uma fonte nomeada. É isso que o editor markdown do painel de
+administração grava para uma imagem enviada. Troque as referências por URLs
+ao renderizar o texto:
+
+```typescript
+import { resolveStorageReferences } from "@rebasepro/client";
+
+const post = await client.data.collection("posts").findById("post-1");
+const body = await resolveStorageReferences(String(post?.body ?? ""), client);
+// `body` é o mesmo markdown, cada referência substituída por uma URL nova.
+```
+
+Cada objeto é assinado uma vez por chamada, a partir de sua própria fonte, então
+uma imagem privada continua funcionando por mais tempo que tenha passado desde
+o upload. Uma referência que nomeia um objeto que não existe mais é deixada
+como está. `storageReference(key, storageId?)` constrói uma, para texto que
+você mesmo escreve.
 
 ## Baixar um Arquivo
 

@@ -70,6 +70,8 @@ Enquanto o `rebase dev` estiver em execução, você não precisa fazer isso: el
 `generated/sdk/` ao iniciar e a cada salvamento em `config/collections/`. Execute o
 comando você mesmo no CI, em um repositório de frontend que não tem coleções
 (`rebase generate-sdk --from link`), ou onde quer que o `rebase dev` não esteja em execução.
+<span class="since-badge" data-since="0.24">Desde 0.24</span> para a regeneração: na versão 0.23, o `rebase dev` não toca nos tipos do SDK,
+então execute o comando após cada alteração de coleção.
 
 Em seguida, passe o parâmetro de tipo `Database` para `createRebaseClient` para obter autocompletar completo:
 
@@ -96,7 +98,7 @@ O `collectionsDictionary` mapeia cada acessador de volta para o slug utilizado n
 
 Uma chave de propriedade que *você* escreveu é a sua chave, qualquer que seja seu formato — nada renomeia um nome que você escolheu. As duas chaves que são derivadas em vez de declaradas, a chave estrangeira de uma relação e uma coluna lida por introspecção, são camelCase.
 
-`Row` descreve uma leitura, `Insert` um `create()` e `Update` um `update()` — eles não têm o mesmo formato. Colunas anuláveis são `T | null` em `Row`, a chave primária está sempre presente em uma leitura e nunca pode ser definida em uma atualização, e o alvo de um `belongsTo` pode ser escrito tanto como a relação (`{ author: 5 }`) quanto como sua chave estrangeira (`{ authorId: 5 }`).
+`Row` descreve uma leitura, `Insert` um `create()` e `Update` um `update()` — eles não têm o mesmo formato. Uma coluna que não é obrigatória é `T | null` nos três, para que uma escrita possa limpá-la; a chave primária está sempre presente em uma leitura e nunca pode ser definida em uma atualização; o alvo de um `belongsTo` pode ser escrito tanto como a relação (`{ author: 5 }`) quanto como sua chave estrangeira (`{ authorId: 5 }`); e a participação em um `hasMany` ou `manyToMany` é escrita como uma lista de ids do alvo ou objetos `{ id }` (`{ tags: ["t-1"] }`), cada um carregando um `_pivot` quando a tabela de junção declara colunas de payload. Um campo que ninguém pode escrever (`access: { write: [] }`) não aparece nem em `Insert` nem em `Update`.
 
 ## Exemplo Rápido
 

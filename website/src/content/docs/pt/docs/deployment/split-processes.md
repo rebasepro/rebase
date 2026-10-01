@@ -148,6 +148,9 @@ Observe que o `rebase.jobs.enqueue` continua funcionando em qualquer lugar, incl
 
 **Escalar para zero (Scale to zero).** Nada aqui reduz um processo a zero ou inicializa um sob demanda. Essa é uma capacidade da plataforma, não do runtime.
 
+Tudo o mais que um processo mantém só para si está reunido em uma única lista:
+[Executando mais de uma instância](/docs/deployment/multiple-instances/).
+
 ## Lançando uma unidade de forma independente
 
 Tudo o que foi visto acima divide *onde o trabalho é executado*. Tudo ainda é entregue como uma única build: uma imagem, um bundle, atualizados juntos. Esse é o padrão correto, e a maioria das implantações deve permanecer assim.

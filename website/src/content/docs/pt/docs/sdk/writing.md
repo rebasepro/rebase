@@ -143,6 +143,14 @@ uma linha vinda de `find()`, do cache offline ou de um servidor que não envia
 `ETag` — e passar `undefined` não envia nenhuma pré-condição, fazendo com que a chamada acima
 se degrade para uma atualização comum em vez de lançar um erro.
 
+A partir de um navegador em outra origem — um frontend Vite em sua própria
+porta, um host `app.` chamando um host `api.` — o `ETag` só é legível porque o
+servidor o nomeia em `Access-Control-Expose-Headers`. O runtime do Rebase faz
+isso, junto com `Retry-After`, `X-Request-ID`, os cabeçalhos `X-RateLimit-*` e
+`Preference-Applied`. Um backend que configura seu próprio `cors()` precisa
+expor a mesma lista, ou o `etagOf` é sempre `undefined` ali e toda escrita
+condicional sai como incondicional.
+
 ### Ignorando a resposta
 
 Toda escrita resolve para a linha que foi gravada. Passe `{ returning: false }` quando
@@ -257,8 +265,8 @@ forma entre coleções: uma requisição, uma transação, tudo ou nada.
 const result = await client.batch([
     { op: "create", collection: "orders",
       values: { total: 40 }, ref: "order" },
-    { op: "create", collection: "order_items",
-      values: { order_id: { $ref: "order.id" }, sku: "A-1" } },
+    { op: "create", collection: "orderItems",
+      values: { orderId: { $ref: "order.id" }, sku: "A-1" } },
     { op: "update", collection: "stock",
       id: "A-1", values: { count: { $inc: -1 } } },
     { op: "delete", collection: "carts", id: "c-9" }
@@ -269,9 +277,13 @@ result.meta;  // { operations: 4 }
 ```
 
 `op` é `create`, `update`, `upsert` ou `delete`, e `collection` restringe
-`values` ao formato gerado de `Insert` ou `Update` daquela coleção. Cada
-operação executa o pipeline que seu equivalente de linha única executaria — a mesma
-validação, callbacks e segurança em nível de linha, como o mesmo usuário.
+`values` ao formato gerado de `Insert` ou `Update` daquela coleção — uma coluna
+que a coleção não tem é um erro de compilação, assim como um `create` sem uma
+coluna obrigatória. `collection` é o accessor, o nome que `client.data.<accessor>`
+usa (`orderItems` para o slug `order_items`); o cliente envia o slug, através do
+dicionário `collections` com o qual foi criado. Cada operação executa o pipeline
+que seu equivalente de linha única executaria — a mesma validação, callbacks e
+segurança em nível de linha, como o mesmo usuário.
 
 ### `$ref`
 

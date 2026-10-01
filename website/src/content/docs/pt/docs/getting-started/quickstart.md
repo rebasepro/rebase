@@ -59,7 +59,7 @@ Ele inicia ambas as partes juntas:
 Ambas as portas são **derivadas do caminho deste projeto** em vez de serem fixas, de modo que vários
 projetos Rebase podem rodar lado a lado. O `rebase dev` exibe as duas URLs às quais se vinculou —
 **use essas**, não `localhost:3001` / `localhost:5173`. (`PORT` e `VITE_API_URL`
-no `.env` configuram o `rebase start`, o servidor de produção, e são ignorados aqui.)
+no `.env` configuram o `rebase start`, que executa o bundle já compilado, e são ignorados aqui.)
 Fixe uma porta com `rebase dev --port 3001`.
 
 ### Flags que vale a pena conhecer
@@ -95,12 +95,12 @@ para comparação, e o PGlite atende exatamente a um:
 pnpm run db:push
 ```
 
-A inicialização já cria tabelas ausentes de forma aditiva, então o `db push` serve para as duas
-coisas que ela deliberadamente ignora: [RLS](/docs/collections/security-rules/) em tabelas de junção
-(junction tables) — o Row-Level Security do PostgreSQL, que é
-como o Rebase impõe quem pode ler uma linha — em relações
-muitos-para-muitos, e qualquer alteração que não seja puramente aditiva — uma coluna renomeada,
-um tipo restringido, um campo removido.
+A inicialização já cria as tabelas ausentes — e suas políticas de
+[RLS](/docs/collections/security-rules/), o Row-Level Security do PostgreSQL,
+que é como o Rebase impõe quem pode ler uma linha — de forma aditiva, então o
+`db push` serve para o que ela deliberadamente ignora: qualquer alteração que
+não seja puramente aditiva — uma coluna renomeada, um tipo restringido, um
+campo removido.
 
 O scaffold também inclui um `docker-compose.yml` com um serviço PostgreSQL, caso você
 queira um contêiner em vez de um Postgres instalado:
@@ -131,7 +131,7 @@ O `rebase init` também gravou `REBASE_ADMIN_EMAIL` e um `REBASE_ADMIN_PASSWORD`
 
 ## Definir Sua Primeira Collection
 
-Abra `config/collections/` e crie um novo arquivo. Exporte a collection como o **export padrão** (`default export`) — é assim que o registro a reconhece. O nome da tabela é opcional: seu padrão é o slug, portanto, defina-o apenas quando forem diferentes:
+Abra `config/collections/` e crie um novo arquivo. Exporte a collection como o **export padrão** (`default export`) — é isso que o backend e o painel de administração carregam de cada arquivo do diretório. O nome da tabela é opcional: seu padrão é o slug, portanto, defina-o apenas quando forem diferentes:
 
 ```typescript title="config/collections/products.ts"
 import { defineCollection } from "@rebasepro/cms-types";
@@ -171,7 +171,7 @@ const productsCollection = defineCollection({
 export default productsCollection;
 ```
 
-Em seguida, registre-a em `config/collections/index.ts` para que tanto o backend quanto o painel de administração saibam sobre ela:
+Em seguida, adicione-a ao array `collections` em `config/collections/index.ts`. Esse array é uma ordem de exibição, não um registro: todo arquivo de collection no diretório é carregado — pelo backend, pelo painel de administração e pelo gerador de SDK — esteja ou não listado no array, e o array decide onde ela aparece na navegação. Para remover uma collection, exclua seu arquivo:
 
 ```typescript title="config/collections/index.ts" {2,5}
 // ...existing imports
@@ -189,12 +189,14 @@ Salve o arquivo. Essa é toda a etapa: o `rebase dev` regenera
 collections, reinicia o backend, e a inicialização cria a nova tabela — assim, sua collection **Products** aparece na
 navegação.
 
+<span class="since-badge" data-since="0.24">Desde 0.24</span> para os tipos do SDK: na versão 0.23, o `rebase dev` regenera apenas o schema, então
+execute `rebase generate-sdk` depois de alterar uma collection, antes de importar os tipos dela.
+
 O mesmo vale para uma propriedade adicionada a uma collection que você já possui: salve,
 e a coluna estará lá.
 
 O `rebase db push` é para as alterações que a inicialização deliberadamente ignora — uma coluna
-renomeada, um tipo restringido, um campo removido e RLS em tabelas de junção em
-relações muitos-para-muitos. Ele requer o seu próprio PostgreSQL:
+renomeada, um tipo restringido, um campo removido. Ele requer o seu próprio PostgreSQL:
 
 ```bash
 pnpm run db:push
