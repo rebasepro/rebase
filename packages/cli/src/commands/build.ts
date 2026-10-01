@@ -224,6 +224,10 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
 
     console.log(`${chalk.bold("Rebase")} — building ${targets.length} app(s)\n`);
 
+    // Each static app is built once per run, whichever consumer gets to it
+    // first: folding into the backend bundle, or its own static bundle.
+    const builtApps = new Set<string>();
+
     for (const { name, app } of targets) {
         console.log(chalk.cyan(`▸ ${name}`) + chalk.dim(` (${app.type})`));
 
@@ -370,6 +374,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                     manifest,
                     bundleDir: result.outDir,
                     skipBuild: args["--skip-static-build"] === true,
+                    builtApps,
                     log: (m) => console.log(m)
                 }).catch((err: unknown) => {
                     console.error(chalk.red(`    ✗ ${err instanceof Error ? err.message : String(err)}`));
@@ -383,7 +388,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 }
             }
         } else if (app.type === "static") {
-            await buildAssetApp(projectRoot, name, app, manifest.rebase, output).catch((err: unknown) => {
+            await buildAssetApp(projectRoot, name, app, manifest.rebase, output, { builtApps }).catch((err: unknown) => {
                 console.error(chalk.red(`  ✗ ${err instanceof Error ? err.message : String(err)}`));
                 process.exit(1);
             });
@@ -413,8 +418,11 @@ export async function buildAssetApp(
     app: RebaseAppConfig,
     runtimeRange: string,
     outOverride?: string,
-    /** `quietStdout`: every line, the build command's included, goes to stderr. See `toolStdio`. */
-    options: { quietStdout?: boolean } = {}
+    /**
+     * `quietStdout`: every line, the build command's included, goes to stderr. See `toolStdio`.
+     * `builtApps`: the static apps already built in this run (see `FoldOptions.builtApps`).
+     */
+    options: { quietStdout?: boolean; builtApps?: Set<string> } = {}
 ): Promise<string | undefined> {
     const asset = app as RebaseStaticAppConfig;
     // The path part is what the app is built for and mounted at; the hostname,
@@ -431,15 +439,20 @@ export async function buildAssetApp(
         return undefined;
     }
 
-    try {
-        await execa(asset.build, {
-            cwd: projectRoot,
-            stdio: toolStdio(options.quietStdout),
-            shell: true,
-            env: staticBuildEnv(basePath, name)
-        });
-    } catch {
-        throw new Error(`build command failed for "${name}"`);
+    if (options.builtApps?.has(name)) {
+        say(chalk.dim("  built once already in this run — packaging that output"));
+    } else {
+        try {
+            await execa(asset.build, {
+                cwd: projectRoot,
+                stdio: toolStdio(options.quietStdout),
+                shell: true,
+                env: staticBuildEnv(basePath, name)
+            });
+        } catch {
+            throw new Error(`build command failed for "${name}"`);
+        }
+        options.builtApps?.add(name);
     }
 
     if (!asset.output) {

@@ -45,6 +45,14 @@ export interface FoldOptions {
     bundleDir: string;
     /** Skip running each app's own build command; fold what is already built. */
     skipBuild?: boolean;
+    /**
+     * The static apps already built in this run, shared with `buildAssetApp`.
+     * An app named here is not built again; an app built here is added. One
+     * `rebase build` used to run the admin's `vite build && tsc` twice — once
+     * to fold it, once for its own static bundle — with the same command, the
+     * same environment and the same output directory.
+     */
+    builtApps?: Set<string>;
     log?: (message: string) => void;
     /** Send each app's build output to stderr: the caller's stdout carries a result. See `toolStdio`. */
     quietStdout?: boolean;
@@ -237,13 +245,14 @@ export async function foldFrontendIntoBundle(options: FoldOptions): Promise<Fold
     const outcomes: FoldOutcome[] = [];
 
     for (const app of apps) {
-        if (app.build && !skipBuild) {
+        if (app.build && !skipBuild && !options.builtApps?.has(app.name)) {
             await execa(app.build, {
                 cwd: projectRoot,
                 stdio: toolStdio(options.quietStdout),
                 shell: true,
                 env: staticBuildEnv(app.path, app.name)
             });
+            options.builtApps?.add(app.name);
         }
 
         const assetsDir = path.join(projectRoot, app.output as string);
