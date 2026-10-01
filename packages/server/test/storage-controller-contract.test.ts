@@ -276,6 +276,42 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
         expect(await res.text()).toBe("public by url");
     });
 
+    // ── What is served ─────────────────────────────────────────────────
+
+    it("serves an SVG as an image, sandboxed, on every path that serves it", async () => {
+        const svg = "<svg xmlns='http://www.w3.org/2000/svg'><script>parent.pwned=1</script><rect width='4' height='4'/></svg>";
+        await h.controller.putObject({ file: textFile("logo.svg", svg, "image/svg+xml"), key: "logos/logo.svg" });
+
+        const signed = await sdk().getSignedUrl("logos/logo.svg");
+        expect(signed.url).toContain("token=");
+
+        const paths: [string, string][] = [
+            ["direct", "/api/storage/file/logos/logo.svg"],
+            // An SVG is not transformed — the bytes go out as they are — so a
+            // transform request must not be a way around the policy.
+            ["transform", "/api/storage/file/logos/logo.svg?width=8"],
+            ["download token", signed.url!]
+        ];
+        for (const [label, url] of paths) {
+            const res = await app.request(url);
+            expect([label, res.status]).toEqual([label, 200]);
+            expect([label, res.headers.get("Content-Type")]).toEqual([label, "image/svg+xml"]);
+            expect([label, res.headers.get("Content-Disposition")]).toEqual([label, null]);
+            expect([label, res.headers.get("X-Content-Type-Options")]).toEqual([label, "nosniff"]);
+            const csp = res.headers.get("Content-Security-Policy") ?? "";
+            expect([label, csp.split(";").map(d => d.trim())]).toEqual([
+                label,
+                expect.arrayContaining(["default-src 'none'", "sandbox"])
+            ]);
+        }
+
+        // On a revalidation too: a cached copy is reopened under these headers.
+        const etag = (await app.request(paths[0][1])).headers.get("ETag")!;
+        const notModified = await app.request(paths[0][1], { headers: { "If-None-Match": etag } });
+        expect(notModified.status).toBe(304);
+        expect(notModified.headers.get("Content-Security-Policy")).toContain("sandbox");
+    });
+
     it("reads back what it stored, and nothing for a missing key", async () => {
         await h.controller.putObject({ file: textFile("a.txt", "hello", "text/plain"), key: "rt/a.txt" });
         const object = await h.controller.getObject("rt/a.txt");

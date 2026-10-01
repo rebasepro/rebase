@@ -153,24 +153,49 @@ async function transformOnce(
  * origin — so an uploaded page can fetch `/api/auth/refresh` same-origin and
  * read out a fresh access token, `HttpOnly` notwithstanding.
  *
- * `image/svg+xml` is deliberately absent: an SVG is a document that can carry
- * script. `text/html` and `application/xhtml+xml` are absent for the same
- * reason, and are what the attack actually uses.
+ * `text/html` and `application/xhtml+xml` are absent: they are what the
+ * attack actually uses. `image/svg+xml` is a document that can carry script
+ * too, so it is served as an image only under {@link SVG_CONTENT_SECURITY_POLICY}.
  */
 const INLINE_CONTENT_TYPE_PREFIXES = ["image/", "video/", "audio/"];
 const INLINE_CONTENT_TYPES = new Set(["application/pdf", "text/plain"]);
 
 /**
+ * The policy every SVG response carries.
+ *
+ * An SVG embedded with `<img>` never runs script. Opened directly — a link, a
+ * new tab, an `<iframe>` — it is a document on the API origin, and its
+ * `<script>` would run there, next to the refresh cookie. `sandbox` gives that
+ * document an opaque origin with scripts disabled, and `default-src 'none'`
+ * stops it loading anything; `style-src 'unsafe-inline'` keeps the inline
+ * styles most SVGs are drawn with. It is what GitHub serves user content
+ * under. Serving SVG as a download instead made every SVG logo a broken
+ * thumbnail in the panel.
+ */
+export const SVG_CONTENT_SECURITY_POLICY = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+
+/**
  * Decide what to actually serve for a stored content type.
  *
- * Returns the type to send and whether to force a download. The check is an
+ * Returns the type to send, whether to force a download, and the
+ * `Content-Security-Policy` the response must carry, if any. The check is an
  * allowlist rather than a blocklist of dangerous types: the set of types a
  * browser will execute grows, and the set we want to render inline does not.
  */
-export function resolveServedContentType(storedContentType: string): { contentType: string; attachment: boolean } {
+export function resolveServedContentType(storedContentType: string): {
+    contentType: string;
+    attachment: boolean;
+    contentSecurityPolicy?: string;
+} {
     // Parameters (`; charset=utf-8`) are not part of the decision, and a
     // trailing parameter must not be a way to slip past the prefix match.
     const base = storedContentType.split(";")[0].trim().toLowerCase();
+
+    // Exactly SVG, sandboxed. Any other type that mentions it is not a type a
+    // browser renders as an image, so it is not one to render.
+    if (base === "image/svg+xml") {
+        return { contentType: "image/svg+xml", attachment: false, contentSecurityPolicy: SVG_CONTENT_SECURITY_POLICY };
+    }
 
     const inline = base.includes("svg")
         ? false
@@ -765,6 +790,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             const served = resolveServedContentType(contentType);
             c.header("Content-Type", served.contentType);
             if (served.attachment) c.header("Content-Disposition", "attachment");
+            if (served.contentSecurityPolicy) c.header("Content-Security-Policy", served.contentSecurityPolicy);
 
             // Advertised before the conditional check so a 304 carries it too:
             // a client revalidating a cached media file still needs to know it
@@ -844,6 +870,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const servedRemote = resolveServedContentType(remoteContentType);
         c.header("Content-Type", servedRemote.contentType);
         if (servedRemote.attachment) c.header("Content-Disposition", "attachment");
+        if (servedRemote.contentSecurityPolicy) c.header("Content-Security-Policy", servedRemote.contentSecurityPolicy);
 
         const remoteValidators = objectValidators(fileObject.size, fileObject.lastModified);
         applyCacheHeaders(c, remoteValidators, cachePolicy(OBJECT_MAX_AGE));

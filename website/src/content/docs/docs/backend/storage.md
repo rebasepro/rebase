@@ -215,12 +215,20 @@ nobody asked.
 
 The stored content type is whatever the uploader declared — nothing sniffs the
 bytes — so `/api/storage/file/*` will only render a **narrow allowlist** inline:
-images (except SVG), video, audio, `application/pdf` and `text/plain`. Anything
-else, `text/html` and `image/svg+xml` included, is served as
-`application/octet-stream` with `Content-Disposition: attachment`, and every
-response carries `X-Content-Type-Options: nosniff`. Storage is not a web host:
-an uploaded page rendered on the API origin can read that origin's cookies and
-call its endpoints.
+images, video, audio, `application/pdf` and `text/plain`. Anything else,
+`text/html` included, is served as `application/octet-stream` with
+`Content-Disposition: attachment`, and every response carries
+`X-Content-Type-Options: nosniff`. Storage is not a web host: an uploaded page
+rendered on the API origin can read that origin's cookies and call its
+endpoints.
+
+An SVG is an image that is also a document, and can carry `<script>`. It is
+served as `image/svg+xml` — so it renders in an `<img>` and in the admin
+panel's thumbnails — with
+`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
+on every response, transformed URLs and download-token URLs included. Opened
+directly, it renders with scripts disabled and an opaque origin, so it cannot
+reach the API's cookies or endpoints.
 
 ## TUS Resumable Upload Protocol
 

@@ -20,7 +20,7 @@ import { Hono } from "hono";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
-import { createStorageRoutes, resolveServedContentType } from "../src/storage/routes";
+import { createStorageRoutes, resolveServedContentType, SVG_CONTENT_SECURITY_POLICY } from "../src/storage/routes";
 import { configureJwt } from "../src/auth/jwt";
 
 describe("resolveServedContentType", () => {
@@ -41,8 +41,8 @@ describe("resolveServedContentType", () => {
         "text/html; charset=utf-8",
         "TEXT/HTML",
         "application/xhtml+xml",
-        "image/svg+xml",
-        "image/svg+xml; charset=utf-8",
+        "image/svg",
+        "application/svg+xml",
         "application/javascript",
         "text/xml",
         "application/octet-stream"
@@ -51,6 +51,29 @@ describe("resolveServedContentType", () => {
             contentType: "application/octet-stream",
             attachment: true
         });
+    });
+});
+
+describe("resolveServedContentType — SVG", () => {
+    it.each(["image/svg+xml", "image/svg+xml; charset=utf-8", "IMAGE/SVG+XML"])(
+        "renders %s as an image under a sandboxing policy",
+        (type) => {
+            expect(resolveServedContentType(type)).toEqual({
+                contentType: "image/svg+xml",
+                attachment: false,
+                contentSecurityPolicy: SVG_CONTENT_SECURITY_POLICY
+            });
+        }
+    );
+
+    it("is a policy that disables script and loads nothing", () => {
+        const directives = SVG_CONTENT_SECURITY_POLICY.split(";").map(d => d.trim());
+        expect(directives).toEqual(expect.arrayContaining(["default-src 'none'", "sandbox"]));
+        expect(directives.some(d => d.startsWith("script-src"))).toBe(false);
+    });
+
+    it("leaves every other type without a policy", () => {
+        expect(resolveServedContentType("image/png").contentSecurityPolicy).toBeUndefined();
     });
 });
 
@@ -90,13 +113,15 @@ describe("GET /file/* never serves the uploader's claim as a renderable type", (
         expect(await res.text()).toContain("alert(document.domain)");
     });
 
-    it("serves an uploaded SVG as a download — an SVG is a document that can script", async () => {
+    it("serves an uploaded SVG as an image whose script cannot run — an SVG is a document", async () => {
         await store("public/x.svg", "<svg xmlns='http://www.w3.org/2000/svg'><script/></svg>", "image/svg+xml");
 
         const res = await app.fetch(new Request("http://localhost/api/storage/file/public/x.svg"));
 
-        expect(res.headers.get("Content-Type")).toBe("application/octet-stream");
-        expect(res.headers.get("Content-Disposition")).toBe("attachment");
+        expect(res.headers.get("Content-Type")).toBe("image/svg+xml");
+        expect(res.headers.get("Content-Disposition")).toBeNull();
+        expect(res.headers.get("Content-Security-Policy")).toBe(SVG_CONTENT_SECURITY_POLICY);
+        expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     });
 
     it("still renders an image inline, with nosniff and no forced download", async () => {
