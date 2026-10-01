@@ -89,11 +89,15 @@ export function getPreviewSizeFrom(size: CollectionSize): PreviewSize {
  * stored 15th showed as the 14th west of Greenwich, and a 15th picked east of
  * it was stored as the 14th.
  *
+ * A `columnType: "time"` column holds a time of day with no zone, and travels
+ * as that time on 1970-01-01 UTC, so it is shown in UTC too: in the browser's
+ * zone a stored 09:30 read as 10:30 in Rome.
+ *
  * Any other date is shown in the property's declared `timezone`, or the
  * browser's when it declares none.
  */
 export function getDatePropertyTimezone(property: DateProperty): string | undefined {
-    return property.columnType === "date" ? "UTC" : property.timezone;
+    return property.columnType === "date" || property.columnType === "time" ? "UTC" : property.timezone;
 }
 
 /**

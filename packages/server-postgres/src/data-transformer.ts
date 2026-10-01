@@ -247,6 +247,33 @@ function describeValue(value: unknown): string {
  * string` — no collection, no property, no value, which in the log of a
  * thousand-row import names nothing at all.
  */
+/** `HH:MM[:SS[.fff]]`, the text Postgres reads and writes for a `time` column. */
+const TIME_OF_DAY = /^(\d{2}):(\d{2})(?::(\d{2})(\.\d+)?)?$/;
+
+/**
+ * A `time` column's text as the date it is served as: that time of day, UTC,
+ * on 1970-01-01. `undefined` for text that is not a time of day.
+ */
+function timeOfDayToDate(text: string): Date | undefined {
+    const match = TIME_OF_DAY.exec(text.trim());
+    if (!match) return undefined;
+    const [, hh, mm, ss = "00", fraction = ""] = match;
+    const date = new Date(`1970-01-01T${hh}:${mm}:${ss}${fraction ? fraction.slice(0, 4) : ""}Z`);
+    return isNaN(date.getTime()) ? undefined : date;
+}
+
+/**
+ * What a `time` column is written: the UTC time of day of a date, so neither
+ * the server's zone nor the caller's moves it. Text already shaped as a time of
+ * day is kept as written.
+ */
+function dateToTimeOfDay(value: unknown): unknown {
+    if (typeof value === "string" && TIME_OF_DAY.test(value.trim())) return value.trim();
+    const date = value instanceof Date ? value : typeof value === "string" ? new Date(value) : undefined;
+    if (!date || isNaN(date.getTime())) return value;
+    return date.toISOString().slice(11, 23);
+}
+
 export function serializePropertyToServer(value: unknown, property: Property, propertyKey?: string): unknown {
     if (value === null || value === undefined) {
         return value;
@@ -257,6 +284,9 @@ export function serializePropertyToServer(value: unknown, property: Property, pr
     const propertyType = property.type;
 
     switch (propertyType) {
+        case "date":
+            return property.columnType === "time" ? dateToTimeOfDay(value) : value;
+
         case "relation":
             if (Array.isArray(value)) {
                 return value.map(v => serializePropertyToServer(v, property, propertyKey));
@@ -733,7 +763,12 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
 
         case "date": {
             let date: Date | undefined;
-            if (value instanceof Date) {
+            if (property.columnType === "time" && typeof value === "string") {
+                // A time of day, served like a date-only column: on a fixed
+                // day, in UTC. `new Date("09:30:00")` is Invalid, which read
+                // every time column as null.
+                date = timeOfDayToDate(value);
+            } else if (value instanceof Date) {
                 date = value;
             } else if (typeof value === "string" || typeof value === "number") {
                 const parsedDate = new Date(value);
