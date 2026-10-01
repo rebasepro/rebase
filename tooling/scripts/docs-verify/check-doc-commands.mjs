@@ -25,7 +25,7 @@
  */
 import { readFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
-import { CLI_INVOCATIONS, loadCliCommands, loadCliFlags, loadWorkspaceBins } from "./cli-commands.mjs";
+import { CLI_INVOCATIONS, NPX_LOCAL_ONLY_FLAGS, loadCliCommands, loadCliFlags, loadWorkspaceBins } from "./cli-commands.mjs";
 import { AGENT_INSTRUCTION_GLOBS, PACKAGE_README_GLOBS } from "./extract.mjs";
 
 /**
@@ -606,11 +606,16 @@ export function checkDocCommands(root) {
         }
 
         // 4. A binary name is not a package name.
-        const INSTALLS = /(?:npm\s+(?:install|i|add)|pnpm\s+(?:add|install|dlx)|yarn\s+(?:global\s+)?add|npx|bunx)\s+((?:-{1,2}[\w-]+\s+)*)([@\w][\w@/.-]*)/g;
+        //
+        // Unless the runner cannot reach the registry: `npx --no rebase-mcp`
+        // (or `--no-install`) runs the project's own `@rebasepro/mcp` or fails,
+        // and `pnpm exec rebase-mcp` is not an install shape at all.
+        const INSTALLS = /(npm\s+(?:install|i|add)|pnpm\s+(?:add|install|dlx)|yarn\s+(?:global\s+)?add|npx|bunx)\s+((?:-{1,2}[\w-]+\s+)*)([@\w][\w@/.-]*)/g;
         for (const m of text.matchAll(INSTALLS)) {
-            const pkg = m[2];
+            const [, runner, runnerFlags, pkg] = m;
             const owner = bins.get(pkg);
             if (!owner) continue;
+            if (runner === "npx" && runnerFlags.split(/\s+/).some(flag => NPX_LOCAL_ONLY_FLAGS.has(flag))) continue;
             report(
                 lineAt(text, m.index),
                 `\`${pkg}\` is the *binary* name shipped by \`${owner}\`, not a package on npm — ` +

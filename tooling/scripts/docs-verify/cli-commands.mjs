@@ -302,6 +302,18 @@ export function loadCliFlags(root) {
 }
 
 /**
+ * `npx` flags that make it run only what the project already has installed.
+ *
+ * A bare `npx <bin>` asks the registry for a package *named* `<bin>` when the
+ * project has no such bin — and `rebase-mcp` on npm is somebody else's
+ * package. With `--no` (or its older spelling `--no-install`) npx refuses to
+ * install and fails instead, so it can only ever run the project's own copy:
+ * `npx --no rebase-mcp` is how an npm project starts the `@rebasepro/mcp` it
+ * pinned. `pnpm exec <bin>` never installs at all, so it needs no such flag.
+ */
+export const NPX_LOCAL_ONLY_FLAGS = new Set(["--no", "--no-install"]);
+
+/**
  * Binary names declared by workspace packages, mapped to the package that ships
  * them.
  *

@@ -117,6 +117,7 @@ function fixture(doc) {
         "packages/cli/src/commands/cloud/index.ts": CLOUD,
         "packages/cli/src/commands/telemetry.ts": TELEMETRY,
         "packages/cli/src/commands/dev.ts": DEV,
+        "packages/mcp/package.json": JSON.stringify({ name: "@rebasepro/mcp", bin: { "rebase-mcp": "bin/rebase-mcp.js" } }),
         "tooling/rebase-agent-skills/guide.md": doc
     };
     for (const [file, contents] of Object.entries(files)) {
@@ -188,6 +189,24 @@ test("a fence indented under a list item is read", () => {
         "4: `rebase dev` does not accept `--bogus`",
         "5: `rebase nosuchcommand` is not a CLI command"
     ]);
+});
+
+test("a binary name is refused unless the runner can only run the project's own copy", () => {
+    // `rebase-mcp` is `@rebasepro/mcp`'s binary, and on npm the name belongs
+    // to somebody else. `pnpm exec` never installs, and `npx --no` (or
+    // `--no-install`) refuses to: both run the pinned devDependency or fail.
+    const binary = "`rebase-mcp` is the *binary* name shipped by `@rebasepro/mcp`, not a package on npm";
+    assert.deepEqual(findingsFor(
+        "```bash\n" +
+        "pnpm exec rebase-mcp\n" +
+        "npx --no rebase-mcp\n" +
+        "npx --no-install rebase-mcp\n" +
+        "npx rebase-mcp\n" +
+        "npx -y rebase-mcp\n" +
+        "npm i rebase-mcp\n" +
+        "pnpm add -D @rebasepro/mcp\n" +
+        "```\n"
+    ), [`5: ${binary}`, `6: ${binary}`, `7: ${binary}`]);
 });
 
 test("the real CLI's surface is read the same way", () => {

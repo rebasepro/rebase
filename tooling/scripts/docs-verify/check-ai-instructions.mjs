@@ -29,6 +29,7 @@
 import { readFileSync, globSync } from "node:fs";
 import path from "node:path";
 import { loadSdkExports } from "./sdk-exports.mjs";
+import { NPX_LOCAL_ONLY_FLAGS, loadWorkspaceBins } from "./cli-commands.mjs";
 
 /** Every file that is loaded into a session, or documents one that is. */
 const INSTRUCTION_GLOBS = [
@@ -290,6 +291,46 @@ function checkQuotedPointer(root, findings) {
 /** The default `rebase init` layout — the one every quickstart produces. */
 const SCAFFOLD = "packages/cli/templates/template";
 
+/** The MCP server's package — what `mcpServers.rebase` has to start. */
+const MCP_PACKAGE = "@rebasepro/mcp";
+
+/**
+ * How an MCP server block starts `@rebasepro/mcp`: `"package"` by its package
+ * name, `"bin"` by its binary through a runner that only ever runs the
+ * project's own copy, or `null` when it does neither.
+ *
+ * The binary is `rebase-mcp`, and on npm that name is somebody else's package,
+ * so a block may name it only through a runner that cannot fetch it:
+ * `pnpm exec rebase-mcp` (pnpm's own options may come before `exec`) or
+ * `npx --no rebase-mcp` / `npx --no-install rebase-mcp`. A bare
+ * `npx rebase-mcp`, or `npx -y rebase-mcp`, fetches the stranger's package and
+ * is not a way to start this one.
+ *
+ * @param {{ command?: unknown, args?: unknown } | undefined} server
+ * @param {Iterable<string>} bins the binaries `@rebasepro/mcp` declares
+ * @returns {"package" | "bin" | null}
+ */
+export function mcpLaunchKind(server, bins) {
+    const args = Array.isArray(server?.args) ? server.args.filter(a => typeof a === "string") : [];
+    if (args.includes(MCP_PACKAGE)) return "package";
+    const binNames = new Set(bins);
+    if (server?.command === "pnpm") {
+        const at = args.indexOf("exec");
+        return at !== -1 && binNames.has(args[at + 1]) ? "bin" : null;
+    }
+    if (server?.command === "npx") {
+        const at = args.findIndex(a => !a.startsWith("-"));
+        if (at === -1 || !binNames.has(args[at])) return null;
+        return args.slice(0, at).some(flag => NPX_LOCAL_ONLY_FLAGS.has(flag)) ? "bin" : null;
+    }
+    return null;
+}
+
+/** Whether a `package.json` declares `name` as a dependency of any kind it installs. */
+function declaresDependency(manifest, name) {
+    return ["dependencies", "devDependencies"].some(field => typeof manifest?.[field]?.[name] === "string");
+}
+
 /**
  * What a fresh scaffold hands its assistant: the run scripts, and the MCP block.
  *
@@ -308,12 +349,13 @@ function checkScaffold(root, findings) {
         return;
     }
 
-    let scripts = {};
+    let manifest = {};
     try {
-        scripts = JSON.parse(readFileSync(path.join(root, SCAFFOLD, "package.json"), "utf8")).scripts ?? {};
+        manifest = JSON.parse(readFileSync(path.join(root, SCAFFOLD, "package.json"), "utf8")) ?? {};
     } catch {
         /* the template package.json is checked elsewhere */
     }
+    const scripts = manifest.scripts ?? {};
     for (const name of Object.keys(scripts)) {
         if (text.includes(`\`pnpm ${name}\``) || text.includes(`\`${name}\``)) continue;
         findings.push({
@@ -337,12 +379,26 @@ function checkScaffold(root, findings) {
         });
         return;
     }
-    const args = mcp?.mcpServers?.rebase?.args ?? [];
-    if (!args.includes("@rebasepro/mcp")) {
+    const server = mcp?.mcpServers?.rebase;
+    const mcpBins = [...loadWorkspaceBins(root)].filter(([, owner]) => owner === MCP_PACKAGE).map(([bin]) => bin);
+    const launch = mcpLaunchKind(server, mcpBins);
+    if (launch === null) {
         findings.push({
             file: `${SCAFFOLD}/.mcp.json`,
             line: 0,
-            message: `\`mcpServers.rebase\` does not run \`@rebasepro/mcp\` (args: ${JSON.stringify(args)})`
+            message:
+                `\`mcpServers.rebase\` does not run \`${MCP_PACKAGE}\` ` +
+                `(command: ${JSON.stringify(server?.command)}, args: ${JSON.stringify(server?.args ?? [])})`
+        });
+    } else if (launch === "bin" && !declaresDependency(manifest, MCP_PACKAGE)) {
+        // `pnpm exec rebase-mcp` runs what `node_modules/.bin` holds, so the
+        // block is only the project's own server if the project depends on it.
+        findings.push({
+            file: `${SCAFFOLD}/package.json`,
+            line: 0,
+            message:
+                `\`.mcp.json\` starts the MCP server by its binary, and this does not declare \`${MCP_PACKAGE}\` — ` +
+                "a fresh project would have nothing for the runner to start."
         });
     }
 
