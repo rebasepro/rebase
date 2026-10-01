@@ -72,6 +72,8 @@ While `rebase dev` is running you do not need to: it regenerates the types in
 `generated/sdk/` on start and on every save under `config/collections/`. Run the
 command yourself in CI, in a frontend repository that has no collections
 (`rebase generate-sdk --from link`), or anywhere `rebase dev` is not running.
+<span class="since-badge" data-since="0.24">Since 0.24</span> for the regeneration: on 0.23, `rebase dev` leaves the SDK types alone, so run
+the command after every collection change.
 
 Then pass the `Database` type parameter to `createRebaseClient` for full autocomplete:
 
@@ -98,7 +100,7 @@ When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientR
 
 A property key *you* wrote is your key, whatever its shape — nothing renames a name you chose. The two keys that are derived rather than declared, a relation's foreign key and a column read back by introspection, are camelCase.
 
-`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. Nullable columns are `T | null` on `Row`, the primary key is always present on a read and never settable on an update, and a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`).
+`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. A column that is not required is `T | null` on all three, so a write can clear it; the primary key is always present on a read and never settable on an update; a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`); and a `hasMany` or `manyToMany` membership is written as a list of target ids or `{ id }` objects (`{ tags: ["t-1"] }`), each carrying a `_pivot` when the junction declares payload columns. A field nobody may write (`access: { write: [] }`) is on neither `Insert` nor `Update`.
 
 ## Quick Example
 

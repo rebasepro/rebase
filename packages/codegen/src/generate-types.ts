@@ -198,7 +198,11 @@ function includedRelationType(
     const rowType = accessor
         ? `Database[${emitString(accessor)}]["Row"]`
         : "Record<string, unknown>";
-    return relation.cardinality === "many" ? `Array<${rowType}>` : rowType;
+    // A read of a many-to-many whose junction carries columns serves them on
+    // each target as `_pivot` — see `ManyToManyRelation.through.properties`.
+    const pivot = relation.kind === "manyToMany" ? pivotType(relation.through.properties, "read") : undefined;
+    const elementType = pivot ? `${rowType} & { _pivot?: ${pivot} }` : rowType;
+    return relation.cardinality === "many" ? `Array<${elementType}>` : elementType;
 }
 
 /**
@@ -739,4 +743,38 @@ function emitWritableRelations(
         const relation = findRelation(resolvedRelations, key);
         if (relation?.kind === "belongsTo" && relation.localKey) emit(key, relation);
     }
+
+    // A to-many membership: `hasMany` (the targets' foreign key is pointed at
+    // this row) and `manyToMany` (junction rows). The server writes both on a
+    // create and an update — bare keys, or `{ id }`, or `{ id, _pivot }` where
+    // the junction declares payload columns — but only `belongsTo` was
+    // emitted, so the field a read returns could not be written back. A `via`
+    // is read-only (`writable: false`), and stays off.
+    for (const [key, relation] of Object.entries(resolvedRelations)) {
+        if (relation.cardinality !== "many" || !relation.writable) continue;
+        if (emittedKeys.has(key)) continue;
+        const fk = foreignKeyType(relation);
+        const pivot = relation.kind === "manyToMany" ? pivotType(relation.through.properties, "write") : undefined;
+        const element = `${fk} | { id: ${fk}${pivot ? `; _pivot?: ${pivot}` : ""} }`;
+        lines.push(line(key, `Array<${element}>`, true));
+        emittedKeys.add(key);
+    }
+}
+
+/**
+ * The `_pivot` a many-to-many link carries: the junction's payload columns,
+ * typed as a row's columns are on a read and as a write's on a write. `undefined`
+ * when the junction declares none, so there is no `_pivot` to name.
+ */
+function pivotType(pivotProperties: Properties, direction: "read" | "write"): string | undefined {
+    const entries = Object.entries(pivotProperties);
+    if (entries.length === 0) return undefined;
+    const fields = entries.map(([key, rawProp]) => {
+        const prop = rawProp as Property;
+        const tsType = propertyToTypeScriptType(prop);
+        const required = Boolean(prop.validation?.required);
+        const type = direction === "write" ? writableType(prop, tsType) : (required ? tsType : `${tsType} | null`);
+        return `${emitKey(key)}${required && direction === "read" ? "" : "?"}: ${type};`;
+    });
+    return `{ ${fields.join(" ")} }`;
 }

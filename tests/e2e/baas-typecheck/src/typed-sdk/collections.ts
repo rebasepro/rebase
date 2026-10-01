@@ -62,7 +62,15 @@ export const posts = defineCollection({
             type: "relation",
             relation: { kind: "belongsTo", target: (): AnyCollectionConfig => authors, localKey: "author_id" }
         },
-        tags: { name: "Tags", type: "relation", relation: { kind: "manyToMany", target: () => tags } }
+        tags: {
+            name: "Tags",
+            type: "relation",
+            relation: {
+                kind: "manyToMany",
+                target: () => tags,
+                through: { properties: { position: { name: "Position", type: "number" } } }
+            }
+        }
     }
 });
 

@@ -18,11 +18,13 @@ export interface Database {
       name: string;
       salary?: number | null;
       createdAt?: string | null;
+      posts?: Array<string | { id: string }>;
     };
     Update: {
       name?: string;
       salary?: number | null;
       createdAt?: string | null;
+      posts?: Array<string | { id: string }>;
     };
     Relations: {
       posts: "posts";
@@ -73,7 +75,7 @@ export interface Database {
       publishedAt?: string | null;
       authorId?: number | null;
       author?: Database["authors"]["Row"];
-      tags?: Array<Database["tags"]["Row"]>;
+      tags?: Array<Database["tags"]["Row"] & { _pivot?: { position?: number | null; } }>;
     };
     Insert: {
       id?: string;
@@ -86,6 +88,7 @@ export interface Database {
       publishedAt?: string | null;
       authorId?: number | null;
       author?: number | null;
+      tags?: Array<string | { id: string; _pivot?: { position?: number | null; } }>;
     };
     Update: {
       title?: string;
@@ -97,6 +100,7 @@ export interface Database {
       publishedAt?: string | null;
       authorId?: number | null;
       author?: number | null;
+      tags?: Array<string | { id: string; _pivot?: { position?: number | null; } }>;
     };
     Relations: {
       author: "authors";

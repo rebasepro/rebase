@@ -92,3 +92,18 @@ export async function nullableProbes(): Promise<void> {
     // @ts-expect-error — nor can an update clear it
     await posts.update("p1", { title: null });
 }
+
+/** SDK-7: the to-many relations the server writes are writable, with their junction payload. */
+export async function toManyWriteProbes(): Promise<number | null | undefined> {
+    await posts.create({ title: "t", tags: ["tag-uuid"] });
+    await posts.update("p1", { tags: [{ id: "tag-uuid" }] });
+    await posts.update("p1", { tags: [{ id: "tag-uuid", _pivot: { position: 2 } }] });
+    await client.data.authors.update(1, { posts: ["p1"] });
+    // @ts-expect-error — a tag's id is a string
+    await posts.create({ title: "t", tags: [1] });
+    // @ts-expect-error — not a column of the junction
+    await posts.update("p1", { tags: [{ id: "tag-uuid", _pivot: { positon: 2 } }] });
+    // A read serves the payload on each target.
+    const { data } = await posts.find({ include: ["tags"] });
+    return data[0]?.tags?.[0]?._pivot?.position;
+}
