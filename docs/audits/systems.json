@@ -1,0 +1,331 @@
+{
+  "$comment": [
+    "The audit queue. Every system of the OSS platform, the code that belongs to it, and when it was last audited end to end.",
+    "`pnpm audit:queue` ranks the systems by what changed in their paths since their last audit; the nightly audit routine takes the top one.",
+    "`pnpm check:audit-coverage` fails when a source file under packages/*/src belongs to no system and is not listed in `unowned` — so new code enters the queue the day it lands.",
+    "Paths are git pathspecs (`:(glob)` magic is added by the scripts). A file may belong to several systems.",
+    "How an audit is run: docs/audits/CHARTER.md. The per-unit question bank: docs/audits/audit-map.md."
+  ],
+  "systems": [
+    {
+      "id": "data-doors",
+      "title": "Data API across its doors",
+      "paths": [
+        "packages/server/src/api/rest/**",
+        "packages/server/src/api/errors.ts",
+        "packages/server/src/api/index.ts",
+        "packages/server/src/api/mount.ts",
+        "packages/server/src/api/openapi-generator.ts",
+        "packages/server/src/api/root-error-handler.ts",
+        "packages/server/src/api/types.ts",
+        "packages/server/src/api/contract-routes.ts",
+        "packages/server-postgres/src/PostgresBackendDriver.ts",
+        "packages/server-postgres/src/PostgresAdapter.ts",
+        "packages/server-postgres/src/data-transformer.ts",
+        "packages/server-postgres/src/services/*.ts",
+        "packages/server-postgres/src/utils/**",
+        "packages/common/src/data/**",
+        "packages/common/src/util/**",
+        "packages/common/src/collections/**",
+        "packages/common/src/index.ts",
+        "packages/common/src/table-classification.ts",
+        "packages/client/src/collection.ts",
+        "packages/client/src/query_builder.ts",
+        "packages/client/src/sdk_query_builder.ts",
+        "packages/client/src/reviver.ts",
+        "packages/server/src/services/driver-registry.ts",
+        "packages/server/src/db/**"
+      ],
+      "focus": "One operation set (find/list/get/count/aggregate/create/update/upsert/delete/batch/bulk, field operators, soft delete/restore, nested paths, keyset pagination, vector and full-text search) reached through five doors: REST, the SDK, websocket frames, MCP tools and the Postgres driver. Build the operation x door matrix and find every cell where a door disagrees: validation, required fields, defaults, coercion, hooks, history, error code/shape/status, pagination meta, missing-row and unknown-field behaviour. Check the query contract per operator per property type: the parser accepts what the builder emits, unsupported operators 400 rather than widen."
+    },
+    {
+      "id": "schema-pipeline",
+      "title": "Collection definition to database",
+      "paths": [
+        "packages/server/src/collections/**",
+        "packages/server/src/boot/**",
+        "packages/server-postgres/src/schema/**",
+        "packages/server-postgres/src/collections/**",
+        "packages/server-postgres/src/cli*.ts",
+        "packages/server-postgres/src/generated-sql.ts",
+        "packages/server-postgres/src/branch-*.ts",
+        "packages/server-postgres/src/PostgresBootstrapper.ts",
+        "packages/server/src/api/schema-drift.ts",
+        "packages/cms-types/src/**",
+        "packages/types/src/**"
+      ],
+      "focus": "defineCollection -> validate-config -> schema generate -> db generate/push/migrations -> boot ensure -> introspection/db pull -> doctor. Every property type x relation kind (belongsTo, hasOne, hasMany, manyToMany, via) x stage: do the stages agree? Round-trip fidelity (introspect -> generate -> introspect), renames and retypes, enums, indexes, generated columns, defaults, NOT NULL on a table with rows, composite keys, reserved words, identifiers over 63 chars, irregular plurals. db push on a database aged by an older version. Does the destructive gate catch every destructive op? Does validate-config reject the mistakes agents actually make with an actionable message?"
+    },
+    {
+      "id": "studio-schema-edit",
+      "title": "Studio and live schema editing",
+      "paths": [
+        "packages/studio/src/**",
+        "packages/cms/src/collection_editor/**",
+        "packages/cms/src/collection_editor_ui.ts",
+        "packages/server/src/schema-edit/**",
+        "packages/server/src/api/ast-schema-editor.ts",
+        "packages/server/src/api/live-schema-routes.ts",
+        "packages/server/src/api/schema-editor-routes.ts",
+        "packages/server/src/api/logs-routes.ts"
+      ],
+      "focus": "Every edit the UI can express (add/rename/delete/retype a property, add each relation kind, change enum values, rename a collection) must leave source code AND database agreeing, on a fresh DB and one with rows. An edit that cannot be applied must say so truthfully and leave no half state. Two tabs editing one collection. SQL console: session/role isolation, result editing, huge results, cancel. Storage browser, logs, cron and functions views. Screens built from @rebasepro/ui and consistent with UIReferenceView."
+    },
+    {
+      "id": "identity",
+      "title": "Identity and auth flows",
+      "paths": [
+        "packages/server/src/auth/**",
+        "packages/server-postgres/src/auth/**",
+        "packages/client/src/auth.ts",
+        "packages/app/src/auth/**",
+        "packages/app/src/components/LoginView/**",
+        "packages/app/src/components/RebaseAuth.tsx",
+        "packages/app/src/components/UserSettingsView.tsx"
+      ],
+      "focus": "Who someone is (authorization is the permissions system). The whole lifecycle through every door: sign up (password, each OAuth provider, magic link, guest), verify email, sign in, refresh, multiple devices, sign out here/everywhere, change password, change email, forgot password, MFA enrol/challenge/recovery, link/unlink identity, admin invite, admin disable/delete — what happens to sessions, refresh tokens, sockets, API keys and owned rows. Emails sent and their links behind a proxy or base path. Token lifetimes, rotation, reuse detection, cookie flags, clock skew, enumeration. Gaps against Supabase Auth / Firebase Auth that a user hits in week one."
+    },
+    {
+      "id": "permissions",
+      "title": "Authorization: roles, scopes, RLS, API keys",
+      "paths": [
+        "packages/server-postgres/src/security/**",
+        "packages/server/src/rls-audit/**",
+        "packages/server/src/auth/api-keys/**",
+        "packages/server/src/auth/require-auth.ts",
+        "packages/server/src/auth/middleware.ts",
+        "packages/server/src/auth/rls-scope.ts",
+        "packages/server/src/auth/admin-roles-route.ts",
+        "packages/common/src/util/permissions.ts",
+        "packages/common/src/util/policy/**",
+        "packages/common/src/util/auth-default-policies.ts",
+        "packages/common/src/util/junction-policies.ts",
+        "packages/common/src/collections/field-access.ts",
+        "packages/server-postgres/src/services/read-scope.ts",
+        "packages/server-postgres/src/services/read-field-access.ts",
+        "packages/server-postgres/src/services/write-denial.ts",
+        "packages/client/src/api-keys.ts",
+        "packages/rls-check/src/**"
+      ],
+      "focus": "Who may do what, on every door. One vocabulary for roles, scopes and policies; the same decision on REST, SDK, socket (lists, single rows, subscriptions, re-fetches), MCP, CMS, Studio, storage, functions and API keys; every decision function behind each door tested separately. RLS generation and drift, field-level read/write access, guests and anonymous identity, the bootstrap window, privilege escalation through role or user writes."
+    },
+    {
+      "id": "realtime-offline",
+      "title": "Realtime, channels and offline sync",
+      "paths": [
+        "packages/server-postgres/src/websocket.ts",
+        "packages/server-postgres/src/services/cdc/**",
+        "packages/server-postgres/src/services/channel-bus/**",
+        "packages/server-postgres/src/services/channel-*.ts",
+        "packages/server-postgres/src/services/realtimeService.ts",
+        "packages/server-postgres/src/services/pg-notify-listener.ts",
+        "packages/server/src/services/routed-realtime-service.ts",
+        "packages/server/src/topics/**",
+        "packages/client/src/websocket.ts",
+        "packages/client/src/realtime-channel.ts",
+        "packages/client/src/offline*.ts"
+      ],
+      "focus": "Subscribe, then write from each door (REST, SDK, socket, MCP, CMS, raw SQL, a callback's dataAsAdmin, a cron job): does every subscriber get exactly one correct event? Reconnect after a network drop, a server restart, LISTEN loss; two instances with and without the bus; filtered/ordered/limited subscriptions as rows move in and out of the window; deletes, soft deletes, relation changes; a 10k burst. Offline: replay order, conflicts, schema change while offline, IDB eviction, two tabs. What does a developer see when realtime is silently dead?"
+    },
+    {
+      "id": "storage",
+      "title": "Files and storage",
+      "paths": [
+        "packages/server/src/storage/**",
+        "packages/server/src/init/storage.ts",
+        "packages/client/src/storage.ts",
+        "packages/client/src/storage-registry.ts",
+        "packages/utils/src/storage.ts",
+        "packages/common/src/util/storage.ts"
+      ],
+      "focus": "Local, S3 and GCS controllers implement one interface: list/get/delete/copy/move/metadata/errors/content-type/streaming must agree. Orphans when a row is deleted, a field cleared or a file replaced. Uploads: size limits, content-type sniffing, SVG/HTML stored XSS, path canonicalisation, unicode names, multi-GB files, an interrupted tus upload resumed after restart, two instances. Image transforms: params, decompression bombs, cache. Signed URLs. Multi-source topology and a missing env for a declared source. CMS storage fields' upload/replace/delete UX."
+    },
+    {
+      "id": "server-logic",
+      "title": "Callbacks, functions, cron, jobs, webhooks, email, history",
+      "paths": [
+        "packages/server/src/functions/**",
+        "packages/server/src/cron/**",
+        "packages/server/src/jobs/**",
+        "packages/server/src/queues/**",
+        "packages/server/src/email/**",
+        "packages/server/src/history/**",
+        "packages/server/src/services/webhook-service.ts",
+        "packages/server/src/services/outbound-url-guard.ts",
+        "packages/server/src/init/callback-client.ts",
+        "packages/server/src/init/global-callbacks.ts",
+        "packages/server-postgres/src/history/**",
+        "packages/common/src/util/callbacks.ts",
+        "packages/common/src/util/callback-errors.ts",
+        "packages/client/src/functions.ts",
+        "packages/client/src/cron.ts"
+      ],
+      "focus": "One write -> which hooks run, in what order, inside or outside the transaction, through each door (REST, batch, socket, MCP, CMS, nested path, upsert, bulk). Hooks that throw, are slow, write elsewhere or re-enter. Functions: auth defaults, body limits, timeout, errors to the client, dev reload, a syntax error at boot. Cron: missed ticks, overlap across instances, DST, a job removed from code, manual trigger. Jobs: visibility timeout, retries, poison messages, duplicates, shutdown mid-job. Webhooks: signing, retries, SSRF, redirects. Email: SMTP down must not answer 200 for work not done; template injection."
+    },
+    {
+      "id": "cli-journey",
+      "title": "The CLI, as a newcomer lives it",
+      "paths": [
+        "packages/cli/src/**",
+        "packages/cli/templates/**",
+        "packages/cli/bin/**"
+      ],
+      "focus": "Run it for real in a scratch directory: init every template non-interactively, dev (PGlite), edit a collection, db generate/push, generate sdk, build, start, doctor on a healthy and a broken project, upgrade, apps, skills. Every moment a newcomer is stuck or lied to: success printed for nothing done, an error naming the wrong cause, a printed next step that fails, a prompt without a flag, JSON mode printing prose, help text that disagrees with behaviour, port collisions, no Postgres, Ctrl-C mid-command, init re-run in an existing project."
+    },
+    {
+      "id": "cms-views",
+      "title": "CMS browsing: views, navigation, routing",
+      "paths": [
+        "packages/ui/src/views/**",
+        "packages/cms/src/components/**",
+        "packages/cms/src/routes/**",
+        "packages/cms/src/selection/**",
+        "packages/cms/src/hooks/**",
+        "packages/cms/src/contexts/**",
+        "packages/cms/src/preview/**",
+        "packages/cms/src/util/**",
+        "packages/cms/src/types/**",
+        "packages/cms/src/index.ts",
+        "packages/app/src/core/**",
+        "packages/app/src/components/**",
+        "packages/app/src/contexts/**",
+        "packages/app/src/hooks/**",
+        "packages/app/src/collections/**",
+        "packages/app/src/internal/**",
+        "packages/app/src/util/**",
+        "packages/app/src/i18n/**",
+        "packages/app/src/locales/**",
+        "packages/app/src/index.ts",
+        "packages/app/src/vitePlugin.ts"
+      ],
+      "focus": "A CMS user's first hour: a 100k-row collection (speed, count, scroll), a filter on every property type, sorting by a relation, empty search, a row deleted by someone else while open, a failed load that must not look like 'no data', URL state across reload, deep links into nested collections, selection and bulk actions, side panels and full-screen records, back/forward. Equivalent controls built the same way across table/list/kanban/card. Anything built from raw HTML instead of @rebasepro/ui. i18n and dark mode of these screens."
+    },
+    {
+      "id": "cms-forms",
+      "title": "CMS editing: forms, fields, import and export",
+      "paths": [
+        "packages/cms/src/form/**",
+        "packages/cms/src/editor/**",
+        "packages/cms/src/data_import/**",
+        "packages/cms/src/data_export/**",
+        "packages/cms/src/components/field_configs.tsx",
+        "packages/cms/src/components/ReferenceWidget.tsx",
+        "packages/cms/src/components/RelationSelector.tsx",
+        "packages/cms/src/components/UserSelector.tsx",
+        "packages/cms/src/components/ArrayContainer.tsx",
+        "packages/forms/src/**"
+      ],
+      "focus": "For every property type: a value typed in the form reaches the database unchanged and comes back unchanged — null vs empty vs missing, 0, false, dates across DST and timezones, map sub-keys, reordered arrays, required fields. Client validation rejects what the server rejects and accepts what it accepts. A server-side save failure shows a field error, not a generic toast. Dirty tracking, discard, unsaved-changes navigation, someone else saved first, inline cell edit vs form. Export -> edit -> import round trip on every type; CSV injection; a relation picker over 100k rows."
+    },
+    {
+      "id": "ui-kit",
+      "title": "The @rebasepro/ui kit",
+      "paths": [
+        "packages/ui/src/components/**",
+        "packages/ui/src/hooks/**",
+        "packages/ui/src/icons/**",
+        "packages/ui/src/util/**",
+        "packages/ui/src/scripts/**",
+        "packages/ui/src/*.css",
+        "packages/ui/src/*.ts",
+        "packages/app/src/debug/**"
+      ],
+      "focus": "Accessibility of every interactive primitive (focus trap and return, roles, keyboard, labels, focus ring). Controlled/uncontrolled and prop naming consistent across inputs. Overlay stacking: portals, z-index, scroll lock, nested dialogs. Dark mode and tokens vs hard-coded colours. Raw <button>/<input>/<select> and local re-implementations in CMS/Studio/app instead of the kit. UIReferenceView shows every component and variant actually used. VirtualTable at 100k rows."
+    },
+    {
+      "id": "sdk-types",
+      "title": "Client SDK, codegen and the typed contract",
+      "paths": [
+        "packages/client/src/**",
+        "packages/codegen/src/**",
+        "packages/types/src/**",
+        "packages/cms-types/src/**",
+        "packages/utils/src/**",
+        "packages/common/src/**",
+        "contracts/**"
+      ],
+      "focus": "The types reject what the server rejects and accept what it accepts — prove with negative tsc probes (nonexistent column in where/orderBy/select, wrong value type per operator, nonexistent include, writing a generated field, defineCollection admin keys naming nonexistent properties); hunt dropped type parameters at seams. The generated SDK compiles and matches the server for every property type and relation kind; regeneration is idempotent. Transport on network error, 401 mid-session, 413, 429, non-JSON 500, sub-path servers; stable error classes and codes. Exports coherent; Node, browser and edge runtimes as claimed."
+    },
+    {
+      "id": "server-ops",
+      "title": "Running a server: boot, config, hosting, operations",
+      "paths": [
+        "packages/server/src/env.ts",
+        "packages/server/src/init.ts",
+        "packages/server/src/init/**",
+        "packages/server/src/index.ts",
+        "packages/server/src/singleton.ts",
+        "packages/server/src/serve-spa.ts",
+        "packages/server/src/dev-secrets.ts",
+        "packages/server/src/metrics/**",
+        "packages/server/src/utils/**",
+        "packages/server/src/types/**",
+        "packages/server/src/deploy/**",
+        "packages/server/src/backup/**",
+        "packages/server-postgres/src/backup/**",
+        "packages/server-postgres/src/backup-argv.ts",
+        "packages/server-postgres/src/connection.ts",
+        "packages/server-postgres/src/databasePoolManager.ts",
+        "packages/server-postgres/src/module-dir.ts",
+        "packages/server-postgres/src/index.ts",
+        "packages/server-postgres/src/interfaces.ts",
+        "packages/server-postgres/src/types.ts",
+        "packages/server/src/api/collections_for_test/**"
+      ],
+      "focus": "Missing or invalid env fails closed at boot with an actionable message. Two instances behind a load balancer: what is per-instance that must be shared. SIGTERM mid-request, mid-job, mid-migration. Pool exhaustion. PII and secrets in logs and error bodies; stack traces in production. Static and host-routed apps: traversal, Host spoofing, SPA fallback swallowing API 404s, cache headers, collisions with /api. Rate limiting and trusted proxies, CORS, security headers, body limits and Hono middleware order. Backups and PITR restore for real. Booting an older stamped schema."
+    },
+    {
+      "id": "docs-truth",
+      "title": "Docs, examples and agent skills against the code",
+      "paths": [
+        "website/src/content/docs/docs/**",
+        "packages/*/README.md",
+        "examples/**",
+        "tooling/rebase-agent-skills/**",
+        "app/**"
+      ],
+      "focus": "Everything `pnpm verify:docs` cannot see: prose claims, stated defaults and limits, described behaviour, the getting-started path followed literally with the real CLI, examples building against the current version, agent skills describing removed or renamed APIs, pages that contradict each other. For each false claim decide whether the doc or the code is wrong. English pages only."
+    },
+    {
+      "id": "gates",
+      "title": "Tests and CI gates",
+      "paths": [
+        ".github/**",
+        "tooling/scripts/**",
+        "tests/**",
+        "**/jest.config.*",
+        "**/vitest.config.*",
+        "**/playwright.config.*",
+        "tsconfig*.json",
+        "eslint.config.mjs",
+        "docs/gates.md",
+        "docs/verification.md"
+      ],
+      "focus": "Which gates actually run, on which event, and which can pass silently (|| true, a skip reported green, continue-on-error, an early exit skipping later steps, a glob matching nothing). Test files no runner or tsc program picks up. Ratchets that only grow. Recent regression tests that pass with their fix reverted — mutation-check a sample. Systems with no test through the real wiring. Order- and TZ-dependent tests. Output: the missing guards that would stop whole bug classes."
+    },
+    {
+      "id": "ai-and-extras",
+      "title": "MCP server, AI and insights plugins, inference, rls-check",
+      "paths": [
+        "packages/mcp/src/**",
+        "packages/server/src/mcp/**",
+        "packages/plugin-ai/src/**",
+        "packages/plugin-insights/src/**",
+        "packages/inference/src/**",
+        "packages/rls-check/src/**",
+        "packages/cli/src/commands/agent-setup.ts"
+      ],
+      "focus": "Could an LLM complete common tasks from the MCP tool descriptions alone? Every MCP tool behaves like the REST door for the same operation. Prompt injection through row data into plugin-ai or MCP output. Inference on messy real-world CSV/JSON. rls-check against a live database with broken and correct policies: false positives and negatives. The agent setup rebase init writes: current, and safe to re-run over user edits."
+    }
+  ],
+  "unowned": [
+    {
+      "path": "packages/server-mongo/**",
+      "why": "Mongo is out of scope until it is asked for again; its open findings are listed in docs/bug-classes.md."
+    },
+    {
+      "path": "packages/firebase/**",
+      "why": "Legacy compatibility package with no new surface; audited 2026-08-08 (audit-map unit 44)."
+    }
+  ]
+}

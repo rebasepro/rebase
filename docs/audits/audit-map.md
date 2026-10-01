@@ -5,6 +5,12 @@ sitting, one scope, one write-up. The point is not "audit the codebase"; that
 produces a shallow pass over everything. The point is that each entry below has its
 own failure modes, its own reviewers' questions, and can be declared done.
 
+**This map is the question bank, not the queue.** What gets audited next is decided by
+[`systems.json`](systems.json) — seventeen systems, each owning its paths — and
+`pnpm audit:queue`, which ranks them by what changed since each was last audited.
+[`CHARTER.md`](CHARTER.md) is how one is audited. The units below are the detailed
+questions an auditor of the matching system starts from.
+
 Status legend:
 
 - **done ‹date›** — a written audit exists; findings tracked or fixed.

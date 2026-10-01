@@ -350,6 +350,16 @@ test, so nothing said so. This holds uniqueness and contiguity: a gap means
 an entry was deleted, and a deleted class is a sweep nobody runs again.`
     },
     {
+        run: "check:audit-coverage",
+        why: `Every source file under packages/*/src belongs to a system in
+docs/audits/systems.json, and every path a system names still matches a file.
+Audits used to happen when someone thought to ask, scoped to what they asked
+about, and each one found what the sweeps before it had walked past. The queue
+(\`pnpm audit:queue\`) ranks systems by what changed since their last audit;
+this keeps the queue complete — a new directory fails here until it is
+assigned, so new code enters the queue the day it lands.`
+    },
+    {
         run: "check:untranslated",
         why: `The admin ships seven non-English locales and 200-odd strings that have
 a translation key are also written out as English literals, where no
