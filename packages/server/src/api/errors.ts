@@ -456,6 +456,22 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         } satisfies ErrorResponse, answer.status as ContentfulStatusCode);
     }
 
+    // A body that is not JSON, read with `c.req.json()` — every auth and admin
+    // route reads its body that way. It threw a bare `SyntaxError`, which
+    // landed here as a 500 logged with a stack: a server fault for the
+    // caller's typo, where the data API (which parses its own body) answered
+    // 400. Mapped once, here, rather than at each of forty call sites.
+    if (err instanceof SyntaxError && /JSON/i.test(err.message)) {
+        handOffToRequestLog(c, "INVALID_JSON", "Invalid JSON body");
+        return c.json({
+            error: {
+                message: "Invalid JSON body",
+                code: "INVALID_JSON",
+                ...(reqId && { requestId: reqId })
+            }
+        } satisfies ErrorResponse, 400);
+    }
+
     let statusCode = error.statusCode || codeToStatus(error.code) || 500;
     let code = error.code || "INTERNAL_ERROR";
 
