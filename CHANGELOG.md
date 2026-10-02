@@ -94,6 +94,41 @@
   could hold two copies that disagreed. `SchemaCommitPaths` and
   `DEFAULT_COMMIT_PATHS` now hold only `schemaFile`.
 
+#### Auth
+
+- **An open realtime socket is re-checked, and closed when its identity has
+  ended.** Before each frame, every 30 seconds for a socket that only listens,
+  and when its token expires, the socket asks whether the account still
+  exists, is still signed in and still has its roles. An ended identity gets
+  `AUTH_ERROR` (`SESSION_ENDED` or `TOKEN_EXPIRED`) and close code 4001, and a
+  changed role re-scopes its subscriptions. The SDK reconnects with a fresh
+  token on its own; a client speaking the socket protocol directly must send a
+  fresh token in `AUTHENTICATE` before the old one expires.
+
+- **Following an email-verification link proves the address, and nothing
+  else.** Without a live session of the account or its password, the link now
+  removes the password and any identity nobody proved, and ends every
+  session, as magic links, email codes and password resets already did. This
+  closes an account pre-hijack (see Security). `client.auth.verifyEmail(token,
+  options?)` now POSTs, sends the session when signed in, and may throw
+  `PROOF_REQUIRED`: pass `{ password }` to keep the password, or
+  `{ removeUnproven: true }`.
+
+- **`client.auth.signUp` resolves `{ confirmationRequired, user | null, … }`**,
+  because with `requireEmailVerification` on there is no session until the
+  address is confirmed.
+
+- **`mfa.enroll().recoveryCodes` is `null` when adding a second factor.** The
+  codes are made once, with the first factor; `mfa.regenerateRecoveryCodes()`
+  replaces them on request.
+
+- **`/auth/anonymous/link` and linking a provider to a guest need
+  registration open** (`allowRegistration`), since both turn a guest into an
+  account.
+
+- **A deleted account's token answers 401 `SESSION_REVOKED`** on every door
+  (`/me` used to answer 404).
+
 ### Added
 
 #### CLI
@@ -174,6 +209,52 @@
   in words what the key will be able to do. A *My keys* tab manages your
   personal keys when the backend enables them.
 
+#### Auth
+
+- **`sid` and `exp` on access tokens**, and `isCurrentSession` in the
+  sessions list. Signing one device out now ends that device's access token
+  too.
+- **`auth.requireEmailVerification`** (`AUTH_REQUIRE_EMAIL_VERIFICATION`, off
+  by default): registration sends a confirmation and password sign-in answers
+  `403 EMAIL_NOT_CONFIRMED` until the address is verified; `/register` then
+  no longer says whether an address has an account. Registration now mails
+  the verification link either way; `POST /auth/verify-email` is the new
+  door the SDK uses.
+- **`auth.refreshTokenReuse`** (`"reject"`, the default and today's
+  behaviour, or `"revoke-session"`) and `auth.refreshTokenReuseIntervalSeconds`.
+- **`auth.magicLinkCreatesUsers`** (`AUTH_MAGIC_LINK_CREATES_USERS`, off by
+  default): magic links and email codes may create the account, under the
+  registration policy.
+- **Disabling an account**: `PUT /admin/users/:uid { disabled }`,
+  `admin.updateUser({ disabled })`, answered with `ACCOUNT_DISABLED`; stored in
+  the new `users.disabled_at` column, which `db push` plans.
+- **Admin MFA reset and new recovery codes**: `DELETE /admin/users/:uid/mfa`
+  (`users:write`, never on an account that outranks the caller; it ends the
+  user's sessions), `client.admin.resetMfa(uid)`, and
+  `POST /auth/mfa/recovery-codes` / `mfa.regenerateRecoveryCodes()`.
+- **`RealtimeSocketOptions.identityRecheckIntervalMs`** (default 30000).
+
+### Changed
+
+#### Auth
+
+- `change-password` answers with a fresh session, which the SDK adopts, so
+  the CMS stays signed in after a password change.
+- Linking a provider to a guest turns it into an account, with the
+  registration policy and hooks.
+- A refusing auth hook answers 400 `HOOK_REJECTED` (or the 4xx its error
+  carries) instead of 500; malformed JSON on an auth or admin route is 400
+  `INVALID_JSON`.
+- `onAuthenticated` also fires for OAuth, refresh, password reset and MFA;
+  `beforeLogin("oauth")` and `beforeUserCreate` run on OAuth sign-in and
+  sign-up; `afterLogout` fires for SDK and CMS sign-outs.
+- Sessions record the client address the rate limiter resolves
+  (`TRUSTED_PROXY_HOPS`) instead of a raw `X-Forwarded-For`.
+- The seeded admin is stored verified; the MFA key falls back to
+  `auth.jwtSecret`; the welcome email's button links to the app's root.
+- A database failure while judging a token is 503 on every door; the
+  watermark-only check failed open.
+
 ### Fixed
 
 #### Server & REST
@@ -214,6 +295,11 @@
   reached the first commit. Other editor settings in `.vscode/` are still
   ignored.
 
+#### Auth
+
+- The CMS verifies a verification link opened while signed in; it rendered a
+  not-found page.
+
 ### Security
 
 #### Auth
@@ -234,6 +320,29 @@
   and both realtime sockets compared against `"admin"` by hand while the REST
   admin gate also accepted `schema-admin`; they all read the same roles and
   scopes now.
+
+- **A deleted account's tokens are refused at once on every door.** The
+  revocation watermark lived on the user row, so deleting the row brought
+  back tokens the user had revoked. One check now reads existence, watermark
+  and live roles together, and a source guard fails if anything reads the
+  watermark alone.
+
+- **The email-verification pre-hijack is closed.** Registering someone's
+  address with a password and getting them to click a genuine verification
+  link left the attacker's password working on the account they later
+  joined by OAuth.
+
+- **A second MFA enrolment no longer destroys the printed recovery codes.**
+
+- **Password sign-in no longer reveals by timing whether an address has an
+  account.**
+
+- **A new password voids outstanding reset links, and verification links
+  expire after 24 hours.**
+
+- **The CLI no longer writes a refused password straight into the
+  database:** it falls back to the direct-database reset only on a network
+  error.
 
 ## [0.23.0] - 2026-09-27
 
