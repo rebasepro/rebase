@@ -420,6 +420,17 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     }
 
     /**
+     * A hash of nothing anyone knows, made with this deployment's own
+     * `hashPassword`, so verifying against it costs what verifying a real
+     * password costs. Made once, on first use.
+     */
+    let dummyHash: Promise<string> | undefined;
+    function dummyPasswordHash(): Promise<string> {
+        dummyHash ??= ops.hashPassword(randomBytes(24).toString("hex"));
+        return dummyHash;
+    }
+
+    /**
      * Is the account just created the only one there is?
      *
      * Two rows at most: the total says whether anyone else exists, and the
@@ -690,11 +701,13 @@ displayName: user.displayName });
         } else {
             // Default: email lookup + password hash verification
             user = await authRepo.getUserByEmail(email);
-            if (!user) {
-                throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
-            }
-
-            if (!user.passwordHash) {
+            if (!user || !user.passwordHash) {
+                // One key derivation either way, so the time to answer does
+                // not say whether the address has an account. Refusing before
+                // any hash work answered an unknown address ~15× faster than a
+                // wrong password, which is the question every other route that
+                // takes an address is careful not to answer.
+                await ops.verifyPassword(password, await dummyPasswordHash());
                 throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
             }
 
