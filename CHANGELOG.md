@@ -312,6 +312,14 @@
   server resolves its imports from the image, never from the bundle. The image
   now installs it.
 
+- **Live schema editing works on the managed runtime.** A deployed server has
+  no collection source, so it edits through `liveSchema.repository`, and it
+  rewrites the file with `ts-morph`, which the image did not ship. The editor
+  reported `SCHEMA_EDITOR_MISSING_DEPENDENCY` and said to run
+  `pnpm add -D ts-morph`, which a managed project cannot use to reach the
+  server. The image now installs `ts-morph` 28.0.0, the version the server
+  pins.
+
 ### Security
 
 #### Auth

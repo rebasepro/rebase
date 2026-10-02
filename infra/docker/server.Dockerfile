@@ -98,17 +98,19 @@ RUN mkdir -p /runtime \
         "@aws-sdk/s3-request-presigner@^3.1068.0" \
         "nodemailer@^9.0.0" \
         "google-auth-library@^10.7.0" \
+        "ts-morph@28.0.0" \
         "json-logic-js@^2.0.5" \
         "fast-equals@6.0.2" \
         "object-hash@^3.0.0" \
     && mkdir -p node_modules/@rebasepro
-# `@aws-sdk/*`, `nodemailer` and `google-auth-library` are drivers for features
-# the RUNTIME implements and loads with `await import(...)` only when a project
-# turns them on: S3 object storage, SMTP email and Google sign-in.
+# `@aws-sdk/*`, `nodemailer`, `google-auth-library` and `ts-morph` are drivers
+# for features the RUNTIME implements and loads with `await import(...)` only
+# when a project turns them on: S3 object storage, SMTP email, Google sign-in,
+# and live schema editing.
 #
 # They belong in the image for the same reason `pg` does — the runtime is what
-# constructs the storage, email and OAuth code, so those imports resolve from
-# HERE. A project declaring `@aws-sdk/client-s3` in its own dependencies does not
+# constructs the storage, email, OAuth and schema-editor code, so those imports
+# resolve from HERE. A project declaring `@aws-sdk/client-s3` in its own dependencies does not
 # help: that copy lands in /bundle/node_modules, which is not on the resolution
 # path of a module living in /app.
 #
@@ -123,6 +125,12 @@ RUN mkdir -p /runtime \
 #     OAuth", which the user saw as "Invalid google credentials". Only the
 #     access-token flow, plain fetch, got through. Dadaki's production sign-in
 #     was down this way until it moved to that flow on 2026-10-02.
+#   - Live schema editing: a bundle has no collection source, so a deployed
+#     server edits against `liveSchema.repository`, rewriting the file with
+#     ts-morph in a scratch directory. Without it the editor reported
+#     SCHEMA_EDITOR_MISSING_DEPENDENCY and told the tenant to `pnpm add -D
+#     ts-morph`, which cannot help here for the reason above — on the one
+#     deployment the docs say it works on. Exact pin, because the peer is.
 #
 # Deliberately NOT here: `@google-cloud/storage` (tenant pods cannot reach the
 # GKE metadata server, so GCS is reached over its S3-compatible API instead) and
