@@ -105,11 +105,15 @@ await client.auth.signInWithOAuth("custom-provider", {
 
 ## Magic Links
 
-A one-click sign-in link by email. The link lands on a page of yours carrying a
-token; hand the token back to trade it for a session.
+A one-click sign-in link by email. The link is always
+`<base>/auth/magic-link?token=…`, where `<base>` is the backend's `email.magicLinkUrl`,
+or its reset-password base (`FRONTEND_URL` on the runtime) when that is not set.
+There is no per-request `redirectTo`. Serve that path in your frontend, and hand
+the token back to trade it for a session. The CMS does not handle this path: an
+app that enables magic links needs its own landing page for it.
 
 ```typescript
-// 1. Ask for the link. `redirectTo` is where the link points.
+// 1. Ask for the link.
 await client.auth.sendMagicLink("user@example.com");
 
 // 2. On the landing page, trade the token for a session.

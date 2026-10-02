@@ -230,9 +230,12 @@ request, a development server captures the message and prints its links:
              http://localhost:5173/auth/magic-link?token=…
 ```
 
-Follow the link and the flow completes. Nothing about the token changes — it is
-minted, stored and validated exactly as it would be from a real inbox; only
-delivery is different.
+Follow the link and the flow completes, on whatever page serves that path: the
+CMS serves `/reset-password` and `/verify-email`, and a magic link's
+`/auth/magic-link` needs a page of your own (see the SDK's
+[Magic Links](/docs/sdk/authentication/#magic-links)). Nothing about the token
+changes — it is minted, stored and validated exactly as it would be from a
+real inbox; only delivery is different.
 
 This is on whenever all three hold, and there is no setting that changes them:
 
