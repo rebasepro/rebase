@@ -647,6 +647,11 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                     // nothing" as `aal1` — the restrictive answer. Stamping
                     // every existing row would be inventing evidence.
                     await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS aal TEXT`);
+                    // How the sign-in happened, carried across rotations like
+                    // `aal`. Nullable and not back-filled for the same reason:
+                    // an older row reads as a password sign-in, which is what
+                    // every refresh answered before the column existed.
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS method TEXT`);
 
                     // One session per pre-existing row: under the old model a row
                     // WAS a device session, and there is no record of which rows

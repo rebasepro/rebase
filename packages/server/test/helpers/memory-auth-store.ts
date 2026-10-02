@@ -184,6 +184,7 @@ export class MemoryAuthStore {
                     sessionId: session?.id ?? id,
                     sessionStartedAt: session?.startedAt ?? new Date(),
                     aal: session?.aal,
+                    method: session?.method,
                     rotatedAt: null,
                     revoked: false
                 });

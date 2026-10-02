@@ -145,6 +145,13 @@ export interface RefreshTokenInfo {
      * that do not store it; both read as `aal1`, the restrictive value.
      */
     aal?: "aal1" | "aal2";
+    /**
+     * How the session was signed in — `"password"`, `"anonymous"`,
+     * `"magic-link"`, `"otp"`, `"mfa"` or a provider id such as `"google"`.
+     * See {@link RefreshTokenSession.method}. Absent on rows written before
+     * the column existed, which read as `"password"`.
+     */
+    method?: string;
 }
 
 /**
@@ -183,6 +190,14 @@ export interface RefreshTokenSession {
      * assurance level is a property of the *sign-in*, not of the account.
      */
     aal?: "aal1" | "aal2";
+    /**
+     * How the session was signed in: what `providerId` says in every auth
+     * response for it. Written at sign-in and carried across rotations like
+     * {@link aal}, because a refresh is not a sign-in and has nothing else to
+     * read it from — answering `"password"` there turned a Google session into
+     * a password one an access-token lifetime after it began.
+     */
+    method?: string;
     /**
      * The hash of the token this one replaces, when it is minted by rotating
      * one. A repository that honours it writes the new token only while that

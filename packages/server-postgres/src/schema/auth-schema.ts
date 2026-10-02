@@ -96,6 +96,12 @@ export function createAuthSchema(usersSchemaName = "rebase") {
          * nothing else to read the level from.
          */
         aal: text("aal"),
+        /**
+         * How the sign-in happened — `password`, `anonymous`, `magic-link`,
+         * `otp`, `mfa` or a provider id — and what `providerId` says for the
+         * session. Carried across rotations like `aal`.
+         */
+        method: text("method"),
         userAgent: text("user_agent"),
         ipAddress: text("ip_address"),
         createdAt: timestamp("created_at").defaultNow().notNull()

@@ -297,6 +297,12 @@
 
 #### Auth
 
+- **`providerId` keeps saying how the session was signed in after a refresh.**
+  `/auth/refresh` and `/auth/me` answered `password` for every session, so a
+  Google user read `google` at sign-in and `password` an hour later, and a
+  guest read `anonymous`, then `password`. The method is stored with the
+  session (`refresh_tokens.method`, added at boot) and carried across every
+  rotation; sessions signed in before the upgrade read `password`.
 - The CMS verifies a verification link opened while signed in; it rendered a
   not-found page.
 

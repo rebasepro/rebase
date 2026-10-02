@@ -100,10 +100,15 @@ Every endpoint that issues a session answers with the same envelope — `registe
 Send the access token back as `Authorization: Bearer <accessToken>`.
 `accessTokenExpiresAt` is epoch milliseconds.
 
-`POST /api/auth/refresh` answers with the same envelope, with two caveats: `user`
-is omitted entirely when the account cannot be re-read, so treat it as optional
-there, and `providerId` is always `password` however the session was first
-created.
+`POST /api/auth/refresh` answers with the same envelope, except that `user` is
+omitted entirely when the account cannot be re-read, so treat it as optional
+there.
+
+`providerId` says how the session was signed in: `password`, `anonymous`,
+`magic-link`, `otp`, `mfa` (a sign-in finished with a second factor), or the
+provider's id, such as `google`. It is stored with the session at sign-in, so
+`refresh` and `GET /api/auth/me` give the same answer for as long as the
+session lives. A session signed in before 0.24 reads `password`.
 
 :::caution[The typed SDK flattens this envelope — raw HTTP does not]
 The JSON above is the wire format, and it is what `fetch("/api/auth/login")`

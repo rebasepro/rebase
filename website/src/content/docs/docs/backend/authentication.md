@@ -482,7 +482,7 @@ also proves. `requireEmailVerification` makes registration confirm-first. See
 On first startup, Rebase automatically provisions the `auth` schema and the following tables in the database (bound to the schema defined in your collection, e.g., `rebase`):
 
 - **`rebase.users`** — User accounts with email, password hash, metadata, and a `roles` text[] column (roles are stored as inline text arrays to optimize queries and avoid joins).
-- **`rebase.refresh_tokens`** — Long-lived sessions carrying hashed refresh tokens, user agents, and IP addresses. Includes a unique index on `token_hash`. One sign-in is one `session_id`, shared by every token rotated out of it; there is no per-device constraint, so two browsers behind one address are two sessions.
+- **`rebase.refresh_tokens`** — Long-lived sessions carrying hashed refresh tokens, user agents, and IP addresses. Includes a unique index on `token_hash`. One sign-in is one `session_id`, shared by every token rotated out of it; there is no per-device constraint, so two browsers behind one address are two sessions. Every token of a session also carries its assurance level (`aal`) and how it was signed in (`method`, which `providerId` reports).
 - **`rebase.password_reset_tokens`** — Expirable single-use tokens for password recovery flows.
 - **`rebase.mfa_factors`** — Enrolled multi-factor authentication methods (e.g. TOTP secrets encrypted with AES-256).
 - **`rebase.mfa_challenges`** — Verification logs tracking active MFA verification attempts.

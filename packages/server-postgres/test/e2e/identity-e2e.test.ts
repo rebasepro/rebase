@@ -414,6 +414,24 @@ describe("identity after the account changes (E2E)", () => {
         });
     });
 
+    describe("IDENTITY-18: the sign-in method outlives a refresh", () => {
+        it("is stored on the session's tokens and read back by refresh and /me", async () => {
+            const email = `method-${Math.random().toString(36).slice(2, 8)}@corp.example`;
+            const signedIn = await http("POST", "/api/auth/google", { code: `google-method-${email}|${email}`, redirectUri: "https://app.corp.example/cb" });
+            expect(signedIn.status).toBe(200);
+            expect(signedIn.json.user.providerId).toBe("google");
+
+            const refreshed = await http("POST", "/api/auth/refresh", { refreshToken: signedIn.json.tokens.refreshToken });
+            expect(refreshed.json.user.providerId).toBe("google");
+            const again = await http("POST", "/api/auth/refresh", { refreshToken: refreshed.json.tokens.refreshToken });
+            expect(again.json.user.providerId).toBe("google");
+            expect((await http("GET", "/api/auth/me", undefined, again.json.tokens.accessToken)).json.user.providerId).toBe("google");
+
+            const { rows } = await observer.query("SELECT DISTINCT method FROM rebase.refresh_tokens WHERE uid = $1", [signedIn.json.user.uid]);
+            expect(rows).toEqual([{ method: "google" }]);
+        });
+    });
+
     describe("IDENTITY-9: disabling an account", () => {
         it("refuses its sign-in, its tokens and its socket, and comes back when re-enabled", async () => {
             const member = await register("disabled");

@@ -716,7 +716,7 @@ export class RefreshTokenService {
             userAgent: this.refreshTokensTable.userAgent,
             ipAddress: this.refreshTokensTable.ipAddress
         };
-        for (const optional of ["sessionId", "rotatedAt", "revoked", "sessionStartedAt", "aal"]) {
+        for (const optional of ["sessionId", "rotatedAt", "revoked", "sessionStartedAt", "aal", "method"]) {
             if (this.has(optional)) selection[optional] = this.col(optional);
         }
         return selection;
@@ -754,6 +754,9 @@ export class RefreshTokenService {
         // presented. A table without the column degrades to `aal1` on read,
         // which is the restrictive answer rather than a bypass.
         if (session?.aal && this.has("aal")) values.aal = session.aal;
+        // The sign-in method, on every token of the session for the same
+        // reason: refresh reads it off whichever row was presented.
+        if (session?.method && this.has("method")) values.method = session.method;
 
         // A rotation writes only while the token it replaces is live. Without
         // a `rotatedAt` column `markRotated` deletes that token, so there is
@@ -833,6 +836,8 @@ export class RefreshTokenService {
         // is not exactly "aal2" is left unset, which the reader treats as
         // `aal1`: the restrictive answer, as the interface documents.
         if (row.aal === "aal1" || row.aal === "aal2") info.aal = row.aal;
+        // A label, not a grant: any non-empty text is carried as it is.
+        if (typeof row.method === "string" && row.method.length > 0) info.method = row.method;
         return info;
     }
 

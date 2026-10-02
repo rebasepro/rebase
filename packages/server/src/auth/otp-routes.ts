@@ -44,7 +44,7 @@ import type { MiddlewareHandler } from "hono";
 import { randomInt } from "../utils/portable-crypto";
 import { z } from "zod";
 
-import type { AuthModuleConfig } from "./routes";
+import type { AuthModuleConfig, CreateSessionAndTokens } from "./routes";
 import { accountForPasswordlessRequest } from "./passwordless-signup";
 import type { ResolvedAuthHooks } from "./auth-hooks";
 import type { HonoEnv } from "../api/types";
@@ -201,7 +201,7 @@ export function mountOtpRoutes(deps: {
         refreshToken: string,
         providerId: string
     ) => unknown;
-    createSessionAndTokens: (uid: string, userAgent: string, ipAddress: string) => Promise<{ roleIds: string[]; accessToken: string; refreshToken: string }>;
+    createSessionAndTokens: CreateSessionAndTokens;
     applyTransformHook: (
         response: AuthResponsePayload,
         method: TransformAuthResponseContext["method"],
@@ -352,7 +352,8 @@ export function mountOtpRoutes(deps: {
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            requestClientAddress(c)
+            requestClientAddress(c),
+            { method: "otp" }
         );
 
         if (ops.onAuthenticated) {

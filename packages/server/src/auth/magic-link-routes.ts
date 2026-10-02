@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import type { AuthModuleConfig } from "./routes";
+import type { AuthModuleConfig, CreateSessionAndTokens } from "./routes";
 import { accountForPasswordlessRequest } from "./passwordless-signup";
 import type { ResolvedAuthHooks } from "./auth-hooks";
 import type { HonoEnv } from "../api/types";
@@ -44,7 +44,7 @@ export function mountMagicLinkRoutes(deps: {
         refreshToken: string,
         providerId: string
     ) => unknown;
-    createSessionAndTokens: (uid: string, userAgent: string, ipAddress: string) => Promise<{ roleIds: string[]; accessToken: string; refreshToken: string }>;
+    createSessionAndTokens: CreateSessionAndTokens;
     applyTransformHook: (
         response: AuthResponsePayload,
         method: TransformAuthResponseContext["method"],
@@ -191,7 +191,8 @@ export function mountMagicLinkRoutes(deps: {
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            requestClientAddress(c)
+            requestClientAddress(c),
+            { method: "magic-link" }
         );
 
         // Fire onAuthenticated hook (fire-and-forget)

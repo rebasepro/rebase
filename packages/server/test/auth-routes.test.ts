@@ -859,7 +859,7 @@ withEmail: false }); // Hack to pass empty list of providers
             // `rotatedFrom` names the presented token, so the repository writes
             // the successor only while that token is still live — see
             // refresh-after-sign-out.test.ts.
-            expect(session).toEqual({ id: "session-42", startedAt, aal: "aal1", rotatedFrom: await hashRefreshToken("the-token") });
+            expect(session).toEqual({ id: "session-42", startedAt, aal: "aal1", method: "password", rotatedFrom: await hashRefreshToken("the-token") });
         });
 
         it("falls back to deleting when the repository predates rotation tracking", async () => {
