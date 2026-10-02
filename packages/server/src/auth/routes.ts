@@ -122,6 +122,11 @@ export interface AuthModuleConfig {
      */
     refreshTokenReuseIntervalSeconds?: number;
     /**
+     * What a refresh token presented after its reuse window does to its
+     * session. See `RebaseAuthConfig.refreshTokenReuse`. Default `"reject"`.
+     */
+    refreshTokenReuse?: RefreshTokenReusePolicy;
+    /**
      * Refuse password sign-in until the account's address is verified, and
      * register confirm-first: `POST /auth/register` answers the same "check
      * your inbox" whether or not the address already has an account, and
@@ -139,6 +144,10 @@ export function isDeliverableAddress(email: string): boolean {
     const domain = email.slice(email.lastIndexOf("@") + 1).toLowerCase();
     return domain !== "anonymous.local" && domain !== "twitter.placeholder.rebase";
 }
+
+/** What a refresh token replayed after its reuse window does to its session. */
+export type RefreshTokenReusePolicy = "reject" | "revoke-session";
+const REFRESH_TOKEN_REUSE_POLICIES: readonly RefreshTokenReusePolicy[] = ["reject", "revoke-session"];
 
 /** How long an email-verification link stays usable. */
 export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -205,6 +214,18 @@ function getPasswordResetExpiry(): Date {
 }
 
 export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
+    // Refused at boot, by name: a misspelt policy would otherwise be the
+    // default one, silently, which is the opposite of what was asked for.
+    if (config.refreshTokenReuse !== undefined && !REFRESH_TOKEN_REUSE_POLICIES.includes(config.refreshTokenReuse)) {
+        throw new Error(
+            `auth.refreshTokenReuse is "${String(config.refreshTokenReuse)}"; it must be one of ` +
+            `${REFRESH_TOKEN_REUSE_POLICIES.map(p => `"${p}"`).join(", ")}.`
+        );
+    }
+    if (config.refreshTokenReuseIntervalSeconds !== undefined
+        && !(Number.isFinite(config.refreshTokenReuseIntervalSeconds) && config.refreshTokenReuseIntervalSeconds >= 0)) {
+        throw new Error(`auth.refreshTokenReuseIntervalSeconds is ${String(config.refreshTokenReuseIntervalSeconds)}; give a number of seconds, 0 or more.`);
+    }
     // Every registrant gets the default role, so it may carry nothing a
     // stranger should hold: not `admin`, and no declared role with an
     // admin-plane scope — from `users:write`, real `admin` is one edit away.
@@ -1489,18 +1510,39 @@ message: "Verification email sent" });
         const reuseWindowMs = Math.max(0, config.refreshTokenReuseIntervalSeconds ?? 10) * 1000;
         const supersededAt = storedToken.rotatedAt ? new Date(storedToken.rotatedAt) : null;
         if (supersededAt && Date.now() - supersededAt.getTime() > reuseWindowMs) {
-            // Outside the window we decline the request but leave the session
-            // standing: the live token this one was rotated into is still good,
-            // and punishing its holder for a late straggler is how a legitimate
-            // user gets signed out. Logged because a genuine replay of an old
-            // token — long after it was superseded — is also what a stolen
-            // token looks like, and that signal should not vanish silently.
-            logger.warn("[Auth] Refresh token replayed after the reuse window", {
+            // A token replayed long after it was superseded is either a
+            // straggler — a client that lost an answer and slept — or a copy
+            // someone else is using. Which risk to take is the deployment's
+            // call (`refreshTokenReuse`):
+            //
+            // - "reject" (default): decline the request, leave the session
+            //   standing. Its live token is still good, and punishing its
+            //   holder for a late straggler is how a legitimate user gets
+            //   signed out. This is not reuse *detection*: a thief who
+            //   refreshes first keeps the session and the owner is the one
+            //   refused.
+            // - "revoke-session": end the whole sign-in, both holders included,
+            //   as GoTrue does — the owner signs in again, the thief is out.
+            //
+            // Logged either way: it is what a stolen token looks like.
+            const revoke = config.refreshTokenReuse === "revoke-session";
+            logger.warn("[Security Audit] Refresh token replayed after the reuse window", {
+                eventType: "auth.refresh.reuse",
                 uid: storedToken.uid,
                 sessionId: storedToken.sessionId,
                 supersededSecondsAgo: Math.round((Date.now() - supersededAt.getTime()) / 1000),
-                userAgent: c.req.header("user-agent") || "unknown"
+                userAgent: c.req.header("user-agent") || "unknown",
+                sessionRevoked: revoke
             });
+            if (revoke) {
+                if (storedToken.sessionId && authRepo.revokeRefreshTokenSession) {
+                    await authRepo.revokeRefreshTokenSession(storedToken.sessionId);
+                } else {
+                    await authRepo.deleteRefreshToken(tokenHash);
+                }
+                clearRefreshCookie(c, config.cookieAuth);
+                throw ApiError.unauthorized("Refresh token already used; this session has been ended", "SESSION_REVOKED");
+            }
             throw ApiError.unauthorized("Refresh token already used", "TOKEN_ALREADY_USED");
         }
 

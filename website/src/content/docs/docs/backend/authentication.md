@@ -86,6 +86,8 @@ const backend = await initializeRebaseBackend({
 | `activeKid` | `string` | first key | Which of `signingKeys` mints new tokens |
 | `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
 | `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
+| `refreshTokenReuseIntervalSeconds` | `number` | `10` | How long a refresh token that was rotated away still mints a sibling of its session, so a client that lost a refresh answer is not signed out |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | What a refresh token presented after that window does. `"reject"` refuses it (`TOKEN_ALREADY_USED`) and logs it, and the session stands: this is not reuse detection, since whoever refreshed first keeps the session. `"revoke-session"` ends the whole sign-in on such a replay (`SESSION_REVOKED`), as GoTrue does, and the owner signs in again. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Require a session for the data API |
 | `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |

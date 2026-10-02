@@ -388,6 +388,22 @@ export interface RebaseAuthConfig {
      * confirm. Set by `AUTH_REQUIRE_EMAIL_VERIFICATION=true`.
      */
     requireEmailVerification?: boolean;
+    /**
+     * How long a refresh token that was rotated away still mints a sibling of
+     * the same session, in seconds. Default 10 (GoTrue's
+     * `refresh_token_reuse_interval`): a client that lost a refresh answer —
+     * a deploy, a suspended laptop, two tabs at once — is not signed out.
+     */
+    refreshTokenReuseIntervalSeconds?: number;
+    /**
+     * What a refresh token presented *after* that window does. Default
+     * `"reject"`: the request is refused and logged, and the session stands,
+     * because its live token is still good — which also means a thief who
+     * refreshed first keeps it. `"revoke-session"` ends the whole sign-in on
+     * such a replay, thief and owner alike, as GoTrue does: the owner signs
+     * in again. Set by `AUTH_REFRESH_TOKEN_REUSE`; anything else fails the boot.
+     */
+    refreshTokenReuse?: "reject" | "revoke-session";
 }
 
 /** @see RebaseBackendConfig.baas */
@@ -1898,7 +1914,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 enableMagicLink: safeAuthConfig.magicLink ?? false,
                 enableEmailOtp: safeAuthConfig.emailOtp ?? false,
                 cookieAuth: safeAuthConfig.cookieAuth,
-                requireEmailVerification: safeAuthConfig.requireEmailVerification ?? false
+                requireEmailVerification: safeAuthConfig.requireEmailVerification ?? false,
+                refreshTokenReuseIntervalSeconds: safeAuthConfig.refreshTokenReuseIntervalSeconds,
+                refreshTokenReuse: safeAuthConfig.refreshTokenReuse
             });
 
             // A requirement nobody can meet is a backend nobody can sign in

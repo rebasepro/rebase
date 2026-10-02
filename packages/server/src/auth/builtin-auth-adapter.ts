@@ -103,6 +103,10 @@ export interface BuiltinAuthAdapterConfig {
     cookieAuth?: import("./routes").CookieAuthConfig;
     /** Refuse password sign-in until the address is verified; confirm-first registration. */
     requireEmailVerification?: boolean;
+    /** Seconds a rotated-away refresh token still mints a sibling. Default 10. */
+    refreshTokenReuseIntervalSeconds?: number;
+    /** What a refresh token replayed after that window does to its session. Default `"reject"`. */
+    refreshTokenReuse?: import("./routes").RefreshTokenReusePolicy;
 }
 
 /**
@@ -131,7 +135,9 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         enableMagicLink = false,
         enableEmailOtp = false,
         cookieAuth,
-        requireEmailVerification = false
+        requireEmailVerification = false,
+        refreshTokenReuseIntervalSeconds,
+        refreshTokenReuse
     } = config;
 
     const resolvedOps = resolveAuthHooks(authHooks);
@@ -311,7 +317,9 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 enableEmailOtp,
                 cookieAuth,
                 captcha,
-                requireEmailVerification
+                requireEmailVerification,
+                refreshTokenReuseIntervalSeconds,
+                refreshTokenReuse
             });
         },
 

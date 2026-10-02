@@ -128,7 +128,7 @@ the ID you got. Read the response header.
 | `UNKNOWN_SCOPE_TARGET` | 400 | A scope's target names a collection, storage source or function this backend does not serve. `details` lists the ones it does. | Fix the target. |
 | `UNVERIFIED_IDENTITIES` | 409 | A magic link, email code or password reset proved an unverified account's address, and the account carries a sign-in identity whose provider never verified that address. The auth repository cannot remove it (it has no `unlinkUserIdentity`), so the proof is refused rather than leave that way in on a verified account. | Implement `unlinkUserIdentity` in the custom auth repository, or have an admin review the account. |
 | `SETUP_REQUIRED` | 403 | The project has no admin yet, so this route is not available. | Complete first-admin setup. |
-| `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed. | Request a fresh one. |
+| `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed, or a refresh token that was rotated away more than `refreshTokenReuseIntervalSeconds` ago. | Request a fresh one, or sign in again. |
 | `TOKEN_EXPIRED` | 401 | The token is past its lifetime. | Request a fresh one. |
 | `USER_NOT_FOUND` | 404 | No account with that id. | Check the id. |
 | `WEAK_PASSWORD` | 400 | The password does not meet the configured policy. | Choose a stronger one. |

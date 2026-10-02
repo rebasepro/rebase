@@ -109,6 +109,8 @@ const bootEnvExtension = z.object({
     AUTH_EMAIL_OTP: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
     /** `auth.requireEmailVerification`: confirm-first registration, no password sign-in until verified. */
     AUTH_REQUIRE_EMAIL_VERIFICATION: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    /** `auth.refreshTokenReuse`: what a refresh token replayed after its reuse window does to its session. */
+    AUTH_REFRESH_TOKEN_REUSE: z.enum(["reject", "revoke-session", ""]).optional().transform(v => v || undefined),
     /**
      * Bot protection. Enabled by setting both — a provider without a secret
      * cannot verify anything, and is refused at boot rather than ignored.
