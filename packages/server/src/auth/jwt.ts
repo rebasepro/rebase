@@ -499,7 +499,8 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
 }
 
 /**
- * Generate a random refresh token (long-lived, 30 days by default)
+ * Generate a random refresh token. Long-lived: 400 days by default, sliding —
+ * see {@link getRefreshTokenTtlMs}.
  */
 export function generateRefreshToken(): string {
     return randomHex(40);
