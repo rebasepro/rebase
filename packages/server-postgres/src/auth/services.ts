@@ -19,6 +19,7 @@ import {
     PaginatedUsersResult,
     MfaFactor,
     MfaChallengeInfo,
+    AccountAccessState,
     ApiError
 } from "@rebasepro/server";
 import { toSnakeCase, camelCase } from "@rebasepro/utils";
@@ -552,6 +553,32 @@ export class UserService implements UserRepository {
             SET roles = array_append(roles, ${roleId}), updated_at = NOW()
             WHERE id = ${uid} AND NOT (${roleId} = ANY(roles))
         `));
+    }
+
+    /**
+     * One read of what an access token is judged against: whether the account
+     * exists, its roles, and its revocation watermark. See
+     * `TokenRepository.getAccountAccessState`.
+     *
+     * The watermark is read only where the table declares it, as
+     * `RefreshTokenService.getTokensValidAfter` reads it — a table without the
+     * column has no watermark rather than an error on every request.
+     */
+    async getAccountAccessState(uid: string): Promise<AccountAccessState | null> {
+        const usersTableName = this.getQualifiedUsersTableName();
+        const watermark = getColumnKey(this.usersTable, "tokensValidAfter", "tokens_valid_after")
+            ? sql`tokens_valid_after`
+            : sql`NULL::timestamptz`;
+        const result = await this.db.execute(sql`
+            SELECT roles, ${watermark} AS tokens_valid_after
+            FROM ${sql.raw(usersTableName)} WHERE id = ${uid}
+        `);
+        if (result.rows.length === 0) return null;
+        const row = result.rows[0] as { roles: string[] | null; tokens_valid_after: Date | string | null };
+        return {
+            roles: row.roles ?? [],
+            tokensValidAfter: row.tokens_valid_after ? new Date(row.tokens_valid_after) : null
+        };
     }
 
     /**
@@ -1222,6 +1249,10 @@ export class PostgresAuthRepository implements AuthRepository {
 
     async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: string[] } | null> {
         return this.userService.getUserWithRoles(uid);
+    }
+
+    async getAccountAccessState(uid: string): Promise<AccountAccessState | null> {
+        return this.userService.getAccountAccessState(uid);
     }
 
     // Token operations (delegate to PostgresTokenRepository)

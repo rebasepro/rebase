@@ -769,6 +769,10 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         if (!session) return null;
         const revocation = config.identity?.revocation;
         if (revocation && await isAccessTokenRevoked(revocation, session)) return null;
+        // And the account itself: a deleted one's watermark went with its row,
+        // so the check above reads "nothing set" for it. Refresh already treats
+        // a missing account as revoked; consent is the door that mints the grant.
+        if (config.identity && await config.identity.currentRoles(session.uid) === null) return null;
         return session;
     }
 

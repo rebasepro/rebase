@@ -15,13 +15,13 @@ import { summarizeScopes } from "@rebasepro/types";
 import { errorHandler } from "../api/errors";
 import { callerScopes, getAccessModel } from "./access";
 import { createRequireAuth } from "./middleware";
-import type { AuthRepository } from "./interfaces";
+import type { AccessJudgeRepository } from "./token-revocation";
 import type { HonoEnv } from "../api/types";
 
 export interface ScopeRouteOptions {
     serviceKey?: string;
     resolveRoles?: (uid: string) => Promise<string[]>;
-    revocationRepo?: Pick<AuthRepository, "getTokensValidAfter">;
+    revocationRepo?: AccessJudgeRepository;
     /** Authenticates `rk_` keys first, so a key can read what it holds. */
     apiKeyPreAuth?: MiddlewareHandler<HonoEnv>;
 }

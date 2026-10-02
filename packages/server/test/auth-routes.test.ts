@@ -1342,14 +1342,18 @@ newPassword: "New1Pass" }),
             expect(res.status).toBe(401);
         });
 
-        it("returns 404 when user is deleted", async () => {
+        it("refuses the token of an account that was deleted", async () => {
+            // The live-session guard asks whether the account still exists
+            // before the route runs, so a deleted account's token is a revoked
+            // one (401), not a session whose user went missing (404).
             const app = createApp();
             mockAuthRepo.getUserWithRoles.mockResolvedValueOnce(null);
 
             const res = await app.request("/auth/me", {
                 headers: { ...await authHeader() }
             });
-            expect(res.status).toBe(404);
+            expect(res.status).toBe(401);
+            expect((await res.json() as { error: { code: string } }).error.code).toBe("SESSION_REVOKED");
         });
     });
 

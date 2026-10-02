@@ -22,7 +22,7 @@ import {
 import type { AuthModuleConfig } from "./routes";
 import type { AuthRepository } from "./interfaces";
 import { redactRefreshToken } from "./cookie-utils";
-import { isAccessTokenRevoked } from "./token-revocation";
+import { judgeAccessToken } from "./token-revocation";
 import { resolveAuthHooks } from "./auth-hooks";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
@@ -207,7 +207,9 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
         if (!principal) {
             throw ApiError.unauthorized("Not authenticated");
         }
-        if (await isAccessTokenRevoked(authRepo, principal)) {
+        // Revoked, or an account deleted since the first factor was accepted —
+        // the same judgement every other door makes. See `judgeAccessToken`.
+        if (!(await judgeAccessToken(authRepo, principal)).live) {
             throw ApiError.unauthorized("Session has been revoked", "SESSION_REVOKED");
         }
         return principal;

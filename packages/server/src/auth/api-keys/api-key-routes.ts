@@ -45,7 +45,7 @@ export interface ApiKeyRouteOptions {
      */
     resolveRoles?: (uid: string) => Promise<string[]>;
     /** Repository for the token-revocation watermark. See `createRequireAuth`. */
-    revocationRepo?: Pick<import("../interfaces").AuthRepository, "getTokensValidAfter">;
+    revocationRepo?: import("../token-revocation").AccessJudgeRepository;
     /** What a scope's target may name. Unset, targets are not checked for existence. */
     targets?: KeyTargets;
     /** The access model to validate scopes against. Defaults to the configured one. */
@@ -208,7 +208,7 @@ export interface PersonalKeyRouteOptions {
     /** Recognised only to be refused with a reason: the service key has no account. */
     serviceKey?: string;
     resolveRoles?: (uid: string) => Promise<string[]>;
-    revocationRepo?: Pick<import("../interfaces").AuthRepository, "getTokensValidAfter">;
+    revocationRepo?: import("../token-revocation").AccessJudgeRepository;
     targets?: KeyTargets;
     accessModel?: () => AccessModel;
 }

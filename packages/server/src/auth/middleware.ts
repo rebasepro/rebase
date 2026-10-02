@@ -1,6 +1,5 @@
 import { MiddlewareHandler, Context } from "hono";
-import type { AuthRepository } from "./interfaces";
-import { isAccessTokenRevoked } from "./token-revocation";
+import { judgeAccessToken, type AccessJudgeRepository } from "./token-revocation";
 import { ANONYMOUS_USER_ID, DataDriver, hasAdminRole, isPublicStoragePath } from "@rebasepro/types";
 import { verifyAccessToken, AccessTokenPayload, isJwtConfigured, verifyDownloadToken, type DownloadTokenPayload } from "./jwt";
 import type { HonoEnv } from "../api/types";
@@ -170,7 +169,7 @@ export function createRequireAuth(options?: {
      * invalidated by `logout` or a password reset stops working on admin routes
      * too, not just on the data plane.
      */
-    revocationRepo?: Pick<AuthRepository, "getTokensValidAfter">;
+    revocationRepo?: AccessJudgeRepository;
 }): MiddlewareHandler<HonoEnv> {
     // Only when there is nothing at all to add. Keyed on the service key alone,
     // this dropped `resolveRoles` and `revocationRepo` silently for any caller
@@ -209,13 +208,23 @@ roles: ["admin"] } as AccessTokenPayload);
 
         if (resolveRoles || revocationRepo) {
             try {
-                // Same watermark the data plane checks. An admin route is the
-                // last place a revoked token should still work.
-                if (revocationRepo && await isAccessTokenRevoked(revocationRepo, payload)) {
-                    return refuse(c, ApiError.unauthorized("Session has been revoked", "SESSION_REVOKED"));
+                // The same judgement the data plane makes: revoked, or an
+                // account that no longer exists. An admin route is the last
+                // place such a token should still work. When the judgement
+                // already read the roles, they are the roles — one read, not two.
+                let judgedRoles: string[] | undefined;
+                if (revocationRepo) {
+                    const verdict = await judgeAccessToken(revocationRepo, payload);
+                    if (!verdict.live) {
+                        return refuse(c, ApiError.unauthorized(
+                            verdict.refusal === "account-deleted" ? "This account no longer exists" : "Session has been revoked",
+                            "SESSION_REVOKED"
+                        ));
+                    }
+                    judgedRoles = verdict.roles;
                 }
                 c.set("user", resolveRoles
-                    ? { ...payload, roles: await resolveRoles(payload.uid) }
+                    ? { ...payload, roles: judgedRoles ?? await resolveRoles(payload.uid) }
                     : payload);
                 return next();
             } catch (error) {

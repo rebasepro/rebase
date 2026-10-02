@@ -60,7 +60,7 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 | `POST` | `/api/admin/users` | Create a user |
 | `GET` | `/api/admin/users/:uid` | Read one user |
 | `PUT` | `/api/admin/users/:uid` | Update one user |
-| `DELETE` | `/api/admin/users/:uid` | Delete one user |
+| `DELETE` | `/api/admin/users/:uid` | Delete one user. Their sessions end, and every access token they hold is refused from that request on |
 | `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one |
 | `GET` | `/api/admin/roles` | `admin` and the roles the users collection declares, with their scopes |
 | `POST` | `/api/admin/bootstrap` | Let the earliest-registered user claim the admin role while none exists. Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |

@@ -24,7 +24,7 @@ import type {
 
 import { Hono } from "hono";
 import { hasAdminRole } from "@rebasepro/types";
-import { isAccessTokenRevoked, replaceUserPassword } from "./token-revocation";
+import { judgeAccessToken, replaceUserPassword, type AccessTokenVerdict } from "./token-revocation";
 import { verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
@@ -154,6 +154,31 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         }
     }
 
+    /**
+     * The roles a verified access token runs with now, or `null` when it must
+     * not be honoured at all: revoked, or its account deleted. See
+     * `judgeAccessToken`, which both verify paths ask. A repository that
+     * cannot answer refuses the request (503), as `resolveLiveRoles` does.
+     */
+    async function liveRoles(payload: AccessTokenPayload): Promise<string[] | null> {
+        let verdict: AccessTokenVerdict;
+        try {
+            verdict = await judgeAccessToken(authRepository, payload);
+        } catch (error: unknown) {
+            logger.warn("[Auth] Could not judge an access token; refusing it", { uid: payload.uid, error });
+            throw new ApiError(503, "ROLE_LOOKUP_FAILED", "Could not verify your permissions. Please try again.");
+        }
+        if (!verdict.live) {
+            logger.warn("[Security Audit] Refused an access token", {
+                eventType: verdict.refusal === "revoked" ? "auth.token.revoked" : "auth.token.account_gone",
+                refusal: verdict.refusal,
+                uid: payload.uid
+            });
+            return null;
+        }
+        return verdict.roles ?? await resolveLiveRoles(payload.uid);
+    }
+
     const adapter: AuthAdapter = {
         id: "rebase-builtin",
 
@@ -191,20 +216,13 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             }
 
             // A token issued before the user's revocation watermark is void,
-            // however well it verifies. This is the read that makes `logout`,
-            // `change-password`, `reset-password` and `DELETE /auth/sessions`
-            // reach the access token instead of only the refresh row.
-            if (await isAccessTokenRevoked(authRepository, payload)) {
-                logger.warn("[Security Audit] Refused a revoked access token", {
-                    eventType: "auth.token.revoked",
-                    uid: payload.uid
-                });
-                return null;
-            }
-
-            // Resolve roles from the repository. Never from the token when
-            // that fails — see `resolveLiveRoles`.
-            const roles = await resolveLiveRoles(payload.uid);
+            // however well it verifies, and so is one whose account is gone.
+            // This is the read that makes `logout`, `change-password`,
+            // `reset-password`, `DELETE /auth/sessions` and deleting the
+            // account reach the access token instead of only the refresh row.
+            // Roles come from the same read — never from the token.
+            const roles = await liveRoles(payload);
+            if (!roles) return null;
 
             const isAdmin = hasAdminRole(roles);
 
@@ -245,28 +263,12 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 return null;
             }
 
-            // The same watermark read the request path does above, for the same
-            // reason. This function is what the WebSocket AUTHENTICATE handler
-            // calls, and without it `logout`, `change-password`,
-            // `reset-password` and `DELETE /auth/sessions` voided an access
-            // token for HTTP and left it working over the socket — so signing
-            // out on a stolen session closed the browser's requests and not its
-            // realtime connection.
-            //
-            // This closes the entry point. An ALREADY OPEN socket is a separate
-            // question: nothing re-checks a connection after AUTHENTICATE, so a
-            // session revoked mid-connection survives until it reconnects. That
-            // is a decision about socket lifetime, stated on the realtime docs
-            // page (backend/realtime.md), not a line missing from here.
-            if (await isAccessTokenRevoked(authRepository, payload)) {
-                logger.warn("[Security Audit] Refused a revoked access token", {
-                    eventType: "auth.token.revoked",
-                    uid: payload.uid
-                });
-                return null;
-            }
-
-            const roles = await resolveLiveRoles(payload.uid);
+            // The same judgement the request path makes above, for the same
+            // reason. This function is what the WebSocket handler calls — at
+            // AUTHENTICATE, and again on the frames that follow — so a token
+            // voided for HTTP is voided over the socket too.
+            const roles = await liveRoles(payload);
+            if (!roles) return null;
 
             const isAdmin = hasAdminRole(roles);
 

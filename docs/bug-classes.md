@@ -695,6 +695,31 @@ object after building it. Mutation-tested: each half removed turns ten cases red
 | collection `onResetPassword` returning `temporaryPassword` | **BUG** — the route never wrote it and the hook's context cannot, so the documented example showed the admin a password that did not work. Fixed the same day; see class 21's 2026-09-14 entry. |
 | `isAccessTokenRevoked`, same-second token | **OPEN** (class 55) — the comment and the test's title say a token from the watermark's own second is revoked; the code (`<`) and the test's assertion let it through. |
 
+### A deleted account is a revoked one — 2026-10-02
+
+The watermark lives on the user row, so deleting the row deleted the
+revocation: a token its owner had signed out everywhere came back, as an
+authenticated principal with no roles, the moment an administrator deleted the
+account (identity audit, IDENTITY-2). Four doors asked "does this account still
+exist" and the main one — the built-in adapter, i.e. the data plane and the
+socket — answered "yes" by reading `[]` roles for nobody.
+
+One judge now, `judgeAccessToken` in `auth/token-revocation.ts`: existence,
+watermark and live roles in one repository read (`getAccountAccessState`),
+asked by the adapter's `verifyRequest`/`verifyToken`, every `createRequireAuth`
+gate with a repository, and the MFA step-up routes. A source guard in
+`account-deletion-revokes-tokens.test.ts` fails if anything but the MCP grant
+paths (which pair the watermark with `currentRoles`) reads the watermark on its
+own. `identity-e2e.test.ts` holds it over real Postgres.
+
+| checked | result |
+|---|---|
+| adapter `verifyRequest` / `verifyToken` (data plane, socket `AUTHENTICATE`) | **BUG** — fixed |
+| admin gates and the auth routes' live-session guard | **BUG** — fixed |
+| MFA step-up (`/mfa/verify`, `/mfa/challenge*` with a pending token) | **BUG** — fixed |
+| MCP consent (`verifiedSession`) | **BUG** — a deleted account's session could still consent; fixed |
+| MCP refresh, personal API keys, `GET /auth/me` | clean — already refused |
+
 ---
 
 ## 18. A predicate that discriminates nothing

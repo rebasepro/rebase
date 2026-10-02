@@ -143,6 +143,17 @@ export interface RefreshTokenInfo {
 }
 
 /**
+ * What {@link TokenRepository.getAccountAccessState} reads about an account
+ * that exists.
+ */
+export interface AccountAccessState {
+    /** The account's roles as the database has them now. */
+    roles: string[];
+    /** The revocation watermark: sessions that began before it are void. */
+    tokensValidAfter: Date | null;
+}
+
+/**
  * Identity of the sign-in a refresh token belongs to, threaded through
  * rotation so descendants stay grouped.
  */
@@ -400,6 +411,20 @@ export interface TokenRepository {
      * user's tokens so a rotation racing the delete cannot survive it.
      */
     setTokensValidAfter?(uid: string, at: Date): Promise<void>;
+
+    /**
+     * Everything an access token is judged against, in one read — or `null`
+     * when there is no such account.
+     *
+     * An access token is a bearer credential minted up to an hour ago, and the
+     * account it names may since have been deleted, revoked or demoted. Every
+     * door that honours one asks this before it does: the data plane, the admin
+     * gates, the realtime socket on every frame. See `judgeAccessToken`.
+     *
+     * Optional. Without it the judge composes the answer from
+     * `getUserWithRoles` and `getTokensValidAfter`, two reads instead of one.
+     */
+    getAccountAccessState?(uid: string): Promise<AccountAccessState | null>;
 
     /**
      * Find a refresh token by hash

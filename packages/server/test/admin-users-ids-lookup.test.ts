@@ -35,6 +35,9 @@ roles: [] } : null;
         // that answers "admin" for everyone makes the 403 test pass for a
         // reason that has nothing to do with the gate.
         getUserRoleIds: async (id: string) => (id.startsWith("admin") ? ["admin"] : ["editor"]),
+        // The caller is an account too: the gate asks whether it still exists,
+        // and reads its roles in the same breath.
+        getAccountAccessState: async (id: string) => ({ roles: id.startsWith("admin") ? ["admin"] : ["editor"], tokensValidAfter: null }),
         getUserById: async (id: string) => users.find(u => u.id === id) ?? null,
         listUsersPaginated: async () => ({ users,
 total: users.length,

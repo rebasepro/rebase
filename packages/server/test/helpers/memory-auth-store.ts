@@ -122,7 +122,11 @@ export class MemoryAuthStore {
                 return this.snapshot(user);
             },
             deleteUser: async (id) => {
+                // Everything that lives on the user row goes with it, as it
+                // does in Postgres: the roles and the revocation watermark.
                 this.users.delete(id);
+                this.roles.delete(id);
+                this.validAfter.delete(id);
                 this.identities = this.identities.filter(i => i.uid !== id);
             },
             listUsers: async () => [...this.users.values()].map(u => this.snapshot(u)),
@@ -178,6 +182,13 @@ export class MemoryAuthStore {
                 }
             },
             pruneRefreshTokens: async () => undefined,
+            getAccountAccessState: async (uid) => {
+                if (!this.users.has(uid)) return null;
+                return {
+                    roles: [...(this.roles.get(uid) ?? [])],
+                    tokensValidAfter: this.validAfter.get(uid) ?? null
+                };
+            },
             getTokensValidAfter: async (uid) => this.validAfter.get(uid) ?? null,
             setTokensValidAfter: async (uid, at) => {
                 this.validAfter.set(uid, at);
