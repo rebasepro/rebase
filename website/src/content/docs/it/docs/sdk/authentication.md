@@ -38,12 +38,19 @@ console.log(user.uid, user.email);
 ### Registrazione
 
 ```typescript
-const { user } = await client.auth.signUp(
+const { user, confirmationRequired } = await client.auth.signUp(
     "user@example.com",
     "password",
     "Jane Doe"   // optional displayName
 );
 ```
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> Con [`requireEmailVerification`](/docs/backend/email-verification/) attivo,
+non esiste alcuna sessione finché l'indirizzo non viene confermato:
+`confirmationRequired` è `true` e `user` è `null`, quindi avvisa la persona di
+aprire l'email. Altrimenti `confirmationRequired` è `false` e `user` è
+l'account autenticato. Sulla 0.23 `signUp` risolve
+`{ user, accessToken, refreshToken }` ed effettua sempre l'accesso.
 
 ## Provider OAuth
 
@@ -106,10 +113,17 @@ await client.auth.signInWithOAuth("custom-provider", {
 
 ## Magic Link
 
-Un link di accesso con un clic inviato via email. Il link reindirizza a una tua pagina che trasporta un token; restituisci il token per scambiarlo con una sessione.
+Un link di accesso con un clic inviato via email. Il link è sempre
+`<base>/auth/magic-link?token=…`, dove `<base>` è `email.magicLinkUrl` del
+backend, oppure la sua base per il reset della password (`FRONTEND_URL` sul
+runtime) quando quella non è impostata. Non esiste un `redirectTo` per singola
+richiesta. Servi quel percorso nel tuo frontend, e restituisci il token per
+scambiarlo con una sessione. <span class="since-badge" data-since="0.24">Da 0.24</span> Il CMS lo serve, effettuando l'accesso (tramite il
+passaggio del codice quando è presente un secondo fattore); altri frontend
+hanno bisogno di una pagina di destinazione propria.
 
 ```typescript
-// 1. Ask for the link. `redirectTo` is where the link points.
+// 1. Ask for the link.
 await client.auth.sendMagicLink("user@example.com");
 
 // 2. On the landing page, trade the token for a session.
@@ -188,10 +202,29 @@ const { factor, totp, recoveryCodes } = await client.auth.mfa.enroll({
 });
 
 showQrCode(totp.uri);        // otpauth://… — what the authenticator scans
-showRecoveryCodes(recoveryCodes);
+if (recoveryCodes) showRecoveryCodes(recoveryCodes);
 ```
 
-**Mostra i codici di recupero una sola volta e mai più.** Vengono memorizzati solo i relativi hash, quindi nulla potrà mostrarli in seguito.
+**Mostra i codici di recupero una sola volta e mai più.** Vengono memorizzati solo i relativi hash, quindi nulla potrà mostrarli in seguito. <span class="since-badge" data-since="0.24">Da 0.24</span> Arrivano insieme al primo fattore dell'account.
+Aggiungere un altro fattore mantiene i codici che l'account già possiede, e
+`recoveryCodes` è `null`. Avviare una registrazione e abbandonarla non li
+tocca mai.
+
+Per sostituirli, dopo averne usati diversi o aver perso la copia stampata,
+chiama `regenerateRecoveryCodes()` da una sessione `aal2`. I vecchi codici
+smettono di funzionare:
+
+```typescript
+const { recoveryCodes } = await client.auth.mfa.regenerateRecoveryCodes();
+```
+
+Chi ha perso sia l'autenticatore che i codici viene fatto rientrare da un
+amministratore: `client.admin.resetMfa(uid)` (`DELETE /api/admin/users/:uid/mfa`,
+`users:write`) rimuove i fattori e i codici dell'account e termina le sue
+sessioni, cosicché la password effettua di nuovo l'accesso senza un secondo
+fattore. Sulla 0.23 ogni registrazione restituisce un nuovo insieme di codici
+che sostituisce il precedente, e non esistono né `regenerateRecoveryCodes()`
+né `resetMfa`.
 
 Il fattore non è utilizzabile finché l'utente non dimostra che il proprio autenticatore ha generato un codice a partire da quel segreto:
 
@@ -360,7 +393,7 @@ unsubscribe();
 |--------|--------|
 | `SIGNED_IN` | Un accesso o una registrazione sono stati completati |
 | `TOKEN_REFRESHED` | L'access token è stato rinnovato — compreso il rinnovo silenzioso che ripristina una sessione al caricamento della pagina |
-| `USER_UPDATED` | `updateUser()` ha modificato il profilo |
+| `USER_UPDATED` | `updateUser()` ha modificato il profilo, oppure `confirmEmailChange()` ha spostato questo account sul suo nuovo indirizzo |
 | `SIGNED_OUT` | Una disconnessione, o un aggiornamento del token fallito definitivamente |
 
 ## Gestione delle password
@@ -391,21 +424,70 @@ const { success, message } = await client.auth.changePassword(
 );
 ```
 
+Ogni altra sessione dell'account termina: chiunque altro la possedesse deve
+accedere di nuovo con la nuova password. Questo dispositivo resta autenticato.
+Il server risponde con una sessione nuova, e il client la adotta (emettendo
+`TOKEN_REFRESHED`).
+
 ## Verifica dell'email
+
+La registrazione invia al nuovo account il suo link di verifica quando l'email
+è configurata. `sendVerificationEmail()` lo invia di nuovo.
 
 ```typescript
 // Send verification email to the current user
 await client.auth.sendVerificationEmail();
 
-// Verify with the token from the email link
-await client.auth.verifyEmail(token);
+// Verify with the token from the email link. Signed in as that account, this
+// keeps everything on it.
+const { passwordRemoved } = await client.auth.verifyEmail(token);
+
+// Signed out, an account that holds a password answers PROOF_REQUIRED:
+try {
+    await client.auth.verifyEmail(token);
+} catch (e) {
+    if (e instanceof Error && "code" in e && e.code === "PROOF_REQUIRED") {
+        // Keep the password, and sign in:
+        await client.auth.verifyEmail(token, { password });
+        // …or verify without it, which removes it:
+        // await client.auth.verifyEmail(token, { removeUnproven: true });
+    }
+}
 ```
+
+Il link dimostra la casella di posta, non chi ha registrato l'indirizzo, quindi
+una password che né la sessione né la chiamata dimostrano viene rimossa invece
+che mantenuta — vedi [Verifica email](/docs/backend/email-verification/).
+
+Su un backend con `requireEmailVerification`, `signUp()` risolve con
+`{ confirmationRequired: true, user: null }` e nessuna sessione: l'account
+accede una volta che il link viene seguito con la sua password.
+
+## Cambiare l'indirizzo email
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> Un utente autenticato sposta il proprio account su un altro indirizzo.
+Nulla cambia finché il nuovo indirizzo non risponde:
+
+```typescript
+// Mails a link to the new address, and a notice to the current one
+const { pendingEmail, expiresAt } = await client.auth.changeEmail("jane@new.example");
+
+// On the page the link opens (<frontend>/confirm-email-change?token=…):
+const { email, removedProviders } = await client.auth.confirmEmailChange(token);
+```
+
+Il link vive 24 ore; `getUser()` segnala l'indirizzo in attesa come
+`pendingEmail`. La conferma non richiede alcuna sessione, e un client
+autenticato come quell'account adotta il nuovo indirizzo ed emette
+`USER_UPDATED`. I rifiuti sono elencati in
+[Cambiare un indirizzo email](/docs/backend/auth-endpoints/#changing-an-email-address).
 
 ## Gestione delle sessioni (multi-dispositivo)
 
 ```typescript
-// List all active sessions
+// List all active sessions, one per sign-in
 const sessions = await client.auth.getSessions();
+// [{ id, userAgent, ipAddress, createdAt, isCurrentSession }, …]
 
 // Revoke a specific session
 await client.auth.revokeSession(sessionId);
@@ -413,6 +495,14 @@ await client.auth.revokeSession(sessionId);
 // Revoke ALL sessions (logs out everywhere)
 await client.auth.revokeAllSessions();
 ```
+
+Ogni access token indica a quale accesso appartiene, quindi esattamente una
+voce ha `isCurrentSession: true`: il dispositivo che chiede. Revocare una
+sessione termina insieme il refresh token e l'access token di quel
+dispositivo, dalla richiesta successiva, sia via HTTP sia su un socket
+realtime aperto. Il logout (`signOut()`) fa lo stesso per il dispositivo che
+si disconnette. Un access token emesso prima di questa release non indica
+alcuna sessione; continua a funzionare finché non scade, entro l'ora.
 
 ## Configurazione dell'autenticazione
 
@@ -470,6 +560,7 @@ interface User {
     providerId: string;
     isAnonymous: boolean;
     emailVerified?: boolean;
+    pendingEmail?: string | null; // an address change waiting for its link
     roles?: string[];          // text[] from the users table
     metadata?: Record<string, unknown>;
 }

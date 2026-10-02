@@ -147,7 +147,7 @@ const client = createRebaseClient({
 });
 ```
 
-La cascata è ristretta: un `update` viene scartato insieme alla scrittura che modificava, perché può fallire solo allo stesso modo. Un `create` o un `delete` successivo per la stessa riga sta in piedi da solo e viene mantenuto. Una scrittura scartata non è mai stata inviata, e viene segnalata con un `RebaseApiError` il cui `code` è `DEPENDENCY_REJECTED` e il cui `cause` è il rifiuto che l'ha condannata, così puoi distinguerla dalla scrittura che il server ha effettivamente rifiutato.
+La cascata è ristretta: un `update` viene scartato insieme alla scrittura che modificava, perché può fallire solo allo stesso modo. Un `create` o un `delete` successivo per la stessa riga sta in piedi da solo e viene mantenuto. Una scrittura scartata non è mai stata inviata. <span class="since-badge" data-since="0.24">Da 0.24</span> Viene segnalata con un `RebaseApiError` il cui `code` è `DEPENDENCY_REJECTED` e il cui `cause` è il rifiuto che l'ha condannata, così puoi distinguerla dalla scrittura che il server ha effettivamente rifiutato. Sulla 0.23 porta invece l'errore della scrittura rifiutata stessa.
 
 Modifiche consecutive a una stessa riga mentre si è offline vengono unite in un'unica scrittura in coda, così un form in cui si sta digitando non fa crescere la coda. Se il server rifiuta la scrittura unita per il suo contenuto (un 400, 403 o 422 — ad esempio un campo rimosso da una modifica dello schema mentre l'utente era offline), il motore la scompone di nuovo nelle modifiche separate e le riapplica una per una. Viene annullata e segnalata solo la modifica che il server rifiuta; le altre vengono mantenute.
 

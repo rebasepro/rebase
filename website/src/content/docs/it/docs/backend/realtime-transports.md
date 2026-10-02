@@ -152,7 +152,8 @@ La consegna ai client locali non è una tua responsabilità — il servizio real
 
 `pg_notify` rifiuta un payload di 8000 byte o più. I cursori e la presence ci rientrano comodamente; uno snapshot di un documento no. Rebase gestisce questo problema nello stesso modo in cui gestisce le modifiche a entità di grandi dimensioni — inviando un indirizzo anziché un corpo:
 
-- **Su un canale con retention** (vedi [Channel Retention](#channel-retention)) il messaggio è già memorizzato con un numero di sequenza, quindi la notifica trasporta solo `(channel, seq)` e ciascuna istanza ricevente rilegge il corpo. Non c'è alcun limite di dimensione.
+- **Su un canale con retention** (vedi [Channel Retention](#channel-retention)) il messaggio è già memorizzato con un numero di sequenza, quindi la notifica trasporta solo `(channel, seq)` e ciascuna istanza ricevente rilegge il corpo. Non c'è alcun limite di dimensione. Questo vale per ogni messaggio con retention, piccolo o grande: qualsiasi login al database può eseguire `LISTEN`, quindi il corpo non viaggia mai nella notifica. Costa una lettura per chiave primaria per messaggio su ciascuna istanza con un membro sul canale.
+- **I broadcast effimeri e la presence** viaggiano comunque nella notifica stessa, quindi qualsiasi login al database può leggerli. Metti su un canale con retention tutto ciò che non deve essere leggibile in questo modo.
 - **Su un canale effimero** non c'è nulla a cui puntare. Il broadcast viene consegnato localmente, il mittente riceve un errore `CHANNEL_BUS_PAYLOAD_TOO_LARGE` su `channel.onError()` e un avviso indica il nome del canale — evitando che il messaggio raggiunga silenziosamente solo metà del cluster.
 
 Se trasmetti messaggi di grandi dimensioni in broadcast, assegna a quel canale una regola di retention. La soluzione è tutta qui.

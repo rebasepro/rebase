@@ -78,7 +78,7 @@ rebase schema introspect
 
 Questo è utile quando si adotta Rebase su un database esistente — prima esegui l'introspezione, poi personalizza le collezioni generate.
 
-**Introspezione, poi push, non cambia nulla.** Le proprietà generate dicono esattamente cos'è ogni colonna — `columnType`, `precision`/`scale`, `defaultValue`, `required`, l'`isId` di una chiave (`"increment"` per un'identity intera, `columnType: "serial"` per una serial, `"manual"` per una chiave senza default), l'`onDelete` di una relazione, e il blocco `search` di una collezione letto a ritroso dalla colonna che ha costruito — quindi `rebase db push --dry-run` eseguito subito dopo un'introspezione non pianifica alcuna modifica. Dove nessuna proprietà può rappresentare una colonna — un `timestamp` senza time zone, un `interval`, un `inet`, un tipo enum che non si chiama `<table>_<column>`, un default come `CURRENT_DATE` — l'introspezione lo segnala, colonna per colonna, sul terminale e in testa al file, con ciò che un push le farebbe e, quando esiste, l'istruzione che fa coincidere le due cose (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Una tabella con chiave su più di una colonna viene esclusa con il relativo motivo: una collezione legge una riga tramite una sola colonna chiave, e `db push` lascia stare una tabella che non è una collezione.
+<span class="since-badge" data-since="0.24">Da 0.24</span> **Introspezione, poi push, non cambia nulla.** Le proprietà generate dicono esattamente cos'è ogni colonna — `columnType`, `precision`/`scale`, `defaultValue`, `required`, l'`isId` di una chiave (`"increment"` per un'identity intera, `columnType: "serial"` per una serial, `"manual"` per una chiave senza default), l'`onDelete` di una relazione, e il blocco `search` di una collezione letto a ritroso dalla colonna che ha costruito — quindi `rebase db push --dry-run` eseguito subito dopo un'introspezione non pianifica alcuna modifica. Dove nessuna proprietà può rappresentare una colonna — un `timestamp` senza time zone, un `interval`, un `inet`, un tipo enum che non si chiama `<table>_<column>`, un default come `CURRENT_DATE` — l'introspezione lo segnala, colonna per colonna, sul terminale e in testa al file, con ciò che un push le farebbe e, quando esiste, l'istruzione che fa coincidere le due cose (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Una tabella con chiave su più di una colonna viene esclusa con il relativo motivo: una collezione legge una riga tramite una sola colonna chiave, e `db push` lascia stare una tabella che non è una collezione. Sulla 0.23 il push eseguito subito dopo un'introspezione può ancora pianificare cambi di tipo, default rimossi e NOT NULL, e una chiave `id` fantasma.
 
 ### `rebase db push`
 
@@ -203,6 +203,12 @@ rebase generate-sdk
 - Produce un file `database.types.ts` da usare con `createRebaseClient<Database>()`
 
 `rebase dev` lo esegue per te all'avvio e a ogni salvataggio sotto `config/collections/`. Eseguilo tu stesso in CI, in un repository che non ha collezioni (vedi `--from` più sotto), o ovunque `rebase dev` non sia in esecuzione.
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> per la lettura di ogni file, l'interruzione su uno danneggiato,
+l'esecuzione da parte di `rebase dev` e `--collections` su questo comando.
+Sulla 0.23 legge i file elencati dal barrel `index.ts`, salta con un avviso
+quello che non si carica, e accetta la directory come `--collections-dir`;
+`rebase dev` rigenera solo lo schema.
 
 **Opzioni:**
 

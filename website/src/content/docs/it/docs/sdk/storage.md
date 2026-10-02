@@ -79,12 +79,12 @@ L'SDK memorizza nella cache gli URL firmati per evitare chiamate ridondanti al s
 
 ### URL privati vs. pubblici
 
-- **I file privati** ottengono un URL con un **token di download a breve durata, limitato al percorso** (`?token=…`, 5 minuti salvo che il server imposti `STORAGE_DOWNLOAD_TOKEN_TTL`) — mai il tuo token di accesso. Poiché scade, **non conservare un URL privato**; memorizza il **percorso** del file e richiama `getSignedUrl()` al momento del rendering.
+- **I file privati** ottengono un URL con un **token di download a breve durata, limitato al percorso** (`?token=…`, 5 minuti salvo che il server imposti `STORAGE_DOWNLOAD_TOKEN_TTL` <span class="since-badge" data-since="0.24">Da 0.24</span>, che la 0.23 non legge) — mai il tuo token di accesso. Poiché scade, **non conservare un URL privato**; memorizza il **percorso** del file e richiama `getSignedUrl()` al momento del rendering.
 - **I file pubblici** (archiviati sotto il prefisso `public/` — imposta `storage: { public: true }` sulla proprietà, o passa `public: true` a `putObject`) ottengono un URL **stabile, senza token, permanente e memorizzabile nella CDN**, senza andata e ritorno al server. Sono sicuri da memorizzare in un database e da collegare direttamente.
 
 ### File dentro un testo
 
-Un testo che incorpora un file — le immagini in un campo markdown — non può
+<span class="since-badge" data-since="0.24">Da 0.24</span> Un testo che incorpora un file — le immagini in un campo markdown — non può
 contenere nemmeno un URL privato, quindi contiene invece un **riferimento di
 storage**: `rebase-storage:posts/cover.png`, con `?storageId=media` quando il
 file si trova in una sorgente nominata. È ciò che scrive l'editor markdown del

@@ -18,7 +18,30 @@ Status e plan richiedono lo scope `schema:read`, e apply richiede `schema:write`
 
 ## Pianifica prima di applicare
 
-`/plan` non ha effetti collaterali. Invia tramite POST la collection come dovrebbe risultare alla fine, e ti indicherà cosa comporta la modifica:
+`/plan` non ha effetti collaterali. Invia tramite POST la modifica, e ti
+indicherà cosa comporta. <span class="since-badge" data-since="0.24">Da 0.24</span> Una modifica a una collection esistente è una `patch` — ciò che è
+cambiato, come operazioni su percorsi di chiavi — mentre una nuova collection è
+l'intero `collection`:
+
+```json
+{ "collectionId": "posts", "patch": [
+    { "op": "set", "path": ["properties", "subtitle"], "value": { "name": "Subtitle", "type": "string" } },
+    { "op": "remove", "path": ["admin", "group"] }
+] }
+```
+
+Solo le chiavi che una patch nomina vengono scritte nel file della collection.
+Tutto il resto resta com'è — import, commenti, formattazione, l'`onClick` di
+un'azione sull'entità, una proprietà condivisa da un altro modulo, un enum
+importato altrove. Una patch che si estende *dentro* qualcosa definito nel
+codice (`status: statusProperty`, `enum: LOCALE_ENUM`, uno `...spread`) viene
+rifiutata con l'espressione su cui si è imbattuta, in modo che la modifica
+venga fatta dove risiede quel codice. Un intero `collection` inviato per una
+collection già esistente viene trasformato nella patch di ciò che differisce
+da essa, e una chiave il cui valore è codice non viene mai rimossa in questo
+modo. Il pannello di amministrazione invia patch. Sulla 0.23 `/plan` e
+`/apply` accettano solo l'intero `collection` come dovrebbe risultare alla
+fine.
 
 `$ADMIN_TOKEN` è un token di accesso — l'`accessToken` restituito da un accesso — per un account che possiede `schema:read`: un amministratore, o un ruolo che lo dichiara. Nulla sulla macchina lo imposta per te.
 
@@ -81,7 +104,52 @@ Una modifica può essere applicabile e lasciare comunque non applicato qualcosa 
 
 Il percorso di ensure all'avvio segnala la stessa cosa come avviso. Prima dell'introduzione di questa funzionalità, un vincolo trattenuto veniva omesso in silenzio.
 
-`needs-migration` copre tutto ciò che il percorso di ensure non può fare: eliminare una collection o una proprietà, modificare un tipo, rinominare una colonna, cambiare una chiave primaria, rimuovere un valore di enum. Ogni rifiuto specifica la modifica e cosa fare in alternativa.
+`needs-migration` copre tutto ciò che il percorso di ensure non può fare:
+eliminare una collection o una proprietà, modificare il tipo di una colonna
+(un toggle su un intero, una stringa che diventa un enum, il tipo di elemento
+di un array, la larghezza di un varchar), rinominare una colonna, cambiare una
+chiave primaria, rimuovere un valore di enum, rendere univoca una colonna
+esistente, e modificare una relazione — il suo kind, il suo target, il suo
+`localKey`, il suo `onDelete`. Viene rifiutata anche una `hasMany` o `hasOne`
+la cui colonna di collegamento non è creata da nulla. Ogni rifiuto specifica
+la modifica e cosa fare in alternativa.
+
+Il verdetto viene letto dallo schema che ciascun lato produce — lo stesso
+piano a partire dal quale vengono generati `schema.generated.ts` e `db push`
+— quindi una modifica che cambia il database non può essere segnalata come
+nessuna modifica. Due modifiche che sembrano cambiamenti e non vengono
+rifiutate (<span class="since-badge" data-since="0.24">Da 0.24</span>; la 0.23 segnala entrambe come richiedenti una migrazione):
+
+- **Rinominare la chiave di una proprietà mantenendo la sua colonna**
+  (`columnName` impostato sul vecchio nome della colonna) non sposta alcun
+  dato. È `safe`; i client dell'API leggono il nuovo nome.
+- **Impostare, modificare o eliminare un default** vincola solo le scritture
+  future. È `safe`, e viene applicato con `ALTER COLUMN … SET DEFAULT` /
+  `DROP DEFAULT`.
+
+### Modificare solo la sorgente
+
+Una modifica rifiutata può comunque essere scritta nella sorgente della tua
+collection e committata, lasciando il database com'è — rimuovere una
+proprietà che non servi più è il caso tipico. <span class="since-badge" data-since="0.24">Da 0.24</span> Invia `/apply` con `"sourceOnly": true`. Non viene eseguito nulla; il
+messaggio di commit specifica cosa mantiene il database, ad esempio
+`chore(schema): remove sku from products (source only — column products.sku kept)`,
+e ogni modifica nel piano porta una frase `sourceOnly` che indica cosa lascia
+indietro — compreso il caso in cui una colonna lasciata indietro è `NOT NULL`
+senza default, il che fa fallire ogni inserimento successivo finché non viene
+eliminata o resa nullable. Una modifica senza una frase di questo tipo
+(spostare una chiave primaria, una relazione la cui colonna di collegamento
+non è creata da nulla) non può essere scritta nella sola sorgente.
+
+L'eliminazione di una collection dal pannello di amministrazione segue lo
+stesso percorso: `/apply` con `"remove": true` e `"sourceOnly": true` elimina
+il file della collection e la sua voce in `index.ts` e committa entrambi; la
+tabella e le sue righe restano. Viene rifiutata mentre un'altra collection
+importa il file (una relazione verso di essa), nominando l'importatore —
+eliminarlo interromperebbe il caricamento di ogni collection.
+
+Sulla 0.23 `/apply` non accetta né `sourceOnly` né `remove`, e "Edit source
+only" nel pannello scrive il file senza eseguire un commit.
 
 ## Cosa viene committato
 
@@ -92,13 +160,15 @@ Non solo il file della collection. Da esso viene generato lo schema Drizzle, e u
 
 Questi percorsi sono relativi al tuo **progetto**, non al tuo repository. Quando i due coincidono — un progetto `rebase init`, che rappresenta il caso comune — non c'è nulla di cui preoccuparsi. Quando il progetto si trova in una sottodirectory di un repository più grande, i percorsi includono il relativo prefisso, individuato risalendo dalla directory delle collection fino al `rebase.json` più vicino. Un progetto senza `rebase.json` mantiene i percorsi semplici.
 
-Nel commit non finisce alcun SQL. `rebase db push` e `rebase db generate` scrivono il proprio a partire dalle collection a ogni esecuzione, in `.rebase/sql/`, che è in gitignore.
+<span class="since-badge" data-since="0.24">Da 0.24</span> Nel commit non finisce alcun SQL. `rebase db push` e `rebase db generate` scrivono il proprio a partire dalle collection a ogni esecuzione, in `.rebase/sql/`, che è in gitignore.
+Sulla 0.23 il commit porta anche `drizzle/schema.sql`, `drizzle/policies.sql` e
+`drizzle/search.sql`, scritti nella root del progetto.
 
 Il messaggio di commit descrive la modifica piuttosto che limitarsi ad annunciarne una, ed è attribuito alla persona che l'ha effettuata. Una modifica dello schema con un autore e un diff nella cronologia del tuo progetto è qualcosa che né Firebase né Supabase offrono: le modifiche alle loro tabelle sono invisibili al tuo repository.
 
 ## Chi può applicare
 
-Possedere `schema:read` è sufficiente per eseguire **plan**. La pianificazione non ha effetti collaterali, e un job CI che verifichi se una modifica proposta per una collection sia applicabile ne rappresenta un ottimo caso d'uso.
+<span class="since-badge" data-since="0.24">Da 0.24</span> Possedere `schema:read` è sufficiente per eseguire **plan**. La pianificazione non ha effetti collaterali, e un job CI che verifichi se una modifica proposta per una collection sia applicabile ne rappresenta un ottimo caso d'uso.
 
 L'applicazione è un privilegio distinto, poiché applicare scrive un commit e un commit reca con sé un autore:
 
@@ -109,6 +179,9 @@ L'applicazione è un privilegio distinto, poiché applicare scrive un commit e u
 | La service key del server | sì | no |
 
 Una credenziale non è un autore. `api-key:7c3f…` nel tuo ambiente di CI non è una persona fisica, e consentirle di scrivere nel repository produrrebbe esattamente quella cronologia non attribuibile che questa funzionalità è stata concepita per rimpiazzare.
+
+Sulla 0.23 la linea di confine è il ruolo `admin`: un admin pianifica e
+applica, e qualsiasi chiave API può pianificare.
 
 Se ciò che desideri è una modifica automatizzata dello schema — ad esempio una pipeline di migrazione — attivala esplicitamente:
 

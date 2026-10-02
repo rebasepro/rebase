@@ -96,7 +96,8 @@ I sistemi che ne sono a conoscenza lo utilizzano in questo modo:
   semplicemente con la home page del frontend.
 - **`rebase apps list`** lo mostra accanto all'app che lo serve.
 
-Tre forme possibili, tutte comuni:
+Tre forme possibili, tutte comuni. <span class="since-badge" data-since="0.24">Da 0.24</span> per la terza: sulla 0.23 il `path`
+di un'app non può essere un URL, quindi il CMS condivide l'hostname del progetto.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -207,10 +208,28 @@ deve essere `https://` e contenere un hostname e un percorso e nient'altro:
 niente porta, query o frammento. Un `admin.example.com` scritto da solo viene
 rifiutato, indicando l'URL che avrebbe dovuto essere.
 
-In locale, niente viene instradato per hostname. `rebase dev` esegue l'app in
+Con `rebase dev`, niente viene instradato per hostname. Esegue l'app in
 `frontend/` alla radice di una porta di localhost, come ha sempre fatto, e per
 un'app con un hostname il suo banner stampa anche l'indirizzo `https://` che
 avrà una volta distribuita.
+
+`rebase start` è diverso, perché esegue il bundle compilato attraverso lo
+stesso runtime di un deployment — instradamento per hostname incluso. Un'app
+con un hostname risponde solo alle richieste il cui `Host` è quell'hostname,
+quindi `http://localhost:3001/` mostra l'app senza hostname, e un bundle la
+cui unica app indica un hostname risponde 404 lì. Per raggiungerla in locale,
+invia tu stesso l'header:
+
+```bash
+curl -H "Host: admin.example.com" http://localhost:3001/
+```
+
+oppure punta l'hostname a `127.0.0.1` in `/etc/hosts` e apri
+`http://admin.example.com:3001/`. Non esiste deliberatamente alcun parametro
+di query o header che sovrascriva l'instradamento: uno che funzionasse in
+locale funzionerebbe anche contro un deployment, e scegliere l'app in base a
+qualcosa che non sia il vero `Host` è esattamente ciò che l'instradamento
+esiste per impedire.
 
 In self-hosting, il processo fa la stessa scelta a partire dall'header `Host`
 di ogni richiesta. Puntare l'hostname al server e dargli un certificato spetta a

@@ -39,7 +39,7 @@ per intero. Ogni altro ruolo possiede ciò che l'app dichiara per esso.
 | `storage:delete` | dati | sorgente di storage | Eliminare file |
 | `functions:invoke` | dati | funzione | Chiamare funzioni personalizzate. Una funzione può fare tutto ciò che fa il suo codice |
 | `users:read` | admin | — | Elencare gli account e i loro ruoli |
-| `users:write` | admin | — | Creare, modificare ed eliminare account, reimpostare password, assegnare ruoli fino a quelli di chi lo possiede |
+| `users:write` | admin | — | Creare, modificare ed eliminare account, reimpostare password e secondi fattori, assegnare ruoli fino a quelli di chi lo possiede |
 | `schema:read` | admin | — | Leggere lo schema delle collezioni, pianificare modifiche allo schema, eseguire l'audit RLS, leggere la documentazione privata dell'API |
 | `schema:write` | admin | — | Applicare modifiche allo schema: modifica i file delle collezioni e altera il database |
 | `database:read` | admin | — | Elencare database, tabelle, ruoli Postgres e branch |
@@ -266,7 +266,7 @@ e i criteri del database per l'identità con cui agisce sono un altro.
 
 ## Quando manca uno scope
 
-La risposta è `403 SCOPE_MISSING`, e `details.requiredScope` nomina lo scope,
+<span class="since-badge" data-since="0.24">Da 0.24</span> La risposta è `403 SCOPE_MISSING`, e `details.requiredScope` nomina lo scope,
 con il suo target quando ce n'è uno:
 
 ```json

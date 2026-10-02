@@ -23,13 +23,15 @@ anche per loro, tranne `?on_conflict=`.
 Il corpo di una scrittura deve essere un oggetto JSON. `null`, un numero, una
 stringa o un array restituisce `400 BAD_REQUEST`.
 
-Un aggiornamento non può cambiare la chiave di una riga. Un corpo che nomina la
+<span class="since-badge" data-since="0.24">Da 0.24</span> Un aggiornamento non può cambiare la chiave di una riga. Un corpo che nomina la
 chiave con un altro valore restituisce `400 KEY_IMMUTABLE`, prima che venga
 eseguito qualsiasi hook e senza che nulla venga scritto, indipendentemente dal
 canale con cui arriva l'aggiornamento: REST, il socket realtime, MCP o
 `rebase.data` in-process. La chiave che la riga ha già viene accettata, come fa
 un form che rimanda l'intera riga. Per spostare una riga su una nuova chiave,
-creala in quella posizione ed elimina la vecchia.
+creala in quella posizione ed elimina la vecchia. Sulla 0.23 un aggiornamento
+di questo tipo risponde `500`, e uno in-process ha già spostato la riga quando
+viene sollevata l'eccezione.
 
 ### Idempotenza
 

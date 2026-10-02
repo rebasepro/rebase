@@ -254,7 +254,9 @@ Viene segnalata anche una foreign table con un privilegio simile. Postgres non p
 su di essa, quindi il privilegio consegna tutto ciò che restituisce il server remoto, e la
 correzione suggerita revoca invece il privilegio.
 
-Una tabella con RLS disattivata ma senza privilegi concessi a un ruolo esposto *non* viene segnalata. Non è raggiungibile,
+Una tabella con RLS disattivata ma senza privilegi concessi a un ruolo esposto *non* viene
+segnalata, e lo stesso vale per una in uno schema su cui quel ruolo non ha `USAGE` — Postgres
+risponde "permission denied for schema" prima ancora di considerare la tabella. Non è raggiungibile,
 e segnalarla genererebbe solo rumore.
 
 ```sql
@@ -272,6 +274,17 @@ di servizio silenziosa. Vedi [rls-enabled-no-policies](#rls-enabled-no-policies)
 Una policy permissiva la cui espressione `USING` o `WITH CHECK` è una costante sempre vera — `true`,
 `(true)`, `1 = 1`. Le policy permissive vengono combinate con operatore OR, pertanto una sola di esse soddisfa
 il filtro di riga della tabella a prescindere da quanto siano restrittive tutte le altre.
+
+Come ogni controllo, segnala la policy solo quando un ruolo a cui si applica può raggiungere
+la tabella: possiede il privilegio richiesto dal suo comando, e `USAGE` sullo schema.
+`USING (true) TO anon` su una tabella su cui `anon` non possiede nulla riceve risposta
+"permission denied" prima che la policy venga consultata.
+
+Quando solo il `WITH CHECK` di una policy `UPDATE` è costante — `USING (user_id = rebase.uid())
+WITH CHECK (true)` — è **alto**: `USING` continua a decidere quali righe possono essere toccate,
+ma il check consente a una riga toccata di diventare qualsiasi cosa, come ad esempio quella di
+un altro utente. Su una policy `FOR ALL` lo stesso check ammette anche qualsiasi `INSERT`,
+quindi in quel caso resta critico.
 
 Se policy `RESTRICTIVE` sullo stesso comando (`ALL` per un `ALL` permissivo) si applicano a ogni
 ruolo esposto raggiunto dalla policy permissiva, la gravità viene declassata a media e segnalata
@@ -301,7 +314,10 @@ La gravità dipende dalla piattaforma, e questa distinzione è importante:
 
 - **Su Supabase**, `auth.uid()` restituisce `NULL` per i chiamanti anonimi, quindi questo costituisce un controllo funzionante
   per i soli autenticati. Viene segnalato come **basso** — un mancato isolamento dei dati tra utenti
-  autenticati, non una falla di accesso anonimo.
+  autenticati, non una falla di accesso anonimo. Questo vale solo per `auth.uid()` (e per la claim
+  `sub` che legge): una richiesta non autenticata porta comunque la anon key del progetto, quindi
+  `auth.role()` è `'anon'` e `auth.jwt()` sono le claim di quella chiave. La stessa forma costruita
+  su una delle due è *vera per i chiamanti non autenticati*, e viene segnalata come **critica**.
 - **Su Rebase o PostgREST**, dove un ID chiamante vuoto viene convertito nel valore sentinella
   `'anonymous'`, l'espressione risulta *vera anche per i chiamanti non autenticati*. Segnalato come **critico**.
 - **Su una piattaforma non riconosciuta**, segnalato come **medio**, poiché l'esistenza di una vulnerabilità
@@ -374,7 +390,9 @@ funzione o nell'aggiornare il database.
 Le viste materializzate non possono disporre di row-level security, e i dati in esse contenuti rappresentano uno
 snapshot statico salvato da chiunque ne abbia effettuato il refresh. Se una di esse viene concessa a un ruolo non attendibile e la sua
 query di definizione legge una tabella protetta da RLS, nessuna policy può intervenire: revoca il privilegio, o sposta
-la vista materializzata in uno schema non raggiungibile dai ruoli non attendibili.
+la vista materializzata in uno schema non raggiungibile dai ruoli non attendibili. La correzione suggerita revoca ogni
+privilegio che raggiunge un ruolo non attendibile, dal ruolo nominato da ciascun privilegio: un privilegio concesso
+a un ruolo che `anon` eredita non viene rimosso da `REVOKE … FROM anon`.
 
 ```sql
 REVOKE ALL ON "public"."your_matview" FROM "anon";
@@ -409,17 +427,25 @@ USING (EXISTS (SELECT 1 FROM memberships WHERE id = organizations.id ...))
 USING (EXISTS (SELECT 1 FROM memberships m WHERE m.org_id = organizations.id ...))
 ```
 
-**L'assenza di questo risultato non è una prova di sicurezza.** `pg_policies.qual` è la rappresentazione
-dell'albero sintattico fornita da Postgres stesso, che solitamente ri-qualifica i riferimenti alle colonne — quindi il
-nome originale non qualificato spesso non è più visibile al momento della lettura del catalogo. Quando
-questo controllo scatta, costituisce una prova evidente; quando non scatta, non dimostra nulla.
+**Ciò che mostra il catalogo non è ciò che hai scritto.** `pg_policies.qual` è la rappresentazione
+dell'albero sintattico fornita da Postgres stesso, e all'interno di una sottoquery qualifica sempre
+i riferimenti alle colonne, quindi il nome non qualificato non è mai visibile al momento della
+lettura del catalogo. Ciò che sopravvive è il suo effetto: l'`org_id` non qualificato si lega alla
+tabella interna, e il predicato memorizzato confronta la colonna di quella tabella con se stessa —
+`m.org_id = m.org_id`. Questo autoconfronto è ciò che questo controllo individua su un database live.
+
+**L'assenza di questo risultato non è una prova di sicurezza.** Un nome non qualificato confrontato
+con una colonna interna *diversa* (`organization_id = id`) viene memorizzato come
+`m.organization_id = m.id`, che si legge esattamente come un confronto voluto. Quando questo
+controllo scatta, costituisce una prova evidente; quando non scatta, non dimostra nulla.
 
 ### junction-table-unprotected
 
 **Tabella di join molti-a-molti senza RLS.** Alta, euristico.
 
 Una tabella che consiste essenzialmente nei due estremi di due foreign key, entrambe puntate verso
-tabelle che *hanno* la RLS abilitata, senza avere una propria row-level security. Entrambi i lati della relazione
+tabelle che *hanno* la RLS abilitata, senza avere una propria row-level security — e leggibile o
+scrivibile da un ruolo con cui un chiamante non attendibile può presentarsi. Entrambi i lati della relazione
 sono protetti mentre il collegamento tra loro è aperto — il che è sufficiente per enumerare la relazione
 anche quando nessuno dei due endpoint può essere letto direttamente.
 

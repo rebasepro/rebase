@@ -88,7 +88,10 @@ alla proprietà a cui un file era destinato; quindi `curl -F file=@payload.exe` 
 inserendo un eseguibile da 40 MB nel bucket degli avatar, senza che la configurazione contraria
 venisse mai consultata.
 
-Entrambi vengono ora verificati dal server in base a **dove finisce il file**. Lo
+<span class="since-badge" data-since="0.24">Da 0.24</span> Entrambi vengono ora verificati dal server in base a **dove finisce il file**.
+Sulla 0.23 venivano verificati solo rispetto alla proprietà indicata da un
+caricamento, e un caricamento che non ne nomina alcuna incontra solo il limite
+proprio della sorgente. Lo
 `storagePath` di una proprietà è dove vanno i suoi file, quindi è anche dove
 valgono i suoi limiti: ogni caricamento la cui chiave è un file direttamente
 sotto quel percorso — dal pannello, da `client.storage.putObject`, da un
@@ -113,7 +116,7 @@ proprietà `public: true` è sotto `public/`.
 
 ### Immagini in un campo markdown
 
-Una proprietà markdown (`admin.markdown: true`) con un blocco `storage`
+<span class="since-badge" data-since="0.24">Da 0.24</span> Una proprietà markdown (`admin.markdown: true`) con un blocco `storage`
 accetta caricamenti di immagini nel suo editor. Il testo memorizza ogni
 immagine come **riferimento di storage** — `![](rebase-storage:posts/abc_cover.png)`
 — non come URL: l'URL di un file privato porta un token di download che scade

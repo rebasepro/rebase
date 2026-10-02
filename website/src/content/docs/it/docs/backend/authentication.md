@@ -87,16 +87,20 @@ const backend = await initializeRebaseBackend({
 | `activeKid` | `string` | prima chiave | Quale chiave di `signingKeys` emette i nuovi token |
 | `accessExpiresIn` | `string` | `1h` | Durata dell'access token |
 | `refreshExpiresIn` | `string` | `30d` | Durata del refresh token. Scorrevole: ogni rotazione la rinnova. Il runtime passa `JWT_REFRESH_EXPIRES_IN`, il cui valore predefinito è `400d` |
+| `refreshTokenReuseIntervalSeconds` | `number` | `10` | Per quanto tempo un refresh token che è stato ruotato continua a emettere un gemello della sua sessione, in modo che un client che ha perso la risposta di un refresh non venga disconnesso |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | <span class="since-badge" data-since="0.24">Da 0.24</span> Cosa succede a un refresh token presentato dopo quella finestra. `"reject"` lo rifiuta (`TOKEN_ALREADY_USED`) e lo registra nei log, e la sessione resta in piedi: non si tratta di una rilevazione del riutilizzo, poiché chi ha effettuato il refresh per primo mantiene la sessione. `"revoke-session"` termina l'intero accesso in caso di un simile replay (`SESSION_REVOKED`), come fa GoTrue, e il titolare accede di nuovo. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Richiede una sessione per le API dei dati |
 | `allowRegistration` | `boolean` | `false` | Abilita `POST /api/auth/register`. Al di fuori della produzione, il primo utente su una tabella vuota viene ammesso in ogni caso; in produzione l'admin viene definito con `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: chiude anche la finestra di bootstrap del primo utente lasciata aperta da `allowRegistration: false` |
-| `allowAnonymous` | `boolean` | `false` | Abilita `POST /api/auth/anonymous`. Volutamente non vincolato a `allowRegistration`: un'app pubblica a prevalente lettura potrebbe richiedere sessioni senza account |
+| `allowAnonymous` | `boolean` | `false` | Abilita `POST /api/auth/anonymous`. Volutamente non vincolato a `allowRegistration`: un'app pubblica a prevalente lettura potrebbe richiedere sessioni senza account. Trasformare un guest in un account (`POST /api/auth/anonymous/link`) è una registrazione, e richiede anche `allowRegistration` |
 | `allowUserLookup` | `boolean` | `false` | Monta `POST /api/auth/find-user` per i flussi di invito via email |
 | `defaultRole` | `string` | — | Ruolo assegnato a un nuovo utente registrato quando non ne viene specificato uno. Non può essere `admin`, né un ruolo dichiarato che possiede uno scope del piano di amministrazione: l'avvio li rifiuta entrambi |
 | `serviceKey` | `string` | — | Chiave statica per chiamate server-to-server — vedi [Autenticazione con Service Key](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, per ripristino password, verifiche, inviti e magic link |
 | `magicLink` | `boolean` | `false` | Abilita l'accesso senza password via email. Richiede `email` configurata; in caso contrario le route rispondono con `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Abilita i codici di accesso a sei cifre via email — vedi [Codici monouso](#codici-monouso-via-email). Stesso requisito per l'email |
+| `magicLinkCreatesUsers` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Da 0.24</span> Registrazione senza password: una richiesta di magic link o di codice email per un indirizzo senza account ne crea uno (senza password, non verificato finché il link o il codice non vengono usati), mentre `allowRegistration` è attivo. Esegue `beforeUserCreate` e il ruolo predefinito. Disattivato, tali richieste non creano nulla e rispondono a un indirizzo sconosciuto come rispondono a uno conosciuto. `AUTH_MAGIC_LINK_CREATES_USERS` |
+| `requireEmailVerification` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Da 0.24</span> Rifiuta l'accesso con password finché l'indirizzo non è verificato, e rende la registrazione confirm-first — vedi [Verifica email](/docs/backend/email-verification/). Richiede `email`; l'avvio la rifiuta senza |
 | `cookieAuth` | `CookieAuthConfig` | — | Fornisce il refresh token tramite cookie `httpOnly`, `Secure` e `SameSite` invece che nel corpo JSON — vedi sotto |
 | `providers` | `OAuthProvider[]` | `[]` | L'array OAuth canonico; i campi dei provider denominati confluiscono qui |
 | `allowedRedirectUris` | `string[]` | — | Limita gli URI di reindirizzamento accettati dalle route OAuth |
@@ -125,7 +129,27 @@ Il cookie include il flag `Secure` a meno che non venga disattivato esplicitamen
 :::caution[I callback delle collection non vengono eseguiti per gli utenti auth]
 La creazione e l'aggiornamento degli utenti tramite il sistema di autenticazione — registrazione, gestione utenti admin e OAuth — scrivono **direttamente** nello store utenti e aggirano la pipeline di salvataggio della collection. Un callback `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete` sulla collection di autenticazione (users) **non** verrà eseguito per questi percorsi. Per effetti collaterali come il provisioning di un team personale alla registrazione, usa gli hook del ciclo di vita dell'autenticazione (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), che ricevono il record utente completamente popolato.
 
-OAuth ne esegue meno rispetto alla registrazione. L'accesso tramite provider attiva `afterUserCreate` quando crea l'account e nessun altro hook del ciclo di vita: `beforeUserCreate`, `beforeLogin` e `onAuthenticated` non vengono eseguiti sulla route OAuth, quindi controlli o audit trail associati a essi non intercetteranno mai un utente OAuth.
+<span class="since-badge" data-since="0.24">Da 0.24</span> OAuth esegue gli stessi hook degli altri accessi: `beforeLogin` (con
+l'indirizzo del provider e `"oauth"`), `beforeUserCreate` quando l'accesso crea
+l'account, `afterUserCreate`, e `onAuthenticated`. `onAuthenticated` viene
+eseguito anche su un refresh del token (`"refresh"`), un ripristino password
+(`"password-reset"`) e un secondo fattore (`"mfa"`). `beforeLogin` non viene
+eseguito su un refresh, che non è un accesso. Per bloccare un account già
+autenticato, disattivalo con `PUT /api/admin/users/:uid { disabled: true }`:
+questo rifiuta ogni accesso e refresh e termina ogni sessione e token in suo
+possesso.
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> `beforeEmailChange(user, newEmail)` viene eseguito quando un utente
+autenticato richiede di spostare il proprio account su un altro indirizzo.
+Una regola sugli indirizzi che applichi alla registrazione in
+`beforeUserCreate` (solo il tuo dominio, per esempio) va ripetuta anche qui,
+altrimenti un membro può registrarsi con un indirizzo consentito e poi
+spostarsi su un qualsiasi altro.
+
+Un hook che rifiuta (`beforeUserCreate`, `beforeLogin`, `beforeUserDelete`,
+`beforeEmailChange`) lancia un'eccezione. Il chiamante riceve `400 HOOK_REJECTED` con il messaggio
+dell'errore, oppure lo status che l'errore porta con sé: un `ApiError`, o
+qualsiasi errore con uno `status` 4xx.
 :::
 
 ### Protezione dai bot
@@ -178,7 +202,13 @@ Senza `SMTP_HOST`, le email di autenticazione non possono essere inviate. Anzich
              http://localhost:5173/auth/magic-link?token=…
 ```
 
-Seguendo il link, il flusso viene completato. Non cambia nulla riguardo al token — viene generato, archiviato e convalidato esattamente come avverrebbe da una casella di posta reale; cambia soltanto la modalità di consegna.
+Seguendo il link, il flusso viene completato, sulla pagina che serve quel
+percorso: il CMS serve `/reset-password`, `/verify-email`,
+`/confirm-email-change` e `/auth/magic-link` per un magic link; un altro
+frontend ha bisogno di una propria pagina per ciascuno (vedi il [Magic Link](/docs/sdk/authentication/#magic-links)
+dell'SDK). Non cambia nulla riguardo al token — viene generato, archiviato e
+convalidato esattamente come avverrebbe da una casella di posta reale; cambia
+soltanto la modalità di consegna.
 
 Questa modalità è attiva ogni volta che si verificano tutte e tre le condizioni seguenti, senza alcuna impostazione che possa modificarle:
 
@@ -231,7 +261,7 @@ Leggere un codice dalla casella di posta dimostra la proprietà dell'indirizzo, 
 
 ### Personalizzazione del brand nelle email predefinite
 
-I template integrati per il ripristino della password, la verifica, gli inviti, il benvenuto e i magic link mostrano un logo sopra la card. Questo viene configurato tramite `email.logoUrl`:
+I template integrati per il ripristino della password, la verifica, gli inviti, il benvenuto, i magic link e il cambio email mostrano un logo sopra la card. Questo viene configurato tramite `email.logoUrl`:
 
 ```ts
 email: {
@@ -245,7 +275,10 @@ Deve trattarsi di un'immagine **PNG o JPG situata su un URL `http(s)` assoluto**
 
 Il fallback è volutamente asimmetrico. `appName` ricade su `Rebase`, ma il logo utilizza il simbolo Rebase solo fino a quando l'installazione **non** è stata rinominata. Se imposti `appName` con un altro nome, non visualizzerai alcun logo finché non configuri `logoUrl` — altrimenti gli utenti di Acme riceverebbero il logo di Rebase in email firmate dal dominio di Acme.
 
-Se sostituisci un template tramite `email.templates`, nulla di tutto ciò si applica: la tua funzione gestisce l'intero corpo dell'email.
+Se sostituisci un template tramite `email.templates`, nulla di tutto ciò si applica: la tua funzione gestisce l'intero corpo dell'email. `templates.emailChange(confirmUrl, user, newEmail)`
+è il link inviato al nuovo indirizzo quando un utente cambia il proprio, e
+`templates.emailChangeNotice(user, newEmail)` è l'avviso inviato a quello
+vecchio; `user.email` è l'indirizzo attuale in entrambi.
 
 ### Provider OAuth
 
@@ -321,40 +354,42 @@ Il punto 3 rappresenta il caso critico per la sicurezza. Se un'email del provide
 
 Il lato dell'account conta per lo stesso motivo. Nulla verifica l'indirizzo che riceve `POST /auth/register`, quindi chiunque può registrare l'indirizzo di un'altra persona con una password, o accedere con esso tramite un provider che non lo garantisce, e aspettare. Collegare l'accesso con Google del proprietario a quell'account vi lascerebbe la via d'accesso dell'altra persona.
 
-Un magic link, un codice via email o un ripristino della password dimostrano l'indirizzo e verificano l'account. Su un account non ancora verificato, la prima di queste prove rimuove la password (un ripristino imposta quella nuova) e ogni identità collegata il cui provider non ha verificato quell'indirizzo, e termina tutte le sessioni, prima di contrassegnare l'account come verificato. Da lì in poi vale il passaggio 2. Gli account creati da un amministratore con `POST /api/admin/users` vengono salvati come verificati, quindi un invitato può usare "Accedi con Google" subito. Un repository di autenticazione personalizzato senza `unlinkUserIdentity` rifiuta questa prova con `409 UNVERIFIED_IDENTITIES` quando c'è un'identità da rimuovere.
+Un link di verifica, un magic link, un codice via email o un ripristino della password dimostrano l'indirizzo e verificano l'account. Su un account non ancora verificato, la prima di queste prove rimuove la password (un ripristino imposta quella nuova) e ogni identità collegata il cui provider non ha verificato quell'indirizzo, e termina tutte le sessioni, prima di contrassegnare l'account come verificato. Da lì in poi vale il passaggio 2.
+
+Un link di verifica mantiene ciò che la persona che lo segue dimostra anche: una
+sessione attiva dell'account, oppure la sua password. Vedi [Verifica email](/docs/backend/email-verification/). Gli account creati da un amministratore con `POST /api/admin/users` vengono salvati come verificati, quindi un invitato può usare "Accedi con Google" subito. Un repository di autenticazione personalizzato senza `unlinkUserIdentity` rifiuta questa prova con `409 UNVERIFIED_IDENTITIES` quando c'è un'identità da rimuovere.
 
 Questo comportamento non è configurabile — non esiste intenzionalmente alcuna opzione per collegare account sulla base di email non verificate.
 
-Per risolvere un rifiuto al passaggio 3, l'utente effettua l'accesso con il metodo esistente e invoca l'endpoint esplicito di collegamento:
+### Verifica email
 
-```http
-POST /api/auth/link/google
-Authorization: Bearer <access token>
-
-{ "idToken": "..." }
-```
-
-Il collegamento da autenticati intenzionalmente **non** richiede un'email verificata, né richiede che le email coincidano — spesso l'indirizzo Google di un utente non corrisponde a quello dell'applicazione. L'asimmetria è voluta: durante l'accesso, l'email del provider è l'unica prova che associa l'identità in ingresso a un account, mentre in questo caso il chiamante ha già dimostrato la titolarità possedendo una sessione valida. Restituisce `409 IDENTITY_ALREADY_LINKED` se tale identità del provider appartiene a un altro utente, ed è idempotente se è già collegata al chiamante.
-
-#### La direzione inversa
-
-Un utente che si è registrato con Google e non possiede una password:
-
-- **La registrazione con la stessa email** viene rifiutata con `409 EMAIL_EXISTS`.
-- **`POST /api/auth/change-password`** restituisce `400 INVALID_ACCOUNT` — non esiste una password precedente con cui effettuare la verifica.
-- **`forgot-password` → `reset-password` è il percorso supportato per aggiungerne una.** Questo dimostra nuovamente la proprietà dell'indirizzo tramite email, dopodiché l'account disporrà di entrambi i metodi di accesso.
+<span class="since-badge" data-since="0.24">Da 0.24</span> La registrazione invia al nuovo account un
+link di verifica via email, e seguirlo mantiene solo ciò che la persona che lo
+segue dimostra anche. `requireEmailVerification` rende la registrazione
+confirm-first. Vedi [Verifica email](/docs/backend/email-verification/).
 
 ## Tabelle create automaticamente
 
 Al primo avvio, Rebase crea automaticamente lo schema `auth` e le seguenti tabelle nel database (associate allo schema definito nella collection, ad esempio `rebase`):
 
 - **`rebase.users`** — Account utente con email, hash della password, metadati e una colonna text[] per `roles` (i ruoli sono memorizzati come array di testo inline per ottimizzare le query ed evitare join).
-- **`rebase.refresh_tokens`** — Sessioni a lunga durata contenenti gli hash dei refresh token, user agent e indirizzi IP. Include un indice univoco su `token_hash` e un vincolo di unicità su `(user_id, user_agent, ip_address)` per tracciare le sessioni attive sui dispositivi.
+- **`rebase.refresh_tokens`** — Sessioni a lunga durata contenenti gli hash dei refresh token, user agent e indirizzi IP. Include un indice univoco su `token_hash`. Un accesso è un `session_id`, condiviso da ogni token ruotato a partire da esso; non esiste alcun vincolo per dispositivo, quindi due browser dietro lo stesso indirizzo sono due sessioni. Ogni token di una sessione porta anche il proprio livello di garanzia (`aal`) e come è stato effettuato l'accesso (`method`, che `providerId` riporta).
 - **`rebase.password_reset_tokens`** — Token monouso a scadenza per i flussi di recupero password.
 - **`rebase.mfa_factors`** — Metodi di autenticazione a più fattori registrati (es. segreti TOTP crittografati con AES-256).
 - **`rebase.mfa_challenges`** — Log di verifica che tracciano i tentativi attivi di verifica MFA.
 - **`rebase.recovery_codes`** — Codici di backup/recupero multi-fattore con hash.
 - **`rebase.app_config`** — Archivio chiave-valore per le configurazioni di sistema.
+
+I token che scadono — link di reset, magic link e codici email, refresh token,
+challenge MFA — vengono eliminati un'ora dopo la loro scadenza. La pulizia
+viene eseguita sul processo che possiede i timer (il ruolo `worker` in un
+deployment suddiviso) e su una sola istanza della fleet: ogni ora viene
+rivendicata in `rebase.cron_claims` sotto l'id di job
+`rebase:auth:expired-tokens`, come avviene per uno slot cron. Con
+`cronPersistence: false` non esiste alcuna tabella di claim, e ogni istanza di
+questo tipo esegue la pulizia. Un token scaduto viene rifiutato quando viene
+presentato, indipendentemente dal fatto che la pulizia sia stata eseguita o
+no; la pulizia serve solo a evitare che le tabelle crescano indefinitamente.
 
 ## Bootstrap del primo utente
 

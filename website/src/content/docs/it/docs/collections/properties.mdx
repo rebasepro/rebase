@@ -82,7 +82,7 @@ price: {
 |----------|------|-------------|
 | `admin.readOnly` | `boolean` | Impedisce la modifica |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Disabilita con tooltip opzionale |
-| `admin.filledByServer` | `boolean` | Il server compila il campo quando un nuovo record lo lascia vuoto (un hook `beforeSave`). Il modulo lascia passare una creazione senza di esso; resta obbligatorio in modifica, e i controlli del server si applicano comunque |
+| `admin.filledByServer` | `boolean` | <span class="since-badge" data-since="0.24">Da 0.24</span> Il server compila il campo quando un nuovo record lo lascia vuoto (un hook `beforeSave`). Il modulo lascia passare una creazione senza di esso; resta obbligatorio in modifica, e i controlli del server si applicano comunque |
 | `admin.hideFromCollection` | `boolean` | Nasconde dalla vista a tabella |
 | `admin.columnWidth` | `number` | Larghezza della colonna in pixel (vista a tabella) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Larghezza del campo sulla griglia del modulo a quattro colonne |
@@ -295,12 +295,13 @@ dichiara una [relazione](/docs/collections/relations) se desideri una join.
 della configurazione invece di essere ignorato silenziosamente: le chiavi primarie composite non sono supportate,
 e una configurazione che ne dichiara due verrebbe interpretata come la richiesta di una struttura non supportata da Rebase. Se l'obiettivo era applicare un vincolo di unicità su più colonne, si deve utilizzare un [indice](/docs/backend/indexes) univoco.
 
-Una collection in cui nessuna proprietà dichiara `isId` ottiene una colonna
+<span class="since-badge" data-since="0.24">Da 0.24</span> Una collection in cui nessuna proprietà dichiara `isId` ottiene una colonna
 `id` propria: `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. Il database
 la compila, quindi una riga creata dal pannello di amministrazione, dalla
 REST API o dall'SDK non ha bisogno di una chiave, e una chiave che invii tu
 viene usata come fornita. Una tabella creata prima che esistesse questo
-default la riceve al prossimo avvio.
+default la riceve al prossimo avvio. Sulla 0.23 la colonna non ha un default,
+e una creazione che non invia una chiave fallisce.
 :::
 
 ## Proprietà Number

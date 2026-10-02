@@ -15,11 +15,7 @@ La CLI di Rebase (`rebase`) gestisce il tuo progetto dallo scaffolding al deploy
 pnpm add -g @rebasepro/cli
 ```
 
-Oppure utilizzala tramite `pnpm dlx`:
-
-```bash
-pnpm dlx @rebasepro/cli <command>
-```
+Oppure esegui qualsiasi comando senza installarla: `pnpm dlx @rebasepro/cli <command>`.
 
 ## Output leggibile da macchina (Machine-readable)
 
@@ -58,7 +54,7 @@ Avvia il server di sviluppo:
 rebase dev
 ```
 
-Avvia sia il frontend che il backend con hot reloading, e rigenera lo schema Drizzle e i tipi dell'SDK (`generated/sdk/`) all'avvio e a ogni salvataggio di una collection.
+Avvia sia il frontend che il backend con hot reloading, e rigenera lo schema Drizzle e i tipi dell'SDK (`generated/sdk/`) all'avvio e a ogni salvataggio di una collection. <span class="since-badge" data-since="0.24">Da 0.24</span> per i tipi dell'SDK — sulla 0.23 rigenera solo lo schema, ed eseguire `rebase generate-sdk` spetta a te.
 
 Entrambe le porte sono derivate dal percorso del progetto, consentendo l'esecuzione affiancata di più progetti Rebase. Usa gli URL stampati da `rebase dev`. Puoi fissarne una con `rebase dev --port 3001`.
 
@@ -74,11 +70,12 @@ Il bundle è l'artefatto di cui esegui il deploy — l'immagine di runtime lo ca
 
 | Flag | Effetto |
 |------|--------|
-| `--out <dir>` | Scrive il bundle in una posizione diversa da `dist-bundle/` |
+| `--output <dir>` (o `--out`) | Scrive il bundle in una posizione diversa da `dist-bundle/` (un'app alla volta) |
 | `--vendor` | Installa e include sempre le dipendenze del bundle |
 | `--no-vendor` | Non include mai le dipendenze; il pod le installerà al primo avvio |
 | `--skip-type-check` | Salta il controllo dei tipi (più veloce, meno sicuro) |
-| `--no-static` | Salta la compilazione del frontend |
+| `--no-static` | Non ripiega il frontend nel bundle del backend (ogni app statica ottiene comunque un proprio bundle) |
+| `--skip-static-build` | Ripiega il frontend come già compilato, senza eseguire il suo comando di build |
 
 Le dipendenze vengono incluse (vendored) per impostazione predefinita, evitando che il riavvio di un pod richieda un'installazione di 35–55 secondi. Un albero che supera i 200 MB su disco viene invece scartato, poiché il limite di caricamento è di 100 MB compressi — consulta il changelog per le motivazioni.
 
@@ -88,13 +85,17 @@ Aggiorna ogni pacchetto `@rebasepro/*` bloccato dal progetto a una singola relea
 
 ### `rebase start`
 
-Esegue il bundle compilato come server di produzione:
+Esegue il bundle compilato nello stesso modo in cui lo esegue un deployment:
 
 ```bash
 rebase start
 ```
 
-Legge `PORT` e il resto di `.env`, a differenza di `rebase dev`. Indirizzalo a un bundle posizionato altrove con `rebase start --bundle ./dist-bundle`.
+Legge `PORT` e il resto di `.env`, a differenza di `rebase dev`, nel `NODE_ENV`
+che impostano. Un `.env` scaffoldato indica `development`, quindi il primo
+account che si registra diventa comunque admin, e `rebase start` lo segnala
+in testa; imposta `NODE_ENV=production` per un server di produzione.
+`rebase start --bundle ./dist-bundle` esegue un bundle posizionato altrove.
 
 ### `rebase apps list`
 
@@ -168,7 +169,8 @@ rebase db backups list                  # elenca i backup archiviati
 rebase db restore ./backups/<file>.dump --yes
 ```
 
-`backup` esegue `pg_dump`; `restore` esegue `pg_restore` ed è un'operazione distruttiva, quindi richiede `--yes`. `--out` accetta un percorso locale o un URL di object storage, con valore predefinito pari a `$BACKUP_DESTINATION` o `./backups`.
+`backup` esegue `pg_dump`; `restore` esegue `pg_restore` e, essendo distruttivo, richiede `--yes`.
+La pianificazione, il file dei ruoli che viaggia con ogni dump e la procedura di ripristino sono in [Backup e ripristino](/docs/deployment/backups/).
 
 ### `rebase db pull`
 

@@ -181,9 +181,15 @@ Il client WebSocket gestisce l'autenticazione automaticamente:
 - Al **login** o al **refresh del token**, il nuovo token viene inviato a un socket già aperto tramite un messaggio `authenticate`. Se non c'è alcun socket aperto, non accade nulla — l'accesso non è una richiesta per il realtime, e un socket aperto successivamente si autentica da solo.
 - Al **logout**, la connessione WebSocket viene disconnessa. Il client rimane utilizzabile; una sottoscrizione successiva si riconnette in modo anonimo.
 - Se la connessione cade, il client **si riconnette automaticamente** e ristabilisce tutte le sottoscrizioni attive. Non smette mai di tentare finché esiste una sottoscrizione o un canale cui si è aderito; il ritardo tra i tentativi cresce fino a un massimo di 30 secondi.
+- Se il server termina la sessione del socket — l'utente si è disconnesso ovunque, questa sessione è stata revocata, l'account è stato eliminato, oppure il token è scaduto prima che un refresh raggiungesse il socket — chiude il socket con il codice `4001`. Il client si riconnette come dopo qualsiasi caduta, autenticandosi con la sessione che possiede in quel momento (aggiornata se possibile), oppure in modo anonimo quando non ce n'è una. Un ruolo revocato non chiude il socket: si applica a partire dal frame successivo. Vedi [Autenticazione e RLS](/docs/backend/realtime/#authentication-rls).
 - Se la connessione resta inattiva per più di circa 15 secondi, l'`onError` di ciascuna sottoscrizione (e l'`onError` di ciascun canale cui si è aderito) viene chiamato **una sola volta** con un `RebaseApiError` il cui `code` è `CONNECTION_LOST`. La sottoscrizione non viene terminata: continua a mostrare ciò che hai, segnalalo come potenzialmente non aggiornato, e attendi. Quando il socket torna attivo, il successivo `onUpdate` della sottoscrizione porta tutto ciò che è stato scritto nel frattempo.
 - `client.ws.state` è lo stato della connessione — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` o `closed` — e `client.ws.onStateChange(listener)` viene informato di ogni cambiamento. `disconnected` è lo stato in cui `CONNECTION_LOST` è stato segnalato.
 - Le richieste inviate tramite il socket sono **at-most-once**. Una che è stata inviata quando la connessione è caduta fallisce con `CONNECTION_LOST` e non viene mai rinviata, poiché il server potrebbe averla già eseguita. Una che attende ancora un socket dopo 30 secondi fallisce con `REQUEST_TIMEOUT` senza essere inviata.
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> per tutto quanto elencato dopo il logout. Sulla 0.23 il client rinuncia dopo
+cinque tentativi di riconnessione falliti, accoda le richieste fatte mentre è
+disconnesso e le invia alla riconnessione, non ha `client.ws.state`, e il
+server non chiude mai un socket la cui sessione è terminata.
 
 ```typescript
 import { RebaseApiError } from "@rebasepro/client";

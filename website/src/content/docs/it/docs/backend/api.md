@@ -273,6 +273,8 @@ GET /api/data/posts?fields=id,title&limit=50
 
 La chiave primaria viene sempre restituita (una riga che non può essere indirizzata non può essere aggiornata, eliminata o superata con la paginazione — e il cursore è derivato da essa), e le colonne con `excludeFromApi` rimangono nascoste indipendentemente dal fatto che vengano specificate o meno. Una colonna sconosciuta restituisce un 400 `UNKNOWN_FIELD` anziché una riga priva silenziosamente del campo.
 
+Una relazione indicata in `?include=` viene restituita indipendentemente dal fatto che sia indicata anche in `?fields=`: `?include=author&fields=title` restituisce `title`, la chiave e `author`. Indicare la relazione anche in `?fields=` è consentito e non cambia nulla.
+
 `?distinct=true` raggruppa le righe identiche rispetto a tali colonne:
 
 ```bash
