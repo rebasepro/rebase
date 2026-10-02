@@ -106,12 +106,24 @@ DB_PERMISSION_DENIED — Permission denied by the database on "notes"
 SQLSTATE `42501`. Two different problems arrive under it, and the message
 distinguishes them:
 
-- **A row-level security policy denied the row.** The access-control system is
-  working; the caller asked for something their policies do not permit. Check
-  the collection's `securityRules`, and run `npx @rebasepro/rls-check` for a
-  read-only audit of what the database will actually enforce.
-- **The role lacks a `GRANT`.** Nothing about the request will help — the
-  connection role cannot touch the table at all. This is a deployment problem.
+- **A row-level security policy denied the row** — the message above. The
+  access-control system is working; the caller asked for something their
+  policies do not permit. Check the collection's `securityRules`, and run
+  `npx @rebasepro/rls-check` for a read-only audit of what the database will
+  actually enforce.
+- **The role lacks a `GRANT`.** The message names the object instead:
+
+  ```
+  DB_PERMISSION_DENIED — Permission denied by the database: the role this request
+  runs as has no privilege on schema "rebase". That is a missing GRANT to that
+  role, not a row-level security policy.
+  ```
+
+  Nothing about the request will help — the role requests run as cannot touch
+  that object at all. The server grants its request role on the schemas it
+  provisions, at boot; an object created outside it (by another role, or in a
+  schema no collection declares) needs a `GRANT` of its own. This is a
+  deployment problem.
 
 A read that RLS excludes is not an error: the rows are filtered and you get an
 empty page. If a collection reads as empty for a signed-in user who should see
