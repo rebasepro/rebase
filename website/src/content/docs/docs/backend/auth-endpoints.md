@@ -202,9 +202,10 @@ it shows), lists the account's factors, removes one and replaces the recovery
 codes. When a change needs `aal2` it asks for a code first and steps the session
 up with it. The recovery codes are shown once, after the first factor is
 confirmed. In the users table, **Reset two-step verification**
-(`DELETE /api/admin/users/:uid/mfa`) is offered to whoever holds `users:write`,
-as the route is; an account that outranks you is refused with the server's
-reason.
+(`DELETE /api/admin/users/:uid/mfa`) and **Disable or enable account**
+(`PUT /api/admin/users/:uid { disabled }`) are offered to whoever holds
+`users:write`, as the routes are; the switch is never offered on your own
+account, and an account that outranks you is refused with the server's reason.
 
 Set `MFA_ENCRYPTION_KEY` (32+ random characters) to encrypt stored TOTP
 secrets. Without it the server falls back to `JWT_SECRET` and warns. Set it

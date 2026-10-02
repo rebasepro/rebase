@@ -788,6 +788,11 @@ export interface RebaseTranslations {
     reset_mfa_description?: string;
     reset_mfa_confirm?: string;
     reset_mfa_success?: string;
+    account_access_title?: string;
+    account_disabled_label?: string;
+    account_disabled_description?: string;
+    account_disabled_success?: string;
+    account_enabled_success?: string;
 
     auto_setup_collections_button: string;
     auto_setup_collections_title: string;

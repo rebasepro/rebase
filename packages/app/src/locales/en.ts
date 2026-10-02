@@ -714,6 +714,11 @@ export const en: RebaseTranslations = {
     reset_mfa_description: "Removes this user's authenticator apps and recovery codes and signs them out everywhere. They sign in with their password alone and can set up two-step verification again.",
     reset_mfa_confirm: "Reset",
     reset_mfa_success: "Two-step verification reset",
+    account_access_title: "Account access",
+    account_disabled_label: "Account disabled",
+    account_disabled_description: "A disabled account cannot sign in, and every session and token it holds stops working at once. Its data stays; switch it back on to restore access.",
+    account_disabled_success: "Account disabled",
+    account_enabled_success: "Account enabled",
 
 
     auto_setup_collections_button: "Automatically set up collections",

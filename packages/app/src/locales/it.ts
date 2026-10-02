@@ -706,6 +706,11 @@ export const it: RebaseTranslations = {
     reset_mfa_description: "Rimuove le app di autenticazione e i codici di recupero di questo utente e lo disconnette ovunque. Potrà accedere solo con la password e configurare di nuovo la verifica in due passaggi.",
     reset_mfa_confirm: "Reimposta",
     reset_mfa_success: "Verifica in due passaggi reimpostata",
+    account_access_title: "Accesso all'account",
+    account_disabled_label: "Account disattivato",
+    account_disabled_description: "Un account disattivato non può accedere, e tutte le sue sessioni e i suoi token smettono subito di funzionare. I suoi dati restano; riattivalo per ripristinare l'accesso.",
+    account_disabled_success: "Account disattivato",
+    account_enabled_success: "Account attivato",
 
 
     auto_setup_collections_button: "Configura le collezioni automaticamente",

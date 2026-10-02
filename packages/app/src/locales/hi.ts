@@ -706,6 +706,11 @@ export const hi: RebaseTranslations = {
     reset_mfa_description: "इस उपयोगकर्ता के ऑथेंटिकेटर ऐप और रिकवरी कोड हटाता है और उन्हें हर जगह से साइन आउट करता है। वे सिर्फ़ अपने पासवर्ड से साइन इन करेंगे और दो-चरणीय सत्यापन फिर से सेट कर सकेंगे।",
     reset_mfa_confirm: "रीसेट करें",
     reset_mfa_success: "दो-चरणीय सत्यापन रीसेट हो गया",
+    account_access_title: "खाते की पहुँच",
+    account_disabled_label: "खाता निष्क्रिय",
+    account_disabled_description: "निष्क्रिय खाता साइन इन नहीं कर सकता, और उसके सभी सत्र और टोकन तुरंत काम करना बंद कर देते हैं। उसका डेटा बना रहता है; पहुँच लौटाने के लिए इसे फिर से चालू करें।",
+    account_disabled_success: "खाता निष्क्रिय किया गया",
+    account_enabled_success: "खाता सक्रिय किया गया",
 
 
     auto_setup_collections_button: "संग्रहों को स्वचालित रूप से सेट करें",

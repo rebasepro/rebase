@@ -711,6 +711,11 @@ export const pt: RebaseTranslations = {
     reset_mfa_description: "Remove as aplicações de autenticação e os códigos de recuperação deste utilizador e termina todas as suas sessões. Passa a iniciar sessão só com a palavra-passe e pode voltar a configurar a verificação em dois passos.",
     reset_mfa_confirm: "Repor",
     reset_mfa_success: "Verificação em dois passos reposta",
+    account_access_title: "Acesso à conta",
+    account_disabled_label: "Conta desativada",
+    account_disabled_description: "Uma conta desativada não consegue iniciar sessão, e todas as suas sessões e tokens deixam de funcionar de imediato. Os seus dados mantêm-se; volte a ativá-la para repor o acesso.",
+    account_disabled_success: "Conta desativada",
+    account_enabled_success: "Conta ativada",
 
 
     auto_setup_collections_button: "Configurar coleções automaticamente",

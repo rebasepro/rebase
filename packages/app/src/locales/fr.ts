@@ -706,6 +706,11 @@ export const fr: RebaseTranslations = {
     reset_mfa_description: "Retire les applications d'authentification et les codes de récupération de cet utilisateur et le déconnecte partout. Il se connecte ensuite avec son seul mot de passe et peut reconfigurer la validation en deux étapes.",
     reset_mfa_confirm: "Réinitialiser",
     reset_mfa_success: "Validation en deux étapes réinitialisée",
+    account_access_title: "Accès au compte",
+    account_disabled_label: "Compte désactivé",
+    account_disabled_description: "Un compte désactivé ne peut pas se connecter, et toutes ses sessions et tous ses jetons cessent aussitôt de fonctionner. Ses données sont conservées ; réactivez-le pour rétablir l'accès.",
+    account_disabled_success: "Compte désactivé",
+    account_enabled_success: "Compte activé",
 
 
     auto_setup_collections_button: "Configurer les collections automatiquement",

@@ -706,6 +706,11 @@ export const de: RebaseTranslations = {
     reset_mfa_description: "Entfernt die Authenticator-Apps und Wiederherstellungscodes dieses Benutzers und meldet ihn überall ab. Er meldet sich danach nur mit seinem Passwort an und kann die Zwei-Schritt-Verifizierung neu einrichten.",
     reset_mfa_confirm: "Zurücksetzen",
     reset_mfa_success: "Zwei-Schritt-Verifizierung zurückgesetzt",
+    account_access_title: "Kontozugang",
+    account_disabled_label: "Konto deaktiviert",
+    account_disabled_description: "Ein deaktiviertes Konto kann sich nicht anmelden, und alle seine Sitzungen und Tokens funktionieren sofort nicht mehr. Seine Daten bleiben erhalten; schalte es wieder ein, um den Zugang wiederherzustellen.",
+    account_disabled_success: "Konto deaktiviert",
+    account_enabled_success: "Konto aktiviert",
 
 
     auto_setup_collections_button: "Sammlungen automatisch einrichten",

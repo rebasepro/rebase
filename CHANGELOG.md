@@ -209,6 +209,10 @@
   verification* calls `DELETE /admin/users/:uid/mfa`, and is offered only to
   whoever holds `users:write`, as the route is. The auth controller now reads
   the scopes the signed-in user holds (`heldScopes`).
+- **The users table switches an account off and on.** *Disable or enable
+  account* shows whether the account is disabled and flips it
+  (`PUT /admin/users/:uid { disabled }`); it is offered to whoever holds
+  `users:write`, and never on your own account.
 - **The CMS signs in from a magic link.** `<frontend>/auth/magic-link?token=…`
   opened the sign-in screen and dropped the token; it now signs in, through the
   code step on an account with a second factor, and opens the app at its own
