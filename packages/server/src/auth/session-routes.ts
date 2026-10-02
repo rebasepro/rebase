@@ -115,6 +115,10 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const parsed = parseBody(logoutSchema, body);
         const refreshToken = readRefreshToken(c, parsed, config.cookieAuth);
 
+        // Whose sign-out this is: the refresh token's row says, and it is what
+        // the SDK and the CMS send. Read from the bearer token alone, as it
+        // was, `afterLogout` never fired for either of them.
+        let signedOutUid: string | undefined;
         if (refreshToken) {
             const tokenHash = await hashRefreshToken(refreshToken);
             // Kill the whole sign-in, not just the token that happened to be
@@ -123,6 +127,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             // leave the others perfectly usable — a logout that does not log
             // you out is worse than no logout at all.
             const stored = await authRepo.findRefreshTokenByHash(tokenHash).catch(() => null);
+            signedOutUid = stored?.uid;
             const sessionId = stored?.sessionId;
             if (sessionId && authRepo.revokeRefreshTokenSession) {
                 await authRepo.revokeRefreshTokenSession(sessionId);
@@ -134,14 +139,18 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         // Always clear the cookie if in cookie mode
         clearRefreshCookie(c, config.cookieAuth);
 
-        // Call afterLogout hook (fire-and-forget)
-        // Extract uid from the access token if present
-        const accessToken = extractBearerToken(c.req.header("authorization"));
-        if (ops.afterLogout && accessToken !== undefined) {
-            const { verifyAccessToken } = await import("./jwt");
-            const payload = await verifyAccessToken(accessToken);
-            if (payload) {
-                ops.afterLogout(payload.uid).catch((err: unknown) => {
+        // Call afterLogout hook (fire-and-forget). The refresh token's owner,
+        // or failing that the access token's.
+        if (ops.afterLogout) {
+            if (!signedOutUid) {
+                const accessToken = extractBearerToken(c.req.header("authorization"));
+                if (accessToken !== undefined) {
+                    const { verifyAccessToken } = await import("./jwt");
+                    signedOutUid = (await verifyAccessToken(accessToken))?.uid;
+                }
+            }
+            if (signedOutUid) {
+                ops.afterLogout(signedOutUid).catch((err: unknown) => {
                     logger.error("[AuthHooks] afterLogout error", {
                         error: err instanceof Error ? err.message : err
                     });

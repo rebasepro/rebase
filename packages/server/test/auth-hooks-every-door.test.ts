@@ -117,3 +117,16 @@ describe("onAuthenticated", () => {
         expect(unpassed).toEqual([]);
     });
 });
+
+describe("afterLogout", () => {
+    it("fires for a sign-out that sends only its refresh token, as the SDK's does", async () => {
+        const loggedOut: string[] = [];
+        const { post } = world({ afterLogout: async (uid) => { loggedOut.push(uid); } }, "member@company.com");
+        const registered = await post("/auth/register", { email: "member@company.com", password: "Passw0rd-Member" }) as unknown as {
+            json: { user: { uid: string }; tokens: { refreshToken: string } };
+        };
+        await post("/auth/logout", { refreshToken: registered.json.tokens.refreshToken });
+        await new Promise(resolve => setImmediate(resolve));
+        expect(loggedOut).toEqual([registered.json.user.uid]);
+    });
+});
