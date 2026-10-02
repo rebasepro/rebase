@@ -270,6 +270,31 @@
   in words what the key will be able to do. A *My keys* tab manages your
   personal keys when the backend enables them.
 
+- **Two-step verification is set up in the CMS.** Account settings has a
+  Two-step verification tab: add an authenticator app (its key, and a link
+  that opens it in the app), list and remove factors, and replace the recovery
+  codes, with a code asked for first whenever the change needs `aal2`.
+
+- **The users table resets two-step verification.** *Reset two-step
+  verification* calls `DELETE /admin/users/:uid/mfa`, and is offered only to
+  whoever holds `users:write`, as the route is. The auth controller now reads
+  the scopes the signed-in user holds (`heldScopes`).
+
+- **The users table switches an account off and on.** *Disable or enable
+  account* shows whether the account is disabled and flips it
+  (`PUT /admin/users/:uid { disabled }`); it is offered to whoever holds
+  `users:write`, and never on your own account.
+
+- **The CMS signs in from a magic link.** `<frontend>/auth/magic-link?token=…`
+  opened the sign-in screen and dropped the token; it now signs in, through the
+  code step on an account with a second factor, and opens the app at its own
+  address. A visitor already signed in is sent on without spending the link.
+
+- **Account settings change the email address.** The Profile tab has an email
+  field: it mails the confirmation link and says which address is waiting.
+  The link opens its own step on the sign-in screen, signed in or not, and
+  says which sign-in providers it detached.
+
 #### MCP
 
 - **Remote MCP gets `count_documents` (REST's `/count`) and `searchString`
@@ -397,6 +422,21 @@
   `POST /auth/mfa/recovery-codes` / `mfa.regenerateRecoveryCodes()`.
 
 - **`RealtimeSocketOptions.identityRecheckIntervalMs`** (default 30000).
+
+- **Users change their own email address.** `POST /auth/change-email
+  { newEmail }` mails a link to the new address and a notice to the old one;
+  `POST /auth/confirm-email-change { token }` moves the account onto the new
+  address, verified, detaches the sign-in providers that vouched for the old
+  one and keeps its sessions. The link lives 24 hours; an account with a
+  second factor asks from an `aal2` session. The address is not reserved
+  while the link waits, so whoever holds it when the link is followed keeps
+  it (`409 EMAIL_EXISTS`). SDK: `client.auth.changeEmail(newEmail)` and
+  `confirmEmailChange(token)`; `/auth/me` and `User` carry `pendingEmail`.
+  New `beforeEmailChange` hook and `email.templates.emailChange` /
+  `emailChangeNotice`. Postgres gains `users.pending_email`,
+  `email_change_token` and `email_change_sent_at`, added at boot and planned
+  by `db push`. An X account can now replace its placeholder address, which
+  also no longer receives the welcome mail.
 
 ### Changed
 
@@ -953,6 +993,21 @@
 - The CMS verifies a verification link opened while signed in; it rendered a
   not-found page.
 
+- **Expired auth tokens are deleted.** `deleteExpiredTokens` had no caller,
+  so every expired reset link, magic link, email code, abandoned refresh token
+  and MFA challenge stayed in the database. The server now sweeps them once an
+  hour, on the process that owns the timers and on one instance of the fleet:
+  the hour is claimed in `rebase.cron_claims` as `rebase:auth:expired-tokens`.
+  The Postgres repository's sweep now covers magic links, email codes,
+  refresh tokens and MFA challenges as well as reset links.
+
+- **`providerId` keeps saying how the session was signed in after a refresh.**
+  `/auth/refresh` and `/auth/me` answered `password` for every session, so a
+  Google user read `google` at sign-in and `password` an hour later, and a
+  guest read `anonymous`, then `password`. The method is stored with the
+  session (`refresh_tokens.method`, added at boot) and carried across every
+  rotation; sessions signed in before the upgrade read `password`.
+
 #### MCP
 
 - **Remote MCP reads return REST's rows** (ISO dates, a `belongsTo` as its
@@ -1126,6 +1181,13 @@
 - **The CLI no longer writes a refused password straight into the
   database:** it falls back to the direct-database reset only on a network
   error.
+
+- **`rebase auth reset-password` ends the account's sessions when it resets
+  in the database directly.** With the backend unreachable it wrote the new
+  hash and nothing else, so an operator recovering a phished account left the
+  attacker's refresh token minting access tokens. It now deletes the refresh
+  tokens and outstanding reset links and stamps `tokens_valid_after` in the
+  same transaction, as the API reset does.
 
 ## [0.23.0] - 2026-09-27
 

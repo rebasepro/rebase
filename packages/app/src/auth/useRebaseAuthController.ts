@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User, AuthChangeEvent, RebaseSession } from "@rebasepro/types";
+import type { MfaSettingsController } from "@rebasepro/cms-types";
 import type { AuthConfigResponse } from "./api";
 import { RebaseAuthController, RebaseAuthControllerProps } from "./types";
 import { bindSessionCachesToUser, clearSessionCaches } from "./session_caches";
@@ -29,6 +30,7 @@ export function useRebaseAuthController(
     const [loginSkipped, setLoginSkipped] = useState(false);
     const [extra, setExtra] = useState<unknown>(null);
     const [authConfig, setAuthConfig] = useState<AuthConfigResponse | null>(null);
+    const [heldScopes, setHeldScopes] = useState<string[] | undefined>(undefined);
 
     const isMountedRef = useRef(true);
     // Keep a stable ref to onSignOut so the listener never goes stale.
@@ -149,6 +151,21 @@ export function useRebaseAuthController(
             unsubscribe();
         };
     }, [auth]);
+
+    // The scopes the signed-in user holds, read again whenever who that is, or
+    // which roles they have, changes. A screen offers an admin action only to
+    // those its route admits; `undefined` — not yet known — admits nobody.
+    const scopeListing = client?.personalKeys;
+    const signedInAs = user ? `${user.uid}|${(user.roles ?? []).join(",")}` : undefined;
+    useEffect(() => {
+        setHeldScopes(undefined);
+        if (!signedInAs || !scopeListing) return;
+        let current = true;
+        scopeListing.listScopes()
+            .then(({ held }) => { if (current) setHeldScopes(held); })
+            .catch((e: unknown) => console.warn("[Rebase] Could not read the scopes this user holds.", e));
+        return () => { current = false; };
+    }, [signedInAs, scopeListing]);
 
     const getAuthToken = useCallback(async (): Promise<string> => {
         if (!auth) throw new Error("Rebase client with auth is required");
@@ -341,6 +358,73 @@ export function useRebaseAuthController(
         }
     }, [auth]);
 
+    /**
+     * Sign in with a magic link's token. The SDK adopts the session and emits
+     * SIGNED_IN; a refusal lands in `authProviderError` like every other
+     * sign-in's, which is how an `MFA_REQUIRED` reaches the code step.
+     */
+    const magicLinkLogin = useCallback(async (token: string) => {
+        if (!auth?.verifyMagicLink) throw new Error("Rebase client with magic links is required");
+        setAuthLoading(true);
+        setAuthProviderError(null);
+        try {
+            await auth.verifyMagicLink(token);
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            setAuthProviderError(err);
+            throw error;
+        } finally {
+            setAuthLoading(false);
+        }
+    }, [auth]);
+
+    /**
+     * The account's own second factors, over the client's `mfa`. Only when
+     * the client can enrol, list, remove and replace codes — a hand-built
+     * client that can only answer a sign-in challenge gets no settings.
+     */
+    const mfaSettings = useMemo((): MfaSettingsController | undefined => {
+        const mfa = auth?.mfa;
+        if (!mfa) return undefined;
+        const enroll = mfa.enroll?.bind(mfa);
+        const verify = mfa.verify?.bind(mfa);
+        const listFactors = mfa.listFactors?.bind(mfa);
+        const unenroll = mfa.unenroll?.bind(mfa);
+        const regenerateRecoveryCodes = mfa.regenerateRecoveryCodes?.bind(mfa);
+        if (!enroll || !verify || !listFactors || !unenroll || !regenerateRecoveryCodes) return undefined;
+        return {
+            listFactors: () => listFactors(),
+            enroll: async (friendlyName?: string) => {
+                const { factor, totp, recoveryCodes } = await enroll(friendlyName ? { friendlyName } : undefined);
+                return { factorId: factor.id, secret: totp.secret, uri: totp.uri, recoveryCodes };
+            },
+            verifyEnrollment: async (factorId: string, code: string) => {
+                await verify(factorId, code);
+            },
+            removeFactor: async (factorId: string) => {
+                await unenroll(factorId);
+            },
+            regenerateRecoveryCodes: async () => (await regenerateRecoveryCodes()).recoveryCodes,
+            // No pending token: the challenge steps up the session the client
+            // already holds, and the SDK adopts the `aal2` session it mints.
+            stepUp: async (factorId: string, code: string) => {
+                const { challengeId } = await mfa.challenge(factorId);
+                await mfa.verifyChallenge(challengeId, code);
+            }
+        };
+    }, [auth]);
+
+    const changeEmail = useCallback(async (newEmail: string) => {
+        if (!auth?.changeEmail) throw new Error("Rebase client with email change is required");
+        return await auth.changeEmail(newEmail);
+    }, [auth]);
+
+    const confirmEmailChange = useCallback(async (token: string) => {
+        if (!auth?.confirmEmailChange) throw new Error("Rebase client with email change is required");
+        const { email, removedProviders } = await auth.confirmEmailChange(token);
+        return { email, removedProviders };
+    }, [auth]);
+
     const updateProfile = useCallback(async (displayName?: string, photoURL?: string) => {
         if (!auth) throw new Error("Rebase client with auth is required");
         setAuthLoading(true);
@@ -393,6 +477,11 @@ export function useRebaseAuthController(
         resetPassword,
         verifyEmail,
         changePassword,
+        // Offered only when the client can, so the settings view and the
+        // link's screen can tell a missing feature from a failed request.
+        changeEmail: auth?.changeEmail ? changeEmail : undefined,
+        magicLinkLogin: auth?.verifyMagicLink ? magicLinkLogin : undefined,
+        confirmEmailChange: auth?.confirmEmailChange ? confirmEmailChange : undefined,
         updateProfile,
         fetchSessions,
         revokeSession,
@@ -403,6 +492,8 @@ export function useRebaseAuthController(
         // view can tell a second step it can take from one it cannot.
         startMfaChallenge: auth?.mfa ? startMfaChallenge : undefined,
         verifyMfaChallenge: auth?.mfa ? verifyMfaChallenge : undefined,
+        mfaSettings,
+        heldScopes,
         extra,
         setExtra,
         // `authConfig` is null until `GET /auth/config` lands, so each fallback

@@ -19,7 +19,7 @@ import {
     verifyMfaPendingToken,
     type AccessTokenPayload
 } from "./jwt";
-import type { AuthModuleConfig } from "./routes";
+import type { AuthModuleConfig, CreateSessionAndTokens } from "./routes";
 import type { AuthRepository } from "./interfaces";
 import { redactRefreshToken } from "./cookie-utils";
 import { judgeAccessToken } from "./token-revocation";
@@ -60,12 +60,7 @@ interface MfaRoutesConfig {
         refreshToken: string,
         providerId: string
     ) => unknown;
-    createSessionAndTokens: (
-        uid: string,
-        userAgent: string,
-        ipAddress: string,
-        options?: { skipMfaGate?: boolean; aal?: "aal1" | "aal2" }
-    ) => Promise<{ roleIds: string[]; accessToken: string; refreshToken: string }>;
+    createSessionAndTokens: CreateSessionAndTokens;
     applyTransformHook?: (
         response: AuthResponsePayload,
         method: TransformAuthResponseContext["method"],
@@ -506,8 +501,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
             principal.uid,
             c.req.header("user-agent") || "unknown",
             requestClientAddress(c),
-            { skipMfaGate: true,
-aal: "aal2" }
+            { skipMfaGate: true, aal: "aal2", method: "mfa" }
         );
 
         if (ops.onAuthenticated) {

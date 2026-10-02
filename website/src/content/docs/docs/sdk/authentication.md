@@ -115,8 +115,8 @@ A one-click sign-in link by email. The link is always
 `<base>/auth/magic-link?token=…`, where `<base>` is the backend's `email.magicLinkUrl`,
 or its reset-password base (`FRONTEND_URL` on the runtime) when that is not set.
 There is no per-request `redirectTo`. Serve that path in your frontend, and hand
-the token back to trade it for a session. The CMS does not handle this path: an
-app that enables magic links needs its own landing page for it.
+the token back to trade it for a session. <span class="since-badge" data-since="0.24">Since 0.24</span> The CMS serves it, signing in (through the
+code step when there is a second factor); other frontends need a landing page.
 
 ```typescript
 // 1. Ask for the link.
@@ -430,7 +430,7 @@ unsubscribe();
 |-------|------|
 | `SIGNED_IN` | A sign-in or sign-up completed |
 | `TOKEN_REFRESHED` | The access token was renewed — including the silent renewal that restores a session on page load |
-| `USER_UPDATED` | `updateUser()` changed the profile |
+| `USER_UPDATED` | `updateUser()` changed the profile, or `confirmEmailChange()` moved this account to its new address |
 | `SIGNED_OUT` | A sign-out, or a refresh that failed for good |
 
 ## Password Management
@@ -498,6 +498,24 @@ neither the session nor the call proves is removed rather than kept — see
 On a backend with `requireEmailVerification`, `signUp()` resolves with
 `{ confirmationRequired: true, user: null }` and no session: the account
 signs in once the link is followed with its password.
+
+## Changing the Email Address
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A signed-in user moves their own account to another address. Nothing
+changes until the new address answers:
+
+```typescript
+// Mails a link to the new address, and a notice to the current one
+const { pendingEmail, expiresAt } = await client.auth.changeEmail("jane@new.example");
+
+// On the page the link opens (<frontend>/confirm-email-change?token=…):
+const { email, removedProviders } = await client.auth.confirmEmailChange(token);
+```
+
+The link lives 24 hours; `getUser()` reports the waiting address as
+`pendingEmail`. Confirming needs no session, and a client signed in as that
+account takes the new address and emits `USER_UPDATED`. The refusals are listed
+in [Changing an email address](/docs/backend/auth-endpoints/#changing-an-email-address).
 
 ## Session Management (Multi-Device)
 
@@ -576,6 +594,7 @@ interface User {
     providerId: string;
     isAnonymous: boolean;
     emailVerified?: boolean;
+    pendingEmail?: string | null; // an address change waiting for its link
     roles?: string[];          // text[] from the users table
     metadata?: Record<string, unknown>;
 }

@@ -49,6 +49,15 @@ export function createAuthSchema(usersSchemaName = "rebase") {
         tokensValidAfter: timestamp("tokens_valid_after"),
         /** When an administrator switched the account off; NULL while it is on. */
         disabledAt: timestamp("disabled_at", { withTimezone: true }),
+        /**
+         * A self-service address change waiting for its link: the address
+         * the account is moving to, the hash of the token mailed there, and
+         * when it was mailed. The address is not the account's, and is not
+         * reserved, until the link is followed.
+         */
+        pendingEmail: text("pending_email"),
+        emailChangeToken: text("email_change_token"),
+        emailChangeSentAt: timestamp("email_change_sent_at", { withTimezone: true }),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
     });
@@ -96,6 +105,12 @@ export function createAuthSchema(usersSchemaName = "rebase") {
          * nothing else to read the level from.
          */
         aal: text("aal"),
+        /**
+         * How the sign-in happened — `password`, `anonymous`, `magic-link`,
+         * `otp`, `mfa` or a provider id — and what `providerId` says for the
+         * session. Carried across rotations like `aal`.
+         */
+        method: text("method"),
         userAgent: text("user_agent"),
         ipAddress: text("ip_address"),
         createdAt: timestamp("created_at").defaultNow().notNull()

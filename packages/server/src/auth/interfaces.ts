@@ -45,6 +45,17 @@ export interface CreateUserData {
 }
 
 /**
+ * An address change waiting for its confirmation link. See
+ * {@link UserRepository.setPendingEmailChange}.
+ */
+export interface PendingEmailChange {
+    /** The address the account is moving to, normalized. */
+    email: string;
+    /** When the link was mailed; it is refused 24 hours after this. */
+    sentAt: Date;
+}
+
+/**
  * User Identity Data (OAuth accounts linked to user)
  */
 export interface UserIdentityData {
@@ -145,6 +156,13 @@ export interface RefreshTokenInfo {
      * that do not store it; both read as `aal1`, the restrictive value.
      */
     aal?: "aal1" | "aal2";
+    /**
+     * How the session was signed in — `"password"`, `"anonymous"`,
+     * `"magic-link"`, `"otp"`, `"mfa"` or a provider id such as `"google"`.
+     * See {@link RefreshTokenSession.method}. Absent on rows written before
+     * the column existed, which read as `"password"`.
+     */
+    method?: string;
 }
 
 /**
@@ -183,6 +201,14 @@ export interface RefreshTokenSession {
      * assurance level is a property of the *sign-in*, not of the account.
      */
     aal?: "aal1" | "aal2";
+    /**
+     * How the session was signed in: what `providerId` says in every auth
+     * response for it. Written at sign-in and carried across rotations like
+     * {@link aal}, because a refresh is not a sign-in and has nothing else to
+     * read it from — answering `"password"` there turned a Google session into
+     * a password one an access-token lifetime after it began.
+     */
+    method?: string;
     /**
      * The hash of the token this one replaces, when it is minted by rotating
      * one. A repository that honours it writes the new token only while that
@@ -374,6 +400,40 @@ export interface UserRepository {
      * so rather than pretending.
      */
     setUserDisabled?(uid: string, disabled: boolean): Promise<void>;
+
+    // ── Self-service address change ──
+    //
+    // Optional, all four: a repository without them cannot change an address
+    // by confirmation, and `POST /auth/change-email` answers 501 rather than
+    // pretending.
+
+    /**
+     * Record the address an account is moving to and the hash of the token
+     * mailed there, stamped now — or with `null`, drop it. One per account: a
+     * new request replaces the last, and its link stops working.
+     *
+     * Nothing is reserved by it. The address stays free for anyone to
+     * register until the link is followed, because a pending change that held
+     * it would let any account lock a stranger out of signing up with their
+     * own address.
+     */
+    setPendingEmailChange?(uid: string, change: { email: string; tokenHash: string } | null): Promise<void>;
+
+    /** The account's pending change, if it has one. */
+    getPendingEmailChange?(uid: string): Promise<PendingEmailChange | null>;
+
+    /** The account whose pending change `tokenHash` confirms, with the change. */
+    findPendingEmailChange?(tokenHash: string): Promise<{ user: UserData; change: PendingEmailChange } | null>;
+
+    /**
+     * Move the account onto its pending address, in one write that holds only
+     * while `tokenHash` is still that change's token: the address becomes the
+     * account's, verified, and the pending change and any outstanding
+     * verification token are cleared. `null` when the token no longer names
+     * the change (confirmed already, replaced, cancelled). An address another
+     * account holds by then is a 409 `EMAIL_EXISTS`, as `updateUser` answers.
+     */
+    applyPendingEmailChange?(uid: string, tokenHash: string): Promise<UserData | null>;
 }
 
 /**
@@ -500,7 +560,11 @@ export interface TokenRepository {
     deleteAllPasswordResetTokensForUser(uid: string): Promise<void>;
 
     /**
-     * Clean up expired tokens
+     * Delete every token past its expiry: reset links, magic links and email
+     * codes, refresh tokens, and whatever else the repository keeps that
+     * expires. A token is refused when presented whether or not this has run,
+     * so it is housekeeping, not revocation. The server calls it once an hour
+     * on one instance of the fleet (`startExpiredTokenSweep`).
      */
     deleteExpiredTokens(): Promise<void>;
 

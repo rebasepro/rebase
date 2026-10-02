@@ -156,8 +156,13 @@ a sign-in. To stop an account that is already signed in, disable it with
 `PUT /api/admin/users/:uid { disabled: true }`: that refuses every sign-in and
 refresh and ends every session and token it holds.
 
-A hook that refuses (`beforeUserCreate`, `beforeLogin`, `beforeUserDelete`)
-throws. The caller gets `400 HOOK_REJECTED` with the error's message, or the
+<span class="since-badge" data-since="0.24">Since 0.24</span> `beforeEmailChange(user, newEmail)` runs when a signed-in user asks to
+move their account to another address. An address rule you enforce at sign-up
+in `beforeUserCreate` (only your own domain, say) belongs here too, or a member
+can sign up with an allowed address and then move to any other.
+
+A hook that refuses (`beforeUserCreate`, `beforeLogin`, `beforeUserDelete`,
+`beforeEmailChange`) throws. The caller gets `400 HOOK_REJECTED` with the error's message, or the
 status the error carries: an `ApiError`, or any error with a 4xx `status`.
 :::
 
@@ -231,9 +236,9 @@ request, a development server captures the message and prints its links:
 ```
 
 Follow the link and the flow completes, on whatever page serves that path: the
-CMS serves `/reset-password` and `/verify-email`, and a magic link's
-`/auth/magic-link` needs a page of your own (see the SDK's
-[Magic Links](/docs/sdk/authentication/#magic-links)). Nothing about the token
+CMS serves `/reset-password`, `/verify-email`, `/confirm-email-change` and a
+magic link's `/auth/magic-link`; another frontend needs a page of its own for
+each (see the SDK's [Magic Links](/docs/sdk/authentication/#magic-links)). Nothing about the token
 changes — it is minted, stored and validated exactly as it would be from a
 real inbox; only delivery is different.
 
@@ -314,8 +319,8 @@ See [Account Linking](#account-linking-across-sign-in-methods).
 
 ### Branding the default emails
 
-The built-in password-reset, verification, invitation, welcome and magic-link
-templates render a logo above the card. It comes from `email.logoUrl`:
+The built-in password-reset, verification, invitation, welcome, magic-link and
+email-change templates render a logo above the card. It comes from `email.logoUrl`:
 
 ```ts
 email: {
@@ -338,7 +343,10 @@ itself. Set `appName` to anything else and you get no logo until you set
 Acme's domain.
 
 If you replace a template through `email.templates`, none of this applies: your
-function owns the whole body.
+function owns the whole body. `templates.emailChange(confirmUrl, user, newEmail)`
+is the link mailed to the new address when a user changes theirs, and
+`templates.emailChangeNotice(user, newEmail)` the notice mailed to the old one;
+`user.email` is the current address in both.
 
 ### OAuth Providers
 
@@ -482,12 +490,21 @@ also proves. `requireEmailVerification` makes registration confirm-first. See
 On first startup, Rebase automatically provisions the `auth` schema and the following tables in the database (bound to the schema defined in your collection, e.g., `rebase`):
 
 - **`rebase.users`** — User accounts with email, password hash, metadata, and a `roles` text[] column (roles are stored as inline text arrays to optimize queries and avoid joins).
-- **`rebase.refresh_tokens`** — Long-lived sessions carrying hashed refresh tokens, user agents, and IP addresses. Includes a unique index on `token_hash`. One sign-in is one `session_id`, shared by every token rotated out of it; there is no per-device constraint, so two browsers behind one address are two sessions.
+- **`rebase.refresh_tokens`** — Long-lived sessions carrying hashed refresh tokens, user agents, and IP addresses. Includes a unique index on `token_hash`. One sign-in is one `session_id`, shared by every token rotated out of it; there is no per-device constraint, so two browsers behind one address are two sessions. Every token of a session also carries its assurance level (`aal`) and how it was signed in (`method`, which `providerId` reports).
 - **`rebase.password_reset_tokens`** — Expirable single-use tokens for password recovery flows.
 - **`rebase.mfa_factors`** — Enrolled multi-factor authentication methods (e.g. TOTP secrets encrypted with AES-256).
 - **`rebase.mfa_challenges`** — Verification logs tracking active MFA verification attempts.
 - **`rebase.recovery_codes`** — Hashed multi-factor backup/recovery codes.
 - **`rebase.app_config`** — Key-value store for system configurations.
+
+Tokens that expire — reset links, magic links and email codes, refresh tokens,
+MFA challenges — are deleted once an hour after they expire. The sweep runs on
+the process that owns the timers (the `worker` role in a split deployment) and
+on one instance of the fleet: each hour is claimed in `rebase.cron_claims`
+under the job id `rebase:auth:expired-tokens`, as a cron slot is. With
+`cronPersistence: false` there is no claims table, and every such instance
+sweeps. An expired token is refused when presented whether or not the sweep has
+run; the sweep only keeps the tables from growing.
 
 ## First User Bootstrap
 

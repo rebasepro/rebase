@@ -20,6 +20,7 @@ import {
     MfaFactor,
     MfaChallengeInfo,
     AccountAccessState,
+    PendingEmailChange,
     ApiError
 } from "@rebasepro/server";
 import { toSnakeCase, camelCase } from "@rebasepro/utils";
@@ -172,6 +173,11 @@ export class UserService implements UserRepository {
             "is_anonymous", "isAnonymous",
             "disabled_at", "disabledAt",
             "tokens_valid_after", "tokensValidAfter",
+            // Never metadata: the change is the account's business, and the
+            // token's hash is a secret.
+            "pending_email", "pendingEmail",
+            "email_change_token", "emailChangeToken",
+            "email_change_sent_at", "emailChangeSentAt",
             "roles",
             "created_at", "createdAt",
             "updated_at", "updatedAt",
@@ -643,6 +649,105 @@ export class UserService implements UserRepository {
         return this.disabledColumn;
     }
 
+    /**
+     * Whether the users table has the address-change columns. Added at boot to
+     * every auth table, but the app's drizzle object never declares them, so
+     * the database is asked — once — as for `disabled_at`.
+     */
+    private emailChangeColumns?: Promise<boolean>;
+    private hasEmailChangeColumns(): Promise<boolean> {
+        this.emailChangeColumns ??= (async () => {
+            const name = getTableName(this.usersTable);
+            const schema = getTableConfig(this.usersTable).schema || "public";
+            const result = await this.db.execute(sql`
+                SELECT count(*)::int AS present FROM information_schema.columns
+                WHERE table_schema = ${schema} AND table_name = ${name}
+                  AND column_name IN ('pending_email', 'email_change_token', 'email_change_sent_at')
+            `);
+            return (result.rows[0] as { present: number }).present === 3;
+        })().catch(() => {
+            this.emailChangeColumns = undefined;
+            return false;
+        });
+        return this.emailChangeColumns;
+    }
+
+    private async requireEmailChangeColumns(): Promise<void> {
+        if (!(await this.hasEmailChangeColumns())) {
+            throw new ApiError(501, "NOT_SUPPORTED", "The users table has no pending_email column; restart the server so it is added.");
+        }
+    }
+
+    /** @see UserRepository.setPendingEmailChange */
+    async setPendingEmailChange(uid: string, change: { email: string; tokenHash: string } | null): Promise<void> {
+        await this.requireEmailChangeColumns();
+        const usersTableName = this.getQualifiedUsersTableName();
+        await this.withServerContext(async (db) => db.execute(change
+            ? sql`
+                UPDATE ${sql.raw(usersTableName)}
+                SET pending_email = ${normalizeEmail(change.email)}, email_change_token = ${change.tokenHash},
+                    email_change_sent_at = NOW(), updated_at = NOW()
+                WHERE id = ${uid}`
+            : sql`
+                UPDATE ${sql.raw(usersTableName)}
+                SET pending_email = NULL, email_change_token = NULL, email_change_sent_at = NULL, updated_at = NOW()
+                WHERE id = ${uid}`));
+    }
+
+    /** @see UserRepository.getPendingEmailChange */
+    async getPendingEmailChange(uid: string): Promise<PendingEmailChange | null> {
+        if (!(await this.hasEmailChangeColumns())) return null;
+        const usersTableName = this.getQualifiedUsersTableName();
+        const result = await this.db.execute(sql`
+            SELECT pending_email, email_change_sent_at FROM ${sql.raw(usersTableName)}
+            WHERE id = ${uid} AND pending_email IS NOT NULL AND email_change_sent_at IS NOT NULL
+        `);
+        const row = result.rows[0] as { pending_email: string; email_change_sent_at: Date | string } | undefined;
+        return row ? { email: row.pending_email, sentAt: new Date(row.email_change_sent_at) } : null;
+    }
+
+    /** @see UserRepository.findPendingEmailChange */
+    async findPendingEmailChange(tokenHash: string): Promise<{ user: UserData; change: PendingEmailChange } | null> {
+        if (!(await this.hasEmailChangeColumns())) return null;
+        const usersTableName = this.getQualifiedUsersTableName();
+        const result = await this.db.execute(sql`
+            SELECT * FROM ${sql.raw(usersTableName)}
+            WHERE email_change_token = ${tokenHash} AND pending_email IS NOT NULL AND email_change_sent_at IS NOT NULL
+        `);
+        const row = result.rows[0] as Record<string, unknown> | undefined;
+        if (!row) return null;
+        return {
+            user: this.mapRowToUser(row),
+            change: { email: row.pending_email as string, sentAt: new Date(row.email_change_sent_at as Date | string) }
+        };
+    }
+
+    /** @see UserRepository.applyPendingEmailChange — one write, held to the token. */
+    async applyPendingEmailChange(uid: string, tokenHash: string): Promise<UserData | null> {
+        await this.requireEmailChangeColumns();
+        const usersTableName = this.getQualifiedUsersTableName();
+        try {
+            const result = await this.withServerContext(async (db) => db.execute(sql`
+                UPDATE ${sql.raw(usersTableName)}
+                SET email = pending_email, email_verified = TRUE,
+                    email_verification_token = NULL, email_verification_sent_at = NULL,
+                    pending_email = NULL, email_change_token = NULL, email_change_sent_at = NULL,
+                    updated_at = NOW()
+                WHERE id = ${uid} AND email_change_token = ${tokenHash} AND pending_email IS NOT NULL
+                RETURNING *
+            `));
+            const row = result.rows[0] as Record<string, unknown> | undefined;
+            return row ? this.mapRowToUser(row) : null;
+        } catch (error) {
+            // The address was taken while the link waited: the unique index
+            // on it says so, and the change does not happen.
+            if (extractPgError(error)?.code === "23505") {
+                throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
+            }
+            throw error;
+        }
+    }
+
     /** @see UserRepository.setUserDisabled */
     async setUserDisabled(uid: string, disabled: boolean): Promise<void> {
         if (!(await this.hasDisabledColumn())) {
@@ -716,7 +821,7 @@ export class RefreshTokenService {
             userAgent: this.refreshTokensTable.userAgent,
             ipAddress: this.refreshTokensTable.ipAddress
         };
-        for (const optional of ["sessionId", "rotatedAt", "revoked", "sessionStartedAt", "aal"]) {
+        for (const optional of ["sessionId", "rotatedAt", "revoked", "sessionStartedAt", "aal", "method"]) {
             if (this.has(optional)) selection[optional] = this.col(optional);
         }
         return selection;
@@ -754,6 +859,9 @@ export class RefreshTokenService {
         // presented. A table without the column degrades to `aal1` on read,
         // which is the restrictive answer rather than a bypass.
         if (session?.aal && this.has("aal")) values.aal = session.aal;
+        // The sign-in method, on every token of the session for the same
+        // reason: refresh reads it off whichever row was presented.
+        if (session?.method && this.has("method")) values.method = session.method;
 
         // A rotation writes only while the token it replaces is live. Without
         // a `rotatedAt` column `markRotated` deletes that token, so there is
@@ -833,6 +941,8 @@ export class RefreshTokenService {
         // is not exactly "aal2" is left unset, which the reader treats as
         // `aal1`: the restrictive answer, as the interface documents.
         if (row.aal === "aal1" || row.aal === "aal2") info.aal = row.aal;
+        // A label, not a grant: any non-empty text is carried as it is.
+        if (typeof row.method === "string" && row.method.length > 0) info.method = row.method;
         return info;
     }
 
@@ -962,6 +1072,16 @@ export class RefreshTokenService {
     async deleteById(id: string, uid: string): Promise<void> {
         await this.db.delete(this.refreshTokensTable)
             .where(sql`${this.refreshTokensTable.id} = ${id} AND ${this.refreshTokensTable.uid} = ${uid}`);
+    }
+
+    /**
+     * Every token past its expiry, whoever holds it. `prune` clears a user's
+     * expired rows when that user refreshes; a session nobody comes back to
+     * is only ever cleared here.
+     */
+    async deleteExpired(): Promise<void> {
+        await this.db.delete(this.refreshTokensTable)
+            .where(sql`${this.refreshTokensTable.expiresAt} < NOW()`);
     }
 }
 
@@ -1122,6 +1242,15 @@ export class MagicLinkTokenService {
         };
     }
 
+    /** Links and email codes past their expiry, used or not. */
+    async deleteExpired(): Promise<void> {
+        const tableName = this.getQualifiedTableName();
+        await this.db.execute(sql`
+            DELETE FROM ${sql.raw(tableName)}
+            WHERE expires_at < NOW()
+        `);
+    }
+
     async markAsUsed(tokenHash: string): Promise<void> {
         await this.db
             .update(this.magicLinkTokensTable)
@@ -1212,8 +1341,14 @@ export class PostgresTokenRepository implements TokenRepository {
         await this.passwordResetTokenService.deleteAllForUser(uid);
     }
 
+    /**
+     * @see TokenRepository.deleteExpiredTokens — reset links, magic links and
+     * email codes, and refresh tokens, each past its own expiry.
+     */
     async deleteExpiredTokens(): Promise<void> {
         await this.passwordResetTokenService.deleteExpired();
+        await this.magicLinkTokenService.deleteExpired();
+        await this.refreshTokenService.deleteExpired();
     }
 
     // Magic link token operations
@@ -1334,6 +1469,22 @@ export class PostgresAuthRepository implements AuthRepository {
         await this.userService.setUserDisabled(uid, disabled);
     }
 
+    async setPendingEmailChange(uid: string, change: { email: string; tokenHash: string } | null): Promise<void> {
+        await this.userService.setPendingEmailChange(uid, change);
+    }
+
+    async getPendingEmailChange(uid: string): Promise<PendingEmailChange | null> {
+        return this.userService.getPendingEmailChange(uid);
+    }
+
+    async findPendingEmailChange(tokenHash: string): Promise<{ user: UserData; change: PendingEmailChange } | null> {
+        return this.userService.findPendingEmailChange(tokenHash);
+    }
+
+    async applyPendingEmailChange(uid: string, tokenHash: string): Promise<UserData | null> {
+        return this.userService.applyPendingEmailChange(uid, tokenHash);
+    }
+
     // Token operations (delegate to PostgresTokenRepository)
 
     async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<boolean> {
@@ -1398,6 +1549,7 @@ export class PostgresAuthRepository implements AuthRepository {
 
     async deleteExpiredTokens(): Promise<void> {
         await this.tokenRepository.deleteExpiredTokens();
+        await this.getMfaService().deleteExpiredChallenges();
     }
 
     // Magic link token operations
@@ -1684,6 +1836,15 @@ export class MfaService implements MfaRepository {
 
         if (result.rows.length === 0) return 0;
         return Number((result.rows[0] as { attempts: number | string }).attempts);
+    }
+
+    /** Challenges past their five minutes, answered or not. */
+    async deleteExpiredChallenges(): Promise<void> {
+        const tableName = this.qualify("mfa_challenges");
+        await this.db.execute(sql`
+            DELETE FROM ${sql.raw(tableName)}
+            WHERE expires_at < NOW()
+        `);
     }
 
     async verifyMfaChallenge(challengeId: string): Promise<void> {

@@ -498,6 +498,94 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
             expect(result.current.authLoading).toBe(false);
         });
 
+        it("signs in with a magic link's token, and records a refusal where the login view reads it", async () => {
+            const mfaRequired = Object.assign(new Error("MFA required"), { code: "MFA_REQUIRED" });
+            mockAuth.verifyMagicLink = jest.fn().mockRejectedValueOnce(mfaRequired).mockResolvedValueOnce(undefined);
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await expect(result.current.magicLinkLogin!("link-token")).rejects.toBe(mfaRequired);
+            });
+            expect(mockAuth.verifyMagicLink).toHaveBeenCalledWith("link-token");
+            expect(result.current.authProviderError).toBe(mfaRequired);
+
+            await act(async () => {
+                await result.current.magicLinkLogin!("link-token-2");
+            });
+            expect(result.current.authProviderError).toBeNull();
+        });
+
+        it("reads the scopes the signed-in user holds, and forgets them on sign-out", async () => {
+            let fire!: (event: string, session: unknown) => void;
+            mockAuth.onAuthStateChange.mockImplementation((cb: (event: never, session: never) => void) => {
+                fire = cb as never;
+                return jest.fn();
+            });
+            const listScopes = jest.fn().mockResolvedValue({ scopes: [], held: ["users:read", "users:write"] });
+            const client = { ...mockClient, personalKeys: { listScopes } };
+
+            const { result } = renderHook(() => useRebaseAuthController({ client }));
+            const settle = () => act(async () => {
+                for (let i = 0; i < 5; i++) await Promise.resolve();
+            });
+            await settle();
+            expect(result.current.heldScopes).toBeUndefined();
+            expect(listScopes).not.toHaveBeenCalled();
+
+            await act(async () => {
+                fire("SIGNED_IN", mockSession);
+            });
+            await settle();
+            expect(listScopes).toHaveBeenCalled();
+            expect(result.current.heldScopes).toEqual(["users:read", "users:write"]);
+
+            await act(async () => {
+                fire("SIGNED_OUT", null);
+            });
+            await settle();
+            expect(result.current.heldScopes).toBeUndefined();
+        });
+
+        it("manages the account's second factors through the client, stepping up with a challenge", async () => {
+            const mfa = {
+                challenge: jest.fn().mockResolvedValue({ challengeId: "ch-1" }),
+                verifyChallenge: jest.fn().mockResolvedValue(undefined),
+                enroll: jest.fn().mockResolvedValue({
+                    factor: { id: "f-1", factorType: "totp" },
+                    totp: { secret: "SECRET", uri: "otpauth://x", qrUri: "otpauth://x" },
+                    recoveryCodes: ["c-1"]
+                }),
+                verify: jest.fn().mockResolvedValue({ success: true }),
+                listFactors: jest.fn().mockResolvedValue([]),
+                unenroll: jest.fn().mockResolvedValue({ success: true }),
+                regenerateRecoveryCodes: jest.fn().mockResolvedValue({ recoveryCodes: ["n-1"] })
+            };
+            mockAuth.mfa = mfa;
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+            const settings = result.current.mfaSettings!;
+
+            expect(await settings.enroll("Phone")).toEqual({ factorId: "f-1", secret: "SECRET", uri: "otpauth://x", recoveryCodes: ["c-1"] });
+            expect(mfa.enroll).toHaveBeenCalledWith({ friendlyName: "Phone" });
+            expect(await settings.regenerateRecoveryCodes()).toEqual(["n-1"]);
+            await settings.stepUp("f-1", "123456");
+            // No pending token: the challenge steps up the session the client holds.
+            expect(mfa.challenge).toHaveBeenCalledWith("f-1");
+            expect(mfa.verifyChallenge).toHaveBeenCalledWith("ch-1", "123456");
+        });
+
+        it("offers no factor management when the client cannot enrol", () => {
+            mockAuth.mfa = { challenge: jest.fn(), verifyChallenge: jest.fn() };
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+            expect(result.current.mfaSettings).toBeUndefined();
+        });
+
+        it("offers no magic-link sign-in when the client has none", () => {
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+            expect(result.current.magicLinkLogin).toBeUndefined();
+        });
+
         it("should set authProviderError when signOut fails", async () => {
             mockAuth.signOut.mockRejectedValue(new Error("network error"));
 

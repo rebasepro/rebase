@@ -257,6 +257,20 @@ export interface AuthHooks {
     afterUserDelete?(uid: string): Promise<void>;
 
     /**
+     * Called when a signed-in user asks to move their account to `newEmail`
+     * (`POST /auth/change-email`), before anything is mailed. The address is
+     * normalized, free and deliverable by then.
+     *
+     * The address rule `beforeUserCreate` enforces at sign-up — only your own
+     * domain, say — belongs here too, or a member can sign up with an allowed
+     * address and then move to any other.
+     *
+     * Throw to refuse: 400 `HOOK_REJECTED` with your message, or the status
+     * your error carries.
+     */
+    beforeEmailChange?(user: UserData, newEmail: string): Promise<void>;
+
+    /**
      * Optional hook to customize or override the default user creation flow via the admin panel/REST API.
      * When provided, this replaces the built-in password generation, hashing, and invitation email logic.
      */
@@ -320,7 +334,7 @@ export type ResolvedAuthHooks =
  * What a hook's thrown error answers.
  *
  * The hooks that refuse (`beforeUserCreate`, `beforeLogin`,
- * `beforeUserDelete`) are documented as "throw to reject", and a plain
+ * `beforeUserDelete`, `beforeEmailChange`) are documented as "throw to reject", and a plain
  * `Error` is what people throw. It reached the error handler as a 500
  * "Internal Server Error", so a deployment that limits sign-ups to its own
  * domain answered an outsider with a server fault. A refusal is the caller's
@@ -364,6 +378,7 @@ export function resolveAuthHooks(hooks?: AuthHooks): ResolvedAuthHooks {
         beforeUserCreate: refusable("beforeUserCreate", hooks?.beforeUserCreate?.bind(hooks)),
         beforeLogin: refusable("beforeLogin", hooks?.beforeLogin?.bind(hooks)),
         beforeUserDelete: refusable("beforeUserDelete", hooks?.beforeUserDelete?.bind(hooks)),
+        beforeEmailChange: refusable("beforeEmailChange", hooks?.beforeEmailChange?.bind(hooks)),
 
         hashPassword: hooks?.hashPassword
             ?? defaultHashPassword,

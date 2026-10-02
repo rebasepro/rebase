@@ -377,6 +377,13 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
  * The script the direct-database fallback runs under the project's own tsx, so
  * it resolves the project's `@rebasepro/server-postgres` and schema.
  *
+ * It ends the account's sessions in the transaction that sets the password,
+ * as every door through the API does (`replaceUserPassword`): the refresh
+ * tokens and outstanding reset links go, and `tokens_valid_after` voids the
+ * access tokens already handed out. An operator resetting a phished account
+ * with the backend down is the case this exists for, and a reset that left the
+ * attacker's refresh token minting access tokens did not recover anything.
+ *
  * It exits 0 only when a row was updated: a missing user and a thrown error are
  * both exit 1. `echoPassword` prints the new password, for a generated one.
  *
@@ -386,7 +393,7 @@ export function resetPasswordScript(echoPassword: boolean): string {
     return `
 import { createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import { hashPassword } from "@rebasepro/server";
-import { eq } from "drizzle-orm";
+import { getTableConfig } from "drizzle-orm/pg-core";
 import * as dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
@@ -398,8 +405,10 @@ dotenv.config({ path: process.env.REBASE_ENV_FILE_PATH, quiet: true });
 const email = process.env.REBASE_RESET_EMAIL!.trim().toLowerCase();
 const newPassword = process.env.REBASE_RESET_PASSWORD!;
 
+const quote = (identifier: string) => '"' + identifier.replace(/"/g, '""') + '"';
+
 async function resetPassword() {
-    const { db } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
+    const { pool } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
     const hash = await hashPassword(newPassword);
 
     let usersTable;
@@ -418,25 +427,63 @@ async function resetPassword() {
         usersTable = pgServer.users;
     }
 
-    const passwordHashKey = (usersTable.passwordHash || "passwordHash" in usersTable) ? "passwordHash" : "password_hash";
+    // The physical names, from the table object: the collection may map its
+    // properties to other columns, and the statements below are plain SQL.
+    const { name: tableName, schema: tableSchema } = getTableConfig(usersTable);
+    const usersSchema = tableSchema || "public";
+    const users = quote(usersSchema) + "." + quote(tableName);
+    const idColumn = quote(usersTable.id.name);
+    const emailColumn = quote(usersTable.email.name);
+    const passwordColumn = quote((usersTable.passwordHash ?? usersTable.password_hash).name);
+    // Where \`ensureAuthTablesExist\` puts the tables that hang off the users
+    // table: beside it, or in \`rebase\` when it lives in \`public\`.
+    const authSchema = usersSchema === "public" ? "rebase" : usersSchema;
 
-    const result = await db.update(usersTable)
-        .set({ [passwordHashKey]: hash })
-        .where(eq(usersTable.email, email))
-        .returning({
-            id: usersTable.id,
-            email: usersTable.email
-        });
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const updated = await client.query(
+            "UPDATE " + users + " SET " + passwordColumn + " = $1 WHERE " + emailColumn + " = $2 " +
+            "RETURNING " + idColumn + " AS id, " + emailColumn + " AS email",
+            [hash, email]
+        );
+        if (updated.rows.length === 0) {
+            await client.query("ROLLBACK");
+            // Nothing was updated, so nothing was reset. Exiting 0 here reported
+            // success for a no-op, which is what a script would have believed.
+            console.error("✗ User not found: " + email);
+            process.exit(1);
+        }
+        const uid = updated.rows[0].id;
 
-    if (result.length > 0) {
-        console.log("✅ Password reset for: " + result[0].email);
+        // A table or column the server has not created yet (it never booted
+        // against this database) holds no session to end.
+        const watermark = await client.query(
+            "SELECT 1 FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND column_name = 'tokens_valid_after'",
+            [usersSchema, tableName]
+        );
+        if (watermark.rows.length > 0) {
+            await client.query("UPDATE " + users + " SET tokens_valid_after = NOW() WHERE " + idColumn + " = $1", [uid]);
+        }
+        for (const table of ["refresh_tokens", "password_reset_tokens"]) {
+            const qualified = quote(authSchema) + "." + quote(table);
+            const present = await client.query("SELECT to_regclass($1) IS NOT NULL AS present", [qualified]);
+            if (present.rows[0]?.present) {
+                await client.query("DELETE FROM " + qualified + " WHERE uid = $1", [uid]);
+            }
+        }
+        await client.query("COMMIT");
+
+        console.log("✅ Password reset for: " + updated.rows[0].email);
+        console.log("   Every session of this account has ended.");
         ${echoPassword ? 'console.log("   New password: " + newPassword);' : ""}
         process.exit(0);
+    } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+    } finally {
+        client.release();
     }
-    // Nothing was updated, so nothing was reset. Exiting 0 here reported
-    // success for a no-op, which is what a script would have believed.
-    console.error("✗ User not found: " + email);
-    process.exit(1);
 }
 
 // A thrown error is a failed reset, and exits like one — a refused connection

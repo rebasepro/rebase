@@ -9,13 +9,14 @@ import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
 import { strictAuthLimiter, defaultAuthLimiter, requestClientAddress } from "./rate-limiter";
 import { hashRefreshToken } from "./jwt";
-import type { AuthModuleConfig } from "./routes";
+import type { AuthModuleConfig, CreateSessionAndTokens } from "./routes";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import { readRefreshToken, clearRefreshCookie, redactRefreshToken } from "./cookie-utils";
 import { isAnonymousAuthOpen, isSteadyStateRegistrationOpen } from "./registration-policy";
 import { revokeAllSessions } from "./token-revocation";
 import type { resolveAuthHooks } from "./auth-hooks";
 import type { CreateUserData } from "./interfaces";
+import { EMAIL_CHANGE_TTL_MS } from "./email-change-routes";
 
 interface SessionRoutesConfig {
     router: Hono<HonoEnv>;
@@ -38,11 +39,7 @@ interface SessionRoutesConfig {
         refreshToken: string,
         providerId: string
     ) => unknown;
-    createSessionAndTokens: (uid: string, userAgent: string, ipAddress: string) => Promise<{
-        roleIds: string[];
-        accessToken: string;
-        refreshToken: string;
-    }>;
+    createSessionAndTokens: CreateSessionAndTokens;
     applyTransformHook: (
         response: AuthResponsePayload,
         method: TransformAuthResponseContext["method"],
@@ -87,6 +84,32 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
                 : "Anonymous sign-in is disabled. Set `auth.allowAnonymous: true` to enable it.",
             "ANONYMOUS_AUTH_DISABLED"
         );
+    }
+
+    /**
+     * How the caller's session was signed in, as `providerId` reports it.
+     *
+     * Read off the session's refresh tokens, which carry it from sign-in
+     * through every rotation, found by the access token's `sid`. A token from
+     * before `sid`, or a session whose rows say nothing, reads `"password"` —
+     * what `/me` always answered.
+     */
+    async function sessionMethod(userCtx: { uid: string; sid?: string }): Promise<string> {
+        if (!userCtx.sid) return "password";
+        const tokens = await authRepo.listRefreshTokensForUser(userCtx.uid).catch(() => []);
+        const own = tokens.find(token => (token.sessionId ?? token.id) === userCtx.sid && token.method);
+        return own?.method ?? "password";
+    }
+
+    /**
+     * The address the account is moving to, while its link is still live —
+     * so a settings screen opened later still says a change is waiting.
+     * `null` otherwise, and on a repository that cannot change addresses.
+     */
+    async function pendingEmail(uid: string): Promise<string | null> {
+        const change = await authRepo.getPendingEmailChange?.(uid).catch(() => null);
+        if (!change || Date.now() - change.sentAt.getTime() > EMAIL_CHANGE_TTL_MS) return null;
+        return change.email;
     }
 
     const logoutSchema = z.object({
@@ -271,7 +294,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * Get current authenticated user
      */
     router.get("/me", requireLiveSession, async (c) => {
-        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[]; sid?: string } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -287,9 +310,10 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
                 email: result.user.email,
                 displayName: result.user.displayName,
                 photoURL: result.user.photoUrl,
-                providerId: "password",
+                providerId: await sessionMethod(userCtx),
                 isAnonymous: result.user.isAnonymous ?? false,
                 emailVerified: result.user.emailVerified,
+                pendingEmail: await pendingEmail(userCtx.uid),
                 roles: result.roles,
                 metadata: result.user.metadata ?? {}
             }
@@ -325,7 +349,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * Update current authenticated user profile
      */
     router.patch("/me", requireLiveSession, async (c) => {
-        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[]; sid?: string } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -352,9 +376,10 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
                 email: result.user.email,
                 displayName: result.user.displayName,
                 photoURL: result.user.photoUrl,
-                providerId: "password",
+                providerId: await sessionMethod(userCtx),
                 isAnonymous: result.user.isAnonymous ?? false,
                 emailVerified: result.user.emailVerified,
+                pendingEmail: await pendingEmail(userCtx.uid),
                 roles: result.roles,
                 metadata: result.user.metadata ?? {}
             }
@@ -397,7 +422,8 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            requestClientAddress(c)
+            requestClientAddress(c),
+            { method: "anonymous" }
         );
 
         // Fire afterUserCreate hook
@@ -511,7 +537,8 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            requestClientAddress(c)
+            requestClientAddress(c),
+            { method: "password" }
         );
 
         const authResponse = buildAuthResponse(updatedUser, roleIds, accessToken, refreshToken, "password") as AuthResponsePayload;

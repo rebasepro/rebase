@@ -89,6 +89,11 @@ export const AUTH_USERS_COLUMNS: readonly AuthUsersColumn[] = [
     { column: "tokens_valid_after", type: "TIMESTAMP WITH TIME ZONE" },
     // When an administrator switched the account off; NULL while it is on.
     { column: "disabled_at", type: "TIMESTAMP WITH TIME ZONE" },
+    // A self-service address change waiting for its link: the address, the
+    // hash of the token mailed to it, and when (it lives 24 hours).
+    { column: "pending_email", type: "TEXT" },
+    { column: "email_change_token", type: "TEXT" },
+    { column: "email_change_sent_at", type: "TIMESTAMP WITH TIME ZONE" },
     { column: "created_at", type: "TIMESTAMP WITH TIME ZONE", default: "NOW()", notNull: true },
     { column: "updated_at", type: "TIMESTAMP WITH TIME ZONE", default: "NOW()", notNull: true }
 ];

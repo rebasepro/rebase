@@ -130,6 +130,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         const emailLengthConstraint = `"${authIdentifier("email_length_check")}"`;
         const emailLowerUniqueIndex = authIdentifier("email_lower_key");
         const verificationTokenIndex = authIdentifier("email_verification_token_idx");
+        const emailChangeTokenIndex = authIdentifier("email_change_token_idx");
 
         // Every string column here is TEXT, deliberately. In Postgres VARCHAR(n)
         // and TEXT are the same type with the same storage and the same
@@ -600,6 +601,14 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                 WHERE email_verification_token IS NOT NULL
             `);
         }
+        // The same for the address-change link, which is looked up the same way.
+        if (usersColumnTypes.has("email_change_token")) {
+            await db.execute(sql`
+                CREATE INDEX IF NOT EXISTS ${sql.raw(`"${emailChangeTokenIndex}"`)}
+                ON ${sql.raw(usersTableName)} (email_change_token)
+                WHERE email_change_token IS NOT NULL
+            `);
+        }
 
         // ── Migration: refresh_tokens become session-scoped, rotation-safe ──
         // Two shapes are reconciled here, on EVERY table named refresh_tokens
@@ -647,6 +656,11 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                     // nothing" as `aal1` — the restrictive answer. Stamping
                     // every existing row would be inventing evidence.
                     await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS aal TEXT`);
+                    // How the sign-in happened, carried across rotations like
+                    // `aal`. Nullable and not back-filled for the same reason:
+                    // an older row reads as a password sign-in, which is what
+                    // every refresh answered before the column existed.
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS method TEXT`);
 
                     // One session per pre-existing row: under the old model a row
                     // WAS a device session, and there is no record of which rows

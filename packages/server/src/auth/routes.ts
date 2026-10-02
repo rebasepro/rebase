@@ -37,6 +37,10 @@ import { ADMIN_ROLE, isAdminScope, parseScope } from "@rebasepro/types";
 import { getAccessModel } from "./access";
 import type { Context } from "hono";
 import { readRefreshToken, redactRefreshToken, clearRefreshCookie } from "./cookie-utils";
+import { isDeliverableAddress } from "./deliverable-address";
+import { mountEmailChangeRoutes } from "./email-change-routes";
+
+export { isDeliverableAddress };
 
 /**
  * Shared configuration for auth and admin route factories.
@@ -141,14 +145,6 @@ export interface AuthModuleConfig {
     requireEmailVerification?: boolean;
 }
 
-/**
- * Addresses no mail can reach: the synthetic ones a guest and an X (Twitter)
- * account are given, because `email` is NOT NULL. Nothing is mailed to them.
- */
-export function isDeliverableAddress(email: string): boolean {
-    const domain = email.slice(email.lastIndexOf("@") + 1).toLowerCase();
-    return domain !== "anonymous.local" && domain !== "twitter.placeholder.rebase";
-}
 
 /** What a refresh token replayed after its reuse window does to its session. */
 export type RefreshTokenReusePolicy = "reject" | "revoke-session";
@@ -210,6 +206,29 @@ function buildAuthResponse(
     };
 }
 
+
+/**
+ * What {@link CreateSessionAndTokens} is told about the sign-in it opens.
+ *
+ * `method` is what `providerId` says for the session from now on — stored on
+ * its refresh token and carried across every rotation — so each door names
+ * its own rather than leaving it to a default.
+ */
+export interface SessionOptions {
+    /** `"password"`, `"anonymous"`, `"magic-link"`, `"otp"`, `"mfa"` or a provider id. */
+    method: string;
+    /** Only for the route that has just seen the second factor. */
+    skipMfaGate?: boolean;
+    aal?: "aal1" | "aal2";
+}
+
+/** Mint a session, as every sign-in door does. See `createSessionAndTokens`. */
+export type CreateSessionAndTokens = (
+    uid: string,
+    userAgent: string,
+    ipAddress: string,
+    options: SessionOptions
+) => Promise<{ roleIds: string[]; accessToken: string; refreshToken: string }>;
 
 /**
  * Get password reset token expiry (1 hour from now)
@@ -386,7 +405,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
      * Send welcome email to a newly registered user (fire-and-forget).
      */
     function sendWelcomeEmail(user: { email: string; displayName?: string | null }) {
-        if (!isEmailConfigured()) return;
+        // An X account's placeholder address reaches nobody.
+        if (!isEmailConfigured() || !isDeliverableAddress(user.email)) return;
         const { appName, logoUrl } = resolveEmailBranding(emailConfig);
         const loginUrl = resolveEmailLinkBase(emailConfig, "resetPassword"); // reuse base URL → the login / app page
         const templateFn = emailConfig?.templates?.welcomeEmail;
@@ -489,12 +509,12 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         uid: string,
         userAgent: string,
         ipAddress: string,
-        options?: { skipMfaGate?: boolean; aal?: "aal1" | "aal2" }
+        options: SessionOptions
     ) {
-        if (!options?.skipMfaGate) {
+        if (!options.skipMfaGate) {
             await assertMfaSatisfied(authRepo, uid);
         }
-        const aal = options?.aal ?? "aal1";
+        const aal = options.aal ?? "aal1";
         const roleIds = await authRepo.getUserRoleIds(uid);
 
         // Is this session a GUEST — anonymous sign-in rather than an account?
@@ -542,7 +562,7 @@ aal };
             getRefreshTokenExpiry(),
             userAgent,
             ipAddress,
-            { id: sessionId, startedAt: new Date(), aal }
+            { id: sessionId, startedAt: new Date(), aal, method: options.method }
         );
 
         return { roleIds,
@@ -677,7 +697,8 @@ refreshToken };
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            requestClientAddress(c)
+            requestClientAddress(c),
+            { method: "password" }
         );
 
         // Send welcome email (fire-and-forget, don't block registration)
@@ -770,7 +791,8 @@ displayName: user.displayName });
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            requestClientAddress(c)
+            requestClientAddress(c),
+            { method: "password" }
         );
 
         // Fire onAuthenticated hook (fire-and-forget)
@@ -988,7 +1010,8 @@ displayName: user.displayName });
                 const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
                     user.id,
                     c.req.header("user-agent") || "unknown",
-                    requestClientAddress(c)
+                    requestClientAddress(c),
+                    { method: provider.id }
                 );
 
                 if (ops.onAuthenticated) {
@@ -1086,7 +1109,8 @@ displayName: user.displayName });
                     const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
                         upgraded.id,
                         c.req.header("user-agent") || "unknown",
-                        requestClientAddress(c)
+                        requestClientAddress(c),
+                        { method: provider.id }
                     );
                     const authResponse = buildAuthResponse(upgraded, roleIds, accessToken, refreshToken, provider.id);
                     return c.json({
@@ -1310,7 +1334,7 @@ message: "Password has been reset successfully" });
             user.id,
             c.req.header("user-agent") || "unknown",
             requestClientAddress(c),
-            { skipMfaGate: true, aal: userCtx.aal === "aal2" ? "aal2" : "aal1" }
+            { skipMfaGate: true, aal: userCtx.aal === "aal2" ? "aal2" : "aal1", method: "password" }
         );
         const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, "password");
         return c.json({
@@ -1475,7 +1499,8 @@ message: "Verification email sent" });
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            requestClientAddress(c)
+            requestClientAddress(c),
+            { method: "password" }
         );
         const verified = { ...user, emailVerified: true };
         const authResponse = buildAuthResponse(verified, roleIds, accessToken, refreshToken, "password");
@@ -1633,6 +1658,11 @@ message: "Verification email sent" });
         // before the column existed, or by a repository that does not keep it)
         // reads as `aal1`, the restrictive value.
         const sessionAal: "aal1" | "aal2" = storedToken.aal === "aal2" ? "aal2" : "aal1";
+        // How the session was signed in, carried the same way and for the same
+        // reason: a refresh is not a sign-in. A row from before the column
+        // existed says nothing, and reads as the password sign-in it most
+        // likely was — which is what every refresh used to answer.
+        const sessionMethod = storedToken.method ?? "password";
 
         // Allow customization of access token claims via hook
         let customClaims: Record<string, unknown> | undefined;
@@ -1667,7 +1697,8 @@ aal: sessionAal };
         const session = {
             id: sessionId,
             startedAt: sessionStartedAt,
-            aal: sessionAal
+            aal: sessionAal,
+            method: sessionMethod
         };
 
         if (!supersededAt) {
@@ -1724,7 +1755,7 @@ aal: sessionAal };
         let refreshResponse: AuthResponsePayload = tokensOnlyResponse;
         if (user) {
             try {
-                refreshResponse = buildAuthResponse(user, roleIds, newAccessToken, newRefreshToken, "password");
+                refreshResponse = buildAuthResponse(user, roleIds, newAccessToken, newRefreshToken, sessionMethod);
             } catch (err: unknown) {
                 logger.warn("[Auth] Could not build enriched refresh response; returning tokens only", {
                     error: err instanceof Error ? err.message : String(err)
@@ -1741,6 +1772,11 @@ aal: sessionAal };
         const finalResponse = redactRefreshToken(transformedResponse, c, newRefreshToken, config.cookieAuth);
         return c.json(finalResponse);
     });
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Self-service email change
+    // ═══════════════════════════════════════════════════════════════════════
+    mountEmailChangeRoutes({ router, config, ops, parseBody, requireLiveSession });
 
     mountSessionRoutes({
         router,

@@ -74,6 +74,25 @@ export type EmailOtpTemplateFunction = (
 ) => { subject: string; html: string; text?: string };
 
 /**
+ * Template function for the address-change confirmation, mailed to the new
+ * address. `user.email` is the account's current address.
+ */
+export type EmailChangeTemplateFunction = (
+    confirmUrl: string,
+    user: { email: string; displayName?: string | null },
+    newEmail: string
+) => { subject: string; html: string; text?: string };
+
+/**
+ * Template function for the notice mailed to the old address when an address
+ * change is asked for. Carries no link.
+ */
+export type EmailChangeNoticeTemplateFunction = (
+    user: { email: string; displayName?: string | null },
+    newEmail: string
+) => { subject: string; html: string; text?: string };
+
+/**
  * Complete email configuration
  */
 export interface EmailConfig {
@@ -153,5 +172,7 @@ export interface EmailConfig {
         welcomeEmail?: WelcomeEmailTemplateFunction;
         magicLink?: MagicLinkTemplateFunction;
         emailOtp?: EmailOtpTemplateFunction;
+        emailChange?: EmailChangeTemplateFunction;
+        emailChangeNotice?: EmailChangeNoticeTemplateFunction;
     };
 }

@@ -1,6 +1,8 @@
 import {
     Alert,
+    BooleanSwitch,
     Button,
+    CircularProgress,
     CopyIcon,
     Dialog,
     DialogActions,
@@ -10,15 +12,18 @@ import {
     KeyRoundIcon,
     Label,
     LoadingButton,
+    LockIcon,
     PencilIcon,
     RadioGroup,
     RadioGroupItem,
+    ShieldIcon,
     TextField,
     Trash2Icon,
     Unlink2Icon,
     Typography
 } from "@rebasepro/ui";
 import type { User } from "@rebasepro/types";
+import { scopeGrants } from "@rebasepro/types";
 import type { EntityAction, UserCreationResult } from "@rebasepro/cms-types";
 import {
     apiBaseOf,
@@ -32,7 +37,7 @@ import { addRecentId } from "../CollectionViewBinding/utils";
 import { navigateToEntity } from "../../util/navigation_utils";
 import { resolveDefaultSelectedView } from "@rebasepro/app";
 import { CreationResultDialog } from "../admin/CreationResultDialog";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 export const editEntityAction: EntityAction = {
     icon: <PencilIcon size={iconSize.smallest}/>,
@@ -442,3 +447,231 @@ export const resetPasswordAction: EntityAction = {
     }
 };
 
+
+/**
+ * Does the signed-in caller hold `scope`? Read off the controller's
+ * `heldScopes` — `GET /auth/scopes` — so an action is offered to exactly those
+ * its route admits. Not known yet is no.
+ */
+function callerHoldsScope(authController: unknown, scope: string): boolean {
+    if (typeof authController !== "object" || authController === null || !("heldScopes" in authController)) return false;
+    const held = authController.heldScopes;
+    return Array.isArray(held) && scopeGrants(held.filter((entry): entry is string => typeof entry === "string"), scope);
+}
+
+/** The signed-in caller's uid, if the context names one. */
+function callerUid(authController: unknown): string | undefined {
+    if (typeof authController !== "object" || authController === null || !("user" in authController)) return undefined;
+    const user = authController.user;
+    return typeof user === "object" && user !== null && "uid" in user && typeof user.uid === "string" ? user.uid : undefined;
+}
+
+/** A user, as the two dialogs below need one. */
+interface AdminActionUser {
+    uid: string;
+    email: string;
+}
+
+function adminActionUser(entity: { id: unknown; values?: Record<string, unknown> }): AdminActionUser {
+    return { uid: String(entity.id), email: typeof entity.values?.email === "string" ? entity.values.email : "" };
+}
+
+/**
+ * Call an admin user route as the signed-in caller, and turn a refusal into an
+ * error carrying the server's message.
+ */
+function useAdminUserRequest() {
+    const client = useRebaseClient<{ baseUrl?: string, apiPath?: string }>();
+    const { getAuthToken } = useAuthController();
+    return useCallback(async <T,>(path: string, init?: { method: string; body?: unknown }): Promise<T> => {
+        const token = await getAuthToken?.();
+        const response = await fetch(`${apiBaseOf(client) ?? ""}/admin/users/${path}`, {
+            method: init?.method ?? "GET",
+            headers: {
+                ...(init?.body !== undefined ? { "Content-Type": "application/json" } : {}),
+                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+            },
+            ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {})
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(body?.error?.message || body?.message || response.statusText);
+        }
+        return body as T;
+    }, [client, getAuthToken]);
+}
+
+/**
+ * Remove every second factor and recovery code an account has, and end its
+ * sessions — for someone who lost their authenticator and their codes.
+ */
+export function ResetMfaActionDialog({
+    user,
+    open,
+    onClose
+}: {
+    user: AdminActionUser;
+    open: boolean;
+    onClose: () => void;
+}) {
+    const request = useAdminUserRequest();
+    const snackbarController = useSnackbarController();
+    const { t } = useTranslation();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleConfirm = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            await request<{ removedFactors: number }>(`${encodeURIComponent(user.uid)}/mfa`, { method: "DELETE" });
+            snackbarController.open({ type: "success", message: t("reset_mfa_success") });
+            onClose();
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : String(e));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => !o ? onClose() : undefined} maxWidth="md">
+            <DialogTitle variant="h5" gutterBottom={false}>
+                {t("reset_mfa_title")}
+            </DialogTitle>
+            <DialogContent>
+                <div className="flex flex-col gap-4 py-2">
+                    <Typography variant="body2" color="secondary">{user.email}</Typography>
+                    <Typography variant="body2">{t("reset_mfa_description")}</Typography>
+                    {error && <Alert color="error"><Typography variant="body2">{error}</Typography></Alert>}
+                </div>
+            </DialogContent>
+            <DialogActions>
+                <Button variant="text" onClick={onClose} disabled={loading}>{t("cancel")}</Button>
+                <LoadingButton variant="filled" color="error" onClick={handleConfirm} loading={loading}>
+                    {t("reset_mfa_confirm")}
+                </LoadingButton>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
+/**
+ * Switch an account off, or back on. Off, it signs in nowhere and every session
+ * and token it holds ends; the switch reads the account's state first, because
+ * the users table does not carry it.
+ */
+export function AccountAccessDialog({
+    user,
+    open,
+    onClose
+}: {
+    user: AdminActionUser;
+    open: boolean;
+    onClose: () => void;
+}) {
+    const request = useAdminUserRequest();
+    const snackbarController = useSnackbarController();
+    const { t } = useTranslation();
+    const [disabled, setDisabled] = useState<boolean | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    // Read once per user, whatever the request helper's identity does between renders.
+    const requestRef = useRef(request);
+    requestRef.current = request;
+
+    useEffect(() => {
+        let current = true;
+        requestRef.current<{ user: { disabled?: boolean } }>(encodeURIComponent(user.uid))
+            .then(({ user: account }) => { if (current) setDisabled(account.disabled === true); })
+            .catch((e: unknown) => { if (current) setError(e instanceof Error ? e.message : String(e)); });
+        return () => { current = false; };
+    }, [user.uid]);
+
+    const toggle = async (next: boolean) => {
+        setSaving(true);
+        setError(null);
+        try {
+            const { user: account } = await request<{ user: { disabled?: boolean } }>(encodeURIComponent(user.uid), {
+                method: "PUT",
+                body: { disabled: next }
+            });
+            setDisabled(account.disabled === true);
+            snackbarController.open({ type: "success", message: t(next ? "account_disabled_success" : "account_enabled_success") });
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : String(e));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => !o ? onClose() : undefined} maxWidth="md">
+            <DialogTitle variant="h5" gutterBottom={false}>
+                {t("account_access_title")}
+            </DialogTitle>
+            <DialogContent>
+                <div className="flex flex-col gap-4 py-2">
+                    <Typography variant="body2" color="secondary">{user.email}</Typography>
+                    {disabled === null && !error
+                        ? <div className="flex justify-center p-4"><CircularProgress size="small"/></div>
+                        : disabled !== null && (
+                            <div className="flex items-center gap-3">
+                                <BooleanSwitch value={disabled} disabled={saving} onValueChange={(next) => void toggle(next)}/>
+                                <Typography variant="body1">{t("account_disabled_label")}</Typography>
+                            </div>
+                        )}
+                    <Typography variant="body2" color="secondary">{t("account_disabled_description")}</Typography>
+                    {error && <Alert color="error"><Typography variant="body2">{error}</Typography></Alert>}
+                </div>
+            </DialogContent>
+            <DialogActions>
+                <Button variant="text" onClick={onClose}>{t("close")}</Button>
+            </DialogActions>
+        </Dialog>
+    );
+}
+
+/**
+ * Reset a user's two-step verification. Offered to whoever holds
+ * `users:write`, as `DELETE /admin/users/:uid/mfa` is; the route also refuses
+ * an account that outranks the caller, and the dialog says so.
+ */
+export const resetMfaAction: EntityAction = {
+    icon: <ShieldIcon size={iconSize.smallest}/>,
+    name: "Reset two-step verification",
+    key: "reset_mfa",
+    isEnabled: ({ entity, context }) => Boolean(entity) && callerHoldsScope(context?.authController, "users:write"),
+    onClick({ entity, context }): Promise<void> {
+        if (!entity) throw new Error("INTERNAL: resetMfaAction: Entity is undefined");
+        if (!context?.dialogsController) throw new Error("INTERNAL: resetMfaAction: context.dialogsController is undefined");
+        const { closeDialog } = context.dialogsController.open({
+            key: "reset_mfa_dialog_" + entity.id,
+            Component: ({ open }) => <ResetMfaActionDialog user={adminActionUser(entity)} open={open} onClose={closeDialog}/>
+        });
+        return Promise.resolve(undefined);
+    }
+};
+
+/**
+ * Switch an account off or on. Offered to whoever holds `users:write`, as
+ * `PUT /admin/users/:uid { disabled }` is, and never on the caller's own
+ * account, which the route refuses.
+ */
+export const accountAccessAction: EntityAction = {
+    icon: <LockIcon size={iconSize.smallest}/>,
+    name: "Disable or enable account",
+    key: "account_access",
+    isEnabled: ({ entity, context }) => Boolean(entity)
+        && callerHoldsScope(context?.authController, "users:write")
+        && String(entity?.id) !== callerUid(context?.authController),
+    onClick({ entity, context }): Promise<void> {
+        if (!entity) throw new Error("INTERNAL: accountAccessAction: Entity is undefined");
+        if (!context?.dialogsController) throw new Error("INTERNAL: accountAccessAction: context.dialogsController is undefined");
+        const { closeDialog } = context.dialogsController.open({
+            key: "account_access_dialog_" + entity.id,
+            Component: ({ open }) => <AccountAccessDialog user={adminActionUser(entity)} open={open} onClose={closeDialog}/>
+        });
+        return Promise.resolve(undefined);
+    }
+};

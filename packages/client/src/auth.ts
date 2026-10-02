@@ -22,6 +22,7 @@ function mapRawUser(raw: Record<string, unknown>): User {
         providerId: (raw.providerId as string | undefined) ?? "password",
         isAnonymous: (raw.isAnonymous as boolean | undefined) ?? false,
         emailVerified: raw.emailVerified as boolean | undefined,
+        ...(raw.pendingEmail !== undefined ? { pendingEmail: raw.pendingEmail as string | null } : {}),
         roles: raw.roles as string[] | undefined,
         metadata: raw.metadata as Record<string, unknown> | undefined,
     };
@@ -950,6 +951,62 @@ password })
         return { success: result.success, passwordRemoved: result.passwordRemoved, removedProviders: result.removedProviders ?? [], session };
     }
 
+    /**
+     * Move the signed-in account to `newEmail`. The server mails a link to the
+     * new address and a notice to the current one; nothing changes until the
+     * link is followed and {@link confirmEmailChange} is called with its
+     * token. A new request replaces the last.
+     *
+     * Rejects with `EMAIL_EXISTS` or `UNDELIVERABLE_ADDRESS` (409),
+     * `EMAIL_UNCHANGED` (400), `AAL2_REQUIRED` when the account has a second
+     * factor this session did not present, and `ANONYMOUS_USER` for a guest.
+     */
+    async function changeEmail(newEmail: string) {
+        const data = await transport.request<{ success: boolean; pendingEmail: string; expiresAt: string }>(authPath + "/change-email", {
+            method: "POST",
+            body: JSON.stringify({ newEmail })
+        });
+        // The user this client holds says a change is waiting, as `/me` does.
+        if (currentSession) {
+            currentSession = { ...currentSession, user: { ...currentSession.user, pendingEmail: data.pendingEmail } };
+            saveSession(currentSession);
+            emit("USER_UPDATED", currentSession);
+        }
+        return { pendingEmail: data.pendingEmail, expiresAt: data.expiresAt };
+    }
+
+    /**
+     * Follow an address-change link: the token from
+     * `<frontend>/confirm-email-change?token=…`. Needs no session — the link
+     * proves the new inbox — and when this client is signed in as the account
+     * it moved, its user is updated and `USER_UPDATED` is emitted.
+     *
+     * `removedProviders` names the sign-in providers detached because they
+     * vouched for the old address. Rejects with `INVALID_TOKEN` for a spent,
+     * replaced or expired link and `EMAIL_EXISTS` when the address was taken
+     * while the link waited.
+     */
+    async function confirmEmailChange(token: string) {
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl("/confirm-email-change"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        const result = body as { user: { uid: string; email: string }; removedProviders?: string[] };
+        if (currentSession && currentSession.user.uid === result.user.uid) {
+            currentSession = {
+                ...currentSession,
+                user: { ...currentSession.user, email: result.user.email, emailVerified: true, pendingEmail: null }
+            };
+            saveSession(currentSession);
+            emit("USER_UPDATED", currentSession);
+        }
+        return { uid: result.user.uid, email: result.user.email, removedProviders: result.removedProviders ?? [] };
+    }
+
     async function sendMagicLink(email: string) {
         const fetchFn = getFetch();
         const res = await fetchFn(authUrl("/magic-link"), {
@@ -1328,6 +1385,8 @@ refreshToken: session.refreshToken };
         linkProvider,
         sendVerificationEmail,
         verifyEmail,
+        changeEmail,
+        confirmEmailChange,
         sendMagicLink,
         verifyMagicLink,
         sendEmailOtp,

@@ -36,6 +36,14 @@ describe("resetPasswordAction injection & adminPasswordReset capability", () => 
         expect(keys).toContain("reset_password");
     });
 
+    it("injects the MFA reset and the account switch beside it, on the backend's admin user routes", async () => {
+        const keys = await resolveActions(authControllerWith({ adminPasswordReset: true }));
+        expect(keys).toEqual(expect.arrayContaining(["reset_mfa", "account_access"]));
+        const without = await resolveActions(authControllerWith({ adminPasswordReset: false }));
+        expect(without).not.toContain("reset_mfa");
+        expect(without).not.toContain("account_access");
+    });
+
     it("omits the action when the adapter reports no adminPasswordReset support", async () => {
         const keys = await resolveActions(authControllerWith({ adminPasswordReset: false }));
         expect(keys).not.toContain("reset_password");

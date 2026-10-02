@@ -24,6 +24,8 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/change-password` | Change the caller's own password (authenticated). Ends every other session and answers with a fresh one for the caller |
 | `GET` | `/api/auth/me` | The caller's own profile |
 | `PATCH` | `/api/auth/me` | Update the caller's own profile |
+| `POST` | `/api/auth/change-email` | `{ newEmail }`: move the caller's own account to another address. Mails a link to the new address and a notice to the old one; nothing changes until the link is followed. Needs `aal2` on an account with a second factor. `409 EMAIL_EXISTS` or `UNDELIVERABLE_ADDRESS`, `400 EMAIL_UNCHANGED`, `403 ANONYMOUS_USER` for a guest — see [Changing an email address](#changing-an-email-address) |
+| `POST` | `/api/auth/confirm-email-change` | `{ token }` from the link. No session needed. Moves the account onto the new address, verified; `400 INVALID_TOKEN` for a spent, replaced or expired link, `409 EMAIL_EXISTS` when the address was taken while it waited |
 | `GET` | `/api/auth/config` | What this backend offers a sign-in screen — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Unauthenticated, and computed from the same predicates the routes enforce, so what the screen advertises cannot drift from what it can do |
 | `POST` | `/api/auth/send-verification` | Send the caller an email-verification link |
 | `GET` | `/api/auth/verify-email` | Consume a verification link (the URL in that email). Keeps what a live session of the account proves and removes what nobody proved — see [Email verification](/docs/backend/email-verification/) |
@@ -63,7 +65,7 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/users/:uid` | Read one user |
 | `PUT` | `/api/admin/users/:uid` | Update one user. `{ disabled: true }` switches the account off without deleting it: every sign-in and refresh is refused (`ACCOUNT_DISABLED`), its sessions end and every token it holds is refused; `false` switches it back on |
 | `DELETE` | `/api/admin/users/:uid` | Delete one user. Their sessions end, and every access token they hold is refused from that request on |
-| `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one |
+| `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one. `rebase auth reset-password` calls it, and writes to the database directly only when the backend cannot be reached; either way the account's sessions end |
 | `DELETE` | `/api/admin/users/:uid/mfa` | Remove a user's second factors and recovery codes, and end their sessions — for someone who lost both |
 | `GET` | `/api/admin/roles` | `admin` and the roles the users collection declares, with their scopes |
 | `POST` | `/api/admin/bootstrap` | Let the earliest-registered user claim the admin role while none exists. Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
@@ -100,10 +102,15 @@ Every endpoint that issues a session answers with the same envelope — `registe
 Send the access token back as `Authorization: Bearer <accessToken>`.
 `accessTokenExpiresAt` is epoch milliseconds.
 
-`POST /api/auth/refresh` answers with the same envelope, with two caveats: `user`
-is omitted entirely when the account cannot be re-read, so treat it as optional
-there, and `providerId` is always `password` however the session was first
-created.
+`POST /api/auth/refresh` answers with the same envelope, except that `user` is
+omitted entirely when the account cannot be re-read, so treat it as optional
+there.
+
+`providerId` says how the session was signed in: `password`, `anonymous`,
+`magic-link`, `otp`, `mfa` (a sign-in finished with a second factor), or the
+provider's id, such as `google`. It is stored with the session at sign-in, so
+`refresh` and `GET /api/auth/me` give the same answer for as long as the
+session lives. A session signed in before 0.24 reads `password`.
 
 :::caution[The typed SDK flattens this envelope — raw HTTP does not]
 The JSON above is the wire format, and it is what `fetch("/api/auth/login")`
@@ -117,6 +124,34 @@ Both shapes are real; they belong to two different layers. Reading the SDK's
 shape off a raw `fetch` yields `undefined`, which shows up as "login succeeded
 but there is no access token" — the login was fine, the token was one level down.
 :::
+
+### Changing an email address
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A signed-in user
+moves their own account to another address in two steps:
+
+1. `POST /api/auth/change-email { newEmail }` records the change and mails a
+   link, `<frontend>/confirm-email-change?token=…`, to the new address, and a
+   notice without a link to the current one. The link lives 24 hours, and a
+   new request replaces the last. `GET /api/auth/me` reports the waiting
+   address as `pendingEmail`.
+2. `POST /api/auth/confirm-email-change { token }` moves the account: the new
+   address becomes its address, verified. Every OAuth identity whose provider
+   vouched for the old address is detached (`removedProviders` names them),
+   because whoever controls the old address could otherwise still sign in
+   through it, and any reset link mailed to the old address stops working.
+   Sessions are kept.
+
+The new address is not reserved while the link waits: holding it would let any
+account keep a stranger from signing up with their own address. If another
+account has the address by the time the link is followed, the link answers
+`409 EMAIL_EXISTS` and nothing moves; of two accounts asking for the same
+address, the first to follow its link gets it. The `beforeEmailChange` hook can
+refuse an address, as `beforeUserCreate` does at sign-up.
+
+In the CMS, the address is changed from **Account settings → Profile**, and the
+link opens the CMS's own screen, signed in or not. Another frontend serves a page
+at `/confirm-email-change` that calls the route with the link's token.
 
 With [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) enabled the refresh
 token travels as an `httpOnly` cookie and `tokens.refreshToken` is an empty
@@ -160,6 +195,17 @@ guesses, each account is limited to ten verification attempts per 15 minutes
 (counted per user, so rotating IPs does not help), and an accepted code is
 recorded against the factor so it cannot be replayed for the rest of its
 ±1-step window.
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> In the CMS, **Account settings → Two-step verification** enrols an
+authenticator app (its key, and a link that opens it in the app, then the code
+it shows), lists the account's factors, removes one and replaces the recovery
+codes. When a change needs `aal2` it asks for a code first and steps the session
+up with it. The recovery codes are shown once, after the first factor is
+confirmed. In the users table, **Reset two-step verification**
+(`DELETE /api/admin/users/:uid/mfa`) and **Disable or enable account**
+(`PUT /api/admin/users/:uid { disabled }`) are offered to whoever holds
+`users:write`, as the routes are; the switch is never offered on your own
+account, and an account that outranks you is refused with the server's reason.
 
 Set `MFA_ENCRYPTION_KEY` (32+ random characters) to encrypt stored TOTP
 secrets. Without it the server falls back to `JWT_SECRET` and warns. Set it

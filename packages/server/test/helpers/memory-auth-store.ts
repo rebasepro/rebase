@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { ApiError } from "../../src/api/errors";
 import type {
     AuthRepository,
     MfaChallengeInfo,
@@ -49,6 +50,7 @@ export class MemoryAuthStore {
     factors: StoredFactor[] = [];
     recoveryCodes: { uid: string; codeHash: string; used: boolean }[] = [];
     readonly challenges = new Map<string, MfaChallengeInfo>();
+    readonly pendingEmailChanges = new Map<string, { email: string; tokenHash: string; sentAt: Date }>();
 
     constructor(private readonly options: MemoryAuthStoreOptions = {}) {}
 
@@ -158,6 +160,36 @@ export class MemoryAuthStore {
                 const user = [...this.users.values()].find(u => u.emailVerificationToken === token);
                 return user ? this.snapshot(user) : null;
             },
+            setPendingEmailChange: async (uid, change) => {
+                if (change) this.pendingEmailChanges.set(uid, { ...change, sentAt: new Date() });
+                else this.pendingEmailChanges.delete(uid);
+            },
+            getPendingEmailChange: async (uid) => {
+                const change = this.pendingEmailChanges.get(uid);
+                return change ? { email: change.email, sentAt: change.sentAt } : null;
+            },
+            findPendingEmailChange: async (tokenHash) => {
+                for (const [uid, change] of this.pendingEmailChanges) {
+                    const user = this.users.get(uid);
+                    if (change.tokenHash === tokenHash && user) {
+                        return { user: this.snapshot(user), change: { email: change.email, sentAt: change.sentAt } };
+                    }
+                }
+                return null;
+            },
+            applyPendingEmailChange: async (uid, tokenHash) => {
+                const change = this.pendingEmailChanges.get(uid);
+                const user = this.users.get(uid);
+                if (!change || change.tokenHash !== tokenHash || !user) return null;
+                // The unique index, as Postgres has it.
+                if (this.findUserByEmail(change.email)) throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
+                user.email = change.email;
+                user.emailVerified = true;
+                user.emailVerificationToken = null;
+                user.updatedAt = new Date();
+                this.pendingEmailChanges.delete(uid);
+                return this.snapshot(user);
+            },
             getUserRoleIds: async (uid) => [...(this.roles.get(uid) ?? [])],
             setUserDisabled: async (uid, disabled) => {
                 const user = this.users.get(uid);
@@ -184,6 +216,7 @@ export class MemoryAuthStore {
                     sessionId: session?.id ?? id,
                     sessionStartedAt: session?.startedAt ?? new Date(),
                     aal: session?.aal,
+                    method: session?.method,
                     rotatedAt: null,
                     revoked: false
                 });
