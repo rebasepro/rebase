@@ -69,7 +69,8 @@ Les outils qui le connaissent l'utilisent :
 - **`rebase dev`** affiche l'URL du CMS dans sa bannière de démarrage lorsqu'il ne s'agit pas simplement de la page d'accueil du frontend.
 - **`rebase apps list`** l'affiche à côté de l'application qui la sert.
 
-Trois configurations, toutes courantes :
+Trois configurations, toutes courantes. <span class="since-badge" data-since="0.24">Depuis 0.24</span> pour la troisième : sur la 0.23 le
+`path` d'une application ne peut pas être une URL, si bien que le CMS partage le nom d'hôte du projet.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -144,7 +145,25 @@ Le backend n'est pas une application, et un nom d'hôte ne le déplace pas. `/ap
 
 Tout le reste de ce qui concerne `path` s'applique à la partie située après le nom d'hôte. L'application est toujours compilée pour elle : `https://admin.example.com` est compilé avec `REBASE_APP_BASE` à `/`, `https://admin.example.com/cms` avec `/cms`, et un bundler qui l'ignore donne toujours une page blanche. `cms` est un chemin sur le nom d'hôte de l'application, à l'intérieur de cette partie chemin. L'URL doit commencer par `https://` et contenir un nom d'hôte et un chemin, rien d'autre — ni port, ni query, ni fragment. Un `admin.example.com` seul est refusé, avec l'URL qu'il aurait dû être.
 
-En local, rien n'est routé par nom d'hôte. `rebase dev` lance l'application de `frontend/` à la racine d'un port de localhost, comme toujours, et pour une application dotée d'un nom d'hôte sa bannière affiche aussi l'adresse `https://` qu'elle aura une fois déployée.
+Sous `rebase dev`, rien n'est routé par nom d'hôte. Il lance l'application de `frontend/` à la racine d'un port de localhost, comme toujours, et pour une application dotée d'un nom d'hôte sa bannière affiche aussi l'adresse `https://` qu'elle aura une fois déployée.
+
+`rebase start` est différent, car il exécute le bundle compilé à travers le
+même runtime qu'un déploiement — routage par nom d'hôte compris. Une
+application dotée d'un nom d'hôte ne répond qu'aux requêtes dont le `Host` est
+ce nom d'hôte, si bien que `http://localhost:3001/` affiche l'application qui
+n'en a pas, et qu'un bundle dont la seule application nomme un nom d'hôte
+répond 404 là. Pour l'atteindre en local, envoyez l'en-tête vous-même :
+
+```bash
+curl -H "Host: admin.example.com" http://localhost:3001/
+```
+
+ou faites pointer le nom d'hôte vers `127.0.0.1` dans `/etc/hosts` et ouvrez
+`http://admin.example.com:3001/`. Il n'existe délibérément aucun paramètre de
+requête ni en-tête qui outrepasse le routage : un mécanisme qui fonctionnerait
+en local fonctionnerait aussi contre un déploiement, et choisir l'application
+par autre chose que le vrai `Host` est précisément ce que le routage existe
+pour empêcher.
 
 En auto-hébergement, le processus fait le même choix à partir de l'en-tête `Host` de chaque requête. Faire pointer le nom d'hôte vers le serveur et lui fournir un certificat vous revient, comme pour le nom d'hôte principal du projet, et un reverse proxy placé devant doit transmettre l'en-tête `Host` d'origine — Caddy le fait par défaut, nginx a besoin de `proxy_set_header Host $host;`. `X-Forwarded-Host` n'est pas lu, parce que n'importe quel client peut en envoyer un.
 

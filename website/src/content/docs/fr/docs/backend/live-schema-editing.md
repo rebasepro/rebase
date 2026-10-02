@@ -18,7 +18,28 @@ Le statut et le plan exigent la portée `schema:read`, et l'application exige `s
 
 ## Planifier avant d'appliquer
 
-`/plan` n'a pas d'effets secondaires. Envoyez la collection telle qu'elle devrait être au final, et il vous indique ce que la modification implique :
+`/plan` n'a pas d'effets secondaires. Envoyez le changement, et il vous indique ce que la modification
+implique. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Un changement sur une collection existante est un `patch` — ce qui a
+changé, sous forme d'opérations sur des chemins de clés — et une nouvelle collection est la `collection`
+entière :
+
+```json
+{ "collectionId": "posts", "patch": [
+    { "op": "set", "path": ["properties", "subtitle"], "value": { "name": "Subtitle", "type": "string" } },
+    { "op": "remove", "path": ["admin", "group"] }
+] }
+```
+
+Seules les clés qu'un patch nomme sont écrites dans le fichier de la collection. Tout le reste
+demeure tel quel — les imports, les commentaires, le formatage, l'`onClick` d'une action
+d'entité, une propriété partagée depuis un autre module, un enum importé d'ailleurs. Un patch
+qui atteint *l'intérieur* de quelque chose défini en code (`status: statusProperty`,
+`enum: LOCALE_ENUM`, un `...spread`) est refusé avec l'expression qu'il a rencontrée, de sorte
+que le changement se fasse là où ce code vit. Une `collection` entière envoyée pour une
+collection qui existe déjà est transformée en le patch de ce qui diffère d'elle, et une clé dont
+la valeur est du code n'est jamais supprimée de cette façon. Le panneau d'administration envoie
+des patches. Sur la 0.23 `/plan` et `/apply` ne prennent que la `collection` entière telle
+qu'elle devrait être au final.
 
 `$ADMIN_TOKEN` est un jeton d'accès — l'`accessToken` renvoyé lors de la connexion — pour un compte qui détient `schema:read` : un administrateur, ou un rôle qui la déclare. Rien sur la machine ne le définit pour vous.
 
@@ -81,7 +102,44 @@ Une modification peut être applicable tout en laissant non appliquée une exige
 
 Le chemin d'assurance au démarrage signale la même chose sous forme d'avertissement. Avant que cela n'existe, une contrainte retenue l'était en silence.
 
-`needs-migration` couvre tout ce que le chemin d'assurance ne peut pas faire : supprimer une collection ou une propriété, changer un type, renommer une colonne, modifier une clé primaire, supprimer une valeur d'enum. Chaque refus nomme le changement et indique quoi faire à la place.
+`needs-migration` couvre tout ce que le chemin d'assurance ne peut pas faire : supprimer une collection ou
+une propriété, changer le type d'une colonne (une bascule d'entier, une chaîne devenant un enum, le type
+d'élément d'un tableau, la largeur d'un varchar), renommer une colonne, modifier une clé primaire, supprimer
+une valeur d'enum, rendre unique une colonne existante, et changer une relation — son genre, sa cible, son
+`localKey`, son `onDelete`. Un `hasMany` ou un `hasOne` dont rien ne crée la colonne de lien est refusé aussi.
+Chaque refus nomme le changement et indique quoi faire à la place.
+
+Le verdict est lu depuis le schéma que chaque côté produit — le même plan dont sont rendus
+`schema.generated.ts` et `db push` — si bien qu'une modification qui change la base de données ne peut pas
+être signalée comme n'étant pas un changement. Deux modifications qui ressemblent à des changements et ne
+sont pas refusées (<span class="since-badge" data-since="0.24">Depuis 0.24</span> ; la 0.23 signale les deux comme nécessitant une migration) :
+
+- **Renommer la clé d'une propriété en conservant sa colonne** (`columnName` réglé sur l'ancienne colonne) ne
+  déplace aucune donnée. C'est `safe` ; les clients API lisent le nouveau nom.
+- **Définir, changer ou supprimer une valeur par défaut** ne lie que les futures écritures. C'est `safe`, et
+  appliqué avec `ALTER COLUMN … SET DEFAULT` / `DROP DEFAULT`.
+
+### Modifier uniquement la source
+
+Un changement refusé peut tout de même être écrit dans le code source de votre collection et committé, en
+laissant la base de données telle qu'elle est — retirer une propriété que vous ne servez plus est le cas
+habituel. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Envoyez `/apply` avec `"sourceOnly": true`. Rien ne s'exécute ; le message
+de commit nomme ce que la base de données conserve, par exemple
+`chore(schema): remove sku from products (source only — column products.sku kept)`,
+et chaque changement du plan porte une phrase `sourceOnly` indiquant ce qu'il laisse derrière lui —
+y compris lorsqu'une colonne laissée derrière est `NOT NULL` sans valeur par défaut, ce qui fait
+échouer toute insertion ultérieure jusqu'à ce qu'elle soit supprimée ou rendue nullable. Un
+changement sans cela (déplacer une clé primaire, une relation dont rien ne crée la colonne de
+lien) ne peut pas être écrit dans la seule source.
+
+Supprimer une collection depuis le panneau d'administration suit le même chemin : `/apply` avec
+`"remove": true` et `"sourceOnly": true` supprime le fichier de la collection et son entrée dans
+`index.ts`, et committe les deux ; la table et ses lignes restent. C'est refusé tant qu'une autre
+collection importe le fichier (une relation vers lui), en nommant l'importateur — le supprimer
+empêcherait chaque collection de se charger.
+
+Sur la 0.23 `/apply` ne prend ni `sourceOnly` ni `remove`, et le « Modifier uniquement la source »
+du panneau écrit le fichier sans commit.
 
 ## Ce qui est validé (commit)
 
@@ -92,13 +150,15 @@ Pas seulement le fichier de collection. Le schéma Drizzle en est généré, et 
 
 Ces chemins sont relatifs à votre **projet**, et non à votre dépôt. Lorsque les deux sont identiques — un projet `rebase init`, ce qui est le cas habituel — il n'y a pas à s'en soucier. Lorsque votre projet se trouve dans un sous-répertoire d'un dépôt plus vaste, les chemins sont préfixés par celui-ci, trouvé en remontant depuis votre répertoire de collections jusqu'au `rebase.json` le plus proche. Un projet sans `rebase.json` conserve les chemins simples.
 
-Aucun SQL n'entre dans le commit. `rebase db push` et `rebase db generate` écrivent le leur à partir des collections à chaque exécution, dans `.rebase/sql/`, qui est ignoré par git.
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Aucun SQL n'entre dans le commit. `rebase db push` et `rebase db generate` écrivent le leur à partir des collections à chaque exécution, dans `.rebase/sql/`, qui est ignoré par git.
+Sur la 0.23 le commit porte aussi `drizzle/schema.sql`, `drizzle/policies.sql` et
+`drizzle/search.sql`, écrits à la racine du projet.
 
 Le message de commit décrit la modification plutôt que d'en annoncer une, et est attribué à la personne qui l'a effectuée. Une modification de schéma avec un auteur et un diff dans l'historique de votre projet est une chose que ni Firebase ni Supabase ne vous offrent — leurs modifications de tables sont invisibles pour votre dépôt.
 
 ## Qui peut appliquer
 
-Détenir `schema:read` est suffisant pour **planifier**. La planification n'a aucun effet secondaire, et un job CI demandant si un changement de collection proposé est applicable en est une bonne utilisation.
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Détenir `schema:read` est suffisant pour **planifier**. La planification n'a aucun effet secondaire, et un job CI demandant si un changement de collection proposé est applicable en est une bonne utilisation.
 
 L'application est un second privilège, car appliquer écrit un commit et un commit porte un auteur :
 
@@ -109,6 +169,9 @@ L'application est un second privilège, car appliquer écrit un commit et un com
 | La clé de service du serveur | oui | non |
 
 Un identifiant n'est pas un auteur. `api-key:7c3f…` dans votre environnement de CI n'est pas une personne physique, et lui permettre d'écrire dans votre dépôt produit exactement l'historique non attribuable que cette fonctionnalité vise à remplacer.
+
+Sur la 0.23 la limite est le rôle `admin` : un administrateur planifie et applique, et n'importe
+quelle clé API peut planifier.
 
 Si une modification automatisée du schéma est ce que vous souhaitez — un pipeline de migration, par exemple — activez-la délibérément :
 

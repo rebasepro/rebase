@@ -39,7 +39,7 @@ le détient en entier. Tout autre rôle détient ce que l'application déclare p
 | `storage:delete` | données | source de stockage | Supprimer des fichiers |
 | `functions:invoke` | données | fonction | Appeler des fonctions personnalisées. Une fonction peut faire tout ce que fait son code |
 | `users:read` | administration | — | Lister les comptes et leurs rôles |
-| `users:write` | administration | — | Créer, modifier et supprimer des comptes, réinitialiser des mots de passe, attribuer des rôles jusqu'à ceux du détenteur |
+| `users:write` | administration | — | Créer, modifier et supprimer des comptes, réinitialiser des mots de passe et des seconds facteurs, attribuer des rôles jusqu'à ceux du détenteur |
 | `schema:read` | administration | — | Lire le schéma des collections, planifier des changements de schéma, lancer l'audit RLS, lire la documentation privée de l'API |
 | `schema:write` | administration | — | Appliquer des changements de schéma : modifie les fichiers de collection et altère la base de données |
 | `database:read` | administration | — | Lister les bases de données, les tables, les rôles Postgres et les branches |
@@ -266,7 +266,7 @@ un autre.
 
 ## Quand une portée manque
 
-La réponse est `403 SCOPE_MISSING`, et `details.requiredScope` nomme la portée, avec sa cible
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> La réponse est `403 SCOPE_MISSING`, et `details.requiredScope` nomme la portée, avec sa cible
 quand il y en a une :
 
 ```json

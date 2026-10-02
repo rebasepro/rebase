@@ -137,7 +137,7 @@ sur lequel toutes les cibles de déploiement s'accordent.
 | `PORT` | Port d'écoute. Par défaut `3001` en local, `8080` dans l'image. |
 | `REBASE_SERVICE_KEY` | Clé de serveur à serveur accordant un accès administrateur. |
 | `REBASE_METRICS` | `true` pour exposer les métriques Prometheus sur `/metrics`. |
-| `REBASE_MIGRATE_ON_BOOT` | `none` laisse le schéma intact ; toute autre valeur — y compris non définie — exécute la passe de provisionnement additive. Défini par défaut sur `ensure` partout, production comprise. |
+| `REBASE_MIGRATE_ON_BOOT` | `ensure` — la valeur par défaut partout, production comprise — exécute la passe de provisionnement additive ; `none` laisse le schéma intact. Toute autre valeur refuse de démarrer, et l'image runtime refuse aussi `push`. |
 | `REBASE_SERVE_STATIC` | Sert les ressources statiques du bundle depuis ce processus. Activé par défaut. |
 
 La configuration de plusieurs bases de données et de plusieurs buckets s'effectue en suffixant la variable

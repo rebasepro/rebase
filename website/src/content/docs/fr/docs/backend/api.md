@@ -273,6 +273,10 @@ GET /api/data/posts?fields=id,title&limit=50
 
 La clé primaire est toujours retournée (une ligne qui ne peut pas être ciblée ne peut être mise à jour, supprimée ou dépassée par pagination — et le curseur en dérive), et les colonnes `excludeFromApi` restent masquées, qu'elles soient nommées ou non. Une colonne inconnue renvoie une erreur 400 `UNKNOWN_FIELD` plutôt qu'une ligne omettant discrètement un champ.
 
+Une relation nommée dans `?include=` revient que `?fields=` la nomme ou non :
+`?include=author&fields=title` renvoie `title`, la clé et `author`. Nommer
+aussi la relation dans `?fields=` est permis et ne change rien.
+
 `?distinct=true` fusionne les lignes identiques sur ces colonnes :
 
 ```bash

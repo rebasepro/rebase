@@ -152,7 +152,8 @@ La distribution aux clients locaux n'est pas de votre ressort — le service tem
 
 `pg_notify` refuse toute charge utile de 8000 octets ou plus. Les curseurs et la présence s'y intègrent largement ; un instantané de document, non. Rebase gère cela de la même manière qu'il gère les modifications d'entités volumineuses — en envoyant une adresse plutôt qu'un corps :
 
-- **Sur un canal persistant (retained)** (voir [Rétention des canaux](#channel-retention)), le message est déjà stocké avec un numéro de séquence, de sorte que la notification ne contient que `(channel, seq)` et chaque instance réceptrice relit le corps. Il n'y a alors aucune limite de taille.
+- **Sur un canal persistant (retained)** (voir [Rétention des canaux](#channel-retention)), le message est déjà stocké avec un numéro de séquence, de sorte que la notification ne contient que `(channel, seq)` et chaque instance réceptrice relit le corps. Il n'y a alors aucune limite de taille. Cela vaut pour tout message persistant, petit ou grand : n'importe quelle connexion à la base de données peut faire `LISTEN`, si bien que le corps ne voyage jamais dans la notification. Cela coûte une lecture par clé primaire et par message, sur chaque instance ayant un membre sur le canal.
+- **Les diffusions éphémères et la présence** voyagent, elles, toujours dans la notification elle-même, si bien que n'importe quelle connexion à la base de données peut les lire. Placez sur un canal persistant tout ce qui ne doit pas être lisible de cette façon.
 - **Sur un canal éphémère**, il n'y a rien vers quoi pointer. La diffusion est distribuée localement, l'émetteur reçoit une erreur `CHANNEL_BUS_PAYLOAD_TOO_LARGE` sur `channel.onError()`, et un avertissement mentionne le canal — évitant ainsi que le message n'atteigne silencieusement que la moitié du cluster.
 
 Si vous diffusez des messages volumineux, attribuez une règle de rétention à ce canal. C'est tout ce qu'il y a à faire.

@@ -81,6 +81,7 @@ avec une simple erreur `404 NO_COLLECTIONS`. Voir [Backend uniquement](/docs/get
 | `POST` | `/api/auth/change-password` | session | [Authentification](/docs/backend/authentication/) |
 | `POST` | `/api/auth/send-verification` | session | [Authentification](/docs/backend/authentication/) |
 | `GET` | `/api/auth/verify-email` | none (un jeton de vérification) | [Authentification](/docs/backend/authentication/) |
+| `POST` | `/api/auth/verify-email` | none (un jeton de vérification, et une session ou le mot de passe pour la conserver) | [Vérification de l'e-mail](/docs/backend/email-verification/) |
 | `POST` | `/api/auth/magic-link` | none | [Authentification](/docs/backend/authentication/) |
 | `POST` | `/api/auth/magic-link/verify` | none (un jeton de lien) | [Authentification](/docs/backend/authentication/) |
 | `POST` | `/api/auth/otp` | none | Codes à usage unique par e-mail |
@@ -94,6 +95,7 @@ avec une simple erreur `404 NO_COLLECTIONS`. Voir [Backend uniquement](/docs/get
 | `POST` | `/api/auth/mfa/verify` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `GET` | `/api/auth/mfa/factors` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `DELETE` | `/api/auth/mfa/unenroll` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
+| `POST` | `/api/auth/mfa/recovery-codes` | session (`aal2`) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge` | none (une connexion en cours) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge/verify` | none (un identifiant de défi) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `GET` | `/api/auth/scopes` | session | Toutes les portées que ce backend connaît, et celles que détient l'appelant — [Rôles et portées](/docs/backend/roles-and-scopes/) |
@@ -119,6 +121,7 @@ une collection ne peut accéder à rien de tout cela. Voir [Rôles et portées](
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Refusé pour un compte qui détient plus que l'appelant |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Refusé pour un compte qui détient plus que l'appelant |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Délivre un mot de passe temporaire |
+| `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Supprime les seconds facteurs et les codes de récupération du compte, met fin à ses sessions |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` et les rôles déclarés par le projet, avec leurs portées |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [Clés d'API](/docs/backend/api-keys/). Jamais une clé d'API |
 | `POST` | `/api/admin/api-keys` | `keys:write` | La clé en texte brut n'est renvoyée qu'une seule fois, à sa création |

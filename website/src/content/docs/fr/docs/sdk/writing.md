@@ -142,7 +142,7 @@ ligne issue de `find()`, du cache hors ligne ou d'un serveur qui n'envoie pas
 d'`ETag` — et passer `undefined` n'envoie aucune précondition, l'appel ci-dessus
 se dégrade donc en une mise à jour ordinaire plutôt que de lever une exception.
 
-Depuis un navigateur sur une autre origine — un frontend Vite sur son propre port, un hôte `app.` appelant un hôte `api.` — l'`ETag` n'est lisible que parce que le serveur le nomme dans `Access-Control-Expose-Headers`. Le runtime Rebase le fait, avec `Retry-After`, `X-Request-ID`, les en-têtes `X-RateLimit-*` et `Preference-Applied`. Un backend qui configure son propre `cors()` doit exposer la même liste, sans quoi `etagOf` y vaut toujours `undefined` et chaque écriture conditionnelle part sans condition.
+Depuis un navigateur sur une autre origine — un frontend Vite sur son propre port, un hôte `app.` appelant un hôte `api.` — l'`ETag` n'est lisible que parce que le serveur le nomme dans `Access-Control-Expose-Headers`. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Le runtime Rebase le fait, avec `Retry-After`, `X-Request-ID`, les en-têtes `X-RateLimit-*` et `Preference-Applied` ; sur la 0.23 il n'en expose aucun, si bien que `etagOf` y vaut `undefined` en cross-origin. Un backend qui configure son propre `cors()` doit exposer la même liste, sans quoi `etagOf` y vaut toujours `undefined` et chaque écriture conditionnelle part sans condition.
 
 ### Ignorer la réponse
 
@@ -272,10 +272,12 @@ result.meta;  // { operations: 4 }
 `op` correspond à `create`, `update`, `upsert` ou `delete`, et `collection` restreint
 `values` au schéma `Insert` ou `Update` généré pour cette collection — une colonne
 que la collection ne possède pas est une erreur de compilation, de même qu'une
-création omettant un champ obligatoire. `collection` est l'accesseur, le nom que
+création omettant un champ obligatoire. <span class="since-badge" data-since="0.24">Depuis 0.24</span> `collection` est l'accesseur, le nom que
 prend `client.data.<accesseur>` (`orderItems` pour le slug `order_items`) ; le
 client envoie le slug, via le dictionnaire `collections` avec lequel il a été
-créé. Chaque opération exécute le pipeline correspondant à son équivalent sur une
+créé. Sur la 0.23 un lot typé envoie l'accesseur tel qu'écrit, si bien qu'une
+collection en snake_case ne peut pas être atteinte par ce biais, et qu'une
+colonne mal orthographiée n'est pas une erreur de compilation. Chaque opération exécute le pipeline correspondant à son équivalent sur une
 seule ligne — les mêmes
 validations, callbacks et sécurité au niveau des lignes, sous la même identité utilisateur.
 

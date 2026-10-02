@@ -17,26 +17,29 @@ Tous les endpoints d'authentification sont montés sur `/api/auth/` :
 | `POST` | `/api/auth/login` | Connexion avec e-mail/mot de passe |
 | `POST` | `/api/auth/refresh` | Rafraîchir le jeton d'accès |
 | `POST` | `/api/auth/<provider>` | Connexion OAuth (ex. : `/api/auth/google`, `/api/auth/linkedin`) |
-| `POST` | `/api/auth/link/<provider>` | Lier un fournisseur OAuth au compte authentifié |
+| `POST` | `/api/auth/link/<provider>` | Lier un fournisseur OAuth au compte authentifié. Sur un invité, c'est une inscription : elle exige `allowRegistration`, prend l'adresse du fournisseur quand celui-ci s'en porte garant, et répond avec une session pour le compte que l'invité est devenu |
 | `POST` | `/api/auth/logout` | Révoquer le jeton de rafraîchissement |
 | `POST` | `/api/auth/forgot-password` | Envoyer un e-mail de réinitialisation de mot de passe |
 | `POST` | `/api/auth/reset-password` | Réinitialiser le mot de passe avec un jeton |
 | `POST` | `/api/auth/find-user` | Résoudre une adresse e-mail en un profil public minimal (activation facultative — `AUTH_ALLOW_USER_LOOKUP`) |
-| `POST` | `/api/auth/change-password` | Modifier le mot de passe de l'appelant (authentifié) |
+| `POST` | `/api/auth/change-password` | Modifier le mot de passe de l'appelant (authentifié). Met fin à toute autre session et répond avec une nouvelle pour l'appelant |
 | `GET` | `/api/auth/me` | Le profil de l'appelant |
 | `PATCH` | `/api/auth/me` | Mettre à jour le profil de l'appelant |
+| `POST` | `/api/auth/change-email` | `{ newEmail }` : déplacer le propre compte de l'appelant vers une autre adresse. Envoie un lien à la nouvelle adresse et un avis à l'ancienne ; rien ne change avant que le lien ne soit suivi. Exige `aal2` sur un compte avec un second facteur. `409 EMAIL_EXISTS` ou `UNDELIVERABLE_ADDRESS`, `400 EMAIL_UNCHANGED`, `403 ANONYMOUS_USER` pour un invité — voir [Changer d'adresse e-mail](#changer-dadresse-e-mail) |
+| `POST` | `/api/auth/confirm-email-change` | `{ token }` provenant du lien. Aucune session requise. Déplace le compte vers la nouvelle adresse, vérifiée ; `400 INVALID_TOKEN` pour un lien consommé, remplacé ou expiré, `409 EMAIL_EXISTS` quand l'adresse a été prise pendant l'attente |
 | `GET` | `/api/auth/config` | Ce que ce backend propose à un écran de connexion — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Non authentifié et calculé à partir des mêmes prédicats que ceux appliqués par les routes, de sorte que ce que l'écran affiche ne peut pas dévier de ce qu'il peut faire |
 | `POST` | `/api/auth/send-verification` | Envoyer à l'appelant un lien de vérification d'e-mail |
-| `GET` | `/api/auth/verify-email` | Valider un lien de vérification (l'URL présente dans cet e-mail) |
+| `GET` | `/api/auth/verify-email` | Valider un lien de vérification (l'URL présente dans cet e-mail). Conserve ce qu'une session active du compte prouve et retire ce que personne n'a prouvé — voir [Vérification de l'e-mail](/docs/backend/email-verification/) |
+| `POST` | `/api/auth/verify-email` | La même chose avec `{ token, password?, removeUnproven? }` : le mot de passe le conserve et connecte ; sans aucune des deux preuves, un compte qui en détient une répond `409 PROOF_REQUIRED` |
 | `POST` | `/api/auth/magic-link` | Envoyer par e-mail un lien de connexion à usage unique. `503 EMAIL_NOT_CONFIGURED` sans SMTP |
 | `POST` | `/api/auth/magic-link/verify` | Échanger un jeton de magic link contre une session |
 | `POST` | `/api/auth/otp` | Envoyer par e-mail un code de connexion à six chiffres. Répond de la même manière que l'adresse possède un compte ou non |
 | `POST` | `/api/auth/otp/verify` | Échanger `{ email, code }` contre une session |
 | `POST` | `/api/auth/anonymous` | Créer une session anonyme (activation facultative — `ALLOW_ANONYMOUS`) |
 | `POST` | `/api/auth/anonymous/link` | Associer des identifiants réels au compte anonyme déjà connecté |
-| `GET` | `/api/auth/sessions` | Lister les sessions actives de l'appelant (jetons de rafraîchissement) |
+| `GET` | `/api/auth/sessions` | Lister les sessions actives de l'appelant, une par connexion. La propre session de l'appelant est marquée `isCurrentSession` |
 | `DELETE` | `/api/auth/sessions` | Révoquer toutes les sessions, y compris celle-ci — déconnexion à distance sur chaque appareil |
-| `DELETE` | `/api/auth/sessions/:id` | Révoquer une session |
+| `DELETE` | `/api/auth/sessions/:id` | Révoquer une session : son jeton de rafraîchissement, et le jeton d'accès que détient cet appareil |
 | `GET` | `/api/auth/scopes` | Toutes les [portées](/docs/backend/roles-and-scopes/) que ce backend connaît, et celles que détient l'appelant |
 | `GET` | `/api/auth/keys` | Les propres [clés API personnelles](/docs/backend/api-keys/#personal-keys) de l'appelant |
 | `POST` | `/api/auth/keys` | Créer une clé personnelle. `403 PERSONAL_KEYS_DISABLED` sauf si la collection des utilisateurs définit `auth.personalKeys` |
@@ -48,6 +51,7 @@ Tous les endpoints d'authentification sont montés sur `/api/auth/` :
 | `POST` | `/api/auth/mfa/challenge` | Initier un challenge pour un facteur vérifié |
 | `POST` | `/api/auth/mfa/challenge/verify` | Répondre à un challenge — c'est ce qui émet la session |
 | `DELETE` | `/api/auth/mfa/unenroll` | Supprimer un facteur (nécessite une session `aal2`) |
+| `POST` | `/api/auth/mfa/recovery-codes` | Remplacer les codes de récupération de l'appelant par dix nouveaux (nécessite une session `aal2`) |
 
 La gestion administrative des utilisateurs et des rôles est une **surface distincte**, montée sur
 `/api/admin/` plutôt que sur `/api/auth/`. La lecture exige la portée `users:read` et
@@ -60,9 +64,10 @@ Voir [Rôles et portées](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/users` | Lister les utilisateurs (paginé) |
 | `POST` | `/api/admin/users` | Créer un utilisateur |
 | `GET` | `/api/admin/users/:uid` | Obtenir un utilisateur |
-| `PUT` | `/api/admin/users/:uid` | Mettre à jour un utilisateur |
-| `DELETE` | `/api/admin/users/:uid` | Supprimer un utilisateur |
-| `POST` | `/api/admin/users/:uid/reset-password` | Réinitialiser le mot de passe d'un utilisateur sans son mot de passe actuel |
+| `PUT` | `/api/admin/users/:uid` | Mettre à jour un utilisateur. `{ disabled: true }` désactive le compte sans le supprimer : toute connexion et tout rafraîchissement sont refusés (`ACCOUNT_DISABLED`), ses sessions prennent fin et chaque jeton qu'il détient est refusé ; `false` le réactive |
+| `DELETE` | `/api/admin/users/:uid` | Supprimer un utilisateur. Ses sessions prennent fin, et chaque jeton d'accès qu'il détient est refusé à partir de cette requête |
+| `POST` | `/api/admin/users/:uid/reset-password` | Réinitialiser le mot de passe d'un utilisateur sans son mot de passe actuel. `rebase auth reset-password` l'appelle, et n'écrit directement dans la base de données que lorsque le backend est inatteignable ; dans les deux cas, les sessions du compte prennent fin |
+| `DELETE` | `/api/admin/users/:uid/mfa` | Supprimer les seconds facteurs et les codes de récupération d'un utilisateur, et mettre fin à ses sessions — pour quelqu'un qui a perdu les deux |
 | `GET` | `/api/admin/roles` | `admin` et les rôles que déclare la collection des utilisateurs, avec leurs portées |
 | `POST` | `/api/admin/bootstrap` | Permettre au premier utilisateur inscrit de revendiquer le rôle admin tant qu'aucun n'existe. Refusé en production — voir [Amorçage du premier utilisateur](/docs/backend/authentication/#first-user-bootstrap) |
 
@@ -98,10 +103,15 @@ Chaque endpoint qui émet une session répond avec la même enveloppe — `regis
 Renvoyez le jeton d'accès sous la forme `Authorization: Bearer <accessToken>`.
 `accessTokenExpiresAt` correspond aux millisecondes de l'époque Unix (epoch).
 
-`POST /api/auth/refresh` répond avec la même enveloppe, avec deux nuances : `user`
+`POST /api/auth/refresh` répond avec la même enveloppe, sauf que `user`
 est totalement omis lorsque le compte ne peut pas être relu, considérez-le donc comme facultatif
-ici, et `providerId` vaut toujours `password`, quelle que soit la façon dont la session
-a été créée initialement.
+ici.
+
+`providerId` indique comment la session s'est connectée : `password`, `anonymous`,
+`magic-link`, `otp`, `mfa` (une connexion achevée avec un second facteur), ou l'id du
+fournisseur, tel que `google`. Il est stocké avec la session à la connexion, si bien que
+`refresh` et `GET /api/auth/me` donnent la même réponse pendant toute la durée de vie de
+la session. Une session connectée avant la 0.24 lit `password`.
 
 :::caution[Le SDK typé aplatit cette enveloppe — le protocole HTTP brut ne le fait pas]
 Le JSON ci-dessus est le format réseau, et c'est ce que renvoie `fetch("/api/auth/login")` :
@@ -116,6 +126,34 @@ Tenter de lire la structure du SDK à partir d'un simple `fetch` renvoie `undefi
 qui se traduit par « connexion réussie mais il n'y a pas de jeton d'accès » — la connexion a bien
 fonctionné, mais le jeton se trouvait un niveau plus bas.
 :::
+
+### Changer d'adresse e-mail
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une personne connectée
+déplace son propre compte vers une autre adresse en deux étapes :
+
+1. `POST /api/auth/change-email { newEmail }` enregistre le changement et envoie un
+   lien, `<frontend>/confirm-email-change?token=…`, à la nouvelle adresse, et un
+   avis sans lien à l'adresse actuelle. Le lien vit 24 heures, et une nouvelle
+   demande remplace la précédente. `GET /api/auth/me` signale l'adresse en attente
+   sous `pendingEmail`.
+2. `POST /api/auth/confirm-email-change { token }` déplace le compte : la nouvelle
+   adresse devient son adresse, vérifiée. Chaque identité OAuth dont le fournisseur
+   s'était porté garant de l'ancienne adresse est détachée (`removedProviders` les
+   nomme), car quiconque contrôle l'ancienne adresse pourrait sinon encore se
+   connecter par ce biais, et tout lien de réinitialisation envoyé à l'ancienne
+   adresse cesse de fonctionner. Les sessions sont conservées.
+
+La nouvelle adresse n'est pas réservée pendant que le lien attend : la réserver
+permettrait à un compte d'empêcher un inconnu de s'inscrire avec sa propre adresse.
+Si un autre compte détient l'adresse au moment où le lien est suivi, le lien répond
+`409 EMAIL_EXISTS` et rien ne se déplace ; entre deux comptes demandant la même
+adresse, le premier à suivre son lien l'obtient. Le hook `beforeEmailChange` peut
+refuser une adresse, comme `beforeUserCreate` le fait à l'inscription.
+
+Dans le CMS, l'adresse se change depuis **Paramètres du compte → Profil**, et le
+lien ouvre l'écran propre au CMS, connecté ou non. Un autre frontend sert une page
+à `/confirm-email-change` qui appelle la route avec le jeton du lien.
 
 Lorsque [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) est activé, le jeton
 de rafraîchissement transite dans un cookie `httpOnly` et `tokens.refreshToken` est une chaîne
@@ -159,6 +197,19 @@ chaque compte est limité à dix tentatives de vérification par tranche de 15 m
 (comptabilisées par utilisateur, donc changer d'adresse IP n'aide pas), et un code accepté est
 enregistré pour ce facteur afin qu'il ne puisse pas être rejoué durant le reste de sa fenêtre de validité
 de ±1 intervalle (step).
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Dans le CMS, **Paramètres du compte → Vérification en deux
+étapes** permet d'enrôler une application d'authentification (sa clé, et un lien
+qui l'ouvre dans l'application, puis le code qu'elle affiche), de lister les
+facteurs du compte, d'en supprimer un et de remplacer les codes de récupération.
+Lorsqu'un changement exige `aal2`, elle demande d'abord un code et élève la
+session avec celui-ci. Les codes de récupération sont affichés une seule fois,
+après la confirmation du premier facteur. Dans la table des utilisateurs,
+**Réinitialiser la vérification en deux étapes** (`DELETE /api/admin/users/:uid/mfa`)
+et **Désactiver ou activer le compte** (`PUT /api/admin/users/:uid { disabled }`)
+sont proposées à quiconque détient `users:write`, comme le sont les routes ;
+le bouton n'est jamais proposé sur votre propre compte, et un compte qui vous
+dépasse est refusé avec la raison donnée par le serveur.
 
 Définissez `MFA_ENCRYPTION_KEY` (au moins 32 caractères aléatoires) pour chiffrer les secrets TOTP
 stockés. Sans cela, le serveur se rabat sur `JWT_SECRET` et émet un avertissement. Définissez-la

@@ -178,6 +178,53 @@ La trame est de la forme `{ rows, pks, meta }` :
 
 Lorsque le décompte lui-même échoue, la trame comporte `partial: true` et aucun `total` ; cela ne constitue pas une erreur d'abonnement, et un client doit conserver le dernier total réel plutôt que de lui substituer la longueur de la page.
 
+### Ce que coûte une écriture, et les limites
+
+Comme chaque trame est une requête exécutée en tant que son abonné, le coût d'une écriture
+croît avec le nombre de **questions distinctes posées par des identités distinctes**
+sur la collection qu'elle a touchée — pas avec le nombre de sockets ouverts :
+
+- Les abonnements qui posent la même question (même chemin, filtres, tri, page, `include`,
+  `fields`, recherche) en tant que la même identité (même id d'utilisateur, mêmes rôles, même
+  statut invité et mêmes revendications) partagent une seule nouvelle requête. Une écriture
+  sur une liste coûte **une lecture et un décompte par groupe de ce genre**, quel que soit le
+  nombre de sockets qui le détiennent ; chaque membre reçoit tout de même une trame construite
+  à partir de lignes lues sous cette identité.
+- Un abonnement à une seule entité n'est interrogé que lorsque son propre enregistrement change.
+- Des identités différentes ne partagent jamais une lecture — c'est ce qui empêche une trame
+  de porter une ligne que son destinataire ne devrait pas voir. Une liste surveillée par mille
+  utilisateurs connectés différents, c'est mille lectures et mille décomptes à chaque écriture
+  qui la touche.
+
+Mesuré sur un ordinateur portable contre un PostgreSQL local avec un pool de 20 connexions,
+une écriture sur une liste :
+
+| Abonnés | Transactions pour l'écriture | Dernière trame après l'écriture |
+|-------------|----------------------------|----------------------------|
+| 1 000, une seule identité | 4 | ~350 ms |
+| 1 000, chacun une identité différente | ~2 000 | ~700 ms |
+
+300 ms de chacune sont la temporisation (debounce). La seconde ligne est le plafond à
+prévoir : les nouvelles requêtes font la queue sur le même pool que votre trafic REST, si bien
+qu'une collection écrite plusieurs fois par seconde tandis que **des centaines d'utilisateurs
+différents** surveillent la même liste est le point où le temps réel commence à entrer en
+concurrence avec les requêtes. Au-delà, préférez des abonnements plus étroits (une page, un
+filtre sur les propres lignes de l'utilisateur) ou un
+[canal de diffusion](#canaux-de-diffusion-broadcast-channels) qui porte le changement pour que
+les clients le relisent à leur propre rythme.
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> **Un socket peut détenir au plus 1 000 abonnements.** Le suivant est refusé avec
+une trame d'erreur codée `TOO_MANY_SUBSCRIPTIONS` ; se réabonner sous un id que le socket
+détient déjà remplace cet abonnement et ne compte pas une deuxième fois. Le SDK partage les
+abonnements identiques sur un socket, ce qui compte donc les listes et enregistrements
+distincts qu'une page a ouverts. Changez cela avec `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` ou
+`realtime.maxSubscriptionsPerSocket` sur l'adaptateur Postgres (la variable d'environnement
+l'emporte) ; une valeur qui n'est pas un entier positif arrête le serveur au démarrage. Sur la
+0.23 les abonnements d'un socket ne sont pas limités.
+
+Un id d'abonnement est propre au socket : deux clients qui nomment tous deux un abonnement
+`"sub-1"` conservent chacun le leur, et un `unsubscribe` ne met fin qu'à celui de l'émetteur.
+
 ## Canaux de diffusion (Broadcast Channels)
 
 Les canaux de diffusion permettent aux clients de s'envoyer mutuellement des messages arbitraires en temps réel — utile pour des fonctionnalités telles que les indicateurs de frappe, la position des curseurs ou les notifications personnalisées.
@@ -274,7 +321,7 @@ Le nettoyage (pruning) s'effectue à l'arrivée des messages, régulé par canal
 
 ### Garanties de livraison
 
-- **Ordonnée.** Les numéros de séquence sont alloués par canal, et l'ordre de livraison correspond à l'ordre des séquences.
+- **Ordonnée.** Les numéros de séquence sont alloués par canal, et l'ordre de livraison correspond à l'ordre des séquences — sur une seule instance, et entre instances sur le bus `postgres`, où l'instruction qui numérote un message l'annonce aussi, si bien que chaque instance (y compris celle de l'émetteur) reçoit les annonces dans l'ordre des séquences. Un bus que vous fournissez vous-même transporte les trames dans l'ordre où il les livre.
 - **Durable avant d'être livré.** Un message qui ne peut pas être stocké n'est livré à personne, et l'expéditeur en est informé. Le livrer le présenterait aux abonnés connectés en direct tout en l'excluant de tout rejeu futur, et aucun message ultérieur ne pourrait combler cet écart.
 - **Au moins une fois lors du rattrapage (At-least-once).** Une plage de rejeu peut chevaucher des messages qu'un client a déjà reçus ; le SDK élimine ceux qu'il a déjà livrés.
 
@@ -331,17 +378,33 @@ Les présences inactives sont automatiquement nettoyées après 30 secondes d'in
 
 Le SDK typé se reconnecte automatiquement lorsque la connexion WebSocket est interrompue :
 
-- **Temporisation exponentielle (Exponential backoff)** — Les délais de reconnexion débutent à 1 seconde et doublent à chaque tentative, avec un plafond à 30 secondes.
-- **5 tentatives au maximum** — Après 5 tentatives infructueuses de reconnexion, le client cesse d'essayer.
-- **Réabonnement automatique** — En cas de reconnexion réussie, tous les abonnements actifs sont réenregistrés auprès du serveur. Aucune intervention manuelle n'est requise.
-- **Mise en file d'attente des messages** — Les messages envoyés pendant la déconnexion sont mis en file d'attente et délivrés après la reconnexion.
+- **Temporisation exponentielle (Exponential backoff)** — La première recomposition arrive environ 2 secondes après la coupure, et chaque suivante attend deux fois plus longtemps, jusqu'à un plafond de 30 secondes. Chaque délai est raccourci d'au plus un cinquième, au hasard, pour que des clients coupés en même temps par un déploiement ne reviennent pas tous au même instant.
+- **Pas d'abandon tant que quelque chose est actif** — Tant qu'un abonnement ou un canal rejoint existe, le client continue de recomposer au plafond de 30 secondes pendant toute la durée de la coupure. Sans rien d'enregistré, il s'arrête après 5 tentatives infructueuses, et le prochain abonnement recompose. Dans un navigateur, l'événement `online` et le fait que l'onglet redevienne visible recomposent tous les deux immédiatement plutôt que d'attendre la fin de la temporisation.
+- **Les coupures sont signalées une seule fois** — Lorsque la connexion est tombée pendant environ 15 secondes (trois recompositions infructueuses), l'`onError` de chaque abonnement actif et de chaque canal rejoint reçoit une `RebaseApiError` avec le code `CONNECTION_LOST`. L'abonnement est **conservé** : l'erreur signale que ses données ne se mettent plus à jour, pas qu'il a pris fin.
+- **Réabonnement automatique** — En cas de reconnexion réussie, tous les abonnements actifs sont réenregistrés auprès du serveur, et le prochain `onUpdate` de chacun porte tout ce qui a été écrit pendant l'absence du client. Cette mise à jour est le signal de rétablissement. Aucune intervention manuelle n'est requise.
+- **Les requêtes sont au plus une fois (at-most-once)** — Une requête faite pendant que le socket est en panne attend sa remise en ligne, pendant 30 secondes au plus à partir de l'appel, puis échoue avec `REQUEST_TIMEOUT` sans jamais avoir été envoyée. Une requête déjà envoyée au moment de la coupure échoue avec `CONNECTION_LOST` et n'est **pas** renvoyée : le serveur a pu l'exécuter ou non, et seul l'appelant sait s'il est sûr de l'exécuter deux fois.
 
-Vous pouvez écouter les événements liés au cycle de vie de la connexion :
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> `client.ws.state` indique où en est la connexion, et `onStateChange` est informé de
+chaque changement. Sur la 0.23 ni l'un ni l'autre n'existe, le client s'arrête après 5 tentatives
+infructueuses, et les messages envoyés pendant la déconnexion sont mis en file et envoyés après la
+reconnexion :
+
+| État | Signification |
+|---|---|
+| `idle` | Aucun socket, et aucun désiré pour l'instant (la connexion est paresseuse), ou une déconnexion l'a abandonné. |
+| `connecting` | En train de composer, sans coupure en cours. |
+| `connected` | Le socket est ouvert. |
+| `reconnecting` | Le socket s'est coupé et le client recompose. Rien n'a encore été signalé. |
+| `disconnected` | La coupure dure depuis environ 15 secondes ou plus. `CONNECTION_LOST` a été signalé, et le client continue de recomposer. |
+| `closed` | `client.close()` a été appelé. Définitif. |
 
 ```typescript
 // `ws` is undefined on a client built without realtime, so narrow it once.
 const ws = client.ws;
 if (ws) {
+    ws.onStateChange((state) => {
+        showOfflineBanner(state === "disconnected");
+    });
     ws.on("connect", () => console.log("Connected"));
     ws.on("disconnect", () => console.log("Disconnected"));
     ws.on("reconnect", () => console.log("Reconnected"));
@@ -349,13 +412,15 @@ if (ws) {
 }
 ```
 
+L'admin Rebase affiche sa propre bannière tant que l'état est `disconnected`, et conserve les lignes et enregistrements déjà à l'écran plutôt que de les remplacer par une erreur.
+
 ## Authentification & RLS
 
 Les abonnements WebSocket respectent automatiquement les politiques de sécurité au niveau des lignes (RLS). Lorsque le client est authentifié :
 
 1. La connexion WebSocket s'authentifie en utilisant le même jeton JWT que l'API REST.
 2. Chaque réévaluation d'abonnement s'exécute dans une transaction PostgreSQL avec `set_config('app.user_id', ...)` et `set_config('app.user_roles', ...)` — garantissant ainsi l'application des politiques RLS.
-3. Le jeton est vérifié une seule fois, lors de l'authentification du socket, et le serveur ne le revérifie pas pendant toute la durée de la connexion. Un jeton d'accès qui expire, une session révoquée ou un rôle retiré ne modifie pas ce qu'un socket ouvert peut lire tant qu'il ne se réauthentifie pas ou ne se reconnecte pas. Le SDK réauthentifie son socket chaque fois qu'il actualise son jeton, et le déconnecte lors de la déconnexion ; un client utilisant directement le protocole conserve l'identité avec laquelle il a ouvert la connexion jusqu'à ce qu'il se reconnecte.
+3. <span class="since-badge" data-since="0.24">Depuis 0.24</span> L'identité est revérifiée pendant toute la durée où le socket reste ouvert, pas seulement à son authentification. Avant chaque trame, le serveur demande ce qu'une requête HTTP demanderait : le jeton est-il toujours valide, sa session a-t-elle été déconnectée ou révoquée, le compte existe-t-il encore, et quels rôles détient-il maintenant. Les trames de canal sont vérifiées au plus une fois par seconde. Un socket qui ne fait qu'écouter est vérifié au moins toutes les 30 secondes, et un jeton cesse d'être honoré à l'instant où il expire. Un rôle retiré s'applique à partir de la trame suivante, aussi bien pour les lectures, les écritures que les abonnements ouverts. Un socket dont l'identité a pris fin reçoit une trame `AUTH_ERROR` avec le code `SESSION_ENDED` ou `TOKEN_EXPIRED` et est fermé avec le code `4001`. Le SDK réauthentifie son socket chaque fois qu'il actualise son jeton, et après un `4001` il se reconnecte avec la session qu'il détient alors, ou sans aucune. Un client utilisant directement le protocole doit envoyer un jeton frais dans `AUTHENTICATE` avant que l'ancien n'expire.
 
 Cela signifie que chaque socket ne reçoit que les mises à jour relatives aux enregistrements que son identité authentifiée est autorisée à voir.
 
@@ -404,7 +469,7 @@ Si la connexion ne le prend pas en charge, `auto` consigne une ligne d'informati
 
 ### Fonctionnement
 
-1. **Auto-provisionnement** — Au démarrage (contexte serveur/propriétaire), Rebase installe un déclencheur idempotent `AFTER INSERT/UPDATE/DELETE` sur chaque table managée. Le déclencheur émet une notification de modification compacte sur le canal `rebase_cdc`. Une charge utile qui dépasserait la limite de 8&nbsp;Ko de `NOTIFY` dans PostgreSQL se rabat sur un message d'identité uniquement, de sorte que le CDC ne puisse jamais interrompre l'écriture déclencheuse.
+1. **Auto-provisionnement** — Au démarrage (contexte serveur/propriétaire), Rebase installe un déclencheur idempotent `AFTER INSERT/UPDATE/DELETE` sur chaque table managée. Le déclencheur émet sur le canal `rebase_cdc` une notification de modification qui nomme la ligne modifiée par sa clé — la clé primaire, plus les deux colonnes d'id pour une table de jonction plusieurs-à-plusieurs — et ne porte **aucune autre colonne**. PostgreSQL n'impose aucun privilège sur `LISTEN`, si bien que tout rôle capable de se connecter à la base de données peut lire ce canal ; il apprend quelles clés ont changé, jamais ce qu'elles contiennent. Une clé trop grande pour la limite de 8&nbsp;Ko de `NOTIFY` dans PostgreSQL est envoyée comme absence de clé (un changement sur la collection entière), de sorte que le CDC ne puisse jamais interrompre l'écriture déclencheuse. La fonction est remplacée à chaque démarrage qui provisionne, si bien qu'une base de données instrumentée par une version plus ancienne — dont le déclencheur envoyait des lignes entières — est mise à jour par le démarrage suivant, `REALTIME_CDC=off` compris.
 2. **Capture** — Un client `LISTEN` dédié et hors pool par instance consomme `rebase_cdc`, associe la table modifiée à sa collection correspondante, et transmet la modification au même pipeline `RealtimeService` que celui utilisé par les mutations d'API. Tout comme le récepteur multi-instances, il privilégie `DATABASE_DIRECT_URL` et se reconnecte automatiquement.
 3. **Livraison sécurisée avec RLS** — La ligne brute provenant du flux de modifications n'est **jamais** transmise aux abonnés. La modification est marquée comme invalidée, et chaque abonnement relit la ligne sous son **propre** contexte d'authentification. Le filtrage s'effectue donc par abonné, jamais par émetteur : un client ne reçoit jamais que les lignes permises par ses politiques RLS.
 4. **Multi-instances** — Étant donné que chaque instance observe chaque commit via le flux de modifications, le CDC *est* également le canal inter-instances ; l'ancienne diffusion par mutation `rebase_entity_changes` n'est pas utilisée tant que le CDC est actif.

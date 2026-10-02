@@ -18,7 +18,7 @@ Il n'y a pas de service d'administration séparé : le panneau d'administration 
 |--------------|----------------|-------------------|
 | Scaffold par défaut (`rebase init`) | Le panneau d'administration | `/` — le frontend **est** l'administration |
 | Frontend produit personnalisé | Votre app | Là où vous le montez, généralement `/admin` — voir [Changer l'URL de base](#changer-lurl-de-base) |
-| Administration comme app sur son propre nom d'hôte | Votre app | `https://admin.example.com/`, servi par le même serveur — voir [Changer l'URL de base](#changer-lurl-de-base) |
+| Administration comme app sur son propre nom d'hôte | Votre app | <span class="since-badge" data-since="0.24">Depuis 0.24</span> `https://admin.example.com/`, servi par le même serveur — voir [Changer l'URL de base](#changer-lurl-de-base) |
 | Projet backend uniquement | Rien (API seulement) | Non déployé |
 
 :::note[Première visite]

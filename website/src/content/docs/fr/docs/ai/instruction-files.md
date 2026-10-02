@@ -30,26 +30,35 @@ Chaque fichier pointeur comporte trois lignes :
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
-Install the Rebase skills for this assistant: `rebase skills install --agent claude`.
+The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
 ```
 
-Les autres ne diffèrent que par le dernier mot de la troisième ligne —
-`--agent cursor`, `--agent windsurf`, `--agent codex`, `--agent copilot` — et par
-le chemin relatif, qui est `../ai-instructions.md` dans
-`.github/copilot-instructions.md` et `ai-instructions.md` dans `AGENTS.md`.
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> pour cette troisième ligne et le `.mcp.json` ci-dessous : sur la 0.23
+la troisième ligne se contente de dire à l'assistant de lancer `rebase skills install --agent claude`,
+et `.mcp.json` démarre le serveur avec `npx -y @rebasepro/mcp` depuis le registre.
+
+Les autres ne diffèrent que par le répertoire de skills de l'agent et sa valeur
+`--agent` — `--agent cursor`, `--agent windsurf`, `--agent codex`,
+`--agent copilot` — et par le chemin relatif, qui est `../ai-instructions.md`
+dans `.github/copilot-instructions.md` et `ai-instructions.md` dans
+`AGENTS.md`. La troisième ligne est conditionnelle parce que
+`rebase init --agent` a pu déjà installer les skills avant que l'assistant ne
+la lise.
 
 Cela se produit lors de chaque `rebase init`, pour chaque preset y compris `--headless`.
 Il n'y a aucun flag ni aucune invite.
 
 `rebase init` écrit également `.mcp.json`, qui pointe Claude Code, Cursor et
-n'importe quel autre client MCP vers le [serveur MCP Rebase](/fr/docs/ai/mcp) :
+n'importe quel autre client MCP vers le [serveur MCP Rebase](/fr/docs/ai/mcp) —
+sa propre copie du projet, une devDependency épinglée avec la CLI
+(`npx --no rebase-mcp` dans un projet npm) :
 
 ```json title=".mcp.json"
 {
     "mcpServers": {
         "rebase": {
-            "command": "npx",
-            "args": ["-y", "@rebasepro/mcp"],
+            "command": "pnpm",
+            "args": ["exec", "rebase-mcp"],
             "env": {
                 "REBASE_PROJECT_DIR": "."
             }
@@ -100,7 +109,7 @@ utile de les répéter au début de chaque session :
    est toute l'étape : le démarrage régénère le schéma Drizzle et crée les tables
    et colonnes manquantes. `pnpm db:push` ne sert qu'à ce que le démarrage laisse
    délibérément de côté — une colonne renommée, un type restreint, un champ
-   supprimé, la RLS d'une table de jonction — et il exige votre propre
+   supprimé — et il exige votre propre
    PostgreSQL, pas la base de données de développement gérée. En production,
    c'est `pnpm db:generate` puis `pnpm db:migrate`.
 3. **Utilisez le SDK.** Passez par `rebase.dataAsAdmin.<slug>` pour le travail

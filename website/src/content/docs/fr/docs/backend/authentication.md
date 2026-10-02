@@ -87,16 +87,20 @@ const backend = await initializeRebaseBackend({
 | `activeKid` | `string` | première clé | Clé parmi `signingKeys` utilisée pour générer de nouveaux jetons |
 | `accessExpiresIn` | `string` | `1h` | Durée de vie du jeton d'accès |
 | `refreshExpiresIn` | `string` | `30d` | Durée de vie du jeton de rafraîchissement. Glissante : chaque rotation la renouvelle. Le runtime transmet `JWT_REFRESH_EXPIRES_IN`, dont la valeur par défaut est de `400d` |
+| `refreshTokenReuseIntervalSeconds` | `number` | `10` | Pendant combien de temps un jeton de rafraîchissement remplacé par rotation génère encore un jumeau de sa session, afin qu'un client qui a perdu la réponse d'un rafraîchissement ne soit pas déconnecté |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Ce que fait un jeton de rafraîchissement présenté après cette fenêtre. `"reject"` le refuse (`TOKEN_ALREADY_USED`) et le journalise, et la session subsiste : ce n'est pas une détection de réutilisation, puisque celui qui a rafraîchi le premier garde la session. `"revoke-session"` met fin à toute la connexion lors d'une telle répétition (`SESSION_REVOKED`), comme le fait GoTrue, et le titulaire se reconnecte. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Exiger une session pour l'API de données |
 | `allowRegistration` | `boolean` | `false` | Ouvrir `POST /api/auth/register`. Hors production, le premier utilisateur sur une table vide est admis dans les deux cas ; en production, l'administrateur est défini avec `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Coupe-circuit : ferme également la fenêtre de bootstrap du premier utilisateur laissée ouverte par `allowRegistration: false` |
-| `allowAnonymous` | `boolean` | `false` | Activer `POST /api/auth/anonymous`. Délibérément non conditionné par `allowRegistration` — une application publique principalement en lecture peut nécessiter des sessions sans comptes |
+| `allowAnonymous` | `boolean` | `false` | Activer `POST /api/auth/anonymous`. Délibérément non conditionné par `allowRegistration` — une application publique principalement en lecture peut nécessiter des sessions sans comptes. Transformer un invité en compte (`POST /api/auth/anonymous/link`) est une inscription, et nécessite aussi `allowRegistration` |
 | `allowUserLookup` | `boolean` | `false` | Monter `POST /api/auth/find-user` pour les flux d'invitation par e-mail |
 | `defaultRole` | `string` | — | Rôle attribué à un utilisateur nouvellement inscrit lorsqu'aucun n'est spécifié. Il ne peut pas être `admin`, ni un rôle déclaré qui détient une portée du plan d'administration : le démarrage refuse les deux |
 | `serviceKey` | `string` | — | Clé statique pour les appels de serveur à serveur — voir [Authentification par clé de service](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, pour la réinitialisation de mot de passe, la vérification, les invitations et les liens magiques |
 | `magicLink` | `boolean` | `false` | Activer la connexion sans mot de passe par e-mail. Nécessite la configuration d'`email` ; sinon, les routes répondent `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Activer les codes de connexion à six chiffres par e-mail — voir [Codes à usage unique](#codes-à-usage-unique-par-e-mail). Même prérequis concernant l'e-mail |
+| `magicLinkCreatesUsers` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Inscription sans mot de passe : une demande de lien magique ou de code par e-mail pour une adresse sans compte en crée un (sans mot de passe, non vérifié jusqu'à l'utilisation du lien ou du code), tant que `allowRegistration` est activé. Exécute `beforeUserCreate` et le rôle par défaut. Désactivé, ces demandes ne créent rien et répondent à une adresse inconnue comme à une adresse connue. `AUTH_MAGIC_LINK_CREATES_USERS` |
+| `requireEmailVerification` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Refuser la connexion par mot de passe tant que l'adresse n'est pas vérifiée, et rendre l'inscription à confirmation préalable — voir [Vérification de l'e-mail](/docs/backend/email-verification/). Nécessite `email` ; le démarrage le refuse sans cela |
 | `cookieAuth` | `CookieAuthConfig` | — | Délivrer le jeton de rafraîchissement sous forme de cookie `httpOnly` `Secure` `SameSite` plutôt que dans le corps JSON — voir ci-dessous |
 | `providers` | `OAuthProvider[]` | `[]` | Tableau OAuth canonique ; les champs de fournisseurs nommés s'y résolvent |
 | `allowedRedirectUris` | `string[]` | — | Restreindre les URI de redirection acceptées par les routes OAuth |
@@ -125,7 +129,25 @@ Le cookie porte le flag `Secure` à moins que vous ne le désactiviez, et rien d
 :::caution[Les callbacks de collection ne se déclenchent pas pour les utilisateurs auth]
 La création et les mises à jour d'utilisateurs via le système d'authentification — inscription, gestion des utilisateurs par un administrateur et OAuth — écrivent **directement** dans le magasin d'utilisateurs et contournent le pipeline d'enregistrement de la collection. Un callback `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete` sur la collection auth (utilisateurs) ne s'exécutera **pas** pour ces opérations. Pour des effets de bord tels que le provisionnement d'une équipe personnelle à l'inscription, utilisez les hooks de cycle de vie de l'authentification (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), qui reçoivent l'enregistrement utilisateur entièrement renseigné.
 
-OAuth en exécute moins que l'inscription standard. La connexion via un fournisseur déclenche `afterUserCreate` lors de la création du compte, et aucun autre hook de cycle de vie : `beforeUserCreate`, `beforeLogin` et `onAuthenticated` ne s'exécutent pas sur la route OAuth, de sorte qu'une vérification ou une piste d'audit liée à ces hooks ne verra jamais un utilisateur OAuth.
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> OAuth exécute les mêmes hooks que les autres connexions : `beforeLogin`
+(avec l'adresse du fournisseur et `"oauth"`), `beforeUserCreate` lorsque la connexion crée le
+compte, `afterUserCreate`, et `onAuthenticated`. `onAuthenticated` se déclenche aussi lors d'un
+rafraîchissement de jeton (`"refresh"`), d'une réinitialisation de mot de passe
+(`"password-reset"`) et d'un second facteur (`"mfa"`). `beforeLogin` ne s'exécute pas lors d'un
+rafraîchissement, qui n'est pas une connexion. Pour arrêter un compte déjà connecté,
+désactivez-le avec `PUT /api/admin/users/:uid { disabled: true }` : cela refuse chaque connexion
+et chaque rafraîchissement, et met fin à chaque session et jeton qu'il détient.
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> `beforeEmailChange(user, newEmail)` s'exécute lorsqu'une personne connectée
+demande à déplacer son compte vers une autre adresse. Une règle d'adresse que vous appliquez à
+l'inscription dans `beforeUserCreate` (uniquement votre propre domaine, par exemple) a aussi sa
+place ici, sinon un membre peut s'inscrire avec une adresse autorisée puis se déplacer vers
+n'importe quelle autre.
+
+Un hook qui refuse (`beforeUserCreate`, `beforeLogin`, `beforeUserDelete`,
+`beforeEmailChange`) lève une exception. L'appelant reçoit `400 HOOK_REJECTED` avec le message
+de l'erreur, ou le statut que porte l'erreur : une `ApiError`, ou toute erreur avec un `status`
+4xx.
 :::
 
 ### Protection contre les bots
@@ -178,7 +200,12 @@ Sans `SMTP_HOST`, les e-mails d'authentification n'ont aucune destination. Plut�
              http://localhost:5173/auth/magic-link?token=…
 ```
 
-Suivez le lien et le flux se termine. Rien ne change concernant le jeton — il est généré, stocké et validé exactement comme il le serait depuis une véritable boîte de réception ; seule la distribution diffère.
+Suivez le lien et le flux se termine, sur quelle que soit la page qui sert ce chemin : le CMS
+sert `/reset-password`, `/verify-email`, `/confirm-email-change` et le `/auth/magic-link` d'un
+lien magique ; un autre frontend a besoin de sa propre page pour chacun (voir les
+[Liens magiques](/docs/sdk/authentication/#magic-links) du SDK). Rien ne change concernant le
+jeton — il est généré, stocké et validé exactement comme il le serait depuis une véritable
+boîte de réception ; seule la distribution diffère.
 
 Ce comportement est actif dès lors que ces trois conditions sont réunies, et aucun paramètre ne peut les modifier :
 
@@ -231,7 +258,7 @@ La lecture d'un code depuis la boîte de réception prouve la possession de l'ad
 
 ### Personnaliser l'image de marque des e-mails par défaut
 
-Les modèles intégrés de réinitialisation de mot de passe, de vérification, d'invitation, de bienvenue et de lien magique affichent un logo au-dessus de la carte. Il provient de `email.logoUrl` :
+Les modèles intégrés de réinitialisation de mot de passe, de vérification, d'invitation, de bienvenue, de lien magique et de changement d'adresse e-mail affichent un logo au-dessus de la carte. Il provient de `email.logoUrl` :
 
 ```ts
 email: {
@@ -245,7 +272,10 @@ Il doit s'agir d'un fichier **PNG ou JPG accessible via une URL `http(s)` absolu
 
 Le mécanisme de repli est délibérément asymétrique. `appName` utilise `Rebase` par défaut, mais le logo ne revient à la marque Rebase que tant que l'installation ne s'est **pas** renommée. Définissez `appName` sur toute autre valeur et vous n'aurez aucun logo jusqu'à ce que vous configuriez `logoUrl` — autrement, les utilisateurs d'Acme recevraient le logo de Rebase dans un e-mail signé par le domaine d'Acme.
 
-Si vous remplacez un modèle via `email.templates`, rien de tout cela ne s'applique : votre fonction gère l'intégralité du corps.
+Si vous remplacez un modèle via `email.templates`, rien de tout cela ne s'applique : votre fonction gère l'intégralité du corps. `templates.emailChange(confirmUrl, user, newEmail)`
+est le lien envoyé à la nouvelle adresse lorsqu'une personne change la sienne, et
+`templates.emailChangeNotice(user, newEmail)` l'avis envoyé à l'ancienne ;
+`user.email` est l'adresse actuelle dans les deux cas.
 
 ### Fournisseurs OAuth
 
@@ -321,40 +351,40 @@ L'étape 3 est le cas critique pour la sécurité. Si un e-mail de fournisseur n
 
 Le côté du compte compte pour la même raison. Rien ne vérifie l'adresse que reçoit `POST /auth/register` : n'importe qui peut donc inscrire l'adresse de quelqu'un d'autre avec un mot de passe, ou se connecter avec elle via un fournisseur qui ne la garantit pas, et attendre. Lier la connexion Google du propriétaire à ce compte y laisserait le moyen d'accès de l'autre personne.
 
-Un lien magique, un code par e-mail ou une réinitialisation du mot de passe prouvent l'adresse et vérifient le compte. Sur un compte qui n'était pas encore vérifié, la première de ces preuves supprime le mot de passe (une réinitialisation définit le nouveau) et chaque identité liée dont le fournisseur n'a pas vérifié cette adresse, et met fin à toutes les sessions, avant de marquer le compte comme vérifié. Ensuite, l'étape 2 s'applique. Les comptes créés par un administrateur avec `POST /api/admin/users` sont enregistrés comme vérifiés, de sorte qu'une personne invitée peut utiliser « Se connecter avec Google » immédiatement. Un dépôt d'authentification personnalisé sans `unlinkUserIdentity` refuse une telle preuve avec `409 UNVERIFIED_IDENTITIES` lorsqu'il y a une identité à supprimer.
+Un lien de vérification, un lien magique, un code par e-mail ou une réinitialisation du mot de passe prouvent l'adresse et vérifient le compte. Sur un compte qui n'était pas encore vérifié, la première de ces preuves supprime le mot de passe (une réinitialisation définit le nouveau) et chaque identité liée dont le fournisseur n'a pas vérifié cette adresse, et met fin à toutes les sessions, avant de marquer le compte comme vérifié. Ensuite, l'étape 2 s'applique.
+
+Un lien de vérification conserve ce que la personne qui le suit prouve aussi : une session
+active du compte, ou son mot de passe. Voir [Vérification de l'e-mail](/docs/backend/email-verification/). Les comptes créés par un administrateur avec `POST /api/admin/users` sont enregistrés comme vérifiés, de sorte qu'une personne invitée peut utiliser « Se connecter avec Google » immédiatement. Un dépôt d'authentification personnalisé sans `unlinkUserIdentity` refuse une telle preuve avec `409 UNVERIFIED_IDENTITIES` lorsqu'il y a une identité à supprimer.
 
 Ce comportement n'est pas configurable — il n'existe délibérément aucune option pour lier des comptes sur la base d'e-mails non vérifiés.
 
-Pour surmonter un rejet à l'étape 3, l'utilisateur se connecte avec sa méthode existante et appelle le point de terminaison explicite de liaison :
+### Vérification de l'e-mail
 
-```http
-POST /api/auth/link/google
-Authorization: Bearer <access token>
-
-{ "idToken": "..." }
-```
-
-La liaison en étant authentifié n'exige délibérément **pas** d'e-mail vérifié, et ne nécessite pas non plus que les e-mails correspondent — l'adresse Google d'un utilisateur n'est souvent pas son adresse sur l'application. Cette asymétrie est délibérée : lors de la connexion, l'e-mail du fournisseur est la seule preuve reliant l'identité entrante à un compte, tandis qu'ici, l'appelant a déjà prouvé sa légitimité en détenant une session valide. L'endpoint renvoie `409 IDENTITY_ALREADY_LINKED` si cette identité de fournisseur appartient à un autre utilisateur, et est idempotent si elle est déjà liée à l'appelant.
-
-#### Le cas inverse
-
-Un utilisateur qui s'est inscrit avec Google et n'a pas de mot de passe :
-
-- **L'inscription avec le même e-mail** est refusée avec `409 EMAIL_EXISTS`.
-- **`POST /api/auth/change-password`** renvoie `400 INVALID_ACCOUNT` — il n'y a aucun mot de passe existant à vérifier.
-- **`forgot-password` → `reset-password` est la méthode prise en charge pour en ajouter un.** Elle prouve à nouveau la propriété de l'adresse par e-mail, après quoi le compte dispose des deux méthodes de connexion.
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> L'inscription envoie au nouveau compte un
+lien de vérification par e-mail, et le suivre ne conserve que ce que la personne qui le suit
+prouve aussi. `requireEmailVerification` rend l'inscription à confirmation préalable. Voir
+[Vérification de l'e-mail](/docs/backend/email-verification/).
 
 ## Tables créées automatiquement
 
 Lors du premier démarrage, Rebase provisionne automatiquement le schéma `auth` et les tables suivantes dans la base de données (liées au schéma défini dans votre collection, par ex. `rebase`) :
 
 - **`rebase.users`** — Comptes utilisateurs avec e-mail, hash de mot de passe, métadonnées et une colonne `roles` en text[] (les rôles sont stockés sous forme de tableaux de texte inline pour optimiser les requêtes et éviter les jointures).
-- **`rebase.refresh_tokens`** — Sessions longue durée contenant les jetons de rafraîchissement hachés, les user-agents et les adresses IP. Comprend un index unique sur `token_hash` et une contrainte d'unicité sur `(user_id, user_agent, ip_address)` pour suivre les sessions actives par appareil.
+- **`rebase.refresh_tokens`** — Sessions longue durée contenant les jetons de rafraîchissement hachés, les user-agents et les adresses IP. Comprend un index unique sur `token_hash`. Une connexion correspond à un seul `session_id`, partagé par chaque jeton issu de sa rotation ; il n'y a pas de contrainte par appareil, donc deux navigateurs derrière une même adresse comptent pour deux sessions. Chaque jeton d'une session porte aussi son niveau d'assurance (`aal`) et la façon dont la connexion s'est faite (`method`, que rapporte `providerId`).
 - **`rebase.password_reset_tokens`** — Jetons à usage unique avec expiration pour les flux de réinitialisation de mot de passe.
 - **`rebase.mfa_factors`** — Méthodes d'authentification multifacteur enregistrées (par ex. secrets TOTP chiffrés avec AES-256).
 - **`rebase.mfa_challenges`** — Journaux de vérification suivant les tentatives actives de validation MFA.
 - **`rebase.recovery_codes`** — Codes de secours/récupération multifacteur hachés.
 - **`rebase.app_config`** — Magasin clé-valeur pour les configurations système.
+
+Les jetons qui expirent — liens de réinitialisation, liens magiques et codes par e-mail,
+jetons de rafraîchissement, challenges MFA — sont supprimés une heure après leur expiration.
+Le balayage s'exécute sur le processus qui détient les minuteurs (le rôle `worker` dans un
+déploiement scindé) et sur une seule instance de la flotte : chaque heure est revendiquée dans
+`rebase.cron_claims` sous l'id de job `rebase:auth:expired-tokens`, comme l'est un créneau cron.
+Avec `cronPersistence: false` il n'y a pas de table de revendications, et chaque instance de ce
+type balaie. Un jeton expiré est refusé quand il est présenté, que le balayage ait eu lieu ou non ;
+le balayage ne fait qu'empêcher les tables de grossir.
 
 ## Amorçage du premier utilisateur (Bootstrap)
 

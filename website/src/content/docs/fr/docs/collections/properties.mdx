@@ -82,7 +82,7 @@ price: {
 |-----------|------|-------------|
 | `admin.readOnly` | `boolean` | Empêche la modification |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Désactive avec infobulle optionnelle |
-| `admin.filledByServer` | `boolean` | Le serveur remplit le champ lorsqu'un nouvel enregistrement le laisse vide (un hook `beforeSave`). Le formulaire laisse passer une création sans lui ; il reste requis à l'édition, et les propres vérifications du serveur continuent de s'appliquer |
+| `admin.filledByServer` | `boolean` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Le serveur remplit le champ lorsqu'un nouvel enregistrement le laisse vide (un hook `beforeSave`). Le formulaire laisse passer une création sans lui ; il reste requis à l'édition, et les propres vérifications du serveur continuent de s'appliquer |
 | `admin.hideFromCollection` | `boolean` | Masque de la vue en tableau |
 | `admin.columnWidth` | `number` | Largeur de colonne en pixels (vue en tableau) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Largeur du champ sur la grille de formulaire à quatre colonnes |
@@ -300,7 +300,7 @@ une configuration en déclarant deux doit être interprétée comme une demande 
 vous souhaitiez définir une contrainte d'unicité sur plusieurs colonnes, il s'agit d'un
 [index](/docs/backend/indexes) unique.
 
-Une collection dont aucune propriété ne revendique `isId` reçoit sa propre colonne `id` : `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. La base de données la remplit, si bien qu'une ligne créée depuis le panneau d'administration, l'API REST ou le SDK n'a besoin d'aucune clé, et une clé que vous envoyez vous-même est utilisée telle quelle. Une table créée avant l'existence de cette valeur par défaut la reçoit au démarrage suivant.
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une collection dont aucune propriété ne revendique `isId` reçoit sa propre colonne `id` : `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. La base de données la remplit, si bien qu'une ligne créée depuis le panneau d'administration, l'API REST ou le SDK n'a besoin d'aucune clé, et une clé que vous envoyez vous-même est utilisée telle quelle. Une table créée avant l'existence de cette valeur par défaut la reçoit au démarrage suivant. Sur la 0.23 la colonne n'a aucune valeur par défaut, et une création qui n'envoie aucune clé échoue.
 :::
 
 ## Propriétés numériques (Number)

@@ -359,7 +359,7 @@ Il s'exécute sur une connexion TCP à votre base de données, ce qui en fait le
 :::caution[L'accès direct à Drizzle est réservé à Node]
 Vous pouvez également importer votre propre instance Drizzle et la requêter directement (`db.execute(sql\`…\`)`). Cela fonctionne, et sur un déploiement Node auto-hébergé ou managé, cela ne pose aucun problème.
 
-Il convient de mesurer ce que cela implique : une fonction qui importe `drizzle-orm` et un pool `pg` est définitivement une fonction Node, elle contourne les callbacks et la validation de votre collection, et elle obtient sa connexion d'ailleurs que de la requête. `rebase.sql()` vous offre le même SQL brut via la propre connexion du framework. Privilégiez cette approche.
+Il convient de mesurer ce que cela implique : une fonction qui importe `drizzle-orm` et un pool `pg` est définitivement une fonction Node, elle contourne les callbacks de votre collection, que `rebase.data` exécute (ni l'un ni l'autre ne vérifie la `validation`, qui s'applique aux [requêtes API](/docs/collections/validation-and-conditions/#where-validation-runs)), et elle obtient sa connexion d'ailleurs que de la requête. `rebase.sql()` vous offre le même SQL brut via la propre connexion du framework. Privilégiez cette approche.
 :::
 
 ## Configuration et secrets

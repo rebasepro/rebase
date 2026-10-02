@@ -55,7 +55,9 @@ curl -X PATCH /api/data/invoices/7 -d '{"deletedAt": null}'
 
 Cette mise à jour est la seule qui atteint une ligne marquée. Toute autre modification de celle-ci répond `404`, comme la ligne le fait pour toute lecture par défaut ; restaurez-la d'abord.
 
-L'inverse n'est pas une mise à jour. Donner une valeur au champ est refusé avec une `400` `FIELD_NOT_WRITABLE` — supprimez plutôt la ligne —, de sorte que la permission `delete`, `beforeDelete` et `afterDelete` s'y appliquent toujours. Un upsert peut créer une ligne déjà marquée, mais ne marque jamais une ligne déjà stockée. Un upsert n'écrit pas non plus dans une ligne de la corbeille : lorsque sa clé appartient à une ligne marquée, il est refusé avec `409` `ROW_IN_TRASH` et rien n'est écrit. Restaurez d'abord la ligne, ou purgez-la avec `?hard=true` puis refaites l'upsert.
+L'inverse n'est pas une mise à jour. Donner une valeur au champ est refusé avec une `400` `FIELD_NOT_WRITABLE` — supprimez plutôt la ligne —, de sorte que la permission `delete`, `beforeDelete` et `afterDelete` s'y appliquent toujours. Un upsert peut créer une ligne déjà marquée, mais ne marque jamais une ligne déjà stockée.
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Un upsert n'écrit pas non plus dans une ligne de la corbeille : lorsque sa clé appartient à une ligne marquée, il est refusé avec `409` `ROW_IN_TRASH` et rien n'est écrit. Restaurez d'abord la ligne, ou purgez-la avec `?hard=true` puis refaites l'upsert. Sur la 0.23 l'upsert écrit ses valeurs dans la ligne cachée et répond `201`.
 
 Une suppression via un chemin plusieurs-à-plusieurs, comme `DELETE /api/data/posts/1/tags/5`, retire le lien entre le post 1 et le tag. Elle ne supprime pas logiquement le tag, que d'autres posts utilisent encore.
 

@@ -252,7 +252,9 @@ Une table étrangère (foreign table) avec un tel privilège est également sign
 pas activer le RLS sur une telle table, donc le privilège livre tout ce que renvoie le serveur
 distant, et le correctif proposé révoque plutôt le privilège.
 
-Une table avec le RLS désactivé mais sans privilège accordé à un rôle exposé n'est *pas* signalée. Elle n'est
+Une table avec le RLS désactivé mais sans privilège accordé à un rôle exposé n'est *pas* signalée, et il
+en va de même pour une table d'un schéma sur lequel ce rôle n'a pas `USAGE` — Postgres répond « permission
+denied for schema » avant même de regarder la table. Elle n'est
 pas accessible, et la signaler ne ferait qu'ajouter du bruit.
 
 ```sql
@@ -270,6 +272,16 @@ Voir [rls-enabled-no-policies](#rls-enabled-no-policies).
 Une stratégie permissive dont l'expression `USING` ou `WITH CHECK` est une constante vraie — `true`,
 `(true)`, `1 = 1`. Les stratégies permissives sont combinées avec un opérateur OU (OR), de sorte qu'une seule d'entre
 elles suffit à satisfaire le filtre de ligne de la table, quelle que soit la rigueur de toutes les autres stratégies.
+
+Comme pour chaque vérification, la stratégie n'est signalée que lorsqu'un rôle auquel elle s'applique peut
+atteindre la table : qu'il détient le privilège requis par sa commande, et `USAGE` sur le schéma. `USING (true)
+TO anon` sur une table sur laquelle `anon` ne détient rien répond « permission denied » avant même que la
+stratégie ne soit consultée.
+
+Lorsque seul le `WITH CHECK` d'une stratégie `UPDATE` est constant — `USING (user_id = rebase.uid())
+WITH CHECK (true)` — c'est **élevé** : `USING` continue de décider quelles lignes peuvent être touchées, et
+le check laisse une ligne touchée devenir n'importe quoi, par exemple celle d'un autre utilisateur. Sur une
+stratégie `FOR ALL`, ce même check admet aussi n'importe quel `INSERT`, ce qui reste donc critique.
 
 Si des stratégies `RESTRICTIVE` sur la même commande (`ALL` pour un `ALL` permissif) s'appliquent à
 chaque rôle exposé qu'atteint la stratégie permissive, ce constat est rétrogradé au niveau moyen et
@@ -299,7 +311,10 @@ La gravité dépend de la plateforme, et cette distinction a son importance :
 
 - **Sur Supabase**, `auth.uid()` renvoie `NULL` pour les appelants anonymes, c'est donc une vérification fonctionnelle
   réservée aux utilisateurs authentifiés. Signalé comme **faible** (low) — un défaut de restriction des données entre
-  utilisateurs connectés, et non une faille d'accès anonyme.
+  utilisateurs connectés, et non une faille d'accès anonyme. Cela ne vaut que pour `auth.uid()` (et la revendication
+  `sub` qu'elle lit) : une requête déconnectée porte tout de même la clé anonyme du projet, si bien que `auth.role()`
+  vaut `'anon'` et que `auth.jwt()` contient les revendications de cette clé. La même forme construite sur l'une ou
+  l'autre est *vraie pour les appelants déconnectés*, et est signalée comme **critique**.
 - **Sur Rebase ou PostgREST**, où un identifiant d'appelant vide est converti en valeur sentinelle `'anonymous'`,
   l'expression est *vraie également pour les appelants déconnectés*. Signalé comme **critique** (critical).
 - **Sur une plateforme non reconnue**, signalé comme **moyen** (medium), car le fait qu'il s'agisse d'une faille
@@ -371,7 +386,9 @@ Les vues matérialisées ne peuvent pas bénéficier de la sécurité au niveau 
 contiennent constituent un instantané statique pris par quiconque l'a rafraîchi. Si une vue matérialisée est
 accordée à un rôle non approuvé et que sa requête de définition lit une table protégée par RLS, aucune stratégie
 ne peut intervenir — révoquez le privilège ou déplacez la vue matérialisée dans un schéma inaccessible aux rôles
-non approuvés.
+non approuvés. Le correctif proposé révoque chaque privilège qui atteint un rôle non approuvé, depuis le rôle que
+nomme chaque privilège : un privilège accordé à un rôle dont `anon` hérite n'est pas supprimé par un
+`REVOKE … FROM anon`.
 
 ```sql
 REVOKE ALL ON "public"."your_matview" FROM "anon";
@@ -406,17 +423,27 @@ USING (EXISTS (SELECT 1 FROM memberships WHERE id = organizations.id ...))
 USING (EXISTS (SELECT 1 FROM memberships m WHERE m.org_id = organizations.id ...))
 ```
 
-**L'absence de ce constat ne constitue pas une preuve de sécurité.** `pg_policies.qual` est le rendu propre à
-Postgres de l'arbre syntaxique, et il requalifie généralement les références de colonnes — le nom simple d'origine
-n'est donc souvent plus visible au moment où le catalogue est lu. Lorsque cette vérification se déclenche, il
-s'agit d'une preuve solide ; lorsqu'elle ne se déclenche pas, cela ne prouve rien.
+**Ce que montre le catalogue n'est pas ce que vous avez écrit.** `pg_policies.qual` est le rendu
+propre à Postgres de l'arbre syntaxique, et à l'intérieur d'une sous-requête il qualifie toujours
+les références de colonnes, si bien que le nom simple n'est jamais visible au moment où le
+catalogue est lu. Ce qui survit, c'est son effet : le `org_id` non préfixé lié à la table interne,
+et le prédicat stocké compare la colonne de cette table avec elle-même —
+`m.org_id = m.org_id`. C'est cette comparaison avec elle-même que cette vérification détecte sur
+une base de données réelle.
+
+**L'absence de ce constat ne constitue pas une preuve de sécurité.** Un nom non préfixé comparé à
+une colonne interne *différente* (`organization_id = id`) est stocké comme
+`m.organization_id = m.id`, ce qui se lit exactement comme une comparaison voulue. Lorsque cette
+vérification se déclenche, il s'agit d'une preuve solide ; lorsqu'elle ne se déclenche pas, cela ne
+prouve rien.
 
 ### junction-table-unprotected
 
 **Table de jointure plusieurs-à-plusieurs sans RLS.** Élevé, heuristique.
 
 Une table qui ne contient pour l'essentiel que les deux extrémités de deux clés étrangères, pointant toutes deux
-vers des tables qui *ont* un RLS, sans avoir de sécurité au niveau des lignes elle-même. Les deux côtés de la
+vers des tables qui *ont* un RLS, sans avoir de sécurité au niveau des lignes elle-même — et lisible ou
+inscriptible par un rôle sous lequel un appelant non approuvé peut se présenter. Les deux côtés de la
 relation sont verrouillés tandis que le lien entre eux reste ouvert — ce qui suffit pour énumérer la relation même
 lorsque ni l'une ni l'autre des extrémités ne peut être lue.
 

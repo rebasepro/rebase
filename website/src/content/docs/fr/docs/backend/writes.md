@@ -13,13 +13,14 @@ Au-delà des verbes, les routes d'écriture acceptent cinq éléments qui modifi
 
 Le corps d'une écriture doit être un objet JSON. `null`, un nombre, une chaîne ou un tableau donne un `400 BAD_REQUEST`.
 
-Une mise à jour ne peut pas changer la clé d'une ligne. Un corps qui nomme la clé
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une mise à jour ne peut pas changer la clé d'une ligne. Un corps qui nomme la clé
 avec une autre valeur donne un `400 KEY_IMMUTABLE`, avant l'exécution de tout hook
 et sans rien écrire, quel que soit le chemin par lequel la mise à jour arrive :
 REST, le socket temps réel, MCP ou `rebase.data` en interne. La clé que la ligne
 possède déjà est acceptée, comme l'envoie un formulaire qui renvoie la ligne
 entière. Pour déplacer une ligne vers une nouvelle clé, créez-la à cet
-emplacement puis supprimez l'ancienne.
+emplacement puis supprimez l'ancienne. Sur la 0.23 une telle mise à jour répond `500`,
+et une mise à jour interne au processus a déjà déplacé la ligne au moment où elle échoue.
 
 ### Idempotence
 
