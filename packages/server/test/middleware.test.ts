@@ -71,7 +71,8 @@ describe("Auth Middleware", () => {
                 aal: "aal1",
                 // `iat` is carried through verification now: revocation compares the
                 // token\'s issue time against the user\'s `tokensValidAfter` watermark.
-                iat: expect.any(Number)
+                iat: expect.any(Number),
+                exp: expect.any(Number)
             });
         });
 
@@ -144,7 +145,8 @@ describe("Auth Middleware", () => {
             expect(getUser()).toEqual({ uid: "user-123",
 roles: ["admin"],
 aal: "aal1",
-iat: expect.any(Number) });
+iat: expect.any(Number),
+                exp: expect.any(Number) });
         });
 
         it("should handle an uppercase BEARER prefix", async () => {
@@ -157,7 +159,8 @@ iat: expect.any(Number) });
             expect(getUser()).toEqual({ uid: "user-123",
 roles: ["admin"],
 aal: "aal1",
-iat: expect.any(Number) });
+iat: expect.any(Number),
+                exp: expect.any(Number) });
         });
 
         it("should still reject a non-Bearer scheme", async () => {
@@ -206,7 +209,8 @@ iat: expect.any(Number) });
                 aal: "aal1",
                 // `iat` is carried through verification now: revocation compares the
                 // token\'s issue time against the user\'s `tokensValidAfter` watermark.
-                iat: expect.any(Number)
+                iat: expect.any(Number),
+                exp: expect.any(Number)
             });
         });
 
@@ -241,7 +245,8 @@ iat: expect.any(Number) });
                 aal: "aal1",
                 // `iat` is carried through verification now: revocation compares the
                 // token\'s issue time against the user\'s `tokensValidAfter` watermark.
-                iat: expect.any(Number)
+                iat: expect.any(Number),
+                exp: expect.any(Number)
             });
         });
 
@@ -362,7 +367,8 @@ roles: ["schema-adminstration", "admins", "admin "] } });
                 aal: "aal1",
                 // `iat` is carried through verification now: revocation compares the
                 // token\'s issue time against the user\'s `tokensValidAfter` watermark.
-                iat: expect.any(Number)
+                iat: expect.any(Number),
+                exp: expect.any(Number)
             });
         });
 
@@ -386,7 +392,8 @@ roles: ["schema-adminstration", "admins", "admin "] } });
                 aal: "aal1",
                 // `iat` is carried through verification now: revocation compares the
                 // token\'s issue time against the user\'s `tokensValidAfter` watermark.
-                iat: expect.any(Number)
+                iat: expect.any(Number),
+                exp: expect.any(Number)
             });
         });
     });

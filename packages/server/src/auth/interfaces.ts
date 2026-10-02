@@ -151,6 +151,12 @@ export interface AccountAccessState {
     roles: string[];
     /** The revocation watermark: sessions that began before it are void. */
     tokensValidAfter: Date | null;
+    /**
+     * Whether the session asked about has a refresh token that is not
+     * revoked. `undefined` when no session was asked about, or the store
+     * cannot tell (a refresh-token table without session grouping).
+     */
+    sessionActive?: boolean;
 }
 
 /**
@@ -421,10 +427,15 @@ export interface TokenRepository {
      * door that honours one asks this before it does: the data plane, the admin
      * gates, the realtime socket on every frame. See `judgeAccessToken`.
      *
+     * `sessionId` is the token's `sid`: when given, the state also says
+     * whether that sign-in is still live, which is how signing one device out
+     * reaches the access token that device holds.
+     *
      * Optional. Without it the judge composes the answer from
-     * `getUserWithRoles` and `getTokensValidAfter`, two reads instead of one.
+     * `getUserWithRoles` and `getTokensValidAfter`, two reads instead of one,
+     * and cannot see one revoked session — only every session at once.
      */
-    getAccountAccessState?(uid: string): Promise<AccountAccessState | null>;
+    getAccountAccessState?(uid: string, sessionId?: string): Promise<AccountAccessState | null>;
 
     /**
      * Find a refresh token by hash

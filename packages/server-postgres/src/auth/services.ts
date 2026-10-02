@@ -46,6 +46,15 @@ function getColumnKey(table: RebasePgTable | undefined, ...keys: string[]): stri
     return undefined;
 }
 
+/** `"schema"."table"`, for the statements written as raw SQL. */
+function qualifiedTableName(table: RebasePgTable): string {
+    const schema = getTableConfig(table).schema || "public";
+    return `"${schema}"."${getTableName(table)}"`;
+}
+
+/** The shape of a session id sign-in mints (`randomUUID()`). */
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function getColumn(table: RebasePgTable | undefined, ...keys: string[]): RebasePgTable[string] | undefined {
     if (!table) return undefined;
     const key = getColumnKey(table, ...keys);
@@ -81,6 +90,8 @@ export { normalizeEmail };
 export class UserService implements UserRepository {
     private usersTable: RebasePgTable;
     private userIdentitiesTable: RebasePgTable;
+    /** Read by `getAccountAccessState`, to say whether one sign-in is still live. */
+    private refreshTokensTable: RebasePgTable;
 
     constructor(
         private db: NodePgDatabase,
@@ -90,10 +101,12 @@ export class UserService implements UserRepository {
             const tables = tableOrTables as Partial<AuthSchemaTables>;
             this.usersTable = (tables.users || users) as RebasePgTable;
             this.userIdentitiesTable = (tables.userIdentities || userIdentities) as RebasePgTable;
+            this.refreshTokensTable = (tables.refreshTokens || refreshTokens) as RebasePgTable;
         } else {
             const table = tableOrTables as RebasePgTable | undefined;
             this.usersTable = table || asRebasePgTable(users);
             this.userIdentitiesTable = asRebasePgTable(userIdentities);
+            this.refreshTokensTable = asRebasePgTable(refreshTokens);
         }
     }
 
@@ -564,20 +577,39 @@ export class UserService implements UserRepository {
      * `RefreshTokenService.getTokensValidAfter` reads it — a table without the
      * column has no watermark rather than an error on every request.
      */
-    async getAccountAccessState(uid: string): Promise<AccountAccessState | null> {
+    async getAccountAccessState(uid: string, sessionId?: string): Promise<AccountAccessState | null> {
         const usersTableName = this.getQualifiedUsersTableName();
         const watermark = getColumnKey(this.usersTable, "tokensValidAfter", "tokens_valid_after")
-            ? sql`tokens_valid_after`
+            ? sql`u.tokens_valid_after`
             : sql`NULL::timestamptz`;
+        // A session is live while one of its refresh tokens is not revoked:
+        // logout and `DELETE /auth/sessions/:id` revoke every row of it, and
+        // signing out everywhere deletes them. Asked only for an id shaped like
+        // the ones sign-in mints, so a `uuid` column is never handed text it
+        // cannot cast, and only where the table groups tokens by session.
+        const tokens = this.refreshTokensTable;
+        const canAskSession = Boolean(sessionId)
+            && UUID_SHAPE.test(sessionId ?? "")
+            && Boolean(getColumnKey(tokens, "sessionId", "session_id"));
+        const revokedClause = getColumnKey(tokens, "revoked")
+            ? sql`AND rt.revoked IS NOT TRUE`
+            : sql``;
+        const sessionActive = canAskSession
+            ? sql`EXISTS (
+                SELECT 1 FROM ${sql.raw(qualifiedTableName(tokens))} rt
+                WHERE rt.uid = u.id AND rt.session_id = ${sessionId} ${revokedClause}
+            )`
+            : sql`NULL::boolean`;
         const result = await this.db.execute(sql`
-            SELECT roles, ${watermark} AS tokens_valid_after
-            FROM ${sql.raw(usersTableName)} WHERE id = ${uid}
+            SELECT u.roles, ${watermark} AS tokens_valid_after, ${sessionActive} AS session_active
+            FROM ${sql.raw(usersTableName)} u WHERE u.id = ${uid}
         `);
         if (result.rows.length === 0) return null;
-        const row = result.rows[0] as { roles: string[] | null; tokens_valid_after: Date | string | null };
+        const row = result.rows[0] as { roles: string[] | null; tokens_valid_after: Date | string | null; session_active: boolean | null };
         return {
             roles: row.roles ?? [],
-            tokensValidAfter: row.tokens_valid_after ? new Date(row.tokens_valid_after) : null
+            tokensValidAfter: row.tokens_valid_after ? new Date(row.tokens_valid_after) : null,
+            ...(row.session_active === null ? {} : { sessionActive: row.session_active })
         };
     }
 
@@ -1251,8 +1283,8 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.userService.getUserWithRoles(uid);
     }
 
-    async getAccountAccessState(uid: string): Promise<AccountAccessState | null> {
-        return this.userService.getAccountAccessState(uid);
+    async getAccountAccessState(uid: string, sessionId?: string): Promise<AccountAccessState | null> {
+        return this.userService.getAccountAccessState(uid, sessionId);
     }
 
     // Token operations (delegate to PostgresTokenRepository)

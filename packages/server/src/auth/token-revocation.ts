@@ -82,9 +82,11 @@ export type AccessJudgeRepository = Partial<Pick<AuthRepository,
  *
  * - `revoked`: issued before the account's revocation watermark — a sign-out
  *   everywhere, a password change or reset.
+ * - `session-revoked`: its own sign-in was ended — `POST /auth/logout`, or
+ *   `DELETE /auth/sessions/:id` from another device. Needs the token's `sid`.
  * - `account-deleted`: the account it names no longer exists.
  */
-export type AccessTokenRefusal = "revoked" | "account-deleted";
+export type AccessTokenRefusal = "revoked" | "session-revoked" | "account-deleted";
 
 export type AccessTokenVerdict =
     | {
@@ -120,16 +122,19 @@ export type AccessTokenVerdict =
  */
 export async function judgeAccessToken(
     authRepo: AccessJudgeRepository,
-    payload: Pick<AccessTokenPayload, "uid" | "iat">
+    payload: Pick<AccessTokenPayload, "uid" | "iat" | "sid">
 ): Promise<AccessTokenVerdict> {
     let roles: string[] | undefined;
     let validAfter: Date | null = null;
 
     if (typeof authRepo.getAccountAccessState === "function") {
-        const state = await authRepo.getAccountAccessState(payload.uid);
+        const state = await authRepo.getAccountAccessState(payload.uid, payload.sid);
         if (!state) return { live: false, refusal: "account-deleted" };
         roles = state.roles;
         validAfter = state.tokensValidAfter;
+        // Only an explicit `false`: a token minted before `sid` existed, or a
+        // store that cannot group sessions, is judged by the watermark alone.
+        if (payload.sid && state.sessionActive === false) return { live: false, refusal: "session-revoked" };
     } else {
         if (typeof authRepo.getUserWithRoles === "function") {
             const account = await authRepo.getUserWithRoles(payload.uid);

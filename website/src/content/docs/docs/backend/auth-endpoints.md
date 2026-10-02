@@ -33,9 +33,9 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/otp/verify` | Exchange `{ email, code }` for a session |
 | `POST` | `/api/auth/anonymous` | Create an anonymous session (opt-in — `ALLOW_ANONYMOUS`) |
 | `POST` | `/api/auth/anonymous/link` | Attach real credentials to the anonymous account already signed in |
-| `GET` | `/api/auth/sessions` | List the caller's active sessions (refresh tokens) |
+| `GET` | `/api/auth/sessions` | List the caller's active sessions, one per sign-in. The caller's own is marked `isCurrentSession` |
 | `DELETE` | `/api/auth/sessions` | Revoke every session, this one included — remote logout on every device |
-| `DELETE` | `/api/auth/sessions/:id` | Revoke one session |
+| `DELETE` | `/api/auth/sessions/:id` | Revoke one session: its refresh token, and the access token that device holds |
 | `GET` | `/api/auth/scopes` | Every [scope](/docs/backend/roles-and-scopes/) this backend knows, and the ones the caller holds |
 | `GET` | `/api/auth/keys` | The caller's own [personal API keys](/docs/backend/api-keys/#personal-keys) |
 | `POST` | `/api/auth/keys` | Create a personal key. `403 PERSONAL_KEYS_DISABLED` unless the users collection sets `auth.personalKeys` |

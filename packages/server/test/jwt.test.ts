@@ -71,7 +71,8 @@ accessExpiresIn: "2h" });
                 aal: "aal1",
                 // Carried through verification so that revocation can compare it
                 // against the user\'s `tokensValidAfter` watermark.
-                iat: expect.any(Number)
+                iat: expect.any(Number),
+                exp: expect.any(Number)
             });
         });
 
@@ -92,7 +93,8 @@ accessExpiresIn: "2h" });
                 aal: "aal1",
                 // Carried through verification so that revocation can compare it
                 // against the user\'s `tokensValidAfter` watermark.
-                iat: expect.any(Number)
+                iat: expect.any(Number),
+                exp: expect.any(Number)
             });
         });
 

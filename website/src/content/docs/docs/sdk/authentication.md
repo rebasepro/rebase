@@ -447,8 +447,9 @@ await client.auth.verifyEmail(token);
 ## Session Management (Multi-Device)
 
 ```typescript
-// List all active sessions
+// List all active sessions, one per sign-in
 const sessions = await client.auth.getSessions();
+// [{ id, userAgent, ipAddress, createdAt, isCurrentSession }, …]
 
 // Revoke a specific session
 await client.auth.revokeSession(sessionId);
@@ -456,6 +457,13 @@ await client.auth.revokeSession(sessionId);
 // Revoke ALL sessions (logs out everywhere)
 await client.auth.revokeAllSessions();
 ```
+
+Every access token names the sign-in it belongs to, so exactly one entry has
+`isCurrentSession: true`: the device asking. Revoking a session ends that
+device's refresh token and its access token together, from the next request.
+Signing out (`signOut()`) does the
+same for the device that signs out. An access token issued before this release
+names no session; it keeps working until it expires, within the hour.
 
 ## Auth Configuration
 

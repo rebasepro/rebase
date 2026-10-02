@@ -206,6 +206,28 @@ describe("identity after the account changes (E2E)", () => {
         return { ws, send, closed: () => closed, closedPromise };
     }
 
+    async function signIn(email: string): Promise<{ accessToken: string; refreshToken: string }> {
+        const res = await http("POST", "/api/auth/login", { email, password: PASSWORD });
+        expect(res.status).toBe(200);
+        return { accessToken: res.json.tokens.accessToken, refreshToken: res.json.tokens.refreshToken };
+    }
+
+    describe("the session id in the access token", () => {
+        it("signs one device out, its access token included, and marks the caller's own session", async () => {
+            const owner = await register("devices");
+            const laptop = await signIn(owner.email);
+            const phone = await signIn(owner.email);
+
+            const listed = await http("GET", "/api/auth/sessions", undefined, laptop.accessToken);
+            expect(listed.json.sessions.filter((s: { isCurrentSession: boolean }) => s.isCurrentSession)).toHaveLength(1);
+
+            expect((await http("POST", "/api/auth/logout", { refreshToken: phone.refreshToken })).status).toBe(200);
+
+            expect((await http("GET", "/api/whoami", undefined, phone.accessToken)).status).toBe(401);
+            expect((await http("GET", "/api/whoami", undefined, laptop.accessToken)).status).toBe(200);
+        });
+    });
+
     describe("IDENTITY-2: deleting an account revokes its tokens", () => {
         it("keeps a token its owner revoked refused after an administrator deletes the account", async () => {
             const victim = await register("stolen");

@@ -152,12 +152,18 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * Get active refresh tokens (sessions) for the current user
      */
     router.get("/sessions", requireLiveSession, async (c) => {
-        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[]; sid?: string } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
 
-        const currentRefreshToken = c.req.header("x-refresh-token") as string;
+        // Which of these is the caller's own: the access token says, by its
+        // `sid`. The `x-refresh-token` header was the only way before, and no
+        // first-party client sent it — in cookie mode none could — so every
+        // row read "not this device", and revoking your own row signed nobody
+        // out until the next request failed. Kept for a token minted before
+        // `sid` existed.
+        const currentRefreshToken = userCtx.sid ? undefined : c.req.header("x-refresh-token");
         const currentTokenHash = currentRefreshToken ? await hashRefreshToken(currentRefreshToken) : null;
 
         const tokens = await authRepo.listRefreshTokensForUser(userCtx.uid);
@@ -185,9 +191,11 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             // The sign-in, not the last rotation — otherwise every session
             // looks like it started an hour ago, whatever its real age.
             createdAt: s.sessionStartedAt ?? s.createdAt,
-            isCurrentSession: currentTokenHash
-                ? tokens.some(t => t.tokenHash === currentTokenHash && (t.sessionId ?? t.id) === (s.sessionId ?? s.id))
-                : false
+            isCurrentSession: userCtx.sid
+                ? (s.sessionId ?? s.id) === userCtx.sid
+                : currentTokenHash
+                    ? tokens.some(t => t.tokenHash === currentTokenHash && (t.sessionId ?? t.id) === (s.sessionId ?? s.id))
+                    : false
         }));
 
         return c.json({ sessions: mappedSessions });

@@ -414,21 +414,23 @@ aal };
             }
         }
 
-        const accessToken = await generateAccessToken(uid, roleIds, aal, customClaims, isAnonymous);
-        const refreshToken = generateRefreshToken();
-
         // A sign-in opens a session; every token later rotated out of it
         // inherits this id and start time. `startedAt` is what
         // `tokens_valid_after` is judged against, so it must NOT advance on
         // rotation — otherwise a session could stay one step ahead of a
-        // revocation forever simply by refreshing.
+        // revocation forever simply by refreshing. The access token carries
+        // the id too (`sid`), so signing this one device out reaches it.
+        const sessionId = randomUUID();
+        const accessToken = await generateAccessToken(uid, roleIds, aal, customClaims, isAnonymous, sessionId);
+        const refreshToken = generateRefreshToken();
+
         await authRepo.createRefreshToken(
             uid,
             await hashRefreshToken(refreshToken),
             getRefreshTokenExpiry(),
             userAgent,
             ipAddress,
-            { id: randomUUID(), startedAt: new Date(), aal }
+            { id: sessionId, startedAt: new Date(), aal }
         );
 
         return { roleIds,
@@ -1284,8 +1286,9 @@ aal: sessionAal };
         // rather than from the old token: a session that WAS anonymous and has
         // since been upgraded to a real account should stop being a guest at
         // its next refresh, not at its next sign-in.
+        const sessionId = storedToken.sessionId ?? storedToken.id;
         const newAccessToken = await generateAccessToken(
-            storedToken.uid, roleIds, sessionAal, customClaims, user?.isAnonymous === true
+            storedToken.uid, roleIds, sessionAal, customClaims, user?.isAnonymous === true, sessionId
         );
         const newRefreshToken = generateRefreshToken();
 
@@ -1301,7 +1304,7 @@ aal: sessionAal };
         const userAgent = c.req.header("user-agent") || "unknown";
         const ipAddress = c.req.header("x-forwarded-for") || "unknown";
         const session = {
-            id: storedToken.sessionId ?? storedToken.id,
+            id: sessionId,
             startedAt: sessionStartedAt,
             aal: sessionAal
         };

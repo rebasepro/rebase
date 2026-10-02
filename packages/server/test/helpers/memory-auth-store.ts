@@ -182,11 +182,14 @@ export class MemoryAuthStore {
                 }
             },
             pruneRefreshTokens: async () => undefined,
-            getAccountAccessState: async (uid) => {
+            getAccountAccessState: async (uid, sessionId) => {
                 if (!this.users.has(uid)) return null;
                 return {
                     roles: [...(this.roles.get(uid) ?? [])],
-                    tokensValidAfter: this.validAfter.get(uid) ?? null
+                    tokensValidAfter: this.validAfter.get(uid) ?? null,
+                    ...(sessionId
+                        ? { sessionActive: this.refreshTokens.some(r => r.uid === uid && r.sessionId === sessionId && !r.revoked) }
+                        : {})
                 };
             },
             getTokensValidAfter: async (uid) => this.validAfter.get(uid) ?? null,

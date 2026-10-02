@@ -78,6 +78,23 @@ export interface AccessTokenPayload {
      * comparison and the watermark was read on exactly one path — refresh.
      */
     iat?: number;
+    /**
+     * When the token expires, in seconds since the epoch — the standard `exp`
+     * claim. Carried through because a socket authenticated with this token
+     * has to stop honouring it at this instant, and has no request to refuse.
+     */
+    exp?: number;
+    /**
+     * The sign-in this token was minted for: the session id its refresh
+     * tokens share, carried across every rotation.
+     *
+     * What lets one device be signed out — `POST /auth/logout`,
+     * `DELETE /auth/sessions/:id` — reach that device's access token rather
+     * than only its refresh token, and what lets `GET /auth/sessions` mark the
+     * caller's own session. Absent on tokens minted before it existed; those
+     * keep working until they expire, judged by the watermark alone.
+     */
+    sid?: string;
     /** Email claim from the JWT, if present */
     email?: string;
     /** Display name claim from the JWT, if present */
@@ -117,7 +134,7 @@ export interface AccessTokenPayload {
  * session.
  */
 const RESERVED_TOKEN_CLAIMS: ReadonlySet<string> = new Set([
-    "uid", "sub", "roles", "aal", "isAnonymous", "purpose",
+    "uid", "sub", "roles", "aal", "isAnonymous", "sid", "purpose",
     "iat", "exp", "nbf", "iss", "aud", "jti"
 ]);
 
@@ -289,7 +306,12 @@ export async function generateAccessToken(
      * account. Written into the token so the RLS identity and the WebSocket
      * path can tell the two apart without a database lookup.
      */
-    isAnonymous = false
+    isAnonymous = false,
+    /**
+     * The sign-in this token belongs to — see {@link AccessTokenPayload.sid}.
+     * Every token the auth routes mint carries one.
+     */
+    sessionId?: string
 ): Promise<string> {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
@@ -318,7 +340,10 @@ export async function generateAccessToken(
         // An identity claim, so it goes with the others — after the custom
         // ones, where a hook cannot overwrite it. Omitted when false to keep
         // the token as small as it was.
-        ...(isAnonymous ? { isAnonymous: true } : {})
+        ...(isAnonymous ? { isAnonymous: true } : {}),
+        // The session is an identity claim too: a hook that could set it
+        // could point a token at somebody else's live session.
+        ...(sessionId ? { sid: sessionId } : {})
     };
 
     // The `kid` is what lets a verifier pick the right public key out of the
@@ -421,7 +446,7 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
         const decoded = (namedKey
             ? await verifyJwt(token, namedKey.publicKey, { algorithms: [namedKey.algorithm] })
             : await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] })
-        ) as Record<string, unknown> & { uid?: string; sub?: string; roles?: string[]; aal?: string; isAnonymous?: boolean; purpose?: string; iat?: number };
+        ) as Record<string, unknown> & { uid?: string; sub?: string; roles?: string[]; aal?: string; isAnonymous?: boolean; purpose?: string; iat?: number; exp?: number; sid?: unknown };
         if (decoded.purpose) {
             logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
             return null;
@@ -446,6 +471,10 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
             // it had, for everything that compares whole payloads.
             ...(decoded.isAnonymous === true ? { isAnonymous: true as const } : {}),
             iat: decoded.iat,
+            // Present only when the token carries them, like `isAnonymous`, so
+            // a payload compared whole keeps the shape it had.
+            ...(typeof decoded.exp === "number" ? { exp: decoded.exp } : {}),
+            ...(typeof decoded.sid === "string" && decoded.sid ? { sid: decoded.sid } : {}),
             // Everything the mint's `customClaims` put on the token. Absent when
             // there were none, so a payload that had no custom claims is
             // byte-for-byte the object it used to be.
