@@ -6,13 +6,15 @@
  * properties of `NOTIFY` shape everything below:
  *
  *  - **8000 bytes per payload.** Presence and cursors fit with room to spare; a
- *    scene snapshot does not. Rather than truncate or drop, an oversized frame
- *    on a *retained* channel is published as a pointer — the body is already in
- *    `rebase.channel_messages` with a sequence number, so the receiver reads it
- *    back. That is the same trick the entity path uses (notify an address,
- *    refetch the row), applied to a different table. On an ephemeral channel
- *    there is nothing to point at, so the publish is refused loudly instead of
- *    reaching some instances and not others.
+ *    scene snapshot does not. A message on a *retained* channel never travels
+ *    here at all, whatever its size: the statement that numbers it notifies a
+ *    pointer — the body is already in `rebase.channel_messages` with a sequence
+ *    number, so the receiver reads it back (`ChannelHistoryStore.append`). That
+ *    is the same trick the entity path uses (notify an address, refetch the
+ *    row), applied to a different table, and for the same reason: any database
+ *    login can `LISTEN`. On an ephemeral channel there is nothing to point at,
+ *    so the frame carries the message, and an oversized one is refused loudly
+ *    instead of reaching some instances and not others.
  *
  *  - **A notify is a query on the primary database.** Not a slow one, but it
  *    competes with the application's real queries, and that — not throughput —

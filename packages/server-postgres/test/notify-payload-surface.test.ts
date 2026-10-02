@@ -11,10 +11,14 @@
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { ChannelHistoryStore } from "../src/services/channel-history";
+import { CHANNEL_BUS_NOTIFY_CHANNEL, parseChannelBusPayload } from "../src/services/channel-bus/PostgresChannelBus";
 
 const SRC = join(__dirname, "..", "src");
 
@@ -25,7 +29,10 @@ const NOTIFY_SITES: Record<string, string> = {
     "services/realtimeService.ts":
         "rebase_entity_changes — { sid, p, eid, db }: an address, never a row (pinned below)",
     "services/channel-bus/PostgresChannelBus.ts":
-        "rebase_channel_bus — channel broadcast and presence frames, which clients put on the channel to share"
+        "rebase_channel_bus — channel broadcast and presence frames, which clients put on the channel to share",
+    "services/channel-history.ts":
+        "rebase_channel_bus — a retained message's address { kind: broadcast_ref, sid, channel, seq }, never its event, " +
+        "body or sender, whatever its size: the body stays in rebase.channel_messages and receivers read it back (pinned below)"
 };
 
 function sourceFiles(dir: string): string[] {
@@ -68,5 +75,43 @@ describe("the NOTIFY surface", () => {
         const payload = chunks.find((chunk): chunk is string => typeof chunk === "string" && chunk.startsWith("{"));
         expect(payload).toBeDefined();
         expect(Object.keys(JSON.parse(payload!)).sort()).toEqual(["db", "eid", "p", "sid"]);
+    });
+
+    it("carries a retained message's address, not the message, on the channel bus", async () => {
+        const pglite = new PGlite();
+        await pglite.waitReady;
+        try {
+            const store = new ChannelHistoryStore(drizzle(pglite) as never, [{ match: "doc:*", limit: 10 }]);
+            await store.ensureTables();
+            const payloads: string[] = [];
+            await pglite.listen(CHANNEL_BUS_NOTIFY_CHANNEL, (payload) => { payloads.push(payload); });
+
+            const announce = { notifyChannel: CHANNEL_BUS_NOTIFY_CHANNEL, sid: "instance-a" };
+            await store.append("doc:1", "op", { text: "draft body" }, "client_sender", announce);
+            // One too large for a NOTIFY travels the same way, not as a refusal.
+            await store.append("doc:1", "op", { text: "x".repeat(20_000) }, "client_sender", announce);
+            for (let i = 0; i < 100 && payloads.length < 2; i++) {
+                await new Promise((resolve) => setTimeout(resolve, 10));
+            }
+
+            expect(payloads.map((payload) => JSON.parse(payload))).toEqual([
+                { kind: "broadcast_ref", sid: "instance-a", channel: "doc:1", seq: 1 },
+                { kind: "broadcast_ref", sid: "instance-a", channel: "doc:1", seq: 2 }
+            ]);
+            for (const payload of payloads) {
+                for (const secret of ["draft body", "xxxx", "client_sender", "\"op\""]) {
+                    expect(payload).not.toContain(secret);
+                }
+            }
+            // And it is a frame the bus understands — the body is one read away.
+            expect(parseChannelBusPayload(payloads[0])).toEqual([
+                { kind: "broadcast_ref", sid: "instance-a", channel: "doc:1", from: undefined, seq: 1 }
+            ]);
+            await expect(store.getBySeq("doc:1", 1)).resolves.toMatchObject({
+                event: "op", payload: { text: "draft body" }, senderId: "client_sender"
+            });
+        } finally {
+            await pglite.close();
+        }
     });
 });

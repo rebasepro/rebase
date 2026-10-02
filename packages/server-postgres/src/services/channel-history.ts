@@ -104,14 +104,18 @@ export interface ResolvedRetention {
 /**
  * A bus frame to send in the statement that numbers a retained message — see
  * {@link ChannelHistoryStore.append}.
+ *
+ * It is always a pointer, `{ kind: "broadcast_ref", sid, channel, seq }`, and
+ * never the message. Postgres puts no privilege on `LISTEN`, so a NOTIFY payload
+ * reaches every role that can connect to the database; the body stays in
+ * `rebase.channel_messages`, behind the table grants, and each receiving
+ * instance reads it back by `(channel, seq)` — the sender's id with it.
  */
 export interface RetainedAnnouncement {
     /** The NOTIFY channel the bus listens on. */
     notifyChannel: string;
     /** The sending instance. */
     sid: string;
-    /** The whole message, or a pointer receivers read back — for one too large to notify. */
-    inline: boolean;
 }
 
 /**
@@ -284,6 +288,10 @@ export class ChannelHistoryStore {
         // a NOTIFY is delivered at commit, in commit order. Sent afterwards, by
         // whichever instance took the number, two instances' messages reached
         // a third in whatever order their sends landed.
+        //
+        // The frame is the message's address and nothing else — not its event,
+        // its body or its sender. Any database login can LISTEN; only a reader
+        // of `rebase.channel_messages` can turn the address into the message.
         const result = announce
             ? await this.db.execute(sql`
                 WITH next AS (
@@ -298,13 +306,8 @@ export class ChannelHistoryStore {
                     FROM next
                     RETURNING seq, created_at
                 )
-                SELECT stored.seq, stored.created_at, pg_notify(${announce.notifyChannel}, (
-                    CASE WHEN ${announce.inline}::boolean
-                        THEN json_build_object('kind', 'broadcast', 'sid', ${announce.sid}::text, 'channel', ${channel}::text,
-                            'event', ${event}::text, 'from', ${senderId ?? null}::text, 'seq', stored.seq, 'payload', ${payloadJson}::jsonb)
-                        ELSE json_build_object('kind', 'broadcast_ref', 'sid', ${announce.sid}::text, 'channel', ${channel}::text,
-                            'from', ${senderId ?? null}::text, 'seq', stored.seq)
-                    END
+                SELECT stored.seq, stored.created_at, pg_notify(${announce.notifyChannel}, json_build_object(
+                    'kind', 'broadcast_ref', 'sid', ${announce.sid}::text, 'channel', ${channel}::text, 'seq', stored.seq
                 )::text)
                 FROM stored
             `)

@@ -2337,15 +2337,15 @@ roles: ["anon"] };
         // announcement arrives: in commit order, which is sequence order. Fanned
         // out here first, a reader on this instance got this instance's N+1
         // before another's N, and a client that keeps a watermark dropped N for
-        // good. See `ChannelHistoryStore.append`.
+        // good. The announcement is a pointer, whatever the message's size: any
+        // database login can LISTEN, so the body stays in the history table and
+        // each instance reads it back. See `ChannelHistoryStore.append`.
         const ordered = this.bus instanceof PostgresChannelBus;
         let seq: number;
         try {
             ({ seq } = await this.channelHistory!.append(channel, event, payload, clientId, ordered ? {
                 notifyChannel: CHANNEL_BUS_NOTIFY_CHANNEL,
-                sid: this.instanceId,
-                // Room for any sequence number in the frame measured here.
-                inline: frameByteLength({ kind: "broadcast", sid: this.instanceId, channel, event, from: clientId, seq: Number.MAX_SAFE_INTEGER, payload }) <= this.bus.maxFrameBytes
+                sid: this.instanceId
             } : undefined));
         } catch (error) {
             logger.error(`❌ [ChannelHistory] Could not persist broadcast on "${channel}" — message dropped`, { error });
@@ -2555,7 +2555,7 @@ roles: ["anon"] };
         if (!retained) return this.deliverBusFrame(frame);
 
         // In the order they arrived, per channel: a pointer is read back from
-        // the history table, and the inline frame after it must not overtake it.
+        // the history table, and the frame after it must not overtake it.
         const previous = this.channelReceiveQueues.get(frame.channel) ?? Promise.resolve();
         const next = previous.catch(() => { /* reported where it failed */ }).then(() => this.deliverBusFrame(frame));
         this.channelReceiveQueues.set(frame.channel, next);
@@ -2584,7 +2584,9 @@ roles: ["anon"] };
                     );
                     return;
                 }
-                this.fanOutBroadcast(frame.from ?? "", frame.channel, entry.event, entry.payload, entry.seq);
+                // The ordered path's pointer leaves the sender out — the stored
+                // row names it, and the sender is not echoed its own message.
+                this.fanOutBroadcast(frame.from ?? entry.senderId ?? "", frame.channel, entry.event, entry.payload, entry.seq);
                 return;
             }
 
