@@ -5,12 +5,15 @@ import React from "react";
 import { describe, expect, test, jest, beforeEach } from "@jest/globals";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 
-// Mock @rebasepro/app hooks and LoginView component
+// Mock @rebasepro/app hooks and LoginView component. The gate also asks
+// `readEmailLinkAction` whether the page is an emailed verification link;
+// it answers "no link" unless a test says otherwise.
 jest.mock("@rebasepro/app", () => ({
     useRebaseRegistry: jest.fn(),
     useAuthController: jest.fn(),
     useTranslation: () => ({ t: (key: string) => key === "copy" ? "Copy" : key }),
-    LoginView: ({ authController }: any) => <div data-testid="login-view">Login View</div>
+    LoginView: ({ authController }: any) => <div data-testid="login-view">Login View</div>,
+    readEmailLinkAction: jest.fn(() => null)
 }));
 
 // Mock some of @rebasepro/ui components that require theme context or specific providers
@@ -51,7 +54,7 @@ import { FieldCaption } from "../../src/components/FieldCaption";
 import { RebaseAuthGate } from "../../src/components/RebaseAuthGate";
 import { PropertyKeyHint } from "../../src/components/PropertyKeyHint";
 import { PropertyConfigBadge } from "../../src/components/PropertyConfigBadge";
-import { useRebaseRegistry, useAuthController } from "@rebasepro/app";
+import { useRebaseRegistry, useAuthController, readEmailLinkAction } from "@rebasepro/app";
 import { PropertyConfig } from "@rebasepro/cms-types";
 
 describe("React Components Tests", () => {
@@ -137,6 +140,27 @@ describe("React Components Tests", () => {
             expect(screen.getByTestId("child")).toBeTruthy();
             expect(screen.queryByTestId("loading-spinner")).toBeNull();
             expect(screen.queryByTestId("login-view")).toBeNull();
+        });
+
+        test("should show LoginView for an opened verification link, even when signed in", () => {
+            // The signed-in session verifies the address, on the screen that
+            // knows the link — the app's router has no such page.
+            (useAuthController as any).mockReturnValue({
+                initialLoading: false,
+                user: { uid: "user-123" }
+            });
+            (useRebaseRegistry as any).mockReturnValue({});
+            jest.mocked(readEmailLinkAction).mockReturnValueOnce({ kind: "verify-email", token: "t" });
+
+            render(
+                <RebaseAuthGate>
+                    <div data-testid="child">Authenticated Child</div>
+                </RebaseAuthGate>
+            );
+
+            expect(readEmailLinkAction).toHaveBeenCalledWith(window.location);
+            expect(screen.getByTestId("login-view")).toBeTruthy();
+            expect(screen.queryByTestId("child")).toBeNull();
         });
     });
 
