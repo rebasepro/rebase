@@ -53,7 +53,12 @@ const EVERY_ROW = [
     ["GET", "/api/data/:slug/count"],
     ["GET", "/api/docs"],
     ["GET", "/api/swagger"],
-    ["GET", "/api/auth/config"]
+    ["GET", "/api/auth/config"],
+    // The personal-key routes, which `init.ts` mounts by hand, are required the
+    // same way (`EXTRA_ROUTES`).
+    ["GET", "/api/auth/keys"],
+    ["POST", "/api/auth/keys"],
+    ["DELETE", "/api/auth/keys/:id"]
 ];
 
 test("endpoint index: a fully documented surface has nothing missing", () => {
@@ -63,7 +68,7 @@ test("endpoint index: a fully documented surface has nothing missing", () => {
 test("endpoint index: a second method on a documented path is still an endpoint of its own", () => {
     // The path is in the table, under GET. The DELETE on it is not — and the
     // completeness rule compared paths only, so it passed.
-    const rows = EVERY_ROW.filter(([method]) => method !== "DELETE");
+    const rows = EVERY_ROW.filter(([method, route]) => !(method === "DELETE" && route === "/api/auth/session"));
     assert.deepEqual(missingIn(endpointFixture(rows)), ["DELETE /api/auth/session is mounted and not in the index"]);
 });
 
