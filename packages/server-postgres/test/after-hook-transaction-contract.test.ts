@@ -85,8 +85,8 @@ const SAVED_ROW = { id: "a1", title: "Ada" };
 function stubDataService() {
     jest.spyOn(DataService.prototype, "save").mockResolvedValue(SAVED_ROW as never);
     jest.spyOn(DataService.prototype, "delete").mockResolvedValue(undefined as never);
-    // What a delete reads before deleting.
-    jest.spyOn(DataService.prototype, "fetchOne").mockResolvedValue(SAVED_ROW as never);
+    // What a delete reads before deleting: the row as REST serves it.
+    jest.spyOn(DataService.prototype, "fetchOneForRest").mockResolvedValue(SAVED_ROW as never);
 }
 
 const articles = (callbacks: Record<string, unknown>) => ({
