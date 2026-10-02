@@ -151,7 +151,8 @@ Delivery to local clients is not your concern — the realtime service owns whic
 
 `pg_notify` refuses a payload of 8000 bytes or more. Cursors and presence fit with room to spare; a document snapshot does not. Rebase handles this the same way it handles large entity changes — by sending an address instead of a body:
 
-- **On a retained channel** (see [Channel Retention](#channel-retention)) the message is already stored with a sequence number, so the notification carries only `(channel, seq)` and each receiving instance reads the body back. There is no size limit at all.
+- **On a retained channel** (see [Channel Retention](#channel-retention)) the message is already stored with a sequence number, so the notification carries only `(channel, seq)` and each receiving instance reads the body back. There is no size limit at all. This holds for every retained message, small or large: any database login can `LISTEN`, so the body never travels in the notification. It costs one primary-key read per message on each instance with a member on the channel.
+- **Ephemeral broadcasts and presence** still travel in the notification itself, so any login to the database can read them. Put anything that must not be readable that way on a retained channel.
 - **On an ephemeral channel** there is nothing to point at. The broadcast is delivered locally, the sender receives a `CHANNEL_BUS_PAYLOAD_TOO_LARGE` error on `channel.onError()`, and a warning names the channel — rather than the message silently reaching half the cluster.
 
 If you broadcast large messages, give that channel a retention rule. That is the whole fix.

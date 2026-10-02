@@ -1024,6 +1024,12 @@
 
 #### Realtime
 
+- **A retained channel's messages no longer travel in the Postgres bus's
+  NOTIFY payload.** The notification names the message (`channel`, `seq`) and
+  each instance reads it back from `rebase.channel_messages`. Before, any
+  database login could `LISTEN` and read every retained channel's traffic.
+  Ephemeral broadcasts and presence still travel in the payload.
+
 - **Change capture no longer broadcasts changed rows.** The `rebase_cdc`
   NOTIFY payload now carries only the changed row's key (plus a junction's
   two ids). Previously any database login could `LISTEN` and read every
