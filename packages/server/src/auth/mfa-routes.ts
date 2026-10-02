@@ -4,7 +4,7 @@ import { ApiError } from "../api/errors";
 import { HonoEnv } from "../api/types";
 import { extractBearerToken } from "./middleware";
 import { logger } from "../utils/logger";
-import { createRateLimiter, strictAuthLimiter } from "./rate-limiter";
+import { createRateLimiter, strictAuthLimiter, requestClientAddress } from "./rate-limiter";
 import {
     generateTotpSecret,
     verifyTotpCounter,
@@ -414,7 +414,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
             throw ApiError.badRequest("MFA factor is not yet verified", "FACTOR_NOT_VERIFIED");
         }
 
-        const ipAddress = c.req.header("x-forwarded-for") || "unknown";
+        const ipAddress = requestClientAddress(c);
         const challenge = await authRepo.createMfaChallenge(factorId, ipAddress);
 
         return c.json({
@@ -505,7 +505,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             principal.uid,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown",
+            requestClientAddress(c),
             { skipMfaGate: true,
 aal: "aal2" }
         );

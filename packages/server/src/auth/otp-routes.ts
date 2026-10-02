@@ -51,7 +51,7 @@ import type { HonoEnv } from "../api/types";
 import { ApiError } from "../api/errors";
 import { hashToken } from "./admin-user-ops";
 import { getEmailOtpTemplate, resolveEmailBranding } from "../email/templates";
-import { createRateLimiter, strictAuthLimiter } from "./rate-limiter";
+import { createRateLimiter, strictAuthLimiter, requestClientAddress } from "./rate-limiter";
 import { logger } from "../utils/logger";
 import { redactRefreshToken } from "./cookie-utils";
 import { confirmAddressOwnership } from "./address-ownership";
@@ -352,7 +352,7 @@ export function mountOtpRoutes(deps: {
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            requestClientAddress(c)
         );
 
         if (ops.onAuthenticated) {

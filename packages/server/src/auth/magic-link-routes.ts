@@ -13,8 +13,7 @@ import {
     captureRecipientEmail,
     notBefore,
     recipientEmailLimiter,
-    strictAuthLimiter
-} from "./rate-limiter";
+    strictAuthLimiter, requestClientAddress } from "./rate-limiter";
 import { z } from "zod";
 import { logger } from "../utils/logger";
 import { redactRefreshToken } from "./cookie-utils";
@@ -192,7 +191,7 @@ export function mountMagicLinkRoutes(deps: {
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            requestClientAddress(c)
         );
 
         // Fire onAuthenticated hook (fire-and-forget)

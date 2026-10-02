@@ -157,3 +157,43 @@ describe("POST /auth/change-password", () => {
         expect((await call("POST", "/auth/refresh", { refreshToken: phone.refreshToken })).status).toBe(401);
     });
 });
+
+/**
+ * The address a session row records is the one the rate limiter counts: the
+ * connection's, or what a declared proxy reports. It was the raw
+ * `X-Forwarded-For` header — whose leftmost entry the caller writes — or the
+ * string "unknown" for every direct connection.
+ */
+describe("the address a session records", () => {
+    it("ignores X-Forwarded-For when no proxy is declared", async () => {
+        delete process.env.TRUSTED_PROXY_HOPS;
+        const store = new MemoryAuthStore();
+        const adapter = createBuiltinAuthAdapter({ authRepository: store.repo(), allowRegistration: true, authHooks: HOOKS });
+        const app = new Hono<HonoEnv>();
+        app.route("/auth", adapter.createAuthRoutes() as Hono<HonoEnv>);
+        await app.request("/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Forwarded-For": "10.9.8.7, 203.0.113.5" },
+            body: JSON.stringify({ email: "owner@corp.com", password: PASSWORD })
+        });
+        expect(store.refreshTokens[0].ipAddress).not.toContain("10.9.8.7");
+    });
+
+    it("takes the address the declared proxy reports, not the caller's leftmost entry", async () => {
+        process.env.TRUSTED_PROXY_HOPS = "1";
+        try {
+            const store = new MemoryAuthStore();
+            const adapter = createBuiltinAuthAdapter({ authRepository: store.repo(), allowRegistration: true, authHooks: HOOKS });
+            const app = new Hono<HonoEnv>();
+            app.route("/auth", adapter.createAuthRoutes() as Hono<HonoEnv>);
+            await app.request("/auth/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-Forwarded-For": "10.9.8.7, 203.0.113.5" },
+                body: JSON.stringify({ email: "owner@corp.com", password: PASSWORD })
+            });
+            expect(store.refreshTokens[0].ipAddress).toBe("203.0.113.5");
+        } finally {
+            delete process.env.TRUSTED_PROXY_HOPS;
+        }
+    });
+});

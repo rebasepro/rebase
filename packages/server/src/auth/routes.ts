@@ -20,8 +20,7 @@ import {
     notBefore,
     recipientEmailLimiter,
     strictAuthLimiter,
-    verificationEmailLimiter
-} from "./rate-limiter";
+    verificationEmailLimiter, requestClientAddress } from "./rate-limiter";
 import { buildCaptchaMiddlewares, type CaptchaConfig } from "./captcha";
 import { z } from "zod";
 import { logger } from "../utils/logger";
@@ -678,7 +677,7 @@ refreshToken };
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            requestClientAddress(c)
         );
 
         // Send welcome email (fire-and-forget, don't block registration)
@@ -771,7 +770,7 @@ displayName: user.displayName });
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            requestClientAddress(c)
         );
 
         // Fire onAuthenticated hook (fire-and-forget)
@@ -989,7 +988,7 @@ displayName: user.displayName });
                 const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
                     user.id,
                     c.req.header("user-agent") || "unknown",
-                    c.req.header("x-forwarded-for") || "unknown"
+                    requestClientAddress(c)
                 );
 
                 if (ops.onAuthenticated) {
@@ -1264,7 +1263,7 @@ message: "Password has been reset successfully" });
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown",
+            requestClientAddress(c),
             { skipMfaGate: true, aal: userCtx.aal === "aal2" ? "aal2" : "aal1" }
         );
         const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, "password");
@@ -1430,7 +1429,7 @@ message: "Verification email sent" });
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            requestClientAddress(c)
         );
         const verified = { ...user, emailVerified: true };
         const authResponse = buildAuthResponse(verified, roleIds, accessToken, refreshToken, "password");
@@ -1618,7 +1617,7 @@ aal: sessionAal };
         // and simply add a sibling: two tabs then hold two live tokens of one
         // session, which is exactly what we want them to have.
         const userAgent = c.req.header("user-agent") || "unknown";
-        const ipAddress = c.req.header("x-forwarded-for") || "unknown";
+        const ipAddress = requestClientAddress(c);
         const session = {
             id: sessionId,
             startedAt: sessionStartedAt,

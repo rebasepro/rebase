@@ -39,7 +39,7 @@ jest.mock("../../src/utils/logger", () => ({
 }));
 jest.mock("../../src/auth/rate-limiter", () => {
     const passthrough = async (_c: unknown, next: () => Promise<void>) => next();
-    return { createRateLimiter: () => passthrough, defaultAuthLimiter: passthrough, strictAuthLimiter: passthrough };
+    return { createRateLimiter: () => passthrough, defaultAuthLimiter: passthrough, strictAuthLimiter: passthrough, requestClientAddress: () => "127.0.0.1" };
 });
 
 const SECRET = "property-test-secret-key-that-is-definitely-32-chars-long!!";

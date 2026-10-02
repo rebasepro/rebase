@@ -7,7 +7,7 @@ import { HonoEnv } from "../api/types";
 import type { MiddlewareHandler } from "hono";
 import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
-import { strictAuthLimiter, defaultAuthLimiter } from "./rate-limiter";
+import { strictAuthLimiter, defaultAuthLimiter, requestClientAddress } from "./rate-limiter";
 import { hashRefreshToken } from "./jwt";
 import type { AuthModuleConfig } from "./routes";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
@@ -397,7 +397,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            requestClientAddress(c)
         );
 
         // Fire afterUserCreate hook
@@ -499,7 +499,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            requestClientAddress(c)
         );
 
         const authResponse = buildAuthResponse(updatedUser, roleIds, accessToken, refreshToken, "password") as AuthResponsePayload;

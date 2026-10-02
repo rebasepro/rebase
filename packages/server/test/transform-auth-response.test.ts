@@ -35,6 +35,8 @@ jest.mock("../src/utils/logger", () => {
 jest.mock("../src/auth/rate-limiter", () => {
     const passthrough = async (_c: unknown, next: () => Promise<void>) => next();
     return {
+        // The address a session records; a header fixture is all these need.
+        requestClientAddress: () => "127.0.0.1",
         createRateLimiter: () => passthrough,
         defaultAuthLimiter: passthrough,
         strictAuthLimiter: passthrough
