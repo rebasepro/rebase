@@ -196,6 +196,16 @@ guesses, each account is limited to ten verification attempts per 15 minutes
 recorded against the factor so it cannot be replayed for the rest of its
 ±1-step window.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> In the CMS, **Account settings → Two-step verification** enrols an
+authenticator app (its key, and a link that opens it in the app, then the code
+it shows), lists the account's factors, removes one and replaces the recovery
+codes. When a change needs `aal2` it asks for a code first and steps the session
+up with it. The recovery codes are shown once, after the first factor is
+confirmed. In the users table, **Reset two-step verification**
+(`DELETE /api/admin/users/:uid/mfa`) is offered to whoever holds `users:write`,
+as the route is; an account that outranks you is refused with the server's
+reason.
+
 Set `MFA_ENCRYPTION_KEY` (32+ random characters) to encrypt stored TOTP
 secrets. Without it the server falls back to `JWT_SECRET` and warns. Set it
 **before** anyone enrols: stored secrets carry no key id, so changing the key

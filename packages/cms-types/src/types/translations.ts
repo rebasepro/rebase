@@ -767,6 +767,27 @@ export interface RebaseTranslations {
     auth_signing_in_with_link?: string;
     auth_magic_link_failed_title?: string;
     auth_magic_link_unavailable?: string;
+    mfa_settings_tab?: string;
+    mfa_settings_title?: string;
+    mfa_settings_description?: string;
+    mfa_no_factors?: string;
+    mfa_factor_unconfirmed?: string;
+    mfa_factor_added?: string;
+    mfa_remove_factor?: string;
+    mfa_add_authenticator?: string;
+    mfa_regenerate_codes?: string;
+    mfa_enroll_instructions?: string;
+    mfa_open_in_app?: string;
+    mfa_enroll_confirm?: string;
+    mfa_recovery_codes_title?: string;
+    mfa_recovery_codes_save?: string;
+    mfa_recovery_codes_done?: string;
+    mfa_step_up_title?: string;
+    mfa_step_up_body?: string;
+    reset_mfa_title?: string;
+    reset_mfa_description?: string;
+    reset_mfa_confirm?: string;
+    reset_mfa_success?: string;
 
     auto_setup_collections_button: string;
     auto_setup_collections_title: string;

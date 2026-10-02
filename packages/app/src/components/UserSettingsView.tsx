@@ -18,6 +18,8 @@ import {
 } from "@rebasepro/ui";
 import { useAuthController, useTranslation } from "../hooks";
 import { emailChangeErrorMessage } from "./email-change-message";
+import { MfaSettingsPanel } from "./MfaSettingsPanel";
+import type { MfaSettingsController } from "@rebasepro/cms-types";
 
 interface SessionInfo {
     id: string;
@@ -32,13 +34,14 @@ interface ExtendedAuthController {
     updateProfile?: (displayName: string, photoURL: string) => Promise<void>;
     changePassword?: (oldPassword: string, newPassword: string) => Promise<void>;
     changeEmail?: (newEmail: string) => Promise<{ pendingEmail: string; expiresAt: string }>;
+    mfaSettings?: MfaSettingsController;
     fetchSessions?: () => Promise<SessionInfo[]>;
     revokeSession?: (id: string) => Promise<void>;
     revokeAllSessions?: () => Promise<void>;
     signOut: () => Promise<void>;
 }
 
-type ActiveTab = "profile" | "security" | "sessions";
+type ActiveTab = "profile" | "security" | "two_step" | "sessions";
 
 export function UserSettingsView() {
     const authController = useAuthController() as ExtendedAuthController;
@@ -211,6 +214,7 @@ export function UserSettingsView() {
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ActiveTab)} className="mb-8">
                 <Tab value="profile">{t("profile")}</Tab>
                 {hasPasswordChange && <Tab value="security">{t("security")}</Tab>}
+                {authController.mfaSettings && <Tab value="two_step">{t("mfa_settings_tab")}</Tab>}
                 <Tab value="sessions">{t("sessions")}</Tab>
             </Tabs>
 
@@ -318,6 +322,10 @@ export function UserSettingsView() {
                         </Button>
                     </div>
                 </div>
+            )}
+
+            {activeTab === "two_step" && authController.mfaSettings && (
+                <MfaSettingsPanel mfa={authController.mfaSettings}/>
             )}
 
             {activeTab === "sessions" && (

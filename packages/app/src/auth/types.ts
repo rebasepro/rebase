@@ -1,5 +1,5 @@
 import { User, AuthTokens, DeviceSession, RebaseSession, AuthChangeEvent } from "@rebasepro/types";
-import { AuthController } from "@rebasepro/cms-types";
+import { AuthController, MfaSettingsController } from "@rebasepro/cms-types";
 import type { AuthConfigResponse } from "./api";
 
 // Re-export canonical types so the auth entry point stays self-contained. `User`
@@ -79,6 +79,10 @@ export type RebaseAuthController = AuthController & {
      * the client has no MFA support.
      */
     verifyMfaChallenge?: (mfaToken: string, challengeId: string, code: string) => Promise<void>;
+    /** The account's own second factors. Absent when the client cannot enrol one. */
+    mfaSettings?: MfaSettingsController;
+    /** The scopes the signed-in user holds; `undefined` until known. */
+    heldScopes?: string[];
 }
 
 /**
@@ -119,8 +123,19 @@ export interface ClientAuth {
      * without it an account with a second factor cannot sign in here.
      */
     mfa?: {
-        challenge(factorId: string, options: { mfaToken: string }): Promise<{ challengeId: string }>;
-        verifyChallenge(challengeId: string, code: string, options: { mfaToken: string }): Promise<unknown>;
+        /** Without `options`, the challenge steps up the session the client holds. */
+        challenge(factorId: string, options?: { mfaToken: string }): Promise<{ challengeId: string }>;
+        verifyChallenge(challengeId: string, code: string, options?: { mfaToken: string }): Promise<unknown>;
+        /** The rest manage the signed-in account's own factors; optional for a hand-built client. */
+        enroll?(options?: { friendlyName?: string }): Promise<{
+            factor: { id: string };
+            totp: { secret: string; uri: string };
+            recoveryCodes: string[] | null;
+        }>;
+        verify?(factorId: string, code: string): Promise<unknown>;
+        listFactors?(): Promise<{ id: string; factorType: string; friendlyName?: string; verified: boolean; createdAt: string }[]>;
+        unenroll?(factorId: string): Promise<unknown>;
+        regenerateRecoveryCodes?(): Promise<{ recoveryCodes: string[] }>;
     };
 }
 
@@ -136,6 +151,8 @@ export interface RebaseAuthControllerProps {
         setOnUnauthorized?: (handler: () => Promise<boolean>) => void;
         ws?: { setAuthTokenGetter: (getter: () => Promise<string | null>) => void };
         auth?: ClientAuth;
+        /** Read for the scopes the signed-in user holds (`GET /auth/scopes`). */
+        apiKeys?: { listScopes(): Promise<{ held: string[] }> };
     };
     /** Google OAuth client ID (optional, enables Google login) */
     googleClientId?: string;

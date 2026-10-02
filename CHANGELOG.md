@@ -201,6 +201,14 @@
 
 #### Admin (CMS & app)
 
+- **Two-step verification is set up in the CMS.** Account settings has a
+  Two-step verification tab: add an authenticator app (its key, and a link
+  that opens it in the app), list and remove factors, and replace the recovery
+  codes, with a code asked for first whenever the change needs `aal2`.
+- **The users table resets two-step verification.** *Reset two-step
+  verification* calls `DELETE /admin/users/:uid/mfa`, and is offered only to
+  whoever holds `users:write`, as the route is. The auth controller now reads
+  the scopes the signed-in user holds (`heldScopes`).
 - **The CMS signs in from a magic link.** `<frontend>/auth/magic-link?token=…`
   opened the sign-in screen and dropped the token; it now signs in, through the
   code step on an account with a second factor, and opens the app at its own

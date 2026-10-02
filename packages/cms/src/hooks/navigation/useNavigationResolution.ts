@@ -3,7 +3,7 @@ import type { AppView, AppViewsBuilder, EntityAction, CollectionConfigsBuilder, 
 import { type User, type RebaseData } from "@rebasepro/types";
 import { type AuthController, resolveAdminCollection } from "@rebasepro/cms-types";
 import { canReadCollection } from "@rebasepro/common";
-import { resetPasswordAction } from "../../components/common/default_entity_actions";
+import { resetMfaAction, resetPasswordAction } from "../../components/common/default_entity_actions";
 import { CreationResultDialog } from "../../components/admin/CreationResultDialog";
 import React from "react";
 
@@ -106,6 +106,21 @@ function injectAuthCollectionConfig(
                     ...result,
                     entityActions: [...existing, injectedAction]
                 };
+            }
+        }
+
+        // ─── The other admin user actions ───────────────────────────────
+        //
+        // Resetting a user's second factors is mounted by the same admin user
+        // routes as the password reset, so the same capability says whether it
+        // exists. The action is offered only to a caller holding
+        // `users:write`, which is what the route demands.
+        if (adminPasswordResetSupported) {
+            const present = result.entityActions ?? [];
+            const missing = [resetMfaAction].filter((action) => !present.some((a) =>
+                typeof a === "string" ? a === action.key : a.key != null && a.key === action.key));
+            if (missing.length > 0) {
+                result = { ...result, entityActions: [...present, ...missing] };
             }
         }
 
