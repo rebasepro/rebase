@@ -86,8 +86,15 @@ async function resolveCodeBlocks(mdxFilePath) {
     const frontmatter = parsed.data;
     const content = parsed.content;
 
-    // Regex to match ALL import statements
-    const importPattern = /^import\s+[\s\S]+?\s+from\s+['"](.*?)['"];?$/gm;
+    // An MDX import statement: `import` at the start of a line, ending in
+    // `from "…"` on the same statement — never across a blank line. The old
+    // pattern spanned any number of lines, so a prose line that happened to
+    // start with "import to decide …" (backend/extending.md) matched through to
+    // the next `import … from "…";` inside a code sample and deleted everything
+    // between — a section and a fence opener — which left every later heading
+    // in llms-full.txt undemoted. It is also only applied outside code fences
+    // (below): an `import` in a sample is part of the sample.
+    const importPattern = /^import\s+(?:(?!\n[ \t]*\n)[\s\S])+?\s+from\s+['"](.*?)['"];?$/gm;
 
     // Object to map imported variables to their file contents
     const importContents = {};
@@ -121,8 +128,11 @@ async function resolveCodeBlocks(mdxFilePath) {
         }
     }
 
-    // Remove all import statements from the content
-    let contentWithoutImports = content.replace(importPattern, "");
+    // Remove the import statements, outside code fences only.
+    let contentWithoutImports = content
+        .split(/(^```[^\n]*\n[\s\S]*?^```[ \t]*$)/m)
+        .map((segment, i) => i % 2 === 1 ? segment : segment.replace(importPattern, ""))
+        .join("");
 
     // Replace <Code code={variableName} lang="..." /> with fenced code blocks
     const codeComponentPattern = /<Code\s+code=\{([a-zA-Z0-9_]+)\}(?:\s+lang=["']([^"']+)["'])?\s*\/>/g;

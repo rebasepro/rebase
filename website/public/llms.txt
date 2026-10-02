@@ -39,7 +39,7 @@
 - [Environment & Configuration](https://rebase.pro/docs/getting-started/configuration): All environment variables and configuration options for Rebase projects.
 - [Troubleshooting](https://rebase.pro/docs/troubleshooting): The failures that stop a Rebase backend from starting or serving — an unreachable database, wrong credentials, a missing extension, an RLS refusal, schema drift, a busy port, a function that will not load — and what each one looks like.
 - [Upgrading](https://rebase.pro/docs/upgrading): What breaks when you move an existing app to the current release, and what to do about each one.
-- [Upgrading 0.23 to the next release](https://rebase.pro/docs/upgrading/0-23-to-next): The breaking changes already merged on main and live in these docs, before the release that carries them exists.
+- [Upgrading 0.23 to the next release](https://rebase.pro/docs/upgrading/0-23-to-next): The breaking changes already merged on main and live in these docs, before the release that carries them exists — generated SQL and SDK types, CLI paths, scopes, upserts and keys, the remote MCP endpoint, and sessions and accounts.
 - [Upgrading 0.21 to 0.23](https://rebase.pro/docs/upgrading/0-21-to-0-23): The breaking changes 0.23 carries for an app on 0.21 or 0.22 — nested-path API keys, boot refusals, custom auth repositories, guest upgrades and custom job stores.
 - [Upgrading 0.18 to 0.21](https://rebase.pro/docs/upgrading/0-18-to-0-21): Every breaking change in 0.21, and what to do about each one.
 - [Upgrading 0.17 to 0.18](https://rebase.pro/docs/upgrading/0-17-to-0-18): Every breaking change in 0.18, and what to do about each one.
@@ -74,9 +74,11 @@
 - [Live schema editing](https://rebase.pro/docs/backend/live-schema-editing): Create and alter collections against a running backend — committed to your repository first, then applied.
 - [Authentication](https://rebase.pro/docs/backend/authentication): Configure JWT authentication, OAuth providers, SMTP email, bot protection and the users collection on the Rebase backend.
 - [Roles and scopes](https://rebase.pro/docs/backend/roles-and-scopes): What a caller may do: the data plane every person holds, the admin plane that roles grant, the scopes an app declares for itself, and how each credential carries them.
+- [Email verification](https://rebase.pro/docs/backend/email-verification): How an account proves its email address: the link mailed at registration, what following it keeps and removes, and confirm-first registration with requireEmailVerification.
 - [Auth endpoints and tokens](https://rebase.pro/docs/backend/auth-endpoints): The authentication routes the Rebase backend mounts, their response shapes, multi-factor authentication, the database context a policy sees, JWKS and service keys.
 - [Custom auth adapters](https://rebase.pro/docs/backend/auth-adapters): Replace Rebase's built-in authentication with Clerk, Firebase Auth or your own identity provider by implementing the AuthAdapter contract.
 - [Storage Configuration](https://rebase.pro/docs/backend/storage): Configure local filesystem, S3-compatible, or GCS/Firebase Storage backends for file uploads, images, and media.
+- [Storage caching and CDNs](https://rebase.pro/docs/backend/storage-caching): How Rebase serves stored files so browsers and CDNs can cache them — ETags and 304s, Cache-Control by who may read an object, byte ranges for seeking in audio and video, and what to configure on a CDN in front.
 - [Multiple Databases and Buckets](https://rebase.pro/docs/backend/multiple-sources): Route collections to different databases and properties to different storage buckets, and configure each one from the environment.
 - [MongoDB](https://rebase.pro/docs/backend/mongodb): @rebasepro/server-mongo runs Rebase on MongoDB: a complete data driver, change-stream realtime and snapshot history — and no row-level security.
 - [Realtime & WebSocket](https://rebase.pro/docs/backend/realtime): Real-time data synchronization, broadcast channels, and presence tracking via WebSocket.
@@ -221,6 +223,7 @@
 - [Storage & Files](https://rebase.pro/docs/sdk/storage): Upload, download, list, and delete files using the Rebase typed SDK's storage module.
 - [AI & Agents](https://rebase.pro/docs/ai): What Rebase ships for AI coding assistants and autonomous agents — an MCP server, project-local agent skills, scaffolded instruction files, and the credential model that decides what an agent can actually reach.
 - [MCP Server](https://rebase.pro/docs/ai/mcp): Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 42 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
+- [MCP tool reference](https://rebase.pro/docs/ai/mcp-tool-reference): Every tool the Rebase MCP server registers, by group — what each one needs and does, and which ones the loopback gate refuses against a non-local project.
 - [Agent Skills](https://rebase.pro/docs/ai/skills): rebase skills install writes 21 Rebase reference skills into your repo, in the layout your AI assistant expects — Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity.
 - [AI Instruction Files](https://rebase.pro/docs/ai/instruction-files): Every scaffolded Rebase project ships ai-instructions.md plus three-line pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md — one source of truth, many filenames.
 - [CLI Reference](https://rebase.pro/docs/cli): Rebase CLI commands for project initialization, schema generation, database migrations, and SDK generation.
@@ -235,6 +238,8 @@
 - [Rebase Cloud](https://rebase.pro/docs/deployment/cloud): Rebase Cloud is the same Rebase, operated for you. What it is, how a project links and deploys, and what the private beta does not include yet.
 - [Self-Hosting](https://rebase.pro/docs/deployment/self-hosting): Run Rebase anywhere with the official runtime image and your project bundle — Docker Compose, Fly, Railway, or a plain VPS.
 - [Splitting into several processes](https://rebase.pro/docs/deployment/split-processes): Run one bundle as several cooperating processes — an API, a functions tier, a worker — from the same published runtime image, so a heavy custom function stops competing with the data API.
+- [Running more than one instance](https://rebase.pro/docs/deployment/multiple-instances): Every piece of state a Rebase process keeps to itself, and the setting that shares it — what to set before a second replica, a rolling deploy or a split deployment takes traffic.
+- [Backups and restore](https://rebase.pro/docs/deployment/backups): Take, schedule, list and restore database backups with pg_dump — what a backup contains, the roles file that travels with it, and the one thing it does not cover, your uploaded files.
 - [Kubernetes](https://rebase.pro/docs/deployment/kubernetes): Deploy Rebase to a Kubernetes cluster with the official Helm chart — one Deployment or several, a migration Job that owns the schema, and static apps on the same host.
 - [Deploying Rebase on AWS](https://rebase.pro/docs/deployment/aws): Deploy your Rebase instance securely on Amazon Web Services utilizing RDS and AWS App Runner with a strong European focus.
 - [Deploying Rebase on Google Cloud Platform](https://rebase.pro/docs/deployment/gcp): Deploy your Rebase instance securely on GCP using Cloud SQL and Cloud Run, focusing on EU data center regions.
