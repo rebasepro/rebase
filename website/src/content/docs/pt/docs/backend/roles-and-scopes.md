@@ -39,7 +39,7 @@ todo ele. Qualquer outro papel tem o que o app declara para ele.
 | `storage:delete` | dados | fonte de storage | Excluir arquivos |
 | `functions:invoke` | dados | função | Chamar funções personalizadas. Uma função pode fazer tudo o que seu código faz |
 | `users:read` | administrativo | — | Listar contas e seus papéis |
-| `users:write` | administrativo | — | Criar, editar e excluir contas, redefinir senhas, atribuir papéis até os do próprio titular |
+| `users:write` | administrativo | — | Criar, editar e excluir contas, redefinir senhas e segundos fatores, atribuir papéis até os do próprio titular |
 | `schema:read` | administrativo | — | Ler o esquema das coleções, planejar alterações de esquema, executar a auditoria de RLS, ler a documentação privada da API |
 | `schema:write` | administrativo | — | Aplicar alterações de esquema: edita os arquivos de coleção e altera o banco de dados |
 | `database:read` | administrativo | — | Listar bancos de dados, tabelas, papéis do Postgres e branches |
@@ -265,7 +265,7 @@ e as políticas do banco de dados para a identidade como a qual ele age são out
 
 ## Quando falta um escopo
 
-A resposta é `403 SCOPE_MISSING`, e `details.requiredScope` nomeia o escopo,
+<span class="since-badge" data-since="0.24">Since 0.24</span> A resposta é `403 SCOPE_MISSING`, e `details.requiredScope` nomeia o escopo,
 com seu alvo quando há um:
 
 ```json

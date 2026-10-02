@@ -21,13 +21,14 @@ então tudo nesta seção vale para elas também, exceto `?on_conflict=`.
 O corpo de uma escrita precisa ser um objeto JSON. `null`, um número, uma string ou
 um array resulta em `400 BAD_REQUEST`.
 
-Uma atualização não pode alterar a chave de uma linha. Um corpo que nomeia a
+<span class="since-badge" data-since="0.24">Since 0.24</span> Uma atualização não pode alterar a chave de uma linha. Um corpo que nomeia a
 chave com outro valor resulta em `400 KEY_IMMUTABLE`, antes de qualquer hook
 rodar e sem nada escrito, seja qual for o caminho pelo qual a atualização
 chega: REST, o socket de tempo real, MCP ou o `rebase.data` em processo. A
 chave que a linha já tem é aceita, como a de um formulário que envia a linha
 inteira de volta. Para mover uma linha para uma nova chave, crie-a lá e exclua
-a antiga.
+a antiga. Na 0.23 essa atualização responde `500`, e uma em processo já moveu
+a linha quando lança o erro.
 
 ### Idempotência
 

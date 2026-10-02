@@ -22,8 +22,11 @@ consulte [O endpoint remoto](#o-endpoint-remoto).
 
 ## Conectando um cliente
 
-O servidor é publicado no npm e não precisa de etapa de instalação; o `npx` faz o download.
-Cada bloco abaixo representa a integração completa.
+O servidor é executado a partir do seu projeto: `@rebasepro/mcp` é uma devDependency que todo
+scaffold do `rebase init` fixa junto com a CLI, e cada bloco abaixo — a integração
+completa — inicia essa cópia (`pnpm exec rebase-mcp`, ou `npx --no rebase-mcp`
+em um projeto npm), nunca uma mais recente do npm. Um projeto mais antigo a adiciona uma vez,
+com `rebase skills install --mcp` ou `pnpm add -D @rebasepro/mcp`.
 
 <span class="since-badge" data-since="0.24">Desde 0.24</span> O `rebase init` grava o bloco para cada agente escolhido quando ele
 [configura seus agentes de codificação por IA](/docs/ai/skills#set-up-by-rebase-init), mantendo
@@ -37,8 +40,8 @@ arquivo para você:
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "."
       }
@@ -54,8 +57,8 @@ arquivo para você:
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "${workspaceFolder}"
       }
@@ -70,8 +73,8 @@ arquivo para você:
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "."
       }
@@ -85,8 +88,8 @@ O Codex lê a configuração do projeto somente após você confiar no projeto:
 
 ```toml title=".codex/config.toml"
 [mcp_servers.rebase]
-command = "npx"
-args = ["-y", "@rebasepro/mcp"]
+command = "pnpm"
+args = ["exec", "rebase-mcp"]
 
 [mcp_servers.rebase.env]
 REBASE_PROJECT_DIR = "."
@@ -98,8 +101,8 @@ REBASE_PROJECT_DIR = "."
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "."
       }
@@ -116,8 +119,8 @@ um transporte explícito:
   "servers": {
     "rebase": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "${workspaceFolder}"
       }
@@ -127,8 +130,8 @@ um transporte explícito:
 ```
 
 O **Windsurf** lê os servidores MCP apenas da sua configuração no nível do usuário, portanto não há
-arquivo de projeto para gravar. Adicione o servidor nas configurações de MCP do Windsurf, com um
-`REBASE_PROJECT_DIR` absoluto.
+arquivo de projeto para gravar. Adicione o servidor nas configurações de MCP dele como `"command": "pnpm"`,
+`"args": ["--dir", "/absolute/path/to/your/project", "exec", "rebase-mcp"]`, com esse caminho como `REBASE_PROJECT_DIR`.
 
 Qualquer cliente MCP capaz de iniciar um servidor stdio funciona; o formato é o mesmo.
 
@@ -209,8 +212,8 @@ descobrir uma service key:
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "/absolute/path/to/your/project",
         "REBASE_API_TOKEN": "rk_live_..."
@@ -358,6 +361,9 @@ formato semelhante ao marcador são quebrados com um espaço de largura zero (ze
 `<<<END_UNTRUSTED_DATA>>>` não encerre o envelope prematuramente deixando o que vem a seguir
 do lado de fora.
 
+O [endpoint remoto](#o-endpoint-remoto) cerca os resultados das suas ferramentas da mesma
+forma e avisa o cliente disso; seu `structuredContent` carrega o resultado puro.
+
 Trata-se de um marcador, não de uma sandbox. Um assistente que possui essas ferramentas é apenas tão seguro
 quanto o conteúdo que você permite que ele leia.
 
@@ -395,119 +401,10 @@ com o devido cuidado.
 
 ## Referência de ferramentas
 
-42 ferramentas, divididas em nove grupos. As ferramentas marcadas com ⚠ são recusadas contra destinos não locais,
-a menos que você desative essa proteção.
-
-### Schema e banco de dados (12)
-
-Executam a CLI do Rebase no diretório do projeto ativo.
-
-| Ferramenta | Obrigatório | Descrição |
-|---|---|---|
-| `rebase_schema_generate` | — | Gera o schema Drizzle a partir das definições das coleções |
-| `rebase_db_push` ⚠ | — | Aplica o schema diretamente ao banco de dados (atalho para dev) |
-| `rebase_schema_introspect` | — | Faz introspecção do banco de dados ativo gerando definições de coleções |
-| `rebase_db_generate` | — | Gera arquivos de migração SQL a partir das alterações de schema |
-| `rebase_db_migrate` ⚠ | — | Executa todas as migrações SQL pendentes |
-| `rebase_generate_sdk` | — | Gera o SDK TypeScript totalmente tipado |
-| `rebase_doctor` | — | Detecta divergências entre definições, schema gerado e o banco de dados ativo |
-| `rebase_db_branch_create` ⚠ | `name` | Cria uma branch de banco de dados (somente admins) |
-| `rebase_db_branch_list` | — | Lista as branches de banco de dados (somente admins) |
-| `rebase_db_branch_delete` ⚠ | `name` | Exclui uma branch de banco de dados (somente admins) |
-| `rebase_db_branch_info` | `name` | Informações e status da branch (somente admins) |
-| `rebase_db_branch_switch` | — | Aponta este checkout para uma branch ou de volta ao banco principal (somente admins) |
-
-### Planejamento de schema (1)
-
-Pergunta ao backend o que uma alteração faria, via `POST /api/admin/schema/plan`. Não usa
-CLI e nada é gravado em disco — funciona no banco de desenvolvimento gerenciado,
-o que os comandos baseados em Atlas não conseguem fazer.
-
-| Ferramenta | Obrigatório | Descrição |
-|---|---|---|
-| `rebase_schema_plan` | `collectionId`, `collection` | O SQL que a alteração de uma coleção executaria e quais instruções destroem dados |
-
-### Documentos (5)
-
-| Ferramenta | Obrigatório | Descrição |
-|---|---|---|
-| `list_documents` | `collection` | Lista linhas, com `limit`, `offset`, `orderBy`, `where` opcionais |
-| `get_document` | `collection`, `id` | Busca uma única linha por ID |
-| `create_document` ⚠ | `collection`, `data` | Cria uma linha |
-| `update_document` ⚠ | `collection`, `id`, `data` | Atualiza uma linha |
-| `delete_document` ⚠ | `collection`, `id` | Exclui uma linha |
-
-### Usuários e roles (6)
-
-| Ferramenta | Obrigatório | Descrição |
-|---|---|---|
-| `list_users` | — | Lista todos os usuários, incluindo roles |
-| `create_user` ⚠ | `email` | Cria um usuário (`displayName`, `password`, `roles` opcionais) |
-| `update_user` ⚠ | `uid` | Atualiza email, nome de exibição ou roles |
-| `delete_user` ⚠ | `uid` | Exclui um usuário |
-| `list_roles` | — | Lista as roles definidas |
-| `rebase_auth_reset_password` ⚠ | `email` | Redefine uma senha via API admin |
-
-`create_user` e `update_user` aceitam `roles`, portanto qualquer um deles pode conceder
-acesso de administrador. É por isso que são bloqueados em vez de serem tratados apenas como "aditivos".
-
-### Storage (3)
-
-| Ferramenta | Obrigatório | Descrição |
-|---|---|---|
-| `storage_list_objects` | — | Lista objetos armazenados |
-| `storage_get_download_url` | `key` | Uma URL assinada temporária para download e sua expiração — não metadados do objeto |
-| `storage_delete_object` ⚠ | `key` | Exclui um objeto |
-
-`storage_get_download_url` é classificada como leitura porque não altera o
-ambiente — mas a URL assinada que ela gera concede acesso (bearer capability) que persiste
-após a chamada da ferramenta.
-
-### Cron (5)
-
-| Ferramenta | Obrigatório | Descrição |
-|---|---|---|
-| `cron_list_jobs` | — | Lista tarefas agendadas e seus status |
-| `cron_get_job` | `jobId` | Detalhes da tarefa |
-| `cron_get_job_logs` | `jobId` | Logs de execução |
-| `cron_trigger_job` ⚠ | `jobId` | Executa uma tarefa imediatamente |
-| `cron_toggle_job` ⚠ | `jobId`, `enabled` | Ativa ou desativa uma tarefa |
-
-`cron_toggle_job` pode desativar silenciosamente um backup ou um job de faturamento — uma alteração
-sem erro e sem saída até que algo faça falta mais tarde.
-
-### Funções (1)
-
-| Ferramenta | Obrigatório | Descrição |
-|---|---|---|
-| `invoke_function` ⚠ | `name` | Invoca uma [função customizada](/docs/backend/custom-functions) com qualquer método e payload |
-
-Isso chama código que o servidor MCP nunca viu, com um método e corpo escolhidos
-pelo modelo. Seu raio de impacto é tudo aquilo que suas funções puderem fazer.
-
-### Servidor de desenvolvimento (3)
-
-| Ferramenta | Obrigatório | Descrição |
-|---|---|---|
-| `rebase_dev_start` | — | Inicia o servidor de desenvolvimento; retorna imediatamente |
-| `rebase_dev_logs` | — | Lê saídas recentes (padrão de 50 linhas, buffer de 500 linhas) |
-| `rebase_dev_stop` | — | Para o servidor de desenvolvimento |
-
-### Registro de projetos (6)
-
-| Ferramenta | Obrigatório | Descrição |
-|---|---|---|
-| `rebase_project_list` | — | Lista projetos registrados e mostra o ativo |
-| `rebase_project_switch` | `name` | Altera o projeto ativo |
-| `rebase_project_add` | `name` | Registra um projeto (`baseUrl`, `projectDir` e `token` opcionais) |
-| `rebase_project_remove` | `name` | Remove um projeto (o projeto default não pode ser removido) |
-| `rebase_project_current` | — | Mostra o projeto ativo e seu status de autenticação |
-| `rebase_project_status` | — | Verifica a integridade (health-check) do backend ativo |
-
-`rebase_project_switch` não é bloqueado, pois redireciona todo o restante
-em vez de agir diretamente em um alvo. Um assistente pode, portanto, alternar para um
-projeto remoto sem disparar o gate — ele apenas não poderá executar uma ferramenta
-destrutiva lá.
+42 ferramentas, divididas em nove grupos: schema e banco de dados, planejamento de schema,
+documentos, usuários e roles, storage, cron, funções, servidor de desenvolvimento e registro
+de projetos. Cada uma, com o que precisa e se o gate a recusa contra um destino não
+local, está na [referência de ferramentas do MCP](/docs/ai/mcp-tool-reference).
 
 ## Recursos
 
@@ -554,9 +451,9 @@ a um usuário, o endpoint se recusa a inicializar e informa o motivo no log de b
   vem ativado por padrão; `REBASE_MCP_OPEN_REGISTRATION=false` limita-o
   aos clientes que você registrar) e envia a pessoa para uma tela de consentimento que faz
   o login através do seu `/auth/login` existente.
-- <span class="since-badge" data-since="0.24">Desde 0.24</span> **Seis ferramentas, três escopos.** Os mesmos [escopos](/docs/backend/roles-and-scopes/)
+- <span class="since-badge" data-since="0.24">Desde 0.24</span> **Sete ferramentas, três escopos.** Os mesmos [escopos](/docs/backend/roles-and-scopes/)
   que toda credencial usa. `data:read` oferece `list_collections`,
-  `query_collection` e `get_document`; `data:write` adiciona `create_document` e
+  `query_collection`, `count_documents` e `get_document`; `data:write` adiciona `create_document` e
   `update_document`; `data:delete` adiciona `delete_document`. Um cliente que não pede
   nada recebe `data:read`. Cada um pode ser restringido a uma coleção: `data:read:posts`
   lista e lê `posts` e nada mais. Um escopo decide quais ferramentas são
@@ -570,6 +467,17 @@ a um usuário, o endpoint se recusa a inicializar e informa o motivo no log de b
   as ferramentas que seus escopos `data:*` cobrem, como quem quer que ela represente: uma
   [chave pessoal](/docs/backend/api-keys/#personal-keys) como seu proprietário, uma chave de serviço
   como `api-key:<id>`.
+- **O vocabulário do SDK, as respostas do REST.** As ferramentas recebem o que o SDK recebe —
+  `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` ou
+  `"created_at:desc"`), `limit`, `offset`, `searchString`, e `data` para uma
+  escrita — e leem através do caminho de `GET /api/data/<collection>`, então uma linha
+  volta como o REST a serve (datas ISO, um `belongsTo` como sua chave estrangeira, por exemplo
+  `authorId`) e pode ser enviada de volta em uma atualização sem alterações. `query_collection`
+  responde `{ data, meta }` com `meta.total` e `meta.hasMore`, `count_documents`
+  `{ count }`, e `list_collections` os esquemas OpenAPI `row` e `create` de cada coleção,
+  além de `softDeleteField` onde linhas vão para a lixeira. Como no REST,
+  um `limit` acima de 1000, um argumento não declarado e uma edição ou exclusão de uma linha na
+  lixeira (404) são recusados; definir o campo de soft-delete como `null` a restaura.
 - **Um token apenas para este endpoint.** Um token de acesso MCP é recusado por
   `/api/data`, `/api/admin` e pelo WebSocket, logo conectar um assistente não
   entrega uma sessão a ele.

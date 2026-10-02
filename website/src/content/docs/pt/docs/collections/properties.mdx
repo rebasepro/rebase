@@ -57,7 +57,7 @@ Várias opções abaixo carregam esse rótulo: elas moldam o formulário desenha
 painel e nada mais — a API aceita gravações que as ignoram, e nenhuma restrição é
 aplicada pelo banco. Uma regra que deve ser válida para todo chamador da API é uma
 [regra de validação](/docs/collections/validation-and-conditions/) — verificada em
-gravações via REST, socket e MCP, [mas não nas em processo](/docs/collections/validation-and-conditions/#onde-a-validação-é-executada)
+gravações via REST, socket e MCP, [mas não nas em processo](/docs/collections/validation-and-conditions/#where-validation-runs)
 — ou uma [regra de segurança](/docs/collections/security-rules/), que o banco de
 dados impõe para todos.
 :::
@@ -82,7 +82,7 @@ price: {
 |-------------|------|-----------|
 | `admin.readOnly` | `boolean` | Impede a edição |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Desativa com tooltip opcional |
-| `admin.filledByServer` | `boolean` | O servidor preenche o campo quando um novo registro o deixa vazio (um hook `beforeSave`). O formulário permite criar sem ele; permanece obrigatório na edição, e as próprias verificações do servidor continuam valendo |
+| `admin.filledByServer` | `boolean` | <span class="since-badge" data-since="0.24">Since 0.24</span> O servidor preenche o campo quando um novo registro o deixa vazio (um hook `beforeSave`). O formulário permite criar sem ele; permanece obrigatório na edição, e as próprias verificações do servidor continuam valendo |
 | `admin.hideFromCollection` | `boolean` | Oculta da visualização em tabela |
 | `admin.columnWidth` | `number` | Largura da coluna em pixels (visualização em tabela) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Largura do campo na grade de formulário de quatro colunas |
@@ -301,11 +301,12 @@ compostas não são suportadas, e uma configuração declarando duas deve ser in
 como uma solicitação de algo que o Rebase não pode construir. Se o que você desejava era
 uma restrição de unicidade em várias colunas, utilize um [índice](/docs/backend/indexes) único.
 
-Uma coleção em que nenhuma propriedade reivindica `isId` recebe uma coluna `id`
+<span class="since-badge" data-since="0.24">Since 0.24</span> Uma coleção em que nenhuma propriedade reivindica `isId` recebe uma coluna `id`
 própria: `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. O banco de dados a
 preenche, então uma linha criada pelo painel admin, pela API REST ou pelo SDK
 não precisa de chave, e uma chave que você envia é usada como está. Uma tabela
-criada antes de esse default existir o recebe no próximo arranque.
+criada antes de esse default existir o recebe no próximo arranque. Na 0.23 a
+coluna não tem default, e uma criação que não envia chave falha.
 :::
 
 ## Propriedades Number

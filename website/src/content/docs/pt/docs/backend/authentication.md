@@ -87,16 +87,20 @@ const backend = await initializeRebaseBackend({
 | `activeKid` | `string` | primeira chave | Qual chave de `signingKeys` emite novos tokens |
 | `accessExpiresIn` | `string` | `1h` | Tempo de vida do token de acesso |
 | `refreshExpiresIn` | `string` | `30d` | Tempo de vida do refresh token. Deslizante: cada rotação o renova. O runtime passa `JWT_REFRESH_EXPIRES_IN`, cujo padrão próprio é `400d` |
+| `refreshTokenReuseIntervalSeconds` | `number` | `10` | Por quanto tempo um refresh token que foi rotacionado ainda emite um irmão da sua sessão, de modo que um cliente que perdeu uma resposta de refresh não seja desconectado |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | <span class="since-badge" data-since="0.24">Since 0.24</span> O que um refresh token apresentado depois dessa janela faz. `"reject"` o recusa (`TOKEN_ALREADY_USED`) e registra o fato, e a sessão permanece: isso não é detecção de reuso, já que quem fez o refresh primeiro mantém a sessão. `"revoke-session"` encerra todo o login nesse replay (`SESSION_REVOKED`), como o GoTrue faz, e o proprietário faz login novamente. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Exigir uma sessão para a API de dados |
 | `allowRegistration` | `boolean` | `false` | Libera `POST /api/auth/register`. Fora de produção, o primeiro usuário em uma tabela vazia é admitido de qualquer forma; em produção, o admin é definido com `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: também fecha a janela de bootstrap do primeiro usuário que `allowRegistration: false` deixa aberta |
-| `allowAnonymous` | `boolean` | `false` | Habilita `POST /api/auth/anonymous`. Deliberadamente não restrito por `allowRegistration` — um aplicativo público predominantemente de leitura pode querer sessões sem contas |
+| `allowAnonymous` | `boolean` | `false` | Habilita `POST /api/auth/anonymous`. Deliberadamente não restrito por `allowRegistration` — um aplicativo público predominantemente de leitura pode querer sessões sem contas. Transformar um convidado em uma conta (`POST /api/auth/anonymous/link`) é um registro, e também requer `allowRegistration` |
 | `allowUserLookup` | `boolean` | `false` | Disponibiliza `POST /api/auth/find-user` para fluxos de convite por e-mail |
 | `defaultRole` | `string` | — | Role atribuída a um usuário recém-registrado quando nenhuma for especificada. Não pode ser `admin`, nem uma role declarada que tenha um escopo do plano administrativo: a inicialização recusa as duas |
 | `serviceKey` | `string` | — | Chave estática para chamadas servidor para servidor — consulte [Autenticação por Chave de Serviço](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, para redefinição de senha, verificação, convites e magic links |
 | `magicLink` | `boolean` | `false` | Habilita login por e-mail sem senha (passwordless). Requer `email` configurado; sem isso, as rotas respondem com `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Habilita códigos de login de seis dígitos por e-mail — consulte [Códigos de uso único](#códigos-de-uso-único-por-e-mail). Mesma exigência de e-mail |
+| `magicLinkCreatesUsers` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Since 0.24</span> Cadastro sem senha: uma requisição de magic link ou código por e-mail para um endereço sem conta cria uma (sem senha, não verificada até que o link ou código seja usado), enquanto `allowRegistration` estiver ativo. Executa `beforeUserCreate` e a role padrão. Desativado, essas requisições não criam nada e respondem a um endereço desconhecido como respondem a um conhecido. `AUTH_MAGIC_LINK_CREATES_USERS` |
+| `requireEmailVerification` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Since 0.24</span> Recusa o login por senha até que o endereço seja verificado, e torna o registro confirm-first — consulte [Verificação de e-mail](/docs/backend/email-verification/). Requer `email`; a inicialização o recusa sem isso |
 | `cookieAuth` | `CookieAuthConfig` | — | Entrega o refresh token como um cookie `httpOnly` `Secure` `SameSite` em vez de no corpo JSON — veja abaixo |
 | `providers` | `OAuthProvider[]` | `[]` | O array canônico de OAuth; os campos de provedores nomeados são resolvidos nele |
 | `allowedRedirectUris` | `string[]` | — | Restringe quais URIs de redirecionamento as rotas OAuth aceitam |
@@ -148,11 +152,23 @@ colaterais como provisionar uma equipe pessoal no cadastro, utilize os hooks de
 ciclo de vida de autenticação (`afterUserCreate`, `beforeUserCreate`,
 `afterUserDelete`, …), que recebem o registro de usuário totalmente preenchido.
 
-O OAuth executa menos hooks do que o registro convencional. O login por um
-provedor dispara `afterUserCreate` quando cria a conta, e nenhum outro hook de
-ciclo de vida: `beforeUserCreate`, `beforeLogin` e `onAuthenticated` não são
-executados na rota OAuth, portanto uma validação ou trilha de auditoria vinculada
-a eles nunca verá um usuário de OAuth.
+<span class="since-badge" data-since="0.24">Since 0.24</span> O OAuth executa os mesmos hooks que os outros logins: `beforeLogin` (com
+o endereço do provedor e `"oauth"`), `beforeUserCreate` quando o login cria
+a conta, `afterUserCreate`, e `onAuthenticated`. `onAuthenticated` também
+dispara em uma atualização de token (`"refresh"`), uma redefinição de senha (`"password-reset"`) e
+um segundo fator (`"mfa"`). `beforeLogin` não executa em um refresh, que não é
+um login. Para impedir uma conta que já está conectada, desative-a com
+`PUT /api/admin/users/:uid { disabled: true }`: isso recusa todo login e
+refresh e encerra toda sessão e token que ela possui.
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> `beforeEmailChange(user, newEmail)` executa quando um usuário conectado pede para
+mover sua conta para outro endereço. Uma regra de endereço que você aplica no cadastro
+em `beforeUserCreate` (apenas o seu próprio domínio, por exemplo) também pertence aqui, ou um membro
+pode se cadastrar com um endereço permitido e depois mudar para qualquer outro.
+
+Um hook que recusa (`beforeUserCreate`, `beforeLogin`, `beforeUserDelete`,
+`beforeEmailChange`) lança um erro. O chamador recebe `400 HOOK_REJECTED` com a mensagem do erro, ou o
+status que o erro carrega: um `ApiError`, ou qualquer erro com um `status` 4xx.
 :::
 
 ### Proteção contra bots
@@ -227,8 +243,11 @@ links no console:
              http://localhost:5173/auth/magic-link?token=…
 ```
 
-Acesse o link e o fluxo será concluído. Nada sobre o token muda — ele é
-gerado, armazenado e validado exatamente como seria a partir de uma caixa de
+Acesse o link e o fluxo será concluído, em qualquer página que sirva esse caminho: o
+CMS serve `/reset-password`, `/verify-email`, `/confirm-email-change` e, para um
+magic link, `/auth/magic-link`; outro frontend precisa de uma página própria
+para cada um (veja os [Magic Links](/docs/sdk/authentication/#magic-links) do SDK). Nada sobre o token
+muda — ele é gerado, armazenado e validado exatamente como seria a partir de uma caixa de
 entrada real; apenas a entrega é diferente.
 
 Isso fica ativo sempre que as três condições forem atendidas, e nenhuma
@@ -317,7 +336,7 @@ Contas](#vinculação-de-contas-entre-métodos-de-login).
 ### Personalizando a marca dos e-mails padrão
 
 Os templates integrados de redefinição de senha, verificação, convite,
-boas-vindas e magic link renderizam um logotipo acima do card. Ele é obtido de
+boas-vindas, magic link e alteração de e-mail renderizam um logotipo acima do card. Ele é obtido de
 `email.logoUrl`:
 
 ```ts
@@ -342,7 +361,10 @@ e você não terá logotipo até configurar `logoUrl` — caso contrário, os us
 da Acme receberiam a marca do Rebase em e-mails assinados pelo domínio da Acme.
 
 Se você substituir um template através de `email.templates`, nada disso se
-aplica: sua função controla todo o corpo do e-mail.
+aplica: sua função controla todo o corpo do e-mail. `templates.emailChange(confirmUrl, user, newEmail)`
+é o link enviado ao novo endereço quando um usuário altera o seu, e
+`templates.emailChangeNotice(user, newEmail)` o aviso enviado ao antigo;
+`user.email` é o endereço atual em ambos.
 
 ### Provedores OAuth
 
@@ -461,11 +483,15 @@ pessoa com uma senha, ou entrar com ele por um provedor que não o garante, e
 esperar. Vincular o login com o Google do titular a essa conta deixaria nela a forma
 de acesso da outra pessoa.
 
-Um magic link, um código por e-mail ou uma redefinição de senha comprovam o endereço
-e verificam a conta. Em uma conta que ainda não estava verificada, a primeira dessas
-provas remove a senha (uma redefinição define a nova) e cada identidade vinculada
-cujo provedor não verificou esse endereço, e encerra todas as sessões, antes de
-marcar a conta como verificada. A partir daí vale o passo 2. Contas criadas por um
+Um link de verificação, um magic link, um código por e-mail ou uma redefinição de
+senha comprovam o endereço e verificam a conta. Em uma conta que ainda não estava
+verificada, a primeira dessas provas remove a senha (uma redefinição define a nova)
+e cada identidade vinculada cujo provedor não verificou esse endereço, e encerra
+todas as sessões, antes de marcar a conta como verificada. A partir daí vale o
+passo 2.
+
+Um link de verificação mantém o que a pessoa que o segue também comprova: uma
+sessão ativa da conta, ou sua senha. Veja [Verificação de e-mail](/docs/backend/email-verification/). Contas criadas por um
 administrador com `POST /api/admin/users` são salvas como verificadas, então um
 convidado pode usar "Entrar com o Google" imediatamente. Um repositório de
 autenticação próprio sem `unlinkUserIdentity` recusa essa prova com
@@ -474,35 +500,12 @@ autenticação próprio sem `unlinkUserIdentity` recusa essa prova com
 Esse comportamento não é configurável — deliberadamente não existe opção para
 vincular contas com e-mails não verificados.
 
-Para se recuperar de uma rejeição do passo 3, o usuário entra com seu método
-existente e chama o endpoint explícito de vinculação:
+### Verificação de e-mail
 
-```http
-POST /api/auth/link/google
-Authorization: Bearer <access token>
-
-{ "idToken": "..." }
-```
-
-A vinculação enquanto autenticado intencionalmente **não** exige um e-mail
-verificado, e não exige que os e-mails coincidam — o endereço do Google de um
-usuário frequentemente não é o endereço dele no aplicativo. A assimetria é
-deliberada: no login, o e-mail do provedor é a única evidência que vincula a
-identidade recebida a uma conta, enquanto aqui o solicitante já comprovou a posse
-da conta por possuir uma sessão válida. Retorna `409 IDENTITY_ALREADY_LINKED` se
-essa identidade do provedor pertencer a outro usuário, e é idempotente se já
-estiver vinculada ao solicitante.
-
-#### A direção inversa
-
-Um usuário que se cadastrou com o Google e não possui senha:
-
-- **Registrar-se com o mesmo e-mail** é recusado com `409 EMAIL_EXISTS`.
-- **`POST /api/auth/change-password`** retorna `400 INVALID_ACCOUNT` — não há
-  senha existente para validação.
-- **`forgot-password` → `reset-password` é a forma suportada de adicionar uma.**
-  Ela comprova novamente a titularidade do endereço por e-mail, após o que a
-  conta passa a ter ambos os métodos de login.
+<span class="since-badge" data-since="0.24">Since 0.24</span> O registro envia à nova conta um
+link de verificação, e segui-lo mantém apenas o que a pessoa que o segue também
+comprova. `requireEmailVerification` torna o registro confirm-first. Veja
+[Verificação de e-mail](/docs/backend/email-verification/).
 
 ## Tabelas Criadas Automaticamente
 
@@ -514,9 +517,11 @@ coleção, por exemplo, `rebase`):
   uma coluna `roles` do tipo text[] (as roles são armazenadas como arrays de texto
   inline para otimizar consultas e evitar joins).
 - **`rebase.refresh_tokens`** — Sessões de longa duração contendo refresh tokens
-  hasheados, user agents e endereços IP. Inclui um índice único em `token_hash` e
-  uma restrição única em `(user_id, user_agent, ip_address)` para rastrear
-  sessões ativas de dispositivos.
+  hasheados, user agents e endereços IP. Inclui um índice único em `token_hash`.
+  Um login é um único `session_id`, compartilhado por todo token rotacionado a
+  partir dele; não há restrição por dispositivo, então dois navegadores atrás de
+  um mesmo endereço são duas sessões. Todo token de uma sessão também carrega seu
+  nível de garantia (`aal`) e como ele foi autenticado (`method`, que `providerId` reporta).
 - **`rebase.password_reset_tokens`** — Tokens de uso único com expiração para
   fluxos de recuperação de senha.
 - **`rebase.mfa_factors`** — Métodos de autenticação multifator cadastrados (por
@@ -527,6 +532,16 @@ coleção, por exemplo, `rebase`):
   hasheados.
 - **`rebase.app_config`** — Armazenamento chave-valor para configurações do
   sistema.
+
+Tokens que expiram — links de redefinição, magic links e códigos por e-mail,
+refresh tokens, desafios de MFA — são excluídos uma hora depois de expirarem. A
+limpeza é executada no processo que possui os timers (a role `worker` em uma
+implantação dividida) e em uma única instância da frota: cada hora é reivindicada
+em `rebase.cron_claims` sob o id de job `rebase:auth:expired-tokens`, como um slot
+de cron é. Com `cronPersistence: false` não há tabela de claims, e toda instância
+assim faz a limpeza. Um token expirado é recusado quando apresentado, tenha a
+limpeza sido executada ou não; a limpeza apenas impede que as tabelas cresçam
+indefinidamente.
 
 ## Bootstrap do Primeiro Usuário
 

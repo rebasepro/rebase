@@ -255,8 +255,9 @@ Uma foreign table com uma concessão assim também é relatada. O Postgres não 
 nela, então a concessão entrega tudo o que o servidor remoto retornar, e a correção sugerida revoga
 a concessão em vez disso.
 
-Uma tabela com o RLS desativado, mas sem concessões a uma role exposta, *não* é relatada. Ela não está acessível
-e sinalizá-la seria apenas ruído.
+Uma tabela com o RLS desativado, mas sem concessões a uma role exposta, *não* é relatada, e tampouco
+uma em um schema sobre o qual essa role não tem `USAGE` — o Postgres responde "permission denied for
+schema" antes mesmo de olhar para a tabela. Ela não está acessível e sinalizá-la seria apenas ruído.
 
 ```sql
 ALTER TABLE "public"."your_table" ENABLE ROW LEVEL SECURITY;
@@ -273,6 +274,16 @@ silenciosa. Consulte [rls-enabled-no-policies](#rls-enabled-no-policies).
 Uma policy permissiva cuja expressão `USING` ou `WITH CHECK` é uma verdade constante — `true`,
 `(true)`, `1 = 1`. As policies permissivas são combinadas com o operador OR, portanto basta uma delas para satisfazer
 o filtro de linhas da tabela, não importa quão restritivas sejam todas as outras policies.
+
+Como toda verificação, ela relata a policy apenas quando uma role à qual ela se aplica pode
+alcançar a tabela: possui o privilégio que seu comando exige, e `USAGE` no schema.
+`USING (true) TO anon` em uma tabela sobre a qual `anon` não possui nada é respondido com
+"permission denied" antes mesmo de a policy ser consultada.
+
+Quando apenas o `WITH CHECK` de uma policy `UPDATE` é constante — `USING (user_id = rebase.uid())
+WITH CHECK (true)` — isso é **alto**: o `USING` ainda decide quais linhas podem ser tocadas, mas o
+check permite que uma linha tocada se torne qualquer coisa, como a de outro usuário. Em uma policy
+`FOR ALL` o mesmo check também admite qualquer `INSERT`, então isso permanece crítico.
 
 Se policies `RESTRICTIVE` no mesmo comando (`ALL` para um `ALL` permissivo) se aplicarem a cada role
 exposta que a policy permissiva alcança, a severidade é reduzida para média e relatada como algo a
@@ -301,7 +312,10 @@ A severidade depende da plataforma, e essa distinção é importante:
 
 - **No Supabase**, `auth.uid()` retorna `NULL` para chamadores anônimos, portanto essa é uma verificação funcional de
   apenas autenticados. É relatada como **baixa** (low) — uma lacuna de delimitação de dados entre usuários
-  autenticados, e não uma brecha de acesso anônimo.
+  autenticados, e não uma brecha de acesso anônimo. Isso vale apenas para `auth.uid()` (e para a claim
+  `sub` que ele lê): uma requisição não autenticada ainda carrega a anon key do projeto, então
+  `auth.role()` é `'anon'` e `auth.jwt()` são as claims dessa chave. A mesma forma construída sobre
+  qualquer um dos dois é *verdadeira para chamadores não autenticados*, e é relatada como **crítica**.
 - **No Rebase ou PostgREST**, onde um ID de chamador vazio é convertido para a sentinela `'anonymous'`,
   a expressão é *verdadeira também para chamadores não autenticados*. Relatada como **crítica** (critical).
 - **Em uma plataforma não reconhecida**, relatada como **média** (medium), pois o fato de ser ou não uma brecha
@@ -374,7 +388,9 @@ função ou atualizar o PostgreSQL.
 Materialized views não podem ter segurança em nível de linha, e os dados nelas são um snapshot
 armazenado tirado por quem quer que o tenha atualizado (refresh). Se uma delas for concedida a uma role não confiável e sua
 consulta de definição ler uma tabela protegida por RLS, nenhuma policy poderá ajudar — revogue a concessão (grant) ou mova
-a matview para um schema que roles não confiáveis não consigam acessar.
+a matview para um schema que roles não confiáveis não consigam acessar. A correção sugerida revoga toda
+concessão que alcança uma role não confiável, a partir da role que cada concessão nomeia: uma concessão
+a uma role que `anon` herda não é removida por `REVOKE … FROM anon`.
 
 ```sql
 REVOKE ALL ON "public"."your_matview" FROM "anon";
@@ -409,9 +425,16 @@ USING (EXISTS (SELECT 1 FROM memberships WHERE id = organizations.id ...))
 USING (EXISTS (SELECT 1 FROM memberships m WHERE m.org_id = organizations.id ...))
 ```
 
-**A ausência desse achado não é garantia de segurança.** `pg_policies.qual` é a própria
-renderização feita pelo Postgres da árvore sintática (parse tree), e ele geralmente requalifica as referências de coluna — portanto, o
-nome original sem qualificação frequentemente já não fica visível quando o catálogo é lido. Quando
+**O que o catálogo mostra não é o que você escreveu.** `pg_policies.qual` é a própria
+renderização feita pelo Postgres da árvore sintática (parse tree), e dentro de uma subquery ele sempre
+qualifica as referências de coluna, então o nome sem qualificação nunca fica visível quando o
+catálogo é lido. O que sobrevive é o seu efeito: o `org_id` sem qualificação vinculado à tabela
+interna, e o predicado armazenado compara a coluna dessa tabela com ela mesma —
+`m.org_id = m.org_id`. Essa autocomparação é o que essa verificação encontra em um banco de dados ativo.
+
+**A ausência desse achado não é garantia de segurança.** Um nome sem qualificação comparado com uma
+coluna interna *diferente* (`organization_id = id`) é armazenado como `m.organization_id = m.id`,
+o que se lê exatamente como uma comparação que alguém quis fazer de propósito. Quando
 essa verificação dispara, é um indício forte; quando não dispara, nada foi comprovado.
 
 ### junction-table-unprotected
@@ -419,7 +442,8 @@ essa verificação dispara, é um indício forte; quando não dispara, nada foi 
 **Tabela de junção muitos-para-muitos sem RLS.** Alta, heurística.
 
 Uma tabela que consiste basicamente nos dois pontos finais de duas chaves estrangeiras, ambas apontando para
-tabelas que *possuem* RLS, mas sem segurança em nível de linha própria. Ambos os lados da relação
+tabelas que *possuem* RLS, mas sem segurança em nível de linha própria — e legível ou gravável por uma role
+com a qual um chamador não confiável chega. Ambos os lados da relação
 estão protegidos e a ligação entre eles está aberta — o que é suficiente para enumerar a relação
 mesmo quando nenhum dos lados puder ser lido.
 

@@ -67,7 +67,7 @@ Atrás de um load balancer, o limitador também precisa do endereço real do
 cliente, que chega em `X-Forwarded-For`. O `TRUSTED_PROXY_HOPS` diz quantos
 proxies ignorar; no padrão `0`, toda requisição parece vir do load balancer e
 todo cliente compartilha um único bucket. Veja
-[Configuração](/docs/getting-started/configuration/#comportamento-em-tempo-de-execução).
+[Configuração](/docs/getting-started/configuration/#runtime-behaviour).
 
 ## Tempo real
 
@@ -78,7 +78,7 @@ listener de cada instância refaz a busca para seus próprios assinantes. Se o
 CDC estiver desativado, ou se o `auto` não conseguiu provisioná-lo (o log de
 inicialização diz o motivo), uma assinatura vê apenas as gravações feitas
 através da instância a cujo socket ela está conectada. Veja
-[Tempo real](/docs/backend/realtime/#captura-de-alterações-a-nível-de-banco-de-dados-cdc).
+[Tempo real](/docs/backend/realtime/#database-level-change-capture-cdc).
 
 **Canais de broadcast e presença** são em processo a menos que um barramento
 os carregue: dois clientes em instâncias diferentes no mesmo canal não se
@@ -86,14 +86,14 @@ ouvem, e cada instância responde "quem está aqui?" com apenas a sua metade.
 Defina `REALTIME_CHANNEL_BUS=postgres`. O barramento escuta o banco de dados,
 o que exige uma conexão direta em vez de um pooler de transação — defina
 `DATABASE_DIRECT_URL` quando `DATABASE_URL` passa pelo pgBouncer. Veja
-[Canais e presença entre instâncias](/docs/backend/realtime-transports/#canais-e-presença-entre-instâncias).
+[Canais e presença entre instâncias](/docs/backend/realtime-transports/#channels-and-presence-across-instances).
 
 ## Arquivos
 
 Com `STORAGE_TYPE=local`, os uploads são arquivos no disco da instância que os
 recebeu, e outra instância responde 404 para eles. Use S3 ou GCS, ou monte um
 único volume em `STORAGE_PATH` em todas as instâncias. Veja
-[Auto-hospedagem: armazenamento de arquivos](/docs/deployment/self-hosting/#armazenamento-de-arquivos).
+[Auto-hospedagem: armazenamento de arquivos](/docs/deployment/self-hosting/#file-storage).
 
 **Os uploads retomáveis** (o endpoint TUS) mantêm o arquivo parcial de cada
 upload e seu estado no disco local da instância que o criou, em

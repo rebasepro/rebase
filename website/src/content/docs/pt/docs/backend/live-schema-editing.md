@@ -25,8 +25,27 @@ A aplicação também exige algo além do escopo — consulte [Quem pode aplicar
 
 ## Planeje antes de aplicar
 
-O `/plan` não tem efeitos colaterais. Envie a coleção como ela deve ficar no
-final, e ele informa o que a alteração significa:
+O `/plan` não tem efeitos colaterais. Envie a alteração, e ele informa o que ela
+significa. <span class="since-badge" data-since="0.24">Since 0.24</span> Uma alteração em uma coleção existente é um `patch` — o que mudou, como
+operações sobre caminhos de chaves — e uma nova coleção é a `collection` inteira:
+
+```json
+{ "collectionId": "posts", "patch": [
+    { "op": "set", "path": ["properties", "subtitle"], "value": { "name": "Subtitle", "type": "string" } },
+    { "op": "remove", "path": ["admin", "group"] }
+] }
+```
+
+Apenas as chaves que um patch nomeia são escritas no arquivo da coleção. Todo o
+resto permanece como está — imports, comentários, formatação, o `onClick` de
+uma ação de entidade, uma propriedade compartilhada de outro módulo, um enum
+importado de outro lugar. Um patch que alcança *dentro* de algo definido em
+código (`status: statusProperty`, `enum: LOCALE_ENUM`, um `...spread`) é
+recusado com a expressão em que bateu, de modo que a alteração seja feita onde
+esse código vive. Uma `collection` inteira enviada para uma coleção que já
+existe é transformada no patch do que difere dela, e uma chave cujo valor é
+código nunca é removida dessa forma. O painel admin envia patches. Na 0.23 o
+`/plan` e o `/apply` recebem apenas a `collection` inteira como ela deve ficar.
 
 `$ADMIN_TOKEN` é um token de acesso — o `accessToken` que um login retorna — de uma
 conta que tem `schema:read`: um administrador, ou uma role que o declara. Nada na
@@ -111,9 +130,47 @@ O caminho ensure de boot relata a mesma coisa como um aviso. Até que isso
 existisse, uma restrição retida ficava retida em silêncio.
 
 `needs-migration` cobre tudo o que o caminho ensure não pode fazer: remover uma
-coleção ou uma propriedade, alterar um tipo, renomear uma coluna, alterar uma
-chave primária, remover um valor de enum. Cada recusa nomeia a alteração e o que
-fazer em vez disso.
+coleção ou uma propriedade, alterar o tipo de uma coluna (alternar um inteiro,
+uma string se tornando um enum, o tipo de elemento de um array, a largura de um
+varchar), renomear uma coluna, alterar uma chave primária, remover um valor de
+enum, tornar única uma coluna já existente, e alterar uma relação — seu tipo
+(`kind`), seu destino, seu `localKey`, seu `onDelete`. Um `hasMany` ou `hasOne`
+cuja coluna de vínculo nada cria também é recusado. Cada recusa nomeia a
+alteração e o que fazer em vez disso.
+
+O veredito é lido a partir do esquema que cada lado produz — o mesmo plano a
+partir do qual o `schema.generated.ts` e o `db push` são renderizados — então
+uma edição que altera o banco de dados não pode ser relatada como nenhuma
+alteração. Duas edições que parecem alterações e não são recusadas (<span class="since-badge" data-since="0.24">Since 0.24</span>; a 0.23 relata ambas como exigindo uma migração):
+
+- **Renomear a chave de uma propriedade mantendo sua coluna** (`columnName`
+  definido como a coluna antiga) não move nenhum dado. É `safe`; os clientes da
+  API leem o nome novo.
+- **Definir, alterar ou remover um default** vincula apenas gravações
+  futuras. É `safe`, e aplicado com `ALTER COLUMN … SET DEFAULT` / `DROP DEFAULT`.
+
+### Editar apenas a origem
+
+Uma alteração recusada ainda pode ser escrita na origem da sua coleção e
+commitada, deixando o banco de dados como está — remover uma propriedade que
+você não serve mais é o caso comum. <span class="since-badge" data-since="0.24">Since 0.24</span> Envie `/apply` com `"sourceOnly": true`. Nada é
+executado; a mensagem do commit nomeia o que o banco de dados mantém, por
+exemplo `chore(schema): remove sku from products (source only — column products.sku kept)`,
+e cada alteração no plano carrega uma frase `sourceOnly` dizendo o que ela
+deixa para trás — incluindo quando uma coluna deixada para trás é `NOT NULL`
+sem default, o que faz toda inserção futura falhar até que ela seja removida ou
+se torne anulável (nullable). Uma alteração sem uma dessas (mover uma chave
+primária, uma relação cuja coluna de vínculo nada cria) não pode ser escrita
+apenas na origem.
+
+Excluir uma coleção pelo painel admin segue o mesmo caminho: `/apply` com
+`"remove": true` e `"sourceOnly": true` exclui o arquivo da coleção e sua
+entrada em `index.ts` e commita os dois; a tabela e suas linhas permanecem.
+É recusado enquanto outra coleção importa o arquivo (uma relação a ele),
+nomeando o importador — excluí-lo impediria que todas as coleções carregassem.
+
+Na 0.23 o `/apply` não recebe nem `sourceOnly` nem `remove`, e o "Editar apenas
+a origem" do painel escreve o arquivo sem um commit.
 
 ## O que é comitado
 
@@ -130,8 +187,10 @@ um repositório maior, os caminhos recebem o prefixo dele, localizado ao subir a
 partir do diretório de coleções até o `rebase.json` mais próximo. Um projeto sem
 `rebase.json` mantém os caminhos simples.
 
-Nenhum SQL entra no commit. `rebase db push` e `rebase db generate` gravam o próprio
+<span class="since-badge" data-since="0.24">Since 0.24</span> Nenhum SQL entra no commit. `rebase db push` e `rebase db generate` gravam o próprio
 SQL a partir das coleções a cada execução, em `.rebase/sql/`, que fica no gitignore.
+Na 0.23 o commit também carrega `drizzle/schema.sql`, `drizzle/policies.sql` e
+`drizzle/search.sql`, escritos na raiz do projeto.
 
 A mensagem de commit descreve a alteração em vez de simplesmente anunciar uma, e
 é atribuída à pessoa que a realizou. Uma alteração de schema com autor e
@@ -140,7 +199,7 @@ oferecem — as edições de tabela deles são invisíveis para o seu repositór
 
 ## Quem pode aplicar
 
-Ter `schema:read` é suficiente para **planejar** (*plan*). O planejamento
+<span class="since-badge" data-since="0.24">Since 0.24</span> Ter `schema:read` é suficiente para **planejar** (*plan*). O planejamento
 não tem efeitos colaterais, e uma tarefa de CI verificando se uma alteração de
 coleção proposta é aplicável é um bom uso para ele.
 
@@ -156,6 +215,9 @@ um autor:
 Uma credencial não é um autor. `api-key:7c3f…` no seu ambiente de CI não é
 alguém, e permitir que ela escreva no seu repositório produz exatamente o
 histórico sem autoria que este recurso existe para substituir.
+
+Na 0.23 a linha é a role `admin`: um admin planeja e aplica, e qualquer chave
+de API pode planejar.
 
 Se você deseja uma alteração automatizada de schema — um pipeline de migração,
 por exemplo —, ative isso deliberadamente:

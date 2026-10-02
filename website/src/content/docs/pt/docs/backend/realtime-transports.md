@@ -152,7 +152,8 @@ A entrega aos clientes locais não é sua preocupação — o serviço de tempo 
 
 O `pg_notify` recusa um payload de 8.000 bytes ou mais. Cursores e presença cabem com folga; o snapshot de um documento não. O Rebase lida com isso da mesma forma que lida com grandes alterações de entidade — enviando um endereço em vez de um corpo:
 
-- **Em um canal retido** (consulte [Retenção de canais](#channel-retention)), a mensagem já está armazenada com um número de sequência, portanto a notificação carrega apenas `(channel, seq)` e cada instância receptora lê o corpo de volta. Não há nenhum limite de tamanho.
+- **Em um canal retido** (consulte [Retenção de canais](#channel-retention)), a mensagem já está armazenada com um número de sequência, portanto a notificação carrega apenas `(channel, seq)` e cada instância receptora lê o corpo de volta. Não há nenhum limite de tamanho. Isso vale para toda mensagem retida, pequena ou grande: qualquer login no banco de dados pode fazer `LISTEN`, então o corpo nunca trafega na notificação. Custa uma leitura por chave primária por mensagem em cada instância com um membro no canal.
+- **Broadcasts efêmeros e presença** ainda trafegam na própria notificação, então qualquer login no banco de dados pode lê-los. Coloque em um canal retido tudo o que não deva ser legível dessa forma.
 - **Em um canal efêmero**, não há nada para o que apontar. O broadcast é entregue localmente, o remetente recebe um erro `CHANNEL_BUS_PAYLOAD_TOO_LARGE` em `channel.onError()`, e um aviso informa o nome do canal — em vez de a mensagem alcançar silenciosamente apenas metade do cluster.
 
 Se você transmite mensagens grandes, atribua uma regra de retenção a esse canal. Essa é toda a solução.

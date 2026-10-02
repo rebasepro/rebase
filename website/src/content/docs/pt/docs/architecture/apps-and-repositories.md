@@ -93,7 +93,8 @@ O que sabe disso, faz algo a respeito:
   simplesmente a página inicial do frontend.
 - O **`rebase apps list`** o exibe ao lado do app que o serve.
 
-Três formatos, e todos são comuns:
+Três formatos, e todos são comuns. <span class="since-badge" data-since="0.24">Since 0.24</span> para o terceiro: na 0.23 o
+`path` de um app não pode ser uma URL, então o CMS compartilha o hostname do projeto.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -205,10 +206,27 @@ caminho no hostname do app, dentro dessa parte do caminho. A URL precisa ser
 fragmento. Um `admin.example.com` sozinho é recusado, com a URL que deveria ter
 sido escrita.
 
-Localmente, nada é roteado por hostname. O `rebase dev` executa o app em
+No `rebase dev`, nada é roteado por hostname. Ele executa o app em
 `frontend/` na raiz de uma porta do localhost, como sempre fez, e para um app
 com hostname o banner dele também exibe o endereço `https://` que o app terá
 depois do deploy.
+
+O `rebase start` é diferente, porque executa o bundle compilado através do mesmo
+runtime que um deploy usa — roteamento por hostname incluído. Um app com hostname
+responde apenas a requisições cujo `Host` seja aquele hostname, então
+`http://localhost:3001/` mostra o app sem um, e um bundle cujo único app
+nomeia um hostname responde 404 ali. Para alcançá-lo localmente, envie o header
+você mesmo:
+
+```bash
+curl -H "Host: admin.example.com" http://localhost:3001/
+```
+
+ou aponte o hostname para `127.0.0.1` no `/etc/hosts` e abra
+`http://admin.example.com:3001/`. Deliberadamente não há nenhum parâmetro de query ou
+header que sobrescreva o roteamento: um que funcionasse localmente também funcionaria
+contra um deploy, e escolher o app por qualquer coisa que não seja o `Host` real é
+exatamente o que o roteamento existe para impedir.
 
 Em auto-hospedagem, o processo faz a mesma escolha a partir do header `Host` de
 cada requisição. Apontar o hostname para o servidor e dar a ele um certificado

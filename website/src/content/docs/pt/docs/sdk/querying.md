@@ -391,7 +391,7 @@ const rows = await client.data.orders
 
 As chaves do resultado são **derivadas**, não escolhidas: `sum(total)` retorna como `sum_total`, um `count()` puro como `count`. Permitir a personalização dos nomes exigiria validar se o nome escolhido não coincide com um campo do `groupBy` — uma regra que ninguém adivinharia, gerando sobrescrita silenciosa de valores caso não fosse verificada.
 
-Os grupos são paginados como as linhas de uma listagem: `limit` os limita e
+<span class="since-badge" data-since="0.24">Since 0.24</span> Os grupos são paginados como as linhas de uma listagem: `limit` os limita e
 `offset` os pula (agrupar por uma coluna de alta cardinalidade retornaria uma
 tabela inteira de linhas em uma só resposta). Uma agregação agrupada sem
 `limit` recebe o padrão de uma listagem — **50 grupos** via HTTP — então leia
@@ -411,7 +411,9 @@ enumerável nele, então um spread ou um `JSON.stringify` só vê as linhas. Ela
 está presente sempre que os grupos foram cortados em um `limit`. Sem um
 `groupBy` há uma única linha, `limit` não faz nada e `offset` é recusado. Em
 uma function de servidor (`rebase.data`, `context.data`) uma agregação
-agrupada sem `limit` retorna todos os grupos. `include` não é enviado com uma
+agrupada sem `limit` retorna todos os grupos. Na 0.23 não há `meta` nem
+`offset`, então uma lista de grupos cortada no limite parece completa.
+`include` não é enviado com uma
 agregação: ela não tem relações para carregar. O SDK ainda não ordena grupos;
 via HTTP eles também podem ser ordenados — veja
 [Agregações e busca](/docs/sdk/aggregates-and-search/).

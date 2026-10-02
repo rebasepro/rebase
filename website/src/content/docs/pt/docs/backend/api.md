@@ -326,6 +326,10 @@ atualizada, excluída ou paginada adiante — e o cursor é derivado dela), e as
 `excludeFromApi` permanecem ocultas, quer sejam nomeadas ou não. Uma coluna desconhecida
 resulta em um 400 `UNKNOWN_FIELD`, em vez de uma linha silenciosamente sem um campo.
 
+Uma relação nomeada em `?include=` volta independentemente de `?fields=` a nomear:
+`?include=author&fields=title` retorna `title`, a chave e `author`. Nomear a
+relação também em `?fields=` é permitido e não muda nada.
+
 `?distinct=true` agrupa linhas idênticas com base nessas colunas:
 
 ```bash

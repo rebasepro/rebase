@@ -128,10 +128,11 @@ export const relations = {  };
 
 Três coisas ali merecem uma segunda leitura. A coluna `id` que você não
 declarou: toda coleção recebe uma chave primária `text`, a menos que uma
-propriedade reivindique `isId`, e o banco de dados a preenche com um uuid
+propriedade reivindique `isId`, e <span class="since-badge" data-since="0.24">Since 0.24</span> o banco de dados a preenche com um uuid
 (`gen_random_uuid()::text`), de modo que uma linha criada pelo painel admin,
 pela API REST ou pelo SDK não precisa de chave própria. Uma chave que você
-envia é usada como está. O bloco `pgPolicy`: row level security está habilitado
+envia é usada como está. Na 0.23 a coluna não tem default, e uma criação que
+não envia chave falha. O bloco `pgPolicy`: row level security está habilitado
 em todas as tabelas, e essas políticas de base são o que mantém o contexto
 confiável do servidor e a role `admin` capazes de lê-la — veja
 [Regras de Segurança](/docs/collections/security-rules). E `active`, que carrega

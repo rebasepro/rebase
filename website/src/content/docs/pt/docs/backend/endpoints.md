@@ -81,6 +81,7 @@ como um único `404 NO_COLLECTIONS`. Consulte [Backend only](/docs/getting-start
 | `POST` | `/api/auth/change-password` | session | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/send-verification` | session | [Authentication](/docs/backend/authentication/) |
 | `GET` | `/api/auth/verify-email` | none (um token de verificação) | [Authentication](/docs/backend/authentication/) |
+| `POST` | `/api/auth/verify-email` | none (um token de verificação, e uma sessão ou a senha para mantê-la) | [Verificação de e-mail](/docs/backend/email-verification/) |
 | `POST` | `/api/auth/magic-link` | none | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/magic-link/verify` | none (um token de link) | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/otp` | none | Códigos de uso único por e-mail |
@@ -94,6 +95,7 @@ como um único `404 NO_COLLECTIONS`. Consulte [Backend only](/docs/getting-start
 | `POST` | `/api/auth/mfa/verify` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `GET` | `/api/auth/mfa/factors` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `DELETE` | `/api/auth/mfa/unenroll` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
+| `POST` | `/api/auth/mfa/recovery-codes` | session (`aal2`) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge` | none (um login em andamento) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge/verify` | none (um id de desafio) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `GET` | `/api/auth/scopes` | session | Todos os escopos que este backend conhece, e os que o chamador tem — [Papéis e escopos](/docs/backend/roles-and-scopes/) |
@@ -119,6 +121,7 @@ uma coleção não acessa nada disso. Consulte [Papéis e escopos](/docs/backend
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Recusado para uma conta que tem mais do que o chamador |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Recusado para uma conta que tem mais do que o chamador |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Emite uma senha temporária |
+| `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Remove os segundos fatores e os códigos de recuperação da conta, encerra suas sessões |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` e as roles que o projeto declara, com seus escopos |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [API keys](/docs/backend/api-keys/). Nunca uma chave de API |
 | `POST` | `/api/admin/api-keys` | `keys:write` | A chave em texto simples é retornada uma vez, na criação |

@@ -18,7 +18,7 @@ Não há um serviço de administração separado: o painel de administração fa
 |--------------|----------------|-------------------|
 | Scaffold padrão (`rebase init`) | O painel de administração | `/` — o frontend **é** o admin |
 | Frontend de produto personalizado | Sua app | Onde você o montar, comumente `/admin` — veja [Alterar a URL Base](#alterar-a-url-base) |
-| Administração como app num hostname só seu | Sua app | `https://admin.example.com/`, servido pelo mesmo servidor — veja [Alterar a URL Base](#alterar-a-url-base) |
+| Administração como app num hostname só seu | Sua app | <span class="since-badge" data-since="0.24">Since 0.24</span> `https://admin.example.com/`, servido pelo mesmo servidor — veja [Alterar a URL Base](#alterar-a-url-base) |
 | Projeto somente backend | Nada (apenas API) | Não implantado |
 
 :::note[Primeira visita]

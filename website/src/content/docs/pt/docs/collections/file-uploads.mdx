@@ -88,7 +88,9 @@ propriedade a que o arquivo se destinava; assim, um `curl -F file=@payload.exe`
 ignorando o seletor colocava um executável de 40 MB no bucket de avatares e a
 configuração que dizia o contrário nunca era consultada.
 
-Ambos agora são verificados pelo servidor em relação a **onde o arquivo é gravado**.
+<span class="since-badge" data-since="0.24">Since 0.24</span> Ambos agora são verificados pelo servidor em relação a **onde o arquivo é gravado**. Na
+0.23 eles são verificados apenas em relação à propriedade que um upload nomeia, e um upload
+que não nomeia nenhuma atende apenas ao limite da própria fonte.
 O `storagePath` de uma propriedade é para onde vão os seus arquivos, então é
 também onde valem os seus limites: todo upload cuja chave é um arquivo
 diretamente sob esse caminho — do painel, do `client.storage.putObject`, de um
@@ -113,7 +115,7 @@ caminho, `{path}` qualquer número deles. O caminho de uma propriedade com
 
 ### Imagens em um campo markdown
 
-Uma propriedade markdown (`admin.markdown: true`) com um bloco `storage` aceita
+<span class="since-badge" data-since="0.24">Since 0.24</span> Uma propriedade markdown (`admin.markdown: true`) com um bloco `storage` aceita
 uploads de imagem em seu editor. O texto armazena cada imagem como uma
 **referência de storage** — `![](rebase-storage:posts/abc_cover.png)` — e não
 como uma URL: a URL de um arquivo privado carrega um token de download que
@@ -121,7 +123,7 @@ expira em minutos, e é o texto que é salvo. O editor e as pré-visualizações
 painel de administração trocam cada referência por uma URL nova ao exibi-la; um
 site que renderiza o campo faz o mesmo com
 `resolveStorageReferences(text, client)` — consulte
-[Arquivos dentro de texto](/docs/sdk/storage#arquivos-dentro-de-texto).
+[Arquivos dentro de texto](/docs/sdk/storage#files-inside-text).
 
 Textos salvos antes dessa mudança armazenam as próprias URLs, e os tokens delas
 já expiraram; reinsira essas imagens para armazenar referências em vez disso.
