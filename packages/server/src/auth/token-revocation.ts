@@ -211,10 +211,15 @@ export async function revokeAllSessions(
  * revocation: see `confirmAddressOwnership`.
  */
 export async function replaceUserPassword(
-    authRepo: Pick<AuthRepository, "updatePassword" | "deleteAllRefreshTokensForUser" | "setTokensValidAfter">,
+    authRepo: Pick<AuthRepository, "updatePassword" | "deleteAllRefreshTokensForUser" | "setTokensValidAfter">
+        & Partial<Pick<AuthRepository, "deleteAllPasswordResetTokensForUser">>,
     uid: string,
     passwordHash: string | null
 ): Promise<void> {
     await authRepo.updatePassword(uid, passwordHash);
     await revokeAllSessions(authRepo, uid);
+    // A reset link still in someone's inbox would set the password again for
+    // the rest of its hour — the one just replaced, perhaps because a link
+    // went to the wrong place. Every outstanding one goes with the old password.
+    await authRepo.deleteAllPasswordResetTokensForUser?.(uid);
 }
