@@ -43,6 +43,7 @@ import {
     validatePasswordStrength as defaultValidatePasswordStrength
 } from "./password";
 import type { PasswordValidationResult } from "./password";
+import { ApiError } from "../api/errors";
 import type { AuthRepository, UserData, CreateUserData } from "./interfaces";
 import type { EmailService, EmailConfig } from "../email";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
@@ -111,8 +112,12 @@ export interface AuthHooks {
     // ─── Lifecycle Hooks ──────────────────────────────────────────────────
 
     /**
-     * Called after any successful authentication event (login, register,
-     * OAuth, token refresh, password reset).
+     * Called after any successful authentication event: password login
+     * (`login`), registration (`register`), an OAuth sign-in (`oauth`), a
+     * token refresh (`refresh`), a password reset (`password-reset`), a
+     * guest session (`anonymous`), a magic link (`magic-link`), an email code
+     * (`otp`) and a second factor (`mfa`). Every value of {@link AuthMethod}
+     * is passed by some route.
      *
      * Use for audit logging, syncing external state, updating
      * last-login timestamps, etc.
@@ -122,7 +127,11 @@ export interface AuthHooks {
     onAuthenticated?(user: UserData, method: AuthMethod): Promise<void>;
 
     /**
-     * Called before a new user is created (registration or admin creation).
+     * Called before a new user is created: registration, an OAuth sign-in
+     * that creates the account, a guest, and admin creation.
+     *
+     * Throw to refuse: the caller gets 400 `HOOK_REJECTED` with your message,
+     * or the status your error carries (`ApiError`, or a 4xx `status`).
      *
      * Also called when a guest becomes an account through
      * `POST /auth/anonymous/link`, with the email and password hash it is
@@ -148,10 +157,13 @@ export interface AuthHooks {
     // ─── Extended Lifecycle Hooks ─────────────────────────────────────────
 
     /**
-     * Pre-login validation. Called before credential verification.
+     * Pre-login validation. Called before credential verification on every
+     * sign-in: password (`login`), OAuth (`oauth`, with the provider's
+     * address), and the requests for a magic link (`magic-link`) or an email
+     * code (`otp`). Not on a token refresh, which is not a sign-in.
      *
-     * Throw an error to reject the login attempt (e.g. for account lockout,
-     * IP-based restrictions, etc.).
+     * Throw to refuse: 400 `HOOK_REJECTED` with your message, or the status
+     * your error carries.
      */
     beforeLogin?(email: string, method: AuthMethod): Promise<void>;
 
@@ -303,9 +315,53 @@ export type ResolvedAuthHooks =
  * This is the single point where defaults are applied — all consumers
  * call this once and use the resolved hooks throughout.
  */
+/**
+ * What a hook's thrown error answers.
+ *
+ * The hooks that refuse (`beforeUserCreate`, `beforeLogin`,
+ * `beforeUserDelete`) are documented as "throw to reject", and a plain
+ * `Error` is what people throw. It reached the error handler as a 500
+ * "Internal Server Error", so a deployment that limits sign-ups to its own
+ * domain answered an outsider with a server fault. A refusal is the caller's
+ * answer: 400 `HOOK_REJECTED` with the hook's message — or the status an
+ * error carries, when the hook chose one (`ApiError`, or any error with a 4xx
+ * `status`/`statusCode`).
+ */
+export function hookRefusal(error: unknown, hook: string): ApiError {
+    if (error instanceof ApiError) return error;
+    const carried = typeof error === "object" && error !== null
+        ? ("statusCode" in error && typeof error.statusCode === "number" ? error.statusCode
+            : "status" in error && typeof error.status === "number" ? error.status : undefined)
+        : undefined;
+    const status = carried !== undefined && carried >= 400 && carried < 500 ? carried : 400;
+    const code = typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" && /^[A-Z][A-Z0-9_]+$/.test(error.code)
+        ? error.code
+        : "HOOK_REJECTED";
+    const message = error instanceof Error ? error.message : typeof error === "string" ? error : `${hook} refused the request`;
+    return new ApiError(status, code, message, { hook });
+}
+
+/** A refusing hook whose throw answers as {@link hookRefusal} says. */
+function refusable<A extends unknown[], R>(hook: string, fn: ((...args: A) => Promise<R>) | undefined): ((...args: A) => Promise<R>) | undefined {
+    if (!fn) return undefined;
+    return async (...args: A) => {
+        try {
+            return await fn(...args);
+        } catch (error) {
+            throw hookRefusal(error, hook);
+        }
+    };
+}
+
 export function resolveAuthHooks(hooks?: AuthHooks): ResolvedAuthHooks {
     return {
         ...hooks,
+
+        // Every door calls these through the resolved hooks, so a refusal
+        // answers the same on all of them.
+        beforeUserCreate: refusable("beforeUserCreate", hooks?.beforeUserCreate?.bind(hooks)),
+        beforeLogin: refusable("beforeLogin", hooks?.beforeLogin?.bind(hooks)),
+        beforeUserDelete: refusable("beforeUserDelete", hooks?.beforeUserDelete?.bind(hooks)),
 
         hashPassword: hooks?.hashPassword
             ?? defaultHashPassword,

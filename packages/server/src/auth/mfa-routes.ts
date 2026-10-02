@@ -510,6 +510,15 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
 aal: "aal2" }
         );
 
+        if (ops.onAuthenticated) {
+            const account = await authRepo.getUserById(principal.uid);
+            if (account) {
+                ops.onAuthenticated(account, "mfa").catch((err: unknown) => {
+                    logger.error("[AuthHooks] onAuthenticated error", { error: err instanceof Error ? err.message : err });
+                });
+            }
+        }
+
         // Fire onMfaVerified hook
         if (ops.onMfaVerified) {
             ops.onMfaVerified(principal.uid, factor.id).catch((err) => {

@@ -144,10 +144,16 @@ side effects like provisioning a personal team on signup, use the auth lifecycle
 hooks (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), which
 receive the fully-populated user record.
 
-OAuth runs fewer of them than registration does. A provider sign-in fires
-`afterUserCreate` when it creates the account, and no other lifecycle hook:
-`beforeUserCreate`, `beforeLogin` and `onAuthenticated` do not run on the OAuth
-route, so a check or an audit trail hung on them never sees an OAuth user.
+<span class="since-badge" data-since="0.24">Since 0.24</span> OAuth runs the same hooks as the other sign-ins: `beforeLogin` (with the
+provider's address and `"oauth"`), `beforeUserCreate` when the sign-in creates
+the account, `afterUserCreate`, and `onAuthenticated`. `onAuthenticated` also
+fires on a token refresh (`"refresh"`), a password reset (`"password-reset"`) and
+a second factor (`"mfa"`). `beforeLogin` does not run on a refresh, which is not
+a sign-in.
+
+A hook that refuses (`beforeUserCreate`, `beforeLogin`, `beforeUserDelete`)
+throws. The caller gets `400 HOOK_REJECTED` with the error's message, or the
+status the error carries: an `ApiError`, or any error with a 4xx `status`.
 :::
 
 ### Bot protection

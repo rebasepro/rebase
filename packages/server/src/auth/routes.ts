@@ -802,6 +802,12 @@ displayName: user.displayName });
                 const payload = parseBody(provider.schema, await c.req.json());
                 const externalUser = await verifyProviderPayload(provider, payload);
 
+                // A sign-in like any other, so the hook a deployment uses to
+                // refuse one hears about it — it fired for passwords alone.
+                if (ops.beforeLogin) {
+                    await ops.beforeLogin(normalizeEmail(externalUser.email), "oauth");
+                }
+
                 // Find or create user
                 let user = await authRepo.getUserByIdentity(provider.id, externalUser.providerId);
 
@@ -878,12 +884,19 @@ displayName: user.displayName });
                         // every OAuth account sat unverified forever — and was
                         // then exactly the unverified local account the link
                         // decision refuses to trust.
-                        user = await authRepo.createUser({
+                        // `beforeUserCreate` runs here too: a deployment that
+                        // limits sign-ups to its own domain wrote it for every
+                        // account, and an OAuth button created them unasked.
+                        let createData: CreateUserData = {
                             email: normalizeEmail(externalUser.email),
                             displayName: externalUser.displayName || undefined,
                             photoUrl: externalUser.photoUrl || undefined,
                             emailVerified: externalUser.emailVerified === true
-                        });
+                        };
+                        if (ops.beforeUserCreate) {
+                            createData = await ops.beforeUserCreate(createData);
+                        }
+                        user = await authRepo.createUser(createData);
 
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, identityProfileData(externalUser));
 
@@ -930,6 +943,13 @@ displayName: user.displayName });
                     c.req.header("user-agent") || "unknown",
                     c.req.header("x-forwarded-for") || "unknown"
                 );
+
+                if (ops.onAuthenticated) {
+                    const signedIn = user;
+                    ops.onAuthenticated(signedIn, "oauth").catch(err => {
+                        logger.error("[AuthHooks] onAuthenticated error", { error: err instanceof Error ? err.message : err });
+                    });
+                }
 
                 const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, provider.id);
                 const transformedResponse = await applyTransformHook(authResponse, "oauth", c.req.raw, user.id);
@@ -1136,6 +1156,12 @@ displayName: user.displayName }, appName, logoUrl);
 
         // Mark token as used
         await authRepo.markPasswordResetTokenUsed(tokenHash);
+
+        if (ops.onAuthenticated && account) {
+            ops.onAuthenticated(account, "password-reset").catch(err => {
+                logger.error("[AuthHooks] onAuthenticated error", { error: err instanceof Error ? err.message : err });
+            });
+        }
 
         // Fire onPasswordReset hook (fire-and-forget)
         if (ops.onPasswordReset) {
@@ -1568,6 +1594,11 @@ aal: sessionAal };
                 });
                 refreshResponse = tokensOnlyResponse;
             }
+        }
+        if (ops.onAuthenticated && user) {
+            ops.onAuthenticated(user, "refresh").catch(err => {
+                logger.error("[AuthHooks] onAuthenticated error", { error: err instanceof Error ? err.message : err });
+            });
         }
         const transformedResponse = await applyTransformHook(refreshResponse, "refresh", c.req.raw, storedToken.uid);
         const finalResponse = redactRefreshToken(transformedResponse, c, newRefreshToken, config.cookieAuth);
