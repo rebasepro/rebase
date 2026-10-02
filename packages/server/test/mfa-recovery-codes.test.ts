@@ -164,3 +164,24 @@ describe("DELETE /admin/users/:uid/mfa", () => {
         expect(w.store.factors.filter(f => f.uid === uid)).toHaveLength(1);
     });
 });
+
+/**
+ * MFA's key falls back to the JWT secret the server was given, not only to the
+ * one in `JWT_SECRET`: an app passing `auth.jwtSecret` in code had no key, and
+ * every `/mfa/enroll` answered 500.
+ */
+describe("the TOTP encryption key", () => {
+    it("is the configured auth.jwtSecret when no MFA key or JWT_SECRET is in the environment", async () => {
+        const saved = { mfa: process.env.MFA_ENCRYPTION_KEY, jwt: process.env.JWT_SECRET };
+        delete process.env.MFA_ENCRYPTION_KEY;
+        delete process.env.JWT_SECRET;
+        try {
+            const { encryptTotpSecret, decryptTotpSecret } = await import("../src/auth/mfa-crypto");
+            const sealed = encryptTotpSecret("JBSWY3DPEHPK3PXP");
+            expect(decryptTotpSecret(sealed)).toBe("JBSWY3DPEHPK3PXP");
+        } finally {
+            if (saved.mfa !== undefined) process.env.MFA_ENCRYPTION_KEY = saved.mfa;
+            if (saved.jwt !== undefined) process.env.JWT_SECRET = saved.jwt;
+        }
+    });
+});

@@ -39,6 +39,7 @@
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { logger } from "../utils/logger";
+import { configuredJwtSecret } from "./jwt";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_BYTES = 12;
@@ -88,11 +89,16 @@ function keyCandidates(): KeyCandidate[] {
         add(previous, "MFA_ENCRYPTION_KEY_PREVIOUS");
     }
     add(process.env.JWT_SECRET, "JWT_SECRET");
+    // The secret the server was actually given. An app that passes
+    // `auth.jwtSecret` in code, not under that environment name, had no key
+    // at all, and every `/mfa/enroll` answered 500 with the reason only in the
+    // log. Last, so a deployment that sets both keeps reading what it wrote.
+    add(configuredJwtSecret(), "auth.jwtSecret");
 
     if (candidates.length === 0) {
         throw new Error(
             "Cannot encrypt or decrypt TOTP secrets: none of MFA_ENCRYPTION_KEY, " +
-                "MFA_ENCRYPTION_KEY_PREVIOUS or JWT_SECRET is configured."
+                "MFA_ENCRYPTION_KEY_PREVIOUS, JWT_SECRET or auth.jwtSecret is configured."
         );
     }
 

@@ -273,6 +273,15 @@ export function getJwks(): { keys: PublicJwk[] } {
     return toJwks(signingKeys);
 }
 
+/**
+ * The secret `configureJwt` was given, or undefined before it is called. For
+ * `mfa-crypto.ts`, which falls back to it when no MFA key is set — the secret
+ * passed in code, not only the one in `JWT_SECRET`.
+ */
+export function configuredJwtSecret(): string | undefined {
+    return jwtConfig.secret || undefined;
+}
+
 /** Is this backend signing access tokens asymmetrically? */
 export function hasAsymmetricSigningKey(): boolean {
     return activeSigningKey !== null;
