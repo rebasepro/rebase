@@ -474,7 +474,7 @@ const { passwordRemoved } = await client.auth.verifyEmail(token);
 try {
     await client.auth.verifyEmail(token);
 } catch (e) {
-    if (e.code === "PROOF_REQUIRED") {
+    if (e instanceof Error && "code" in e && e.code === "PROOF_REQUIRED") {
         // Keep the password, and sign in:
         await client.auth.verifyEmail(token, { password });
         // …or verify without it, which removes it:
@@ -485,7 +485,7 @@ try {
 
 The link proves the inbox, not who registered the address, so a password
 neither the session nor the call proves is removed rather than kept — see
-[Email verification](/docs/backend/authentication/#email-verification).
+[Email verification](/docs/backend/email-verification/).
 
 On a backend with `requireEmailVerification`, `signUp()` resolves with
 `{ confirmationRequired: true, user: null }` and no session: the account

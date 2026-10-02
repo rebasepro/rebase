@@ -396,13 +396,13 @@ export function createPostgresWebSocket(
      * re-asking it later answers what signing in would answer. A refusal is a
      * value; a store that cannot answer throws.
      */
-    async function resolveIdentity(token: string): Promise<{ user: WsUserIdentity } | { refused: string; code?: "API_KEY" }> {
+    async function resolveIdentity(token: string): Promise<{ user: WsUserIdentity } | { refused: string; apiKey?: true }> {
         if (token.startsWith("rk_")) {
             // An API key: the same verification the HTTP middlewares run, so a
             // key means one thing on both — revoked or expired included.
             const resolved = options?.resolveApiKey ? await options.resolveApiKey(token) : undefined;
             if (!resolved || !("uid" in resolved)) {
-                return { refused: resolved?.message ?? "API keys are not enabled on this server", code: "API_KEY" };
+                return { refused: resolved?.message ?? "API keys are not enabled on this server", apiKey: true };
             }
             return {
                 user: {
@@ -695,7 +695,7 @@ channelWindowStart: Date.now() });
                         if (token.startsWith("rk_") || !authAdapter) throw error;
                         resolved = { refused: "Invalid or expired token" };
                     }
-                    if ("refused" in resolved && resolved.code === "API_KEY") {
+                    if ("refused" in resolved && resolved.apiKey) {
                         sendError("AUTH_ERROR", "INVALID_TOKEN", resolved.refused);
                         return;
                     }

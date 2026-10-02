@@ -80,6 +80,7 @@ as a single `404 NO_COLLECTIONS`. See [Backend only](/docs/getting-started/headl
 | `POST` | `/api/auth/change-password` | session | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/send-verification` | session | [Authentication](/docs/backend/authentication/) |
 | `GET` | `/api/auth/verify-email` | none (a verification token) | [Authentication](/docs/backend/authentication/) |
+| `POST` | `/api/auth/verify-email` | none (a verification token, and a session or the password to keep it) | [Email verification](/docs/backend/email-verification/) |
 | `POST` | `/api/auth/magic-link` | none | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/magic-link/verify` | none (a link token) | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/otp` | none | One-time codes by email |
@@ -93,6 +94,7 @@ as a single `404 NO_COLLECTIONS`. See [Backend only](/docs/getting-started/headl
 | `POST` | `/api/auth/mfa/verify` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `GET` | `/api/auth/mfa/factors` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `DELETE` | `/api/auth/mfa/unenroll` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
+| `POST` | `/api/auth/mfa/recovery-codes` | session (`aal2`) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge` | none (a login in progress) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge/verify` | none (a challenge id) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `GET` | `/api/auth/scopes` | session | Every scope this backend knows, and the ones the caller holds — [Roles and scopes](/docs/backend/roles-and-scopes/) |
@@ -118,6 +120,7 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Issues a temporary password |
+| `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Removes the account's second factors and recovery codes, ends its sessions |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` and the roles the project declares, with their scopes |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [API keys](/docs/backend/api-keys/). Never an API key |
 | `POST` | `/api/admin/api-keys` | `keys:write` | The plaintext key is returned once, on creation |

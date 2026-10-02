@@ -124,7 +124,16 @@ the ID you got. Read the response header.
 | `SCOPE_EXCEEDS_CREATOR` | 403 | A key was asked for a scope its creator does not hold. A key never holds more than the account that makes it. `details.scopes` names them. | Drop them, or have someone who holds them create the key. |
 | `SCOPE_MISSING` | 403 | The credential does not hold the scope this route, collection, storage source or function needs. `details.requiredScope` names it, target included. | For a person, a role that declares the scope. For a key, a key that holds it. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
 | `SELF_DELETE` | 400 | An admin tried to delete their own account. | Have another admin do it. |
-| `SESSION_REVOKED` | 401 | The session was signed out elsewhere, or every session was revoked. | Sign in again. |
+| `SESSION_REVOKED` | 401 | The session was signed out elsewhere, or every session was revoked, or the account was deleted. | Sign in again. |
+| `ACCOUNT_DISABLED` | 401/403 | An administrator switched the account off: sign-in (403), refresh and every token it holds (401) are refused. | Ask an administrator. |
+| `EMAIL_NOT_CONFIRMED` | 403 | `requireEmailVerification` is on and the address is not verified yet. Answered only for a correct password; a new link is mailed. | Follow the link in the mail. |
+| `PROOF_REQUIRED` | 409 | `POST /auth/verify-email`: the account holds a password or identity nobody proved, and the request proves neither. The token is not spent. | Send `password` to keep it, or `removeUnproven: true` to verify without it. |
+| `UNDELIVERABLE_ADDRESS` | 400 | A verification mail was asked for an address mail cannot reach (a guest's, or X's placeholder). | Set a real address first. |
+| `MFA_NOT_ENROLLED` | 400 | Recovery codes were asked for an account with no verified second factor. | Enrol a factor first. |
+| `HOOK_REJECTED` | 400 | A `beforeUserCreate`, `beforeLogin` or `beforeUserDelete` hook threw. The message is the hook's; a hook that chose a 4xx status answers with it. | See the message. |
+| `INVALID_JSON` | 400 | The request body is not JSON. | Send a JSON body. |
+| `SELF_DISABLE` | 400 | An administrator tried to disable their own account. | Ask another administrator. |
+| `NOT_SUPPORTED` | 501 | This backend's auth repository cannot do what was asked (disable accounts). | Restart the server so the column is added, or use a repository that supports it. |
 | `UNKNOWN_SCOPE_TARGET` | 400 | A scope's target names a collection, storage source or function this backend does not serve. `details` lists the ones it does. | Fix the target. |
 | `UNVERIFIED_IDENTITIES` | 409 | A magic link, email code or password reset proved an unverified account's address, and the account carries a sign-in identity whose provider never verified that address. The auth repository cannot remove it (it has no `unlinkUserIdentity`), so the proof is refused rather than leave that way in on a verified account. | Implement `unlinkUserIdentity` in the custom auth repository, or have an admin review the account. |
 | `SETUP_REQUIRED` | 403 | The project has no admin yet, so this route is not available. | Complete first-admin setup. |

@@ -335,11 +335,12 @@ export function hookRefusal(error: unknown, hook: string): ApiError {
             : "status" in error && typeof error.status === "number" ? error.status : undefined)
         : undefined;
     const status = carried !== undefined && carried >= 400 && carried < 500 ? carried : 400;
-    const code = typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" && /^[A-Z][A-Z0-9_]+$/.test(error.code)
+    const ownCode = typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" && /^[A-Z][A-Z0-9_]+$/.test(error.code)
         ? error.code
-        : "HOOK_REJECTED";
+        : undefined;
     const message = error instanceof Error ? error.message : typeof error === "string" ? error : `${hook} refused the request`;
-    return new ApiError(status, code, message, { hook });
+    if (status === 400 && !ownCode) return ApiError.badRequest(message, "HOOK_REJECTED", { hook });
+    return new ApiError(status, ownCode ?? "HOOK_REJECTED", message, { hook });
 }
 
 /** A refusing hook whose throw answers as {@link hookRefusal} says. */
