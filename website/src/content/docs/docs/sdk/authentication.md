@@ -460,8 +460,8 @@ await client.auth.revokeAllSessions();
 
 Every access token names the sign-in it belongs to, so exactly one entry has
 `isCurrentSession: true`: the device asking. Revoking a session ends that
-device's refresh token and its access token together, from the next request.
-Signing out (`signOut()`) does the
+device's refresh token and its access token together, from the next request,
+over HTTP and over an open realtime socket. Signing out (`signOut()`) does the
 same for the device that signs out. An access token issued before this release
 names no session; it keeps working until it expires, within the hour.
 

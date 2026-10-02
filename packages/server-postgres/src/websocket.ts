@@ -60,6 +60,16 @@ interface ClientSession {
     ws: WebSocket;
     user?: WsUserIdentity;
     authenticated: boolean;
+    /**
+     * The credential `user` was resolved from, kept so the identity can be
+     * re-read: every frame asks again, and so does the sweep for a socket
+     * that only listens. See `recheckIdentity`.
+     */
+    credential?: string;
+    /** When `user` was last confirmed against the credential, in ms. */
+    checkedAt: number;
+    /** Ends the session the instant the credential expires. */
+    expiryTimer?: ReturnType<typeof setTimeout>;
     /** Sliding window message counter for rate limiting */
     messageCount: number;
     messageWindowStart: number;
@@ -101,6 +111,57 @@ const WS_CHANNEL_RATE_LIMIT = 7200;
  * socket with 1009 before it is read.
  */
 const MAX_UNAUTHENTICATED_FRAME_BYTES = 64 * 1024;
+
+/**
+ * How often a socket that only listens has its identity re-read, in ms.
+ *
+ * A socket that sends frames is re-checked before each one, as an HTTP request
+ * is; a socket that only receives pushes sends none, so without this a
+ * subscription opened by an identity that has since signed out everywhere, been
+ * demoted or deleted went on receiving rows as that identity for as long as the
+ * connection lasted.
+ */
+const DEFAULT_IDENTITY_RECHECK_MS = 30_000;
+
+/**
+ * Channel frames are re-checked at most this often, in ms. They are the
+ * high-rate traffic (see `WS_CHANNEL_RATE_LIMIT`): a database read for every
+ * cursor position would make realtime presence the busiest query a backend
+ * runs, for a window no wider than this.
+ */
+const CHANNEL_RECHECK_MIN_MS = 1_000;
+
+/**
+ * The close code for a socket whose identity ended: signed out, revoked,
+ * demoted out of existence, deleted or expired. In the 4000–4999 range the
+ * protocol leaves to applications. The SDK reconnects and authenticates with
+ * whatever session it holds now — a refreshed token, or none.
+ */
+export const SESSION_ENDED_CLOSE_CODE = 4001;
+
+/**
+ * When a JWT expires, in ms, or undefined for a credential that is not one
+ * (an API key, the service key, an adapter's opaque token).
+ *
+ * Read without verifying, and only ever for a token that was verified a moment
+ * ago by the same request: the signature is not in question, only the instant.
+ */
+function jwtExpiryMs(token: string): number | undefined {
+    const parts = token.split(".");
+    if (parts.length !== 3) return undefined;
+    try {
+        const claims: unknown = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+        if (typeof claims !== "object" || claims === null || !("exp" in claims)) return undefined;
+        return typeof claims.exp === "number" ? claims.exp * 1000 : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/** Everything about an identity that decides what its frames may do. */
+function identityFingerprint(user: WsUserIdentity): string {
+    return JSON.stringify([user.uid, [...user.roles].sort(), user.isAdmin, user.isAnonymous, user.scopes ?? null, user.claims ?? null]);
+}
 
 /** Frames counted against the channel budget rather than the general one. */
 const CHANNEL_MESSAGE_TYPES = new Set([
@@ -330,6 +391,187 @@ export function createPostgresWebSocket(
         );
     }
 
+    /**
+     * Who a credential is, now: the same verification `AUTHENTICATE` runs, so
+     * re-asking it later answers what signing in would answer. A refusal is a
+     * value; a store that cannot answer throws.
+     */
+    async function resolveIdentity(token: string): Promise<{ user: WsUserIdentity } | { refused: string; code?: "API_KEY" }> {
+        if (token.startsWith("rk_")) {
+            // An API key: the same verification the HTTP middlewares run, so a
+            // key means one thing on both — revoked or expired included.
+            const resolved = options?.resolveApiKey ? await options.resolveApiKey(token) : undefined;
+            if (!resolved || !("uid" in resolved)) {
+                return { refused: resolved?.message ?? "API keys are not enabled on this server", code: "API_KEY" };
+            }
+            return {
+                user: {
+                    uid: resolved.uid,
+                    roles: resolved.roles,
+                    isAdmin: hasAdminRole(resolved.roles),
+                    isAnonymous: false,
+                    scopes: resolved.scopes
+                }
+            };
+        }
+
+        if (authAdapter) {
+            // Custom auth, Clerk, the built-in auth — anything that is an
+            // adapter. One that throws could not answer (its store is
+            // unreachable); that is not a refusal, and the caller decides
+            // what a question nobody could answer means.
+            const adapterUser = authAdapter.verifyToken
+                ? await authAdapter.verifyToken(token)
+                : await authAdapter.verifyRequest(new Request("http://localhost/_ws_auth", {
+                    headers: { Authorization: `Bearer ${token}` }
+                }));
+            if (!adapterUser) return { refused: "Invalid or expired token" };
+            return {
+                user: {
+                    uid: adapterUser.uid,
+                    roles: adapterUser.roles,
+                    isAdmin: adapterUser.isAdmin,
+                    // Read, as the JWT path reads it: dropped here, a guest
+                    // signed in through an adapter subscribed as an account.
+                    // Absent from an adapter with no such concept, and absent
+                    // reads as "not a guest".
+                    isAnonymous: adapterUser.isAnonymous === true,
+                    // Kept, as the JWT branch keeps them: the built-in auth is
+                    // an adapter, so dropping them here left every
+                    // claim-tenanted collection with no tenant on the socket.
+                    ...(adapterUser.claims ? { claims: adapterUser.claims } : {})
+                }
+            };
+        }
+
+        if (authConfig?.serviceKey && safeCompare(token, authConfig.serviceKey)) {
+            // Service key: a static secret, not a JWT. Checked before
+            // verification, mirroring the HTTP middleware — verifying it as a
+            // JWT can only ever fail.
+            return { user: { uid: "service", roles: ["admin"], isAdmin: true, isAnonymous: false } };
+        }
+
+        // Standard JWT path: the signature and the expiry, nothing more —
+        // there is no account store on this path to ask.
+        const jwtPayload = await extractUserFromToken(token);
+        if (!jwtPayload) return { refused: "Invalid or expired token" };
+        return {
+            user: {
+                uid: jwtPayload.uid,
+                roles: jwtPayload.roles ?? [],
+                isAdmin: hasAdminRole(jwtPayload.roles ?? []),
+                isAnonymous: jwtPayload.isAnonymous === true,
+                claims: jwtPayload.claims
+            }
+        };
+    }
+
+    /** Stop honouring the session at the instant its token expires. */
+    function scheduleExpiry(clientId: string, token: string): void {
+        const session = clientSessions.get(clientId);
+        if (!session) return;
+        if (session.expiryTimer) clearTimeout(session.expiryTimer);
+        session.expiryTimer = undefined;
+        const expiresAt = jwtExpiryMs(token);
+        if (expiresAt === undefined) return;
+        // `setTimeout` overflows past 2^31-1 ms (~24.8 days) and fires at once;
+        // a token living longer than that is re-checked by the sweep instead.
+        const delay = Math.max(0, expiresAt - Date.now());
+        if (delay > 2_147_483_647) return;
+        session.expiryTimer = setTimeout(() => {
+            const current = clientSessions.get(clientId);
+            if (current?.credential === token) {
+                endSession(clientId, "TOKEN_EXPIRED", "The token this socket authenticated with has expired.");
+            }
+        }, delay);
+        session.expiryTimer.unref?.();
+    }
+
+    /**
+     * The identity this socket authenticated as is over: say so, forget it,
+     * and close. Closing rather than carrying on anonymously, because every
+     * subscription the socket holds was opened as that identity — the SDK
+     * reconnects, authenticates with whatever session it has now, and
+     * re-subscribes as that.
+     */
+    function endSession(clientId: string, code: string, message: string): void {
+        const session = clientSessions.get(clientId);
+        if (!session) return;
+        if (session.expiryTimer) clearTimeout(session.expiryTimer);
+        session.expiryTimer = undefined;
+        session.user = undefined;
+        session.credential = undefined;
+        session.authenticated = !requireAuth;
+        wsDebug(`[WS] ${clientId} session ended: ${code}`);
+        try {
+            session.ws.send(JSON.stringify({ type: "AUTH_ERROR", payload: { error: { code, message } } }));
+        } catch {
+            // Already closing.
+        }
+        session.ws.close(SESSION_ENDED_CLOSE_CODE, message.slice(0, 120));
+    }
+
+    /**
+     * Is the identity this socket authenticated as still the one its
+     * credential names?
+     *
+     * Asked of the database, through the same verification as
+     * `AUTHENTICATE`, before each frame and by the sweep — never by an event
+     * one instance publishes to the others. A sign-out, a demotion or a
+     * deletion is written to the database by whichever instance served it;
+     * re-reading there is correct on every instance with nothing in between,
+     * where an event would reach only the instances a bus connects (and the
+     * bus is opt-in).
+     *
+     * - `"live"`: still honoured; roles or claims that changed are applied,
+     *   and the socket's subscriptions are re-scoped to them.
+     * - `"ended"`: refused — revoked, signed out, deleted, expired. The
+     *   socket is closed.
+     * - `"unavailable"`: the store could not answer. The frame is refused,
+     *   the session kept, and the next frame or sweep asks again.
+     */
+    async function recheckIdentity(clientId: string): Promise<"live" | "ended" | "unavailable"> {
+        const session = clientSessions.get(clientId);
+        const credential = session?.credential;
+        if (!session?.user || !credential) return "live";
+        let outcome: Awaited<ReturnType<typeof resolveIdentity>>;
+        try {
+            outcome = await resolveIdentity(credential);
+        } catch {
+            return "unavailable";
+        }
+        // Re-authenticated while this was in flight: that answer is newer.
+        if (session.credential !== credential || !session.user) return session.user ? "live" : "ended";
+        session.checkedAt = Date.now();
+        if (!("user" in outcome)) {
+            endSession(clientId, "SESSION_ENDED", "This session has ended: it was signed out, revoked, or its account changed. Authenticate again.");
+            return "ended";
+        }
+        if (identityFingerprint(outcome.user) !== identityFingerprint(session.user)) {
+            session.user = outcome.user;
+            await realtimeService.rescopeClient(clientId, sessionAuthContext(session));
+        }
+        return "live";
+    }
+
+    // The sweep: a socket that only listens sends nothing to be re-checked
+    // before, so it is re-checked on a timer instead.
+    const identityRecheckMs = Math.max(250, options?.identityRecheckIntervalMs ?? DEFAULT_IDENTITY_RECHECK_MS);
+    const identitySweep = setInterval(() => {
+        const now = Date.now();
+        for (const [id, session] of clientSessions) {
+            if (session.user && session.credential && now - session.checkedAt >= identityRecheckMs / 2) {
+                void recheckIdentity(id).catch(() => undefined);
+            }
+        }
+    }, identityRecheckMs);
+    // Unref'd, so it never holds a process open; stopped with whichever goes
+    // first, the socket server or the HTTP server it is attached to.
+    identitySweep.unref?.();
+    const stopSweep = () => clearInterval(identitySweep);
+    wss.on("close", stopSweep);
+    if (typeof server.on === "function") server.on("close", stopSweep);
+
     wss.on("connection", (ws, request?: IncomingMessage) => {
         const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         const origin = connectionOrigin(request);
@@ -338,6 +580,7 @@ export function createPostgresWebSocket(
         // Initialize client session
         clientSessions.set(clientId, { ws,
 authenticated: !requireAuth,
+checkedAt: Date.now(),
 messageCount: 0,
 messageWindowStart: Date.now(),
 channelMessageCount: 0,
@@ -346,6 +589,8 @@ channelWindowStart: Date.now() });
 
         ws.on("close", () => {
             wsDebug(`WebSocket client disconnected: ${clientId}`);
+            const session = clientSessions.get(clientId);
+            if (session?.expiryTimer) clearTimeout(session.expiryTimer);
             clientSessions.delete(clientId);
         });
 
@@ -440,78 +685,33 @@ channelWindowStart: Date.now() });
                         return;
                     }
 
-                    // Use the auth adapter when available (custom auth, Clerk, etc.)
-                    // Fall back to JWT extraction otherwise.
-                    let verifiedUser: WsUserIdentity | null = null;
-
-                    if (token.startsWith("rk_")) {
-                        // An API key: the same verification the HTTP
-                        // middlewares run, so a key means one thing on both.
-                        const resolved = options?.resolveApiKey ? await options.resolveApiKey(token) : undefined;
-                        if (!resolved || !("uid" in resolved)) {
-                            sendError("AUTH_ERROR", "INVALID_TOKEN", resolved?.message ?? "API keys are not enabled on this server");
-                            return;
-                        }
-                        verifiedUser = {
-                            uid: resolved.uid,
-                            roles: resolved.roles,
-                            isAdmin: hasAdminRole(resolved.roles),
-                            isAnonymous: false,
-                            scopes: resolved.scopes
-                        };
-                    } else if (authAdapter) {
-                        try {
-                            const adapterUser = authAdapter.verifyToken
-                                ? await authAdapter.verifyToken(token)
-                                : await authAdapter.verifyRequest(new Request("http://localhost/_ws_auth", {
-                                    headers: { Authorization: `Bearer ${token}` }
-                                }));
-
-                            if (adapterUser) {
-                                verifiedUser = {
-                                    uid: adapterUser.uid,
-                                    roles: adapterUser.roles,
-                                    isAdmin: adapterUser.isAdmin,
-                                    // Read, as the JWT path reads it: dropped
-                                    // here, a guest signed in through an adapter
-                                    // subscribed as an account. Absent from an
-                                    // adapter with no such concept, and absent
-                                    // reads as "not a guest".
-                                    isAnonymous: adapterUser.isAnonymous === true,
-                                    // Kept, as the JWT branch keeps them: the
-                                    // built-in auth is an adapter, so dropping
-                                    // them here left every claim-tenanted
-                                    // collection with no tenant on the socket.
-                                    ...(adapterUser.claims ? { claims: adapterUser.claims } : {})
-                                };
-                            }
-                        } catch {
-                            // Adapter threw — treat as invalid token
-                        }
-                    } else if (authConfig?.serviceKey && safeCompare(token, authConfig.serviceKey)) {
-                        // Service key: a static secret, not a JWT. Checked
-                        // before verification, mirroring the HTTP middleware —
-                        // verifying it as a JWT can only ever fail.
-                        verifiedUser = { uid: "service", roles: ["admin"], isAdmin: true, isAnonymous: false };
-                    } else {
-                        // Standard JWT path
-                        const jwtPayload = await extractUserFromToken(token);
-                        if (jwtPayload) {
-                            verifiedUser = {
-                                uid: jwtPayload.uid,
-                                roles: jwtPayload.roles ?? [],
-                                isAdmin: hasAdminRole(jwtPayload.roles ?? []),
-                                isAnonymous: jwtPayload.isAnonymous === true,
-                                claims: jwtPayload.claims
-                            };
-                        }
+                    // An adapter that throws (its store unreachable) is an
+                    // invalid token here, as it always was: there is no
+                    // session yet to keep.
+                    let resolved: Awaited<ReturnType<typeof resolveIdentity>>;
+                    try {
+                        resolved = await resolveIdentity(token);
+                    } catch (error) {
+                        if (token.startsWith("rk_") || !authAdapter) throw error;
+                        resolved = { refused: "Invalid or expired token" };
                     }
+                    if ("refused" in resolved && resolved.code === "API_KEY") {
+                        sendError("AUTH_ERROR", "INVALID_TOKEN", resolved.refused);
+                        return;
+                    }
+                    const verifiedUser = "user" in resolved ? resolved.user : null;
 
                     if (verifiedUser) {
                         const session = clientSessions.get(clientId);
                         if (session) {
                             session.user = verifiedUser;
                             session.authenticated = true;
+                            // Kept to be asked again: before every frame, by
+                            // the sweep, and — for a token that expires — at
+                            // the instant it does.
+                            session.credential = token;
+                            session.checkedAt = Date.now();
+                            scheduleExpiry(clientId, token);
                             // What this socket already holds open — a session
                             // refresh, a demotion, another account — is read
                             // as the identity it has now, before it is told
@@ -531,6 +731,24 @@ roles: verifiedUser.roles }
                         sendError("AUTH_ERROR", "INVALID_TOKEN", "Invalid or expired token");
                     }
                     return;
+                }
+
+                // The identity this socket authenticated as is asked again
+                // before the frame runs, as an HTTP request asks on every
+                // request: a sign-out everywhere, a revoked session, a
+                // demotion, a deleted account or an expired token stops being
+                // honoured here, not when the socket happens to reconnect.
+                {
+                    const session = clientSessions.get(clientId);
+                    if (session?.user && session.credential
+                        && Date.now() - session.checkedAt >= (CHANNEL_MESSAGE_TYPES.has(type) ? CHANNEL_RECHECK_MIN_MS : 0)) {
+                        const outcome = await recheckIdentity(clientId);
+                        if (outcome === "ended") return;
+                        if (outcome === "unavailable") {
+                            sendError("ERROR", "ROLE_LOOKUP_FAILED", "Could not verify your permissions. Please try again.");
+                            return;
+                        }
+                    }
                 }
 
                 // Check authentication for protected operations

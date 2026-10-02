@@ -814,6 +814,13 @@ export interface RealtimeSocketOptions {
      * limited. Absent when the deployment has rate limiting off.
      */
     dataRateLimit?: (caller: DataRateLimitCaller) => Promise<{ allowed: boolean; retryAfterMs: number } | null>;
+    /**
+     * How often a socket that only listens has its identity re-read, in ms
+     * (default 30 000). A socket that sends frames is re-checked before each
+     * one; this bounds how long a subscription keeps receiving rows as an
+     * identity that has since signed out, been revoked, demoted or deleted.
+     */
+    identityRecheckIntervalMs?: number;
 }
 
 /**

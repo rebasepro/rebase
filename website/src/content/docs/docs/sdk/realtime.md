@@ -211,6 +211,7 @@ The WebSocket client handles authentication automatically:
 - On **sign-in** or **token refresh**, the new token is sent to an already-open socket via an `authenticate` message. If none is open, nothing happens — signing in is not a request for realtime, and a socket opened later authenticates itself.
 - On **sign-out**, the WebSocket connection is disconnected. The client stays usable; a later subscription reconnects anonymously.
 - If the connection drops, the client **reconnects automatically** and re-establishes all active subscriptions.
+- If the server ends the socket's session — the user signed out everywhere, this session was revoked, the account was deleted, or the token expired before a refresh reached the socket — it closes the socket with code `4001`. The client reconnects like after any drop, authenticating with the session it holds then (refreshed if it can be), or anonymously when there is none. A role taken away does not close the socket: it applies from the next frame. See [Authentication & RLS](/docs/backend/realtime/#authentication--rls).
 
 No manual token management is needed — the integration between `client.auth` and the WebSocket layer is handled internally.
 

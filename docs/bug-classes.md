@@ -3924,6 +3924,26 @@ stays true when the next cache is added.
 | MCP grant roles | **BUG**. Roles, account existence and the revocation watermark re-read on every refresh. |
 | `useFetch`, `useCollection`, `useRelationSelector` caches | clean. Keyed by query and cleared by the fetch-cache reset. |
 
+**Sweep (2026-10-02, the server's half of "a connection authenticated once"):**
+the Postgres socket stored `session.user` at `AUTHENTICATE` and scoped every
+later frame with it, so an open socket read *and wrote* as an identity that had
+signed out everywhere, been demoted, deleted, or whose token had expired
+(IDENTITY-3). It now keeps the credential and asks `resolveIdentity` — the same
+verification `AUTHENTICATE` runs — before each frame (channel frames at most
+once a second), on a sweep for sockets that only listen, and on a timer at the
+token's `exp`. An ended identity gets `AUTH_ERROR` and close `4001`; changed
+roles re-scope the socket's subscriptions. Re-reading the database rather than
+publishing a kick event is what makes it hold across instances without the
+opt-in bus. `identity-e2e.test.ts` mutation-tests each of the three triggers.
+
+| checked | result |
+|---|---|
+| Postgres socket, frames after sign-out / logout / demotion / deletion | **BUG**. Re-checked per frame. |
+| Postgres socket, subscriptions that only listen | **BUG**. Re-checked by the sweep (30 s, `identityRecheckIntervalMs`). |
+| Postgres socket, token expiry | **BUG**. Closed at `exp`; the SDK re-authenticates on every refresh. |
+| API-key sockets | **BUG** by construction (same stored identity). The same re-check re-resolves the key; not separately tested. |
+| Mongo socket | **OPEN** — same shape, Mongo is out of scope for now. |
+
 ## 68. A value the store replaces whole, written as a diff
 
 The unit a write can express is not always the unit the store replaces. A

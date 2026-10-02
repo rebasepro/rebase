@@ -67,6 +67,8 @@ describe("identity after the account changes (E2E)", () => {
     let adapter: AuthAdapter;
     let realtime: RealtimeService;
     let server: Server;
+    /** The same socket with the default sweep (thirty seconds), for the expiry timer alone. */
+    let quietServer: Server;
     let base: string;
     let adminToken: string;
     const sockets: NodeWebSocket[] = [];
@@ -122,9 +124,14 @@ describe("identity after the account changes (E2E)", () => {
         realtime.rlsUserRole = REBASE_USER_ROLE;
 
         server = createServer(getRequestListener(app.fetch));
-        createPostgresWebSocket(server, realtime, driver, undefined, adapter);
+        // A short sweep, so a socket that only listens is re-checked within
+        // the test's patience rather than the default thirty seconds.
+        createPostgresWebSocket(server, realtime, driver, undefined, adapter, { identityRecheckIntervalMs: 400 });
         await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
         base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+        quietServer = createServer();
+        createPostgresWebSocket(quietServer, realtime, driver, undefined, adapter);
+        await new Promise<void>(resolve => quietServer.listen(0, "127.0.0.1", resolve));
 
         const admin = await repo.createUser({ email: "admin@corp.example", emailVerified: true });
         await repo.setUserRoles(admin.id, ["admin"]);
@@ -134,7 +141,9 @@ describe("identity after the account changes (E2E)", () => {
     afterAll(async () => {
         for (const ws of sockets) ws.terminate();
         await realtime?.destroy();
-        await new Promise<void>(resolve => (server ? server.close(() => resolve()) : resolve()));
+        for (const open of [server, quietServer]) {
+            await new Promise<void>(resolve => (open ? open.close(() => resolve()) : resolve()));
+        }
         await observer?.end().catch(() => {});
         await pool?.end().catch(() => {});
         if (container) await stopPgContainer(container.containerName);
@@ -161,8 +170,8 @@ describe("identity after the account changes (E2E)", () => {
     const nextSecond = () => new Promise(resolve => setTimeout(resolve, 1100));
 
     /** A raw socket, its `send`, and every frame and close it received. */
-    async function socket() {
-        const ws = new NodeWebSocket(`ws://127.0.0.1:${(server.address() as AddressInfo).port}`);
+    async function socket(on: Server = server) {
+        const ws = new NodeWebSocket(`ws://127.0.0.1:${(on.address() as AddressInfo).port}`);
         sockets.push(ws);
         await new Promise<void>((resolve, reject) => {
             ws.once("open", () => resolve());
@@ -176,9 +185,12 @@ describe("identity after the account changes (E2E)", () => {
                 resolve(closed);
             });
         });
+        /** Frames nobody asked for — the session-ended notice among them. */
+        const unsolicited: Frame[] = [];
         ws.on("message", (data) => {
             const frame = JSON.parse(String(data)) as Frame;
             const key = frame.requestId ?? frame.subscriptionId;
+            if (!key) unsolicited.push(frame);
             const waiter = key && waiters.get(key);
             if (waiter) {
                 waiters.delete(key);
@@ -203,7 +215,7 @@ describe("identity after the account changes (E2E)", () => {
                 ? { type, payload: { ...payload, subscriptionId: key } }
                 : { type, requestId: key, payload }));
         });
-        return { ws, send, closed: () => closed, closedPromise };
+        return { ws, send, closed: () => closed, closedPromise, unsolicited };
     }
 
     async function signIn(email: string): Promise<{ accessToken: string; refreshToken: string }> {
@@ -225,6 +237,110 @@ describe("identity after the account changes (E2E)", () => {
 
             expect((await http("GET", "/api/whoami", undefined, phone.accessToken)).status).toBe(401);
             expect((await http("GET", "/api/whoami", undefined, laptop.accessToken)).status).toBe(200);
+        });
+    });
+
+    describe("IDENTITY-3: an open socket stops acting as an identity that ended", () => {
+        const noteCount = async (id: string) =>
+            (await observer.query("SELECT count(*)::int AS c FROM public.notes WHERE id = $1", [id])).rows[0].c as number;
+
+        it("after its owner signs out everywhere: the next frame closes the socket, and nothing is written", async () => {
+            const victim = await register("signout");
+            const { send } = await socket();
+            expect((await send("AUTHENTICATE", { token: victim.accessToken })).type).toBe("AUTH_SUCCESS");
+            expect((await send("FETCH_COLLECTION", { path: "notes" })).type).toBe("FETCH_COLLECTION_SUCCESS");
+
+            await nextSecond();
+            expect((await http("DELETE", "/api/auth/sessions", undefined, victim.accessToken)).status).toBe(200);
+
+            const answer = await send("SAVE", { path: "notes", values: { id: "after-signout", body: "written after sign-out" }, status: "new" });
+            expect(answer.type).toBe("CLOSED");
+            expect(answer.payload.code).toBe(4001);
+            expect(await noteCount("after-signout")).toBe(0);
+        });
+
+        it("after the device is signed out by its session alone", async () => {
+            const owner = await register("device");
+            const phone = await signIn(owner.email);
+            const { send } = await socket();
+            expect((await send("AUTHENTICATE", { token: phone.accessToken })).type).toBe("AUTH_SUCCESS");
+
+            expect((await http("POST", "/api/auth/logout", { refreshToken: phone.refreshToken })).status).toBe(200);
+
+            expect((await send("FETCH_COLLECTION", { path: "notes" })).type).toBe("CLOSED");
+        });
+
+        it("after a demotion: the admin verbs it held are refused on the same socket", async () => {
+            const deputy = await register("deputy");
+            await repo.setUserRoles(deputy.uid, ["admin"]);
+            const deputyToken = (await signIn(deputy.email)).accessToken;
+            const { send } = await socket();
+            expect((await send("AUTHENTICATE", { token: deputyToken })).type).toBe("AUTH_SUCCESS");
+            expect((await send("FETCH_CURRENT_DATABASE", {})).payload?.error?.code).not.toBe("SCOPE_MISSING");
+
+            expect((await http("PUT", `/api/admin/users/${deputy.uid}`, { roles: [] }, adminToken)).status).toBe(200);
+
+            const refused = await send("FETCH_CURRENT_DATABASE", {});
+            expect(refused.type).toBe("ERROR");
+            expect(refused.payload.error.code).toBe("SCOPE_MISSING");
+        });
+
+        it("after the account is deleted: the next write closes the socket, and nothing lands", async () => {
+            const victim = await register("ghost");
+            const { send } = await socket();
+            expect((await send("AUTHENTICATE", { token: victim.accessToken })).type).toBe("AUTH_SUCCESS");
+
+            expect((await http("DELETE", `/api/admin/users/${victim.uid}`, undefined, adminToken)).status).toBe(200);
+
+            const answer = await send("SAVE", { path: "notes", values: { id: "ghost-note", body: "written by a deleted user" }, status: "new" });
+            expect(answer.type).toBe("CLOSED");
+            expect(await noteCount("ghost-note")).toBe(0);
+        });
+
+        it("when it only listens: the sweep closes it, so no further rows are pushed", async () => {
+            const victim = await register("listener");
+            const { send, closedPromise } = await socket();
+            expect((await send("AUTHENTICATE", { token: victim.accessToken })).type).toBe("AUTH_SUCCESS");
+            expect((await send("subscribe_collection", { path: "notes" })).type).toBe("collection_update");
+
+            await nextSecond();
+            expect((await http("DELETE", "/api/auth/sessions", undefined, victim.accessToken)).status).toBe(200);
+
+            const closed = await Promise.race([
+                closedPromise,
+                new Promise<null>(resolve => setTimeout(() => resolve(null), 3_000))
+            ]);
+            expect(closed?.code).toBe(4001);
+        });
+
+        it("when its token expires, at that instant, unless it authenticated again", async () => {
+            const owner = await register("expiring");
+            configureJwt({ secret: JWT_SECRET, accessExpiresIn: "2s", refreshExpiresIn: "7d" });
+            let shortLived: string;
+            let renewed: string;
+            try {
+                shortLived = (await signIn(owner.email)).accessToken;
+                renewed = (await signIn(owner.email)).accessToken;
+            } finally {
+                configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h", refreshExpiresIn: "7d" });
+            }
+            const renewedAfter = (await signIn(owner.email)).accessToken;
+
+            const expiring = await socket(quietServer);
+            expect((await expiring.send("AUTHENTICATE", { token: shortLived })).type).toBe("AUTH_SUCCESS");
+            const kept = await socket(quietServer);
+            expect((await kept.send("AUTHENTICATE", { token: renewed })).type).toBe("AUTH_SUCCESS");
+            // What the SDK does on every refresh: authenticate the socket again.
+            expect((await kept.send("AUTHENTICATE", { token: renewedAfter })).type).toBe("AUTH_SUCCESS");
+
+            const closed = await Promise.race([
+                expiring.closedPromise,
+                new Promise<null>(resolve => setTimeout(() => resolve(null), 4_000))
+            ]);
+            expect(closed?.code).toBe(4001);
+            expect(expiring.unsolicited.map(frame => frame.payload?.error?.code)).toContain("TOKEN_EXPIRED");
+            expect(kept.closed()).toBeUndefined();
+            expect((await kept.send("FETCH_COLLECTION", { path: "notes" })).type).toBe("FETCH_COLLECTION_SUCCESS");
         });
     });
 
