@@ -422,7 +422,7 @@ unsubscribe();
 |-------|------|
 | `SIGNED_IN` | A sign-in or sign-up completed |
 | `TOKEN_REFRESHED` | The access token was renewed — including the silent renewal that restores a session on page load |
-| `USER_UPDATED` | `updateUser()` changed the profile |
+| `USER_UPDATED` | `updateUser()` changed the profile, or `confirmEmailChange()` moved this account to its new address |
 | `SIGNED_OUT` | A sign-out, or a refresh that failed for good |
 
 ## Password Management
@@ -490,6 +490,33 @@ neither the session nor the call proves is removed rather than kept — see
 On a backend with `requireEmailVerification`, `signUp()` resolves with
 `{ confirmationRequired: true, user: null }` and no session: the account
 signs in once the link is followed with its password.
+
+## Changing the Email Address
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A signed-in user moves their own account to another address. Nothing
+changes until the new address answers:
+
+```typescript
+// Mails a link to the new address, and a notice to the current one
+const { pendingEmail, expiresAt } = await client.auth.changeEmail("jane@new.example");
+
+// On the page the link opens (<frontend>/confirm-email-change?token=…):
+const { email, removedProviders } = await client.auth.confirmEmailChange(token);
+```
+
+The link lives 24 hours, and asking again replaces it. `getUser()` reports the
+address that is waiting as `pendingEmail`. Confirming needs no session; when
+this client is signed in as the account that moved, its user takes the new
+address and `USER_UPDATED` is emitted. The new address is verified, sessions
+are kept, and `removedProviders` names the sign-in providers detached because
+they vouched for the old address.
+
+`changeEmail` rejects with `EMAIL_EXISTS` or `UNDELIVERABLE_ADDRESS` (409),
+`EMAIL_UNCHANGED` (400), `AAL2_REQUIRED` when the account has a second factor
+this session did not present, and `ANONYMOUS_USER` for a guest.
+`confirmEmailChange` rejects with `INVALID_TOKEN` for a spent, replaced or
+expired link, and `EMAIL_EXISTS` when another account took the address while
+the link waited. See [Changing an email address](/docs/backend/auth-endpoints/#changing-an-email-address).
 
 ## Session Management (Multi-Device)
 
@@ -568,6 +595,7 @@ interface User {
     providerId: string;
     isAnonymous: boolean;
     emailVerified?: boolean;
+    pendingEmail?: string | null; // an address change waiting for its link
     roles?: string[];          // text[] from the users table
     metadata?: Record<string, unknown>;
 }

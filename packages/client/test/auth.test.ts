@@ -968,6 +968,78 @@ message: "Sent" });
         });
     });
 
+    describe("Email change", () => {
+        it("changeEmail asks the server to mail the new address, as the signed-in user", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            mockRequest.mockResolvedValueOnce({ success: true, pendingEmail: "new@b.c", expiresAt: "2026-10-03T10:00:00.000Z" });
+
+            const result = await auth.changeEmail("New@b.c");
+
+            expect(mockRequest).toHaveBeenCalledWith("/auth/change-email", { method: "POST", body: JSON.stringify({ newEmail: "New@b.c" }) });
+            expect(result).toEqual({ pendingEmail: "new@b.c", expiresAt: "2026-10-03T10:00:00.000Z" });
+        });
+
+        it("confirmEmailChange posts the token, and moves the signed-in user it names onto the new address", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    user: { uid: "u1", email: "old@b.c", roles: [], pendingEmail: "new@b.c" },
+                    tokens: { accessToken: "access-1", refreshToken: "refresh-1", accessTokenExpiresAt: Date.now() + 3_600_000 }
+                })
+            });
+            await auth.signInWithEmail("old@b.c", "pw");
+            expect(auth.getSession()?.user.pendingEmail).toBe("new@b.c");
+            const events: AuthChangeEvent[] = [];
+            auth.onAuthStateChange((event) => { events.push(event); });
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ success: true, user: { uid: "u1", email: "new@b.c", emailVerified: true }, removedProviders: ["google"] })
+            });
+
+            const result = await auth.confirmEmailChange("the-token");
+
+            const [url, init] = mockFetch.mock.calls[1] as [string, RequestInit];
+            expect(url).toBe("http://localhost/api/v1/auth/confirm-email-change");
+            expect(JSON.parse(String(init.body))).toEqual({ token: "the-token" });
+            expect(result).toEqual({ uid: "u1", email: "new@b.c", removedProviders: ["google"] });
+            expect(auth.getSession()?.user).toMatchObject({ email: "new@b.c", emailVerified: true, pendingEmail: null });
+            expect(events).toContain("USER_UPDATED");
+            auth.stopAutoRefresh();
+        });
+
+        it("confirmEmailChange leaves a session for another account alone", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    user: { uid: "someone-else", email: "me@b.c", roles: [] },
+                    tokens: { accessToken: "access-1", refreshToken: "refresh-1", accessTokenExpiresAt: Date.now() + 3_600_000 }
+                })
+            });
+            await auth.signInWithEmail("me@b.c", "pw");
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ success: true, user: { uid: "u1", email: "new@b.c", emailVerified: true }, removedProviders: [] })
+            });
+
+            await auth.confirmEmailChange("t");
+
+            expect(auth.getSession()?.user.email).toBe("me@b.c");
+            auth.stopAutoRefresh();
+        });
+
+        it("confirmEmailChange rejects with the server's code", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            mockFetch.mockResolvedValueOnce({
+                ok: false,
+                status: 409,
+                json: async () => ({ error: { message: "Email already registered", code: "EMAIL_EXISTS" } })
+            });
+            await expect(auth.confirmEmailChange("t")).rejects.toMatchObject({ code: "EMAIL_EXISTS" });
+        });
+    });
+
     /**
      * The backend has served `/auth/anonymous` and `/auth/mfa/*` since they
      * landed; the SDK exposed neither, so an app that wanted either hand-wrote

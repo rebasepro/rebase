@@ -156,8 +156,13 @@ a sign-in. To stop an account that is already signed in, disable it with
 `PUT /api/admin/users/:uid { disabled: true }`: that refuses every sign-in and
 refresh and ends every session and token it holds.
 
-A hook that refuses (`beforeUserCreate`, `beforeLogin`, `beforeUserDelete`)
-throws. The caller gets `400 HOOK_REJECTED` with the error's message, or the
+<span class="since-badge" data-since="0.24">Since 0.24</span> `beforeEmailChange(user, newEmail)` runs when a signed-in user asks to
+move their account to another address. An address rule you enforce at sign-up
+in `beforeUserCreate` (only your own domain, say) belongs here too, or a member
+can sign up with an allowed address and then move to any other.
+
+A hook that refuses (`beforeUserCreate`, `beforeLogin`, `beforeUserDelete`,
+`beforeEmailChange`) throws. The caller gets `400 HOOK_REJECTED` with the error's message, or the
 status the error carries: an `ApiError`, or any error with a 4xx `status`.
 :::
 
@@ -314,8 +319,8 @@ See [Account Linking](#account-linking-across-sign-in-methods).
 
 ### Branding the default emails
 
-The built-in password-reset, verification, invitation, welcome and magic-link
-templates render a logo above the card. It comes from `email.logoUrl`:
+The built-in password-reset, verification, invitation, welcome, magic-link and
+email-change templates render a logo above the card. It comes from `email.logoUrl`:
 
 ```ts
 email: {
@@ -338,7 +343,10 @@ itself. Set `appName` to anything else and you get no logo until you set
 Acme's domain.
 
 If you replace a template through `email.templates`, none of this applies: your
-function owns the whole body.
+function owns the whole body. `templates.emailChange(confirmUrl, user, newEmail)`
+is the link mailed to the new address when a user changes theirs, and
+`templates.emailChangeNotice(user, newEmail)` the notice mailed to the old one;
+`user.email` is the current address in both.
 
 ### OAuth Providers
 

@@ -680,3 +680,152 @@ No action is needed.
 html: body.toString().trim(),
 text };
 }
+
+/**
+ * Default address-change confirmation, mailed to the NEW address.
+ *
+ * Names the account being moved — its current address — because the link
+ * makes the address the account's: whoever follows it hands their inbox to
+ * that account, and must be able to tell whether it is theirs.
+ */
+export function getEmailChangeTemplate(
+    confirmUrl: string,
+    user: TemplateUser,
+    newEmail: string,
+    appName = DEFAULT_APP_NAME,
+    logoUrl?: string
+): { subject: string; html: string; text: string } {
+    const greeting = getGreeting(user);
+
+    const subject = `Confirm your new ${appName} email address`;
+
+    const body = html`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+    <div style="${styles.container}">${renderHeader(appName, logoUrl)}
+        <div style="${styles.card}">
+            <h1 style="${styles.heading}">Confirm Your New Email</h1>
+
+            <p style="${styles.paragraph}">
+                Hi ${greeting},
+            </p>
+
+            <p style="${styles.paragraph}">
+                The ${appName} account ${user.email} asked to use ${newEmail} from now on.
+                Confirm it is yours by clicking the button below:
+            </p>
+
+            <div style="text-align: center;">
+                <a href="${confirmUrl}" style="${styles.button}">Confirm New Email</a>
+            </div>
+
+            <p style="${styles.paragraph}">
+                Or copy and paste this link into your browser:
+            </p>
+            <p style="color: #3b82f6; word-break: break-all; font-size: 14px;">
+                ${confirmUrl}
+            </p>
+
+            <div style="${styles.warning}">
+                ⏰ This link expires in 24 hours and can only be used once.
+            </div>
+
+            <div style="${styles.footer}">
+                <p style="margin: 0;">
+                    If you did not ask for this, ignore this email: nothing changes until the link is followed.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Confirm Your New Email
+
+Hi ${greeting},
+
+The ${appName} account ${user.email} asked to use ${newEmail} from now on. Confirm it is yours by following this link:
+${confirmUrl}
+
+This link expires in 24 hours and can only be used once.
+
+If you did not ask for this, ignore this email: nothing changes until the link is followed.
+    `.trim();
+
+    return { subject,
+html: body.toString().trim(),
+text };
+}
+
+/**
+ * Default notice to the OLD address that a change was asked for. It carries
+ * no link: the old inbox can do nothing about the change except know of it,
+ * and a link here would be a second way to make it.
+ */
+export function getEmailChangeNoticeTemplate(
+    user: TemplateUser,
+    newEmail: string,
+    appName = DEFAULT_APP_NAME,
+    logoUrl?: string
+): { subject: string; html: string; text: string } {
+    const greeting = getGreeting(user);
+
+    const subject = `Your ${appName} email address is being changed`;
+
+    const body = html`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+    <div style="${styles.container}">${renderHeader(appName, logoUrl)}
+        <div style="${styles.card}">
+            <h1 style="${styles.heading}">Email Change Requested</h1>
+
+            <p style="${styles.paragraph}">
+                Hi ${greeting},
+            </p>
+
+            <p style="${styles.paragraph}">
+                Someone signed in to your ${appName} account asked to change its email address
+                from ${user.email} to ${newEmail}. The change happens only when the link we sent
+                to ${newEmail} is followed.
+            </p>
+
+            <div style="${styles.footer}">
+                <p style="margin: 0;">
+                    If this was you, there is nothing to do here. If it was not, sign in, change your
+                    password and sign out of every other session.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Email Change Requested
+
+Hi ${greeting},
+
+Someone signed in to your ${appName} account asked to change its email address from ${user.email} to ${newEmail}. The change happens only when the link we sent to ${newEmail} is followed.
+
+If this was you, there is nothing to do here. If it was not, sign in, change your password and sign out of every other session.
+    `.trim();
+
+    return { subject,
+html: body.toString().trim(),
+text };
+}

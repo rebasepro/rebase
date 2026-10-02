@@ -24,6 +24,8 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/change-password` | Change the caller's own password (authenticated). Ends every other session and answers with a fresh one for the caller |
 | `GET` | `/api/auth/me` | The caller's own profile |
 | `PATCH` | `/api/auth/me` | Update the caller's own profile |
+| `POST` | `/api/auth/change-email` | `{ newEmail }`: move the caller's own account to another address. Mails a link to the new address and a notice to the old one; nothing changes until the link is followed. Needs `aal2` on an account with a second factor. `409 EMAIL_EXISTS` or `UNDELIVERABLE_ADDRESS`, `400 EMAIL_UNCHANGED`, `403 ANONYMOUS_USER` for a guest — see [Changing an email address](#changing-an-email-address) |
+| `POST` | `/api/auth/confirm-email-change` | `{ token }` from the link. No session needed. Moves the account onto the new address, verified; `400 INVALID_TOKEN` for a spent, replaced or expired link, `409 EMAIL_EXISTS` when the address was taken while it waited |
 | `GET` | `/api/auth/config` | What this backend offers a sign-in screen — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Unauthenticated, and computed from the same predicates the routes enforce, so what the screen advertises cannot drift from what it can do |
 | `POST` | `/api/auth/send-verification` | Send the caller an email-verification link |
 | `GET` | `/api/auth/verify-email` | Consume a verification link (the URL in that email). Keeps what a live session of the account proves and removes what nobody proved — see [Email verification](/docs/backend/email-verification/) |
@@ -122,6 +124,32 @@ Both shapes are real; they belong to two different layers. Reading the SDK's
 shape off a raw `fetch` yields `undefined`, which shows up as "login succeeded
 but there is no access token" — the login was fine, the token was one level down.
 :::
+
+### Changing an email address
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A signed-in user
+moves their own account to another address in two steps:
+
+1. `POST /api/auth/change-email { newEmail }` records the change and mails a
+   link, `<frontend>/confirm-email-change?token=…`, to the new address, and a
+   notice without a link to the current one. The link lives 24 hours, and a
+   new request replaces the last. `GET /api/auth/me` reports the waiting
+   address as `pendingEmail`.
+2. `POST /api/auth/confirm-email-change { token }` moves the account: the new
+   address becomes its address, verified. Every OAuth identity whose provider
+   vouched for the old address is detached (`removedProviders` names them),
+   because whoever controls the old address could otherwise still sign in
+   through it, and any reset link mailed to the old address stops working.
+   Sessions are kept.
+
+The new address is not reserved while the link waits: holding it would let any
+account keep a stranger from signing up with their own address. If another
+account has the address by the time the link is followed, the link answers
+`409 EMAIL_EXISTS` and nothing moves; of two accounts asking for the same
+address, the first to follow its link gets it. The `beforeEmailChange` hook can
+refuse an address, as `beforeUserCreate` does at sign-up. The CMS opens the
+link on its own screen; another frontend calls the route from its page at that
+path.
 
 With [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) enabled the refresh
 token travels as an `httpOnly` cookie and `tokens.refreshToken` is an empty

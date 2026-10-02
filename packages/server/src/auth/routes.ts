@@ -37,6 +37,10 @@ import { ADMIN_ROLE, isAdminScope, parseScope } from "@rebasepro/types";
 import { getAccessModel } from "./access";
 import type { Context } from "hono";
 import { readRefreshToken, redactRefreshToken, clearRefreshCookie } from "./cookie-utils";
+import { isDeliverableAddress } from "./deliverable-address";
+import { mountEmailChangeRoutes } from "./email-change-routes";
+
+export { isDeliverableAddress };
 
 /**
  * Shared configuration for auth and admin route factories.
@@ -141,14 +145,6 @@ export interface AuthModuleConfig {
     requireEmailVerification?: boolean;
 }
 
-/**
- * Addresses no mail can reach: the synthetic ones a guest and an X (Twitter)
- * account are given, because `email` is NOT NULL. Nothing is mailed to them.
- */
-export function isDeliverableAddress(email: string): boolean {
-    const domain = email.slice(email.lastIndexOf("@") + 1).toLowerCase();
-    return domain !== "anonymous.local" && domain !== "twitter.placeholder.rebase";
-}
 
 /** What a refresh token replayed after its reuse window does to its session. */
 export type RefreshTokenReusePolicy = "reject" | "revoke-session";
@@ -409,7 +405,8 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
      * Send welcome email to a newly registered user (fire-and-forget).
      */
     function sendWelcomeEmail(user: { email: string; displayName?: string | null }) {
-        if (!isEmailConfigured()) return;
+        // An X account's placeholder address reaches nobody.
+        if (!isEmailConfigured() || !isDeliverableAddress(user.email)) return;
         const { appName, logoUrl } = resolveEmailBranding(emailConfig);
         const loginUrl = resolveEmailLinkBase(emailConfig, "resetPassword"); // reuse base URL → the login / app page
         const templateFn = emailConfig?.templates?.welcomeEmail;
@@ -1775,6 +1772,11 @@ aal: sessionAal };
         const finalResponse = redactRefreshToken(transformedResponse, c, newRefreshToken, config.cookieAuth);
         return c.json(finalResponse);
     });
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Self-service email change
+    // ═══════════════════════════════════════════════════════════════════════
+    mountEmailChangeRoutes({ router, config, ops, parseBody, requireLiveSession });
 
     mountSessionRoutes({
         router,

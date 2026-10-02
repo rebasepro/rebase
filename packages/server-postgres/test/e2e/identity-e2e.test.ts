@@ -478,6 +478,88 @@ describe("identity after the account changes (E2E)", () => {
         });
     });
 
+    describe("IDENTITY-11: changing one's own email address", () => {
+        /** The token in the last address-change link mailed to `to`. */
+        const changeLinkTo = (to: string) => {
+            const mail = [...mails].reverse().find(m => m.to === to && /confirm-email-change\?token=/.test(m.text ?? ""));
+            return mail ? /confirm-email-change\?token=([A-Za-z0-9_-]+)/.exec(mail.text!)![1] : undefined;
+        };
+        const fresh = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}@corp.example`;
+        const row = async (uid: string) => (await observer.query(
+            "SELECT email, email_verified, pending_email, email_change_token, email_change_sent_at FROM rebase.users WHERE id = $1", [uid]
+        )).rows[0];
+
+        it("mails the new address, moves the account when the link is followed, and keeps its sessions", async () => {
+            const oldEmail = fresh("mover");
+            const google = await http("POST", "/api/auth/google", { code: `google-${oldEmail}|${oldEmail}`, redirectUri: "https://app.corp.example/cb" });
+            const uid = google.json.user.uid as string;
+            await repo.updatePassword(uid, null);
+            const newEmail = fresh("moved");
+
+            const asked = await http("POST", "/api/auth/change-email", { newEmail }, google.json.tokens.accessToken);
+            expect(asked.status).toBe(200);
+            const pending = await row(uid);
+            expect(pending.email).toBe(oldEmail);
+            expect(pending.pending_email).toBe(newEmail);
+            const token = changeLinkTo(newEmail)!;
+            // Only the hash is stored.
+            expect(pending.email_change_token).not.toBe(token);
+            expect(pending.email_change_token).toHaveLength(64);
+            expect(mails.some(m => m.to === oldEmail && /being changed/.test(m.subject))).toBe(true);
+            expect((await http("GET", "/api/auth/me", undefined, google.json.tokens.accessToken)).json.user.pendingEmail).toBe(newEmail);
+
+            const confirmed = await http("POST", "/api/auth/confirm-email-change", { token });
+            expect(confirmed.status).toBe(200);
+            expect(confirmed.json.removedProviders).toEqual(["google"]);
+            expect(await row(uid)).toMatchObject({ email: newEmail, email_verified: true, pending_email: null, email_change_token: null, email_change_sent_at: null });
+            expect((await observer.query("SELECT count(*)::int AS n FROM rebase.user_identities WHERE uid = $1", [uid])).rows[0].n).toBe(0);
+
+            // The session that asked survives the change, its refresh token too.
+            expect((await http("GET", "/api/whoami", undefined, google.json.tokens.accessToken)).status).toBe(200);
+            expect((await http("POST", "/api/auth/refresh", { refreshToken: google.json.tokens.refreshToken })).status).toBe(200);
+            expect((await http("POST", "/api/auth/confirm-email-change", { token })).json.error.code).toBe("INVALID_TOKEN");
+        });
+
+        it("lets a second account claim nothing mid-flight: one address, one account, whoever confirms first", async () => {
+            const a = await register("first");
+            const b = await register("second");
+            const contested = fresh("contested");
+            expect((await http("POST", "/api/auth/change-email", { newEmail: contested }, a.accessToken)).status).toBe(200);
+            const tokenA = changeLinkTo(contested)!;
+            expect((await http("POST", "/api/auth/change-email", { newEmail: contested }, b.accessToken)).status).toBe(200);
+            const tokenB = changeLinkTo(contested)!;
+
+            // Both links followed at once: the unique index lets one through.
+            const [first, second] = await Promise.all([
+                http("POST", "/api/auth/confirm-email-change", { token: tokenA }),
+                http("POST", "/api/auth/confirm-email-change", { token: tokenB })
+            ]);
+            expect([first.status, second.status].sort()).toEqual([200, 409]);
+            const owners = await observer.query("SELECT id FROM rebase.users WHERE lower(email) = $1", [contested]);
+            expect(owners.rows).toHaveLength(1);
+            const loser = owners.rows[0].id === a.uid ? b : a;
+            expect((await row(loser.uid)).email).toBe(loser.email);
+            // Registered unverified; the link the winner followed proved the address.
+            expect((await row(owners.rows[0].id)).email_verified).toBe(true);
+
+            // Nor can anyone register it now that it is taken.
+            expect((await http("POST", "/api/auth/register", { email: contested, password: PASSWORD })).json.error.code).toBe("EMAIL_EXISTS");
+        });
+
+        it("moves nothing when the address was registered while the link waited", async () => {
+            const mover = await register("waiting");
+            const target = fresh("target");
+            await http("POST", "/api/auth/change-email", { newEmail: target }, mover.accessToken);
+            const token = changeLinkTo(target)!;
+            expect((await http("POST", "/api/auth/register", { email: target, password: PASSWORD })).status).toBe(201);
+
+            const confirmed = await http("POST", "/api/auth/confirm-email-change", { token });
+            expect(confirmed.status).toBe(409);
+            expect(confirmed.json.error.code).toBe("EMAIL_EXISTS");
+            expect((await row(mover.uid)).email).toBe(mover.email);
+        });
+    });
+
     describe("IDENTITY-9: disabling an account", () => {
         it("refuses its sign-in, its tokens and its socket, and comes back when re-enabled", async () => {
             const member = await register("disabled");

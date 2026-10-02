@@ -12,7 +12,10 @@ export type {
     EmailVerificationTemplateFunction,
     UserInvitationTemplateFunction,
     WelcomeEmailTemplateFunction,
-    MagicLinkTemplateFunction
+    MagicLinkTemplateFunction,
+    EmailOtpTemplateFunction,
+    EmailChangeTemplateFunction,
+    EmailChangeNoticeTemplateFunction
 } from "./types";
 
 export { SMTPEmailService, createEmailService } from "./smtp-email-service";
@@ -35,7 +38,7 @@ export type { DevEmailSink, CapturedEmail } from "./dev-sink";
 export { resolveEmailLinkBase, assertEmailLinkBases } from "./link-base";
 export type { EmailLinkKind } from "./link-base";
 
-export { getPasswordResetTemplate, getEmailVerificationTemplate, getUserInvitationTemplate, getWelcomeEmailTemplate, getMagicLinkTemplate, getEmailOtpTemplate } from "./templates";
+export { getPasswordResetTemplate, getEmailVerificationTemplate, getUserInvitationTemplate, getWelcomeEmailTemplate, getMagicLinkTemplate, getEmailOtpTemplate, getEmailChangeTemplate, getEmailChangeNoticeTemplate } from "./templates";
 
 // Every auth route resolves the name and logo through this rather than reading
 // `emailConfig.appName` directly, so the "branded app never gets Rebase's mark"

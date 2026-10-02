@@ -49,6 +49,15 @@ export function createAuthSchema(usersSchemaName = "rebase") {
         tokensValidAfter: timestamp("tokens_valid_after"),
         /** When an administrator switched the account off; NULL while it is on. */
         disabledAt: timestamp("disabled_at", { withTimezone: true }),
+        /**
+         * A self-service address change waiting for its link: the address
+         * the account is moving to, the hash of the token mailed there, and
+         * when it was mailed. The address is not the account's, and is not
+         * reserved, until the link is followed.
+         */
+        pendingEmail: text("pending_email"),
+        emailChangeToken: text("email_change_token"),
+        emailChangeSentAt: timestamp("email_change_sent_at", { withTimezone: true }),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
     });

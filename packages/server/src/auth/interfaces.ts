@@ -45,6 +45,17 @@ export interface CreateUserData {
 }
 
 /**
+ * An address change waiting for its confirmation link. See
+ * {@link UserRepository.setPendingEmailChange}.
+ */
+export interface PendingEmailChange {
+    /** The address the account is moving to, normalized. */
+    email: string;
+    /** When the link was mailed; it is refused 24 hours after this. */
+    sentAt: Date;
+}
+
+/**
  * User Identity Data (OAuth accounts linked to user)
  */
 export interface UserIdentityData {
@@ -389,6 +400,40 @@ export interface UserRepository {
      * so rather than pretending.
      */
     setUserDisabled?(uid: string, disabled: boolean): Promise<void>;
+
+    // ── Self-service address change ──
+    //
+    // Optional, all four: a repository without them cannot change an address
+    // by confirmation, and `POST /auth/change-email` answers 501 rather than
+    // pretending.
+
+    /**
+     * Record the address an account is moving to and the hash of the token
+     * mailed there, stamped now — or with `null`, drop it. One per account: a
+     * new request replaces the last, and its link stops working.
+     *
+     * Nothing is reserved by it. The address stays free for anyone to
+     * register until the link is followed, because a pending change that held
+     * it would let any account lock a stranger out of signing up with their
+     * own address.
+     */
+    setPendingEmailChange?(uid: string, change: { email: string; tokenHash: string } | null): Promise<void>;
+
+    /** The account's pending change, if it has one. */
+    getPendingEmailChange?(uid: string): Promise<PendingEmailChange | null>;
+
+    /** The account whose pending change `tokenHash` confirms, with the change. */
+    findPendingEmailChange?(tokenHash: string): Promise<{ user: UserData; change: PendingEmailChange } | null>;
+
+    /**
+     * Move the account onto its pending address, in one write that holds only
+     * while `tokenHash` is still that change's token: the address becomes the
+     * account's, verified, and the pending change and any outstanding
+     * verification token are cleared. `null` when the token no longer names
+     * the change (confirmed already, replaced, cancelled). An address another
+     * account holds by then is a 409 `EMAIL_EXISTS`, as `updateUser` answers.
+     */
+    applyPendingEmailChange?(uid: string, tokenHash: string): Promise<UserData | null>;
 }
 
 /**

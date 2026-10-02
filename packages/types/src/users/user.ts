@@ -49,6 +49,14 @@ export type User = {
     readonly emailVerified?: boolean;
 
     /**
+     * The address this account is moving to, while the link mailed there is
+     * waiting to be followed (`client.auth.changeEmail`). `email` stays the
+     * account's address until then. `null` or absent when no change is
+     * waiting.
+     */
+    readonly pendingEmail?: string | null;
+
+    /**
      * Role IDs assigned to this user (e.g. `["admin", "editor"]`).
      */
     roles?: string[];

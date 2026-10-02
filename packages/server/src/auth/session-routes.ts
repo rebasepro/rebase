@@ -16,6 +16,7 @@ import { isAnonymousAuthOpen, isSteadyStateRegistrationOpen } from "./registrati
 import { revokeAllSessions } from "./token-revocation";
 import type { resolveAuthHooks } from "./auth-hooks";
 import type { CreateUserData } from "./interfaces";
+import { EMAIL_CHANGE_TTL_MS } from "./email-change-routes";
 
 interface SessionRoutesConfig {
     router: Hono<HonoEnv>;
@@ -98,6 +99,17 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const tokens = await authRepo.listRefreshTokensForUser(userCtx.uid).catch(() => []);
         const own = tokens.find(token => (token.sessionId ?? token.id) === userCtx.sid && token.method);
         return own?.method ?? "password";
+    }
+
+    /**
+     * The address the account is moving to, while its link is still live —
+     * so a settings screen opened later still says a change is waiting.
+     * `null` otherwise, and on a repository that cannot change addresses.
+     */
+    async function pendingEmail(uid: string): Promise<string | null> {
+        const change = await authRepo.getPendingEmailChange?.(uid).catch(() => null);
+        if (!change || Date.now() - change.sentAt.getTime() > EMAIL_CHANGE_TTL_MS) return null;
+        return change.email;
     }
 
     const logoutSchema = z.object({
@@ -301,6 +313,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
                 providerId: await sessionMethod(userCtx),
                 isAnonymous: result.user.isAnonymous ?? false,
                 emailVerified: result.user.emailVerified,
+                pendingEmail: await pendingEmail(userCtx.uid),
                 roles: result.roles,
                 metadata: result.user.metadata ?? {}
             }
@@ -366,6 +379,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
                 providerId: await sessionMethod(userCtx),
                 isAnonymous: result.user.isAnonymous ?? false,
                 emailVerified: result.user.emailVerified,
+                pendingEmail: await pendingEmail(userCtx.uid),
                 roles: result.roles,
                 metadata: result.user.metadata ?? {}
             }

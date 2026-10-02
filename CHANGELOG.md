@@ -233,6 +233,20 @@
   user's sessions), `client.admin.resetMfa(uid)`, and
   `POST /auth/mfa/recovery-codes` / `mfa.regenerateRecoveryCodes()`.
 - **`RealtimeSocketOptions.identityRecheckIntervalMs`** (default 30000).
+- **Users change their own email address.** `POST /auth/change-email
+  { newEmail }` mails a link to the new address and a notice to the old one;
+  `POST /auth/confirm-email-change { token }` moves the account onto the new
+  address, verified, detaches the sign-in providers that vouched for the old
+  one and keeps its sessions. The link lives 24 hours; an account with a
+  second factor asks from an `aal2` session. The address is not reserved
+  while the link waits, so whoever holds it when the link is followed keeps
+  it (`409 EMAIL_EXISTS`). SDK: `client.auth.changeEmail(newEmail)` and
+  `confirmEmailChange(token)`; `/auth/me` and `User` carry `pendingEmail`.
+  New `beforeEmailChange` hook and `email.templates.emailChange` /
+  `emailChangeNotice`. Postgres gains `users.pending_email`,
+  `email_change_token` and `email_change_sent_at`, added at boot and planned
+  by `db push`. An X account can now replace its placeholder address, which
+  also no longer receives the welcome mail.
 
 ### Changed
 

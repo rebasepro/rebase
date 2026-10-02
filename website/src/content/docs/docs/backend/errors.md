@@ -95,7 +95,7 @@ the ID you got. Read the response header.
 | `CAPTCHA_FAILED` | 400 | The provider rejected the CAPTCHA token. | Solve a fresh challenge. |
 | `CAPTCHA_REQUIRED` | 400 | The route requires a CAPTCHA token and none was sent. | Include the token. |
 | `CHALLENGE_EXHAUSTED` | 401 | Too many wrong codes against one MFA challenge. | Start a new challenge. |
-| `EMAIL_EXISTS` | 409 | An account with that address already exists. | Sign in, or start a password reset. |
+| `EMAIL_EXISTS` | 409 | An account with that address already exists — on registration, on an address change, and on following an address-change link when another account took the address while it waited. | Sign in, or start a password reset; for an address change, pick another address. |
 | `EMAIL_NOT_CONFIGURED` | 503 | Magic links or OTP were requested and the server has no mail transport. | Configure SMTP, or use another sign-in method. |
 | `EMAIL_NOT_VERIFIED` | 403 | The account exists and its address is unverified. | Verify the address. |
 | `FACTOR_NOT_VERIFIED` | 400 | The MFA factor was enrolled but never confirmed. | Confirm the factor. |
@@ -105,7 +105,7 @@ the ID you got. Read the response header.
 | `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |
 | `INVALID_CREDENTIALS` | 401 | Wrong email or password — deliberately not saying which. | Retry, or reset the password. |
 | `INVALID_SCOPES` | 400 | A key was asked for something that is not a scope: malformed, unknown, or with a target the scope does not take. `details.problems` says which and why; `details.validScopes` lists them all. | Use a name from the list. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
-| `INVALID_TOKEN` | 400 / 401 | A verification, reset or magic-link token is malformed or unknown (400). An OAuth provider credential or a refresh token that does not verify is a 401. | Request a fresh link, or sign in again. |
+| `INVALID_TOKEN` | 400 / 401 | A verification, reset, magic-link or address-change token is malformed, unknown, spent or expired (400). An OAuth provider credential or a refresh token that does not verify is a 401. | Request a fresh link, or sign in again. |
 | `KEY_MANAGEMENT_SCOPE` | 400 | A key was asked for `keys:read` or `keys:write`. No key may manage keys. `details.scopes` names them. | Leave them out. |
 | `LAST_ADMIN` | 403 | The change would leave the project with no admin. | Promote someone else first. |
 | `MFA_REQUIRED` | 401 | The password was right and the account has a verified second factor, so sign-in is only half done. `details` carries a short-lived token scoped to the MFA challenge — it is not a session. | Open a challenge and answer it; the challenge response issues the session. |
@@ -128,12 +128,14 @@ the ID you got. Read the response header.
 | `ACCOUNT_DISABLED` | 401/403 | An administrator switched the account off: sign-in (403), refresh and every token it holds (401) are refused. | Ask an administrator. |
 | `EMAIL_NOT_CONFIRMED` | 403 | `requireEmailVerification` is on and the address is not verified yet. Answered only for a correct password; a new link is mailed. | Follow the link in the mail. |
 | `PROOF_REQUIRED` | 409 | `POST /auth/verify-email`: the account holds a password or identity nobody proved, and the request proves neither. The token is not spent. | Send `password` to keep it, or `removeUnproven: true` to verify without it. |
-| `UNDELIVERABLE_ADDRESS` | 400 | A verification mail was asked for an address mail cannot reach (a guest's, or X's placeholder). | Set a real address first. |
+| `UNDELIVERABLE_ADDRESS` | 400 / 409 | A verification mail was asked for an address mail cannot reach — a guest's, or X's placeholder (400) — or an account asked to move onto such an address (409, `POST /auth/change-email`). | Set a real address first. |
+| `EMAIL_UNCHANGED` | 400 | `POST /auth/change-email` named the account's current address. | Nothing to change. |
+| `ANONYMOUS_USER` | 403 | A guest asked to change its email address; a guest has none of its own. | Make it an account first (`POST /auth/anonymous/link`). |
 | `MFA_NOT_ENROLLED` | 400 | Recovery codes were asked for an account with no verified second factor. | Enrol a factor first. |
-| `HOOK_REJECTED` | 400 | A `beforeUserCreate`, `beforeLogin` or `beforeUserDelete` hook threw. The message is the hook's; a hook that chose a 4xx status answers with it. | See the message. |
+| `HOOK_REJECTED` | 400 | A `beforeUserCreate`, `beforeLogin`, `beforeUserDelete` or `beforeEmailChange` hook threw. The message is the hook's; a hook that chose a 4xx status answers with it. | See the message. |
 | `INVALID_JSON` | 400 | The request body is not JSON. | Send a JSON body. |
 | `SELF_DISABLE` | 400 | An administrator tried to disable their own account. | Ask another administrator. |
-| `NOT_SUPPORTED` | 501 | This backend's auth repository cannot do what was asked (disable accounts). | Restart the server so the column is added, or use a repository that supports it. |
+| `NOT_SUPPORTED` | 501 | This backend's auth repository cannot do what was asked (disable accounts, change an address). | Restart the server so the column is added, or use a repository that supports it. |
 | `UNKNOWN_SCOPE_TARGET` | 400 | A scope's target names a collection, storage source or function this backend does not serve. `details` lists the ones it does. | Fix the target. |
 | `UNVERIFIED_IDENTITIES` | 409 | A magic link, email code or password reset proved an unverified account's address, and the account carries a sign-in identity whose provider never verified that address. The auth repository cannot remove it (it has no `unlinkUserIdentity`), so the proof is refused rather than leave that way in on a verified account. | Implement `unlinkUserIdentity` in the custom auth repository, or have an admin review the account. |
 | `SETUP_REQUIRED` | 403 | The project has no admin yet, so this route is not available. | Complete first-admin setup. |
