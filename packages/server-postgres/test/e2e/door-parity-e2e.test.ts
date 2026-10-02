@@ -218,7 +218,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
             const out = await definition.run(args, {
                 driver: driver as unknown as DataDriver,
                 collections: [peopleCollection, docsCollection],
-                caller: { ...USER, scope: "mcp:read mcp:write", clientId: "door-parity" }
+                caller: { ...USER, scopes: ["data:read", "data:write", "data:delete"], clientId: "door-parity" }
             });
             return { ok: true, ...(tool === "delete_document" ? {} : { row: out as Record<string, unknown> }) };
         } catch (error) {

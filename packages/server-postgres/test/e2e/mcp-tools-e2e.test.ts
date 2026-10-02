@@ -107,7 +107,7 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         return definition.run(args, {
             driver: driver as unknown as DataDriver,
             collections: [authors, posts],
-            caller: { ...USER, scope: "mcp:read mcp:write", clientId: "mcp-e2e" }
+            caller: { ...USER, scopes: ["data:read", "data:write", "data:delete"], clientId: "mcp-e2e" }
         });
     }
 
