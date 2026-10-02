@@ -159,6 +159,10 @@ export class MemoryAuthStore {
                 return user ? this.snapshot(user) : null;
             },
             getUserRoleIds: async (uid) => [...(this.roles.get(uid) ?? [])],
+            setUserDisabled: async (uid, disabled) => {
+                const user = this.users.get(uid);
+                if (user) user.disabled = disabled;
+            },
             setUserRoles: async (uid, roleIds) => {
                 this.roles.set(uid, [...roleIds]);
             },
@@ -195,8 +199,10 @@ export class MemoryAuthStore {
             },
             pruneRefreshTokens: async () => undefined,
             getAccountAccessState: async (uid, sessionId) => {
-                if (!this.users.has(uid)) return null;
+                const user = this.users.get(uid);
+                if (!user) return null;
                 return {
+                    ...(user.disabled ? { disabled: true } : {}),
                     roles: [...(this.roles.get(uid) ?? [])],
                     tokensValidAfter: this.validAfter.get(uid) ?? null,
                     ...(sessionId

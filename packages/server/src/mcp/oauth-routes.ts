@@ -120,7 +120,9 @@ export function grantIdentityFromRepository(
     if (!repo || !getUser || !getRoles) return undefined;
     return {
         async currentRoles(uid) {
-            return await getUser(uid) ? getRoles(uid) : null;
+            // Deleted or disabled: no grant acts for it any more.
+            const user = await getUser(uid);
+            return user && !user.disabled ? getRoles(uid) : null;
         },
         revocation: repo
     };

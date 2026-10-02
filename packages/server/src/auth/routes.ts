@@ -468,6 +468,11 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         // configured; this is the same read, hoisted so it happens either way.
         const sessionUser = await authRepo.getUserById(uid);
         const isAnonymous = sessionUser?.isAnonymous === true;
+        // Every door that signs somebody in comes through here, so a disabled
+        // account is refused on all of them at once.
+        if (sessionUser?.disabled) {
+            throw ApiError.forbidden("This account has been disabled. Contact an administrator.", "ACCOUNT_DISABLED");
+        }
 
         // Allow customization of access token claims via hook
         let customClaims: Record<string, unknown> | undefined;
@@ -1486,6 +1491,14 @@ message: "Verification email sent" });
             });
             return null;
         });
+
+        // A disabled account keeps no session: refresh is how a session lives
+        // past its access token, so it ends here too.
+        if (user?.disabled) {
+            await authRepo.deleteRefreshToken(tokenHash);
+            clearRefreshCookie(c, config.cookieAuth);
+            throw ApiError.unauthorized("This account has been disabled", "ACCOUNT_DISABLED");
+        }
 
         // The assurance level is a property of the sign-in, and rotation is not
         // a new sign-in — so it is read off the presented token's row and

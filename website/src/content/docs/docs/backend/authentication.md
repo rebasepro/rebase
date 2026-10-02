@@ -149,7 +149,9 @@ provider's address and `"oauth"`), `beforeUserCreate` when the sign-in creates
 the account, `afterUserCreate`, and `onAuthenticated`. `onAuthenticated` also
 fires on a token refresh (`"refresh"`), a password reset (`"password-reset"`) and
 a second factor (`"mfa"`). `beforeLogin` does not run on a refresh, which is not
-a sign-in.
+a sign-in. To stop an account that is already signed in, disable it with
+`PUT /api/admin/users/:uid { disabled: true }`: that refuses every sign-in and
+refresh and ends every session and token it holds.
 
 A hook that refuses (`beforeUserCreate`, `beforeLogin`, `beforeUserDelete`)
 throws. The caller gets `400 HOOK_REJECTED` with the error's message, or the

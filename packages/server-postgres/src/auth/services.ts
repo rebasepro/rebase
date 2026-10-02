@@ -155,6 +155,7 @@ export class UserService implements UserRepository {
         const emailVerificationToken = (row.email_verification_token ?? row.emailVerificationToken ?? null) as string | null | undefined;
         const emailVerificationSentAt = (row.email_verification_sent_at ?? row.emailVerificationSentAt ?? null) as string | number | Date | null;
         const isAnonymous = (row.is_anonymous ?? row.isAnonymous ?? false) as boolean;
+        const disabledAt = row.disabled_at ?? row.disabledAt ?? null;
         const createdAt = (row.created_at ?? row.createdAt) as string | number | Date | undefined;
         const updatedAt = (row.updated_at ?? row.updatedAt) as string | number | Date | undefined;
 
@@ -169,6 +170,8 @@ export class UserService implements UserRepository {
             "email_verification_token", "emailVerificationToken",
             "email_verification_sent_at", "emailVerificationSentAt",
             "is_anonymous", "isAnonymous",
+            "disabled_at", "disabledAt",
+            "tokens_valid_after", "tokensValidAfter",
             "roles",
             "created_at", "createdAt",
             "updated_at", "updatedAt",
@@ -192,6 +195,7 @@ export class UserService implements UserRepository {
             emailVerificationToken,
             emailVerificationSentAt: emailVerificationSentAt ? new Date(emailVerificationSentAt) : null,
             isAnonymous,
+            ...(disabledAt ? { disabled: true } : {}),
             createdAt: createdAt ? new Date(createdAt) : new Date(),
             updatedAt: updatedAt ? new Date(updatedAt) : new Date(),
             metadata
@@ -600,17 +604,56 @@ export class UserService implements UserRepository {
                 WHERE rt.uid = u.id AND rt.session_id = ${sessionId} ${revokedClause}
             )`
             : sql`NULL::boolean`;
+        const disabled = await this.hasDisabledColumn()
+            ? sql`u.disabled_at IS NOT NULL`
+            : sql`FALSE`;
         const result = await this.db.execute(sql`
-            SELECT u.roles, ${watermark} AS tokens_valid_after, ${sessionActive} AS session_active
+            SELECT u.roles, ${watermark} AS tokens_valid_after, ${sessionActive} AS session_active, ${disabled} AS disabled
             FROM ${sql.raw(usersTableName)} u WHERE u.id = ${uid}
         `);
         if (result.rows.length === 0) return null;
-        const row = result.rows[0] as { roles: string[] | null; tokens_valid_after: Date | string | null; session_active: boolean | null };
+        const row = result.rows[0] as { roles: string[] | null; tokens_valid_after: Date | string | null; session_active: boolean | null; disabled: boolean };
         return {
             roles: row.roles ?? [],
             tokensValidAfter: row.tokens_valid_after ? new Date(row.tokens_valid_after) : null,
-            ...(row.session_active === null ? {} : { sessionActive: row.session_active })
+            ...(row.session_active === null ? {} : { sessionActive: row.session_active }),
+            ...(row.disabled ? { disabled: true } : {})
         };
+    }
+
+    /**
+     * Whether the users table has `disabled_at`. `ensureAuthTablesExist` adds
+     * it to every auth table at boot, but the app's own drizzle object may
+     * predate it, so the database is asked — once — rather than the object.
+     */
+    private disabledColumn?: Promise<boolean>;
+    private hasDisabledColumn(): Promise<boolean> {
+        this.disabledColumn ??= (async () => {
+            const name = getTableName(this.usersTable);
+            const schema = getTableConfig(this.usersTable).schema || "public";
+            const result = await this.db.execute(sql`
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = ${schema} AND table_name = ${name} AND column_name = 'disabled_at'
+            `);
+            return result.rows.length > 0;
+        })().catch(() => {
+            this.disabledColumn = undefined;
+            return false;
+        });
+        return this.disabledColumn;
+    }
+
+    /** @see UserRepository.setUserDisabled */
+    async setUserDisabled(uid: string, disabled: boolean): Promise<void> {
+        if (!(await this.hasDisabledColumn())) {
+            throw new ApiError(501, "NOT_SUPPORTED", "The users table has no disabled_at column; restart the server so it is added.");
+        }
+        const usersTableName = this.getQualifiedUsersTableName();
+        await this.withServerContext(async (db) => db.execute(sql`
+            UPDATE ${sql.raw(usersTableName)}
+            SET disabled_at = ${disabled ? sql`NOW()` : sql`NULL`}, updated_at = NOW()
+            WHERE id = ${uid}
+        `));
     }
 
     /**
@@ -1285,6 +1328,10 @@ export class PostgresAuthRepository implements AuthRepository {
 
     async getAccountAccessState(uid: string, sessionId?: string): Promise<AccountAccessState | null> {
         return this.userService.getAccountAccessState(uid, sessionId);
+    }
+
+    async setUserDisabled(uid: string, disabled: boolean): Promise<void> {
+        await this.userService.setUserDisabled(uid, disabled);
     }
 
     // Token operations (delegate to PostgresTokenRepository)

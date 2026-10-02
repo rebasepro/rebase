@@ -1704,7 +1704,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 model: accessModel,
                 resolveKeyOwner: async (uid) => {
                     const user = await ownerRepo.getUserById(uid);
-                    if (!user) return null;
+                    // A disabled owner's keys stop with them.
+                    if (!user || user.disabled) return null;
                     return { roles: await ownerRepo.getUserRoleIds(uid) };
                 }
             });

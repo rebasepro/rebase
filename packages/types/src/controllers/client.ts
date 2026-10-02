@@ -151,6 +151,11 @@ export interface AdminUser {
      */
     providerId: string;
     roles: string[];
+    /**
+     * Switched off by an administrator (`PUT /admin/users/:uid { disabled }`):
+     * it signs in nowhere and the tokens it holds are refused.
+     */
+    disabled?: boolean;
     metadata?: Record<string, any>;
     createdAt: string;
     updatedAt: string;

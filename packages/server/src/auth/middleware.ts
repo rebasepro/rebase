@@ -216,10 +216,12 @@ roles: ["admin"] } as AccessTokenPayload);
                 if (revocationRepo) {
                     const verdict = await judgeAccessToken(revocationRepo, payload);
                     if (!verdict.live) {
-                        return refuse(c, ApiError.unauthorized(
-                            verdict.refusal === "account-deleted" ? "This account no longer exists" : "Session has been revoked",
-                            "SESSION_REVOKED"
-                        ));
+                        return refuse(c, verdict.refusal === "account-disabled"
+                            ? ApiError.unauthorized("This account has been disabled", "ACCOUNT_DISABLED")
+                            : ApiError.unauthorized(
+                                verdict.refusal === "account-deleted" ? "This account no longer exists" : "Session has been revoked",
+                                "SESSION_REVOKED"
+                            ));
                     }
                     judgedRoles = verdict.roles;
                 }

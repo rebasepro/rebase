@@ -63,6 +63,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             photoUrl?: string | null;
             createdAt?: Date | string;
             updatedAt?: Date | string;
+            disabled?: boolean;
         },
         roles: string[]
     ): AdminUser {
@@ -73,6 +74,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             photoURL: u.photoUrl ?? null,
             providerId: "custom",
             roles,
+            disabled: u.disabled === true,
             createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : (u.createdAt ?? new Date().toISOString()),
             updatedAt: u.updatedAt instanceof Date ? u.updatedAt.toISOString() : (u.updatedAt ?? new Date().toISOString())
         };
@@ -363,11 +365,23 @@ values: prepResult.values },
     router.put("/users/:uid", requireScope("users:write"), async (c) => {
         const uid = c.req.param("uid");
         const body = await c.req.json();
-        const { password, email, displayName, roles } = body;
+        const { password, email, displayName, roles, disabled } = body;
 
         const existing = await authRepo.getUserById(uid);
         if (!existing) {
             throw ApiError.notFound("User not found");
+        }
+        if (disabled !== undefined) {
+            if (typeof disabled !== "boolean") {
+                throw ApiError.badRequest("`disabled` must be true or false", "INVALID_INPUT");
+            }
+            const caller = c.get("user") as { uid?: string } | undefined;
+            if (disabled && caller?.uid === uid) {
+                throw ApiError.badRequest("Cannot disable your own account", "SELF_DISABLE");
+            }
+            if (typeof authRepo.setUserDisabled !== "function") {
+                throw new ApiError(501, "NOT_SUPPORTED", "This backend's auth repository cannot disable accounts.");
+            }
         }
 
         // Refused before anything is written, so a refused change does not
@@ -406,6 +420,19 @@ values: prepResult.values },
 
         if (roles !== undefined && Array.isArray(roles)) {
             await authRepo.setUserRoles(uid, roles);
+        }
+
+        // Disabling is how an administrator stops an account without deleting
+        // it: it signs in nowhere, and every session and token it holds ends
+        // now, on every door — see `judgeAccessToken`.
+        if (typeof disabled === "boolean" && authRepo.setUserDisabled) {
+            await authRepo.setUserDisabled(uid, disabled);
+            if (disabled) await revokeAllSessions(authRepo, uid);
+            logger.info("[Security Audit] Account " + (disabled ? "disabled" : "re-enabled") + " by an administrator", {
+                eventType: disabled ? "auth.account.disabled" : "auth.account.enabled",
+                uid,
+                by: (c.get("user") as { uid?: string } | undefined)?.uid
+            });
         }
 
         const result = await authRepo.getUserWithRoles(uid);

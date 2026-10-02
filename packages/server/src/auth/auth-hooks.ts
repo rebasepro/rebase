@@ -160,7 +160,8 @@ export interface AuthHooks {
      * Pre-login validation. Called before credential verification on every
      * sign-in: password (`login`), OAuth (`oauth`, with the provider's
      * address), and the requests for a magic link (`magic-link`) or an email
-     * code (`otp`). Not on a token refresh, which is not a sign-in.
+     * code (`otp`). Not on a token refresh, which is not a sign-in: to stop a
+     * signed-in account, disable it (`PUT /admin/users/:uid { disabled: true }`).
      *
      * Throw to refuse: 400 `HOOK_REJECTED` with your message, or the status
      * your error carries.

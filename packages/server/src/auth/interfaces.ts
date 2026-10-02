@@ -21,6 +21,11 @@ export interface UserData {
     emailVerificationToken?: string | null;
     emailVerificationSentAt?: Date | null;
     isAnonymous?: boolean;
+    /**
+     * An administrator switched the account off: no sign-in, no refresh, and
+     * no token it already holds is honoured. See `setUserDisabled`.
+     */
+    disabled?: boolean;
     metadata?: Record<string, unknown>;
     createdAt: Date;
     updatedAt: Date;
@@ -157,6 +162,8 @@ export interface AccountAccessState {
      * cannot tell (a refresh-token table without session grouping).
      */
     sessionActive?: boolean;
+    /** The account is switched off (`UserData.disabled`). */
+    disabled?: boolean;
 }
 
 /**
@@ -359,6 +366,14 @@ export interface UserRepository {
      * Get user with their roles
      */
     getUserWithRoles(uid: string): Promise<{ user: UserData; roles: string[] } | null>;
+
+    /**
+     * Switch an account off, or back on. Off, it cannot sign in or refresh,
+     * and the tokens it holds are refused (`judgeAccessToken`). Optional: a
+     * repository without it cannot disable accounts, and the admin route says
+     * so rather than pretending.
+     */
+    setUserDisabled?(uid: string, disabled: boolean): Promise<void>;
 }
 
 /**

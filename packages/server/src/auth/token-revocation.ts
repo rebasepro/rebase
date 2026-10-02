@@ -85,8 +85,9 @@ export type AccessJudgeRepository = Partial<Pick<AuthRepository,
  * - `session-revoked`: its own sign-in was ended — `POST /auth/logout`, or
  *   `DELETE /auth/sessions/:id` from another device. Needs the token's `sid`.
  * - `account-deleted`: the account it names no longer exists.
+ * - `account-disabled`: an administrator switched the account off.
  */
-export type AccessTokenRefusal = "revoked" | "session-revoked" | "account-deleted";
+export type AccessTokenRefusal = "revoked" | "session-revoked" | "account-deleted" | "account-disabled";
 
 export type AccessTokenVerdict =
     | {
@@ -130,6 +131,7 @@ export async function judgeAccessToken(
     if (typeof authRepo.getAccountAccessState === "function") {
         const state = await authRepo.getAccountAccessState(payload.uid, payload.sid);
         if (!state) return { live: false, refusal: "account-deleted" };
+        if (state.disabled) return { live: false, refusal: "account-disabled" };
         roles = state.roles;
         validAfter = state.tokensValidAfter;
         // Only an explicit `false`: a token minted before `sid` existed, or a
@@ -139,6 +141,7 @@ export async function judgeAccessToken(
         if (typeof authRepo.getUserWithRoles === "function") {
             const account = await authRepo.getUserWithRoles(payload.uid);
             if (!account) return { live: false, refusal: "account-deleted" };
+            if (account.user.disabled) return { live: false, refusal: "account-disabled" };
             roles = account.roles;
         }
         if (typeof authRepo.getTokensValidAfter === "function") {

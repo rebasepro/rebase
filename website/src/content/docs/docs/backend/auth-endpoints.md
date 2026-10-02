@@ -61,7 +61,7 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/users` | List users (paginated) |
 | `POST` | `/api/admin/users` | Create a user |
 | `GET` | `/api/admin/users/:uid` | Read one user |
-| `PUT` | `/api/admin/users/:uid` | Update one user |
+| `PUT` | `/api/admin/users/:uid` | Update one user. `{ disabled: true }` switches the account off without deleting it: every sign-in and refresh is refused (`ACCOUNT_DISABLED`), its sessions end and every token it holds is refused; `false` switches it back on |
 | `DELETE` | `/api/admin/users/:uid` | Delete one user. Their sessions end, and every access token they hold is refused from that request on |
 | `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one |
 | `DELETE` | `/api/admin/users/:uid/mfa` | Remove a user's second factors and recovery codes, and end their sessions — for someone who lost both |

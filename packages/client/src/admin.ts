@@ -55,7 +55,11 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         });
     }
 
-    async function updateUser(userId: string, data: { email?: string, displayName?: string, password?: string, roles?: string[] }) {
+    /**
+     * Change an account. `disabled: true` switches it off — no sign-in, no
+     * refresh, and every token it holds refused at once — without deleting it.
+     */
+    async function updateUser(userId: string, data: { email?: string, displayName?: string, password?: string, roles?: string[], disabled?: boolean }) {
         return transport.request<{ user: AdminUser }>(adminPath + "/users/" + encodeURIComponent(userId), {
             method: "PUT",
             body: JSON.stringify(data)

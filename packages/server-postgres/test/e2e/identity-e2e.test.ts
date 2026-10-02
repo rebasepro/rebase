@@ -414,6 +414,31 @@ describe("identity after the account changes (E2E)", () => {
         });
     });
 
+    describe("IDENTITY-9: disabling an account", () => {
+        it("refuses its sign-in, its tokens and its socket, and comes back when re-enabled", async () => {
+            const member = await register("disabled");
+            const { send } = await socket();
+            expect((await send("AUTHENTICATE", { token: member.accessToken })).type).toBe("AUTH_SUCCESS");
+
+            const off = await http("PUT", `/api/admin/users/${member.uid}`, { disabled: true }, adminToken);
+            expect(off.status).toBe(200);
+            expect(off.json.user.disabled).toBe(true);
+
+            expect((await http("GET", "/api/whoami", undefined, member.accessToken)).status).toBe(401);
+            expect((await http("POST", "/api/auth/login", { email: member.email, password: PASSWORD })).json.error.code).toBe("ACCOUNT_DISABLED");
+            expect((await send("FETCH_COLLECTION", { path: "notes" })).type).toBe("CLOSED");
+
+            expect((await http("PUT", `/api/admin/users/${member.uid}`, { disabled: false }, adminToken)).status).toBe(200);
+            expect((await http("POST", "/api/auth/login", { email: member.email, password: PASSWORD })).status).toBe(200);
+        });
+
+        it("is read from the column alone, whoever wrote it", async () => {
+            const member = await register("flagged");
+            await observer.query("UPDATE rebase.users SET disabled_at = NOW() WHERE id = $1", [member.uid]);
+            expect((await http("GET", "/api/whoami", undefined, member.accessToken)).status).toBe(401);
+        });
+    });
+
     describe("IDENTITY-2: deleting an account revokes its tokens", () => {
         it("keeps a token its owner revoked refused after an administrator deletes the account", async () => {
             const victim = await register("stolen");
