@@ -13,6 +13,9 @@ const React = require("react");
  * rather than a fixture.
  */
 const explicit = {
+    // Not a component: the real helper, so the console's global shortcuts
+    // decide exactly as they do in the app.
+    isKeyHandled: require("../../../ui/src/util/keys").isKeyHandled,
     Card: ({ children, ...props }) =>
         React.createElement("div", { "data-testid": "card",
 ...props }, children),
@@ -115,6 +118,13 @@ module.exports = new Proxy(explicit, {
         // own equality checks, `util.inspect`). Answering with a component
         // would be a lie.
         if (typeof key !== "string") return undefined;
+        // Only a component may be stubbed. A helper or a hook (lowercase) that
+        // fell through used to come back as a component too — a truthy
+        // function — so `if (isKeyHandled(e)) return` returned on every key and
+        // the SQL console's Cmd+Enter did nothing in these tests, silently.
+        // Undefined makes the missing entry a "not a function" error that
+        // names it; add it to `explicit` above.
+        if (!/^[A-Z]/.test(key)) return undefined;
         const Stub = ({ children }) => React.createElement("div", null, children);
         Stub.displayName = key;
         return Stub;

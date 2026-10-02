@@ -1277,7 +1277,7 @@ export const hi: RebaseTranslations = {
     studio_scope_users_read_label: "उपयोगकर्ता देखें",
     studio_scope_users_read_description: "उपयोगकर्ता खाते और उनकी भूमिकाएँ सूचीबद्ध करें।",
     studio_scope_users_write_label: "उपयोगकर्ता प्रबंधित करें",
-    studio_scope_users_write_description: "खाते बनाएँ, संपादित करें और हटाएँ, पासवर्ड रीसेट करें और धारक की अपनी भूमिकाओं तक की भूमिकाएँ दें।",
+    studio_scope_users_write_description: "खाते बनाएँ, संपादित करें और हटाएँ, पासवर्ड और दूसरे फ़ैक्टर रीसेट करें, और धारक की अपनी भूमिकाओं तक की भूमिकाएँ दें।",
     studio_scope_schema_read_label: "स्कीमा देखें",
     studio_scope_schema_read_description: "कलेक्शन स्कीमा पढ़ें, स्कीमा बदलावों की योजना बनाएँ और RLS ऑडिट चलाएँ।",
     studio_scope_schema_write_label: "स्कीमा बदलें",

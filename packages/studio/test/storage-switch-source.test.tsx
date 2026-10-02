@@ -40,9 +40,6 @@ jest.mock("@rebasepro/app", () => ({
     useSnackbarController: () => ({ open: jest.fn() }),
     useApiBase: () => "http://api.test/api",
     useApiConfig: () => ({ apiUrl: "http://api.test", getAuthToken: async () => "token" }),
-    // Through a hook, as the real one is, so a component calling its hooks in
-    // a different order between renders still fails here.
-    useTranslation: () => jest.requireActual<typeof React>("react").useMemo(() => ({ t: (key: string) => key }), []),
     ErrorView: () => null
 }));
 

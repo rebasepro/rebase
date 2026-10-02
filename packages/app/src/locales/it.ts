@@ -1277,7 +1277,7 @@ export const it: RebaseTranslations = {
     studio_scope_users_read_label: "Vedere gli utenti",
     studio_scope_users_read_description: "Elencare gli account utente e i loro ruoli.",
     studio_scope_users_write_label: "Gestire gli utenti",
-    studio_scope_users_write_description: "Creare, modificare ed eliminare account, reimpostare password e assegnare ruoli fino a quelli del titolare.",
+    studio_scope_users_write_description: "Creare, modificare ed eliminare account, reimpostare password e secondi fattori, e assegnare ruoli fino a quelli del titolare.",
     studio_scope_schema_read_label: "Vedere lo schema",
     studio_scope_schema_read_description: "Leggere lo schema delle collection, pianificare modifiche allo schema ed eseguire l'audit RLS.",
     studio_scope_schema_write_label: "Modificare lo schema",

@@ -271,7 +271,6 @@ function FilePreviewPanel({
     const FileIconComponent = getFileIcon(file.contentType);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [urlCopied, setUrlCopied] = useState(false);
-    const { t } = useTranslation();
 
     return (
         <>

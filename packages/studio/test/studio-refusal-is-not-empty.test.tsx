@@ -140,7 +140,7 @@ describe("an empty list is still empty", () => {
         render(<BackupsView/>);
 
         await waitFor(() => {
-            expect(screen.getByText(/No backups found yet/i)).toBeTruthy();
+            expect(screen.getByText(/No backups yet/i)).toBeTruthy();
         });
     });
 

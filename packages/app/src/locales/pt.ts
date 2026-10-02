@@ -1282,7 +1282,7 @@ export const pt: RebaseTranslations = {
     studio_scope_users_read_label: "Ver utilizadores",
     studio_scope_users_read_description: "Listar as contas de utilizador e os seus papéis.",
     studio_scope_users_write_label: "Gerir utilizadores",
-    studio_scope_users_write_description: "Criar, editar e eliminar contas, redefinir palavras-passe e atribuir papéis até aos do próprio titular.",
+    studio_scope_users_write_description: "Criar, editar e eliminar contas, redefinir palavras-passe e segundos fatores, e atribuir papéis até aos do próprio titular.",
     studio_scope_schema_read_label: "Ver o esquema",
     studio_scope_schema_read_description: "Ler o esquema das coleções, planear alterações ao esquema e executar a auditoria RLS.",
     studio_scope_schema_write_label: "Alterar o esquema",

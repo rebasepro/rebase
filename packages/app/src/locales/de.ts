@@ -1277,7 +1277,7 @@ export const de: RebaseTranslations = {
     studio_scope_users_read_label: "Benutzer sehen",
     studio_scope_users_read_description: "Benutzerkonten und ihre Rollen auflisten.",
     studio_scope_users_write_label: "Benutzer verwalten",
-    studio_scope_users_write_description: "Konten anlegen, bearbeiten und löschen, Passwörter zurücksetzen und Rollen bis zu den eigenen des Inhabers vergeben.",
+    studio_scope_users_write_description: "Konten anlegen, bearbeiten und löschen, Passwörter und zweite Faktoren zurücksetzen und Rollen bis zu den eigenen des Inhabers vergeben.",
     studio_scope_schema_read_label: "Schema ansehen",
     studio_scope_schema_read_description: "Das Collection-Schema lesen, Schemaänderungen planen und das RLS-Audit ausführen.",
     studio_scope_schema_write_label: "Schema ändern",
