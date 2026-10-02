@@ -474,7 +474,8 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
                 passwordHash,
                 displayName: data.displayName,
                 photoUrl: data.photoUrl,
-                metadata: data.metadata
+                metadata: data.metadata,
+                ...(data.emailVerified !== undefined ? { emailVerified: data.emailVerified } : {})
             };
             if (resolvedOps.beforeUserCreate) {
                 createData = await resolvedOps.beforeUserCreate(createData);

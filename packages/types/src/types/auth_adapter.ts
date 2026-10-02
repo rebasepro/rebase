@@ -243,6 +243,11 @@ export interface AuthCreateUserData {
     displayName?: string;
     photoUrl?: string;
     metadata?: Record<string, unknown>;
+    /**
+     * Store the address as verified: whoever creates the account named it
+     * (an operator, an administrator), so nobody needs to prove it.
+     */
+    emailVerified?: boolean;
 }
 
 /**

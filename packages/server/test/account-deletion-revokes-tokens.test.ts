@@ -165,3 +165,12 @@ describe("who reads the revocation watermark on its own", () => {
         expect(callers.sort()).toEqual(["mcp/oauth-routes.ts"]);
     });
 });
+
+describe("userManagement.createUser", () => {
+    it("stores the address verified when told to, as the seeded admin is", async () => {
+        const store = new MemoryAuthStore();
+        const adapter = createBuiltinAuthAdapter({ authRepository: store.repo(), authHooks: HOOKS });
+        const seeded = await adapter.userManagement!.createUser({ email: "ops@corp.com", password: "Passw0rd-Ops", emailVerified: true });
+        expect(store.users.get(seeded.id)?.emailVerified).toBe(true);
+    });
+});

@@ -51,7 +51,10 @@ describe("seeding the initial admin from the environment", () => {
         expect(outcome).toEqual({ status: "created", uid: "u1" });
         expect(adapter.createUser).toHaveBeenCalledWith({
             email: "ops@acme.test",
-            password: "a-long-enough-secret"
+            password: "a-long-enough-secret",
+            // The operator named the address: stored verified, so their own
+            // "Sign in with Google" links, and a magic link removes nothing.
+            emailVerified: true
         });
         expect(roles.get("u1")).toEqual(["admin"]);
     });
