@@ -132,9 +132,13 @@ RUN mkdir -p /runtime \
 #     ts-morph`, which cannot help here for the reason above — on the one
 #     deployment the docs say it works on. Exact pin, because the peer is.
 #
-# Deliberately NOT here: `@google-cloud/storage` (tenant pods cannot reach the
-# GKE metadata server, so GCS is reached over its S3-compatible API instead) and
-# `sharp` (native, and managed intake rejects native dependencies outright).
+# The optional peers deliberately NOT here. Each `not-in-image:` line is read by
+# tooling/scripts/check-runtime-provided-deps.mjs, which fails on an optional
+# peer that is neither installed above nor named below — so leaving a driver out
+# is a decision written down with its reason, never an omission nobody made:
+#
+#   not-in-image: @google-cloud/storage — tenant pods cannot reach the GKE metadata server, so GCS is reached over its S3-compatible API instead
+#   not-in-image: sharp — native, and managed intake rejects native dependencies outright
 
 # The workspace packages are copied into the runtime stage below, one by one, so
 # that only built output ships. (They are deliberately NOT copied here: a
