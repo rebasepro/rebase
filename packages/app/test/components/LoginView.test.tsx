@@ -529,7 +529,22 @@ enabledProviders: ["github"] }
 
             expect(await screen.findByText("auth_email_verified_title")).toBeInTheDocument();
             expect(mockAuthController.verifyEmail).toHaveBeenCalledTimes(1);
-            expect(mockAuthController.verifyEmail).toHaveBeenCalledWith("verify-token-1");
+            expect(mockAuthController.verifyEmail).toHaveBeenCalledWith("verify-token-1", undefined);
+        });
+
+        it("asks for the password instead of removing it when the server wants proof", async () => {
+            const proofRequired = Object.assign(new Error("proof"), { code: "PROOF_REQUIRED" });
+            mockAuthController.verifyEmail = jest.fn()
+                .mockRejectedValueOnce(proofRequired)
+                .mockResolvedValueOnce({ passwordRemoved: false, signedIn: true });
+            openLink("/verify-email?token=verify-token-2");
+
+            render(<LoginView authController={mockAuthController}/>);
+
+            expect(await screen.findByText("auth_verify_email_proof_title")).toBeInTheDocument();
+            fireEvent.click(screen.getByText("auth_verify_email_without_password"));
+            expect(await screen.findByText("auth_email_verified_title")).toBeInTheDocument();
+            expect(mockAuthController.verifyEmail).toHaveBeenLastCalledWith("verify-token-2", { removeUnproven: true });
         });
 
         it("leaves the link for the app's own address, base path kept", () => {
