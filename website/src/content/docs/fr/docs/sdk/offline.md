@@ -1,5 +1,5 @@
 ---
-sourceHash: bc546322103b4aa9
+sourceHash: 5072db38fc5777e0
 title: Hors ligne et synchronisation local-first
 sidebar_label: Hors ligne
 description: Activez le moteur de synchronisation local-first du SDK typé de Rebase — une base de données locale de lignes, des écritures hors ligne instantanées avec annulation, et des requêtes en direct réactives.

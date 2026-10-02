@@ -1,4 +1,5 @@
 ---
+sourceHash: e68d814b6b83ef41
 title: Referencia de herramientas MCP
 sidebar_label: Referencia de herramientas MCP
 description: Cada herramienta que registra el servidor MCP de Rebase, por grupo — qué necesita y hace cada una, y cuáles rechaza la barrera de loopback frente a un proyecto no local.

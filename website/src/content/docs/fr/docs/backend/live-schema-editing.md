@@ -1,5 +1,5 @@
 ---
-sourceHash: 5d7dd80d4991fd97
+sourceHash: 2efe07fee7cafe0a
 title: Édition de schéma en direct
 description: Créez et modifiez des collections sur un backend en cours d'exécution — d'abord validé dans votre dépôt, puis appliqué.
 ---

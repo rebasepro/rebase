@@ -1,5 +1,5 @@
 ---
-sourceHash: abb4fea850cf0823
+sourceHash: 8b15e7eb390a6548
 title: Endpoint e token di autenticazione
 sidebar_label: Endpoint di autenticazione
 description: Le route di autenticazione montate dal backend Rebase, la struttura delle loro risposte, l'autenticazione a più fattori, il contesto del database visibile a una policy, JWKS e chiavi di servizio.

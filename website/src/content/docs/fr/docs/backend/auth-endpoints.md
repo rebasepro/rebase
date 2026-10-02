@@ -1,5 +1,5 @@
 ---
-sourceHash: abb4fea850cf0823
+sourceHash: 8b15e7eb390a6548
 title: Endpoints d'authentification et jetons
 sidebar_label: Endpoints d'authentification
 description: Les routes d'authentification montées par le backend Rebase, le format de leurs réponses, l'authentification multifacteur, le contexte de base de données vu par une politique, JWKS et clés de service.

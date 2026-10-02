@@ -1,5 +1,5 @@
 ---
-sourceHash: 0719e3f0558c0b1a
+sourceHash: 144c4a3958537ebb
 title: Integration eines eigenen Servers
 sidebar_label: Eigener Server (Express)
 description: Wie Sie Rebase-Datenbank- und Realtime-Dienste in Ihr eigenes benutzerdefiniertes Node.js-Backend einbetten, ohne Hono oder den Rebase-Koordinator zu verwenden.

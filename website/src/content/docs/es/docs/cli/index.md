@@ -1,5 +1,5 @@
 ---
-sourceHash: cc9569d9e5b15674
+sourceHash: bf93b611a72a5f12
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de Rebase CLI para inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9ab3b04e9fddf6d4
+sourceHash: b07d5564196f8950
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, significado e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.

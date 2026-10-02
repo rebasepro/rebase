@@ -1,5 +1,5 @@
 ---
-sourceHash: 6e15a506e712f1ad
+sourceHash: c1e57d745898d1dc
 title: Runtime e Bundles
 sidebar_label: Runtime & Bundles
 description: Como um projeto Rebase se divide em um bundle de projeto e um runtime versionado, e por que essa separação torna possíveis atualizações, aplicações multi-repositório e hospedagem gerenciada.

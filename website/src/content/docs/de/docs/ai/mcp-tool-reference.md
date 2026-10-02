@@ -1,4 +1,5 @@
 ---
+sourceHash: e68d814b6b83ef41
 title: MCP-Tool-Referenz
 sidebar_label: MCP-Tool-Referenz
 description: Jedes Tool, das der Rebase-MCP-Server registriert, nach Gruppe – was jedes einzelne benötigt und tut, und welche das Loopback-Gate bei einem nicht lokalen Projekt abweist.

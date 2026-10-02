@@ -1,5 +1,5 @@
 ---
-sourceHash: abb4fea850cf0823
+sourceHash: 8b15e7eb390a6548
 title: Endpoints de autenticação e tokens
 sidebar_label: Endpoints de autenticação
 description: As rotas de autenticação que o backend do Rebase disponibiliza, seus formatos de resposta, autenticação multifator, o contexto de banco de dados que uma política visualiza, JWKS e chaves de serviço.

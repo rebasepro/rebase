@@ -1,5 +1,5 @@
 ---
-sourceHash: 3f722457adc3d8f9
+sourceHash: 8f5d12b8af667778
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.

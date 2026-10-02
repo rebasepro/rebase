@@ -1,5 +1,5 @@
 ---
-sourceHash: 65087c49b7985cc7
+sourceHash: ce3b9ea649b09037
 title: Consultar relaciones
 sidebar_label: Relaciones
 description: "Incluye entidades relacionadas en una consulta y lee una colección secundaria a través de su elemento principal con los accesores de relaciones del SDK."

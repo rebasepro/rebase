@@ -1,5 +1,5 @@
 ---
-sourceHash: b39d5a790d94c656
+sourceHash: 250ff63e7148cd0e
 title: Cron-Jobs
 sidebar_label: Cron-Jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.

@@ -1,4 +1,5 @@
 ---
+sourceHash: 922c44ae945d9509
 title: Vérification de l'e-mail
 sidebar_label: Vérification de l'e-mail
 description: "Comment un compte prouve son adresse e-mail : le lien envoyé à l'inscription, ce qu'en le suivant on conserve et on retire, et l'inscription à confirmation préalable avec requireEmailVerification."

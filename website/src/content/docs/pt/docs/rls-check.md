@@ -1,5 +1,5 @@
 ---
-sourceHash: 2239bbe27163e9dc
+sourceHash: f5376e9a832e32a2
 slug: pt/docs/rls-check
 title: rls-check
 description: Audite a segurança em nível de linha (RLS) em qualquer banco de dados PostgreSQL — Supabase, Neon, RDS ou seu próprio servidor. Somente leitura, sem cadastro, sem necessidade de Rebase.

@@ -1,5 +1,5 @@
 ---
-sourceHash: fe0da2499f512a69
+sourceHash: e89814d78c29b234
 title: Rollen und Scopes
 sidebar_label: Rollen und Scopes
 description: "Was ein Aufrufer darf: die Datenebene, die jede Person hält, die Admin-Ebene, die Rollen gewähren, die Scopes, die eine App für sich selbst deklariert, und wie jedes Credential sie trägt."

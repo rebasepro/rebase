@@ -1,4 +1,5 @@
 ---
+sourceHash: e68d814b6b83ef41
 title: Riferimento dei tool MCP
 sidebar_label: Riferimento dei tool MCP
 description: Ogni tool registrato dal server MCP di Rebase, per gruppo — cosa richiede e cosa fa ciascuno, e quali vengono rifiutati dal loopback gate se rivolti a un progetto non locale.

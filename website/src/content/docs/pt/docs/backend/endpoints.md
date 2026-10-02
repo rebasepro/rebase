@@ -1,5 +1,5 @@
 ---
-sourceHash: 3f722457adc3d8f9
+sourceHash: 8f5d12b8af667778
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada rota HTTP montada por um backend Rebase — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso (gate) de cada uma e a página que a explica.

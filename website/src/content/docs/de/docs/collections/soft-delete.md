@@ -1,5 +1,5 @@
 ---
-sourceHash: 31c7cc059687a1af
+sourceHash: 461a5f0e0c5ecec5
 title: Soft Delete
 sidebar_label: Soft Delete
 description: Verwandeln Sie Löschvorgänge in einen Zeitstempel, blenden Sie mit Zeitstempel versehene Zeilen bei jedem Lesezugriff aus und stellen Sie sie mit einer normalen Aktualisierung wieder her.

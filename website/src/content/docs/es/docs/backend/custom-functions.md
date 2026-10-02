@@ -1,5 +1,5 @@
 ---
-sourceHash: ec641aaae29499e9
+sourceHash: c1895420d8eb9878
 title: Funciones personalizadas
 sidebar_label: Funciones personalizadas
 description: Añade endpoints de API de Hono personalizados junto a tus rutas CRUD de Rebase. Detección automática desde un directorio, con acceso completo a la instancia del backend.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5b2338b3fe2dd725
+sourceHash: 1c417068b657af16
 title: Realtime-Abonnements
 sidebar_label: Realtime
 description: Abonnieren Sie Live-Datenänderungen mit dem typisierten SDK von Rebase über WebSocket-basierte Realtime-Listener.

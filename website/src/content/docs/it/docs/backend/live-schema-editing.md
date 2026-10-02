@@ -1,5 +1,5 @@
 ---
-sourceHash: 5d7dd80d4991fd97
+sourceHash: 2efe07fee7cafe0a
 title: Modifica dello schema live
 description: "Crea e modifica collection a fronte di un backend in esecuzione: prima committate nel repository, poi applicate."
 ---

@@ -1,4 +1,5 @@
 ---
+sourceHash: 922c44ae945d9509
 title: Verifica email
 sidebar_label: Verifica email
 description: "Come un account dimostra il proprio indirizzo email: il link inviato alla registrazione, cosa mantiene e rimuove seguirlo, e la registrazione confirm-first con requireEmailVerification."

@@ -1,5 +1,5 @@
 ---
-sourceHash: 4c3ab79cfd150295
+sourceHash: 419a1d3fedba3c2d
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Echtzeit-Datensynchronisierung, Broadcast-Kanäle und Presence-Tracking über WebSocket.

@@ -1,5 +1,5 @@
 ---
-sourceHash: c6ba76446950def7
+sourceHash: 719f802a23cf78ec
 title: Schema als Code
 sidebar_label: Schema als Code
 description: Wie Rebase TypeScript-Sammlungen als einzige Quelle der Wahrheit für Ihr Datenbankschema, Ihre Benutzeroberfläche und Ihre API verwendet.

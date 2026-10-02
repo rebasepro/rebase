@@ -1,5 +1,5 @@
 ---
-sourceHash: 31c7cc059687a1af
+sourceHash: 461a5f0e0c5ecec5
 title: Soft delete
 sidebar_label: Soft delete
 description: Transforme a exclusão em um timestamp, oculte linhas marcadas de todas as leituras e restaure-as com uma atualização comum.

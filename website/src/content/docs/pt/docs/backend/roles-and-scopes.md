@@ -1,5 +1,5 @@
 ---
-sourceHash: fe0da2499f512a69
+sourceHash: e89814d78c29b234
 title: Papéis e escopos
 sidebar_label: Papéis e escopos
 description: "O que um chamador pode fazer: o plano de dados que toda pessoa tem, o plano administrativo que os papéis concedem, os escopos que um app declara para si mesmo e como cada credencial os carrega."

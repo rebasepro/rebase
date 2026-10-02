@@ -1,4 +1,5 @@
 ---
+sourceHash: 922c44ae945d9509
 title: Verificação de e-mail
 sidebar_label: Verificação de e-mail
 description: "Como uma conta comprova seu endereço de e-mail: o link enviado no registro, o que segui-lo mantém e remove, e o registro confirm-first com requireEmailVerification."

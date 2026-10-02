@@ -1,5 +1,5 @@
 ---
-sourceHash: 08f462e8a9e1a008
+sourceHash: 13c002a75ecd9ce1
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Autenticazione lato client con l'SDK di Rebase — accesso con email/password, provider OAuth, gestione delle sessioni e listener dello stato di autenticazione.

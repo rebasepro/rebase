@@ -1,5 +1,5 @@
 ---
-sourceHash: 3685f91c615fb127
+sourceHash: 6dea8dc014a1c282
 title: Daten abfragen
 sidebar_label: Daten abfragen
 description: CRUD-Operationen, Fluent Query Builder, Filteroperatoren, Sortierung, Spaltenauswahl und Aggregate mit dem typisierten SDK von Rebase.

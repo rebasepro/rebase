@@ -1,4 +1,5 @@
 ---
+sourceHash: 922c44ae945d9509
 title: E-Mail-Verifizierung
 sidebar_label: E-Mail-Verifizierung
 description: "Wie ein Konto seine E-Mail-Adresse nachweist: der bei der Registrierung versendete Link, was das Folgen behält und entfernt, und Registrierung mit vorheriger Bestätigung über requireEmailVerification."

@@ -1,4 +1,5 @@
 ---
+sourceHash: 922c44ae945d9509
 title: Verificación de correo electrónico
 sidebar_label: Verificación de correo electrónico
 description: "Cómo una cuenta demuestra su dirección de correo electrónico: el enlace que se envía al registrarse, lo que seguirlo conserva y elimina, y el registro con confirmación previa con requireEmailVerification."

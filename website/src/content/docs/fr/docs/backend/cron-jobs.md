@@ -1,5 +1,5 @@
 ---
-sourceHash: b39d5a790d94c656
+sourceHash: 250ff63e7148cd0e
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.

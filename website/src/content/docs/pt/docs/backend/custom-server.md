@@ -1,5 +1,5 @@
 ---
-sourceHash: 0719e3f0558c0b1a
+sourceHash: 144c4a3958537ebb
 title: Integração com Servidor Customizado
 sidebar_label: Servidor Customizado (Express)
 description: Como incorporar os serviços de Banco de Dados e Realtime do Rebase em seu próprio backend Node.js customizado sem usar o Hono ou o coordenador do Rebase.

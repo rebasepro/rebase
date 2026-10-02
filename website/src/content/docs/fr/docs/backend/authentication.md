@@ -1,5 +1,5 @@
 ---
-sourceHash: 2a2328d2d6223346
+sourceHash: c7a020bdf4f333b9
 title: Authentification
 sidebar_label: Authentification
 description: Configurez l'authentification JWT, les fournisseurs OAuth, les e-mails SMTP, la protection contre les bots et la collection d'utilisateurs sur le backend Rebase.

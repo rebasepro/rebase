@@ -1,5 +1,5 @@
 ---
-sourceHash: 3f722457adc3d8f9
+sourceHash: 8f5d12b8af667778
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Ogni route HTTP montata da un backend Rebase — data, auth, storage, admin, meta — con il relativo gate e la pagina che la descrive.

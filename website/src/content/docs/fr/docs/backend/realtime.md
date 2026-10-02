@@ -1,5 +1,5 @@
 ---
-sourceHash: 4c3ab79cfd150295
+sourceHash: 419a1d3fedba3c2d
 title: Temps réel & WebSocket
 sidebar_label: Temps réel
 description: Synchronisation des données en temps réel, canaux de diffusion et suivi de présence via WebSocket.

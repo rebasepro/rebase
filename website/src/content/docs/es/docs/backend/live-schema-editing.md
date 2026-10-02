@@ -1,5 +1,5 @@
 ---
-sourceHash: 5d7dd80d4991fd97
+sourceHash: 2efe07fee7cafe0a
 title: Edición de esquemas en vivo
 description: "Crea y modifica colecciones en un backend en ejecución: primero se confirman en tu repositorio y luego se aplican."
 ---

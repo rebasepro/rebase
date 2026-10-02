@@ -1,5 +1,5 @@
 ---
-sourceHash: 0719e3f0558c0b1a
+sourceHash: 144c4a3958537ebb
 title: Integrazione Server Personalizzato
 sidebar_label: Server Personalizzato (Express)
 description: Come integrare i servizi Rebase Database e Realtime nel tuo backend Node.js personalizzato senza utilizzare Hono o il coordinator di Rebase.

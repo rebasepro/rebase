@@ -1,5 +1,5 @@
 ---
-sourceHash: 3685f91c615fb127
+sourceHash: 6dea8dc014a1c282
 title: Consulta de datos
 sidebar_label: Consulta de datos
 description: Operaciones CRUD, constructor de consultas fluido, operadores de filtro, ordenación, selección de columnas y agregaciones con el SDK tipado de Rebase.

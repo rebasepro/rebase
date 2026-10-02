@@ -1,5 +1,5 @@
 ---
-sourceHash: 3f722457adc3d8f9
+sourceHash: 8f5d12b8af667778
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.

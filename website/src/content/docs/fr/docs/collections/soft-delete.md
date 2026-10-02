@@ -1,5 +1,5 @@
 ---
-sourceHash: 31c7cc059687a1af
+sourceHash: 461a5f0e0c5ecec5
 title: Soft delete
 sidebar_label: Soft delete
 description: Transformez la suppression en horodatage, masquez les lignes marquées de chaque lecture et restaurez-les avec une simple mise à jour.

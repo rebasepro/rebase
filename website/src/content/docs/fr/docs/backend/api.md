@@ -1,5 +1,5 @@
 ---
-sourceHash: 494cc48e060fb2f1
+sourceHash: a8bf9ad448b91c03
 title: API REST
 sidebar_label: API REST
 description: Points de terminaison d'API REST générés automatiquement pour chaque collection, avec filtrage, tri, pagination et inclusion de relations.

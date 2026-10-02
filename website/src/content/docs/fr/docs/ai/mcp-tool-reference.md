@@ -1,4 +1,5 @@
 ---
+sourceHash: e68d814b6b83ef41
 title: Référence des outils MCP
 sidebar_label: Référence des outils MCP
 description: Chaque outil que le serveur MCP Rebase enregistre, par groupe — ce dont chacun a besoin, ce qu'il fait, et ceux que le verrou loopback refuse sur un projet non local.

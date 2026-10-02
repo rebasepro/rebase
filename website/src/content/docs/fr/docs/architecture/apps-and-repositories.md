@@ -1,5 +1,5 @@
 ---
-sourceHash: 2b5f4b5b83a711a3
+sourceHash: 8186aa37929028e4
 title: Applications et dépôts
 sidebar_label: Apps & dépôts
 description: Un projet est un backend accompagné des applications qui communiquent avec lui, chacune pouvant résider dans son propre dépôt.

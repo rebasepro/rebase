@@ -1,5 +1,5 @@
 ---
-sourceHash: 5b2338b3fe2dd725
+sourceHash: 1c417068b657af16
 title: Sottoscrizioni Realtime
 sidebar_label: Realtime
 description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato di Rebase utilizzando listener realtime basati su WebSocket.
