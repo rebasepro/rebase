@@ -300,6 +300,18 @@
 - The CMS verifies a verification link opened while signed in; it rendered a
   not-found page.
 
+#### Runtime
+
+- **Google sign-in works on the managed runtime.** The image did not ship
+  `google-auth-library`, which the server loads to verify a Google ID token.
+  Every One Tap or rendered-button sign-in failed, and so did every
+  authorization-code sign-in, the admin's included, because Google returns an
+  ID token with the code. The server logged "google-auth-library is required
+  for Google OAuth", and the user saw "Invalid google credentials". Only the
+  access-token flow worked. Adding the package to a project did not help: the
+  server resolves its imports from the image, never from the bundle. The image
+  now installs it.
+
 ### Security
 
 #### Auth
