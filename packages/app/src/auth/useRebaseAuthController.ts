@@ -155,17 +155,17 @@ export function useRebaseAuthController(
     // The scopes the signed-in user holds, read again whenever who that is, or
     // which roles they have, changes. A screen offers an admin action only to
     // those its route admits; `undefined` — not yet known — admits nobody.
-    const apiKeys = client?.apiKeys;
+    const scopeListing = client?.personalKeys;
     const signedInAs = user ? `${user.uid}|${(user.roles ?? []).join(",")}` : undefined;
     useEffect(() => {
         setHeldScopes(undefined);
-        if (!signedInAs || !apiKeys) return;
+        if (!signedInAs || !scopeListing) return;
         let current = true;
-        apiKeys.listScopes()
+        scopeListing.listScopes()
             .then(({ held }) => { if (current) setHeldScopes(held); })
             .catch((e: unknown) => console.warn("[Rebase] Could not read the scopes this user holds.", e));
         return () => { current = false; };
-    }, [signedInAs, apiKeys]);
+    }, [signedInAs, scopeListing]);
 
     const getAuthToken = useCallback(async (): Promise<string> => {
         if (!auth) throw new Error("Rebase client with auth is required");

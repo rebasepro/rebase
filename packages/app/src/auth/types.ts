@@ -152,7 +152,7 @@ export interface RebaseAuthControllerProps {
         ws?: { setAuthTokenGetter: (getter: () => Promise<string | null>) => void };
         auth?: ClientAuth;
         /** Read for the scopes the signed-in user holds (`GET /auth/scopes`). */
-        apiKeys?: { listScopes(): Promise<{ held: string[] }> };
+        personalKeys?: { listScopes(): Promise<{ held: string[] }> };
     };
     /** Google OAuth client ID (optional, enables Google login) */
     googleClientId?: string;

@@ -523,7 +523,7 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
                 return jest.fn();
             });
             const listScopes = jest.fn().mockResolvedValue({ scopes: [], held: ["users:read", "users:write"] });
-            const client = { ...mockClient, apiKeys: { listScopes } };
+            const client = { ...mockClient, personalKeys: { listScopes } };
 
             const { result } = renderHook(() => useRebaseAuthController({ client }));
             const settle = () => act(async () => {
