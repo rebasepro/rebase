@@ -88,6 +88,27 @@ describe("the direct-database reset", () => {
         expect(state.spawned[0].env.DATABASE_URL).toBe("postgresql://postgres@127.0.0.1:54329/managed");
     });
 
+    it("does not go round a backend that refused the reset — a weak password stays refused", async () => {
+        process.env.REBASE_BASE_URL = "http://127.0.0.1:1";
+        process.env.REBASE_SERVICE_KEY = "service-key-that-is-long-enough-0123456789";
+        const errors: string[] = [];
+        vi.spyOn(console, "error").mockImplementation((line: unknown) => { errors.push(String(line)); });
+        vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const fetchMock = vi.fn(async (url: string) => String(url).includes("/reset-password")
+            ? new Response("{\"error\":{\"message\":\"Password too weak\"}}", { status: 400 })
+            : new Response(JSON.stringify({ users: [{ uid: "u1", email: "admin@example.com" }] }), { status: 200 }));
+        vi.stubGlobal("fetch", fetchMock);
+        try {
+            await authCommand("reset-password", ["node", "rebase", "auth", "reset-password", "admin@example.com", "short"]);
+        } finally {
+            vi.unstubAllGlobals();
+            process.exitCode = undefined;
+        }
+
+        expect(state.spawned).toHaveLength(0);
+        expect(errors.join("\n")).toContain("Password too weak");
+    });
+
     it("exits non-zero when the update fails, rather than printing a stack and exiting 0", () => {
         // The generated script, run for real against stand-ins for its four
         // imports whose update rejects the way a refused connection does.

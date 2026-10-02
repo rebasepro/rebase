@@ -19,6 +19,9 @@ import {
 } from "../utils/project";
 import { unknownCommand } from "../utils/unknown-command";
 
+/** The backend was reached and refused: not a reason to fall back to the database. */
+class ApiAnswered extends Error {}
+
 /** Everything the switch below dispatches, for the did-you-mean. */
 export const AUTH_SUBCOMMANDS = ["reset-password"] as const;
 import { parseCommandArgs, wantsHelp } from "../utils/args";
@@ -234,7 +237,7 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
                 }
             });
             if (!searchRes.ok) {
-                throw new Error(`Failed to list users: ${searchRes.statusText}`);
+                throw new ApiAnswered(`Failed to list users: ${searchRes.status} ${searchRes.statusText}`);
             }
             const searchData = await searchRes.json() as unknown;
             if (!searchData || typeof searchData !== "object") {
@@ -243,7 +246,7 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
 
             const matched = selectUserForEmail(searchData, email);
             if (!matched) {
-                throw new Error(`No user has the email ${email}.`);
+                throw new ApiAnswered(`No user has the email ${email}.`);
             }
 
             const resetUrl = `${cleanBaseUrl}/api/admin/users/${matched.id}/reset-password`;
@@ -259,7 +262,7 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
 
             if (!resetRes.ok) {
                 const errText = await resetRes.text();
-                throw new Error(`Password reset endpoint failed: ${errText || resetRes.statusText}`);
+                throw new ApiAnswered(`Password reset endpoint failed: ${errText || resetRes.statusText}`);
             }
 
             console.log("API reset successful.");
@@ -275,6 +278,16 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
             return;
         } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
+            // The backend answered and said no — a password too weak, a user
+            // it does not have. That answer stands: writing the hash straight
+            // into the database instead skipped the strength rule it had just
+            // applied, and ended no sessions. Only a backend that could not be
+            // reached is a reason to go round it.
+            if (err instanceof ApiAnswered) {
+                console.error(chalk.red(`✗ ${errMsg}`));
+                process.exitCode = 1;
+                return;
+            }
             console.warn(chalk.yellow("API reset failed, falling back to direct database update..."));
             console.warn(chalk.gray(`  Details: ${errMsg}`));
         }
@@ -380,7 +393,9 @@ import fs from "fs";
 
 dotenv.config({ path: process.env.REBASE_ENV_FILE_PATH, quiet: true });
 
-const email = process.env.REBASE_RESET_EMAIL!;
+// Lowercased, as every address is stored (\`normalizeEmail\`): matched as
+// typed, "Ops@Acme.test" found no row.
+const email = process.env.REBASE_RESET_EMAIL!.trim().toLowerCase();
 const newPassword = process.env.REBASE_RESET_PASSWORD!;
 
 async function resetPassword() {
