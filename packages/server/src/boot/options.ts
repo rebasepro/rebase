@@ -154,6 +154,7 @@ export function resolveAuthOptions(
         emailOtp: env.AUTH_EMAIL_OTP,
         requireEmailVerification: env.AUTH_REQUIRE_EMAIL_VERIFICATION,
         refreshTokenReuse: env.AUTH_REFRESH_TOKEN_REUSE,
+        magicLinkCreatesUsers: env.AUTH_MAGIC_LINK_CREATES_USERS,
         email: resolveEmailOptions(env),
         // Cookie auth keeps the refresh token in an httpOnly cookie rather than
         // localStorage, putting it out of reach of XSS. Enabling it costs a

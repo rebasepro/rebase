@@ -404,6 +404,16 @@ export interface RebaseAuthConfig {
      * in again. Set by `AUTH_REFRESH_TOKEN_REUSE`; anything else fails the boot.
      */
     refreshTokenReuse?: "reject" | "revoke-session";
+    /**
+     * Let a magic-link or email-code request for an address with no account
+     * create one — passwordless sign-up — while registration is open
+     * (`allowRegistration`, not `disableSelfRegistration`). The account has no
+     * password and is unverified until the link or code is used, which proves
+     * the address and signs it in. Off by default, so those requests answer an
+     * unknown address the same as a known one and create nothing. Set by
+     * `AUTH_MAGIC_LINK_CREATES_USERS`.
+     */
+    magicLinkCreatesUsers?: boolean;
 }
 
 /** @see RebaseBackendConfig.baas */
@@ -1916,7 +1926,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 cookieAuth: safeAuthConfig.cookieAuth,
                 requireEmailVerification: safeAuthConfig.requireEmailVerification ?? false,
                 refreshTokenReuseIntervalSeconds: safeAuthConfig.refreshTokenReuseIntervalSeconds,
-                refreshTokenReuse: safeAuthConfig.refreshTokenReuse
+                refreshTokenReuse: safeAuthConfig.refreshTokenReuse,
+                magicLinkCreatesUsers: safeAuthConfig.magicLinkCreatesUsers ?? false
             });
 
             // A requirement nobody can meet is a backend nobody can sign in

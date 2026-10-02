@@ -145,6 +145,7 @@ answers.
 | `REBASE_RATE_LIMIT_STORE` | Where auth rate-limit counters live: `memory` (per-process) or `sql` (shared across replicas). A process cannot see its own replica count, so a deployment with peers has to say so — three replicas on the default enforce three times the limit. Any other value **refuses to boot** rather than falling back, `postgres` included. | `memory` |
 | `AUTH_MAGIC_LINK` | Mount the passwordless sign-in-link flow. Needs an email service configured, or the link has nowhere to go. | `false` |
 | `AUTH_EMAIL_OTP` | Mount passwordless sign-in with a six-digit code sent by email. Same email requirement as above. | `false` |
+| `AUTH_MAGIC_LINK_CREATES_USERS` | Passwordless sign-up: a magic-link or email-code request for an unknown address creates the account, while registration is open. | `false` |
 | `AUTH_REFRESH_TOKEN_REUSE` | What a refresh token replayed after its reuse window does: `reject` (refuse it, keep the session) or `revoke-session` (end the sign-in). Anything else fails the boot. | `reject` |
 | `AUTH_REQUIRE_EMAIL_VERIFICATION` | Confirm-first registration: no password sign-in until the address is verified. Needs email; the boot refuses it without. | `false` |
 | `CAPTCHA_PROVIDER` | Turn on captcha verification on the auth routes: `turnstile` or `hcaptcha`. Unset means no captcha. | — |

@@ -45,6 +45,7 @@ import { randomInt } from "../utils/portable-crypto";
 import { z } from "zod";
 
 import type { AuthModuleConfig } from "./routes";
+import { accountForPasswordlessRequest } from "./passwordless-signup";
 import type { ResolvedAuthHooks } from "./auth-hooks";
 import type { HonoEnv } from "../api/types";
 import { ApiError } from "../api/errors";
@@ -251,8 +252,6 @@ export function mountOtpRoutes(deps: {
             );
         }
 
-        const user = await authRepo.getUserByEmail(email);
-
         // Fired for every attempt, not only the ones that name a real account.
         //
         // This hook is where a deployment blocks or audits sign-in attempts,
@@ -264,6 +263,9 @@ export function mountOtpRoutes(deps: {
         if (ops.beforeLogin) {
             await ops.beforeLogin(email, "otp");
         }
+
+        // With `magicLinkCreatesUsers`, an unknown address gets its account here.
+        const user = await accountForPasswordlessRequest(config, ops, email);
 
         if (user) {
             const code = generateOtpCode();

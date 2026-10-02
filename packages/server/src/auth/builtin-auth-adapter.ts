@@ -107,6 +107,8 @@ export interface BuiltinAuthAdapterConfig {
     refreshTokenReuseIntervalSeconds?: number;
     /** What a refresh token replayed after that window does to its session. Default `"reject"`. */
     refreshTokenReuse?: import("./routes").RefreshTokenReusePolicy;
+    /** A magic-link or email-code request for an unknown address creates its account, while registration is open. */
+    magicLinkCreatesUsers?: boolean;
 }
 
 /**
@@ -137,7 +139,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         cookieAuth,
         requireEmailVerification = false,
         refreshTokenReuseIntervalSeconds,
-        refreshTokenReuse
+        refreshTokenReuse,
+        magicLinkCreatesUsers = false
     } = config;
 
     const resolvedOps = resolveAuthHooks(authHooks);
@@ -319,7 +322,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 captcha,
                 requireEmailVerification,
                 refreshTokenReuseIntervalSeconds,
-                refreshTokenReuse
+                refreshTokenReuse,
+                magicLinkCreatesUsers
             });
         },
 

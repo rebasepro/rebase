@@ -122,6 +122,12 @@ export interface AuthModuleConfig {
      */
     refreshTokenReuseIntervalSeconds?: number;
     /**
+     * Let a magic-link or email-code request for an address with no account
+     * create one (no password, unverified until the link or code is used),
+     * while registration is open. Off by default. See `passwordless-signup.ts`.
+     */
+    magicLinkCreatesUsers?: boolean;
+    /**
      * What a refresh token presented after its reuse window does to its
      * session. See `RebaseAuthConfig.refreshTokenReuse`. Default `"reject"`.
      */

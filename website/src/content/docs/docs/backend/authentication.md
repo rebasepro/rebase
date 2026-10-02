@@ -98,6 +98,7 @@ const backend = await initializeRebaseBackend({
 | `email` | `EmailConfig` | — | SMTP, for password reset, verification, invitations and magic links |
 | `magicLink` | `boolean` | `false` | Enable passwordless email sign-in. Needs `email` configured; without it the routes answer `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Enable six-digit sign-in codes by email — see [One-time codes](#one-time-codes-by-email). Same email requirement |
+| `magicLinkCreatesUsers` | `boolean` | `false` | Passwordless sign-up: a magic-link or email-code request for an address with no account creates one (no password, unverified until the link or code is used), while `allowRegistration` is on. Runs `beforeUserCreate` and the default role. Off, those requests create nothing and answer an unknown address as they answer a known one. `AUTH_MAGIC_LINK_CREATES_USERS` |
 | `requireEmailVerification` | `boolean` | `false` | Refuse password sign-in until the address is verified, and register confirm-first — see [Email verification](#email-verification). Needs `email`; the boot refuses it without |
 | `cookieAuth` | `CookieAuthConfig` | — | Deliver the refresh token as an `httpOnly` `Secure` `SameSite` cookie instead of in the JSON body — see below |
 | `providers` | `OAuthProvider[]` | `[]` | The canonical OAuth array; the named provider fields resolve into it |
