@@ -91,7 +91,7 @@ const backend = await initializeRebaseBackend({
 | `requireAuth` | `boolean` | `true` | Require a session for the data API |
 | `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
-| `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts |
+| `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts. Turning a guest into an account (`POST /api/auth/anonymous/link`) is registration, and needs `allowRegistration` too |
 | `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` for invite-by-email flows |
 | `defaultRole` | `string` | — | Role given to a newly registered user when none is specified. It may not be `admin`, or a declared role that holds an admin-plane scope: the boot refuses both |
 | `serviceKey` | `string` | — | Static key for server-to-server calls — see [Service Key Authentication](/docs/backend/auth-endpoints/#service-key-authentication) |

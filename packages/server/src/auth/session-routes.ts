@@ -12,7 +12,7 @@ import { hashRefreshToken } from "./jwt";
 import type { AuthModuleConfig } from "./routes";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import { readRefreshToken, clearRefreshCookie, redactRefreshToken } from "./cookie-utils";
-import { isAnonymousAuthOpen } from "./registration-policy";
+import { isAnonymousAuthOpen, isSteadyStateRegistrationOpen } from "./registration-policy";
 import { revokeAllSessions } from "./token-revocation";
 import type { resolveAuthHooks } from "./auth-hooks";
 import type { CreateUserData } from "./interfaces";
@@ -435,12 +435,24 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * an account that passed neither.
      */
     router.post("/anonymous/link", strictAuthLimiter, requireLiveSession, ...(registerCaptcha ? [registerCaptcha] : []), async (c) => {
-        // Gated on the same predicate as `/anonymous`, not on registration: this
-        // route cannot create an account, only put credentials on one that
-        // `/anonymous` already made. If anonymous auth is off, any session
-        // reaching here predates the switch, and letting it finish would be a
-        // second way to reach the state the switch exists to prevent.
+        // Gated on the same predicate as `/anonymous`: if anonymous auth is
+        // off, any session reaching here predates the switch, and letting it
+        // finish would be a second way to reach the state the switch exists to
+        // prevent.
         assertAnonymousAuthOpen();
+        // And on registration's, because this is registration: the guest
+        // becomes an account that signs in with a password. Gated on anonymous
+        // auth alone, a backend with registration closed still made password
+        // accounts for anyone — sign in as a guest, then link.
+        if (!isSteadyStateRegistrationOpen({
+            disableSelfRegistration: config.disableSelfRegistration,
+            allowRegistration: config.allowRegistration ?? false
+        })) {
+            throw ApiError.forbidden(
+                "A guest cannot become an account here: registration is disabled on this backend.",
+                "REGISTRATION_DISABLED"
+            );
+        }
 
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {

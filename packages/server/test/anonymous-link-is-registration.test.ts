@@ -45,14 +45,14 @@ const HOOKS: AuthHooks = {
 
 beforeAll(() => configureJwt({ secret: "anonymous-link-registration-secret-32-chars!!", accessExpiresIn: "1h" }));
 
-function world() {
+function world(allowRegistration = true) {
     const store = new MemoryAuthStore();
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.route("/auth", createAuthRoutes({
         authRepo: store.repo(),
         authHooks: HOOKS,
-        allowRegistration: true,
+        allowRegistration,
         allowAnonymous: true,
         captcha: { enabled: true, verify: verifyCaptcha, routes: ["register"] }
     }));
@@ -72,6 +72,23 @@ function world() {
 }
 
 describe("POST /auth/anonymous/link is registration", () => {
+    it("is refused while registration is closed, guests or no guests", async () => {
+        const { store, post } = world(false);
+        // A user exists, so the empty-table exception does not apply.
+        await store.repo().createUser({ email: "existing@corp.com" });
+        const guestRes = await post("/anonymous");
+        expect(guestRes.status).toBe(201);
+        const { tokens } = await guestRes.json() as { tokens: { accessToken: string } };
+
+        const res = await post("/anonymous/link", { email: "upgraded@corp.com", password: "Passw0rd-Guest", captchaToken: "solved" }, {
+            Authorization: `Bearer ${tokens.accessToken}`
+        });
+
+        expect(res.status).toBe(403);
+        expect((await res.json() as { error: { code: string } }).error.code).toBe("REGISTRATION_DISABLED");
+        expect([...store.users.values()].some(u => u.email === "upgraded@corp.com")).toBe(false);
+    });
+
     it("asks for the register challenge, which the guest sign-in before it does not", async () => {
         const { store, post, guest } = world();
         const { uid, auth } = await guest();
