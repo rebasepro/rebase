@@ -682,6 +682,9 @@ export const de: RebaseTranslations = {
     auth_email_change_failed_title: "E-Mail-Adresse nicht geändert",
     auth_email_change_continue: "Weiter",
     auth_email_change_unavailable: "Das Ändern der E-Mail-Adresse ist in diesem Backend nicht verfügbar.",
+    auth_signing_in_with_link: "Du wirst angemeldet…",
+    auth_magic_link_failed_title: "Anmeldelink nicht angenommen",
+    auth_magic_link_unavailable: "Anmeldelinks sind in diesem Backend nicht verfügbar.",
 
 
     auto_setup_collections_button: "Sammlungen automatisch einrichten",

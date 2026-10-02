@@ -201,6 +201,10 @@
 
 #### Admin (CMS & app)
 
+- **The CMS signs in from a magic link.** `<frontend>/auth/magic-link?token=…`
+  opened the sign-in screen and dropped the token; it now signs in, through the
+  code step on an account with a second factor, and opens the app at its own
+  address. A visitor already signed in is sent on without spending the link.
 - **Account settings change the email address.** The Profile tab has an email
   field: it mails the confirmation link and says which address is waiting.
   The link opens its own step on the sign-in screen, signed in or not, and

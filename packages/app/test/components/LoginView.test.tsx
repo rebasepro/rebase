@@ -1,7 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { LoginView } from "../../src/components/LoginView/LoginView";
-import { appAddressOfEmailLink } from "../../src/components/LoginView/email-link";
+import { appAddressOfEmailLink, readEmailLinkAction } from "../../src/components/LoginView/email-link";
 import "@testing-library/jest-dom";
 
 // Polyfill TextEncoder/TextDecoder for JSDOM
@@ -568,6 +568,47 @@ enabledProviders: ["github"] }
 
             expect(await screen.findByText("auth_email_change_failed_title")).toBeInTheDocument();
             expect(screen.getByText("email_change_taken")).toBeInTheDocument();
+        });
+
+        it("signs in with the token from a magic link", async () => {
+            mockAuthController.magicLinkLogin = jest.fn().mockResolvedValue(undefined);
+            openLink("/admin/auth/magic-link?token=magic-token-1");
+
+            render(<LoginView authController={mockAuthController}/>);
+
+            expect(await screen.findByText("auth_signing_in_with_link")).toBeInTheDocument();
+            expect(mockAuthController.magicLinkLogin).toHaveBeenCalledTimes(1);
+            expect(mockAuthController.magicLinkLogin).toHaveBeenCalledWith("magic-token-1");
+        });
+
+        it("says a spent magic link is spent, and offers the sign-in screen", async () => {
+            mockAuthController.magicLinkLogin = jest.fn().mockRejectedValue(
+                Object.assign(new Error("Invalid or expired magic link"), { code: "INVALID_TOKEN" }));
+            openLink("/auth/magic-link?token=spent");
+
+            render(<LoginView authController={mockAuthController}/>);
+
+            expect(await screen.findByText("auth_magic_link_failed_title")).toBeInTheDocument();
+            expect(screen.getByText("auth_link_invalid_or_expired")).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: "auth_continue_to_sign_in" })).toBeInTheDocument();
+        });
+
+        it("spends no magic link for a visitor already signed in", async () => {
+            mockAuthController.magicLinkLogin = jest.fn().mockResolvedValue(undefined);
+            mockAuthController.user = { uid: "u1" };
+            openLink("/auth/magic-link?token=unused");
+
+            render(<LoginView authController={mockAuthController}/>);
+            await act(async () => undefined);
+
+            expect(mockAuthController.magicLinkLogin).not.toHaveBeenCalled();
+        });
+
+        it("reads a magic link only under /auth", () => {
+            expect(readEmailLinkAction({ pathname: "/admin/auth/magic-link", search: "?token=t" })).toEqual({ kind: "magic-link", token: "t" });
+            expect(readEmailLinkAction({ pathname: "/magic-link", search: "?token=t" })).toBeNull();
+            expect(appAddressOfEmailLink({ origin: "https://example.com", pathname: "/admin/auth/magic-link" }))
+                .toBe("https://example.com/admin/");
         });
 
         it("leaves the link for the app's own address, base path kept", () => {

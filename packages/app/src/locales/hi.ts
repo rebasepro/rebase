@@ -682,6 +682,9 @@ export const hi: RebaseTranslations = {
     auth_email_change_failed_title: "ईमेल पता नहीं बदला",
     auth_email_change_continue: "जारी रखें",
     auth_email_change_unavailable: "इस बैकएंड पर ईमेल पता बदलना उपलब्ध नहीं है।",
+    auth_signing_in_with_link: "आपको साइन इन किया जा रहा है…",
+    auth_magic_link_failed_title: "साइन-इन लिंक स्वीकार नहीं हुआ",
+    auth_magic_link_unavailable: "इस बैकएंड पर साइन-इन लिंक उपलब्ध नहीं हैं।",
 
 
     auto_setup_collections_button: "संग्रहों को स्वचालित रूप से सेट करें",

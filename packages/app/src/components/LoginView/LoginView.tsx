@@ -169,7 +169,7 @@ export interface LoginViewProps {
     onNewsletterOptIn?: (email: string) => void;
 }
 
-type AuthMode = "buttons" | "login" | "register" | "forgot" | "reset-password" | "verify-email" | "confirm-email-change";
+type AuthMode = "buttons" | "login" | "register" | "forgot" | "reset-password" | "verify-email" | "confirm-email-change" | "magic-link";
 
 /**
  * The shared field background mixin (`dark:bg-black/30`) is invisible on the
@@ -297,6 +297,15 @@ export function LoginView({
         setProviderError(null);
         setPendingMfa(pending);
     }, [authController.authProviderError, authController.user, mfaAnswerable]);
+
+    // A magic link has done its job once somebody is signed in: by its own
+    // token, by the code step after it, or before it was ever opened. The app
+    // starts at its own address, not at the link's — and an already signed-in
+    // visitor does not spend the link at all.
+    const signedIn = Boolean(authController.user);
+    useEffect(() => {
+        if (emailLink?.kind === "magic-link" && signedIn) leaveEmailLink();
+    }, [emailLink, signedIn]);
 
     // The controller as of the latest render. A provider callback resolves long
     // after the click that started it, and the `authController` captured in that
@@ -681,6 +690,15 @@ export function LoginView({
                             {/* Opened from a verification email */}
                             {mode === "verify-email" && emailLink?.kind === "verify-email" && (
                                 <VerifyEmailView
+                                    token={emailLink.token}
+                                    authController={authController}
+                                    onDone={leaveEmailLink}
+                                />
+                            )}
+
+                            {/* Opened from a magic link */}
+                            {mode === "magic-link" && emailLink?.kind === "magic-link" && !signedIn && (
+                                <MagicLinkView
                                     token={emailLink.token}
                                     authController={authController}
                                     onDone={leaveEmailLink}
@@ -1703,6 +1721,66 @@ function VerifyEmailView({
                     </>
                 )}
 
+            <Button onClick={onDone} variant="filled" color="primary" size="large" className="w-full">
+                {t("auth_continue_to_sign_in")}
+            </Button>
+        </div>
+    );
+}
+
+/**
+ * The step a magic link opens: it signs in with the link's token as soon as the
+ * screen loads. Success is not shown here — the user is signed in, and the
+ * view leaves for the app's address. A second factor takes over the screen
+ * the way it does after any sign-in, because the controller records the
+ * refusal where the code step reads it.
+ */
+function MagicLinkView({
+    token,
+    authController,
+    onDone
+}: {
+    token: string,
+    authController: AuthControllerExtended,
+    onDone: () => void
+}) {
+    const { t } = useTranslation();
+    const [error, setError] = useState<string | null>(null);
+    // Once per token: a magic link is single use, and a second request would
+    // find it spent and say so over a sign-in that worked.
+    const requestedRef = useRef(false);
+
+    useEffect(() => {
+        if (requestedRef.current) return;
+        requestedRef.current = true;
+        if (!authController.magicLinkLogin) {
+            setError(t("auth_magic_link_unavailable"));
+            return;
+        }
+        authController.magicLinkLogin(token).catch((err: unknown) => {
+            // The code step answers this one; it is not a failure.
+            if (err instanceof Error && "code" in err && err.code === "MFA_REQUIRED") return;
+            setError(emailLinkErrorMessage(err, t));
+        });
+    }, [authController, token, t]);
+
+    if (!error) {
+        return (
+            <div className="flex flex-col items-center w-full gap-4 mt-6 mb-4">
+                <CircularProgress size="small"/>
+                <Typography variant="body2" color="secondary">
+                    {t("auth_signing_in_with_link")}
+                </Typography>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col w-full gap-4 mt-2">
+            <Typography variant="h6" className="mb-0.5">
+                {t("auth_magic_link_failed_title")}
+            </Typography>
+            <ErrorView error={error}/>
             <Button onClick={onDone} variant="filled" color="primary" size="large" className="w-full">
                 {t("auth_continue_to_sign_in")}
             </Button>

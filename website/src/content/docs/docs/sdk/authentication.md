@@ -109,8 +109,10 @@ A one-click sign-in link by email. The link is always
 `<base>/auth/magic-link?token=…`, where `<base>` is the backend's `email.magicLinkUrl`,
 or its reset-password base (`FRONTEND_URL` on the runtime) when that is not set.
 There is no per-request `redirectTo`. Serve that path in your frontend, and hand
-the token back to trade it for a session. The CMS does not handle this path: an
-app that enables magic links needs its own landing page for it.
+the token back to trade it for a session. <span class="since-badge" data-since="0.24">Since 0.24</span> The CMS serves it: the link signs in
+(through the code step on an account with a second factor) and opens the app at
+its own address, and a visitor already signed in is sent on without spending the
+link. Any other frontend needs its own landing page for it.
 
 ```typescript
 // 1. Ask for the link.

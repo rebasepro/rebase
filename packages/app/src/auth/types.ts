@@ -47,6 +47,8 @@ export type RebaseAuthController = AuthController & {
      * `removeUnproven` to verify without it.
      */
     verifyEmail: (token: string, options?: { password?: string; removeUnproven?: boolean }) => Promise<{ passwordRemoved: boolean; signedIn: boolean }>;
+    /** Sign in with a magic link's token. Absent when the client cannot. */
+    magicLinkLogin?: (token: string) => Promise<void>;
     /** Change password for authenticated user */
     changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
     /** Ask to move the signed-in account to another address. Absent when the client cannot. */
@@ -100,6 +102,8 @@ export interface ClientAuth {
     /** Optional so a hand-built auth client need not implement it. */
     verifyEmail?(token: string, options?: { password?: string; removeUnproven?: boolean }): Promise<unknown>;
     changePassword(oldPassword: string, newPassword: string): Promise<unknown>;
+    /** Optional so a hand-built auth client need not implement it. */
+    verifyMagicLink?(token: string): Promise<unknown>;
     /** Optional so a hand-built auth client need not implement it. */
     changeEmail?(newEmail: string): Promise<{ pendingEmail: string; expiresAt: string }>;
     /** Optional so a hand-built auth client need not implement it. */

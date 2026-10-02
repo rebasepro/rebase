@@ -764,6 +764,9 @@ export interface RebaseTranslations {
     auth_email_change_failed_title?: string;
     auth_email_change_continue?: string;
     auth_email_change_unavailable?: string;
+    auth_signing_in_with_link?: string;
+    auth_magic_link_failed_title?: string;
+    auth_magic_link_unavailable?: string;
 
     auto_setup_collections_button: string;
     auto_setup_collections_title: string;

@@ -498,6 +498,29 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
             expect(result.current.authLoading).toBe(false);
         });
 
+        it("signs in with a magic link's token, and records a refusal where the login view reads it", async () => {
+            const mfaRequired = Object.assign(new Error("MFA required"), { code: "MFA_REQUIRED" });
+            mockAuth.verifyMagicLink = jest.fn().mockRejectedValueOnce(mfaRequired).mockResolvedValueOnce(undefined);
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => {
+                await expect(result.current.magicLinkLogin!("link-token")).rejects.toBe(mfaRequired);
+            });
+            expect(mockAuth.verifyMagicLink).toHaveBeenCalledWith("link-token");
+            expect(result.current.authProviderError).toBe(mfaRequired);
+
+            await act(async () => {
+                await result.current.magicLinkLogin!("link-token-2");
+            });
+            expect(result.current.authProviderError).toBeNull();
+        });
+
+        it("offers no magic-link sign-in when the client has none", () => {
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+            expect(result.current.magicLinkLogin).toBeUndefined();
+        });
+
         it("should set authProviderError when signOut fails", async () => {
             mockAuth.signOut.mockRejectedValue(new Error("network error"));
 

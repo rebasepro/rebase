@@ -341,6 +341,26 @@ export function useRebaseAuthController(
         }
     }, [auth]);
 
+    /**
+     * Sign in with a magic link's token. The SDK adopts the session and emits
+     * SIGNED_IN; a refusal lands in `authProviderError` like every other
+     * sign-in's, which is how an `MFA_REQUIRED` reaches the code step.
+     */
+    const magicLinkLogin = useCallback(async (token: string) => {
+        if (!auth?.verifyMagicLink) throw new Error("Rebase client with magic links is required");
+        setAuthLoading(true);
+        setAuthProviderError(null);
+        try {
+            await auth.verifyMagicLink(token);
+        } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            setAuthProviderError(err);
+            throw error;
+        } finally {
+            setAuthLoading(false);
+        }
+    }, [auth]);
+
     const changeEmail = useCallback(async (newEmail: string) => {
         if (!auth?.changeEmail) throw new Error("Rebase client with email change is required");
         return await auth.changeEmail(newEmail);
@@ -407,6 +427,7 @@ export function useRebaseAuthController(
         // Offered only when the client can, so the settings view and the
         // link's screen can tell a missing feature from a failed request.
         changeEmail: auth?.changeEmail ? changeEmail : undefined,
+        magicLinkLogin: auth?.verifyMagicLink ? magicLinkLogin : undefined,
         confirmEmailChange: auth?.confirmEmailChange ? confirmEmailChange : undefined,
         updateProfile,
         fetchSessions,

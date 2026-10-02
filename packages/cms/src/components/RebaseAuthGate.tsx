@@ -36,10 +36,13 @@ export function RebaseAuthGate({ children }: { children: React.ReactNode }) {
     // A verification link opened while signed in is verified by the session
     // itself — which keeps everything on the account — on the screen that
     // knows the link, and an address-change link is usually followed in the
-    // tab that asked for the change. Left to the app's router either was a
-    // page that does not exist, so the link went unfollowed.
+    // tab that asked for the change. A magic link opened while signed in is
+    // sent on to the app by that screen, without being spent. Left to the
+    // app's router each was a page that does not exist.
     const openedLink = typeof window !== "undefined" ? readEmailLinkAction(window.location)?.kind : undefined;
-    const linkOpensOverSession = openedLink === "verify-email" || openedLink === "confirm-email-change";
+    const linkOpensOverSession = openedLink === "verify-email"
+        || openedLink === "confirm-email-change"
+        || openedLink === "magic-link";
 
     if (!authController?.user || linkOpensOverSession) {
         const ActiveLoginView = registry.authConfig?.loginView ?? (

@@ -140,6 +140,12 @@ export interface AuthControllerExtended<USER extends User = User, ExtraData = un
      * verify without it.
      */
     verifyEmail?(token: string, options?: { password?: string; removeUnproven?: boolean }): Promise<{ passwordRemoved?: boolean; signedIn?: boolean } | void>;
+    /**
+     * Sign in with the token from a magic link
+     * (`<frontend>/auth/magic-link?token=…`). A refusal — `MFA_REQUIRED`
+     * among them — is recorded in `authProviderError`, as every sign-in's is.
+     */
+    magicLinkLogin?(token: string): Promise<void>;
     /** Change password for the authenticated user */
     changePassword?(oldPassword: string, newPassword: string): Promise<void>;
     /**

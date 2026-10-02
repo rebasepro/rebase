@@ -146,6 +146,25 @@ describe("React Components Tests", () => {
             }
         });
 
+        test("opens the login view for a magic link while signed in, which sends the visitor on to the app", () => {
+            (useAuthController as any).mockReturnValue({
+                initialLoading: false,
+                user: { uid: "user-123" }
+            });
+            (useRebaseRegistry as any).mockReturnValue({});
+            window.history.replaceState(null, "", "/admin/auth/magic-link?token=t-1");
+            try {
+                render(
+                    <RebaseAuthGate>
+                        <div data-testid="child">Authenticated Child</div>
+                    </RebaseAuthGate>
+                );
+                expect(screen.getByTestId("login-view")).toBeTruthy();
+            } finally {
+                window.history.replaceState(null, "", "/");
+            }
+        });
+
         test("should render children when user is authenticated", () => {
             (useAuthController as any).mockReturnValue({
                 initialLoading: false,
