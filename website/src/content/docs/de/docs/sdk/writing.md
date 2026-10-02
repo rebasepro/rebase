@@ -145,8 +145,9 @@ Update herabgestuft wird, anstatt einen Fehler zu werfen.
 
 Von einem Browser auf einem anderen Origin aus — ein Vite-Frontend auf eigenem Port, ein
 `app.`-Host, der einen `api.`-Host aufruft — ist das `ETag` nur lesbar, weil der Server es in
-`Access-Control-Expose-Headers` benennt. Die Rebase-Runtime tut dies, zusammen mit
-`Retry-After`, `X-Request-ID`, den `X-RateLimit-*`-Headern und `Preference-Applied`. Ein
+`Access-Control-Expose-Headers` benennt. <span class="since-badge" data-since="0.24">Seit 0.24</span> Die Rebase-Runtime tut dies, zusammen mit
+`Retry-After`, `X-Request-ID`, den `X-RateLimit-*`-Headern und `Preference-Applied`; unter 0.23
+legt sie keinen davon frei, sodass `etagOf` dort cross-origin immer `undefined` ist. Ein
 Backend, das sein eigenes `cors()` verdrahtet, muss dieselbe Liste freigeben, sonst ist
 `etagOf` dort immer `undefined`, und jeder bedingte Schreibvorgang geht unbedingt hinaus.
 
@@ -279,10 +280,12 @@ result.meta;  // { operations: 4 }
 
 `op` ist `create`, `update`, `upsert` oder `delete`, und `collection` schränkt `values` auf den
 generierten `Insert`- oder `Update`-Typ dieser Kollektion ein — eine Spalte, die die Kollektion
-nicht hat, ist ein Compile-Fehler, ebenso ein Create, dem eine erforderliche fehlt. `collection`
+nicht hat, ist ein Compile-Fehler, ebenso ein Create, dem eine erforderliche fehlt. <span class="since-badge" data-since="0.24">Seit 0.24</span> `collection`
 ist der Accessor, der Name, den `client.data.<accessor>` annimmt (`orderItems` für den Slug
 `order_items`); der Client sendet den Slug, über das `collections`-Dictionary, mit dem er
-erstellt wurde. Jede Operation durchläuft die gleiche Pipeline wie ihr Einzelzeilen-Äquivalent –
+erstellt wurde. Unter 0.23 sendet ein typisierter Batch den Accessor wie geschrieben, sodass eine
+snake_case-Kollektion darüber nicht erreichbar ist und eine falsch geschriebene Spalte kein
+Compile-Fehler ist. Jede Operation durchläuft die gleiche Pipeline wie ihr Einzelzeilen-Äquivalent –
 dieselbe Validierung, dieselben Callbacks und dieselbe Row-Level Security, als derselbe Benutzer.
 
 ### `$ref`

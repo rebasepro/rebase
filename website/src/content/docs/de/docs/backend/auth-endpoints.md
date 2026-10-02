@@ -17,26 +17,29 @@ Alle Auth-Endpunkte sind unter `/api/auth/` eingebunden:
 | `POST` | `/api/auth/login` | Anmelden mit E-Mail/Passwort |
 | `POST` | `/api/auth/refresh` | Access-Token aktualisieren |
 | `POST` | `/api/auth/<provider>` | OAuth-Anmeldung (z. B. `/api/auth/google`, `/api/auth/linkedin`) |
-| `POST` | `/api/auth/link/<provider>` | OAuth-Anbieter mit dem authentifizierten Konto verknüpfen |
+| `POST` | `/api/auth/link/<provider>` | OAuth-Anbieter mit dem authentifizierten Konto verknüpfen. Bei einem Gast ist dies eine Registrierung: Sie braucht `allowRegistration`, übernimmt die Adresse des Providers, wenn dieser für sie bürgt, und antwortet mit einer Sitzung für das Konto, zu dem der Gast wurde |
 | `POST` | `/api/auth/logout` | Refresh-Token widerrufen |
 | `POST` | `/api/auth/forgot-password` | E-Mail zum Zurücksetzen des Passworts senden |
 | `POST` | `/api/auth/reset-password` | Passwort mit Token zurücksetzen |
 | `POST` | `/api/auth/find-user` | E-Mail-Adresse zu einem minimalen öffentlichen Profil auflösen (Opt-in — `AUTH_ALLOW_USER_LOOKUP`) |
-| `POST` | `/api/auth/change-password` | Eigenes Passwort des Aufrufers ändern (authentifiziert) |
+| `POST` | `/api/auth/change-password` | Eigenes Passwort des Aufrufers ändern (authentifiziert). Beendet jede andere Sitzung und antwortet mit einer neuen für den Aufrufer |
 | `GET` | `/api/auth/me` | Eigenes Profil des Aufrufers |
 | `PATCH` | `/api/auth/me` | Eigenes Profil des Aufrufers aktualisieren |
+| `POST` | `/api/auth/change-email` | `{ newEmail }`: verschiebt das eigene Konto des Aufrufers auf eine andere Adresse. Sendet einen Link an die neue Adresse und einen Hinweis an die alte; nichts ändert sich, bis der Link angeklickt wird. Braucht `aal2` bei einem Konto mit einem zweiten Faktor. `409 EMAIL_EXISTS` oder `UNDELIVERABLE_ADDRESS`, `400 EMAIL_UNCHANGED`, `403 ANONYMOUS_USER` für einen Gast — siehe [E-Mail-Adresse ändern](#e-mail-adresse-ändern) |
+| `POST` | `/api/auth/confirm-email-change` | `{ token }` aus dem Link. Keine Sitzung nötig. Verschiebt das Konto auf die neue Adresse, verifiziert; `400 INVALID_TOKEN` für einen verbrauchten, ersetzten oder abgelaufenen Link, `409 EMAIL_EXISTS`, wenn die Adresse vergeben wurde, während er wartete |
 | `GET` | `/api/auth/config` | Was dieses Backend einem Anmeldebildschirm anbietet – `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Unauthentifiziert und basierend auf denselben Prädikaten berechnet, die die Routen erzwingen, sodass das, was der Bildschirm anzeigt, nicht von den tatsächlichen Möglichkeiten abweichen kann |
 | `POST` | `/api/auth/send-verification` | Dem Aufrufer einen Link zur E-Mail-Verifizierung senden |
-| `GET` | `/api/auth/verify-email` | Verifizierungslink einlösen (die URL in dieser E-Mail) |
+| `GET` | `/api/auth/verify-email` | Verifizierungslink einlösen (die URL in dieser E-Mail). Behält, was eine aktive Sitzung des Kontos beweist, und entfernt, was niemand bewiesen hat — siehe [E-Mail-Verifizierung](/docs/backend/email-verification/) |
+| `POST` | `/api/auth/verify-email` | Dasselbe mit `{ token, password?, removeUnproven? }`: Das Passwort behält sie und meldet an; fehlt beides, antwortet ein Konto, das eine solche hält, mit `409 PROOF_REQUIRED` |
 | `POST` | `/api/auth/magic-link` | Einmaligen Anmeldelink per E-Mail senden. `503 EMAIL_NOT_CONFIGURED` ohne SMTP |
 | `POST` | `/api/auth/magic-link/verify` | Magic-Link-Token gegen eine Sitzung eintauschen |
 | `POST` | `/api/auth/otp` | Sechsstelligen Anmeldecode per E-Mail senden. Antwortet unabhängig davon gleich, ob für die Adresse ein Konto existiert |
 | `POST` | `/api/auth/otp/verify` | `{ email, code }` gegen eine Sitzung eintauschen |
 | `POST` | `/api/auth/anonymous` | Anonyme Sitzung erstellen (Opt-in — `ALLOW_ANONYMOUS`) |
 | `POST` | `/api/auth/anonymous/link` | Reale Anmeldedaten mit dem bereits angemeldeten anonymen Konto verknüpfen |
-| `GET` | `/api/auth/sessions` | Aktive Sitzungen (Refresh-Tokens) des Aufrufers auflisten |
+| `GET` | `/api/auth/sessions` | Aktive Sitzungen des Aufrufers auflisten, eine pro Anmeldung. Die eigene Sitzung des Aufrufers ist mit `isCurrentSession` markiert |
 | `DELETE` | `/api/auth/sessions` | Jede Sitzung widerrufen, einschließlich dieser – Remote-Abmeldung auf jedem Gerät |
-| `DELETE` | `/api/auth/sessions/:id` | Eine Sitzung widerrufen |
+| `DELETE` | `/api/auth/sessions/:id` | Eine Sitzung widerrufen: ihr Refresh-Token und das Access-Token, das dieses Gerät hält |
 | `GET` | `/api/auth/scopes` | Jeder [Scope](/docs/backend/roles-and-scopes/), den dieses Backend kennt, und die, die der Aufrufer hält |
 | `GET` | `/api/auth/keys` | Die eigenen [persönlichen API-Schlüssel](/docs/backend/api-keys/#personal-keys) des Aufrufers |
 | `POST` | `/api/auth/keys` | Einen persönlichen Schlüssel erstellen. `403 PERSONAL_KEYS_DISABLED`, außer die Users-Collection setzt `auth.personalKeys` |
@@ -48,6 +51,7 @@ Alle Auth-Endpunkte sind unter `/api/auth/` eingebunden:
 | `POST` | `/api/auth/mfa/challenge` | Challenge für einen verifizierten Faktor eröffnen |
 | `POST` | `/api/auth/mfa/challenge/verify` | Challenge beantworten – dies stellt die Sitzung aus |
 | `DELETE` | `/api/auth/mfa/unenroll` | Faktor entfernen (erfordert eine `aal2`-Sitzung) |
+| `POST` | `/api/auth/mfa/recovery-codes` | Die Wiederherstellungscodes des Aufrufers durch zehn neue ersetzen (erfordert eine `aal2`-Sitzung) |
 
 Die administrative Benutzer- und Rollenverwaltung ist eine **separate Schnittstelle**, die unter `/api/admin/` statt `/api/auth/` eingebunden ist. Lesen braucht den Scope `users:read`, Ändern braucht `users:write`. Ein Admin und der Service-Schlüssel halten beide; ebenso eine Rolle, die sie deklariert. Niemand darf ein Konto ändern, das mehr hält als er selbst. Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/).
 
@@ -56,9 +60,10 @@ Die administrative Benutzer- und Rollenverwaltung ist eine **separate Schnittste
 | `GET` | `/api/admin/users` | Benutzer auflisten (paginiert) |
 | `POST` | `/api/admin/users` | Benutzer erstellen |
 | `GET` | `/api/admin/users/:uid` | Einzelnen Benutzer abrufen |
-| `PUT` | `/api/admin/users/:uid` | Einzelnen Benutzer aktualisieren |
-| `DELETE` | `/api/admin/users/:uid` | Einzelnen Benutzer löschen |
-| `POST` | `/api/admin/users/:uid/reset-password` | Passwort eines Benutzers ohne dessen aktuelles Passwort zurücksetzen |
+| `PUT` | `/api/admin/users/:uid` | Einzelnen Benutzer aktualisieren. `{ disabled: true }` schaltet das Konto ab, ohne es zu löschen: Jede Anmeldung und jedes Refresh wird abgelehnt (`ACCOUNT_DISABLED`), seine Sitzungen enden und jedes Token, das es hält, wird abgelehnt; `false` schaltet es wieder ein |
+| `DELETE` | `/api/admin/users/:uid` | Einzelnen Benutzer löschen. Seine Sitzungen enden, und jedes Access-Token, das er hält, wird ab dieser Anfrage abgelehnt |
+| `POST` | `/api/admin/users/:uid/reset-password` | Passwort eines Benutzers ohne dessen aktuelles Passwort zurücksetzen. `rebase auth reset-password` ruft diese Route auf und schreibt nur direkt in die Datenbank, wenn das Backend nicht erreichbar ist; in beiden Fällen enden die Sitzungen des Kontos |
+| `DELETE` | `/api/admin/users/:uid/mfa` | Die zweiten Faktoren und Wiederherstellungscodes eines Benutzers entfernen und seine Sitzungen beenden — für jemanden, der beide verloren hat |
 | `GET` | `/api/admin/roles` | `admin` und die Rollen, die die Users-Collection deklariert, mit ihren Scopes |
 | `POST` | `/api/admin/bootstrap` | Dem am frühesten registrierten Benutzer erlauben, die Administratorrolle zu beanspruchen, solange keine existiert. In der Produktion abgelehnt – siehe [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
@@ -94,10 +99,15 @@ Jeder Endpunkt, der eine Sitzung ausstellt, antwortet mit demselben Envelope –
 Senden Sie das Access-Token als `Authorization: Bearer <accessToken>` zurück.
 `accessTokenExpiresAt` sind Millisekunden seit der Unix-Epoche.
 
-`POST /api/auth/refresh` antwortet mit demselben Envelope, mit zwei Besonderheiten: `user`
-wird vollständig weggelassen, wenn das Konto nicht erneut gelesen werden kann, behandeln Sie es dort
-also als optional; und `providerId` ist immer `password`, unabhängig davon, wie die Sitzung
-ursprünglich erstellt wurde.
+`POST /api/auth/refresh` antwortet mit demselben Envelope, außer dass `user`
+vollständig weggelassen wird, wenn das Konto nicht erneut gelesen werden kann – behandeln Sie es dort
+also als optional.
+
+`providerId` gibt an, wie die Sitzung angemeldet wurde: `password`, `anonymous`,
+`magic-link`, `otp`, `mfa` (eine Anmeldung, die mit einem zweiten Faktor abgeschlossen wurde)
+oder die ID des Providers, etwa `google`. Es wird bei der Anmeldung mit der Sitzung gespeichert,
+sodass `refresh` und `GET /api/auth/me` dieselbe Antwort liefern, solange die Sitzung
+besteht. Eine vor 0.24 angemeldete Sitzung liest `password`.
 
 :::caution[Das typisierte SDK flacht diesen Envelope ab – reines HTTP nicht]
 Das obige JSON ist das Übertragungsformat (Wire Format) und entspricht dem, was `fetch("/api/auth/login")`
@@ -111,6 +121,36 @@ Beide Strukturen sind real; sie gehören zu zwei verschiedenen Schichten. Das Le
 aus einem einfachen `fetch` ergibt `undefined`, was sich als „Anmeldung erfolgreich, aber kein
 Access-Token vorhanden“ bemerkbar macht – die Anmeldung war in Ordnung, das Token befand sich lediglich eine Ebene tiefer.
 :::
+
+### E-Mail-Adresse ändern
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Ein angemeldeter Benutzer
+verschiebt sein eigenes Konto in zwei Schritten auf eine andere Adresse:
+
+1. `POST /api/auth/change-email { newEmail }` zeichnet die Änderung auf und sendet
+   einen Link, `<frontend>/confirm-email-change?token=…`, an die neue Adresse sowie
+   einen Hinweis ohne Link an die aktuelle. Der Link ist 24 Stunden gültig, und eine
+   neue Anfrage ersetzt die letzte. `GET /api/auth/me` meldet die wartende Adresse
+   als `pendingEmail`.
+2. `POST /api/auth/confirm-email-change { token }` verschiebt das Konto: Die neue
+   Adresse wird zu seiner Adresse, verifiziert. Jede OAuth-Identität, deren Provider
+   für die alte Adresse gebürgt hat, wird getrennt (`removedProviders` nennt sie),
+   denn wer die alte Adresse kontrolliert, könnte sich sonst weiterhin darüber
+   anmelden, und jeder an die alte Adresse gesendete Reset-Link funktioniert nicht
+   mehr. Sitzungen bleiben erhalten.
+
+Die neue Adresse wird nicht reserviert, während der Link wartet: Sie zu reservieren
+würde es jedem Konto erlauben, einen Fremden davon abzuhalten, sich mit seiner
+eigenen Adresse zu registrieren. Hat ein anderes Konto die Adresse bereits, wenn
+der Link angeklickt wird, antwortet der Link mit `409 EMAIL_EXISTS` und nichts wird
+verschoben; fragen zwei Konten dieselbe Adresse an, bekommt sie, wer zuerst seinem
+Link folgt. Der `beforeEmailChange`-Hook kann eine Adresse ablehnen, genau wie
+`beforeUserCreate` es bei der Registrierung tut.
+
+Im CMS wird die Adresse unter **Kontoeinstellungen → Profil** geändert, und der
+Link öffnet den eigenen Bildschirm des CMS, angemeldet oder nicht. Ein anderes
+Frontend stellt eine Seite unter `/confirm-email-change` bereit, die die Route mit
+dem Token des Links aufruft.
 
 Wenn [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) aktiviert ist, wird das
 Refresh-Token als `httpOnly`-Cookie übertragen und `tokens.refreshToken` ist eine leere
@@ -154,6 +194,17 @@ jedes Konto ist auf zehn Verifizierungsversuche pro 15 Minuten beschränkt
 (gezählt pro Benutzer, IP-Rotation hilft also nicht), und ein akzeptierter Code wird
 für den Faktor vermerkt, sodass er für den Rest seines Zeitfensters von
 ±1 Schritt nicht erneut verwendet werden kann.
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Im CMS registriert **Kontoeinstellungen → Zwei-Schritt-Verifizierung** eine
+Authenticator-App (ihren Schlüssel und einen Link, der sie in der App öffnet, dann den
+Code, den sie zeigt), listet die Faktoren des Kontos auf, entfernt einen und ersetzt die
+Wiederherstellungscodes. Braucht eine Änderung `aal2`, fragt es zuerst nach einem Code
+und stuft die Sitzung damit hoch. Die Wiederherstellungscodes werden einmal angezeigt,
+nachdem der erste Faktor bestätigt wurde. In der Benutzertabelle werden **Zwei-Schritt-Verifizierung zurücksetzen**
+(`DELETE /api/admin/users/:uid/mfa`) und **Konto deaktivieren oder aktivieren**
+(`PUT /api/admin/users/:uid { disabled }`) jedem angeboten, der `users:write` hält,
+genau wie die Routen selbst; der Schalter wird nie für das eigene Konto angeboten, und
+ein Konto, das mehr hält als man selbst, wird mit der Begründung des Servers abgelehnt.
 
 Setzen Sie `MFA_ENCRYPTION_KEY` (mindestens 32 Zufallszeichen), um gespeicherte TOTP-Secrets
 zu verschlüsseln. Ohne diesen Schlüssel greift der Server auf `JWT_SECRET` zurück und gibt eine Warnung aus. Setzen Sie ihn,

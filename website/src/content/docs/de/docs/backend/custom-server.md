@@ -247,7 +247,8 @@ app.use(cors({
 }));
 ```
 
-Die Rebase-Runtime und das ejected Backend senden diese Liste bereits.
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Die Rebase-Runtime und das ejected Backend senden diese Liste bereits. Auf 0.23
+geben sie keinen dieser Header frei, sodass ein Frontend auf einem anderen Origin kein `ETag` lesen kann.
 
 ## Verwandte Themen
 

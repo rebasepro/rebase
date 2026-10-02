@@ -102,7 +102,7 @@ Die Runtime wird vollständig über Umgebungsvariablen konfiguriert, da dies der
 | `PORT` | Zu bindender Port. Standardmäßig lokal `3001`, im Image `8080`. |
 | `REBASE_SERVICE_KEY` | Server-to-Server-Schlüssel, der Administratorzugriff gewährt. |
 | `REBASE_METRICS` | `true`, um Prometheus-Metriken unter `/metrics` bereitzustellen. |
-| `REBASE_MIGRATE_ON_BOOT` | `none` belässt das Schema unverändert; jeder andere Wert – einschließlich nicht gesetzt – führt den additiven Bereitstellungsschritt aus. Standardmäßig überall `ensure`, auch in Produktion. |
+| `REBASE_MIGRATE_ON_BOOT` | `ensure` – der Standard überall, auch in Produktion – führt den additiven Bereitstellungsschritt aus; `none` belässt das Schema unverändert. Jeder andere Wert verweigert den Start, und auch das Image verweigert `push`. |
 | `REBASE_SERVE_STATIC` | Statische Assets des Bundles über diesen Prozess ausliefern. Standardmäßig aktiviert. |
 
 Mehrere Datenbanken und Buckets werden konfiguriert, indem der Source-Key als Suffix an die Variable angehängt wird – siehe [Mehrere Datenbanken und Buckets](/docs/backend/multiple-sources/).

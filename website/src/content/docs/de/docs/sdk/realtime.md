@@ -181,9 +181,15 @@ Der WebSocket-Client übernimmt die Authentifizierung automatisch:
 - Bei der **Anmeldung** oder beim **Token-Refresh** wird das neue Token über eine `authenticate`-Nachricht an einen bereits geöffneten Socket gesendet. Ist keiner geöffnet, geschieht nichts – das Anmelden ist keine Anforderung für Realtime, und ein später geöffneter Socket authentifiziert sich selbst.
 - Bei der **Abmeldung** wird die WebSocket-Verbindung getrennt. Der Client bleibt nutzbar; ein späteres Abonnement stellt die Verbindung anonym wieder her.
 - Wenn die Verbindung abbricht, **verbindet sich der Client automatisch wieder** und richtet alle aktiven Abonnements neu ein. Er hört nie auf, es zu versuchen, solange ein Abonnement oder ein beigetretener Channel existiert; die Verzögerung zwischen den Versuchen wächst auf höchstens 30 Sekunden.
+- Beendet der Server die Sitzung des Sockets — die Person hat sich überall abgemeldet, diese Sitzung wurde widerrufen, das Konto wurde gelöscht, oder das Token ist abgelaufen, bevor ein Refresh den Socket erreichte —, schließt er den Socket mit dem Code `4001`. Der Client verbindet sich wieder wie nach jedem anderen Abbruch und authentifiziert sich mit der Sitzung, die er dann hält (aktualisiert, falls möglich), oder anonym, wenn keine vorhanden ist. Eine entzogene Rolle schließt den Socket nicht: Sie gilt ab dem nächsten Frame. Siehe [Authentifizierung & RLS](/docs/backend/realtime/#authentication-rls).
 - Bleibt die Verbindung länger als etwa 15 Sekunden unterbrochen, wird das `onError` jedes Abonnements (und das `onError` jedes beigetretenen Channels) **einmal** mit einem `RebaseApiError` aufgerufen, dessen `code` `CONNECTION_LOST` ist. Das Abonnement wird dabei nicht beendet: Zeigen Sie weiterhin, was Sie haben, markieren Sie es als möglicherweise veraltet, und warten Sie. Sobald der Socket zurück ist, trägt das nächste `onUpdate` des Abonnements alles, was in der Zwischenzeit geschrieben wurde.
 - `client.ws.state` ist der Zustand der Verbindung — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` oder `closed` — und `client.ws.onStateChange(listener)` wird über jede Änderung informiert. `disconnected` ist der Zustand, in dem `CONNECTION_LOST` gemeldet wurde.
 - Über den Socket gesendete Anfragen sind **at-most-once**. Eine, die gesendet wurde, als die Verbindung abbrach, scheitert mit `CONNECTION_LOST` und wird nie erneut gesendet, da der Server sie möglicherweise schon ausgeführt hat. Eine, die nach 30 Sekunden noch auf einen Socket wartet, scheitert mit `REQUEST_TIMEOUT`, ohne gesendet worden zu sein.
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> für alles in der Liste nach der Abmeldung. Unter 0.23 gibt der Client nach
+fünf gescheiterten Wiederverbindungsversuchen auf, reiht Anfragen, die während der Trennung
+gestellt wurden, ein und sendet sie bei der Wiederverbindung, hat kein `client.ws.state`, und der
+Server schließt nie einen Socket, dessen Sitzung beendet wurde.
 
 ```typescript
 import { RebaseApiError } from "@rebasepro/client";

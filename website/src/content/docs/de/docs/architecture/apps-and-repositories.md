@@ -93,7 +93,8 @@ Wer diese Information hat, nutzt sie:
   einfach um die Startseite des Frontends handelt.
 - **`rebase apps list`** zeigt sie neben der App an, die sie bereitstellt.
 
-Drei Varianten, und alle sind üblich:
+Drei Varianten, und alle sind üblich. <span class="since-badge" data-since="0.24">Seit 0.24</span> für die dritte: Unter 0.23
+kann der `path` einer App keine URL sein, sodass das CMS den Hostnamen des Projekts teilt.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -207,10 +208,27 @@ beginnen und einen Hostnamen und einen Pfad enthalten, sonst nichts – keinen
 Port, keine Query und kein Fragment. Ein bloßes `admin.example.com` wird
 abgelehnt, zusammen mit der URL, die gemeint war.
 
-Lokal wird nichts nach Hostnamen geroutet. `rebase dev` startet die App in
+Unter `rebase dev` wird nichts nach Hostnamen geroutet. Es startet die App in
 `frontend/` an der Wurzel eines localhost-Ports, wie bisher, und für eine App
 mit Hostnamen gibt sein Banner zusätzlich die `https://`-Adresse aus, die sie
 nach dem Deployment haben wird.
+
+`rebase start` ist anders, da es das gebaute Bundle durch dieselbe Runtime
+laufen lässt wie ein Deployment — Hostname-Routing eingeschlossen. Eine App mit
+Hostnamen antwortet nur auf Anfragen, deren `Host` dieser Hostname ist, sodass
+`http://localhost:3001/` die App ohne einen zeigt, und ein Bundle, dessen
+einzige App einen Hostnamen nennt, dort mit 404 antwortet. Um sie lokal zu
+erreichen, senden Sie den Header selbst:
+
+```bash
+curl -H "Host: admin.example.com" http://localhost:3001/
+```
+
+oder zeigen Sie den Hostnamen in `/etc/hosts` auf `127.0.0.1` und öffnen Sie
+`http://admin.example.com:3001/`. Es gibt absichtlich keinen Query-Parameter
+und keinen Header, der das Routing überschreibt: Einer, der lokal funktionierte,
+würde auch gegen ein Deployment funktionieren, und die App anhand von irgendetwas
+außer dem echten `Host` auszuwählen, ist genau das, was das Routing verhindern soll.
 
 Beim Self-Hosting trifft der Prozess dieselbe Wahl anhand des `Host`-Headers
 jeder Anfrage. Den Hostnamen auf den Server zeigen zu lassen und ihm ein

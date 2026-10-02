@@ -25,8 +25,28 @@ Das Anwenden erfordert außerdem eine Sache mehr als den Scope – siehe [Wer Ä
 
 ## Erst planen, dann anwenden
 
-`/plan` hat keine Nebeneffekte. Senden Sie die Collection so, wie sie am Ende aussehen soll, und
-der Endpunkt teilt Ihnen mit, was die Änderung bedeutet:
+`/plan` hat keine Nebeneffekte. Senden Sie die Änderung, und der Endpunkt teilt Ihnen mit, was
+die Änderung bedeutet. <span class="since-badge" data-since="0.24">Seit 0.24</span> Eine Änderung an einer bestehenden Collection ist ein
+`patch` — was sich geändert hat, als Operationen auf Pfaden von Schlüsseln — und eine neue
+Collection ist die gesamte `collection`:
+
+```json
+{ "collectionId": "posts", "patch": [
+    { "op": "set", "path": ["properties", "subtitle"], "value": { "name": "Subtitle", "type": "string" } },
+    { "op": "remove", "path": ["admin", "group"] }
+] }
+```
+
+Nur die Schlüssel, die ein Patch benennt, werden in die Collection-Datei geschrieben. Alles
+andere bleibt, wie es ist — Imports, Kommentare, Formatierung, das `onClick` einer
+Entity-Aktion, eine aus einem anderen Modul geteilte Property, ein von anderswo importiertes
+Enum. Ein Patch, der *in* etwas hineinreicht, das im Code definiert ist
+(`status: statusProperty`, `enum: LOCALE_ENUM`, ein `...spread`), wird mit dem Ausdruck
+abgelehnt, auf den er gestoßen ist, sodass die Änderung dort vorgenommen wird, wo dieser Code
+lebt. Eine vollständige `collection`, die für eine bestehende Collection gesendet wird, wird in
+den Patch dessen umgewandelt, was sich von ihr unterscheidet, und ein Schlüssel, dessen Wert
+Code ist, wird auf diesem Weg nie entfernt. Das Admin-Panel sendet Patches. Unter 0.23 nehmen
+`/plan` und `/apply` nur die gesamte `collection` so, wie sie am Ende aussehen soll.
 
 `$ADMIN_TOKEN` ist ein Zugriffstoken – das `accessToken`, das ein Sign-in zurückgibt – für ein
 Konto, das `schema:read` hält: ein Admin oder eine Rolle, die den Scope deklariert. Nichts auf
@@ -110,9 +130,47 @@ Der Ensure-Pfad beim Booten meldet dasselbe als Warnung. Bis es dies
 gab, wurde ein zurückgehaltenes Constraint stillschweigend zurückgehalten.
 
 `needs-migration` deckt alles ab, was der Ensure-Pfad nicht tun kann: das Löschen einer
-Collection oder Property, das Ändern eines Typs, das Umbenennen einer Spalte, das Ändern eines Primärschlüssels,
-das Entfernen eines Enum-Werts. Jede Ablehnung benennt die Änderung und was stattdessen
-zu tun ist.
+Collection oder Property, das Ändern des Typs einer Spalte (ein Integer-Umschalter, ein String,
+der zu einem Enum wird, der Elementtyp eines Arrays, die Breite eines Varchar), das Umbenennen
+einer Spalte, das Ändern eines Primärschlüssels, das Entfernen eines Enum-Werts, das
+nachträgliche Eindeutig-Machen einer bestehenden Spalte und das Ändern einer Relation — ihrer
+Art, ihres Ziels, ihres `localKey`, ihres `onDelete`. Ein `hasMany` oder `hasOne`, dessen
+Link-Spalte nichts erzeugt, wird ebenfalls abgelehnt. Jede Ablehnung benennt die Änderung und
+was stattdessen zu tun ist.
+
+Das Urteil wird aus dem Schema gelesen, das jede Seite erzeugt — demselben Plan, aus dem
+`schema.generated.ts` und `db push` gerendert werden — sodass eine Änderung, die die Datenbank
+verändert, nicht als „keine Änderung" gemeldet werden kann. Zwei Änderungen, die wie Änderungen
+aussehen und nicht abgelehnt werden (<span class="since-badge" data-since="0.24">Seit 0.24</span>; 0.23 meldet beide als migrationsbedürftig):
+
+- **Das Umbenennen des Schlüssels einer Property bei gleichbleibender Spalte** (`columnName`
+  auf die alte Spalte gesetzt) bewegt keine Daten. Es ist `safe`; API-Clients lesen den neuen
+  Namen.
+- **Das Setzen, Ändern oder Entfernen eines Standardwerts** bindet nur künftige
+  Schreibvorgänge. Es ist `safe` und wird mit `ALTER COLUMN … SET DEFAULT` / `DROP DEFAULT`
+  angewendet.
+
+### Nur die Quelle bearbeiten
+
+Eine abgelehnte Änderung kann trotzdem in Ihren Collection-Quellcode geschrieben und committet
+werden, wobei die Datenbank bleibt, wie sie ist — das Entfernen einer Property, die Sie nicht
+mehr bedienen, ist der übliche Fall. <span class="since-badge" data-since="0.24">Seit 0.24</span> Senden Sie `/apply` mit `"sourceOnly": true`. Es
+läuft nichts; die Commit-Nachricht benennt, was die Datenbank behält, zum Beispiel
+`chore(schema): remove sku from products (source only — column products.sku kept)`, und jede
+Änderung im Plan trägt einen `sourceOnly`-Satz, der sagt, was sie zurücklässt — auch wenn eine
+zurückgelassene Spalte `NOT NULL` ohne Standardwert ist, was jeden späteren Insert fehlschlagen
+lässt, bis sie entfernt oder nullable gemacht wird. Eine Änderung ohne einen solchen Satz (das
+Verschieben eines Primärschlüssels, eine Relation, deren Link-Spalte nichts erzeugt) kann nicht
+allein in die Quelle geschrieben werden.
+
+Das Löschen einer Collection im Admin-Panel nimmt denselben Weg: `/apply` mit `"remove": true`
+und `"sourceOnly": true` löscht die Datei der Collection und ihren Eintrag in `index.ts` und
+committet beides; die Tabelle und ihre Zeilen bleiben. Es wird abgelehnt, solange eine andere
+Collection die Datei importiert (eine Relation zu ihr), unter Angabe der importierenden
+Collection — sie zu löschen würde das Laden jeder Collection stoppen.
+
+Unter 0.23 nimmt `/apply` weder `sourceOnly` noch `remove`, und „Nur die Quelle bearbeiten" im
+Panel schreibt die Datei ohne Commit.
 
 ## Was committet wird
 
@@ -129,8 +187,10 @@ Repositorys befindet, werden die Pfade mit diesem vorangestellt, ermittelt durch
 von Ihrem Collections-Verzeichnis aufwärts zur nächsten `rebase.json`. Ein Projekt ohne
 `rebase.json` behält die einfachen Pfade bei.
 
-Kein SQL landet im Commit. `rebase db push` und `rebase db generate` schreiben ihr
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Kein SQL landet im Commit. `rebase db push` und `rebase db generate` schreiben ihr
 SQL bei jedem Lauf aus den Collections nach `.rebase/sql/`, das von Git ignoriert wird.
+Unter 0.23 trägt der Commit außerdem `drizzle/schema.sql`, `drizzle/policies.sql` und
+`drizzle/search.sql`, geschrieben im Projekt-Root.
 
 Die Commit-Nachricht beschreibt die Änderung, anstatt nur eine anzukündigen, und wird
 der Person zugeschrieben, die sie vorgenommen hat. Eine Schemaänderung mit einem Autor und einem Diff
@@ -139,7 +199,7 @@ deren Tabellenbearbeitungen sind für Ihr Repository unsichtbar.
 
 ## Wer Änderungen anwenden darf
 
-`schema:read` zu halten reicht aus, um zu **planen** (`plan`). Das Planen hat keine Nebeneffekte, und ein CI-Job,
+<span class="since-badge" data-since="0.24">Seit 0.24</span> `schema:read` zu halten reicht aus, um zu **planen** (`plan`). Das Planen hat keine Nebeneffekte, und ein CI-Job,
 der abfragt, ob eine vorgeschlagene Collection-Änderung anwendbar ist, ist ein guter Einsatzzweck dafür.
 
 Das Anwenden (`apply`) ist ein zweites Privileg, da das Anwenden einen Commit schreibt und ein Commit
@@ -154,6 +214,9 @@ einen Autor trägt:
 Ein Credential ist kein Autor. `api-key:7c3f…` in Ihrer CI-Umgebung ist nicht
 eine reale Person, und wenn man diesem erlaubt, in Ihr Repository zu schreiben, entsteht genau die
 nicht zuordenbare Historie, zu deren Ersatz dieses Feature existiert.
+
+Unter 0.23 verläuft die Grenze an der Rolle `admin`: Ein Admin plant und wendet an, und jeder
+API-Key darf planen.
 
 Wenn eine automatisierte Schemaänderung das ist, was Sie wollen – etwa eine Migrations-Pipeline –,
 aktivieren Sie dies bewusst:

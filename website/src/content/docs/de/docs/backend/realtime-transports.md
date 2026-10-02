@@ -145,7 +145,8 @@ Die Zustellung an lokale Clients ist nicht Aufgabe des Transports – der Realti
 
 `pg_notify` lehnt Payloads ab 8000 Bytes ab. Cursors und Presence passen problemlos hinein; ein Dokument-Snapshot nicht. Rebase handhabt dies genauso wie große Entitätsänderungen – indem eine Adresse anstelle eines Bodys gesendet wird:
 
-- **Auf einem persistierten Channel** (siehe [Channel-Retention](#channel-retention)) ist die Nachricht bereits mit einer Sequenznummer gespeichert, sodass die Benachrichtigung nur `(channel, seq)` überträgt und jede empfangende Instanz den Body nachliest. Es gibt keinerlei Größenbeschränkung.
+- **Auf einem persistierten Channel** (siehe [Channel-Retention](#channel-retention)) ist die Nachricht bereits mit einer Sequenznummer gespeichert, sodass die Benachrichtigung nur `(channel, seq)` überträgt und jede empfangende Instanz den Body nachliest. Es gibt keinerlei Größenbeschränkung. Dies gilt für jede persistierte Nachricht, klein oder groß: Jeder Datenbank-Login kann `LISTEN`, sodass der Body nie in der Benachrichtigung mitreist. Es kostet einen Primärschlüssel-Read pro Nachricht auf jeder Instanz mit einem Mitglied im Channel.
+- **Ephemere Broadcasts und Presence** reisen weiterhin in der Benachrichtigung selbst mit, sodass jeder Login an der Datenbank sie lesen kann. Legen Sie alles, was nicht auf diesem Weg lesbar sein darf, auf einen persistierten Channel.
 - **Auf einem ephemeren Channel** gibt es nichts, worauf verwiesen werden könnte. Der Broadcast wird lokal zugestellt, der Absender erhält einen `CHANNEL_BUS_PAYLOAD_TOO_LARGE`-Fehler auf `channel.onError()`, und eine Warnung benennt den Channel – anstatt dass die Nachricht stillschweigend nur die Hälfte des Clusters erreicht.
 
 Wenn Sie große Nachrichten übertragen, versehen Sie diesen Channel mit einer Retention-Regel. Das ist bereits die gesamte Lösung.

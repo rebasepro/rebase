@@ -39,7 +39,7 @@ sie vollständig. Jede andere Rolle hält, was die App für sie deklariert.
 | `storage:delete` | Daten | Storage-Quelle | Dateien löschen |
 | `functions:invoke` | Daten | Funktion | Benutzerdefinierte Funktionen aufrufen. Eine Funktion kann alles tun, was ihr Code tut |
 | `users:read` | Admin | — | Konten und ihre Rollen auflisten |
-| `users:write` | Admin | — | Konten erstellen, bearbeiten und löschen, Passwörter zurücksetzen, Rollen bis zu den eigenen des Inhabers zuweisen |
+| `users:write` | Admin | — | Konten erstellen, bearbeiten und löschen, Passwörter und zweite Faktoren zurücksetzen, Rollen bis zu den eigenen des Inhabers zuweisen |
 | `schema:read` | Admin | — | Das Collection-Schema lesen, Schemaänderungen planen, das RLS-Audit ausführen, die privaten API-Docs lesen |
 | `schema:write` | Admin | — | Schemaänderungen anwenden: bearbeitet Collection-Dateien und ändert die Datenbank |
 | `database:read` | Admin | — | Datenbanken, Tabellen, Postgres-Rollen und Branches auflisten |
@@ -266,7 +266,7 @@ und die Policies der Datenbank für die Identität, als die er handelt, sind ein
 
 ## Wenn ein Scope fehlt
 
-Die Antwort ist `403 SCOPE_MISSING`, und `details.requiredScope` nennt den Scope,
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Die Antwort ist `403 SCOPE_MISSING`, und `details.requiredScope` nennt den Scope,
 mit seinem Ziel, wenn es eines gibt:
 
 ```json

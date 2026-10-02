@@ -38,12 +38,18 @@ console.log(user.uid, user.email);
 ### Registrieren
 
 ```typescript
-const { user } = await client.auth.signUp(
+const { user, confirmationRequired } = await client.auth.signUp(
     "user@example.com",
     "password",
     "Jane Doe"   // optional displayName
 );
 ```
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Ist [`requireEmailVerification`](/docs/backend/email-verification/) aktiv,
+gibt es keine Sitzung, bis die Adresse bestätigt ist: `confirmationRequired` ist
+`true` und `user` ist `null`, also sagen Sie der Person, sie solle ihre Mails öffnen. Andernfalls
+ist `confirmationRequired` `false` und `user` ist das angemeldete Konto. Unter 0.23
+liefert `signUp` `{ user, accessToken, refreshToken }` und meldet immer an.
 
 ## OAuth-Anbieter
 
@@ -106,10 +112,15 @@ await client.auth.signInWithOAuth("custom-provider", {
 
 ## Magic Links
 
-Ein Ein-Klick-Anmeldelink per E-Mail. Der Link führt zu einer Seite Ihrer Anwendung und enthält ein Token; übergeben Sie das Token zurück, um es gegen eine Sitzung einzutauschen.
+Ein Ein-Klick-Anmeldelink per E-Mail. Der Link lautet immer
+`<base>/auth/magic-link?token=…`, wobei `<base>` das `email.magicLinkUrl` des Backends ist,
+oder dessen Basis für das Passwort-Reset (`FRONTEND_URL` auf der Runtime), wenn das nicht gesetzt ist.
+Es gibt kein `redirectTo` pro Anfrage. Stellen Sie diesen Pfad in Ihrem Frontend bereit und übergeben Sie
+das Token zurück, um es gegen eine Sitzung einzutauschen. <span class="since-badge" data-since="0.24">Seit 0.24</span> Das CMS stellt ihn bereit und meldet an (über den
+Code-Schritt, wenn es einen zweiten Faktor gibt); andere Frontends brauchen eine Landing-Page.
 
 ```typescript
-// 1. Ask for the link. `redirectTo` is where the link points.
+// 1. Ask for the link.
 await client.auth.sendMagicLink("user@example.com");
 
 // 2. On the landing page, trade the token for a session.
@@ -188,10 +199,26 @@ const { factor, totp, recoveryCodes } = await client.auth.mfa.enroll({
 });
 
 showQrCode(totp.uri);        // otpauth://… — what the authenticator scans
-showRecoveryCodes(recoveryCodes);
+if (recoveryCodes) showRecoveryCodes(recoveryCodes);
 ```
 
-**Zeigen Sie die Wiederherstellungscodes einmalig und nie wieder an.** Da nur deren Hashes gespeichert werden, können sie später nicht mehr angezeigt werden.
+**Zeigen Sie die Wiederherstellungscodes einmalig und nie wieder an.** Da nur deren Hashes gespeichert werden, können sie später nicht mehr angezeigt werden. <span class="since-badge" data-since="0.24">Seit 0.24</span> Sie werden mit dem ersten Faktor des Kontos ausgegeben.
+Das Hinzufügen eines weiteren Faktors behält die Codes, die das Konto bereits hat, und
+`recoveryCodes` ist `null`. Eine begonnene und abgebrochene Registrierung rührt sie nie an.
+
+Um sie zu ersetzen, nachdem mehrere verbraucht wurden oder der Ausdruck verloren ging, rufen Sie
+`regenerateRecoveryCodes()` aus einer `aal2`-Sitzung auf. Die alten Codes funktionieren danach nicht mehr:
+
+```typescript
+const { recoveryCodes } = await client.auth.mfa.regenerateRecoveryCodes();
+```
+
+Wer sowohl den Authentifikator als auch die Codes verloren hat, wird von einem
+Administrator wieder hereingelassen: `client.admin.resetMfa(uid)` (`DELETE /api/admin/users/:uid/mfa`,
+`users:write`) entfernt die Faktoren und Codes des Kontos und beendet dessen Sitzungen,
+sodass das Passwort wieder ohne zweiten Faktor anmeldet. Unter 0.23 liefert jede Registrierung
+einen neuen Satz Codes, der den alten ersetzt, und weder
+`regenerateRecoveryCodes()` noch `resetMfa` existieren.
 
 Der Faktor ist erst nutzbar, wenn der Benutzer nachweist, dass sein Authentifikator einen Code aus diesem Secret generiert hat:
 
@@ -360,7 +387,7 @@ unsubscribe();
 |-------|------|
 | `SIGNED_IN` | Eine Anmeldung oder Registrierung wurde abgeschlossen |
 | `TOKEN_REFRESHED` | Das Access-Token wurde erneuert — einschließlich der stillen Erneuerung, die eine Sitzung beim Laden der Seite wiederherstellt |
-| `USER_UPDATED` | `updateUser()` hat das Profil geändert |
+| `USER_UPDATED` | `updateUser()` hat das Profil geändert, oder `confirmEmailChange()` hat dieses Konto auf seine neue Adresse verschoben |
 | `SIGNED_OUT` | Eine Abmeldung oder eine Aktualisierung, die endgültig fehlgeschlagen ist |
 
 ## Passwortverwaltung
@@ -391,21 +418,68 @@ const { success, message } = await client.auth.changePassword(
 );
 ```
 
+Jede andere Sitzung des Kontos endet: Wer auch immer sonst eine hielt, muss sich mit
+dem neuen Passwort erneut anmelden. Dieses Gerät bleibt angemeldet. Der Server antwortet mit einer
+frischen Sitzung, und der Client übernimmt sie (und sendet `TOKEN_REFRESHED`).
+
 ## E-Mail-Verifizierung
+
+Bei der Registrierung erhält das neue Konto seinen Verifizierungslink per Mail, sofern E-Mail
+konfiguriert ist. `sendVerificationEmail()` versendet ihn erneut.
 
 ```typescript
 // Send verification email to the current user
 await client.auth.sendVerificationEmail();
 
-// Verify with the token from the email link
-await client.auth.verifyEmail(token);
+// Verify with the token from the email link. Signed in as that account, this
+// keeps everything on it.
+const { passwordRemoved } = await client.auth.verifyEmail(token);
+
+// Signed out, an account that holds a password answers PROOF_REQUIRED:
+try {
+    await client.auth.verifyEmail(token);
+} catch (e) {
+    if (e instanceof Error && "code" in e && e.code === "PROOF_REQUIRED") {
+        // Keep the password, and sign in:
+        await client.auth.verifyEmail(token, { password });
+        // …or verify without it, which removes it:
+        // await client.auth.verifyEmail(token, { removeUnproven: true });
+    }
+}
 ```
+
+Der Link beweist den Zugriff auf das Postfach, nicht, wer die Adresse registriert hat, daher wird
+ein Passwort, das weder die Sitzung noch der Aufruf nachweist, entfernt statt beibehalten — siehe
+[E-Mail-Verifizierung](/docs/backend/email-verification/).
+
+Bei einem Backend mit `requireEmailVerification` liefert `signUp()`
+`{ confirmationRequired: true, user: null }` und keine Sitzung: Das Konto
+meldet sich an, sobald der Link mit seinem Passwort geöffnet wurde.
+
+## Änderung der E-Mail-Adresse
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Eine angemeldete Person verschiebt ihr eigenes Konto auf eine andere Adresse. Nichts
+ändert sich, bis die neue Adresse antwortet:
+
+```typescript
+// Mails a link to the new address, and a notice to the current one
+const { pendingEmail, expiresAt } = await client.auth.changeEmail("jane@new.example");
+
+// On the page the link opens (<frontend>/confirm-email-change?token=…):
+const { email, removedProviders } = await client.auth.confirmEmailChange(token);
+```
+
+Der Link lebt 24 Stunden; `getUser()` meldet die wartende Adresse als
+`pendingEmail`. Die Bestätigung braucht keine Sitzung, und ein Client, der als dieses
+Konto angemeldet ist, übernimmt die neue Adresse und sendet `USER_UPDATED`. Die Ablehnungen sind aufgeführt
+in [Änderung einer E-Mail-Adresse](/docs/backend/auth-endpoints/#changing-an-email-address).
 
 ## Sitzungsverwaltung (Multi-Device)
 
 ```typescript
-// List all active sessions
+// List all active sessions, one per sign-in
 const sessions = await client.auth.getSessions();
+// [{ id, userAgent, ipAddress, createdAt, isCurrentSession }, …]
 
 // Revoke a specific session
 await client.auth.revokeSession(sessionId);
@@ -413,6 +487,13 @@ await client.auth.revokeSession(sessionId);
 // Revoke ALL sessions (logs out everywhere)
 await client.auth.revokeAllSessions();
 ```
+
+Jedes Access-Token nennt die Sitzung, zu der es gehört, sodass genau ein Eintrag
+`isCurrentSession: true` trägt: das fragende Gerät. Das Widerrufen einer Sitzung beendet
+das Refresh-Token und das Access-Token dieses Geräts gemeinsam, ab der nächsten Anfrage,
+über HTTP und über einen offenen Echtzeit-Socket. Das Abmelden (`signOut()`) tut
+dasselbe für das Gerät, das sich abmeldet. Ein Access-Token, das vor diesem Release ausgestellt wurde,
+nennt keine Sitzung; es funktioniert weiter, bis es abläuft, innerhalb der Stunde.
 
 ## Auth-Konfiguration
 
@@ -470,6 +551,7 @@ interface User {
     providerId: string;
     isAnonymous: boolean;
     emailVerified?: boolean;
+    pendingEmail?: string | null; // an address change waiting for its link
     roles?: string[];          // text[] from the users table
     metadata?: Record<string, unknown>;
 }

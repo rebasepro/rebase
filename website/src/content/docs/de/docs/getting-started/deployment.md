@@ -18,7 +18,7 @@ Es gibt keinen separaten Admin-Dienst: Das Admin-Panel ist Teil eines Frontends,
 |--------------|----------------|-------------------|
 | Standard-Scaffold (`rebase init`) | Das Admin-Panel | `/` — das Frontend **ist** der Admin |
 | Benutzerdefiniertes Produkt-Frontend | Ihre App | Wo Sie es einbinden, üblicherweise `/admin` — siehe [Basis-URL ändern](#basis-url-ändern) |
-| Admin als App auf einem eigenen Hostnamen | Ihre App | `https://admin.example.com/`, vom selben Server ausgeliefert — siehe [Basis-URL ändern](#basis-url-ändern) |
+| Admin als App auf einem eigenen Hostnamen | Ihre App | <span class="since-badge" data-since="0.24">Seit 0.24</span> `https://admin.example.com/`, vom selben Server ausgeliefert — siehe [Basis-URL ändern](#basis-url-ändern) |
 | Reines Backend-Projekt | Nichts (nur API) | Nicht bereitgestellt |
 
 :::note[Erster Besuch]

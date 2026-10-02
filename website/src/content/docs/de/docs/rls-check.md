@@ -262,7 +262,9 @@ aktivieren, sodass der Grant alles herausgibt, was der entfernte Server liefert;
 Fix entzieht stattdessen den Grant.
 
 Eine Tabelle mit deaktivierter RLS, aber ohne Berechtigung für eine exponierte Rolle, wird *nicht*
-gemeldet. Sie ist nicht erreichbar, und ein Hinweis darauf wäre reines Rauschen.
+gemeldet, und ebenso wenig eine in einem Schema, auf das diese Rolle kein `USAGE` hat — Postgres
+antwortet mit "permission denied for schema", bevor es die Tabelle überhaupt betrachtet. Sie ist
+nicht erreichbar, und ein Hinweis darauf wäre reines Rauschen.
 
 ```sql
 ALTER TABLE "public"."your_table" ENABLE ROW LEVEL SECURITY;
@@ -279,6 +281,17 @@ gegen einen stillen Ausfall eingetauscht. Siehe [rls-enabled-no-policies](#rls-e
 Eine permissive Policy, deren `USING`- oder `WITH CHECK`-Ausdruck eine konstante Wahrheit ist – `true`,
 `(true)`, `1 = 1`. Permissive Policies werden mit ODER verknüpft, sodass eine einzige dieser Regeln
 den Zeilenfilter der Tabelle erfüllt, ganz gleich, wie streng jede andere Policy ist.
+
+Wie bei jeder Prüfung wird die Policy nur gemeldet, wenn eine Rolle, für die sie gilt, die Tabelle
+auch erreichen kann: Sie muss die vom Befehl benötigte Berechtigung besitzen und `USAGE` auf dem
+Schema. `USING (true) TO anon` auf einer Tabelle, auf die `anon` nichts besitzt, wird mit "permission
+denied" beantwortet, bevor die Policy überhaupt konsultiert wird.
+
+Ist nur der `WITH CHECK`-Teil einer `UPDATE`-Policy konstant – `USING (user_id = rebase.uid())
+WITH CHECK (true)` –, ist dies **high**: `USING` entscheidet weiterhin, welche Zeilen angefasst
+werden dürfen, aber der Check lässt eine angefasste Zeile zu allem werden, etwa der eines anderen
+Benutzers. Bei einer `FOR ALL`-Policy lässt derselbe Check auch jedes `INSERT` zu, sodass es dort
+bei critical bleibt.
 
 Wenn `RESTRICTIVE`-Policies für denselben Befehl (`ALL` für ein permissives `ALL`) für jede
 exponierte Rolle gelten, die die permissive Policy erreicht, wird dies auf "medium" herabgestuft und
@@ -308,7 +321,11 @@ Der Schweregrad ist plattformabhängig, und diese Unterscheidung ist wichtig:
 
 - **Auf Supabase** gibt `auth.uid()` für anonyme Aufrufer `NULL` zurück, sodass dies eine funktionierende
   Prüfung nur für authentifizierte Benutzer ist. Gemeldet als **low** – eine Lücke bei der Datenabgrenzung
-  zwischen angemeldeten Benutzern, keine Lücke für anonymen Zugriff.
+  zwischen angemeldeten Benutzern, keine Lücke für anonymen Zugriff. Das gilt nur für `auth.uid()`
+  (und den `sub`-Claim, den sie liest): Eine abgemeldete Anfrage trägt weiterhin den Anon-Key des
+  Projekts, sodass `auth.role()` `'anon'` ist und `auth.jwt()` die Claims dieses Keys sind. Dieselbe
+  Form, auf einem der beiden aufgebaut, ist *für abgemeldete Aufrufer wahr* und wird als **critical**
+  gemeldet.
 - **Auf Rebase oder PostgREST**, wo eine leere Aufrufer-ID in einen `'anonymous'`-Sentinel umgewandelt
   wird, ist der Ausdruck *auch für abgemeldete Aufrufer wahr*. Gemeldet als **critical**.
 - **Auf einer nicht erkannten Plattform** gemeldet als **medium**, da es davon abhängt, ob Ihr Stack
@@ -383,6 +400,9 @@ gespeicherter Snapshot, der von derjenigen Person/Rolle erstellt wurde, die den 
 Wenn eine solche View einer nicht vertrauenswürdigen Rolle zugänglich gemacht wird und ihre definierende
 Abfrage eine RLS-geschützte Tabelle liest, kann keine Policy helfen – entziehen Sie das Grant oder
 verschieben Sie die Materialized View in ein Schema, das nicht vertrauenswürdige Rollen nicht erreichen können.
+Der vorgeschlagene Fix entzieht jedes Grant, das eine nicht vertrauenswürdige Rolle erreicht, von der
+Rolle, die jedes Grant nennt: Ein Grant an eine Rolle, von der `anon` erbt, wird durch
+`REVOKE … FROM anon` nicht entfernt.
 
 ```sql
 REVOKE ALL ON "public"."your_matview" FROM "anon";
@@ -417,19 +437,27 @@ USING (EXISTS (SELECT 1 FROM memberships WHERE id = organizations.id ...))
 USING (EXISTS (SELECT 1 FROM memberships m WHERE m.org_id = organizations.id ...))
 ```
 
-**Das Fehlen dieses Befundes ist kein Sicherheitsbeweis.** `pg_policies.qual` ist die von Postgres
-selbst neu gerenderte Form des Parse-Trees und re-qualifiziert Spaltenreferenzen meist – daher ist der
-ursprüngliche unqualifizierte Name häufig nicht mehr sichtbar, wenn der Katalog ausgelesen wird. Wenn
-diese Prüfung anschlägt, ist dies ein starker Hinweis; schlägt sie nicht an, beweist dies nichts.
+**Was der Katalog zeigt, ist nicht das, was Sie geschrieben haben.** `pg_policies.qual` ist die von
+Postgres selbst neu gerenderte Form des Parse-Trees, und innerhalb einer Subquery qualifiziert sie
+Spaltenreferenzen immer, sodass der unqualifizierte Name beim Auslesen des Katalogs nie mehr sichtbar
+ist. Was übrig bleibt, ist seine Wirkung: Der nackte `org_id` wird an die innere Tabelle gebunden, und
+das gespeicherte Prädikat vergleicht die Spalte dieser Tabelle mit sich selbst —
+`m.org_id = m.org_id`. Diesen Selbstvergleich findet diese Prüfung auf einer laufenden Datenbank.
+
+**Das Fehlen dieses Befundes ist kein Sicherheitsbeweis.** Ein nackter Name, der mit einer
+*anderen* inneren Spalte verglichen wird (`organization_id = id`), wird als `m.organization_id = m.id`
+gespeichert, was genau wie ein beabsichtigter Vergleich aussieht. Wenn diese Prüfung anschlägt, ist
+dies ein starker Hinweis; schlägt sie nicht an, beweist dies nichts.
 
 ### junction-table-unprotected
 
 **Many-to-Many-Join-Tabelle ohne RLS.** High, heuristisch.
 
 Eine Tabelle, die im Wesentlichen nur aus den beiden Endpunkten zweier Fremdschlüssel besteht, die beide
-auf Tabellen verweisen, die RLS *haben*, selbst jedoch über keine Row-Level Security verfügt. Beide Seiten
-der Relation sind gesperrt und die Verknüpfung dazwischen ist offen – was ausreicht, um die Relation zu
-enumerieren, selbst wenn keiner der Endpunkte gelesen werden kann.
+auf Tabellen verweisen, die RLS *haben*, selbst jedoch über keine Row-Level Security verfügt – und die
+lesbar oder schreibbar ist für eine Rolle, als die ein nicht vertrauenswürdiger Aufrufer ankommt. Beide
+Seiten der Relation sind gesperrt und die Verknüpfung dazwischen ist offen – was ausreicht, um die
+Relation zu enumerieren, selbst wenn keiner der Endpunkte gelesen werden kann.
 
 Heuristisch, da eine Junction-Table anhand ihrer Struktur abgeleitet wird. Wenn Ihre Tabelle bewusst
 öffentlich ist: `--skip junction-table-unprotected`.

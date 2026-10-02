@@ -82,11 +82,14 @@ Die Umkehrung ist kein Update. Das Setzen des Feldes auf einen Wert wird mit `40
 `FIELD_NOT_WRITABLE` abgelehnt – löschen Sie die Zeile stattdessen –, sodass die
 `delete`-Berechtigung, `beforeDelete` und `afterDelete` immer dafür gelten. Ein
 Upsert kann eine Zeile erstellen, die bereits gestempelt ist, stempelt aber nie
-eine, die gespeichert war. Ebenso wenig schreibt ein Upsert in eine Zeile im
+eine, die gespeichert war.
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Ebenso wenig schreibt ein Upsert in eine Zeile im
 Papierkorb: Wenn sein Schlüssel zu einer gestempelten Zeile gehört, wird er mit
 `409` `ROW_IN_TRASH` abgelehnt, und nichts wird geschrieben. Stellen Sie die
 Zeile zuerst wieder her, oder löschen Sie sie endgültig mit `?hard=true` und
-führen Sie das Upsert erneut aus.
+führen Sie das Upsert erneut aus. Auf 0.23 schreibt das Upsert seine Werte in
+die verborgene Zeile und antwortet mit `201`.
 
 Ein Löschvorgang über einen Many-to-Many-Pfad wie `DELETE /api/data/posts/1/tags/5`
 entfernt die Verknüpfung von Post 1 mit dem Tag. Er führt kein Soft Delete des Tags

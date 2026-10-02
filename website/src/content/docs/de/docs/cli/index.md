@@ -15,11 +15,7 @@ Die Rebase CLI (`rebase`) verwaltet Ihr Projekt vom Scaffolding bis zum Deployme
 pnpm add -g @rebasepro/cli
 ```
 
-Oder über `pnpm dlx` verwenden:
-
-```bash
-pnpm dlx @rebasepro/cli <command>
-```
+Oder führen Sie jeden Befehl aus, ohne ihn zu installieren: `pnpm dlx @rebasepro/cli <command>`.
 
 ## Maschinenlesbare Ausgabe
 
@@ -58,7 +54,7 @@ Startet den Entwicklungsserver:
 rebase dev
 ```
 
-Startet sowohl Frontend als auch Backend mit Hot Reloading und generiert das Drizzle-Schema sowie die SDK-Typen (`generated/sdk/`) beim Start und bei jedem Speichern einer Collection neu.
+Startet sowohl Frontend als auch Backend mit Hot Reloading und generiert das Drizzle-Schema sowie die SDK-Typen (`generated/sdk/`) beim Start und bei jedem Speichern einer Collection neu. <span class="since-badge" data-since="0.24">Seit 0.24</span> für die SDK-Typen — in 0.23 wird nur das Schema neu generiert, und `rebase generate-sdk` müssen Sie selbst ausführen.
 
 Beide Ports werden aus dem Pfad des Projekts abgeleitet, sodass mehrere Rebase-Projekte
 nebeneinander laufen können. Verwenden Sie die URLs, die `rebase dev` ausgibt. Einen Port festlegen können Sie mit `rebase dev --port 3001`.
@@ -76,11 +72,12 @@ Anwendungs-Image selbst gebaut werden muss. Nützliche Flags:
 
 | Flag | Auswirkung |
 |------|------------|
-| `--out <dir>` | Schreibt das Bundle an einen anderen Ort als `dist-bundle/` |
+| `--output <dir>` (oder `--out`) | Schreibt das Bundle an einen anderen Ort als `dist-bundle/` (jeweils eine App) |
 | `--vendor` | Die Abhängigkeiten des Bundles immer installieren und mitliefern |
 | `--no-vendor` | Niemals vendoren; der Pod installiert beim ersten Start |
 | `--skip-type-check` | Typechecking überspringen (schneller, weniger sicher) |
-| `--no-static` | Das Bauen des Frontends überspringen |
+| `--no-static` | Das Frontend nicht ins Backend-Bundle einfalten (jede statische App bekommt trotzdem ihr eigenes Bundle) |
+| `--skip-static-build` | Das Frontend als bereits gebaut einfalten, ohne dessen Build-Befehl auszuführen |
 
 Abhängigkeiten werden standardmäßig per Vendoring eingebunden, damit ein Pod-Neustart keine
 35–55 Sekunden dauernde Installation durchführen muss. Ein Abhängigkeitsbaum, der auf der Festplatte über 200 MB anwächst, wird stattdessen verworfen, da das Upload-Limit komprimiert 100 MB beträgt — siehe Changelog für die Begründung.
@@ -101,14 +98,17 @@ Overrides in `pnpm-workspace.yaml` und `package.json` werden ebenfalls aktualisi
 
 ### `rebase start`
 
-Führt das gebaute Bundle als Produktionsserver aus:
+Führt das gebaute Bundle so aus, wie ein Deployment es ausführt:
 
 ```bash
 rebase start
 ```
 
-Liest im Gegensatz zu `rebase dev` `PORT` und den Rest von `.env`. Verweisen Sie mit
-`rebase start --bundle ./dist-bundle` auf ein Bundle an einem anderen Ort.
+Liest im Gegensatz zu `rebase dev` `PORT` und den Rest von `.env`, und zwar in dem `NODE_ENV`,
+das diese Dateien festlegen. Ein gescaffoldetes `.env` enthält `development`, sodass das erste
+registrierte Konto weiterhin zum Admin wird, und `rebase start` weist oben darauf hin; setzen Sie
+`NODE_ENV=production` für einen Produktionsserver. `rebase start --bundle ./dist-bundle` führt ein
+Bundle an einem anderen Ort aus.
 
 ### `rebase apps list`
 
@@ -187,9 +187,9 @@ rebase db backups list                  # auflisten, was gespeichert ist
 rebase db restore ./backups/<file>.dump --yes
 ```
 
-`backup` führt `pg_dump` aus; `restore` führt `pg_restore` aus und ist destruktiv, weshalb
-es `--yes` erfordert. `--out` akzeptiert einen lokalen Pfad oder eine Object-Storage-URL und
-ist standardmäßig `$BACKUP_DESTINATION` oder `./backups`.
+`backup` führt `pg_dump` aus; `restore` führt `pg_restore` aus und benötigt, da destruktiv, `--yes`.
+Planung, die Rollen-Datei, die mit jedem Dump mitreist, und das Restore-Verfahren finden Sie unter
+[Backups und Wiederherstellung](/docs/deployment/backups/).
 
 ### `rebase db pull`
 

@@ -339,6 +339,11 @@ bleiben verborgen, unabhängig davon, ob sie angegeben sind. Eine unbekannte Spa
 führt zu einem 400 `UNKNOWN_FIELD` statt zu einer Zeile, bei der stillschweigend ein
 Feld fehlt.
 
+Eine Relation, die in `?include=` genannt wird, kommt zurück, unabhängig davon, ob
+`?fields=` sie nennt: `?include=author&fields=title` liefert `title`, den Schlüssel
+und `author`. Die Relation zusätzlich in `?fields=` zu nennen, ist erlaubt und
+ändert nichts.
+
 `?distinct=true` fasst Zeilen zusammen, die bezüglich dieser Spalten identisch sind:
 
 ```bash

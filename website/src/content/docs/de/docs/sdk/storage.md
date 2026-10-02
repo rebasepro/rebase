@@ -79,12 +79,12 @@ Das SDK speichert signierte URLs im Cache, um redundante Serveraufrufe zu vermei
 
 ### Private vs. öffentliche URLs
 
-- **Private Dateien** erhalten eine URL mit einem **kurzlebigen, pfadbeschränkten Download-Token** (`?token=…`, 5 Minuten, sofern der Server nicht `STORAGE_DOWNLOAD_TOKEN_TTL` setzt) — niemals Ihr Access-Token. Da es abläuft, **speichern Sie keine private URL**; speichern Sie den **Pfad** der Datei und rufen Sie `getSignedUrl()` beim Rendern erneut auf.
+- **Private Dateien** erhalten eine URL mit einem **kurzlebigen, pfadbeschränkten Download-Token** (`?token=…`, 5 Minuten, sofern der Server nicht `STORAGE_DOWNLOAD_TOKEN_TTL` setzt <span class="since-badge" data-since="0.24">Seit 0.24</span>, was 0.23 nicht liest) — niemals Ihr Access-Token. Da es abläuft, **speichern Sie keine private URL**; speichern Sie den **Pfad** der Datei und rufen Sie `getSignedUrl()` beim Rendern erneut auf.
 - **Öffentliche Dateien** (unter dem Präfix `public/` gespeichert — setzen Sie `storage: { public: true }` auf die Property oder übergeben Sie `public: true` an `putObject`) erhalten eine **stabile, tokenlose, dauerhafte, CDN-cachefähige** URL ohne Server-Roundtrip. Diese können sicher in einer Datenbank gespeichert und direkt verlinkt werden.
 
 ### Dateien innerhalb von Text
 
-Text, der eine Datei einbettet — die Bilder in einem Markdown-Feld — kann ebenfalls keine
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Text, der eine Datei einbettet — die Bilder in einem Markdown-Feld — kann ebenfalls keine
 private URL halten, sondern hält stattdessen eine **Storage-Referenz**:
 `rebase-storage:posts/cover.png`, mit `?storageId=media`, wenn die Datei in einer benannten
 Quelle liegt. Das ist es, was der Markdown-Editor des Admin-Panels für ein hochgeladenes Bild

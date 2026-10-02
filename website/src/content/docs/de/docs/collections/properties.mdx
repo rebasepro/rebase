@@ -82,7 +82,7 @@ price: {
 |----------|------|-------------|
 | `admin.readOnly` | `boolean` | Bearbeitung verhindern |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Deaktivieren mit optionalem Tooltip |
-| `admin.filledByServer` | `boolean` | Der Server befüllt das Feld, wenn ein neuer Datensatz es leer lässt (ein `beforeSave`-Hook). Das Formular lässt eine Erstellung ohne dieses Feld durch; beim Bearbeiten bleibt es erforderlich, und die eigenen Prüfungen des Servers gelten weiterhin |
+| `admin.filledByServer` | `boolean` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Der Server befüllt das Feld, wenn ein neuer Datensatz es leer lässt (ein `beforeSave`-Hook). Das Formular lässt eine Erstellung ohne dieses Feld durch; beim Bearbeiten bleibt es erforderlich, und die eigenen Prüfungen des Servers gelten weiterhin |
 | `admin.hideFromCollection` | `boolean` | In der Tabellenansicht ausblenden |
 | `admin.columnWidth` | `number` | Spaltenbreite in Pixeln (Tabellenansicht) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Feldbreite im vierspaltigen Formularraster |
@@ -301,11 +301,12 @@ Primärschlüssel werden nicht unterstützt, und eine Konfiguration, die zwei de
 verlangt etwas, das Rebase nicht erstellen kann. Wenn Sie einen Eindeutigkeits-Constraint
 über mehrere Spalten hinweg wollten, ist das ein eindeutiger [Index](/docs/backend/indexes).
 
-Eine Collection, bei der keine Eigenschaft `isId` beansprucht, erhält eine eigene `id`-Spalte:
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Eine Collection, bei der keine Eigenschaft `isId` beansprucht, erhält eine eigene `id`-Spalte:
 `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. Die Datenbank befüllt sie, sodass eine über das
 Admin-Panel, die REST-API oder das SDK erstellte Zeile keinen Schlüssel braucht, und ein Schlüssel,
 den Sie selbst mitsenden, wird so verwendet, wie er ist. Eine Tabelle, die erstellt wurde, bevor
-dieser Default existierte, erhält ihn beim nächsten Start.
+dieser Default existierte, erhält ihn beim nächsten Start. Auf 0.23 hat die Spalte keinen Default,
+und eine Erstellung ohne mitgesendeten Schlüssel schlägt fehl.
 :::
 
 ## Number-Eigenschaften

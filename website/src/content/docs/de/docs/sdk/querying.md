@@ -392,7 +392,7 @@ const rows = await client.data.orders
 
 Ergebnisschlüssel werden **abgeleitet**, nicht frei gewählt: `sum(total)` wird als `sum_total` zurückgegeben, ein einfaches `count()` als `count`. Eine freie Benennung würde erfordern zu prüfen, dass der Name nicht gleichzeitig ein `groupBy`-Feld ist – eine Regel, die kaum jemand erwarten würde, und ein stillschweigend überschriebener Wert, wenn dies ungeprüft bliebe.
 
-Gruppen werden wie die Zeilen einer Auflistung paginiert: `limit` begrenzt sie, und `offset`
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Gruppen werden wie die Zeilen einer Auflistung paginiert: `limit` begrenzt sie, und `offset`
 überspringt sie (eine Gruppierung nach einer Spalte mit hoher Kardinalität entspräche dem
 gesamten Inhalt einer Tabelle in einer einzigen Antwort). Ein gruppiertes Aggregat ohne `limit`
 erhält den Standardwert einer Auflistung — **50 Gruppen** über HTTP —, lesen Sie daher `meta`
@@ -411,7 +411,9 @@ Das Ergebnis ist weiterhin ein Array von Zeilen; `meta` ist eine nicht-enumerier
 darauf, sodass ein Spread oder ein `JSON.stringify` nur die Zeilen sieht. Es ist immer dann
 vorhanden, wenn die Gruppen bei einem `limit` gekappt wurden. Ohne `groupBy` gibt es genau eine
 Zeile, `limit` bewirkt nichts und `offset` wird abgelehnt. In einer Server-Function
-(`rebase.data`, `context.data`) liefert ein gruppiertes Aggregat ohne `limit` jede Gruppe.
+(`rebase.data`, `context.data`) liefert ein gruppiertes Aggregat ohne `limit` jede Gruppe. Unter 0.23
+gibt es kein `meta` und kein `offset`, sodass eine bei `limit` gekappte Liste von Gruppen
+vollständig aussieht.
 `include` wird bei einem Aggregat nicht gesendet: Es hat keine Relationen zum Laden. Das SDK
 sortiert Gruppen noch nicht; über HTTP lassen sie sich ebenfalls sortieren — siehe
 [Aggregate und Suche](/docs/sdk/aggregates-and-search/).

@@ -88,7 +88,9 @@ nichts über die Eigenschaft, für die eine Datei bestimmt war. Ein `curl -F fil
 am Dateiauswahldialog vorbei platzierte somit eine 40-MB-Binärdatei im Avatar-Bucket, und die
 Konfiguration, die etwas anderes vorgab, wurde nie abgefragt.
 
-Beide werden nun vom Server anhand **des Orts, an dem die Datei landet**, geprüft. Der `storagePath`
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Beide werden nun vom Server anhand **des Orts, an dem die Datei landet**, geprüft. Auf
+0.23 werden sie nur anhand der Eigenschaft geprüft, die ein Upload benennt, und ein Upload, der
+keine benennt, erfüllt allein das eigene Limit der Quelle. Der `storagePath`
 einer Eigenschaft ist dort, wohin ihre Dateien gehen, also ist es auch dort, wo ihre Limits greifen:
 Jeder Upload, dessen Schlüssel eine Datei direkt unter diesem Pfad ist – aus dem Panel,
 `client.storage.putObject`, einem fortsetzbaren Upload, Studios Storage-Browser oder `curl` –
@@ -109,7 +111,7 @@ Pfad einer Eigenschaft mit `public: true` liegt unter `public/`.
 
 ### Bilder in einem Markdown-Feld
 
-Eine Markdown-Eigenschaft (`admin.markdown: true`) mit einem `storage`-Block nimmt in ihrem Editor
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Eine Markdown-Eigenschaft (`admin.markdown: true`) mit einem `storage`-Block nimmt in ihrem Editor
 Bild-Uploads an. Der Text speichert jedes Bild als **Storage-Referenz** —
 `![](rebase-storage:posts/abc_cover.png)` — nicht als URL: Die URL einer privaten Datei trägt ein
 Download-Token, das innerhalb von Minuten abläuft, während der Text gespeichert bleibt. Der Editor

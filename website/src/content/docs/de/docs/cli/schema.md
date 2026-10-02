@@ -78,7 +78,7 @@ rebase schema introspect
 
 Dies ist nützlich, wenn Sie Rebase auf einer bestehenden Datenbank einführen — zuerst introspizieren, dann die generierten Collections anpassen.
 
-**Introspektion, gefolgt von Push, ändert nichts.** Die generierten Eigenschaften geben exakt an, was jede Spalte ist — `columnType`, `precision`/`scale`, `defaultValue`, `required`, das `isId` eines Schlüssels (`"increment"` für eine ganzzahlige Identity, `columnType: "serial"` für ein Serial, `"manual"` für einen Schlüssel ohne Default), das `onDelete` einer Relation sowie der `search`-Block einer Collection, zurückgelesen aus der Spalte, die er aufgebaut hat — daher plant `rebase db push --dry-run` direkt nach einer Introspektion keine Änderungen. Wo keine Eigenschaft eine Spalte vollständig abbilden kann — ein `timestamp` ohne Zeitzone, ein `interval`, ein `inet`, ein Enum-Typ, der nicht `<table>_<column>` heißt, ein Default wie `CURRENT_DATE` — weist die Introspektion pro Spalte darauf hin, im Terminal und am Anfang der Datei, mit dem, was ein Push damit tun würde, und, wenn vorhanden, dem Statement, das die beiden in Übereinstimmung bringt (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Eine Tabelle, deren Schlüssel aus mehr als einer Spalte besteht, wird mit ihrem Grund ausgelassen: Eine Collection liest eine Zeile über eine einzelne Schlüsselspalte, und `db push` lässt eine Tabelle, die keine Collection ist, unangetastet.
+<span class="since-badge" data-since="0.24">Seit 0.24</span> **Introspektion, gefolgt von Push, ändert nichts.** Die generierten Eigenschaften geben exakt an, was jede Spalte ist — `columnType`, `precision`/`scale`, `defaultValue`, `required`, das `isId` eines Schlüssels (`"increment"` für eine ganzzahlige Identity, `columnType: "serial"` für ein Serial, `"manual"` für einen Schlüssel ohne Default), das `onDelete` einer Relation sowie der `search`-Block einer Collection, zurückgelesen aus der Spalte, die er aufgebaut hat — daher plant `rebase db push --dry-run` direkt nach einer Introspektion keine Änderungen. Wo keine Eigenschaft eine Spalte vollständig abbilden kann — ein `timestamp` ohne Zeitzone, ein `interval`, ein `inet`, ein Enum-Typ, der nicht `<table>_<column>` heißt, ein Default wie `CURRENT_DATE` — weist die Introspektion pro Spalte darauf hin, im Terminal und am Anfang der Datei, mit dem, was ein Push damit tun würde, und, wenn vorhanden, dem Statement, das die beiden in Übereinstimmung bringt (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). Eine Tabelle, deren Schlüssel aus mehr als einer Spalte besteht, wird mit ihrem Grund ausgelassen: Eine Collection liest eine Zeile über eine einzelne Schlüsselspalte, und `db push` lässt eine Tabelle, die keine Collection ist, unangetastet. Auf 0.23 kann der Push direkt nach einer Introspektion weiterhin Typänderungen, entfernte Defaults und NOT NULLs sowie einen Phantom-`id`-Schlüssel planen.
 
 ### `rebase db push`
 
@@ -206,6 +206,12 @@ rebase generate-sdk
 `config/collections/` für Sie aus. Selbst ausführen müssen Sie es in CI, in einem
 Repository ohne Collections (siehe `--from` unten) oder überall dort, wo
 `rebase dev` nicht läuft.
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> gilt das für das Lesen jeder Datei, das Abbrechen bei einer
+defekten Datei, das Ausführen durch `rebase dev` und `--collections` bei diesem
+Befehl. Auf 0.23 liest es die Dateien, die der `index.ts`-Barrel auflistet,
+überspringt eine nicht ladbare mit einer Warnung und verwendet das Verzeichnis
+als `--collections-dir`; `rebase dev` generiert dabei nur das Schema neu.
 
 **Optionen:**
 

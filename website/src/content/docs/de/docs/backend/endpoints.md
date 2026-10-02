@@ -81,6 +81,7 @@ ein einzelnes `404 NO_COLLECTIONS` aus. Siehe [Backend only](/docs/getting-start
 | `POST` | `/api/auth/change-password` | session | [Authentifizierung](/docs/backend/authentication/) |
 | `POST` | `/api/auth/send-verification` | session | [Authentifizierung](/docs/backend/authentication/) |
 | `GET` | `/api/auth/verify-email` | none (ein Verifizierungs-Token) | [Authentifizierung](/docs/backend/authentication/) |
+| `POST` | `/api/auth/verify-email` | none (ein Verifizierungs-Token, und eine Session oder das Passwort, um es zu behalten) | [E-Mail-Verifizierung](/docs/backend/email-verification/) |
 | `POST` | `/api/auth/magic-link` | none | [Authentifizierung](/docs/backend/authentication/) |
 | `POST` | `/api/auth/magic-link/verify` | none (ein Link-Token) | [Authentifizierung](/docs/backend/authentication/) |
 | `POST` | `/api/auth/otp` | none | Einmalcodes per E-Mail |
@@ -94,6 +95,7 @@ ein einzelnes `404 NO_COLLECTIONS` aus. Siehe [Backend only](/docs/getting-start
 | `POST` | `/api/auth/mfa/verify` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `GET` | `/api/auth/mfa/factors` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `DELETE` | `/api/auth/mfa/unenroll` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
+| `POST` | `/api/auth/mfa/recovery-codes` | session (`aal2`) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge` | none (eine laufende Anmeldung) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge/verify` | none (eine Challenge-ID) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `GET` | `/api/auth/scopes` | session | Jeder Scope, den dieses Backend kennt, und die, die der Aufrufer hält – [Rollen und Scopes](/docs/backend/roles-and-scopes/) |
@@ -119,6 +121,7 @@ der auf eine Collection beschränkt ist, erreicht nichts davon. Siehe [Rollen un
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Abgelehnt für ein Konto, das mehr hält als der Aufrufer |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Abgelehnt für ein Konto, das mehr hält als der Aufrufer |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Gibt ein temporäres Passwort aus |
+| `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Entfernt die zweiten Faktoren und Wiederherstellungscodes des Kontos, beendet seine Sitzungen |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` und die Rollen, die das Projekt deklariert, mit ihren Scopes |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [API-Schlüssel](/docs/backend/api-keys/). Nie ein API-Schlüssel |
 | `POST` | `/api/admin/api-keys` | `keys:write` | Der Klartext-Schlüssel wird nur einmalig bei der Erstellung zurückgegeben |

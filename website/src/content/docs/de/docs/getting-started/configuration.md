@@ -145,6 +145,9 @@ zu stellen und die Antworten zu lesen.
 | `REBASE_RATE_LIMIT_STORE` | Wo Zähler für Authentifizierungs-Rate-Limits gespeichert werden: `memory` (pro Prozess) oder `sql` (geteilt über Replikate hinweg). Ein Prozess kann seine eigene Anzahl an Replikaten nicht sehen, daher muss ein Deployment mit Peers dies angeben – drei Replikate auf dem Standardwert erzwingen das dreifache Limit. Jeder andere Wert **verweigert den Start**, anstatt auf einen Fallback zurückzugreifen, einschließlich `postgres`. | `memory` |
 | `AUTH_MAGIC_LINK` | Stellt den passwortlosen Ablauf per Anmelde-Link bereit. Erfordert einen konfigurierten E-Mail-Dienst, da der Link sonst nirgendwohin gesendet werden kann. | `false` |
 | `AUTH_EMAIL_OTP` | Stellt die passwortlose Anmeldung mit einem sechsstelligen, per E-Mail gesendeten Code bereit. Gleiche E-Mail-Anforderung wie oben. | `false` |
+| `AUTH_MAGIC_LINK_CREATES_USERS` | Passwortlose Registrierung: Eine Magic-Link- oder E-Mail-Code-Anfrage für eine unbekannte Adresse legt das Konto an, solange die Registrierung offen ist. | `false` |
+| `AUTH_REFRESH_TOKEN_REUSE` | Was mit einem Refresh-Token geschieht, das nach seinem Wiederverwendungsfenster erneut eingesetzt wird: `reject` (ablehnen, Sitzung bleibt bestehen) oder `revoke-session` (die Anmeldung beenden). Jeder andere Wert lässt den Start fehlschlagen. | `reject` |
+| `AUTH_REQUIRE_EMAIL_VERIFICATION` | Registrierung mit vorheriger Bestätigung: keine Passwort-Anmeldung, bevor die Adresse verifiziert ist. Benötigt E-Mail; ohne diese lehnt der Start ab. | `false` |
 | `CAPTCHA_PROVIDER` | Aktiviert die Captcha-Verifizierung auf den Authentifizierungsrouten: `turnstile` oder `hcaptcha`. Nicht gesetzt bedeutet kein Captcha. | — |
 | `CAPTCHA_SECRET` | Das Secret des Anbieters, das serverseitig verwendet wird, um das vom Browser gesendete Token zu überprüfen. Erforderlich, sobald `CAPTCHA_PROVIDER` gesetzt ist. | — |
 | `CAPTCHA_ROUTES` | Kommagetrennte Authentifizierungsrouten, die geschützt werden sollen (z. B. `register,login`). Nicht gesetzt schützt die Standardauswahl des Anbieters. | — |
@@ -164,6 +167,8 @@ mitliefert), `STORAGE_PUBLIC_READ` oder `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `STORAGE_TYPE` | Storage-Backend: `local`, `s3` oder `gcs`. In der Produktion deaktiviert `local` den Storage, es sei denn, `FORCE_LOCAL_STORAGE=true` | `local` |
 | `STORAGE_PATH` | Basispfad für lokalen Speicher | `./uploads` |
 | `FORCE_LOCAL_STORAGE` | Lokalen Speicher in der Produktion erlauben – nur mit einem dauerhaften Volume, das unter `STORAGE_PATH` gemountet ist | `false` |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Sekunden, die die Download-URL einer privaten Datei funktioniert — das Token, das `getSignedUrl()` darin einsetzt. Höchstens `604800` (eine Woche) | `300` |
+| `STORAGE_MAX_FILE_SIZE` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Größte Datei, die die Quelle akzeptiert, in Bytes, auf jedem Upload-Pfad — `__<KEY>` für eine benannte Quelle. Keine ganze Zahl von Bytes lässt den Start fehlschlagen | `52428800` (50 MB) |
 | `S3_BUCKET` | S3-Bucket-Name (wenn `STORAGE_TYPE=s3`) | — |
 | `S3_REGION` | AWS-Region | — |
 | `S3_ACCESS_KEY_ID` | AWS-Zugriffsschlüssel | — |
@@ -217,11 +222,13 @@ Server-Image. Ein Projekt, für das `eject` ausgeführt wurde, steuert diese Ent
 | `REBASE_MAX_BODY_SIZE` | Maximaler Request-Body, **in Bytes** (`10485760`, nicht `10MB` – ein Wert, der keine Zahl ist, verweigert den Start, anstatt das Limit stillschweigend aufzuheben). | — |
 | `REBASE_ENABLE_SWAGGER` | Die OpenAPI-Oberfläche. Drei Zustände: Nicht gesetzt bedeutet in der Entwicklung aktiviert, in der Produktion deaktiviert; `false` deaktiviert beides überall. Beachten Sie, dass `true` in der Produktion die **Spezifikation** unter `/api/docs` bereitstellt, jedoch nicht die Swagger-**Benutzeroberfläche** unter `/api/swagger` – die UI wird separat über `NODE_ENV` gesteuert. | — |
 | `REBASE_METRICS` | Prometheus-Metriken unter `/metrics` bereitstellen. | `false` |
+| `REBASE_HSTS_INCLUDE_SUBDOMAINS` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Fügt `includeSubDomains` zum `Strict-Transport-Security`-Header hinzu, sodass Browser sechs Monate lang reines HTTP auf jeder Subdomain des Hosts ablehnen — auch auf Hosts, die dieser Prozess nicht bedient. Aktivieren Sie dies nur, wenn jede Subdomain der Domain ausschließlich HTTPS verwendet. Alles außer `true`/`false` lässt den Start fehlschlagen. Siehe [Sicherheits-Header](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Bearer-Token zum Schutz von `/metrics`. Wenn nicht gesetzt, bleibt der Endpunkt für alles offen, was den Port erreichen kann – in einem privaten Netzwerk in Ordnung, in einem öffentlichen nicht, worauf die Boot-Logs hinweisen. | — |
 | `REBASE_MIGRATE_ON_BOOT` | Was die Runtime beim Start mit dem Schema tun darf. `ensure` (der Standard überall – einschließlich Produktion) führt den **additiven** Schritt aus: Fehlende Tabellen, Spalten und Enum-Typen anlegen, niemals löschen oder umschreiben. `none` rührt nichts an. Das veröffentlichte Image akzeptiert nur diese beiden und **verweigert den Start bei `push`**. In einem [getrennten Deployment](/docs/deployment/split-processes) darf genau ein Prozess die Bereitstellung übernehmen, daher müssen alle anderen Rollen `none` setzen oder den Start verweigern. | `ensure` |
 | `REBASE_REQUIRE_SCHEMA_MATCH` | Start verweigern, wenn die Datenbank zuletzt aus einem anderen Satz von Collections bereitgestellt wurde, als diesem Prozess zugrunde liegt. Nicht gesetzt (oder alles andere als `true`/`1`) gibt stattdessen eine Warnung aus. | warn |
 | `REALTIME_CDC` | Change-Capture auf Datenbankebene: `auto` (aktivieren, wo die Verbindung es unterstützt, sonst stiller Fallback), `trigger` (erzwingen, warnen falls unmöglich), `wal` (fällt aktuell auf `trigger` zurück), `off`. Siehe [Realtime](/docs/backend/realtime#database-level-change-capture-cdc). | `auto` |
 | `REALTIME_CHANNEL_BUS` | Instanzübergreifender Transport für Broadcast-Kanäle und Anwesenheit (Presence): `memory` oder `postgres`. Wird ignoriert, wenn `realtime.bus` ein konstruierter Transport übergeben wurde. | `memory` |
+| `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | Wie viele Abonnements ein Realtime-Socket halten darf; das nächste wird mit `TOO_MANY_SUBSCRIPTIONS` abgelehnt. Eine positive ganze Zahl — alles andere stoppt den Server beim Start. Hat Vorrang vor `realtime.maxSubscriptionsPerSocket`. Siehe [Realtime](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
 | `ALLOW_LOCALHOST_IN_PRODUCTION` | `localhost`/Loopback-Werte unter `NODE_ENV=production` zulassen. Standardmäßig deaktiviert, damit ein Produktionsstart deutlich fehlschlägt, anstatt sich mit einer Datenbank zu verbinden, die nicht existiert. | `false` |
 | `REBASE_STRICT_COLLECTION_CONFIG` | Was der Startvorgang mit einem Schlüssel in Ihren Collections tun soll, den diese Version nicht liest: `warn`, `error` (Start verweigern – sinnvoll in CI), oder `off`. Regelt nur Schlüssel, die *nicht erkannt* werden (meist Tippfehler, gelegentlich beabsichtigte Metadaten); ein Schlüssel, von dem bekannt ist, dass er verschoben wurde, ist immer fatal, da das konfigurierte Feature andernfalls stillschweigend fehlt. | `warn` |
 | `REBASE_PROVISION_ONLY` | `1`/`true` führt den Schemadurchlauf aus und beendet sich, ohne einen Socket zu öffnen – genau das Verhalten, das ein Migrations-Job benötigt, aus demselben Image und demselben Bundle wie der nachfolgende Server. Ein leerer Wert gilt als *nicht gesetzt*, sodass ein nicht ersetztes `${SOMETHING}` in einer Compose-Datei ein normales Deployment nicht in eines verwandeln kann, das migriert und die Bereitstellung verweigert. | — |
@@ -283,12 +290,17 @@ zu übergeben, und diese sollte von einer Person getroffen und nicht von der Ber
 | `BACKUP_DESTINATION` | Lokaler Pfad oder eine `s3://bucket/prefix`- / `gs://bucket/prefix`-URL. | `./backups` |
 | `BACKUP_RETENTION_DAYS` | Backups löschen, die älter als N Tage sind. Nicht gesetzt oder `0` behält alles. | — |
 | `BACKUP_KEEP_MINIMUM` | Immer mindestens N der neuesten Backups behalten, unabhängig von der Aufbewahrungsfrist. | — |
-| `PG_DUMP_PATH` | Überschreiben der `pg_dump`-Binärdatei – sie muss der Hauptversion des Servers entsprechen. | — |
+| `PG_DUMP_PATH` | Überschreiben der `pg_dump`-Binärdatei – sie muss die Hauptversion des Servers oder neuer sein. | — |
 | `PG_RESTORE_PATH` | Überschreiben der `pg_restore`-Binärdatei. | — |
+| `PG_DUMPALL_PATH` | Wo sich `pg_dumpall` befindet, wenn es nicht im `PATH` liegt. Ohne dies – und ohne installierte PostgreSQL-Client-Tools – schlägt ein globales Backup mit einem Fehler fehl, der diese Variable nennt. | — |
+
+Das offizielle Runtime-Image (`rebasepro/server`) liefert die PostgreSQL-18-Client-Tools mit,
+sodass ein geplantes Backup darin gegen jeden Server bis Postgres 18 läuft. Außerhalb des
+Images installieren Sie sie selbst (`apt-get install postgresql-client-18`,
+`brew install libpq`).
 
 Backups enthalten Secrets und personenbezogene Daten (PII). Verwenden Sie ein privates Ziel mit
 Ruhezustandsverschlüsselung (Encryption-at-Rest).
-| `PG_DUMPALL_PATH` | Wo sich `pg_dumpall` befindet, wenn es nicht im `PATH` liegt. Ohne dies – und ohne installierte PostgreSQL-Client-Tools – schlägt ein globales Backup mit einem Fehler fehl, der diese Variable nennt. | — |
 
 ### Bundle-Auslieferung
 

@@ -128,10 +128,11 @@ export const relations = {  };
 
 Drei Dinge darin lohnen es, zweimal gelesen zu werden. Die Spalte `id`, die Sie
 nicht deklariert haben: Jede Collection erhält einen `text`-Primärschlüssel,
-sofern keine Eigenschaft `isId` beansprucht, und die Datenbank befüllt sie mit
+sofern keine Eigenschaft `isId` beansprucht, und <span class="since-badge" data-since="0.24">Seit 0.24</span> befüllt die Datenbank sie mit
 einer UUID (`gen_random_uuid()::text`), sodass eine über das Admin-Panel, die
 REST-API oder das SDK erstellte Zeile keinen eigenen Schlüssel braucht. Ein
-Schlüssel, den Sie selbst mitsenden, wird genau so verwendet. Der `pgPolicy`-Block:
+Schlüssel, den Sie selbst mitsenden, wird genau so verwendet. Auf 0.23 hat die Spalte keinen
+Default, und ein Erstellen ohne mitgesendeten Schlüssel schlägt fehl. Der `pgPolicy`-Block:
 Row Level Security ist auf jeder Tabelle aktiviert, und diese Basis-Policies
 sind es, die dem vertrauenswürdigen Server-Kontext und der `admin`-Rolle
 überhaupt das Lesen ermöglichen — siehe
