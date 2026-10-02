@@ -329,9 +329,9 @@ export function useRebaseAuthController(
         setAuthLoading(true);
         setAuthProviderError(null);
         try {
+            // The SDK adopts the fresh session the server answers with: this
+            // device stays signed in, every other one is signed out.
             await auth.changePassword(oldPassword, newPassword);
-            // Sign out after password change as sessions are usually invalidated
-            await auth.signOut();
         } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error));
             setAuthProviderError(err);

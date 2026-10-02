@@ -868,18 +868,28 @@ password: "newPass" })
             });
         });
 
-        it("changePassword calls transport", async () => {
+        it("changePassword adopts the fresh session the server answers with, and stays signed in", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockRequest.mockResolvedValueOnce({ success: true,
-message: "Changed" });
+            const tokens = (accessToken: string) => ({ accessToken, refreshToken: `r-${accessToken}`, accessTokenExpiresAt: Date.now() + 3_600_000 });
+            mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ user: { uid: "u1", email: "a@b.c", roles: [] }, tokens: tokens("before") }) });
+            await auth.signInWithEmail("a@b.c", "oldPass");
+            const events: string[] = [];
+            auth.onAuthStateChange((event) => { events.push(event); });
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ success: true, message: "Changed", user: { uid: "u1", email: "a@b.c", roles: [] }, tokens: tokens("after") })
+            });
 
             const result = await auth.changePassword("oldPass", "newPass");
-            expect(result.success).toBe(true);
-            expect(mockRequest).toHaveBeenCalledWith("/auth/change-password", {
-                method: "POST",
-                body: JSON.stringify({ oldPassword: "oldPass",
-newPassword: "newPass" })
-            });
+
+            expect(result).toEqual({ success: true, message: "Changed" });
+            const [url, init] = mockFetch.mock.calls[1] as [string, RequestInit];
+            expect(url).toBe("http://localhost/api/v1/auth/change-password");
+            expect(JSON.parse(String(init.body))).toEqual({ oldPassword: "oldPass", newPassword: "newPass" });
+            expect((init.headers as Record<string, string>).Authorization).toBe("Bearer before");
+            expect(auth.getSession()?.accessToken).toBe("after");
+            expect(events).not.toContain("SIGNED_OUT");
+            auth.stopAutoRefresh();
         });
     });
 

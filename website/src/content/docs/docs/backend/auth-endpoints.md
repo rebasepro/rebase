@@ -21,7 +21,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/forgot-password` | Send password reset email |
 | `POST` | `/api/auth/reset-password` | Reset password with token |
 | `POST` | `/api/auth/find-user` | Resolve an email to a minimal public profile (opt-in — `AUTH_ALLOW_USER_LOOKUP`) |
-| `POST` | `/api/auth/change-password` | Change the caller's own password (authenticated) |
+| `POST` | `/api/auth/change-password` | Change the caller's own password (authenticated). Ends every other session and answers with a fresh one for the caller |
 | `GET` | `/api/auth/me` | The caller's own profile |
 | `PATCH` | `/api/auth/me` | Update the caller's own profile |
 | `GET` | `/api/auth/config` | What this backend offers a sign-in screen — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Unauthenticated, and computed from the same predicates the routes enforce, so what the screen advertises cannot drift from what it can do |

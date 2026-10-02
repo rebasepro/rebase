@@ -498,7 +498,7 @@ export const hi: RebaseTranslations = {
     current_password: "वर्तमान पासवर्ड",
     new_password: "नया पासवर्ड",
     confirm_password: "नया पासवर्ड की पुष्टि करें",
-    password_changed: "पासवर्ड सफलतापूर्वक बदल गया। आपको लॉग आउट कर दिया जाएगा।",
+    password_changed: "पासवर्ड बदल गया। आपके दूसरे डिवाइस से साइन आउट कर दिया गया।",
     passwords_dont_match: "पासवर्ड मेल नहीं खाते",
     password_too_short: "पासवर्ड कम से कम 8 वर्णों का होना चाहिए",
     password_change_not_available: "बाहरी साइन-इन प्रदाता का उपयोग करने वाले खातों के लिए पासवर्ड बदलना उपलब्ध नहीं है।",

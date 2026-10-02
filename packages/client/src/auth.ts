@@ -832,12 +832,37 @@ password })
         return body as { success: boolean; message: string; };
     }
 
+    /**
+     * Change the signed-in account's password. Every other session ends; this
+     * one is replaced by the fresh session the server answers with, so the
+     * client stays signed in.
+     */
     async function changePassword(oldPassword: string, newPassword: string) {
-        return transport.request<{ success: boolean; message: string; }>(authPath + "/change-password", {
+        // Sent with this client's own fetch rather than the transport, so that
+        // in cookie mode the new refresh cookie the answer sets is kept — so
+        // the transport's refresh-on-401 is done here, before the call.
+        if (currentSession && currentSession.expiresAt <= Date.now() + 10_000) {
+            await refreshSession().catch(() => undefined);
+        }
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl("/change-password"), {
             method: "POST",
-            body: JSON.stringify({ oldPassword,
-newPassword })
-        });
+            headers: {
+                "Content-Type": "application/json",
+                ...(currentSession?.accessToken ? { Authorization: `Bearer ${currentSession.accessToken}` } : {})
+            },
+            body: JSON.stringify({ oldPassword, newPassword }),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        const result = body as { success: boolean; message: string; tokens?: AuthTokens; user?: Record<string, unknown> };
+        // A server from before this release answers without a session, having
+        // revoked this one: nothing to adopt, and the next call signs out.
+        if (result.tokens && result.user) {
+            handleAuthResponse({ tokens: result.tokens, user: result.user }, "TOKEN_REFRESHED");
+        }
+        return { success: result.success, message: result.message };
     }
 
     /**

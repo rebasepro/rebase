@@ -1184,7 +1184,7 @@ message: "Password has been reset successfully" });
      * Change password for authenticated user
      */
     router.post("/change-password", requireLiveSession, async (c) => {
-        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[]; aal?: "aal1" | "aal2" } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -1209,12 +1209,27 @@ message: "Password has been reset successfully" });
             throw ApiError.badRequest(passwordValidation.errors.join(". "), "WEAK_PASSWORD");
         }
 
-        // Update the password and log out every session, this one included
+        // Update the password and log out every session, this one included —
+        // then sign this device back in. Every other device has to sign in
+        // with the new password, which is why the password was changed; this
+        // one just proved the old password, so it gets a fresh session at the
+        // level it already had, rather than a success answer and a session the
+        // server had just revoked (which signed the app out on its next call).
         const passwordHash = await ops.hashPassword(newPassword);
         await replaceUserPassword(authRepo, user.id, passwordHash);
 
-        return c.json({ success: true,
-message: "Password has been changed successfully" });
+        const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
+            user.id,
+            c.req.header("user-agent") || "unknown",
+            c.req.header("x-forwarded-for") || "unknown",
+            { skipMfaGate: true, aal: userCtx.aal === "aal2" ? "aal2" : "aal1" }
+        );
+        const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, "password");
+        return c.json({
+            ...redactRefreshToken(authResponse, c, refreshToken, config.cookieAuth),
+            success: true,
+            message: "Password has been changed successfully"
+        });
     });
 
     /**

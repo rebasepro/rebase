@@ -132,3 +132,28 @@ describe("the access token's session id", () => {
         expect((await call("GET", "/data", undefined, legacy)).status).toBe(200);
     });
 });
+
+/**
+ * Changing the password ends every session, this one included — and signs
+ * this device back in. It used to answer `{ success: true }` and leave the
+ * caller holding the session it had just revoked, so the app was signed out
+ * by its next request; the CMS papered over it with a sign-out of its own.
+ */
+describe("POST /auth/change-password", () => {
+    it("answers with a fresh session for this device and ends the others", async () => {
+        const { signIn, call } = await registered();
+        const laptop = await signIn();
+        const phone = await signIn();
+        await new Promise(resolve => setTimeout(resolve, 1100));
+
+        const changed = await call("POST", "/auth/change-password", { oldPassword: PASSWORD, newPassword: "N3w-Passw0rd-Device" }, laptop.accessToken);
+
+        expect(changed.status).toBe(200);
+        expect(changed.json.tokens.accessToken).toBeDefined();
+        expect((await call("GET", "/data", undefined, changed.json.tokens.accessToken)).status).toBe(200);
+        expect((await call("POST", "/auth/refresh", { refreshToken: changed.json.tokens.refreshToken })).status).toBe(200);
+        expect((await call("GET", "/data", undefined, laptop.accessToken)).status).toBe(401);
+        expect((await call("GET", "/data", undefined, phone.accessToken)).status).toBe(401);
+        expect((await call("POST", "/auth/refresh", { refreshToken: phone.refreshToken })).status).toBe(401);
+    });
+});

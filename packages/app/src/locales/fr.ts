@@ -498,7 +498,7 @@ export const fr: RebaseTranslations = {
     current_password: "Mot de passe actuel",
     new_password: "Nouveau mot de passe",
     confirm_password: "Confirmer le nouveau mot de passe",
-    password_changed: "Mot de passe modifié. Vous allez être déconnecté.",
+    password_changed: "Mot de passe modifié. Vos autres appareils ont été déconnectés.",
     passwords_dont_match: "Les mots de passe ne correspondent pas",
     password_too_short: "Le mot de passe doit comporter au moins 8 caractères",
     password_change_not_available: "Le changement de mot de passe n'est pas disponible pour les comptes utilisant un fournisseur de connexion externe.",

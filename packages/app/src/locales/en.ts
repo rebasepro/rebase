@@ -506,7 +506,7 @@ export const en: RebaseTranslations = {
     current_password: "Current Password",
     new_password: "New Password",
     confirm_password: "Confirm New Password",
-    password_changed: "Password changed successfully. You will be logged out.",
+    password_changed: "Password changed. Your other devices were signed out.",
     passwords_dont_match: "Passwords don't match",
     password_too_short: "Password must be at least 8 characters",
     password_change_not_available: "Password change is not available for accounts using external sign-in providers.",

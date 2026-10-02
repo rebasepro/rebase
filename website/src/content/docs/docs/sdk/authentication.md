@@ -449,6 +449,10 @@ const { success, message } = await client.auth.changePassword(
 );
 ```
 
+Every other session of the account ends: whoever else held one has to sign in
+with the new password. This device stays signed in. The server answers with a
+fresh session, and the client adopts it (emitting `TOKEN_REFRESHED`).
+
 ## Email Verification
 
 Registering mails the new account its verification link when email is

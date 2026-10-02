@@ -498,7 +498,7 @@ export const it: RebaseTranslations = {
     current_password: "Password attuale",
     new_password: "Nuova password",
     confirm_password: "Conferma la nuova password",
-    password_changed: "Password modificata con successo. Verrai disconnesso.",
+    password_changed: "Password modificata. I tuoi altri dispositivi sono stati disconnessi.",
     passwords_dont_match: "Le password non coincidono",
     password_too_short: "La password deve contenere almeno 8 caratteri",
     password_change_not_available: "La modifica della password non è disponibile per gli account che usano provider di accesso esterni.",

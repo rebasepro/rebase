@@ -506,7 +506,7 @@ export const es: RebaseTranslations = {
     current_password: "Contraseña Actual",
     new_password: "Nueva Contraseña",
     confirm_password: "Confirmar Nueva Contraseña",
-    password_changed: "Contraseña cambiada con éxito. Se cerrará tu sesión.",
+    password_changed: "Contraseña cambiada. Se cerró la sesión en tus otros dispositivos.",
     passwords_dont_match: "Las contraseñas no coinciden",
     password_too_short: "La contraseña debe tener al menos 8 caracteres",
     password_change_not_available: "El cambio de contraseña no está disponible para cuentas que usan proveedores de inicio de sesión externos.",

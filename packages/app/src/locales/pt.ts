@@ -503,7 +503,7 @@ export const pt: RebaseTranslations = {
     current_password: "Palavra-passe atual",
     new_password: "Nova palavra-passe",
     confirm_password: "Confirmar a nova palavra-passe",
-    password_changed: "Palavra-passe alterada com sucesso. A sua sessão será terminada.",
+    password_changed: "Palavra-passe alterada. A sessão foi terminada nos seus outros dispositivos.",
     passwords_dont_match: "As palavras-passe não coincidem",
     password_too_short: "A palavra-passe deve ter pelo menos 8 caracteres",
     password_change_not_available: "A alteração da palavra-passe não está disponível para contas que usam fornecedores de início de sessão externos.",

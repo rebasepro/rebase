@@ -498,7 +498,7 @@ export const de: RebaseTranslations = {
     current_password: "Aktuelles Passwort",
     new_password: "Neues Passwort",
     confirm_password: "Neues Passwort bestätigen",
-    password_changed: "Passwort erfolgreich geändert. Sie werden abgemeldet.",
+    password_changed: "Passwort geändert. Deine anderen Geräte wurden abgemeldet.",
     passwords_dont_match: "Die Passwörter stimmen nicht überein",
     password_too_short: "Das Passwort muss mindestens 8 Zeichen lang sein",
     password_change_not_available: "Für Konten mit externem Anmeldeanbieter ist die Passwortänderung nicht verfügbar.",
