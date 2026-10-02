@@ -87,7 +87,9 @@ describe("bin/rebase.js writes plain text to a pipe", () => {
         fs.writeFileSync(path.join(project, "rebase.json"), "{}\n");
         const collections = path.join(project, "config", "collections");
         fs.mkdirSync(collections, { recursive: true });
-        fs.writeFileSync(path.join(collections, "index.ts"), "throw new Error(\"collection file is broken\");\n");
+        // A collection file, not the `index.ts` barrel: generate-sdk loads the
+        // directory the way boot does, and boot skips the barrel.
+        fs.writeFileSync(path.join(collections, "posts.ts"), "throw new Error(\"collection file is broken\");\n");
         try {
             const { stderr } = await runCli(["generate-sdk"], {}, project);
             expect(stderr).toContain("collection file is broken");
