@@ -256,7 +256,10 @@ export function CalendarWidget({ loading, tasks, onOpenTask }: CalendarWidgetPro
                                     key={day.dateKey}
                                     onClick={() => setSelectedDay(isSelected ? null : day.dateKey)}
                                     className={cls(
-                                        "flex flex-col items-center justify-center py-1.5 rounded-md transition-colors duration-100 focus:outline-none",
+                                        // The today and selected rings are utilities, which outrank the kit's
+                                        // base :focus-visible ring — so the focus ring is said here too, or a
+                                        // keyboard user on today's cell sees nothing change.
+                                        "flex flex-col items-center justify-center py-1.5 rounded-md transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
                                         day.isCurrentMonth
                                             ? "text-text-primary dark:text-text-primary-dark"
                                             : "text-surface-300 dark:text-surface-600",
