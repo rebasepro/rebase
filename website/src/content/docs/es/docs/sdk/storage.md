@@ -79,12 +79,12 @@ El SDK almacena en caché las URL firmadas para evitar llamadas redundantes al s
 
 ### URL privadas vs. públicas
 
-- **Los archivos privados** obtienen una URL con un **token de descarga de corta duración y limitado a la ruta** (`?token=…`, 5 minutos salvo que el servidor establezca `STORAGE_DOWNLOAD_TOKEN_TTL`) — nunca su token de acceso. Como caduca, **no persista una URL privada**; almacene la **ruta** del archivo y vuelva a llamar a `getSignedUrl()` al renderizarlo.
+- **Los archivos privados** obtienen una URL con un **token de descarga de corta duración y limitado a la ruta** (`?token=…`, 5 minutos salvo que el servidor establezca `STORAGE_DOWNLOAD_TOKEN_TTL` <span class="since-badge" data-since="0.24">Desde 0.24</span>, que 0.23 no lee) — nunca su token de acceso. Como caduca, **no persista una URL privada**; almacene la **ruta** del archivo y vuelva a llamar a `getSignedUrl()` al renderizarlo.
 - **Los archivos públicos** (almacenados bajo el prefijo `public/` — establezca `storage: { public: true }` en la propiedad, o pase `public: true` a `putObject`) obtienen una URL **estable, sin token, permanente y cacheable por CDN**, sin ida y vuelta al servidor. Son seguros para almacenar en una base de datos y enlazar directamente.
 
 ### Archivos dentro de texto
 
-Un texto que incrusta un archivo — las imágenes de un campo markdown — tampoco
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Un texto que incrusta un archivo — las imágenes de un campo markdown — tampoco
 puede contener una URL privada, así que contiene una **referencia de
 almacenamiento** en su lugar: `rebase-storage:posts/cover.png`, con
 `?storageId=media` cuando el archivo está en un origen de almacenamiento con

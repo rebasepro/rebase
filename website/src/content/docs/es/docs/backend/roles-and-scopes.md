@@ -41,7 +41,7 @@ declare para él.
 | `storage:delete` | datos | origen de almacenamiento | Eliminar archivos |
 | `functions:invoke` | datos | función | Llamar a funciones personalizadas. Una función puede hacer todo lo que haga su código |
 | `users:read` | administración | — | Listar cuentas y sus roles |
-| `users:write` | administración | — | Crear, editar y eliminar cuentas, restablecer contraseñas, asignar roles hasta los del propio titular |
+| `users:write` | administración | — | Crear, editar y eliminar cuentas, restablecer contraseñas y segundos factores, asignar roles hasta los del propio titular |
 | `schema:read` | administración | — | Leer el esquema de colecciones, planificar cambios de esquema, ejecutar la auditoría de RLS, leer la documentación privada de la API |
 | `schema:write` | administración | — | Aplicar cambios de esquema: edita los archivos de colección y altera la base de datos |
 | `database:read` | administración | — | Listar bases de datos, tablas, roles de Postgres y ramas |
@@ -280,7 +280,7 @@ otro.
 
 ## Cuando falta un alcance
 
-La respuesta es `403 SCOPE_MISSING`, y `details.requiredScope` nombra el alcance, con
+<span class="since-badge" data-since="0.24">Desde 0.24</span> La respuesta es `403 SCOPE_MISSING`, y `details.requiredScope` nombra el alcance, con
 su destino cuando lo tiene:
 
 ```json

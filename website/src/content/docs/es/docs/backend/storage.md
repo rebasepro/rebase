@@ -217,16 +217,48 @@ que nadie hizo.
 
 El tipo de contenido almacenado es el que haya declarado quien lo subió — nada analiza los
 bytes internamente —, por lo que `/api/storage/file/*` solo representará en línea una **lista de permitidos estricta**:
-imágenes (excepto SVG), vídeo, audio, `application/pdf` y `text/plain`. Todo lo
-demás, incluidos `text/html` e `image/svg+xml`, se sirve como
+imágenes, vídeo, audio, `application/pdf` y `text/plain`. Todo lo
+demás, incluido `text/html`, se sirve como
 `application/octet-stream` con `Content-Disposition: attachment`, y cada
 respuesta incluye `X-Content-Type-Options: nosniff`. El almacenamiento no es un alojamiento web:
 una página subida que se procese en el origen de la API puede leer las cookies de ese origen y
 llamar a sus endpoints.
 
+Un SVG es una imagen que también es un documento, y puede llevar `<script>`.
+Se sirve como `image/svg+xml` — de modo que se renderiza en un `<img>` y en
+las miniaturas del panel de administración — con
+`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
+en cada respuesta, incluidas las URLs de transformaciones y las de token de
+descarga. Abierto directamente, se renderiza con los scripts deshabilitados y
+un origen opaco, por lo que no puede llegar a las cookies ni a los endpoints
+de la API.
+
 ## Protocolo de subidas reanudables TUS
 
-Para subir archivos grandes (de hasta **5GB**) o manejar condiciones de red inestables, Rebase implementa el protocolo abierto **TUS v1.0.0**, incluidas las extensiones `Creation` y `Termination`.
+Para subir archivos grandes o manejar condiciones de red inestables, Rebase implementa el protocolo abierto **TUS v1.0.0**, incluidas las extensiones `Creation` y `Termination`.
+
+### Cuán grande puede ser un archivo
+
+Cada origen de almacenamiento acepta archivos hasta su propio límite: **50 MB**
+salvo que `STORAGE_MAX_FILE_SIZE` (bytes, con el sufijo `__<KEY>` para un
+origen con nombre) o el `maxFileSize` del origen indiquen otra cosa. Todas las
+puertas respetan el mismo número. `POST /api/storage/upload` responde
+`413 PAYLOAD_TOO_LARGE` por encima de él; una subida reanudable se rechaza en
+el momento de crearse, antes de su primer fragmento; y
+`OPTIONS /api/storage/tus` lo anuncia como `Tus-Max-Size` — para el origen
+nombrado por `?storageId=`, o el predeterminado en su defecto.
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> para `STORAGE_MAX_FILE_SIZE`: en 0.23 solo el `maxFileSize` del
+origen fija el límite, y la variable no se lee.
+
+```bash
+STORAGE_MAX_FILE_SIZE=209715200          # (por defecto): 200 MB
+STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
+```
+
+Un archivo completo se mantiene en la memoria del servidor mientras se
+escribe en el store, en todas las vías de subida, así que ajusta el límite a
+la memoria que tenga el servidor.
 
 ```
 Client                                                   Rebase Server
@@ -245,7 +277,7 @@ Client                                                   Rebase Server
 
 1. **Inicialización de la sesión (`POST`)**: El cliente envía el tamaño total del archivo en la cabecera `Upload-Length` y metadatos en base64 mediante `Upload-Metadata`. El servidor crea un archivo marcador de posición vacío en un directorio temporal oculto `.tus-uploads/` y devuelve la URL de subida.
 2. **Consultas de progreso (`HEAD`)**: Si una subida se interrumpe, el cliente consulta la URL de subida mediante una solicitud `HEAD`. El servidor devuelve la posición actual en bytes en la cabecera `Upload-Offset`.
-3. **Anexión de datos (`PATCH`)**: El cliente reanuda el envío de datos binarios comenzando en el desplazamiento devuelto con `Content-Type: application/offset+octet-stream`. El servidor escribe los fragmentos entrantes directamente en el archivo temporal utilizando las API de bajo nivel del sistema de archivos de Node `open` y `write` en el desplazamiento de bytes especificado.
+3. **Anexión de datos (`PATCH`)**: El cliente reanuda el envío de datos binarios comenzando en el desplazamiento devuelto con `Content-Type: application/offset+octet-stream`. El servidor escribe cada fragmento en el archivo temporal en el desplazamiento de bytes que declara la solicitud, que debe ser el desplazamiento que tiene el servidor (`409` en caso contrario). Se recibe un fragmento a la vez: un `PATCH` que llega mientras otro de la misma subida aún se está recibiendo — normalmente un cliente reenviando un fragmento que se estancó — se responde con `423 UPLOAD_LOCKED`, y el cliente reanuda desde el desplazamiento que reporta `HEAD`.
 4. **Finalización**: Cuando el `Upload-Offset` acumulado coincide con el `Upload-Length` declarado, Rebase lee el archivo temporal completado, lo envuelve como un objeto estándar `File` de JavaScript y lo guarda en el backend de almacenamiento configurado (disco local o S3). A continuación, se elimina el archivo temporal.
 5. **Limpieza periódica**: Un limpiador en segundo plano se ejecuta cada **60 segundos** para eliminar subidas temporales huérfanas e incompletas que hayan superado el umbral de retención de **24 horas**.
 
@@ -265,6 +297,8 @@ Client                                                   Rebase Server
 | `GCS_PROJECT_ID` | ID de proyecto de GCP para GCS |
 | `GCS_KEY_FILENAME` | Ruta a un archivo de clave de cuenta de servicio de GCP (omitir en GKE; Workload Identity/ADC proporciona las credenciales) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Variable estándar de ADC, leída por el propio SDK de Google (no es necesaria en GCP con credenciales predeterminadas) |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | <span class="since-badge" data-since="0.24">Desde 0.24</span> Durante cuánto tiempo funciona la URL de descarga de un archivo privado, en segundos — la vida del token que acuña `/api/storage/metadata/*` (por defecto `300`, como máximo `604800`, una semana). Aumenta este valor para vídeo y audio privados, que siguen solicitando rangos después de que se renderiza la página. La variante en variable de entorno de `storageDownloadTokenTtl` |
+| `STORAGE_MAX_FILE_SIZE` | <span class="since-badge" data-since="0.24">Desde 0.24</span> El archivo más grande que acepta el origen, en bytes (por defecto `52428800`, 50 MB). Sufijo `__<KEY>` para un origen con nombre. Un valor que no sea un número entero de bytes rechaza el arranque. Consulta [Cuán grande puede ser un archivo](#cuán-grande-puede-ser-un-archivo) |
 | `FORCE_LOCAL_STORAGE` | Permitir `STORAGE_TYPE=local` en producción — ver a continuación |
 | `STORAGE_PUBLIC_READ` | Servir objetos almacenados a lectores no autenticados. La variante en variable de entorno de `storagePublicRead`, y una de las tres formas de satisfacer la [protección de arranque en producción](#autorización-por-objeto). |
 | `STORAGE_ALLOW_ANY_AUTHENTICATED` | Desactivar la protección de arranque, restaurando el comportamiento en el que cualquier usuario autenticado puede leer, sobrescribir, eliminar o listar cualquier clave. La variante en variable de entorno de `storageInsecureAllowAnyAuthenticated`. Solo justificable cuando se confía cada archivo a cada usuario autenticado. |
@@ -369,67 +403,11 @@ La propiedad `key` de cada origen debe coincidir con una clave de backend regist
 
 ## Caché y CDN
 
-Cada objeto se reenvía a través del servidor mediante proxy en lugar de redirigirse a una
-URL firmada — una URL firmada falla con contenido mixto (una página HTTPS, un MinIO por HTTP) y en
-endpoints a los que solo puede acceder el clúster. Por lo tanto, las cabeceras de respuesta son las que hacen
-que la caché funcione.
-
-Cada respuesta incluye un `ETag` débil y `Last-Modified`, generados a partir del
-tamaño del objeto y la hora de modificación. Un cliente que ya tiene el objeto envía
-`If-None-Match` y recibe un **304 sin cuerpo**, por lo que una carga repetida cuesta un
-viaje de ida y vuelta en lugar de una transferencia completa.
-
-`Cache-Control` depende de quién puede leer el objeto:
-
-| Objeto | Cabecera |
-|---|---|
-| Bajo el prefijo `public/`, o `publicRead: true` | `public, max-age=60, stale-while-revalidate=86400, must-revalidate` |
-| Cualquier otro caso | `private, max-age=60, must-revalidate` |
-| Transformaciones de imágenes | lo mismo, con `max-age=3600` |
-
-`private` es deliberado: un objeto que requirió credenciales para recuperarse no debe ser
-almacenado por una caché compartida, o una CDN podría entregar el archivo de un usuario al siguiente solicitante.
-`Vary: Authorization` se envía por la misma razón.
-
-Nunca se marca nada como `immutable`. Una clave de almacenamiento se puede sobrescribir — escribir
-en una clave existente es una operación ordinaria —, por lo que prometer no volver a validar nunca
-haría que un archivo reemplazado fuera invisible hasta que expirase la ventana de tiempo.
-
-### Búsqueda y desplazamiento (seeking) en audio y vídeo
-
-Cada respuesta de objeto incluye `Accept-Ranges: bytes`, y una solicitud `Range` se
-responde con `206 Partial Content` y un `Content-Range`. Sin esto, un navegador
-no permitirá desplazarse en un elemento multimedia servido desde aquí —y Safari se niega
-a reproducir un `<video>` cuya primera respuesta no sea un `206`—, por lo que para el contenido multimedia esta es
-la diferencia entre un reproductor que funciona y uno roto.
-
-- Un rango por solicitud: `bytes=0-499`, `bytes=500-`, `bytes=-500`. Eso es lo que
-  envían los navegadores para la reproducción.
-- Múltiples rangos en una sola cabecera se responden con el objeto completo y un `200`,
-  lo cual siempre es válido. Ningún cliente relevante los envía.
-- Un rango que comienza más allá del final devuelve un `416` con `Content-Range: bytes */<size>`,
-  no una respuesta silenciosa con el archivo completo.
-- La revalidación prevalece sobre un rango: una solicitud que lleve tanto `If-None-Match` como
-  `Range` recibe el `304`.
-
-En el almacenamiento local solo se lee del disco la porción solicitada. En S3 y GCS, el
-objeto se sigue recuperando por completo —un `StorageController` no tiene lectura por rangos—, por lo que el
-ahorro se produce en la respuesta, no aguas arriba.
-
-### Colocar una CDN por delante
-
-Dado que los objetos públicos son `public` con una ventana de `stale-while-revalidate` y un
-validador, cualquier proxy inverso o CDN ordinario puede almacenarlos en caché sin ninguna
-configuración adicional. Apúntelo al origen de la API y deje que respete las cabeceras.
-
-Dos cosas que debe configurar en la propia CDN:
-
-- **Respetar `Vary: Authorization`**, o no almacenar en caché las rutas autenticadas en absoluto.
-  Una CDN que ignore `Vary` y almacene en caché respuestas `private` es el fallo que
-  esta cabecera busca prevenir.
-- **Esperar revalidación.** El valor corto de `max-age` significa que la CDN volverá a preguntar
-  periódicamente; esas solicitudes son 304 económicos, y son lo que evita que un
-  objeto sobrescrito se sirva desactualizado.
+Cada objeto se reenvía a través del servidor mediante proxy, con un `ETag`
+para una revalidación económica, un `Cache-Control` que depende de quién
+puede leerlo, y rangos de bytes para la búsqueda y el desplazamiento en audio
+y vídeo. [Caché de almacenamiento y CDN](/docs/backend/storage-caching/) tiene
+las cabeceras, y qué configurar en una CDN por delante.
 
 ## Consejos para producción
 
@@ -443,7 +421,7 @@ Configure `STORAGE_TYPE=s3` o `gcs`. Si realmente hay montado un **volumen durad
 
 - Monte un **volumen persistente** si utiliza almacenamiento local en Docker/Kubernetes y configure `FORCE_LOCAL_STORAGE=true`
 - Utilice **S3** o compatibles (R2, MinIO), o **GCS**, para despliegues en producción
-- Configure una **CDN** (CloudFront, Cloudflare) delante de su bucket para mejorar el rendimiento
+- Configure una **CDN** (CloudFront, Cloudflare) por delante para mejorar el rendimiento — consulte [Colocar una CDN por delante](/docs/backend/storage-caching/#putting-a-cdn-in-front)
 - **Cualquier aplicación con almacenamiento en producción debe declarar un modelo de acceso** — consulte a continuación.
   No solo las aplicaciones multitenant: el servidor *se niega a arrancar* sin uno.
 

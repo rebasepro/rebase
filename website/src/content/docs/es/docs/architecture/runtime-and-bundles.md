@@ -139,7 +139,7 @@ estándar común a cualquier destino de despliegue.
 | `PORT` | Puerto al que vincularse. Por defecto `3001` en local, `8080` en la imagen. |
 | `REBASE_SERVICE_KEY` | Clave de servidor a servidor que concede acceso de administrador. |
 | `REBASE_METRICS` | `true` para exponer métricas de Prometheus en `/metrics`. |
-| `REBASE_MIGRATE_ON_BOOT` | `none` deja el esquema intacto; cualquier otro valor —incluido si no se define— ejecuta el paso de aprovisionamiento aditivo. Por defecto es `ensure` en todas partes, incluida la producción. |
+| `REBASE_MIGRATE_ON_BOOT` | `ensure` —el valor por defecto en todas partes, incluida la producción— ejecuta el paso de aprovisionamiento aditivo; `none` deja el esquema intacto. Cualquier otro valor hace que se niegue a arrancar, y la imagen del runtime también se niega a hacer `push`. |
 | `REBASE_SERVE_STATIC` | Sirve los recursos estáticos del bundle desde este proceso. Activado por defecto. |
 
 Se pueden configurar varias bases de datos y varios buckets añadiendo como sufijo a

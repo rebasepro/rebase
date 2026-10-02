@@ -18,12 +18,15 @@ el bloque de configuración.
 
 Un backend desplegado también puede servir MCP por sí mismo, a través de HTTP, para
 las personas que usan tu aplicación. Eso es algo diferente con un modelo de credenciales
-distinto: consulta [El endpoint remoto](#the-remote-endpoint).
+distinto: consulta [El endpoint remoto](#el-endpoint-remoto).
 
 ## Conectar un cliente
 
-El servidor está publicado en npm y no necesita ningún paso de instalación; `npx` lo descarga.
-Cada bloque a continuación representa la integración completa.
+El servidor se ejecuta desde tu proyecto: `@rebasepro/mcp` es una devDependency que
+cada scaffold de `rebase init` fija con la CLI, y cada bloque a continuación — la
+integración completa — arranca esa copia (`pnpm exec rebase-mcp`, o `npx --no rebase-mcp`
+en un proyecto npm), nunca una más reciente desde npm. Un proyecto más antiguo la añade
+una vez, con `rebase skills install --mcp` o `pnpm add -D @rebasepro/mcp`.
 
 <span class="since-badge" data-since="0.24">Desde 0.24</span> `rebase init` escribe el bloque para cada agente que elijas cuando
 [configura tus agentes de programación con IA](/docs/ai/skills#set-up-by-rebase-init), manteniendo
@@ -37,8 +40,8 @@ archivo por ti:
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "."
       }
@@ -54,8 +57,8 @@ archivo por ti:
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "${workspaceFolder}"
       }
@@ -70,8 +73,8 @@ archivo por ti:
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "."
       }
@@ -85,8 +88,8 @@ Codex lee la configuración de un proyecto solo una vez que hayas confiado en é
 
 ```toml title=".codex/config.toml"
 [mcp_servers.rebase]
-command = "npx"
-args = ["-y", "@rebasepro/mcp"]
+command = "pnpm"
+args = ["exec", "rebase-mcp"]
 
 [mcp_servers.rebase.env]
 REBASE_PROJECT_DIR = "."
@@ -98,8 +101,8 @@ REBASE_PROJECT_DIR = "."
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "."
       }
@@ -116,8 +119,8 @@ un transporte explícito:
   "servers": {
     "rebase": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "${workspaceFolder}"
       }
@@ -127,8 +130,9 @@ un transporte explícito:
 ```
 
 **Windsurf** lee los servidores MCP únicamente desde su configuración a nivel de usuario,
-por lo que no hay ningún archivo de proyecto que escribir. Añade el servidor en la configuración
-de MCP de Windsurf, con una ruta absoluta en `REBASE_PROJECT_DIR`.
+por lo que no hay ningún archivo de proyecto que escribir. Añade el servidor en su
+configuración de MCP como `"command": "pnpm"`, `"args": ["--dir", "/absolute/path/to/your/project", "exec", "rebase-mcp"]`,
+con esa misma ruta en `REBASE_PROJECT_DIR`.
 
 Cualquier cliente MCP que pueda iniciar un servidor stdio funcionará; la estructura es la misma.
 
@@ -210,8 +214,8 @@ una clave de servicio:
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "/absolute/path/to/your/project",
         "REBASE_API_TOKEN": "rk_live_..."
@@ -359,6 +363,9 @@ y solo el marcador final que lo contiene cierra el bloque. El texto dentro de lo
 tenga forma de marcador se divide con un espacio de ancho cero, por lo que una fila que imprima
 `<<<END_UNTRUSTED_DATA>>>` no puede cerrar el contenedor antes de tiempo ni dejar fuera lo que sigue.
 
+El [endpoint remoto](#el-endpoint-remoto) marca los resultados de sus herramientas de la misma
+forma y se lo indica al cliente; su `structuredContent` transporta el resultado sin marcar.
+
 Es un marcador, no un entorno aislado (sandbox). Un asistente que disponga de estas herramientas
 es tan seguro como el contenido que le permitas leer.
 
@@ -394,117 +401,10 @@ trátalo en consecuencia.
 
 ## Referencia de herramientas
 
-42 herramientas, en nueve grupos. Las herramientas marcadas con ⚠ se rechazan frente a destinos
-no locales a menos que desactives la protección.
-
-### Esquema y base de datos (12)
-
-Ejecutan la CLI de Rebase en el directorio del proyecto activo.
-
-| Herramienta | Requerido | Descripción |
-|---|---|---|
-| `rebase_schema_generate` | — | Generar esquema de Drizzle a partir de las definiciones de colecciones |
-| `rebase_db_push` ⚠ | — | Aplicar el esquema directamente a la base de datos (atajo para desarrollo) |
-| `rebase_schema_introspect` | — | Introspeccionar la base de datos activa a definiciones de colecciones |
-| `rebase_db_generate` | — | Generar archivos de migración SQL a partir de cambios en el esquema |
-| `rebase_db_migrate` ⚠ | — | Ejecutar todas las migraciones SQL pendientes |
-| `rebase_generate_sdk` | — | Generar el SDK de TypeScript completamente tipado |
-| `rebase_doctor` | — | Detectar discrepancias entre definiciones, esquema generado y la base de datos activa |
-| `rebase_db_branch_create` ⚠ | `name` | Crear una rama de base de datos (solo administradores) |
-| `rebase_db_branch_list` | — | Listar ramas de base de datos (solo administradores) |
-| `rebase_db_branch_delete` ⚠ | `name` | Eliminar una rama de base de datos (solo administradores) |
-| `rebase_db_branch_info` | `name` | Información y estado de la rama (solo administradores) |
-| `rebase_db_branch_switch` | — | Apuntar este checkout a una rama, o de vuelta a la base de datos principal (solo administradores) |
-
-### Planificación de esquema (1)
-
-Pregunta al backend qué haría un cambio, a través de `POST /api/admin/schema/plan`. Sin CLI
-y sin escribir nada en disco; funciona en la base de datos de desarrollo administrada,
-algo que los comandos respaldados por Atlas no pueden hacer.
-
-| Herramienta | Requerido | Descripción |
-|---|---|---|
-| `rebase_schema_plan` | `collectionId`, `collection` | El SQL que ejecutaría el cambio de una colección y qué sentencias destruyen datos |
-
-### Documentos (5)
-
-| Herramienta | Requerido | Descripción |
-|---|---|---|
-| `list_documents` | `collection` | Listar filas, con `limit`, `offset`, `orderBy`, `where` opcionales |
-| `get_document` | `collection`, `id` | Obtener una sola fila por ID |
-| `create_document` ⚠ | `collection`, `data` | Crear una fila |
-| `update_document` ⚠ | `collection`, `id`, `data` | Actualizar una fila |
-| `delete_document` ⚠ | `collection`, `id` | Eliminar una fila |
-
-### Usuarios y roles (6)
-
-| Herramienta | Requerido | Descripción |
-|---|---|---|
-| `list_users` | — | Listar todos los usuarios, incluidos los roles |
-| `create_user` ⚠ | `email` | Crear un usuario (`displayName`, `password`, `roles` opcionales) |
-| `update_user` ⚠ | `uid` | Actualizar correo electrónico, nombre para mostrar o roles |
-| `delete_user` ⚠ | `uid` | Eliminar un usuario |
-| `list_roles` | — | Listar roles definidos |
-| `rebase_auth_reset_password` ⚠ | `email` | Restablecer una contraseña a través de la API de administración |
-
-`create_user` y `update_user` aceptan `roles`, por lo que cualquiera de los dos puede otorgar
-permisos de administrador. Por eso están restringidos en lugar de ser tratados simplemente como "aditivos".
-
-### Almacenamiento (3)
-
-| Herramienta | Requerido | Descripción |
-|---|---|---|
-| `storage_list_objects` | — | Listar objetos almacenados |
-| `storage_get_download_url` | `key` | Una URL de descarga firmada temporal y su caducidad (no metadatos del objeto) |
-| `storage_delete_object` ⚠ | `key` | Eliminar un objeto |
-
-`storage_get_download_url` se clasifica como lectura porque no modifica el entorno, pero la URL
-firmada que genera es una capacidad portadora que perdura más allá de la llamada a la herramienta.
-
-### Cron (5)
-
-| Herramienta | Requerido | Descripción |
-|---|---|---|
-| `cron_list_jobs` | — | Listar tareas programadas y su estado |
-| `cron_get_job` | `jobId` | Detalles de la tarea |
-| `cron_get_job_logs` | `jobId` | Registros de ejecución |
-| `cron_trigger_job` ⚠ | `jobId` | Ejecutar una tarea inmediatamente |
-| `cron_toggle_job` ⚠ | `jobId`, `enabled` | Habilitar o deshabilitar una tarea |
-
-`cron_toggle_job` puede deshabilitar silenciosamente una copia de seguridad o una tarea de
-facturación; un cambio sin errores y sin salida hasta que falte algo más adelante.
-
-### Funciones (1)
-
-| Herramienta | Requerido | Descripción |
-|---|---|---|
-| `invoke_function` ⚠ | `name` | Invocar una [función personalizada](/docs/backend/custom-functions) con cualquier método y carga útil |
-
-Esto llama a código que el servidor MCP nunca ha visto, con un método y cuerpo elegidos por
-el modelo. Su radio de impacto abarca todo lo que hagan tus funciones.
-
-### Servidor de desarrollo (3)
-
-| Herramienta | Requerido | Descripción |
-|---|---|---|
-| `rebase_dev_start` | — | Iniciar el servidor de desarrollo; retorna inmediatamente |
-| `rebase_dev_logs` | — | Leer la salida reciente (por defecto 50 líneas, búfer de 500 líneas) |
-| `rebase_dev_stop` | — | Detener el servidor de desarrollo |
-
-### Registro de proyectos (6)
-
-| Herramienta | Requerido | Descripción |
-|---|---|---|
-| `rebase_project_list` | — | Listar proyectos registrados y mostrar el activo |
-| `rebase_project_switch` | `name` | Cambiar el proyecto activo |
-| `rebase_project_add` | `name` | Registrar un proyecto (`baseUrl`, `projectDir` opcional, `token`) |
-| `rebase_project_remove` | `name` | Eliminar un proyecto (el proyecto predeterminado no se puede eliminar) |
-| `rebase_project_current` | — | Mostrar el proyecto activo y su estado de autenticación |
-| `rebase_project_status` | — | Comprobar el estado de salud del backend activo |
-
-`rebase_project_switch` no está restringido porque redirige todo lo demás en lugar de actuar
-sobre un destino en sí mismo. Por lo tanto, un asistente puede cambiar a un proyecto remoto
-sin activar la barrera; simplemente no podrá ejecutar una herramienta destructiva allí después.
+42 herramientas, en nueve grupos: esquema y base de datos, planificación de esquema,
+documentos, usuarios y roles, almacenamiento, cron, funciones, el servidor de desarrollo
+y el registro de proyectos. Cada una, con lo que necesita y si la barrera la rechaza
+frente a un destino no local, está en la [referencia de herramientas MCP](/docs/ai/mcp-tool-reference).
 
 ## Recursos
 
@@ -549,9 +449,9 @@ de inicio. Ningún `REBASE_ROLE` lo activa.
   activado por defecto; `REBASE_MCP_OPEN_REGISTRATION=false` lo limita a los clientes que
   registres) y envía a la persona a una pantalla de consentimiento que inicia su sesión a
   través de tu `/auth/login` existente.
-- <span class="since-badge" data-since="0.24">Desde 0.24</span> **Seis herramientas, tres alcances.** Los mismos [alcances](/docs/backend/roles-and-scopes/)
-  que usa toda credencial. `data:read` ofrece `list_collections`, `query_collection` y
-  `get_document`; `data:write` añade `create_document` y `update_document`; `data:delete`
+- <span class="since-badge" data-since="0.24">Desde 0.24</span> **Siete herramientas, tres alcances.** Los mismos [alcances](/docs/backend/roles-and-scopes/)
+  que usa toda credencial. `data:read` ofrece `list_collections`, `query_collection`,
+  `count_documents` y `get_document`; `data:write` añade `create_document` y `update_document`; `data:delete`
   añade `delete_document`. Un cliente que no pide nada recibe `data:read`. Cada uno se
   restringe a una colección: `data:read:posts` lista y lee `posts` y nada más. Un alcance
   decide qué herramientas se ofrecen y a qué colecciones llegan, no qué filas: una lista
@@ -565,6 +465,18 @@ de inicio. Ningún `REBASE_ROLE` lo activa.
   las herramientas que cubren sus alcances `data:*`, como quien sea que represente: una
   [clave personal](/docs/backend/api-keys/#personal-keys) como su propietario, una clave de
   servicio como `api-key:<id>`.
+- **El vocabulario del SDK, las respuestas de REST.** Las herramientas toman lo mismo que el
+  SDK — `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` o
+  `"created_at:desc"`), `limit`, `offset`, `searchString` y `data` para una escritura — y
+  leen a través de la ruta de `GET /api/data/<collection>`, por lo que una fila llega tal
+  como la sirve REST (fechas ISO, una `belongsTo` como su clave foránea, p. ej.
+  `authorId`) y puede reenviarse sin cambios en una actualización. `query_collection`
+  responde `{ data, meta }` con `meta.total` y `meta.hasMore`, `count_documents`
+  `{ count }`, y `list_collections` el esquema OpenAPI `row` y `create` de cada colección,
+  además de `softDeleteField` cuando las filas van a una papelera. Igual que en REST, se
+  rechazan un `limit` superior a 1000, un argumento no declarado y una edición o
+  eliminación de una fila en la papelera (404); poner el campo de borrado suave a `null`
+  la restaura.
 - **Un token solo para este endpoint.** Un token de acceso MCP es rechazado por `/api/data`,
   `/api/admin` y el WebSocket, por lo que conectar un asistente no le otorga una sesión.
 

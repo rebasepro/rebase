@@ -70,5 +70,5 @@ Dos cosas que debe configurar en la propia CDN:
 ## Relacionado
 
 - [Configuración de almacenamiento](/docs/backend/storage/) — los backends desde los que se sirven estas cabeceras, y el prefijo `public/` y `publicRead` que hacen `public` a un objeto.
-- [Autorización por objeto](/docs/backend/storage/#autorización-por-objeto) — quién puede leer un objeto, que es lo que decide entre `public` y `private`.
+- [Autorización por objeto](/docs/backend/storage/#per-object-authorization) — quién puede leer un objeto, que es lo que decide entre `public` y `private`.
 - [Campos de subida de archivos](/docs/collections/file-uploads/) — las propiedades de colección que almacenan archivos.

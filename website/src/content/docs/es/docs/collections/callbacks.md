@@ -209,7 +209,7 @@ Impórtalo desde `@rebasepro/types`, no desde `@rebasepro/server`. Un archivo de
 
 ### `afterSave`
 
-Se llama después de que la fila se escribe y antes del commit, dentro de la misma transacción. Lanzar un error revierte el guardado — consulta [Semántica de transacciones](#transaction-semantics).
+Se llama después de que la fila se escribe y antes del commit, dentro de la misma transacción. Lanzar un error revierte el guardado — consulta [Semántica de transacciones](#semántica-de-transacciones).
 
 ```typescript
 afterSave: async ({
@@ -242,7 +242,7 @@ afterSaveError: async ({
 Se ejecuta para un guardado que falló en la base de datos o después de ella —
 no para un rechazo de `beforeSave`, una solicitud rechazada antes de la
 escritura (validación, un permiso faltante, un 404), ni un commit rechazado
-después de que el guardado retornara ([lista completa](/docs/backend/hooks/#cuándo-se-ejecuta-aftersaveerror)).
+después de que el guardado retornara ([lista completa](/docs/backend/hooks/#when-aftersaveerror-runs)).
 
 En una solicitud, se ejecuta una vez que la transacción de la escritura fallida se ha revertido, no dentro de ella. Su `context.data` es uno nuevo, para la misma identidad de quien llama, en el que cada llamada es una transacción propia, por lo que un [job](/docs/backend/jobs), mensaje de cola o webhook que encole se confirma y sobrevive al fallo del que informa. Un error lanzado desde `afterSaveError` se registra en el log, y quien llama sigue recibiendo el error del propio guardado.
 
@@ -438,7 +438,7 @@ Por lo tanto, la escritura desencadenante y todo lo que escribieron sus callback
 - Lanzar un error desde `afterSave` o `afterDelete` revierte la escritura desencadenante, junto con cada escritura de `context.data` que hicieron los callbacks. A quien llama se le responde **400 `CALLBACK_REJECTED`** con `details.stage` indicando el hook — o con el propio estado del error cuando lleva uno: un `RebaseApiError` que hayas lanzado, el 409 de una infracción de unicidad.
 - Los suscriptores en tiempo real se enteran de la fila solo después del commit, por lo que una escritura que se revirtió nunca se anuncia.
 - Un callback mantiene la transacción abierta mientras se ejecuta, por lo que uno lento representa un bloqueo retenido y una conexión del pool ocupada.
-- Una escritura de `context.data` también ejecuta los callbacks de la colección destino, así que un `afterSave` que actualiza su propia fila se ejecuta de nuevo a sí mismo. Las escrituras anidadas a más de 16 niveles de profundidad se rechazan con **500 `CALLBACK_RECURSION`**, nombrando el hook y la colección, y toda la escritura se revierte. Haz que una escritura así sea condicional, como hace el ejemplo de más abajo.
+- Una escritura de `context.data` también ejecuta los callbacks de la colección destino, así que un `afterSave` que actualiza su propia fila se ejecuta de nuevo a sí mismo. <span class="since-badge" data-since="0.24">Desde 0.24</span> Las escrituras anidadas a más de 16 niveles de profundidad se rechazan con **500 `CALLBACK_RECURSION`**, nombrando el hook y la colección, y toda la escritura se revierte. Haz que una escritura así sea condicional, como hace el ejemplo de más abajo.
 
 Deja que un fallo lance un error cuando la escritura desencadenante no deba sobrevivir a él. Captúralo cuando sí deba, pero solo en torno a una **escritura** de `context.data`: un create, update o delete que la base de datos rechace (una infracción de clave única o foránea, un trigger) se deshace por sí solo y el resto se confirma.
 

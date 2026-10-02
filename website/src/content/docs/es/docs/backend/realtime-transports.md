@@ -152,7 +152,8 @@ La entrega a los clientes locales no es tu responsabilidad: el servicio en tiemp
 
 `pg_notify` rechaza cargas útiles de 8000 bytes o más. Los cursores y la presencia caben con espacio de sobra; una instantánea (snapshot) de un documento no. Rebase gestiona esto del mismo modo que gestiona cambios grandes en entidades: enviando una dirección en lugar de un cuerpo:
 
-- **En un canal retenido** (ver [Retención de canales](#retención-de-canales)) el mensaje ya está almacenado con un número de secuencia, por lo que la notificación solo incluye `(channel, seq)` y cada instancia receptora vuelve a leer el cuerpo. No hay ningún límite de tamaño en absoluto.
+- **En un canal retenido** (ver [Retención de canales](#retención-de-canales)) el mensaje ya está almacenado con un número de secuencia, por lo que la notificación solo incluye `(channel, seq)` y cada instancia receptora vuelve a leer el cuerpo. No hay ningún límite de tamaño en absoluto. Esto vale para todo mensaje retenido, pequeño o grande: cualquier inicio de sesión en la base de datos puede hacer `LISTEN`, así que el cuerpo nunca viaja en la notificación. Cuesta una lectura por clave primaria por mensaje en cada instancia con un miembro en el canal.
+- **Las difusiones efímeras y la presencia** sí viajan en la propia notificación, así que cualquier inicio de sesión en la base de datos puede leerlas. Pon en un canal retenido todo lo que no deba poder leerse de ese modo.
 - **En un canal efímero** no hay nada a lo que apuntar. La difusión se entrega localmente, el remitente recibe un error `CHANNEL_BUS_PAYLOAD_TOO_LARGE` en `channel.onError()`, y una advertencia especifica el nombre del canal, en lugar de que el mensaje llegue silenciosamente solo a la mitad del clúster.
 
 Si vas a transmitir mensajes grandes, añade una regla de retención a ese canal. Esa es toda la solución.

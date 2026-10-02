@@ -30,26 +30,34 @@ Cada archivo de puntero tiene tres líneas:
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
-Install the Rebase skills for this assistant: `rebase skills install --agent claude`.
+The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
 ```
 
-Los demás solo se diferencian en la última palabra de la tercera línea —
-`--agent cursor`, `--agent windsurf`, `--agent codex`, `--agent copilot` — y en la
-ruta relativa, que es `../ai-instructions.md` en
-`.github/copilot-instructions.md` y `ai-instructions.md` en `AGENTS.md`.
+<span class="since-badge" data-since="0.24">Desde 0.24</span> para esta tercera línea y el `.mcp.json` de más abajo: en la 0.23
+la tercera línea solo le dice al asistente que ejecute `rebase skills install --agent claude`,
+y `.mcp.json` arranca el servidor con `npx -y @rebasepro/mcp` desde el registro.
+
+Los demás solo se diferencian en el directorio de skills del agente y en su valor de
+`--agent` — `--agent cursor`, `--agent windsurf`, `--agent codex`, `--agent copilot` —
+y en la ruta relativa, que es `../ai-instructions.md` en
+`.github/copilot-instructions.md` y `ai-instructions.md` en `AGENTS.md`. La tercera
+línea es condicional porque `rebase init --agent` puede haber instalado ya las
+skills antes de que el asistente llegue a leerla.
 
 Esto ocurre en cada `rebase init`, para cada preset, incluido `--headless`.
 No hay ningún flag ni confirmación interactiva.
 
 `rebase init` también escribe `.mcp.json`, que apunta Claude Code, Cursor y
-cualquier otro cliente MCP al [servidor MCP de Rebase](/es/docs/ai/mcp):
+cualquier otro cliente MCP al [servidor MCP de Rebase](/docs/ai/mcp) — la propia
+copia del proyecto, una devDependency fijada con la CLI (`npx --no rebase-mcp`
+en un proyecto npm):
 
 ```json title=".mcp.json"
 {
     "mcpServers": {
         "rebase": {
-            "command": "npx",
-            "args": ["-y", "@rebasepro/mcp"],
+            "command": "pnpm",
+            "args": ["exec", "rebase-mcp"],
             "env": {
                 "REBASE_PROJECT_DIR": "."
             }
@@ -63,7 +71,7 @@ servidor en la raíz del proyecto, y una ruta absoluta es la única línea de es
 archivo que no se puede confirmar en el repositorio. Está ahí porque
 `~/.rebase/projects.json` es común a toda la máquina: un proyecto que no nombra
 un directorio propio acaba usando lo que persistió el último proyecto de esa
-máquina. Consulta [la prioridad](/es/docs/ai/mcp#sobre-qué-directorio-actúa).
+máquina. Consulta [la prioridad](/docs/ai/mcp#which-directory-it-acts-on).
 
 ## Por qué un puntero en lugar de una copia
 
@@ -99,8 +107,8 @@ suficiente como para que valga la pena repetirlas al inicio de cada sesión:
    el paso: el arranque regenera el esquema de Drizzle y crea las tablas y
    columnas que faltan. `pnpm db:push` solo sirve para lo que el arranque deja
    intencionadamente en paz — una columna renombrada, un tipo más estrecho, un
-   campo eliminado, la RLS de una tabla de unión — y necesita tu propio
-   PostgreSQL, no la base de datos de desarrollo gestionada. En producción es
+   campo eliminado — y necesita tu propio PostgreSQL, no la base de datos de
+   desarrollo gestionada. En producción es
    `pnpm db:generate` y después `pnpm db:migrate`.
 3. **Usa el SDK.** Accede a través de `rebase.dataAsAdmin.<slug>` para el trabajo
    realizado con la identidad del servicio, o `getDriver(c)` dentro de una función

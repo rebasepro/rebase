@@ -253,8 +253,9 @@ También se reporta una tabla foránea (foreign table) con un privilegio así. P
 habilitar RLS en ella, así que el privilegio entrega todo lo que devuelva el servidor remoto, y la
 corrección sugerida revoca el privilegio en su lugar.
 
-Una tabla con RLS desactivado pero sin permisos otorgados a un rol expuesto *no* se reporta. No es accesible,
-y señalarla generaría ruido innecesario.
+Una tabla con RLS desactivado pero sin permisos otorgados a un rol expuesto *no* se reporta, y tampoco una
+que esté en un esquema sobre el que ese rol no tenga `USAGE` — Postgres responde "permission denied for
+schema" antes de llegar a examinar la tabla. No es accesible, y señalarla generaría ruido innecesario.
 
 ```sql
 ALTER TABLE "public"."your_table" ENABLE ROW LEVEL SECURITY;
@@ -271,6 +272,17 @@ interrupción silenciosa del servicio. Consulta [rls-enabled-no-policies](#rls-e
 Una política permisiva cuya expresión `USING` o `WITH CHECK` es una verdad constante: `true`,
 `(true)`, `1 = 1`. Las políticas permisivas se combinan con el operador OR, por lo que una sola de estas satisface
 el filtro de filas de la tabla sin importar cuán estrictas sean todas las demás políticas.
+
+Como toda comprobación, solo reporta la política cuando un rol al que se aplica puede alcanzar la
+tabla: posee el privilegio que necesita su comando, y `USAGE` sobre el esquema. `USING (true) TO
+anon` en una tabla sobre la que `anon` no posee nada se responde con "permission denied" antes de
+que se consulte la política.
+
+Cuando solo el `WITH CHECK` de una política `UPDATE` es constante — `USING (user_id =
+rebase.uid()) WITH CHECK (true)` — se considera **alta**: `USING` sigue decidiendo qué filas se
+pueden tocar, y la comprobación permite que una fila tocada se convierta en cualquier cosa, como
+la de otro usuario. En una política `FOR ALL`, la misma comprobación también admite cualquier
+`INSERT`, por lo que en ese caso se mantiene como crítica.
 
 Si políticas `RESTRICTIVE` sobre el mismo comando (`ALL` para un `ALL` permisivo) se aplican a cada
 rol expuesto al que llega la política permisiva, esto se degrada a medio y se reporta como algo para
@@ -299,7 +311,10 @@ La severidad depende de la plataforma, y esta distinción es importante:
 
 - **En Supabase**, `auth.uid()` devuelve `NULL` para clientes anónimos, por lo que es una comprobación funcional
   exclusiva para usuarios autenticados. Se reporta como **baja** — una falta de delimitación de datos entre usuarios
-  autenticados, no una brecha de acceso anónimo.
+  autenticados, no una brecha de acceso anónimo. Esto solo vale para `auth.uid()` (y el claim `sub` que lee):
+  una solicitud sin sesión iniciada sigue portando la clave anónima del proyecto, por lo que `auth.role()`
+  es `'anon'` y `auth.jwt()` son los claims de esa clave. La misma forma construida sobre cualquiera de los
+  dos *es verdadera para clientes sin sesión iniciada*, y se reporta como **crítica**.
 - **En Rebase o PostgREST**, donde un identificador en blanco se convierte en un centinela `'anonymous'`,
   la expresión es *verdadera también para clientes sin sesión iniciada*. Se reporta como **crítica**.
 - **En una plataforma no reconocida**, se reporta como **media**, ya que determinar si es una brecha
@@ -372,7 +387,9 @@ función o actualizar la versión de PostgreSQL.
 Las vistas materializadas no pueden tener seguridad a nivel de fila, y los datos que contienen son una
 captura almacenada tomada por quienquiera que la haya refrescado. Si se otorga acceso a un rol no confiable y su
 consulta de definición lee una tabla protegida por RLS, ninguna política podrá protegerla: revoca el permiso o mueve
-la vista materializada a un esquema al que los roles no confiables no puedan acceder.
+la vista materializada a un esquema al que los roles no confiables no puedan acceder. La corrección sugerida
+revoca todos los permisos que alcanzan un rol no confiable, desde el rol que nombra cada permiso: un permiso
+otorgado a un rol que `anon` hereda no se elimina con `REVOKE … FROM anon`.
 
 ```sql
 REVOKE ALL ON "public"."your_matview" FROM "anon";
@@ -407,17 +424,26 @@ USING (EXISTS (SELECT 1 FROM memberships WHERE id = organizations.id ...))
 USING (EXISTS (SELECT 1 FROM memberships m WHERE m.org_id = organizations.id ...))
 ```
 
-**La ausencia de este hallazgo no es prueba de seguridad.** `pg_policies.qual` es la propia
-representación que Postgres hace del árbol sintáctico (parse tree), y habitualmente vuelve a calificar las referencias a columnas; por tanto, el
-nombre sin calificar original con frecuencia ya no es visible cuando se lee el catálogo. Cuando
-esta comprobación se activa es una evidencia sólida; cuando no lo hace, no demuestra nada.
+**Lo que muestra el catálogo no es lo que escribiste.** `pg_policies.qual` es la propia
+representación que Postgres hace del árbol sintáctico (parse tree), y dentro de una subconsulta
+siempre califica las referencias a columnas, por lo que el nombre sin calificar nunca es visible
+cuando se lee el catálogo. Lo que sobrevive es su efecto: el `org_id` sin calificar queda vinculado
+a la tabla interna, y el predicado almacenado compara la columna de esa tabla consigo misma —
+`m.org_id = m.org_id`. Esa autocomparación es lo que esta comprobación encuentra en una base de
+datos en vivo.
+
+**La ausencia de este hallazgo no es prueba de seguridad.** Un nombre sin calificar comparado con
+una columna interna *distinta* (`organization_id = id`) se almacena como `m.organization_id = m.id`,
+que se lee exactamente como una comparación intencionada. Cuando esta comprobación se activa es una
+evidencia sólida; cuando no lo hace, no demuestra nada.
 
 ### junction-table-unprotected
 
 **Tabla de unión muchos a muchos sin RLS.** Alta, heurística.
 
 Una tabla que consiste esencialmente en los dos extremos de dos claves foráneas que apuntan a
-tablas que *sí* tienen RLS, pero sin seguridad a nivel de fila propia. Ambos lados de la relación
+tablas que *sí* tienen RLS, pero sin seguridad a nivel de fila propia — y legible o escribible por
+un rol con el que puede llegar un cliente no confiable. Ambos lados de la relación
 están protegidos y la unión entre ellos está abierta, lo cual basta para enumerar la relación
 incluso cuando ninguno de los extremos puede ser leído.
 

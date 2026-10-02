@@ -93,7 +93,8 @@ Lo que lo sabe, hace algo con ello:
   simplemente la página principal del frontend.
 - **`rebase apps list`** lo muestra junto a la app que lo sirve.
 
-Tres formas, y todas son comunes:
+Tres formas, y todas son comunes. <span class="since-badge" data-since="0.24">Desde 0.24</span> para la tercera: en la 0.23 el
+`path` de una app no puede ser una URL, así que el CMS compartía el nombre de host del proyecto.
 
 ```jsonc
 // The whole app is the CMS — what `rebase init` scaffolds.
@@ -205,10 +206,27 @@ tiene que ser `https://` y llevar un nombre de host y una ruta y nada más: ni
 puerto, ni query, ni fragmento. Un `admin.example.com` suelto se rechaza,
 indicando la URL que debería haber sido.
 
-En local, nada se enruta por nombre de host. `rebase dev` ejecuta la app de
+Con `rebase dev`, nada se enruta por nombre de host. Ejecuta la app de
 `frontend/` en la raíz de un puerto de localhost, como siempre, y para una app
 con nombre de host su banner imprime además la dirección `https://` que tendrá
 una vez desplegada.
+
+`rebase start` es distinto, porque ejecuta el paquete compilado a través del
+mismo runtime que usa un despliegue — incluido el enrutamiento por nombre de
+host. Una app con nombre de host solo responde a las solicitudes cuyo `Host`
+sea ese nombre de host, así que `http://localhost:3001/` muestra la app que no
+tiene uno, y un paquete cuya única app nombra un nombre de host responde 404
+ahí. Para alcanzarla localmente, envía tú mismo la cabecera:
+
+```bash
+curl -H "Host: admin.example.com" http://localhost:3001/
+```
+
+o apunta el nombre de host a `127.0.0.1` en `/etc/hosts` y abre
+`http://admin.example.com:3001/`. Deliberadamente no existe ningún parámetro
+de query ni cabecera que anule el enrutamiento: uno que funcionara en local
+también funcionaría contra un despliegue, y elegir la app por algo distinto
+del `Host` real es precisamente lo que el enrutamiento existe para impedir.
 
 En autohospedaje, el proceso hace la misma elección a partir de la cabecera
 `Host` de cada solicitud. Apuntar el nombre de host al servidor y darle un

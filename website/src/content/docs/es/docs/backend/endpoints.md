@@ -83,6 +83,7 @@ sirve este prefijo como un único `404 NO_COLLECTIONS`. Consulte
 | `POST` | `/api/auth/change-password` | session | [Autenticación](/docs/backend/authentication/) |
 | `POST` | `/api/auth/send-verification` | session | [Autenticación](/docs/backend/authentication/) |
 | `GET` | `/api/auth/verify-email` | none (un token de verificación) | [Autenticación](/docs/backend/authentication/) |
+| `POST` | `/api/auth/verify-email` | none (un token de verificación, y una sesión o la contraseña para conservarlo) | [Verificación de correo electrónico](/docs/backend/email-verification/) |
 | `POST` | `/api/auth/magic-link` | none | [Autenticación](/docs/backend/authentication/) |
 | `POST` | `/api/auth/magic-link/verify` | none (un token de enlace) | [Autenticación](/docs/backend/authentication/) |
 | `POST` | `/api/auth/otp` | none | Códigos de un solo uso por correo electrónico |
@@ -96,6 +97,7 @@ sirve este prefijo como un único `404 NO_COLLECTIONS`. Consulte
 | `POST` | `/api/auth/mfa/verify` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `GET` | `/api/auth/mfa/factors` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `DELETE` | `/api/auth/mfa/unenroll` | session | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
+| `POST` | `/api/auth/mfa/recovery-codes` | session (`aal2`) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge` | none (un inicio de sesión en curso) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `POST` | `/api/auth/mfa/challenge/verify` | none (un id de desafío) | [MFA](/docs/backend/auth-endpoints/#multi-factor-authentication-totp) |
 | `GET` | `/api/auth/scopes` | session | Todos los alcances que conoce este backend y los que tiene el emisor — [Roles y alcances](/docs/backend/roles-and-scopes/) |
@@ -122,6 +124,7 @@ puede acceder a nada de esto. Consulte [Roles y alcances](/docs/backend/roles-an
 | `PUT` | `/api/admin/users/:uid` | `users:write` | Se rechaza para una cuenta que tiene más que el emisor |
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Se rechaza para una cuenta que tiene más que el emisor |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Emite una contraseña temporal |
+| `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Elimina los segundos factores y los códigos de recuperación de la cuenta, termina sus sesiones |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` y los roles que declara el proyecto, con sus alcances |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [Claves de API](/docs/backend/api-keys/). Nunca una clave de API |
 | `POST` | `/api/admin/api-keys` | `keys:write` | La clave en texto plano se devuelve una sola vez, al crearla |

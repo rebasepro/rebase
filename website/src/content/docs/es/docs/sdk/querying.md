@@ -115,13 +115,13 @@ const { data } = await client.data.products
 | `.limit(n)` | Limita el número de resultados | `.limit(25)` |
 | `.offset(n)` | Omite los primeros N resultados | `.offset(50)` |
 | `.after(cursor)` | Continúa a partir de un [cursor](#cursor-pagination) | `.after(meta.nextCursor)` |
-| `.fields(...columns)` | Devuelve [únicamente estas columnas](#returning-fewer-columns) | `.fields("id", "title")` |
+| `.fields(...columns)` | Devuelve [únicamente estas columnas](#devolver-menos-columnas) | `.fields("id", "title")` |
 | `.distinct()` | Agrupa filas idénticas respecto a esas columnas | `.fields("status").distinct()` |
 | `.search(text)` | Búsqueda de texto — consulta [Search](/docs/backend/search) | `.search("laptop")` |
 | `.vectorSearch(prop, vector, opts?)` | Búsqueda por vecinos más cercanos en una propiedad `vector` | `.vectorSearch("embedding", vec)` |
 | `.include(...relations)` | [Carga filas relacionadas](/docs/sdk/relations#loading-related-rows) | `.include("author", "tags")` |
 | `.find()` | Ejecuta la consulta | Devuelve `FindResult<M>` |
-| `.aggregate(params)` | [Aplica agregaciones en lugar de devolver filas](#aggregates) | `.aggregate({ select: [{ fn: "count" }] })` |
+| `.aggregate(params)` | [Aplica agregaciones en lugar de devolver filas](#agregaciones) | `.aggregate({ select: [{ fn: "count" }] })` |
 | `.iterate(options?)` | [Transmite en streaming cada fila coincidente](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
 | `.findAll(options?)` | [Recupera todas las filas coincidentes](#reading-everything-iterate-and-findall) | Devuelve `M[]` |
 | `.count()` | Cuenta las filas coincidentes | Devuelve `number` |
@@ -201,7 +201,7 @@ const { data } = await client.data.products
     .find();
 ```
 
-`cond` recibe el operador canónico (la columna izquierda de la tabla de [Operadores de filtro](#filter-operators)). Un operador no admitido por el dialecto generará un `TypeError` al serializar la consulta, en lugar de producir silenciosamente una consulta diferente.
+`cond` recibe el operador canónico (la columna izquierda de la tabla de [Operadores de filtro](#operadores-de-filtro)). Un operador no admitido por el dialecto generará un `TypeError` al serializar la consulta, en lugar de producir silenciosamente una consulta diferente.
 
 ### Negación
 
@@ -392,7 +392,7 @@ const rows = await client.data.orders
 
 Las claves del resultado son **derivadas**, no elegidas: `sum(total)` se devuelve como `sum_total`, y un `count()` simple como `count`. Permitir nombres personalizados requeriría validar que no coincidan con campos de `groupBy` (una regla poco intuitiva que, de omitirse, sobrescribiría valores silenciosamente).
 
-Los grupos se paginan como las filas de un listado: `limit` los delimita y
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Los grupos se paginan como las filas de un listado: `limit` los delimita y
 `offset` los salta (agrupar por una columna de alta cardinalidad puede generar
 el equivalente a una tabla completa en una sola respuesta). Una agregación
 agrupada sin `limit` recibe el límite por defecto del listado — **50 grupos**
@@ -413,7 +413,9 @@ enumerable sobre él, de modo que una propagación (spread) o un
 hayan recortado por un `limit`. Sin un `groupBy` hay una sola fila, `limit` no
 hace nada y `offset` se rechaza. En una función de servidor (`rebase.data`,
 `context.data`), una agregación agrupada sin `limit` devuelve todos los
-grupos. `include` no se envía con una agregación: no tiene relaciones que
+grupos. En 0.23 no hay `meta` ni `offset`, así que una lista de grupos
+recortada por el límite parece completa.
+`include` no se envía con una agregación: no tiene relaciones que
 cargar. El SDK todavía no ordena grupos; por HTTP también se pueden ordenar —
 consulte [Agregaciones y búsqueda](/docs/sdk/aggregates-and-search/).
 

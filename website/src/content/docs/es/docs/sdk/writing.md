@@ -146,9 +146,10 @@ se degrada a una actualización ordinaria en lugar de lanzar un error.
 
 Desde un navegador en otro origen — un frontend de Vite en su propio puerto,
 un host `app.` que llama a un host `api.` — el `ETag` solo es legible porque
-el servidor lo nombra en `Access-Control-Expose-Headers`. El runtime de Rebase
+el servidor lo nombra en `Access-Control-Expose-Headers`. <span class="since-badge" data-since="0.24">Desde 0.24</span> El runtime de Rebase
 lo hace, junto con `Retry-After`, `X-Request-ID`, las cabeceras
-`X-RateLimit-*` y `Preference-Applied`. Un backend que conecta su propio
+`X-RateLimit-*` y `Preference-Applied`; en 0.23 no expone ninguna de ellas, por
+lo que `etagOf` es `undefined` entre orígenes ahí. Un backend que conecta su propio
 `cors()` tiene que exponer la misma lista, o `etagOf` es siempre `undefined`
 ahí y toda escritura condicional sale sin condición.
 
@@ -280,10 +281,12 @@ result.meta;  // { operations: 4 }
 `op` es `create`, `update`, `upsert` o `delete`, y `collection` restringe
 `values` a la forma `Insert` o `Update` generada de esa colección — una
 columna que la colección no tiene es un error de compilación, y también lo es
-un create al que le falta una obligatoria. `collection` es el accesor, el
+un create al que le falta una obligatoria. <span class="since-badge" data-since="0.24">Desde 0.24</span> `collection` es el accesor, el
 nombre que toma `client.data.<accesor>` (`orderItems` para el slug
 `order_items`); el cliente envía el slug, a través del diccionario
-`collections` con el que se creó. Cada
+`collections` con el que se creó. En 0.23 un batch tipado envía el accesor tal
+como está escrito, así que no se puede llegar a una colección en snake_case a
+través de él, y una columna mal escrita no es un error de compilación. Cada
 operación ejecuta el pipeline que ejecutaría su equivalente de una sola fila:
 la misma validación, callbacks y seguridad a nivel de fila, con el mismo usuario.
 

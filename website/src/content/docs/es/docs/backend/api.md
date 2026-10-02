@@ -150,7 +150,7 @@ GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 
 Los grupos pueden anidarse hasta 32 niveles de profundidad; más allá de eso, la solicitud se rechaza con `INVALID_LOGICAL_GROUP`.
 
-Un grupo **restringe** los resultados junto con los filtros de campo en lugar de reemplazarlos; consulta [Cómo se combinan los filtros](#how-the-filters-combine).
+Un grupo **restringe** los resultados junto con los filtros de campo en lugar de reemplazarlos; consulta [Cómo se combinan los filtros](#cómo-se-combinan-los-filtros).
 
 ### El dialecto JSON `where`
 
@@ -272,6 +272,10 @@ GET /api/data/posts?fields=id,title&limit=50
 ```
 
 La clave primaria siempre se devuelve (una fila a la que no se puede hacer referencia no puede actualizarse, eliminarse ni paginarse, y el cursor se deriva de ella), y las columnas con `excludeFromApi` permanecen ocultas tanto si se nombran como si no. Una columna desconocida resulta en un error 400 `UNKNOWN_FIELD` en lugar de una fila a la que silenciosamente le falte un campo.
+
+Una relación nombrada en `?include=` se devuelve tanto si `?fields=` la nombra como si no:
+`?include=author&fields=title` devuelve `title`, la clave y `author`. Nombrar también la
+relación en `?fields=` está permitido y no cambia nada.
 
 `?distinct=true` colapsa las filas que sean idénticas en esas columnas:
 

@@ -71,7 +71,7 @@ real del cliente, que llega en `X-Forwarded-For`. `TRUSTED_PROXY_HOPS` indica
 cuántos proxies hay que ignorar; con el valor por defecto `0`, toda petición
 parece provenir del balanceador de carga y todos los clientes comparten un
 mismo cubo. Consulta
-[Configuración](/docs/getting-started/configuration/#comportamiento-del-runtime).
+[Configuración](/docs/getting-started/configuration/#runtime-behaviour).
 
 ## Tiempo real
 
@@ -83,7 +83,7 @@ propios suscriptores. Si el CDC está desactivado, o si `auto` no pudo
 aprovisionarlo (el log de arranque indica por qué), una suscripción solo ve las
 escrituras hechas a través de la instancia a la que está conectado su socket.
 Consulta
-[Tiempo real](/docs/backend/realtime/#captura-de-cambios-a-nivel-de-base-de-datos-cdc).
+[Tiempo real](/docs/backend/realtime/#database-level-change-capture-cdc).
 
 Los **canales de difusión (broadcast) y la presencia** son en proceso a menos
 que un bus los transporte: dos clientes en instancias distintas dentro del
@@ -92,7 +92,7 @@ solo con su propia mitad. Define `REALTIME_CHANNEL_BUS=postgres`. El bus
 escucha en la base de datos, lo cual necesita una conexión directa en lugar de
 un pooler de transacciones — define `DATABASE_DIRECT_URL` cuando
 `DATABASE_URL` pasa por pgBouncer. Consulta
-[Canales y presencia entre instancias](/docs/backend/realtime-transports/#canales-y-presencia-entre-instancias).
+[Canales y presencia entre instancias](/docs/backend/realtime-transports/#channels-and-presence-across-instances).
 
 ## Archivos
 
@@ -100,7 +100,7 @@ Con `STORAGE_TYPE=local`, las subidas son archivos en el disco de la instancia
 que las recibió, y otra instancia responde 404 para ellas. Usa S3 o GCS, o
 monta un volumen compartido en `STORAGE_PATH` en todas las instancias.
 Consulta
-[Autoalojamiento: almacenamiento de archivos](/docs/deployment/self-hosting/#almacenamiento-de-archivos).
+[Autoalojamiento: almacenamiento de archivos](/docs/deployment/self-hosting/#file-storage).
 
 Las **subidas reanudables** (el endpoint TUS) mantienen el archivo parcial de
 cada subida y su estado en el disco local de la instancia que la creó, bajo

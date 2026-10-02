@@ -327,7 +327,7 @@ Una tarea que nunca se dispara no aparece en `jobs` (nada la registró), por lo 
             "reason": "Expected 5 fields, got 6"
         }
     ],
-    "note": "1 cron file(s) failed to load and 1 job(s) have an invalid schedule — NOT scheduled. See `rejected` for the reason; the server log has the rest."
+    "note": "1 cron file(s) failed to load and 1 job(s) were refused — NOT scheduled. See `rejected` for the reason; the server log has the rest."
 }
 ```
 

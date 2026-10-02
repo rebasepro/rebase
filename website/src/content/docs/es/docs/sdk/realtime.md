@@ -181,9 +181,15 @@ El cliente WebSocket gestiona la autenticación automáticamente:
 - Al **iniciar sesión** o **renovar el token**, el nuevo token se envía a un socket ya abierto a través de un mensaje `authenticate`. Si no hay ninguno abierto, no ocurre nada: iniciar sesión no es una solicitud de tiempo real, y un socket abierto más tarde se autentica por sí mismo.
 - Al **cerrar sesión**, la conexión WebSocket se desconecta. El cliente sigue siendo utilizable; una suscripción posterior se reconecta de forma anónima.
 - Si la conexión se cae, el cliente **se reconecta automáticamente** y restablece todas las suscripciones activas. Nunca deja de intentarlo mientras exista una suscripción o un canal al que se haya unido; el retraso entre intentos crece hasta un máximo de 30 segundos.
+- Si el servidor termina la sesión del socket — el usuario cerró sesión en todas partes, esta sesión fue revocada, la cuenta se eliminó o el token expiró antes de que una renovación llegara al socket — cierra el socket con el código `4001`. El cliente se reconecta como tras cualquier caída, autenticándose con la sesión que tenga en ese momento (renovada si es posible), o de forma anónima cuando no hay ninguna. Quitar un rol no cierra el socket: se aplica desde el siguiente frame. Consulta [Autenticación y RLS](/docs/backend/realtime/#authentication-rls).
 - Si la conexión permanece caída durante más de unos 15 segundos, se llama **una vez** al `onError` de cada suscripción (y al `onError` de cada canal al que se haya unido) con un `RebaseApiError` cuyo `code` es `CONNECTION_LOST`. La suscripción no termina: sigue mostrando lo que tienes, márcalo como posiblemente desactualizado, y espera. Cuando el socket vuelve, el siguiente `onUpdate` de la suscripción lleva todo lo escrito en el ínterin.
 - `client.ws.state` es el estado de la conexión — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` o `closed` — y `client.ws.onStateChange(listener)` se notifica de cada cambio. `disconnected` es el estado en el que se ha informado `CONNECTION_LOST`.
 - Las solicitudes enviadas por el socket son **como mucho una vez**. Una que se envió cuando la conexión se cayó falla con `CONNECTION_LOST` y nunca se reenvía, ya que el servidor puede haberla ejecutado ya. Una que sigue esperando un socket tras 30 segundos falla con `REQUEST_TIMEOUT` sin llegar a enviarse.
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> para todo lo de la lista posterior a cerrar sesión. En 0.23 el cliente se rinde tras
+cinco intentos de reconexión fallidos, pone en cola las solicitudes hechas mientras está desconectado y
+las envía al reconectar, no tiene `client.ws.state`, y el servidor nunca cierra un
+socket cuya sesión haya terminado.
 
 ```typescript
 import { RebaseApiError } from "@rebasepro/client";
@@ -256,7 +262,7 @@ La única comprobación que aplica el servidor es la **membresía**: para emitir
 Por lo tanto, el nombre de un canal no es un secreto ni un permiso. No pongas nada en un canal (incluido el historial retenido y el estado de presencia) que no deba ser visto por todos los usuarios de tu aplicación, y no derives el nombre de un canal a partir de datos que no compartirías públicamente. Las reglas de autorización por canal no están implementadas; si las necesitas actualmente, mantén la parte confidencial del intercambio en `client.data`, donde se aplica la seguridad a nivel de fila.
 :::
 
-> **Por defecto, las difusiones no se reproducen.** Solo llegan a los miembros conectados actualmente. Esto es lo adecuado para notificaciones que se autocorigen (un aviso de "alguien guardó" es reemplazado por el siguiente guardado) y no supone ningún coste adicional. Para un flujo de operaciones, donde una omisión silenciosa causa divergencia, habilita el [historial de mensajes](#message-history-and-catch-up) en el canal.
+> **Por defecto, las difusiones no se reproducen.** Solo llegan a los miembros conectados actualmente. Esto es lo adecuado para notificaciones que se autocorigen (un aviso de "alguien guardó" es reemplazado por el siguiente guardado) y no supone ningún coste adicional. Para un flujo de operaciones, donde una omisión silenciosa causa divergencia, habilita el [historial de mensajes](#historial-de-mensajes-y-puesta-al-día-catch-up) en el canal.
 
 ## Historial de mensajes y puesta al día (Catch-Up)
 

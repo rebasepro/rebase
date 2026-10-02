@@ -17,37 +17,41 @@ Todos los endpoints de autenticación están montados en `/api/auth/`:
 | `POST` | `/api/auth/login` | Iniciar sesión con correo/contraseña |
 | `POST` | `/api/auth/refresh` | Refrescar el token de acceso |
 | `POST` | `/api/auth/<provider>` | Inicio de sesión con OAuth (p. ej., `/api/auth/google`, `/api/auth/linkedin`) |
-| `POST` | `/api/auth/link/<provider>` | Vincular un proveedor de OAuth a la cuenta autenticada |
+| `POST` | `/api/auth/link/<provider>` | Vincular un proveedor de OAuth a la cuenta autenticada. En un invitado esto es un registro: necesita `allowRegistration`, toma la dirección del proveedor cuando este la avala, y responde con una sesión para la cuenta en la que se convirtió el invitado |
 | `POST` | `/api/auth/logout` | Revocar el token de actualización (refresh token) |
 | `POST` | `/api/auth/forgot-password` | Enviar correo de restablecimiento de contraseña |
 | `POST` | `/api/auth/reset-password` | Restablecer contraseña con token |
 | `POST` | `/api/auth/find-user` | Resolver un correo a un perfil público mínimo (opcional — `AUTH_ALLOW_USER_LOOKUP`) |
-| `POST` | `/api/auth/change-password` | Cambiar la contraseña del propio usuario emisor (autenticado) |
+| `POST` | `/api/auth/change-password` | Cambiar la contraseña del propio usuario emisor (autenticado). Termina todas las demás sesiones y responde con una nueva para el emisor |
 | `GET` | `/api/auth/me` | El perfil del propio usuario emisor |
 | `PATCH` | `/api/auth/me` | Actualizar el perfil del propio usuario emisor |
+| `POST` | `/api/auth/change-email` | `{ newEmail }`: mover la propia cuenta del emisor a otra dirección. Envía un enlace por correo a la dirección nueva y un aviso a la antigua; nada cambia hasta que se sigue el enlace. Necesita `aal2` en una cuenta con un segundo factor. `409 EMAIL_EXISTS` o `UNDELIVERABLE_ADDRESS`, `400 EMAIL_UNCHANGED`, `403 ANONYMOUS_USER` para un invitado — consulta [Cambiar una dirección de correo](#cambiar-una-dirección-de-correo) |
+| `POST` | `/api/auth/confirm-email-change` | `{ token }` del enlace. No se necesita sesión. Mueve la cuenta a la dirección nueva, verificada; `400 INVALID_TOKEN` para un enlace consumido, sustituido o caducado, `409 EMAIL_EXISTS` cuando la dirección fue tomada mientras esperaba |
 | `GET` | `/api/auth/config` | Lo que este backend ofrece a una pantalla de inicio de sesión — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. No autenticado, y calculado a partir de los mismos predicados que aplican las rutas, por lo que lo anunciado en la pantalla no puede diferir de lo que realmente puede hacer |
 | `POST` | `/api/auth/send-verification` | Enviar al usuario emisor un enlace de verificación de correo |
-| `GET` | `/api/auth/verify-email` | Consumir un enlace de verificación (la URL de ese correo) |
+| `GET` | `/api/auth/verify-email` | Consumir un enlace de verificación (la URL de ese correo). Conserva lo que demuestra una sesión activa de la cuenta y elimina lo que nadie demostró — consulta [Verificación de correo electrónico](/docs/backend/email-verification/) |
+| `POST` | `/api/auth/verify-email` | Lo mismo con `{ token, password?, removeUnproven? }`: la contraseña la conserva e inicia sesión; sin ninguna de las dos pruebas, una cuenta que tenga una responde `409 PROOF_REQUIRED` |
 | `POST` | `/api/auth/magic-link` | Enviar por correo un enlace de inicio de sesión de un solo uso. `503 EMAIL_NOT_CONFIGURED` sin SMTP |
 | `POST` | `/api/auth/magic-link/verify` | Intercambiar un token de magic link por una sesión |
 | `POST` | `/api/auth/otp` | Enviar por correo un código de inicio de sesión de seis dígitos. Responde de la misma manera tenga o no una cuenta la dirección |
 | `POST` | `/api/auth/otp/verify` | Intercambiar `{ email, code }` por una sesión |
 | `POST` | `/api/auth/anonymous` | Crear una sesión anónima (opcional — `ALLOW_ANONYMOUS`) |
 | `POST` | `/api/auth/anonymous/link` | Asociar credenciales reales a la cuenta anónima que ya ha iniciado sesión |
-| `GET` | `/api/auth/sessions` | Listar las sesiones activas del usuario emisor (refresh tokens) |
+| `GET` | `/api/auth/sessions` | Listar las sesiones activas del usuario emisor, una por cada inicio de sesión. La propia del emisor está marcada con `isCurrentSession` |
 | `DELETE` | `/api/auth/sessions` | Revocar todas las sesiones, incluida esta — cierre de sesión remoto en todos los dispositivos |
-| `DELETE` | `/api/auth/sessions/:id` | Revocar una sesión |
+| `DELETE` | `/api/auth/sessions/:id` | Revocar una sesión: su refresh token, y el token de acceso que tiene ese dispositivo |
 | `GET` | `/api/auth/scopes` | Todos los [alcances](/docs/backend/roles-and-scopes/) que conoce este backend y los que tiene el emisor |
 | `GET` | `/api/auth/keys` | Las [claves de API personales](/docs/backend/api-keys/#personal-keys) propias del emisor |
 | `POST` | `/api/auth/keys` | Crear una clave personal. `403 PERSONAL_KEYS_DISABLED` salvo que la colección de usuarios establezca `auth.personalKeys` |
 | `DELETE` | `/api/auth/keys/:id` | Revocar una de las claves propias del emisor |
-| `GET` | `/.well-known/jwks.json` | El JWKS público — montado en la raíz, no bajo `basePath`, porque allí es donde busca un verificador. Presente cuando se configura la [firma asimétrica](#asymmetric-tokens-and-jwks) |
+| `GET` | `/.well-known/jwks.json` | El JWKS público — montado en la raíz, no bajo `basePath`, porque allí es donde busca un verificador. Presente cuando se configura la [firma asimétrica](#tokens-asimétricos-y-jwks) |
 | `POST` | `/api/auth/mfa/enroll` | Iniciar el registro de TOTP (devuelve el secreto y los códigos de recuperación) |
 | `POST` | `/api/auth/mfa/verify` | Confirmar un registro con un código del autenticador |
 | `GET` | `/api/auth/mfa/factors` | Listar los factores registrados del usuario emisor |
 | `POST` | `/api/auth/mfa/challenge` | Abrir un desafío (challenge) contra un factor verificado |
 | `POST` | `/api/auth/mfa/challenge/verify` | Responder a un desafío — esto es lo que emite la sesión |
 | `DELETE` | `/api/auth/mfa/unenroll` | Eliminar un factor (requiere una sesión `aal2`) |
+| `POST` | `/api/auth/mfa/recovery-codes` | Sustituir los códigos de recuperación del emisor por diez nuevos (requiere una sesión `aal2`) |
 
 La gestión administrativa de usuarios y roles es una **superficie independiente**, montada en `/api/admin/` en lugar de `/api/auth/`. Leer necesita el alcance `users:read` y cambiar necesita `users:write`. Un administrador y la clave de servicio tienen ambos; también los tiene un rol que los declare. Nadie puede cambiar una cuenta que tenga más que él. Consulte [Roles y alcances](/docs/backend/roles-and-scopes/).
 
@@ -56,9 +60,10 @@ La gestión administrativa de usuarios y roles es una **superficie independiente
 | `GET` | `/api/admin/users` | Listar usuarios (paginado) |
 | `POST` | `/api/admin/users` | Crear un usuario |
 | `GET` | `/api/admin/users/:uid` | Leer un usuario |
-| `PUT` | `/api/admin/users/:uid` | Actualizar un usuario |
-| `DELETE` | `/api/admin/users/:uid` | Eliminar un usuario |
-| `POST` | `/api/admin/users/:uid/reset-password` | Restablecer la contraseña de un usuario sin su contraseña actual |
+| `PUT` | `/api/admin/users/:uid` | Actualizar un usuario. `{ disabled: true }` deshabilita la cuenta sin eliminarla: todo inicio de sesión y toda renovación se rechazan (`ACCOUNT_DISABLED`), sus sesiones terminan y se rechaza todo token que tenga; `false` la vuelve a habilitar |
+| `DELETE` | `/api/admin/users/:uid` | Eliminar un usuario. Sus sesiones terminan, y a partir de esa solicitud se rechaza todo token de acceso que tenga |
+| `POST` | `/api/admin/users/:uid/reset-password` | Restablecer la contraseña de un usuario sin su contraseña actual. `rebase auth reset-password` la llama, y escribe directamente en la base de datos solo cuando no se puede contactar al backend; de cualquier modo, las sesiones de la cuenta terminan |
+| `DELETE` | `/api/admin/users/:uid/mfa` | Eliminar los segundos factores y los códigos de recuperación de un usuario, y terminar sus sesiones — para alguien que perdió ambos |
 | `GET` | `/api/admin/roles` | `admin` y los roles que declara la colección de usuarios, con sus alcances |
 | `POST` | `/api/admin/bootstrap` | Permitir que el primer usuario registrado reclame el rol de administrador mientras no exista ninguno. Rechazado en producción — consulte [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
@@ -91,7 +96,9 @@ Cada endpoint que emite una sesión responde con la misma estructura contenedora
 
 Envíe el token de acceso devuelto como `Authorization: Bearer <accessToken>`. `accessTokenExpiresAt` se expresa en milisegundos de época (epoch milliseconds).
 
-`POST /api/auth/refresh` responde con la misma estructura, con dos salvedades: `user` se omite por completo cuando la cuenta no se puede volver a leer, por lo que debe tratarse como opcional en ese caso, y `providerId` siempre es `password`, independientemente de cómo se haya creado la sesión originalmente.
+`POST /api/auth/refresh` responde con la misma estructura, salvo que `user` se omite por completo cuando la cuenta no se puede volver a leer, por lo que debe tratarse como opcional en ese caso.
+
+`providerId` indica cómo se inició la sesión: `password`, `anonymous`, `magic-link`, `otp`, `mfa` (un inicio de sesión completado con un segundo factor), o el id del proveedor, como `google`. Se almacena junto con la sesión al iniciarla, por lo que `refresh` y `GET /api/auth/me` dan la misma respuesta durante toda la vida de la sesión. Una sesión iniciada antes de 0.24 muestra `password`.
 
 :::caution[El SDK tipado aplana esta estructura contenedora — HTTP sin procesar no]
 El JSON anterior es el formato de transmisión (wire format), y es lo que devuelve `fetch("/api/auth/login")`: el token reside en **`body.tokens.accessToken`**.
@@ -100,6 +107,37 @@ El [SDK tipado](/docs/sdk/authentication) desempaqueta `tokens` antes de devolve
 
 Ambas estructuras son reales; pertenecen a dos capas distintas. Intentar leer la forma del SDK a partir de un `fetch` directo arroja `undefined`, lo que se manifiesta como "el inicio de sesión tuvo éxito pero no hay token de acceso" — el inicio de sesión fue correcto, pero el token estaba un nivel más abajo.
 :::
+
+### Cambiar una dirección de correo
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Una persona con
+la sesión iniciada mueve su propia cuenta a otra dirección en dos pasos:
+
+1. `POST /api/auth/change-email { newEmail }` registra el cambio y envía por
+   correo un enlace, `<frontend>/confirm-email-change?token=…`, a la dirección
+   nueva, y un aviso sin enlace a la actual. El enlace vive 24 horas, y una
+   solicitud nueva sustituye a la anterior. `GET /api/auth/me` informa la
+   dirección en espera como `pendingEmail`.
+2. `POST /api/auth/confirm-email-change { token }` mueve la cuenta: la
+   dirección nueva se convierte en su dirección, verificada. Cada identidad
+   OAuth cuyo proveedor avaló la dirección antigua se desvincula
+   (`removedProviders` las nombra), porque de otro modo quien controle la
+   dirección antigua podría seguir iniciando sesión con ella, y cualquier
+   enlace de restablecimiento enviado a la dirección antigua deja de
+   funcionar. Las sesiones se conservan.
+
+La dirección nueva no queda reservada mientras el enlace espera: retenerla
+dejaría que cualquier cuenta impidiera que un desconocido se registrara con su
+propia dirección. Si otra cuenta tiene esa dirección cuando se sigue el
+enlace, el enlace responde `409 EMAIL_EXISTS` y nada se mueve; de dos cuentas
+que pidan la misma dirección, se la lleva la primera que siga su enlace. El
+hook `beforeEmailChange` puede rechazar una dirección, igual que
+`beforeUserCreate` lo hace en el registro.
+
+En el CMS, la dirección se cambia desde **Configuración de la cuenta → Perfil**,
+y el enlace abre la propia pantalla del CMS, con o sin sesión iniciada. Otro
+frontend sirve una página en `/confirm-email-change` que llama a la ruta con
+el token del enlace.
 
 Con [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) habilitado, el token de actualización viaja como una cookie `httpOnly` y `tokens.refreshToken` es una cadena vacía en el cuerpo de la respuesta. El token de acceso no se ve afectado.
 
@@ -125,6 +163,19 @@ Con [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-c
 El registro de factores también está restringido. El primer factor en una cuenta puede registrarse desde una sesión ordinaria, pero una vez que uno es verificado, `enroll`, `verify` y `unenroll` requieren una sesión `aal2`; de lo contrario, una contraseña robada podría registrar un factor propio, elevar privilegios con él y eliminar el factor real.
 
 La verificación está acotada en ambos ejes: un desafío expira tras cinco intentos fallidos, cada cuenta está limitada a diez intentos de verificación cada 15 minutos (contabilizados por usuario, por lo que rotar direcciones IP no sirve de nada) y un código aceptado se registra contra el factor para que no pueda reutilizarse durante el resto de su ventana de tolerancia de ±1 paso.
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> En el CMS, **Configuración de la cuenta → Verificación en dos pasos** registra una
+app de autenticación (su clave, y un enlace que la abre en la app, y luego el
+código que muestra), lista los factores de la cuenta, elimina uno y sustituye
+los códigos de recuperación. Cuando un cambio necesita `aal2`, primero pide un
+código y con él eleva el nivel de la sesión. Los códigos de recuperación se
+muestran una sola vez, tras confirmar el primer factor. En la tabla de
+usuarios, **Restablecer verificación en dos pasos**
+(`DELETE /api/admin/users/:uid/mfa`) y **Deshabilitar o habilitar cuenta**
+(`PUT /api/admin/users/:uid { disabled }`) se ofrecen a quien tenga
+`users:write`, igual que las rutas; el interruptor nunca se ofrece sobre la
+propia cuenta, y una cuenta que tiene más que tú se rechaza con el motivo del
+servidor.
 
 Configure `MFA_ENCRYPTION_KEY` (32+ caracteres aleatorios) para cifrar los secretos TOTP almacenados. Sin ella, el servidor recurre a `JWT_SECRET` y emite una advertencia. Configúrela **antes** de que cualquier usuario se registre: los secretos almacenados no llevan ningún ID de clave, por lo que cambiar la clave a posteriori hace que los factores existentes no se puedan descifrar y sus propietarios no puedan completar un desafío.
 

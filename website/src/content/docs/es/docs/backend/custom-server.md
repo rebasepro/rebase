@@ -249,7 +249,8 @@ app.use(cors({
 }));
 ```
 
-El runtime de Rebase y el backend generado por `eject` ya envían esta lista.
+<span class="since-badge" data-since="0.24">Desde 0.24</span> El runtime de Rebase y el backend generado por `eject` ya envían esta lista. En la 0.23
+no exponen ninguna de estas cabeceras, así que un frontend en otro origen no lee ningún `ETag`.
 
 ## Relacionado
 

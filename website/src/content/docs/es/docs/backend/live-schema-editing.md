@@ -18,7 +18,29 @@ El estado y el plan necesitan el alcance `schema:read`, y aplicar necesita `sche
 
 ## Planifica antes de aplicar
 
-`/plan` no tiene efectos secundarios. Envía la colección tal como debería quedar y te indicará qué implica el cambio:
+`/plan` no tiene efectos secundarios. Envía el cambio, y te indica qué implica
+el cambio. <span class="since-badge" data-since="0.24">Desde 0.24</span> Un cambio a una colección existente es
+un `patch` — lo que cambió, como operaciones sobre rutas de claves — y una
+colección nueva es el `collection` completo:
+
+```json
+{ "collectionId": "posts", "patch": [
+    { "op": "set", "path": ["properties", "subtitle"], "value": { "name": "Subtitle", "type": "string" } },
+    { "op": "remove", "path": ["admin", "group"] }
+] }
+```
+
+Solo las claves que nombra un patch se escriben en el archivo de la colección.
+Todo lo demás queda como está — imports, comentarios, formato, el `onClick` de
+una acción de entidad, una propiedad compartida desde otro módulo, un enum
+importado de otro lugar. Un patch que llega *hasta dentro* de algo definido en
+código (`status: statusProperty`, `enum: LOCALE_ENUM`, un `...spread`) se
+rechaza con la expresión en la que chocó, de modo que el cambio se hace donde
+vive ese código. Un `collection` completo enviado para una colección que ya
+existe se convierte en el patch de lo que difiere de ella, y una clave cuyo
+valor es código nunca se elimina de ese modo. El panel de administración envía
+patches. En 0.23, `/plan` y `/apply` solo aceptan el `collection` completo tal
+como debería quedar.
 
 `$ADMIN_TOKEN` es un token de acceso (el `accessToken` que devuelve un inicio de sesión) para una cuenta que tiene `schema:read`: un administrador, o un rol que lo declare. Nada en la máquina lo configura por ti.
 
@@ -81,7 +103,52 @@ Un cambio puede ser aplicable y aun así dejar sin aplicar algo que tu configura
 
 La ruta ensure en el arranque reporta lo mismo como una advertencia. Antes de que esto existiera, una restricción retenida se retenía en silencio.
 
-`needs-migration` cubre todo lo que la ruta ensure no puede hacer: eliminar una colección o una propiedad, cambiar un tipo, renombrar una columna, cambiar una clave primaria, eliminar un valor de un enum. Cada rechazo especifica el cambio y qué hacer en su lugar.
+`needs-migration` cubre todo lo que la ruta ensure no puede hacer: eliminar una
+colección o una propiedad, cambiar el tipo de una columna (alternar un entero,
+que una cadena se convierta en un enum, el tipo de elemento de un array, el
+ancho de un varchar), renombrar una columna, cambiar una clave primaria,
+eliminar un valor de un enum, hacer única una columna existente, y cambiar una
+relación — su `kind`, su destino, su `localKey`, su `onDelete`. Un `hasMany` o
+`hasOne` cuya columna de enlace nada crea también se rechaza. Cada rechazo
+especifica el cambio y qué hacer en su lugar.
+
+El veredicto se lee a partir del esquema que produce cada lado — el mismo del
+que se generan `schema.generated.ts` y `db push` — de modo que una edición que
+cambia la base de datos no puede reportarse como que no hay cambio. Dos
+ediciones que parecen cambios y no se rechazan (<span class="since-badge" data-since="0.24">Desde 0.24</span>; 0.23 reporta
+ambas como que necesitan una migración):
+
+- **Renombrar la clave de una propiedad conservando su columna** (`columnName`
+  fijado a la columna antigua) no mueve ningún dato. Es `safe`; los clientes
+  de la API leen el nombre nuevo.
+- **Definir, cambiar o eliminar un valor por defecto** solo condiciona las
+  escrituras futuras. Es `safe`, y se aplica con `ALTER COLUMN … SET DEFAULT`
+  / `DROP DEFAULT`.
+
+### Editar solo el código fuente
+
+Un cambio rechazado aún puede escribirse en el código fuente de tu colección y
+confirmarse, dejando la base de datos como está — eliminar una propiedad que
+ya no sirves es el caso habitual. <span class="since-badge" data-since="0.24">Desde 0.24</span> Envía `/apply` con
+`"sourceOnly": true`. No se ejecuta nada; el mensaje del commit especifica lo
+que conserva la base de datos, por ejemplo
+`chore(schema): remove sku from products (source only — column products.sku kept)`,
+y cada cambio del plan lleva una frase `sourceOnly` que indica qué deja atrás
+— incluso cuando la columna que deja atrás es `NOT NULL` sin valor por
+defecto, lo que hace fallar toda inserción posterior hasta que se elimine o se
+haga anulable. Un cambio sin esa frase (mover una clave primaria, una relación
+cuya columna de enlace nada crea) no puede escribirse solo en el código
+fuente.
+
+Eliminar una colección desde el panel de administración sigue la misma vía:
+`/apply` con `"remove": true` y `"sourceOnly": true` elimina el archivo de la
+colección y su entrada en `index.ts`, y confirma ambos; la tabla y sus filas
+permanecen. Se rechaza mientras otra colección importe el archivo (una
+relación hacia ella), especificando el importador — eliminarlo detendría la
+carga de todas las colecciones.
+
+En 0.23, `/apply` no acepta ni `sourceOnly` ni `remove`, y «Editar solo el
+código fuente» del panel escribe el archivo sin hacer un commit.
 
 ## Qué se confirma
 
@@ -92,13 +159,15 @@ No solo el archivo de la colección. El esquema de Drizzle se genera a partir de
 
 Estas rutas son relativas a tu **proyecto**, no a tu repositorio. Cuando ambos son lo mismo —un proyecto `rebase init`, que es el caso habitual—, no hay nada de qué preocuparse. Cuando tu proyecto se encuentra en un subdirectorio de un repositorio más grande, las rutas se prefijan con él, ubicándolo subiendo desde tu directorio de colecciones hasta el `rebase.json` más cercano. Un proyecto sin `rebase.json` conserva las rutas simples.
 
-El commit no incluye SQL. `rebase db push` y `rebase db generate` escriben el suyo a partir de las colecciones en cada ejecución, en `.rebase/sql/`, que Git ignora.
+<span class="since-badge" data-since="0.24">Desde 0.24</span> El commit no incluye SQL. `rebase db push` y `rebase db generate` escriben el suyo a partir de las colecciones en cada ejecución, en `.rebase/sql/`, que Git ignora.
+En 0.23 el commit también incluía `drizzle/schema.sql`, `drizzle/policies.sql` y
+`drizzle/search.sql`, escritos en la raíz del proyecto.
 
 El mensaje del commit describe el cambio en lugar de limitarse a anunciarlo, y se atribuye a la persona que lo realizó. Un cambio de esquema con autor y un diff en el historial de tu proyecto es algo que ni Firebase ni Supabase ofrecen: sus ediciones de tablas son invisibles para tu repositorio.
 
 ## Quién puede aplicar cambios
 
-Tener `schema:read` es suficiente para **planificar**. La planificación no tiene efectos secundarios, y un trabajo de CI que consulte si un cambio propuesto en una colección es aplicable es un buen caso de uso.
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Tener `schema:read` es suficiente para **planificar**. La planificación no tiene efectos secundarios, y un trabajo de CI que consulte si un cambio propuesto en una colección es aplicable es un buen caso de uso.
 
 Aplicar los cambios es un privilegio adicional, porque aplicar escribe un commit y un commit lleva un autor:
 
@@ -109,6 +178,8 @@ Aplicar los cambios es un privilegio adicional, porque aplicar escribe un commit
 | La service key del servidor | sí | no |
 
 Una credencial no es un autor. `api-key:7c3f…` en tu entorno de CI no es una persona, y permitirle escribir en tu repositorio produce exactamente el historial sin atribuir que esta característica busca reemplazar.
+
+En 0.23 la línea la marca el rol `admin`: un administrador planifica y aplica, y cualquier clave de API puede planificar.
 
 Si lo que deseas es un cambio de esquema automatizado (por ejemplo, un pipeline de migraciones), actívalo deliberadamente:
 

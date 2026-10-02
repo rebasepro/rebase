@@ -13,13 +13,14 @@ Más allá de los verbos, las rutas de escritura admiten cinco elementos que cam
 
 El cuerpo de una escritura debe ser un objeto JSON. `null`, un número, una cadena o un array es un `400 BAD_REQUEST`.
 
-Una actualización no puede cambiar la clave de una fila. Un cuerpo que nombra
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Una actualización no puede cambiar la clave de una fila. Un cuerpo que nombra
 la clave con otro valor es un `400 KEY_IMMUTABLE`, antes de que se ejecute
 ningún hook y sin que se escriba nada, sea cual sea la vía por la que llega la
 actualización: REST, el socket en tiempo real, MCP o el `rebase.data` en
 proceso. La clave que la fila ya tiene se acepta, como la acepta un formulario
 que devuelve toda la fila. Para mover una fila a una clave nueva, créala ahí y
-elimina la antigua.
+elimina la antigua. En 0.23 tal actualización responde `500`, y una en proceso
+ya ha movido la fila cuando lanza el error.
 
 ### Idempotencia
 

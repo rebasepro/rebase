@@ -128,10 +128,11 @@ export const relations = {  };
 
 Hay tres cosas ahí que merece la pena leer dos veces. La columna `id` que no
 declaraste: toda colección recibe una clave primaria `text` a menos que una
-propiedad declare `isId`, y la base de datos la rellena con un uuid
+propiedad declare `isId`, y <span class="since-badge" data-since="0.24">Desde 0.24</span> la base de datos la rellena con un uuid
 (`gen_random_uuid()::text`), de modo que una fila creada desde el panel de
 administración, la API REST o el SDK no necesita una clave propia. Una clave
-que sí envías se usa tal cual. El bloque `pgPolicy`: la seguridad a nivel de
+que sí envías se usa tal cual. En la 0.23 la columna no tiene valor por
+defecto, y una creación que no envía clave falla. El bloque `pgPolicy`: la seguridad a nivel de
 fila está habilitada en todas las tablas, y esas políticas base son las que
 permiten que el contexto de servidor de confianza y el rol `admin` puedan
 leerla en cualquier caso — consulta
