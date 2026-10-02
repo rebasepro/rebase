@@ -38,7 +38,7 @@ all of it. Any other role holds what the app declares for it.
 | `storage:delete` | data | storage source | Delete files |
 | `functions:invoke` | data | function | Call custom functions. A function can do anything its code does |
 | `users:read` | admin | — | List accounts and their roles |
-| `users:write` | admin | — | Create, edit and delete accounts, reset passwords, assign roles up to the holder's own |
+| `users:write` | admin | — | Create, edit and delete accounts, reset passwords and second factors, assign roles up to the holder's own |
 | `schema:read` | admin | — | Read the collection schema, plan schema changes, run the RLS audit, read the private API docs |
 | `schema:write` | admin | — | Apply schema changes: edits collection files and alters the database |
 | `database:read` | admin | — | List databases, tables, Postgres roles and branches |

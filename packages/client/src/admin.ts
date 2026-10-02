@@ -68,6 +68,18 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         });
     }
 
+    /**
+     * Remove every second factor and recovery code the account has, and end
+     * its sessions — for someone who lost their authenticator and their
+     * codes. Needs `users:write`.
+     */
+    async function resetMfa(userId: string) {
+        return transport.request<{ success: boolean; removedFactors: number }>(
+            adminPath + "/users/" + encodeURIComponent(userId) + "/mfa",
+            { method: "DELETE" }
+        );
+    }
+
     async function resetPassword(userId: string, options?: { password?: string }) {
         return transport.request<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>(
             adminPath + "/users/" + encodeURIComponent(userId) + "/reset-password",
@@ -98,6 +110,7 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         createUser,
         updateUser,
         deleteUser,
+        resetMfa,
         resetPassword,
         listRoles,
         bootstrap

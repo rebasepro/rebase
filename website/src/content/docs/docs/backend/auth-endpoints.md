@@ -48,6 +48,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/mfa/challenge` | Open a challenge against a verified factor |
 | `POST` | `/api/auth/mfa/challenge/verify` | Answer a challenge — this is what issues the session |
 | `DELETE` | `/api/auth/mfa/unenroll` | Remove a factor (requires an `aal2` session) |
+| `POST` | `/api/auth/mfa/recovery-codes` | Replace the caller's recovery codes with ten new ones (requires an `aal2` session) |
 
 Administrative user and role management is a **separate surface**, mounted at
 `/api/admin/` rather than `/api/auth/`. Reading needs the `users:read` scope and
@@ -63,6 +64,7 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 | `PUT` | `/api/admin/users/:uid` | Update one user |
 | `DELETE` | `/api/admin/users/:uid` | Delete one user. Their sessions end, and every access token they hold is refused from that request on |
 | `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one |
+| `DELETE` | `/api/admin/users/:uid/mfa` | Remove a user's second factors and recovery codes, and end their sessions — for someone who lost both |
 | `GET` | `/api/admin/roles` | `admin` and the roles the users collection declares, with their scopes |
 | `POST` | `/api/admin/bootstrap` | Let the earliest-registered user claim the admin role while none exists. Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 

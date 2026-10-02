@@ -207,11 +207,26 @@ const { factor, totp, recoveryCodes } = await client.auth.mfa.enroll({
 });
 
 showQrCode(totp.uri);        // otpauth://… — what the authenticator scans
-showRecoveryCodes(recoveryCodes);
+if (recoveryCodes) showRecoveryCodes(recoveryCodes);
 ```
 
 **Show the recovery codes once and never again.** Only their hashes are stored,
-so nothing can display them later.
+so nothing can display them later. They come with the account's first factor.
+Adding another factor keeps the codes the account already has, and
+`recoveryCodes` is `null`. Starting an enrolment and abandoning it never touches
+them.
+
+To replace them, after using several or losing the printout, call
+`regenerateRecoveryCodes()` from an `aal2` session. The old codes stop working:
+
+```typescript
+const { recoveryCodes } = await client.auth.mfa.regenerateRecoveryCodes();
+```
+
+Someone who lost both the authenticator and the codes is let back in by an
+administrator: `client.admin.resetMfa(uid)` (`DELETE /api/admin/users/:uid/mfa`,
+`users:write`) removes the account's factors and codes and ends its sessions,
+so the password signs in again without a second factor.
 
 The factor is not usable until the user proves their authenticator produced a
 code from that secret:

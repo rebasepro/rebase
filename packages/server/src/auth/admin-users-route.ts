@@ -7,6 +7,7 @@
  *   POST /users
  *   PUT /users/:uid
  *   DELETE /users/:uid
+ *   DELETE /users/:uid/mfa
  *   POST /bootstrap
  */
 
@@ -29,7 +30,7 @@ import {
     normalizeUserEmailChange,
     runAfterUserDelete
 } from "./admin-user-ops";
-import { replaceUserPassword } from "./token-revocation";
+import { replaceUserPassword, revokeAllSessions } from "./token-revocation";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import type { AdminUser, AuthCollectionConfig } from "@rebasepro/types";
@@ -411,6 +412,41 @@ values: prepResult.values },
         const adminUser = toAdminUser(result!.user, result!.roles);
 
         return c.json({ user: adminUser });
+    });
+
+    /**
+     * DELETE /users/:uid/mfa — remove every second factor and recovery code
+     * an account has, and end its sessions.
+     *
+     * The way back in for someone who lost their authenticator and their
+     * codes, which used to be SQL. It lowers the account's protection, so it
+     * is held to what a password reset is held to: `users:write`, never on an
+     * account that outranks the caller, and every session ends — a session
+     * that passed the old factor must not outlive its removal.
+     */
+    router.delete("/users/:uid/mfa", requireScope("users:write"), async (c) => {
+        const uid = c.req.param("uid");
+        const existing = await authRepo.getUserById(uid);
+        if (!existing) {
+            throw ApiError.notFound("User not found");
+        }
+        assertMayManageAccount(c, await authRepo.getUserRoleIds(uid));
+
+        const factors = await authRepo.getMfaFactors(uid);
+        for (const factor of factors) {
+            await authRepo.deleteMfaFactor(factor.id, uid);
+        }
+        await authRepo.deleteAllRecoveryCodes(uid);
+        await revokeAllSessions(authRepo, uid);
+
+        const caller = c.get("user") as { uid?: string } | undefined;
+        logger.info("[Security Audit] Second factors reset by an administrator", {
+            eventType: "auth.mfa.admin_reset",
+            uid,
+            by: caller?.uid,
+            removedFactors: factors.length
+        });
+        return c.json({ success: true, removedFactors: factors.length });
     });
 
     router.delete("/users/:uid", requireScope("users:write"), async (c) => {

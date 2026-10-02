@@ -290,10 +290,18 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
             friendlyName
         );
 
-        // Generate recovery codes
-        const codes = generateRecoveryCodes(10);
-        const codeHashes = codes.map(hashRecoveryCode);
-        await authRepo.createRecoveryCodes(user.id, codeHashes);
+        // Recovery codes only with the account's first factor. Generating
+        // them here on every call replaced the codes a user had printed as
+        // soon as they *started* adding a second authenticator — before it
+        // was verified, and for good if they closed the dialog — so the one
+        // way back in after losing the phone stopped working. An account that
+        // already has a verified factor keeps the codes it has; new ones come
+        // from `POST /auth/mfa/recovery-codes`, at `aal2`.
+        let codes: string[] | null = null;
+        if (!(await authRepo.hasVerifiedMfaFactors(user.id))) {
+            codes = generateRecoveryCodes(10);
+            await authRepo.createRecoveryCodes(user.id, codes.map(hashRecoveryCode));
+        }
 
         return c.json(
             {
@@ -311,6 +319,30 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
             },
             201
         );
+    });
+
+    /**
+     * POST /auth/mfa/recovery-codes
+     * Replace the account's recovery codes with ten new ones, shown once.
+     *
+     * The deliberate way to get new codes — after using several, or after
+     * losing the printout. Needs `aal2` once a factor is verified, as every
+     * factor change does: whoever holds only the password must not be able to
+     * swap the codes for ones they know.
+     */
+    router.post("/mfa/recovery-codes", strictAuthLimiter, requireLiveSession, async (c) => {
+        const userCtx = c.get("user") as AccessTokenPayload | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+        if (!(await authRepo.hasVerifiedMfaFactors(userCtx.uid))) {
+            throw ApiError.badRequest("This account has no verified second factor, so recovery codes would recover nothing.", "MFA_NOT_ENROLLED");
+        }
+        await requireStepUpForFactorChange(userCtx);
+
+        const codes = generateRecoveryCodes(10);
+        await authRepo.createRecoveryCodes(userCtx.uid, codes.map(hashRecoveryCode));
+        return c.json({ recoveryCodes: codes });
     });
 
     /**

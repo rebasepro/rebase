@@ -146,7 +146,7 @@ export const BUILT_IN_SCOPE_DESCRIPTIONS: Readonly<Record<BuiltInScope, ScopeDes
     },
     "users:write": {
         label: "Manage users",
-        description: "Create, edit and delete accounts, reset passwords and assign roles up to the holder's own."
+        description: "Create, edit and delete accounts, reset passwords and second factors, and assign roles up to the holder's own."
     },
     "schema:read": {
         label: "See the schema",

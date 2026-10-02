@@ -1060,8 +1060,11 @@ refreshToken: session.refreshToken };
          * Start enrolling a TOTP factor.
          *
          * Returns the secret and an `otpauth://` URI to render as a QR code,
-         * plus ten single-use recovery codes. **Show the recovery codes once
-         * and never again** — only their hashes are stored.
+         * plus — with the account's first factor — ten single-use recovery
+         * codes. **Show the recovery codes once and never again**: only their
+         * hashes are stored. Adding another factor keeps the codes the account
+         * has, and `recoveryCodes` is then `null`; `regenerateRecoveryCodes()`
+         * replaces them.
          *
          * The factor is not usable until `verify` confirms the user's
          * authenticator produced a correct code from it.
@@ -1070,7 +1073,7 @@ refreshToken: session.refreshToken };
             return transport.request<{
                 factor: { id: string; factorType: string; friendlyName?: string };
                 totp: { secret: string; uri: string; qrUri: string };
-                recoveryCodes: string[];
+                recoveryCodes: string[] | null;
             }>(authPath + "/mfa/enroll", {
                 method: "POST",
                 body: JSON.stringify(options ?? {})
@@ -1097,6 +1100,14 @@ refreshToken: session.refreshToken };
          * Remove a factor. Requires an `aal2` session — one that has already
          * answered a challenge — so a stolen `aal1` token cannot turn MFA off.
          */
+        /**
+         * Replace the account's recovery codes with ten new ones, shown once.
+         * Needs an `aal2` session. Adding a second factor keeps the codes the
+         * account already has; this is how to get new ones.
+         */
+        async regenerateRecoveryCodes() {
+            return transport.request<{ recoveryCodes: string[] }>(authPath + "/mfa/recovery-codes", { method: "POST" });
+        },
         async unenroll(factorId: string) {
             return transport.request<{ success: boolean; message: string }>(
                 authPath + "/mfa/unenroll",

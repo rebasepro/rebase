@@ -47,6 +47,7 @@ export class MemoryAuthStore {
     readonly resetTokens = new Map<string, StoredSingleUseToken>();
     readonly validAfter = new Map<string, Date>();
     factors: StoredFactor[] = [];
+    recoveryCodes: { uid: string; codeHash: string; used: boolean }[] = [];
     readonly challenges = new Map<string, MfaChallengeInfo>();
 
     constructor(private readonly options: MemoryAuthStoreOptions = {}) {}
@@ -298,10 +299,21 @@ export class MemoryAuthStore {
                 challenge.attempts = (challenge.attempts ?? 0) + 1;
                 return challenge.attempts;
             },
-            createRecoveryCodes: async () => undefined,
-            useRecoveryCode: async () => false,
-            getUnusedRecoveryCodeCount: async () => 0,
-            deleteAllRecoveryCodes: async () => undefined
+            // Replaces the account's codes, as the Postgres repository does.
+            createRecoveryCodes: async (uid, codeHashes) => {
+                this.recoveryCodes = this.recoveryCodes.filter(c => c.uid !== uid)
+                    .concat(codeHashes.map(codeHash => ({ uid, codeHash, used: false })));
+            },
+            useRecoveryCode: async (uid, codeHash) => {
+                const code = this.recoveryCodes.find(c => c.uid === uid && c.codeHash === codeHash && !c.used);
+                if (!code) return false;
+                code.used = true;
+                return true;
+            },
+            getUnusedRecoveryCodeCount: async (uid) => this.recoveryCodes.filter(c => c.uid === uid && !c.used).length,
+            deleteAllRecoveryCodes: async (uid) => {
+                this.recoveryCodes = this.recoveryCodes.filter(c => c.uid !== uid);
+            }
         };
         if (this.options.unlinkIdentities !== false) {
             repo.unlinkUserIdentity = async (uid, provider, providerId) => {
