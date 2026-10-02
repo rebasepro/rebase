@@ -9,6 +9,11 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 jest.mock("@rebasepro/app", () => ({
     useRebaseRegistry: jest.fn(),
     useAuthController: jest.fn(),
+    readEmailLinkAction: (location: { pathname: string; search: string }) => {
+        const token = new URLSearchParams(location.search).get("token");
+        const kind = location.pathname.split("/").pop();
+        return token && kind ? { kind, token } : null;
+    },
     useTranslation: () => ({ t: (key: string) => key === "copy" ? "Copy" : key }),
     LoginView: ({ authController }: any) => <div data-testid="login-view">Login View</div>
 }));
@@ -119,6 +124,26 @@ describe("React Components Tests", () => {
             expect(screen.getByTestId("login-view")).toBeTruthy();
             expect(screen.queryByTestId("loading-spinner")).toBeNull();
             expect(screen.queryByTestId("child")).toBeNull();
+        });
+
+        test("opens the login view's step for an address-change link while signed in", () => {
+            (useAuthController as any).mockReturnValue({
+                initialLoading: false,
+                user: { uid: "user-123" }
+            });
+            (useRebaseRegistry as any).mockReturnValue({});
+            window.history.replaceState(null, "", "/admin/confirm-email-change?token=t-1");
+            try {
+                render(
+                    <RebaseAuthGate>
+                        <div data-testid="child">Authenticated Child</div>
+                    </RebaseAuthGate>
+                );
+                expect(screen.getByTestId("login-view")).toBeTruthy();
+                expect(screen.queryByTestId("child")).toBeNull();
+            } finally {
+                window.history.replaceState(null, "", "/");
+            }
         });
 
         test("should render children when user is authenticated", () => {

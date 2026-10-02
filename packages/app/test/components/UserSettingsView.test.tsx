@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { AuthControllerContext } from "../../src/contexts/AuthControllerContext";
 import { UserSettingsView } from "../../src/components/UserSettingsView";
+import "@testing-library/jest-dom";
 
 /**
  * A password change signs the user out once.
@@ -79,5 +80,75 @@ describe("UserSettingsView password change", () => {
         });
 
         expect(harness.signOuts).toBe(1);
+    });
+});
+
+describe("UserSettingsView email change", () => {
+    function EmailHost({ changeEmail, pendingEmail }: { changeEmail: (email: string) => Promise<{ pendingEmail: string; expiresAt: string }>; pendingEmail?: string }) {
+        const authController = {
+            user: { uid: "u1", email: "me@corp.com", displayName: "Me", pendingEmail: pendingEmail ?? null },
+            initialLoading: false,
+            authLoading: false,
+            loginSkipped: false,
+            extra: null,
+            setExtra: () => undefined,
+            getAuthToken: async () => "t",
+            signOut: async () => undefined,
+            changeEmail
+        };
+        return (
+            <AuthControllerContext.Provider value={authController as never}>
+                <UserSettingsView/>
+            </AuthControllerContext.Provider>
+        );
+    }
+
+    it("asks for the new address and says a link is on its way", async () => {
+        const changeEmail = jest.fn(async (email: string) => ({ pendingEmail: email, expiresAt: "2026-10-03T10:00:00.000Z" }));
+        render(<EmailHost changeEmail={changeEmail}/>);
+
+        const field = screen.getByLabelText("email_address");
+        expect((field as HTMLInputElement).value).toBe("me@corp.com");
+        expect(screen.getByRole("button", { name: "email_change_button" })).toBeDisabled();
+        fireEvent.change(field, { target: { value: "new@corp.com" } });
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "email_change_button" }));
+        });
+
+        expect(changeEmail).toHaveBeenCalledWith("new@corp.com");
+        expect(screen.getByText("email_change_pending")).toBeInTheDocument();
+    });
+
+    it("says what a refusal means rather than the server's words", async () => {
+        const changeEmail = jest.fn(async () => {
+            throw Object.assign(new Error("Email already registered"), { code: "EMAIL_EXISTS" });
+        });
+        render(<EmailHost changeEmail={changeEmail}/>);
+
+        fireEvent.change(screen.getByLabelText("email_address"), { target: { value: "taken@corp.com" } });
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "email_change_button" }));
+        });
+
+        expect(screen.getByText("email_change_taken")).toBeInTheDocument();
+    });
+
+    it("shows a change that is already waiting", () => {
+        render(<EmailHost changeEmail={jest.fn(async () => ({ pendingEmail: "", expiresAt: "" }))} pendingEmail="waiting@corp.com"/>);
+        expect(screen.getByText("email_change_pending")).toBeInTheDocument();
+    });
+
+    it("is not offered by a controller that cannot change an address", () => {
+        const authController = {
+            user: { uid: "u1", email: "me@corp.com" },
+            initialLoading: false, authLoading: false, loginSkipped: false, extra: null,
+            setExtra: () => undefined, getAuthToken: async () => "t", signOut: async () => undefined
+        };
+        render(
+            <AuthControllerContext.Provider value={authController as never}>
+                <UserSettingsView/>
+            </AuthControllerContext.Provider>
+        );
+        expect(screen.queryByRole("button", { name: "email_change_button" })).toBeNull();
     });
 });

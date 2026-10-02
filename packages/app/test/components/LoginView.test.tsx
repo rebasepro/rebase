@@ -547,6 +547,29 @@ enabledProviders: ["github"] }
             expect(mockAuthController.verifyEmail).toHaveBeenLastCalledWith("verify-token-2", { removeUnproven: true });
         });
 
+        it("moves the account onto its new address from an address-change link", async () => {
+            mockAuthController.confirmEmailChange = jest.fn().mockResolvedValue({ email: "new@corp.com", removedProviders: ["google"] });
+            openLink("/admin/confirm-email-change?token=change-token-1");
+
+            render(<LoginView authController={mockAuthController}/>);
+
+            expect(await screen.findByText("auth_email_change_confirmed_title")).toBeInTheDocument();
+            expect(mockAuthController.confirmEmailChange).toHaveBeenCalledTimes(1);
+            expect(mockAuthController.confirmEmailChange).toHaveBeenCalledWith("change-token-1");
+            expect(screen.getByText("auth_email_change_providers_removed")).toBeInTheDocument();
+        });
+
+        it("says why an address-change link moved nothing", async () => {
+            mockAuthController.confirmEmailChange = jest.fn().mockRejectedValue(
+                Object.assign(new Error("Email already registered"), { code: "EMAIL_EXISTS" }));
+            openLink("/confirm-email-change?token=change-token-2");
+
+            render(<LoginView authController={mockAuthController}/>);
+
+            expect(await screen.findByText("auth_email_change_failed_title")).toBeInTheDocument();
+            expect(screen.getByText("email_change_taken")).toBeInTheDocument();
+        });
+
         it("leaves the link for the app's own address, base path kept", () => {
             expect(appAddressOfEmailLink({ origin: "https://example.com", pathname: "/admin/reset-password" }))
                 .toBe("https://example.com/admin/");

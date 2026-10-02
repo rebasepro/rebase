@@ -201,6 +201,10 @@
 
 #### Admin (CMS & app)
 
+- **Account settings change the email address.** The Profile tab has an email
+  field: it mails the confirmation link and says which address is waiting.
+  The link opens its own step on the sign-in screen, signed in or not, and
+  says which sign-in providers it detached.
 - **The API keys panel speaks scopes.** A key shows its scopes grouped into
   data, admin and app, with the collections, buckets or functions each is
   narrowed to, and the RLS roles it runs as — a key running as `admin` is

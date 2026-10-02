@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import {
+    Alert,
     Avatar,
     Button,
     Card,
@@ -8,6 +9,7 @@ import {
     CircularProgress,
     cls,
     IconButton,
+    LoadingButton,
     Tab,
     Tabs,
     TextField,
@@ -15,6 +17,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useAuthController, useTranslation } from "../hooks";
+import { emailChangeErrorMessage } from "./email-change-message";
 
 interface SessionInfo {
     id: string;
@@ -25,9 +28,10 @@ interface SessionInfo {
 }
 
 interface ExtendedAuthController {
-    user: { displayName?: string | null; photoURL?: string | null; email?: string | null } | null;
+    user: { displayName?: string | null; photoURL?: string | null; email?: string | null; pendingEmail?: string | null } | null;
     updateProfile?: (displayName: string, photoURL: string) => Promise<void>;
     changePassword?: (oldPassword: string, newPassword: string) => Promise<void>;
+    changeEmail?: (newEmail: string) => Promise<{ pendingEmail: string; expiresAt: string }>;
     fetchSessions?: () => Promise<SessionInfo[]>;
     revokeSession?: (id: string) => Promise<void>;
     revokeAllSessions?: () => Promise<void>;
@@ -50,6 +54,13 @@ export function UserSettingsView() {
     const [savingProfile, setSavingProfile] = useState(false);
     const [profileError, setProfileError] = useState<string | null>(null);
 
+    // Email change state. The address waiting for its link, as the server last
+    // said — on load from the user, then from the request just made.
+    const [newEmail, setNewEmail] = useState(user?.email || "");
+    const [pendingEmail, setPendingEmail] = useState<string | null>(user?.pendingEmail ?? null);
+    const [changingEmail, setChangingEmail] = useState(false);
+    const [emailError, setEmailError] = useState<string | null>(null);
+
     // Password change state
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -68,6 +79,8 @@ export function UserSettingsView() {
     useEffect(() => {
         setDisplayName(user?.displayName || "");
         setPhotoURL(user?.photoURL || "");
+        setNewEmail(user?.email || "");
+        setPendingEmail(user?.pendingEmail ?? null);
         if (activeTab === "sessions") {
             loadSessions();
         }
@@ -86,6 +99,20 @@ export function UserSettingsView() {
             setProfileError(e instanceof Error ? e.message : String(e));
         } finally {
             setSavingProfile(false);
+        }
+    };
+
+    const handleChangeEmail = async () => {
+        if (!authController.changeEmail) return;
+        setChangingEmail(true);
+        setEmailError(null);
+        try {
+            const { pendingEmail: waiting } = await authController.changeEmail(newEmail.trim());
+            setPendingEmail(waiting);
+        } catch (e: unknown) {
+            setEmailError(emailChangeErrorMessage(e, t));
+        } finally {
+            setChangingEmail(false);
         }
     };
 
@@ -210,6 +237,41 @@ export function UserSettingsView() {
                             {savingProfile ? t("saving") : t("save_profile")}
                         </Button>
                     </div>
+
+                    {authController.changeEmail && (
+                        <div className="flex flex-col gap-4 mt-10">
+                            <div>
+                                <Typography variant="h6" className="mb-1">{t("email_address")}</Typography>
+                                <Typography variant="body2" color="secondary">{t("email_change_description")}</Typography>
+                            </div>
+                            <TextField
+                                label={t("email_address")}
+                                type="email"
+                                autoComplete="email"
+                                value={newEmail}
+                                onChange={(e) => {
+                                    setNewEmail(e.target.value);
+                                    setEmailError(null);
+                                }}
+                            />
+                            {pendingEmail && (
+                                <Alert color="info">
+                                    {t("email_change_pending", { email: pendingEmail })}
+                                </Alert>
+                            )}
+                            {emailError && <Typography color="error">{emailError}</Typography>}
+                            <div>
+                                <LoadingButton
+                                    variant="filled"
+                                    onClick={handleChangeEmail}
+                                    loading={changingEmail}
+                                    disabled={changingEmail || !newEmail.trim() || newEmail.trim().toLowerCase() === (user.email ?? "").toLowerCase()}
+                                >
+                                    {t("email_change_button")}
+                                </LoadingButton>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

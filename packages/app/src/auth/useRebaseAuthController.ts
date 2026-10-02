@@ -341,6 +341,17 @@ export function useRebaseAuthController(
         }
     }, [auth]);
 
+    const changeEmail = useCallback(async (newEmail: string) => {
+        if (!auth?.changeEmail) throw new Error("Rebase client with email change is required");
+        return await auth.changeEmail(newEmail);
+    }, [auth]);
+
+    const confirmEmailChange = useCallback(async (token: string) => {
+        if (!auth?.confirmEmailChange) throw new Error("Rebase client with email change is required");
+        const { email, removedProviders } = await auth.confirmEmailChange(token);
+        return { email, removedProviders };
+    }, [auth]);
+
     const updateProfile = useCallback(async (displayName?: string, photoURL?: string) => {
         if (!auth) throw new Error("Rebase client with auth is required");
         setAuthLoading(true);
@@ -393,6 +404,10 @@ export function useRebaseAuthController(
         resetPassword,
         verifyEmail,
         changePassword,
+        // Offered only when the client can, so the settings view and the
+        // link's screen can tell a missing feature from a failed request.
+        changeEmail: auth?.changeEmail ? changeEmail : undefined,
+        confirmEmailChange: auth?.confirmEmailChange ? confirmEmailChange : undefined,
         updateProfile,
         fetchSessions,
         revokeSession,

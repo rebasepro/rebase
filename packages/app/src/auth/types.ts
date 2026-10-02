@@ -49,6 +49,10 @@ export type RebaseAuthController = AuthController & {
     verifyEmail: (token: string, options?: { password?: string; removeUnproven?: boolean }) => Promise<{ passwordRemoved: boolean; signedIn: boolean }>;
     /** Change password for authenticated user */
     changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
+    /** Ask to move the signed-in account to another address. Absent when the client cannot. */
+    changeEmail?: (newEmail: string) => Promise<{ pendingEmail: string; expiresAt: string }>;
+    /** Follow an address-change link. Absent when the client cannot. */
+    confirmEmailChange?: (token: string) => Promise<{ email: string; removedProviders: string[] }>;
     /** Update user profile */
     updateProfile: (displayName?: string, photoURL?: string) => Promise<User>;
     /** Fetch active sessions */
@@ -96,6 +100,10 @@ export interface ClientAuth {
     /** Optional so a hand-built auth client need not implement it. */
     verifyEmail?(token: string, options?: { password?: string; removeUnproven?: boolean }): Promise<unknown>;
     changePassword(oldPassword: string, newPassword: string): Promise<unknown>;
+    /** Optional so a hand-built auth client need not implement it. */
+    changeEmail?(newEmail: string): Promise<{ pendingEmail: string; expiresAt: string }>;
+    /** Optional so a hand-built auth client need not implement it. */
+    confirmEmailChange?(token: string): Promise<{ email: string; removedProviders: string[] }>;
     updateUser(updates: { displayName?: string; photoURL?: string }): Promise<User>;
     getSessions(): Promise<DeviceSession[]>;
     revokeSession(sessionId: string): Promise<unknown>;

@@ -749,6 +749,21 @@ export interface RebaseTranslations {
     auth_mfa_challenge_exhausted?: string;
     auth_mfa_expired?: string;
     auth_mfa_sign_in_again?: string;
+    email_address?: string;
+    email_change_description?: string;
+    email_change_button?: string;
+    email_change_pending?: string;
+    email_change_taken?: string;
+    email_change_undeliverable?: string;
+    email_change_unchanged?: string;
+    email_change_needs_second_factor?: string;
+    auth_confirming_email_change?: string;
+    auth_email_change_confirmed_title?: string;
+    auth_email_change_confirmed_body?: string;
+    auth_email_change_providers_removed?: string;
+    auth_email_change_failed_title?: string;
+    auth_email_change_continue?: string;
+    auth_email_change_unavailable?: string;
 
     auto_setup_collections_button: string;
     auto_setup_collections_title: string;

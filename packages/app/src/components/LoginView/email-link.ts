@@ -3,15 +3,17 @@
  *
  * The server builds them from the configured frontend URL:
  * `<frontend>/reset-password?token=…` for a forgotten password, an admin's
- * "send reset email" and every invitation, and `<frontend>/verify-email?token=…`
- * to confirm an address. The frontend URL may carry a base path (`/admin`), so
- * the action is the *last* path segment, not the whole path.
+ * "send reset email" and every invitation, `<frontend>/verify-email?token=…`
+ * to confirm an address, and `<frontend>/confirm-email-change?token=…` to move
+ * an account to a new one. The frontend URL may carry a base path (`/admin`),
+ * so the action is the *last* path segment, not the whole path.
  */
 export type EmailLinkAction =
     | { kind: "reset-password"; token: string }
-    | { kind: "verify-email"; token: string };
+    | { kind: "verify-email"; token: string }
+    | { kind: "confirm-email-change"; token: string };
 
-const ACTIONS: EmailLinkAction["kind"][] = ["reset-password", "verify-email"];
+const ACTIONS: EmailLinkAction["kind"][] = ["reset-password", "verify-email", "confirm-email-change"];
 
 export function readEmailLinkAction(location: { pathname: string; search: string }): EmailLinkAction | null {
     const token = new URLSearchParams(location.search).get("token");

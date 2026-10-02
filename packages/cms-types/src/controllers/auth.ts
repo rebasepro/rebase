@@ -142,6 +142,17 @@ export interface AuthControllerExtended<USER extends User = User, ExtraData = un
     verifyEmail?(token: string, options?: { password?: string; removeUnproven?: boolean }): Promise<{ passwordRemoved?: boolean; signedIn?: boolean } | void>;
     /** Change password for the authenticated user */
     changePassword?(oldPassword: string, newPassword: string): Promise<void>;
+    /**
+     * Ask to move the signed-in account to `newEmail`: a link is mailed to
+     * it, and nothing changes until the link is followed.
+     */
+    changeEmail?(newEmail: string): Promise<{ pendingEmail: string; expiresAt: string }>;
+    /**
+     * Follow an address-change link with its token. Needs no session.
+     * `removedProviders` names the sign-in providers detached because they
+     * vouched for the old address.
+     */
+    confirmEmailChange?(token: string): Promise<{ email: string; removedProviders: string[] }>;
     /** Update user profile */
     updateProfile?(displayName?: string, photoURL?: string): Promise<USER>;
     /**

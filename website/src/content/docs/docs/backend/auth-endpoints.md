@@ -147,9 +147,11 @@ account keep a stranger from signing up with their own address. If another
 account has the address by the time the link is followed, the link answers
 `409 EMAIL_EXISTS` and nothing moves; of two accounts asking for the same
 address, the first to follow its link gets it. The `beforeEmailChange` hook can
-refuse an address, as `beforeUserCreate` does at sign-up. The CMS opens the
-link on its own screen; another frontend calls the route from its page at that
-path.
+refuse an address, as `beforeUserCreate` does at sign-up.
+
+In the CMS, the address is changed from **Account settings → Profile**, and the
+link opens the CMS's own screen, signed in or not. Another frontend serves a page
+at `/confirm-email-change` that calls the route with the link's token.
 
 With [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) enabled the refresh
 token travels as an `httpOnly` cookie and `tokens.refreshToken` is an empty

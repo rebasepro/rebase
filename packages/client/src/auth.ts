@@ -966,6 +966,12 @@ password })
             method: "POST",
             body: JSON.stringify({ newEmail })
         });
+        // The user this client holds says a change is waiting, as `/me` does.
+        if (currentSession) {
+            currentSession = { ...currentSession, user: { ...currentSession.user, pendingEmail: data.pendingEmail } };
+            saveSession(currentSession);
+            emit("USER_UPDATED", currentSession);
+        }
         return { pendingEmail: data.pendingEmail, expiresAt: data.expiresAt };
     }
 

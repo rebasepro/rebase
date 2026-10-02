@@ -979,6 +979,27 @@ message: "Sent" });
             expect(result).toEqual({ pendingEmail: "new@b.c", expiresAt: "2026-10-03T10:00:00.000Z" });
         });
 
+        it("changeEmail marks the signed-in user's change as waiting", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    user: { uid: "u1", email: "old@b.c", roles: [] },
+                    tokens: { accessToken: "access-1", refreshToken: "refresh-1", accessTokenExpiresAt: Date.now() + 3_600_000 }
+                })
+            });
+            await auth.signInWithEmail("old@b.c", "pw");
+            const events: AuthChangeEvent[] = [];
+            auth.onAuthStateChange((event) => { events.push(event); });
+            mockRequest.mockResolvedValueOnce({ success: true, pendingEmail: "new@b.c", expiresAt: "2026-10-03T10:00:00.000Z" });
+
+            await auth.changeEmail("new@b.c");
+
+            expect(auth.getSession()?.user).toMatchObject({ email: "old@b.c", pendingEmail: "new@b.c" });
+            expect(events).toContain("USER_UPDATED");
+            auth.stopAutoRefresh();
+        });
+
         it("confirmEmailChange posts the token, and moves the signed-in user it names onto the new address", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             mockFetch.mockResolvedValueOnce({

@@ -48,6 +48,7 @@ import { useModeController, useTranslation } from "../../hooks";
 import { consumeOAuthCallback, startOAuthRedirect } from "./oauth-redirect-flow";
 import { authErrorMessage } from "./auth-error-message";
 import { appAddressOfEmailLink, readEmailLinkAction } from "./email-link";
+import { emailChangeErrorMessage } from "../email-change-message";
 import { canAnswerMfa, classifyMfaRefusal, PendingMfaSignIn, readMfaRequired } from "./mfa-required";
 
 /**
@@ -168,7 +169,7 @@ export interface LoginViewProps {
     onNewsletterOptIn?: (email: string) => void;
 }
 
-type AuthMode = "buttons" | "login" | "register" | "forgot" | "reset-password" | "verify-email";
+type AuthMode = "buttons" | "login" | "register" | "forgot" | "reset-password" | "verify-email" | "confirm-email-change";
 
 /**
  * The shared field background mixin (`dark:bg-black/30`) is invisible on the
@@ -680,6 +681,15 @@ export function LoginView({
                             {/* Opened from a verification email */}
                             {mode === "verify-email" && emailLink?.kind === "verify-email" && (
                                 <VerifyEmailView
+                                    token={emailLink.token}
+                                    authController={authController}
+                                    onDone={leaveEmailLink}
+                                />
+                            )}
+
+                            {/* Opened from the link an address change mails to the new address */}
+                            {mode === "confirm-email-change" && emailLink?.kind === "confirm-email-change" && (
+                                <ConfirmEmailChangeView
                                     token={emailLink.token}
                                     authController={authController}
                                     onDone={leaveEmailLink}
@@ -1695,6 +1705,91 @@ function VerifyEmailView({
 
             <Button onClick={onDone} variant="filled" color="primary" size="large" className="w-full">
                 {t("auth_continue_to_sign_in")}
+            </Button>
+        </div>
+    );
+}
+
+/**
+ * The step an address-change link opens: the account moves onto its new
+ * address as soon as the screen loads, signed in or not — the link proves the
+ * new inbox, which is all the move needs.
+ */
+function ConfirmEmailChangeView({
+    token,
+    authController,
+    onDone
+}: {
+    token: string,
+    authController: AuthControllerExtended,
+    onDone: () => void
+}) {
+    const { t } = useTranslation();
+    const [status, setStatus] = useState<"confirming" | "confirmed" | "failed">("confirming");
+    const [error, setError] = useState<string | null>(null);
+    const [result, setResult] = useState<{ email: string; removedProviders: string[] } | null>(null);
+    // Once per token: a second request — a development double-mount — would
+    // find it spent and report a failure over a change that happened.
+    const requestedRef = useRef(false);
+
+    useEffect(() => {
+        if (requestedRef.current) return;
+        requestedRef.current = true;
+        if (!authController.confirmEmailChange) {
+            setError(t("auth_email_change_unavailable"));
+            setStatus("failed");
+            return;
+        }
+        authController.confirmEmailChange(token).then((moved) => {
+            setResult(moved);
+            setStatus("confirmed");
+        }).catch((err: unknown) => {
+            setError(emailChangeErrorMessage(err, t));
+            setStatus("failed");
+        });
+    }, [authController, token, t]);
+
+    if (status === "confirming") {
+        return (
+            <div className="flex flex-col items-center w-full gap-4 mt-6 mb-4">
+                <CircularProgress size="small"/>
+                <Typography variant="body2" color="secondary">
+                    {t("auth_confirming_email_change")}
+                </Typography>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col w-full gap-4 mt-2">
+            {status === "confirmed" && result
+                ? (
+                    <div className="flex flex-col items-center text-center rounded-xl p-6 bg-surface-raised">
+                        <CheckCircle2Icon size={iconSize.large} className="mb-3 text-primary"/>
+                        <Typography variant="subtitle1" className="mb-2">
+                            {t("auth_email_change_confirmed_title")}
+                        </Typography>
+                        <Typography variant="body2" color="secondary">
+                            {t("auth_email_change_confirmed_body", { email: result.email })}
+                        </Typography>
+                        {result.removedProviders.length > 0 && (
+                            <Typography variant="body2" color="secondary" className="mt-2">
+                                {t("auth_email_change_providers_removed", { providers: result.removedProviders.join(", ") })}
+                            </Typography>
+                        )}
+                    </div>
+                )
+                : (
+                    <>
+                        <Typography variant="h6" className="mb-0.5">
+                            {t("auth_email_change_failed_title")}
+                        </Typography>
+                        {error && <ErrorView error={error}/>}
+                    </>
+                )}
+
+            <Button onClick={onDone} variant="filled" color="primary" size="large" className="w-full">
+                {t("auth_email_change_continue")}
             </Button>
         </div>
     );
