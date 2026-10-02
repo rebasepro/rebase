@@ -97,30 +97,48 @@ RUN mkdir -p /runtime \
         "@aws-sdk/client-s3@^3.1068.0" \
         "@aws-sdk/s3-request-presigner@^3.1068.0" \
         "nodemailer@^9.0.0" \
+        "google-auth-library@^10.7.0" \
+        "ts-morph@28.0.0" \
         "json-logic-js@^2.0.5" \
         "fast-equals@6.0.2" \
         "object-hash@^3.0.0" \
     && mkdir -p node_modules/@rebasepro
-# The last three are drivers for features the RUNTIME implements and loads with
-# `await import(...)` only when a project turns them on: S3 object storage and
-# SMTP email.
+# `@aws-sdk/*`, `nodemailer`, `google-auth-library` and `ts-morph` are drivers
+# for features the RUNTIME implements and loads with `await import(...)` only
+# when a project turns them on: S3 object storage, SMTP email, Google sign-in,
+# and live schema editing.
 #
 # They belong in the image for the same reason `pg` does — the runtime is what
-# constructs the storage and email controllers, so those imports resolve from
-# HERE. A project declaring `@aws-sdk/client-s3` in its own dependencies does not
+# constructs the storage, email, OAuth and schema-editor code, so those imports
+# resolve from HERE. A project declaring `@aws-sdk/client-s3` in its own dependencies does not
 # help: that copy lands in /bundle/node_modules, which is not on the resolution
 # path of a module living in /app.
 #
-# Without them a tenant with S3 storage configured boots clean, passes every
-# health probe, serves every other route, and fails ONLY on writes with
-# "@aws-sdk/client-s3 is required for S3 storage". That surfaced as documents
-# which appeared to save — the row and its thumbnail updated, so the dashboard
-# preview showed the new artwork — but reopened empty, because the payload
-# upload was the one part that threw.
+# Without them a tenant boots clean, passes every health probe, serves every
+# other route, and fails ONLY when the feature is first used:
+#   - S3: writes threw "@aws-sdk/client-s3 is required for S3 storage". That
+#     surfaced as documents which appeared to save — the row and its thumbnail
+#     updated, so the dashboard preview showed the new artwork — but reopened
+#     empty, because the payload upload was the one part that threw.
+#   - Google: every ID-token sign-in, and every code exchange (Google returns an
+#     ID token with the code), threw "google-auth-library is required for Google
+#     OAuth", which the user saw as "Invalid google credentials". Only the
+#     access-token flow, plain fetch, got through. Dadaki's production sign-in
+#     was down this way until it moved to that flow on 2026-10-02.
+#   - Live schema editing: a bundle has no collection source, so a deployed
+#     server edits against `liveSchema.repository`, rewriting the file with
+#     ts-morph in a scratch directory. Without it the editor reported
+#     SCHEMA_EDITOR_MISSING_DEPENDENCY and told the tenant to `pnpm add -D
+#     ts-morph`, which cannot help here for the reason above — on the one
+#     deployment the docs say it works on. Exact pin, because the peer is.
 #
-# Deliberately NOT here: `@google-cloud/storage` (tenant pods cannot reach the
-# GKE metadata server, so GCS is reached over its S3-compatible API instead) and
-# `sharp` (native, and managed intake rejects native dependencies outright).
+# The optional peers deliberately NOT here. Each `not-in-image:` line is read by
+# tooling/scripts/check-runtime-provided-deps.mjs, which fails on an optional
+# peer that is neither installed above nor named below — so leaving a driver out
+# is a decision written down with its reason, never an omission nobody made:
+#
+#   not-in-image: @google-cloud/storage — tenant pods cannot reach the GKE metadata server, so GCS is reached over its S3-compatible API instead
+#   not-in-image: sharp — native, and managed intake rejects native dependencies outright
 
 # The workspace packages are copied into the runtime stage below, one by one, so
 # that only built output ships. (They are deliberately NOT copied here: a

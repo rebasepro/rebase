@@ -1075,6 +1075,26 @@
   output in `.rebase/sql` and `drizzle/migrations`, and it no longer leaves
   the backend it starts running after the suite exits.
 
+#### Runtime
+
+- **Google sign-in works on the managed runtime.** The image did not ship
+  `google-auth-library`, which the server loads to verify a Google ID token.
+  Every One Tap or rendered-button sign-in failed, and so did every
+  authorization-code sign-in, the admin's included, because Google returns an
+  ID token with the code. The server logged "google-auth-library is required
+  for Google OAuth", and the user saw "Invalid google credentials". Only the
+  access-token flow worked. Adding the package to a project did not help: the
+  server resolves its imports from the image, never from the bundle. The image
+  now installs it.
+
+- **Live schema editing works on the managed runtime.** A deployed server has
+  no collection source, so it edits through `liveSchema.repository`, and it
+  rewrites the file with `ts-morph`, which the image did not ship. The editor
+  reported `SCHEMA_EDITOR_MISSING_DEPENDENCY` and said to run
+  `pnpm add -D ts-morph`, which a managed project cannot use to reach the
+  server. The image now installs `ts-morph` 28.0.0, the version the server
+  pins.
+
 ### Security
 
 #### Realtime
