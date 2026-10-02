@@ -1,5 +1,5 @@
 ---
-sourceHash: 487ad58f8760f9ac
+sourceHash: ce1b04dc7278a010
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Despliega Rebase en un clúster de Kubernetes con el chart oficial de Helm — uno o varios Deployments, un Job de migración que gestiona el esquema y aplicaciones estáticas en el mismo host.

@@ -1,5 +1,5 @@
 ---
-sourceHash: fcd4cffc00288949
+sourceHash: 31c7cc059687a1af
 title: Soft delete
 sidebar_label: Soft delete
 description: Trasforma l'eliminazione in un timestamp, nascondi le righe contrassegnate da ogni lettura e ripristinale con un normale aggiornamento.

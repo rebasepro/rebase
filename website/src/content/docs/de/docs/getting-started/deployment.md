@@ -1,5 +1,5 @@
 ---
-sourceHash: 3dfefd8103a76481
+sourceHash: e94961f22c3fa77e
 title: Bereitstellung
 sidebar_label: Bereitstellung
 description: Stellen Sie Ihr Rebase-Projekt mit Docker, Cloud-Plattformen oder manuellen Setups in der Produktion bereit.

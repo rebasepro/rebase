@@ -1,5 +1,5 @@
 ---
-sourceHash: c9634d9fe5d4bd79
+sourceHash: 7f66a1e3493fbf07
 title: Ferramentas do Studio
 sidebar_label: Studio
 description: O Rebase Studio oferece ferramentas para desenvolvedores para edição visual de esquemas, consultas SQL, scripting JavaScript, gerenciamento de políticas RLS e navegação de armazenamento.

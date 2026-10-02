@@ -1,5 +1,5 @@
 ---
-sourceHash: c7ecc940df2e4680
+sourceHash: 65087c49b7985cc7
 title: Interrogare le relazioni
 sidebar_label: Relazioni
 description: "Includi entità correlate in una query e leggi una collezione figlia tramite il genitore con gli accessor di relazione dell'SDK."

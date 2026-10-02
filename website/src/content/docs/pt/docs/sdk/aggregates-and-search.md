@@ -1,5 +1,5 @@
 ---
-sourceHash: bc6c73dcfd10b400
+sourceHash: 15505bc41ba0e8f2
 title: Agregações e busca
 sidebar_label: Agregações e busca
 description: "Faça contagens, somas e agrupamentos com o SDK, filtre dentro de colunas JSON e execute busca textual e vetorial a partir do cliente."

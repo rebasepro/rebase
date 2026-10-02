@@ -1,5 +1,5 @@
 ---
-sourceHash: 8bade8e09da44b98
+sourceHash: 29c6fa4cf5af64a8
 title: Collezioni
 sidebar_label: Collezioni
 description: Le collezioni sono l'elemento fondamentale di Rebase — ogni collezione mappa una tabella di database e ne definisce schema, relazioni, sicurezza e comportamento dell'interfaccia utente.

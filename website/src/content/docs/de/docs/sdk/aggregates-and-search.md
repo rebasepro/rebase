@@ -1,5 +1,5 @@
 ---
-sourceHash: bc6c73dcfd10b400
+sourceHash: 15505bc41ba0e8f2
 title: Aggregate und Suche
 sidebar_label: Aggregate & Suche
 description: "Zählen, summieren und gruppieren mit dem SDK, Filtern in JSON-Spalten und Ausführen von Volltext- und Vektorsuche über den Client."

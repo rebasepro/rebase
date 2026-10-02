@@ -1,5 +1,5 @@
 ---
-sourceHash: 904ba8b9051f1edf
+sourceHash: 4ae8706f7b07c3ff
 title: Archiviazione e file
 sidebar_label: Archiviazione
 description: Carica, scarica, elenca ed elimina file usando il modulo di archiviazione dell'SDK tipizzato di Rebase.

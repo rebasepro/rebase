@@ -1,5 +1,5 @@
 ---
-sourceHash: 4c2b6974a271effa
+sourceHash: c315bb1b0080f7b0
 title: Deployment
 sidebar_label: Übersicht
 description: Wo ein Rebase-Projekt laufen kann — Rebase Cloud, Ihr eigener Server, Kubernetes oder eine verwaltete Container-Plattform — und welche Anleitung Sie dafür öffnen.

@@ -1,4 +1,5 @@
 ---
+sourceHash: 02c94e203b545b2c
 title: Backups e restauração
 sidebar_label: Backups
 description: Crie, agende, liste e restaure backups do banco de dados com pg_dump — o que um backup contém, o arquivo de roles que viaja com ele, e a única coisa que ele não cobre, seus arquivos enviados.

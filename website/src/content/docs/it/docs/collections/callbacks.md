@@ -1,5 +1,5 @@
 ---
-sourceHash: 22ae93dbf7922d06
+sourceHash: c1478b42d3c890a5
 title: Callback delle Entità
 sidebar_label: Callback
 description: Usa i callback del ciclo di vita per eseguire logica personalizzata quando le entità vengono create, aggiornate, lette o eliminate. Include l'API context.data per operazioni tra collezioni.

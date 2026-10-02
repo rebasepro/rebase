@@ -1,5 +1,5 @@
 ---
-sourceHash: 14c3049677a7af03
+sourceHash: 43864c4dc229db0b
 title: SDK typé — Prise en main
 sidebar_label: Prise en main
 description: Installez et configurez le SDK typé de Rebase pour interagir avec votre backend depuis n'importe quelle application JavaScript ou TypeScript.

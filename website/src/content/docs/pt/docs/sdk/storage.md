@@ -1,5 +1,5 @@
 ---
-sourceHash: 904ba8b9051f1edf
+sourceHash: 4ae8706f7b07c3ff
 title: Armazenamento e Arquivos
 sidebar_label: Armazenamento
 description: Envie, baixe, liste e exclua arquivos usando o módulo de armazenamento do SDK tipado do Rebase.

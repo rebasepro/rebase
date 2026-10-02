@@ -1,5 +1,5 @@
 ---
-sourceHash: 3dfefd8103a76481
+sourceHash: e94961f22c3fa77e
 title: Déploiement
 sidebar_label: Déploiement
 description: Déployez votre projet Rebase en production à l'aide de Docker, de plateformes cloud ou de configurations manuelles.

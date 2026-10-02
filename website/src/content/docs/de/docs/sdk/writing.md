@@ -1,5 +1,5 @@
 ---
-sourceHash: 281093d0a10d0ae8
+sourceHash: 47fbba4a0312739a
 title: Daten schreiben
 sidebar_label: Daten schreiben
 description: Erstellen, Upserten, Aktualisieren und Löschen mit dem SDK – Feldoperationen, bedingte Schreibvorgänge, Idempotenzschlüssel, Batch-Schreibvorgänge und kollektionsübergreifendes Schreiben in einer einzigen Transaktion.

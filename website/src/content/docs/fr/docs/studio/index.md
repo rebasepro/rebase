@@ -1,5 +1,5 @@
 ---
-sourceHash: c9634d9fe5d4bd79
+sourceHash: 7f66a1e3493fbf07
 title: Outils du Studio
 sidebar_label: Studio
 description: Rebase Studio fournit des outils de développement pour l'édition visuelle de schémas, les requêtes SQL, le scripting JavaScript, la gestion des politiques RLS et la navigation dans le stockage.

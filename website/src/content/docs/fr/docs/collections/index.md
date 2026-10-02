@@ -1,5 +1,5 @@
 ---
-sourceHash: 8bade8e09da44b98
+sourceHash: 29c6fa4cf5af64a8
 title: Collections
 sidebar_label: Collections
 description: Les collections sont la brique de base de Rebase — chaque collection correspond à une table de base de données et définit son schéma, ses relations, sa sécurité et son comportement d'interface utilisateur.

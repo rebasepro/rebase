@@ -1,5 +1,5 @@
 ---
-sourceHash: 4c2b6974a271effa
+sourceHash: c315bb1b0080f7b0
 title: Despliegue
 sidebar_label: Resumen
 description: Dónde puede ejecutarse un proyecto Rebase — Rebase Cloud, tu propio servidor, Kubernetes o una plataforma de contenedores gestionada — y qué guía abrir en cada caso.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 14c3049677a7af03
+sourceHash: 43864c4dc229db0b
 title: Typisiertes SDK — Erste Schritte
 sidebar_label: Erste Schritte
 description: Installieren und konfigurieren Sie das typisierte SDK von Rebase, um von jeder JavaScript- oder TypeScript-Anwendung aus mit Ihrem Backend zu interagieren.

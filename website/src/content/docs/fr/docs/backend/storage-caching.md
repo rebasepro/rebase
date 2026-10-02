@@ -1,4 +1,5 @@
 ---
+sourceHash: bad3ea0d4f6e00f8
 title: Mise en cache du stockage et CDN
 sidebar_label: Mise en cache du stockage et CDN
 description: Comment Rebase distribue les fichiers stockés pour que les navigateurs et les CDN puissent les mettre en cache — ETags et 304, Cache-Control selon qui peut lire un objet, plages d'octets pour le déplacement dans l'audio et la vidéo, et ce qu'il faut configurer sur un CDN en amont.

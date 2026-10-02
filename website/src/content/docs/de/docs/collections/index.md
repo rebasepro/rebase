@@ -1,5 +1,5 @@
 ---
-sourceHash: 8bade8e09da44b98
+sourceHash: 29c6fa4cf5af64a8
 title: Collections
 sidebar_label: Collections
 description: Collections sind der zentrale Baustein von Rebase – jede Collection wird auf eine Datenbanktabelle abgebildet und definiert deren Schema, Relationen, Sicherheit und UI-Verhalten.

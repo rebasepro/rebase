@@ -1,5 +1,5 @@
 ---
-sourceHash: 2c6e24a9d83f64ab
+sourceHash: c61516d8bb8e724e
 title: Entitätshistorie
 sidebar_label: Entitätshistorie
 description: Verfolgen Sie jede Änderung an Ihren Entitäten mit einem vollständigen Audit-Trail – wer hat was wann geändert, inklusive vollständigem Vorher-/Nachher-Zustand.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5869ed500c47d66c
+sourceHash: 50a7c244b28e72ae
 title: Rebase auf AWS bereitstellen
 description: Stellen Sie Ihre Rebase-Instanz sicher auf Amazon Web Services unter Verwendung von RDS und AWS App Runner mit starkem europäischem Fokus bereit.
 sidebar_label: AWS

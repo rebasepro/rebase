@@ -1,5 +1,5 @@
 ---
-sourceHash: 1474038b1d0142aa
+sourceHash: b45fa53f7ac4412f
 title: Hooks Globais de Backend
 sidebar_label: Hooks Globais
 description: Aplique callbacks de ciclo de vida transversais a todas as coleções no nível do servidor usando CollectionCallbacks.

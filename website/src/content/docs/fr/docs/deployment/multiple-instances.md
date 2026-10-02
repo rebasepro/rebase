@@ -1,4 +1,5 @@
 ---
+sourceHash: 2e1acf0a887d27a1
 title: Exécuter plus d'une instance
 sidebar_label: Plus d'une instance
 description: Chaque élément d'état qu'un processus Rebase garde pour lui seul, et le réglage qui le partage — ce qu'il faut définir avant qu'une seconde réplique, un déploiement progressif ou un déploiement scindé ne prenne du trafic.

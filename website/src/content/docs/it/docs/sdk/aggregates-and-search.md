@@ -1,5 +1,5 @@
 ---
-sourceHash: bc6c73dcfd10b400
+sourceHash: 15505bc41ba0e8f2
 title: Aggregazioni e ricerca
 sidebar_label: Aggregazioni e ricerca
 description: "Conta, somma e raggruppa con l'SDK, filtra all'interno delle colonne JSON ed esegui ricerche full-text e vettoriali dal client."

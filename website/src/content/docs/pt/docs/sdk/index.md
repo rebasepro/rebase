@@ -1,5 +1,5 @@
 ---
-sourceHash: 14c3049677a7af03
+sourceHash: 43864c4dc229db0b
 title: SDK tipado — Primeiros passos
 sidebar_label: Primeiros Passos
 description: Instale e configure o SDK tipado do Rebase para interagir com seu backend a partir de qualquer aplicação JavaScript ou TypeScript.

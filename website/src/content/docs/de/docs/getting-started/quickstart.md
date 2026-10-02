@@ -1,5 +1,5 @@
 ---
-sourceHash: ff637239bf2fa695
+sourceHash: ea3185fba08977a9
 title: Schnellstart
 sidebar_label: Schnellstart
 description: Erstellen Sie ein neues Rebase-Projekt und führen Sie es in weniger als 2 Minuten lokal aus.

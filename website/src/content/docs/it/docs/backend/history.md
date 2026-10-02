@@ -1,5 +1,5 @@
 ---
-sourceHash: 2c6e24a9d83f64ab
+sourceHash: c61516d8bb8e724e
 title: Cronologia entità
 sidebar_label: Cronologia entità
 description: Traccia ogni modifica apportata alle tue entità con un audit trail completo — chi ha modificato cosa, quando e l'entità completa prima/dopo.

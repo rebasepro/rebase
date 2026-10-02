@@ -1,5 +1,5 @@
 ---
-sourceHash: 088ee7a6b8423f85
+sourceHash: 5e9f7e8c746d9f67
 title: Scrittura tramite REST
 sidebar_label: Scrittura tramite REST
 description: Chiavi di idempotenza, scritture condizionali con ETag e If-Match, operazioni sui campi, upsert su chiave naturale, return=minimal e batch tra collezioni.

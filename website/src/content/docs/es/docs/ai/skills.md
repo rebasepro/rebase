@@ -1,5 +1,5 @@
 ---
-sourceHash: 057f6243c593912e
+sourceHash: 8fee7de68fa81701
 title: Habilidades del agente
 sidebar_label: Habilidades del agente
 description: rebase skills install escribe 21 habilidades de referencia de Rebase en tu repositorio, en el formato que espera tu asistente de IA — Cursor, Claude Code, Windsurf, Gemini CLI y Antigravity.

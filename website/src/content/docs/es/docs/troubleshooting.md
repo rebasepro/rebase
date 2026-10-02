@@ -1,5 +1,5 @@
 ---
-sourceHash: 1030bf24935489a6
+sourceHash: 31f3a0f8e24a2f69
 slug: es/docs/troubleshooting
 title: Solución de problemas
 description: Los fallos que impiden que un backend de Rebase se inicie o preste servicio — una base de datos inaccesible, credenciales incorrectas, una extensión faltante, un rechazo de RLS, desfase de esquema (schema drift), un puerto ocupado, una función que no carga — y cómo se ve cada uno.

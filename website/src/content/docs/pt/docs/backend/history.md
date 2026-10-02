@@ -1,5 +1,5 @@
 ---
-sourceHash: 2c6e24a9d83f64ab
+sourceHash: c61516d8bb8e724e
 title: Histórico de Entidades
 sidebar_label: Histórico de Entidades
 description: Rastreie todas as alterações em suas entidades com uma trilha de auditoria completa — quem alterou o quê, quando e a entidade completa antes/depois.

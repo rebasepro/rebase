@@ -1,5 +1,5 @@
 ---
-sourceHash: 1474038b1d0142aa
+sourceHash: b45fa53f7ac4412f
 title: Globale Backend-Hooks
 sidebar_label: Globale Hooks
 description: Wenden Sie querschnittliche Lifecycle-Callbacks auf Serverebene mithilfe von CollectionCallbacks auf jede Collection an.

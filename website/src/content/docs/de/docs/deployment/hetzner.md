@@ -1,5 +1,5 @@
 ---
-sourceHash: 258c9efd0ad99d52
+sourceHash: f79b674a588e97cc
 title: Rebase auf Hetzner Cloud bereitstellen
 description: Stellen Sie Rebase mit Terraform oder Docker Compose auf Hetzner Cloud bereit – für exzellente Performance und Datensouveränität in der EU.
 sidebar_label: Hetzner Cloud

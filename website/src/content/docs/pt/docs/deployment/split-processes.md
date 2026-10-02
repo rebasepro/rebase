@@ -1,5 +1,5 @@
 ---
-sourceHash: 5062c0e4dfa8bb60
+sourceHash: 2862051eee047654
 title: Divisão em vários processos
 sidebar_label: Processos Divididos
 description: Execute um bundle como vários processos cooperantes — uma API, uma camada de funções, um worker — a partir da mesma imagem de runtime publicada, para que uma função customizada pesada deixe de concorrer com a API de dados.

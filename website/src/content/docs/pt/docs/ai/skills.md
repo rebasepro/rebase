@@ -1,5 +1,5 @@
 ---
-sourceHash: 057f6243c593912e
+sourceHash: 8fee7de68fa81701
 title: Agent Skills
 sidebar_label: Agent Skills
 description: O comando rebase skills install grava 21 habilidades de referência do Rebase em seu repositório, no layout que seu assistente de IA espera — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.

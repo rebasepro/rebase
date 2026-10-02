@@ -1,4 +1,5 @@
 ---
+sourceHash: 02c94e203b545b2c
 title: Backup e ripristino
 sidebar_label: Backup
 description: Crea, pianifica, elenca e ripristina backup del database con pg_dump — cosa contiene un backup, il file dei ruoli che lo accompagna, e l'unica cosa che non copre, i tuoi file caricati.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1030bf24935489a6
+sourceHash: 31f3a0f8e24a2f69
 slug: it/docs/troubleshooting
 title: Risoluzione dei problemi
 description: Gli errori che impediscono l'avvio o il funzionamento di un backend Rebase — un database irraggiungibile, credenziali errate, un'estensione mancante, un rifiuto RLS, schema drift, una porta occupata, una funzione che non si carica — e come si presenta ciascuno di essi.

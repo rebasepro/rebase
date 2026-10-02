@@ -1,5 +1,5 @@
 ---
-sourceHash: 2d8f2aad3ca6c7da
+sourceHash: 57da5c05731b0030
 title: Autoalojamiento
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial del runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS básico.

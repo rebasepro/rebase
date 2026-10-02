@@ -1,5 +1,5 @@
 ---
-sourceHash: 057f6243c593912e
+sourceHash: 8fee7de68fa81701
 title: Agent Skills
 sidebar_label: Agent Skills
 description: "rebase skills install schreibt 21 Rebase-Referenz-Skills in dein Repo – genau in dem Layout, das dein KI-Assistent erwartet: Cursor, Claude Code, Windsurf, Gemini CLI und Antigravity."

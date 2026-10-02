@@ -1,5 +1,5 @@
 ---
-sourceHash: 3dfefd8103a76481
+sourceHash: e94961f22c3fa77e
 title: Implantação
 sidebar_label: Implantação
 description: Implante seu projeto Rebase em produção usando Docker, plataformas de nuvem ou configurações manuais.

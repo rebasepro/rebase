@@ -1,5 +1,5 @@
 ---
-sourceHash: fcd4cffc00288949
+sourceHash: 31c7cc059687a1af
 title: Soft delete
 sidebar_label: Soft delete
 description: Convierte el borrado en una marca de tiempo, oculta las filas marcadas de cada lectura y restáuralas con una actualización ordinaria.

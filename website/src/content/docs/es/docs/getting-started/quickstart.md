@@ -1,5 +1,5 @@
 ---
-sourceHash: ff637239bf2fa695
+sourceHash: ea3185fba08977a9
 title: Inicio rápido
 sidebar_label: Inicio rápido
 description: Crea un nuevo proyecto de Rebase y ponlo en marcha localmente en menos de 2 minutos.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3dfefd8103a76481
+sourceHash: e94961f22c3fa77e
 title: Distribuzione
 sidebar_label: Distribuzione
 description: Distribuisci il tuo progetto Rebase in produzione utilizzando Docker, piattaforme cloud o configurazioni manuali.

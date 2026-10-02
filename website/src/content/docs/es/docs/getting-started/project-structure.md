@@ -1,5 +1,5 @@
 ---
-sourceHash: a6d76e5410cf6910
+sourceHash: 6f5f096b10dbbdb5
 title: Estructura del proyecto
 sidebar_label: Estructura del proyecto
 description: "Conozca la estructura de un proyecto Rebase: frontend, backend y configuración de colecciones."

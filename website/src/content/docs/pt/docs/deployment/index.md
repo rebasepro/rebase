@@ -1,5 +1,5 @@
 ---
-sourceHash: 4c2b6974a271effa
+sourceHash: c315bb1b0080f7b0
 title: Implantação
 sidebar_label: Visão geral
 description: Onde um projeto Rebase pode ser executado — Rebase Cloud, o seu próprio servidor, Kubernetes ou uma plataforma de contêineres gerenciada — e qual guia abrir para cada caso.

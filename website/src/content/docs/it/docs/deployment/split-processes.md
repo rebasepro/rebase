@@ -1,5 +1,5 @@
 ---
-sourceHash: 5062c0e4dfa8bb60
+sourceHash: 2862051eee047654
 title: Suddivisione in più processi
 sidebar_label: Processi separati
 description: Esegui un unico bundle suddiviso in vari processi cooperanti — un'API, un livello per le funzioni, un worker — a partire dalla stessa immagine di runtime pubblicata, evitando che una funzione custom pesante competa con l'API dati.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0e16c556d7c371c0
+sourceHash: 4051053066964eb8
 title: Déployer Rebase sur Scaleway
 description: Découvrez comment déployer Rebase sur Scaleway pour une infrastructure cloud sécurisée et basée en France avec Serverless Containers.
 sidebar_label: Scaleway

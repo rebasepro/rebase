@@ -1,5 +1,5 @@
 ---
-sourceHash: 1030bf24935489a6
+sourceHash: 31f3a0f8e24a2f69
 slug: de/docs/troubleshooting
 title: Fehlerbehebung
 description: Die Fehler, die verhindern, dass ein Rebase-Backend startet oder Anfragen bedient – eine nicht erreichbare Datenbank, falsche Anmeldedaten, eine fehlende Extension, eine RLS-Verweigerung, Schema-Drift, ein belegter Port, eine Funktion, die nicht lädt – und wie jeder davon aussieht.

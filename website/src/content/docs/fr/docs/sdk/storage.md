@@ -1,5 +1,5 @@
 ---
-sourceHash: 904ba8b9051f1edf
+sourceHash: 4ae8706f7b07c3ff
 title: Stockage et fichiers
 sidebar_label: Stockage
 description: Téléverser, télécharger, lister et supprimer des fichiers à l'aide du module de stockage du SDK typé de Rebase.

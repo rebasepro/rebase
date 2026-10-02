@@ -1,5 +1,5 @@
 ---
-sourceHash: 8bade8e09da44b98
+sourceHash: 29c6fa4cf5af64a8
 title: Coleções
 sidebar_label: Coleções
 description: As coleções são o bloco de construção fundamental do Rebase — cada coleção é mapeada para uma tabela de banco de dados e define seu esquema, relações, segurança e comportamento de interface.

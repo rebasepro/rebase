@@ -1,5 +1,5 @@
 ---
-sourceHash: 281093d0a10d0ae8
+sourceHash: 47fbba4a0312739a
 title: Scrittura dei dati
 sidebar_label: Scrittura dei dati
 description: create, upsert, update e delete con l'SDK — operazioni sui campi, scritture condizionali, chiavi di idempotenza, scritture batch e scrittura tra collezioni in una singola transazione.

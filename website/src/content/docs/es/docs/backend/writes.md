@@ -1,5 +1,5 @@
 ---
-sourceHash: 088ee7a6b8423f85
+sourceHash: 5e9f7e8c746d9f67
 title: Escritura a través de REST
 sidebar_label: Escritura a través de REST
 description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre clave natural, return=minimal y lotes entre colecciones.

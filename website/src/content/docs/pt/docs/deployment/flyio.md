@@ -1,5 +1,5 @@
 ---
-sourceHash: 358e3e51246c60d8
+sourceHash: cab3ef3500139add
 title: Implantando o Rebase no Fly.io
 description: Aprenda como implantar o Rebase globalmente ou restringi-lo a data centers europeus usando o Fly.io.
 sidebar_label: Fly.io

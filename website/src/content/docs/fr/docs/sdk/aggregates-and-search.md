@@ -1,5 +1,5 @@
 ---
-sourceHash: bc6c73dcfd10b400
+sourceHash: 15505bc41ba0e8f2
 title: Agrégats et recherche
 sidebar_label: Agrégats & recherche
 description: "Comptez, additionnez et regroupez avec le SDK, filtrez dans les colonnes JSON, et exécutez des recherches textuelles et vectorielles depuis le client."
