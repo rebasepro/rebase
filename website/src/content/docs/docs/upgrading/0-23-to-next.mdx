@@ -2,7 +2,7 @@
 slug: docs/upgrading/0-23-to-next
 title: Upgrading 0.23 to the next release
 sidebar_label: 0.23 → next
-description: The breaking changes already merged on main and live in these docs, before the release that carries them exists.
+description: The breaking changes already merged on main and live in these docs, before the release that carries them exists — generated SQL and SDK types, CLI paths, scopes, upserts and keys, the remote MCP endpoint, and sessions and accounts.
 ---
 
 # Upgrading 0.23 → next
@@ -14,11 +14,15 @@ the version that carries them exists on npm. If you installed from npm you are
 on 0.23 and none of this has reached you — read it to know what is coming, and
 come back when you move.
 
-Sections 41, 42 and 49 are about generated files: they change what lands in your
-repository, and what `rebase dev` does without being asked. Sections 43 to 48
-are about access. Permissions are now [scopes](/docs/backend/roles-and-scopes/),
-one vocabulary for sessions, API keys, roles and MCP tokens. If every person who
-uses your admin surfaces holds the `admin` role, most of them ask nothing of you.
+Sections 41 to 46 are about the CLI: generated SQL leaves the repository, `rebase
+dev` regenerates the SDK types without being asked, and paths, failures and
+agent setup are made consistent. Sections 47 to 50 change what the server
+answers, and 51 to 55 are about access. Permissions are now
+[scopes](/docs/backend/roles-and-scopes/), one vocabulary for sessions, API keys,
+roles and MCP tokens; if every person who uses your admin surfaces holds the
+`admin` role, most of them ask nothing of you. Sections 56 to 58 cover the remote
+MCP endpoint, in-process writes and the UI kit, and 59 to 64 the session and
+account changes.
 
 ---
 
@@ -66,7 +70,67 @@ not running.
 grep -rnE "rebase dev.*(--generate|-g)|REBASE_(AUTO_)?GENERATE" --exclude-dir=node_modules .
 ```
 
-## 43. `rebase api-keys create` takes scopes
+## 43. A relative `--collections` path is read from where you run the command
+
+`schema generate`, `db push`, `db generate` and `doctor` resolved a relative
+`--collections` from `backend/`, while `generate-sdk` and `db backup --out`
+resolved theirs from the directory you typed the command in. Every command now
+uses the second rule, and so do `schema --output` and `doctor --schema`/`--sdk`.
+A script written for the old rule, `--collections ../config/collections` run from
+the project root, now names a directory that is not there. The CLI refuses it
+before anything runs, because a schema generated from no collections is empty and
+pushing it would drop every table, and the message says what to write instead.
+
+**What to change:** drop the flag where it names `config/collections`, which is
+the default, or write the path from where the command runs. `generate-sdk` now
+takes `--collections` too; `--collections-dir` still works.
+
+```diff lang="json"
+- "db:push": "rebase db push --collections ../config/collections"
++ "db:push": "rebase db push"
+```
+
+```bash
+grep -rnE -- "(--collections|-c) \.\./" --exclude-dir=node_modules .
+```
+
+## 44. `rebase generate-sdk` stops on a collection file that does not load
+
+`generate-sdk` read the `index.ts` barrel in `config/collections/` and skipped,
+with a warning, a file that failed to load. It now loads every top-level
+collection file in the directory, the same files the backend serves and the
+admin panel lists, whether or not the barrel names them. A file that does not
+load fails the command, as it already failed the boot. The barrel orders the
+navigation and holds `defaultSecurityRules`; it is not a registry.
+
+**What to change:** nothing, if your backend boots. If `generate-sdk` (or
+`rebase dev`, which runs it) now stops, fix the file it names: it is one the
+backend would refuse too. A collection left out of the barrel now appears in
+the generated `Database` type, so a typed client gains its accessor.
+
+## 45. Agents start the project's own `@rebasepro/mcp`
+
+The `.mcp.json` that `rebase init` scaffolded ran `npx -y @rebasepro/mcp`: the
+newest version on the registry, whatever version the project's CLI was.
+`rebase init`, and the new `rebase skills install --mcp`, now add
+`@rebasepro/mcp` as a devDependency pinned with the CLI and start that copy:
+`pnpm exec rebase-mcp`, or `npx --no rebase-mcp` in an npm project. A project
+made before this gets the devDependency, with a message to install it, the next
+time `skills install --mcp` runs.
+
+**What to change:** add the devDependency, with `rebase skills install --mcp` or
+`pnpm add -D @rebasepro/mcp`, and point the `rebase` server in `.mcp.json` (and
+any other agent configuration you wrote by hand) at the local binary:
+
+```diff lang="json"
+- "command": "npx", "args": ["-y", "@rebasepro/mcp"]
++ "command": "pnpm", "args": ["exec", "rebase-mcp"]
+```
+
+Upgrade `@rebasepro/mcp` with the CLI from then on, since the two are pinned
+together. See [Connecting a client](/docs/ai/mcp/#connecting-a-client).
+
+## 46. `rebase api-keys create` takes scopes
 
 `--scopes` names what the key may do, comma-separated or repeated:
 `--scopes data:read:posts,logs:read`. `--roles` gives the RLS roles it runs as
@@ -94,7 +158,72 @@ key needs, and `--expires 90d` with `--expires-in 90`.
 grep -rnE "api-keys create.*(--permissions|--admin|--expires )" --exclude-dir=node_modules .
 ```
 
-## 44. Permissions are scopes
+## 47. A live schema edit commits no SQL
+
+A change applied from the admin panel's
+[live schema editor](/docs/backend/live-schema-editing/) commits the collection
+and `backend/src/schema.generated.ts`, and nothing else. It also used to commit
+the five SQL files, but it wrote them at the project root while the CLI writes
+them beside the backend, so a project could hold two copies that disagreed.
+`SchemaCommitPaths` and `DEFAULT_COMMIT_PATHS` now hold only `schemaFile`.
+
+**What to change:** nothing, unless your code reads `DEFAULT_COMMIT_PATHS` or
+builds a `SchemaCommitPaths` — then drop `ddlFile`, `policiesFile`, `searchFile`,
+`vectorFile` and `triggersFile`, which TypeScript now reports. If a live edit
+committed those files to a `drizzle/` directory at your project root, nothing
+reads them: delete them. A project that keeps versioned migrations still runs
+`rebase db generate` after a live edit, and it writes the migration from the
+committed collection.
+
+## 48. An upsert into a row in the trash is refused with `409 ROW_IN_TRASH`
+
+On a collection with [soft delete](/docs/collections/soft-delete/), a deleted row
+keeps its key. An upsert whose key belonged to such a row wrote its values into
+the hidden row and answered `201 Created`, so the row stayed deleted and the
+caller saw a success. It is now refused with `409 ROW_IN_TRASH` and nothing is
+written, on every upsert door: `?on_conflict=`, `/bulk`, `/_batch`, the SDK, the
+socket, and `rebase.data` or `context.data` on the server.
+
+**What to change:** nothing, unless something upserts into a soft-deleted
+collection and expects to bring a row back. Restore the row first, with an
+update setting its soft-delete field to `null`, then upsert. Or purge it with
+`?hard=true` and upsert a new one.
+
+```diff lang="ts"
+- await client.data.invoices.upsert({ id, ...values });
++ await client.data.invoices.update(id, { deletedAt: null });
++ await client.data.invoices.upsert({ id, ...values });
+```
+
+## 49. An update that changes a row's key is refused with `400 KEY_IMMUTABLE`
+
+An update whose body named the row's key with another value, or a `beforeSave`
+that changed it, answered `500`. In-process, through `rebase.data`, the row had
+already moved to the new key when the write threw. Every door now refuses it
+with `400 KEY_IMMUTABLE` before any hook runs, naming the field, and nothing is
+written. Sending the key the row already has is still accepted.
+
+**What to change:** where code moved a row by updating its key, create the row
+under the new key and delete the old one. A `beforeSave` that rewrote the key
+on update has to stop. See [Writing](/docs/backend/writes/).
+
+## 50. `Strict-Transport-Security` no longer sends `includeSubDomains`
+
+The header told browsers to refuse plain HTTP on every subdomain of the
+server's domain, including ones the server has nothing to do with, for as long
+as the header said. It now covers the server's own host only.
+
+**What to change:** nothing, unless your parent domain relies on this server's
+header to force HTTPS on its subdomains. Then set the variable to keep the old
+header:
+
+```bash
+REBASE_HSTS_INCLUDE_SUBDOMAINS=true
+```
+
+See [Security headers](/docs/deployment/self-hosting/#security-headers).
+
+## 51. Permissions are scopes
 
 Every "may this caller do this?" now asks for a scope, named `resource:action`:
 `data:read`, `users:write`, `cron:write`. A scope may name one target:
@@ -124,7 +253,7 @@ branches on `SCOPE_MISSING`.
 grep -rnE "API_KEY_FORBIDDEN|Admin privileges required" --exclude-dir=node_modules .
 ```
 
-## 45. API keys hold scopes, not a permission list and an `admin` flag
+## 52. API keys hold scopes, not a permission list and an `admin` flag
 
 A key now has `scopes` and, for a service key, `roles`: the RLS roles it runs as
 beside `service`. `permissions: [{ collection, operations }]` and `admin: true`
@@ -155,7 +284,7 @@ calling a function is not a read. A key that called a `GET` function with
 grep -rnE "ApiKeyPermission|ApiKeyOperation|isOperationAllowed|api-keys create" --exclude-dir=node_modules .
 ```
 
-## 46. `schema-admin` is no longer an administrator, and roles are declared
+## 53. `schema-admin` is no longer an administrator, and roles are declared
 
 `admin` is the one built-in role. A role named `schema-admin` used to count as a
 second admin; it now means nothing on its own. Roles are no longer stored
@@ -198,7 +327,7 @@ fails the boot.
 grep -rnE "schema-admin|roleService|RoleData|createRole|getUserRoles|collectionPermissions" --exclude-dir=node_modules .
 ```
 
-## 47. The hosted MCP server's scopes are `data:read`, `data:write` and `data:delete`
+## 54. The hosted MCP server's scopes are `data:read`, `data:write` and `data:delete`
 
 The [remote MCP endpoint](/docs/ai/mcp/#the-remote-endpoint) used `mcp:read` and
 `mcp:write`. It now uses the data scopes every other credential uses, and each
@@ -211,7 +340,7 @@ so they keep their reach, and a client that still asks for the old names gets
 the same. Code that compares a granted scope string with `mcp:read` or
 `mcp:write` compares it with the new names.
 
-## 48. `RealtimeSocketLimits` is now `RealtimeSocketOptions`
+## 55. `RealtimeSocketLimits` is now `RealtimeSocketOptions`
 
 It carries the API-key resolver beside the limits, as the sixth argument of
 `initializeWebsockets`. That is what lets an API key authenticate the realtime
@@ -224,19 +353,165 @@ bootstrapper. Then rename the type.
 grep -rn "RealtimeSocketLimits" --exclude-dir=node_modules .
 ```
 
-## 49. A live schema edit commits no SQL
+## 56. The remote MCP endpoint takes the SDK's arguments
 
-A change applied from the admin panel's
-[live schema editor](/docs/backend/live-schema-editing/) commits the collection
-and `backend/src/schema.generated.ts`, and nothing else. It also used to commit
-the five SQL files, but it wrote them at the project root while the CLI writes
-them beside the backend, so a project could hold two copies that disagreed.
-`SchemaCommitPaths` and `DEFAULT_COMMIT_PATHS` now hold only `schemaFile`.
+The tools on `/mcp` used their own argument names. They now take what the SDK
+takes: `where` (was `filter`), `orderBy` as `["field", "desc"]` or
+`"field:desc"` (was `orderBy` plus `order`), and `data` for a write (was
+`values`). `query_collection` answers REST's shape, `{ data, meta }`, instead of
+`{ rows, count, truncated }`. An argument a tool does not declare is refused
+instead of ignored, and a `limit` above 1000 is refused, as on REST, instead of
+being clamped to 200.
 
-**What to change:** nothing, unless your code reads `DEFAULT_COMMIT_PATHS` or
-builds a `SchemaCommitPaths` — then drop `ddlFile`, `policiesFile`, `searchFile`,
-`vectorFile` and `triggersFile`, which TypeScript now reports. If a live edit
-committed those files to a `drizzle/` directory at your project root, nothing
-reads them: delete them. A project that keeps versioned migrations still runs
-`rebase db generate` after a live edit, and it writes the migration from the
-committed collection.
+**What to change:** nothing for an assistant, which reads the tool schemas each
+time it connects. Code or saved prompts that call the tools with fixed
+arguments use the new names and read `data` and `meta.total` from a query:
+
+```diff lang="json"
+- { "collection": "orders", "filter": { "status": ["==", "paid"] }, "orderBy": "total", "order": "desc" }
++ { "collection": "orders", "where": { "status": ["==", "paid"] }, "orderBy": ["total", "desc"] }
+```
+
+See [The remote endpoint](/docs/ai/mcp/#the-remote-endpoint).
+
+## 57. In-process writes refuse `ifMatch` and `idempotencyKey`
+
+A write through `context.data` in a callback, or `rebase.data` in a function,
+cron job or seed, never leaves the process: there is no `If-Match` to check and
+no idempotency store. Both options were silently ignored, so a conditional write
+there was unconditional. They now throw `UNSUPPORTED_OPTION` before anything is
+written.
+
+**What to change:** drop the option from in-process writes. Where the condition
+matters, check it in the code that writes, or make the write through the HTTP
+client, which honours both.
+
+```diff lang="ts"
+- await context.data.orders.update(id, { status: "paid" }, { ifMatch: etag });
++ await context.data.orders.update(id, { status: "paid" });
+```
+
+```bash
+grep -rnE "(context|rebase)\.data\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
+```
+
+## 58. `Button` and `IconButton` are typed against the element they render
+
+Both accepted any prop, which landed on the DOM and did nothing. They are now
+typed against the element they render, a `button` or the `component` you pass,
+so a prop they do not have is a compile error. That includes `IconButton`'s
+`color`, the obsolete HTML attribute, which never coloured anything, and
+`endIcon` or `loading` on `Button`, which never rendered.
+
+**What to change:** drop each prop TypeScript reports. What renders does not
+change; an icon that was meant to show goes in as a child.
+
+```diff lang="tsx"
+- <IconButton color="primary" onClick={close}><CloseIcon /></IconButton>
++ <IconButton onClick={close}><CloseIcon /></IconButton>
+```
+
+## 59. An open realtime socket is checked again, and closed when its identity ends
+
+A socket checked its token once, when it authenticated. A token that expired, a
+session that was revoked or a role that was taken away changed nothing until the
+socket reconnected. Now, before each frame, at least every 30 seconds for a
+socket that only listens, and at the instant its token expires, the server asks
+whether the account still exists, is still signed in and still holds its roles.
+An ended identity gets an `AUTH_ERROR` frame (`SESSION_ENDED` or
+`TOKEN_EXPIRED`) and close code `4001`. A changed role re-scopes the socket's
+subscriptions from the next frame.
+
+**What to change:** nothing with the SDK, which re-authenticates on every token
+refresh and reconnects after a `4001`. A client that speaks the
+[socket protocol](/docs/backend/realtime/#authentication-rls) directly must send
+a fresh token in `AUTHENTICATE` before the old one expires, and treat close
+code `4001` as a reason to reconnect with a new session.
+
+## 60. An email-verification link proves the address, and nothing else
+
+Following a verification link marked the address verified and kept everything
+else on the account. Someone could register a stranger's address with a password
+of their own, and when the owner clicked the link, that password became a way
+into a verified account. Without a live session of the account or its password,
+the link now removes the password and any identity nobody proved, and ends every
+session, as magic links, email codes and password resets already did.
+
+`client.auth.verifyEmail(token, options?)` now POSTs, sends the session when
+there is one, and may throw `PROOF_REQUIRED` (`409`): the account holds a
+password or an identity the request does not prove, and the token is not spent.
+
+**What to change:** in a custom verification page, catch `PROOF_REQUIRED` and
+ask for the password, or let the person verify without it. A page that calls
+`GET /api/auth/verify-email?token=` without the account's session now removes
+the password. The CMS's own page already asks.
+
+```diff lang="ts"
+- await client.auth.verifyEmail(token);
++ try {
++     await client.auth.verifyEmail(token);
++ } catch (error) {
++     if (error instanceof RebaseApiError && error.code === "PROOF_REQUIRED") {
++         await client.auth.verifyEmail(token, { password: await askForPassword() });
++     } else throw error;
++ }
+```
+
+See [Email verification](/docs/backend/email-verification/).
+
+## 61. `client.auth.signUp` resolves `confirmationRequired`, and `user` may be `null`
+
+With [`requireEmailVerification`](/docs/backend/email-verification/#confirm-first-registration)
+on, registering signs nobody in until the address is confirmed. `signUp` now
+resolves `{ confirmationRequired, user, accessToken, refreshToken }`: with
+`confirmationRequired: true`, the other three are `null`. With it off, the
+default, `confirmationRequired` is `false` and the rest is as before.
+
+**What to change:** TypeScript now reports code that reads `user` without
+checking. Narrow on `confirmationRequired`:
+
+```diff lang="ts"
+  const result = await client.auth.signUp(email, password);
+- showWelcome(result.user.uid);
++ if (result.confirmationRequired) showCheckYourInbox();
++ else showWelcome(result.user.uid);
+```
+
+## 62. `mfa.enroll().recoveryCodes` is `null` when adding a second factor
+
+Every enrolment made a fresh set of recovery codes and replaced the old one, so
+adding a second authenticator, or starting an enrolment and abandoning it,
+silently invalidated the printout. The codes are now made once, with the first
+factor. Enrolling another returns `recoveryCodes: null` and keeps the codes the
+account has; `mfa.regenerateRecoveryCodes()` replaces them when asked.
+
+**What to change:** show the codes only when they are there, and offer
+regeneration where you offered re-enrolment. See
+[Enrolling a factor](/docs/sdk/authentication/#enrolling-a-factor).
+
+```diff lang="ts"
+  const { totp, recoveryCodes } = await client.auth.mfa.enroll({ friendlyName: "Phone" });
+- showRecoveryCodes(recoveryCodes);
++ if (recoveryCodes) showRecoveryCodes(recoveryCodes);
+```
+
+## 63. Turning a guest into an account needs registration open
+
+`POST /api/auth/anonymous/link`, and linking an OAuth provider to a guest
+session, turn a guest into an account. Both now answer to `allowRegistration`
+like any other sign-up, and refuse with `403 REGISTRATION_DISABLED` when it is
+off.
+
+**What to change:** nothing, if `allowRegistration` is on. If your app keeps
+registration closed and upgrades guests, it has to open it, in the users
+collection's `auth` block. See
+[Anonymous sessions](/docs/sdk/authentication/#anonymous-sessions).
+
+## 64. A deleted account's token answers `401 SESSION_REVOKED`
+
+An access token whose account had been deleted answered `404` from `/me`. Every
+door now answers `401 SESSION_REVOKED`, as for a session that was signed out.
+
+**What to change:** nothing with the SDK, which signs out on it. A client that
+treated a `404` from `/me` as "account gone" checks for `SESSION_REVOKED`
+instead. See [Errors](/docs/backend/errors/).
