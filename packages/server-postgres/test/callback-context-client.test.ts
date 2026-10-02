@@ -17,6 +17,7 @@
  * singleton's own `dataAsAdmin`, the scoped transaction path a request takes.
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { createServer } from "node:http";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
@@ -51,6 +52,12 @@ const widgetsTable = pgTable("widgets", {
 });
 
 let db: PGlite;
+/**
+ * The booted backend's shutdown. Boot starts the metrics sampler, whose
+ * one-minute tick otherwise outlived this file and wrote through a driver
+ * whose module registry jest had already torn down.
+ */
+let shutdown: (() => Promise<void>) | undefined;
 let seen: RebaseCallContext[];
 /** Whether the callback below reaches for `context.client` — most never do. */
 let readsClient: boolean;
@@ -110,6 +117,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+    await shutdown?.();
+    shutdown = undefined;
     _resetRebaseMock();
     process.env.NODE_ENV = originalNodeEnv;
     await db.close();
@@ -118,12 +127,14 @@ afterEach(async () => {
 describe("a collection callback's `context.client`, on a booted server", () => {
     async function boot(): Promise<PostgresBackendDriver> {
         const driver = driverOver(db);
-        await initializeRebaseBackend({
+        const backend = await initializeRebaseBackend({
             app: new Hono() as never,
-            server: {} as never,
+            // Never listening: its `close` is all the shutdown needs.
+            server: createServer(),
             collections: [widgets()],
             bootstrappers: [bootstrapperFor(driver)]
         } as never);
+        shutdown = () => backend.shutdown(1_000);
         return driver;
     }
 

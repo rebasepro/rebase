@@ -13,6 +13,7 @@
  * returns it — with its own registry — and reads through it.
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { createServer } from "node:http";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
@@ -44,6 +45,12 @@ function notes(): CollectionConfig {
 }
 
 let db: PGlite;
+/**
+ * The booted backend's shutdown. Boot starts the metrics sampler, whose
+ * one-minute tick otherwise outlived this file and wrote through a driver
+ * whose module registry jest had already torn down.
+ */
+let shutdown: (() => Promise<void>) | undefined;
 
 /** A driver over PGlite, returned with its own registry, as the bootstrapper returns one. */
 function bootstrapperOver(pglite: PGlite): { bootstrapper: BackendBootstrapper; driver: PostgresBackendDriver } {
@@ -64,13 +71,15 @@ function bootstrapperOver(pglite: PGlite): { bootstrapper: BackendBootstrapper; 
 
 async function boot(callbacks: CollectionCallbacks): Promise<PostgresBackendDriver> {
     const { bootstrapper, driver } = bootstrapperOver(db);
-    await initializeRebaseBackend({
+    const backend = await initializeRebaseBackend({
         app: new Hono() as never,
-        server: {} as never,
+        // Never listening: its `close` is all the shutdown needs.
+        server: createServer(),
         collections: [notes()],
         bootstrappers: [bootstrapper],
         callbacks
     } as never);
+    shutdown = () => backend.shutdown(1_000);
     return driver;
 }
 
@@ -87,6 +96,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+    await shutdown?.();
+    shutdown = undefined;
     _resetRebaseMock();
     process.env.NODE_ENV = originalNodeEnv;
     await db.close();
