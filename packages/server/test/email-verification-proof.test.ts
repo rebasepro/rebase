@@ -258,3 +258,14 @@ describe("who marks an address verified", () => {
         expect(callers).toEqual(["auth/address-ownership.ts"]);
     });
 });
+
+describe("the welcome mail", () => {
+    it("points at the app's own address, not a /app route nothing serves", async () => {
+        const w = world();
+        await w.register(OWNER_PASSWORD);
+        await new Promise(resolve => setImmediate(resolve));
+        const welcome = w.mails.find(m => !/verify-email/.test(m.text ?? ""));
+        expect(welcome?.text).toContain("https://app.test");
+        expect(welcome?.text).not.toContain("https://app.test/app");
+    });
+});

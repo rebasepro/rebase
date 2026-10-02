@@ -393,7 +393,10 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         const templateFn = emailConfig?.templates?.welcomeEmail;
         const emailContent = templateFn
             ? templateFn(user, appName)
-            : getWelcomeEmailTemplate(user, appName, loginUrl ? `${loginUrl}/app` : undefined, logoUrl);
+            // The app's own address. `<base>/app` is a route no frontend has —
+            // the CMS answered it with its not-found page, after sign-in —
+            // and it was the button in every self-registered user's first mail.
+            : getWelcomeEmailTemplate(user, appName, loginUrl || undefined, logoUrl);
 
         emailService!.send({
             to: user.email,
