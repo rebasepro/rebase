@@ -1,5 +1,5 @@
 ---
-sourceHash: be8521ab898e66ea
+sourceHash: 52e128ca94563aec
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se conecta e faz deploy, e o que o beta privado ainda não inclui.
@@ -148,6 +148,58 @@ Um rollback anexa um novo deployment em vez de retroceder o histórico, e aguard
 a versão restaurada começar a responder antes de reportar sucesso. Acompanhe com
 `rebase cloud logs -f`.
 
+## CI e agentes
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Um job de CI ou um agente não deveria carregar a sua senha. Dê a ele um token: uma chave que age como a sua conta, restrita a poucas ações em um projeto. Crie-o a partir de um terminal autenticado:
+
+```bash
+rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
+```
+
+O token é exibido uma única vez, como uma linha `export REBASE_TOKEN=rk_live_…`. Com `REBASE_TOKEN` definida, todo comando `rebase cloud` se autentica com ele em vez do seu login, e nunca lê nem grava a sessão armazenada. No GitHub Actions, guarde-o como secret do repositório e exponha-o com esse nome:
+
+```yaml title=".github/workflows/deploy.yml"
+name: Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec rebase cloud deploy --project shop
+        env:
+          REBASE_TOKEN: ${{ secrets.REBASE_TOKEN }}
+```
+
+`--can` aceita uma ou mais capacidades, separadas por vírgulas ou repetidas:
+
+| Capacidade | O que o token pode fazer |
+|---|---|
+| `deploy` | Fazer o deploy do projeto e acompanhar os builds: `deploy`, `deployments` |
+| `logs` | Ler os logs de build e de execução, e as métricas ao vivo: `logs`, `metrics` |
+| `env` | Ler e alterar variáveis de ambiente, incluindo secrets |
+| `database` | `db list`, `db info` e `db connect`, o que inclui a senha do banco de dados |
+| `backups` | Listar, criar, consultar e baixar backups, e ler a janela de recuperação point-in-time |
+
+Por baixo, um token é uma [chave de API pessoal](/docs/backend/api-keys/#personal-keys) no control plane. Cada capacidade vira alguns [escopos](/docs/backend/roles-and-scopes/): `deploy` em `shop` tem `project:deploy:<id>`, com o id do projeto, mais os escopos de dados e de funções que os comandos de deploy chamam. O token nunca tem mais do que a sua conta tem no momento em que é usado, então perde tudo o que a sua conta perder.
+
+Duas coisas continuam com uma pessoa autenticada:
+
+- **Gerenciar tokens.** `rebase cloud tokens list`, `create` e `revoke <id>` usam a sua sessão do `rebase cloud login`. Um token não pode listar, criar nem revogar tokens, porque um token que pudesse criar tokens poderia criar o seu próprio sucessor.
+- **Restaurar.** Nenhuma capacidade permite restaurar um backup nem fazer o `restore` e o `cutover` de uma recuperação point-in-time. Colocar dados antigos sobre um banco de dados em produção continua com um owner ou admin autenticado.
+
+`rebase cloud whoami`, com um token definido, mostra o que ele pode fazer e em qual projeto. `rebase cloud tokens revoke <id> --yes` o interrompe na hora.
+
 ## Computação e custos
 
 O preço de um projeto é calculado a partir do que ele reserva, e não por um plano
@@ -187,6 +239,7 @@ janela de manutenção.
 | Grupo de comandos | O que abrange |
 |---|---|
 | `login`, `logout`, `whoami` | Sua sessão |
+| `tokens` | Tokens para CI e agentes, cada um restrito a um projeto. Veja [CI e agentes](#ci-e-agentes) |
 | `link`, `unlink`, `use`, `open` | Vinculação deste diretório a um projeto, seleção de organização, abertura do console |
 | `projects` | Criar, listar, inspecionar, excluir |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Envio e monitoramento |
@@ -231,10 +284,10 @@ Dito de forma direta, porque descobrir mais tarde é pior:
 - **Sem deploys de preview ou branch**, e sem GitHub App oficial. Deploy hooks —
   URLs secretas para as quais você aponta o webhook de um repositório — são a
   automação suportada.
-- **A CI precisa das credenciais de uma pessoa.** Ainda não há tokens de máquina;
-  `rebase cloud login` requer e-mail e senha. Passe-os como
-  `REBASE_CLOUD_EMAIL` e `REBASE_CLOUD_PASSWORD` a partir de um cofre de segredos —
-  o uso de `--password` insere a senha no histórico da sua shell e na tabela de
+- **Os tokens agem como uma pessoa.** Um [token](#ci-e-agentes) é criado por uma conta e age como ela;
+  ainda não existe uma identidade de máquina pertencente à organização. Se em vez disso você
+  fizer login a partir da CI, passe `REBASE_CLOUD_EMAIL` e `REBASE_CLOUD_PASSWORD` a partir de um
+  cofre de segredos — o uso de `--password` insere a senha no histórico da sua shell e na tabela de
   processos, alertando sobre isso antes de autenticar. Se o `.rebase/cloud.json` do
   repositório indicar um control plane diferente do da própria plataforma, passe-o também como `--url`:
   sem um terminal, o `login` se recusa a enviar uma senha para um host que apenas

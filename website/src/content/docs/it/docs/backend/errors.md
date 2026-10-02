@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dcaffcacef692bc
+sourceHash: 9ab3b04e9fddf6d4
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con il rispettivo stato HTTP, il significato e come gestirli — oltre all'envelope di risposta, X-Request-ID e le regole di details.
@@ -87,9 +87,9 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | --- | --- | --- | --- |
 | `AAL2_REQUIRED` | 403 | La route richiede un secondo fattore e la sessione ne ha solo uno. | Completa la verifica MFA, quindi riprova. |
 | `ALREADY_VERIFIED` | 400 | L'indirizzo o il fattore è già verificato. | Nessuna azione: lo stato desiderato è già attivo. |
+| `ACCOUNT_OUTRANKS_CALLER` | 403 | L'account che si sta modificando, reimpostando o eliminando possiede un ruolo o uno scope che il chiamante non possiede. `details.beyond` li nomina. | Fai eseguire la modifica a qualcuno che li possiede. |
 | `ANONYMOUS_AUTH_DISABLED` | 403 | L'accesso anonimo è disabilitato su questo server. | Abilitalo, oppure accedi con un'identità reale. |
-| `API_KEY_FORBIDDEN` | 403 | È stata utilizzata una chiave API su una route riservata alle persone. | Utilizza una sessione utente. |
-| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | Una chiave API ha tentato di creare, elencare o revocare chiavi API. | Gestisci le chiavi come amministratore autenticato. |
+| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | Una chiave API ha tentato di elencare, creare, modificare o revocare chiavi API, del proprio tipo o personali. | Gestisci le chiavi come persona che possiede `keys:write`, oppure con la service key. |
 | `AUTH_MIDDLEWARE_MISSING` | 500 | Una route protetta è stata eseguita senza il middleware di autenticazione di Rebase a monte, quindi la credenziale del chiamante non è mai stata esaminata. | Esegui il mount dell'app tramite il router delle funzioni anziché direttamente sul tuo server. |
 | `BOOTSTRAP_ANONYMOUS` | 403 | Il bootstrap del primo amministratore è stato tentato da un chiamante anonimo. | Prima effettua l'accesso. |
 | `BOOTSTRAP_COMPLETED` | 403 | Il primo amministratore esiste già. | Chiedi a un amministratore esistente di assegnare il ruolo. |
@@ -106,19 +106,28 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `INVALID_CHALLENGE` | 400 | La verifica MFA è sconosciuta o scaduta. | Avviane una nuova. |
 | `INVALID_CODE` | 400 / 401 | Il codice OTP o MFA non è corretto: 400 dall'accesso con codice email (`/auth/otp/verify`), 401 da una registrazione o da un challenge MFA. | Riprova con il codice attuale. |
 | `INVALID_CREDENTIALS` | 401 | Email o password errata — deliberatamente senza specificare quale delle due. | Riprova, o reimposta la password. |
+| `INVALID_SCOPES` | 400 | A una chiave è stato richiesto qualcosa che non è uno scope: malformato, sconosciuto, o con un target che lo scope non accetta. `details.problems` indica quali e perché; `details.validScopes` li elenca tutti. | Usa un nome dell'elenco. Vedi [Ruoli e scope](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | Un token di verifica, reimpostazione o magic link è malformato o sconosciuto (400). Una credenziale di un provider OAuth o un refresh token che non si verifica restituisce 401. | Richiedi un nuovo link, o accedi di nuovo. |
+| `KEY_MANAGEMENT_SCOPE` | 400 | A una chiave sono stati richiesti `keys:read` o `keys:write`. Nessuna chiave può gestire le chiavi. `details.scopes` li nomina. | Escludili. |
 | `LAST_ADMIN` | 403 | La modifica lascerebbe il progetto senza alcun amministratore. | Promuovi prima qualcun altro. |
 | `MFA_REQUIRED` | 401 | La password era corretta e l'account ha un secondo fattore verificato, quindi l'accesso è completato solo a metà. `details` contiene un token temporaneo limitato alla verifica MFA — non è una sessione. | Apri una verifica e rispondi; la risposta alla verifica rilascia la sessione. |
 | `NO_SESSION` | 401 | Non è stato fornito alcun cookie di sessione o refresh token. Normale al primo caricamento della pagina. | Accedi. |
 | `NOT_ANONYMOUS` | 400 | Una route di passaggio da account anonimo è stata chiamata da un account reale. | Nulla da aggiornare. |
 | `OAUTH_ERROR` | 401 | Il provider OAuth ha rifiutato la richiesta o ha restituito un errore. | Riprova il flusso; il messaggio riporta la motivazione del provider. |
+| `PERSONAL_KEYS_DISABLED` | 403 | Le chiavi API personali sono disattivate su questo backend. | Imposta `personalKeys: true` nel blocco `auth` della collezione users. |
+| `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | La service key o una sessione ospite ha tentato di usare le route delle chiavi personali. Nessuna delle due ha un account con cui una chiave possa agire. | Accedi a un account, oppure crea una chiave di servizio sotto `/api/admin/api-keys`. |
 | `RATE_LIMITED` | 429 | Troppi tentativi da parte di questo chiamante. | Rallenta le richieste; il messaggio indica per quanto tempo attendere. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | La destinazione del reindirizzamento non è presente nella lista dei consentiti (allow-list). | Aggiungila alla configurazione del provider. |
 | `REGISTRATION_DISABLED` | 403 | L'auto-registrazione è disabilitata. | Chiedi a un amministratore di creare l'account. |
+| `ROLE_EXCEEDS_CALLER` | 403 | I ruoli che si stanno concedendo possiedono uno scope, o `admin`, che il chiamante non possiede. `details.beyond` li nomina. | Fai concedere il ruolo a qualcuno che li possiede. |
+| `ROLE_EXCEEDS_CREATOR` | 403 | A una chiave di servizio è stato dato un ruolo RLS che il suo creatore non possiede. Solo un admin può dare qualsiasi ruolo. `details.roles` li nomina. | Rimuovi il ruolo, oppure fai creare la chiave a un admin. |
 | `ROLE_EXISTS` | 409 | Questo nome di ruolo è già occupato. | Scegli un altro nome. |
 | `ROLE_LOOKUP_FAILED` | 503 | Impossibile leggere i ruoli del chiamante — su una route di amministrazione, o su una richiesta di dati in un backend con `config.auth`. Si blocca per sicurezza invece di fidarsi dei ruoli nel token. | Riprova; controlla il database. |
+| `SCOPE_EXCEEDS_CREATOR` | 403 | A una chiave è stato richiesto uno scope che il suo creatore non possiede. Una chiave non possiede mai più dell'account che la crea. `details.scopes` li nomina. | Rimuovili, oppure fai creare la chiave a qualcuno che li possiede. |
+| `SCOPE_MISSING` | 403 | La credenziale non possiede lo scope richiesto da questa route, collezione, sorgente di storage o funzione. `details.requiredScope` lo nomina, target incluso. | Per una persona, un ruolo che dichiara lo scope. Per una chiave, una chiave che lo possiede. Vedi [Ruoli e scope](/docs/backend/roles-and-scopes/). |
 | `SELF_DELETE` | 400 | Un amministratore ha tentato di eliminare il proprio account. | Fai eseguire l'operazione a un altro amministratore. |
 | `SESSION_REVOKED` | 401 | È stato eseguito il logout dalla sessione altrove, oppure tutte le sessioni sono state revocate. | Accedi nuovamente. |
+| `UNKNOWN_SCOPE_TARGET` | 400 | Il target di uno scope nomina una collezione, una sorgente di storage o una funzione che questo backend non serve. `details` elenca quelli che serve. | Correggi il target. |
 | `UNVERIFIED_IDENTITIES` | 409 | Un magic link, un codice via email o un ripristino della password ha dimostrato l'indirizzo di un account non verificato, e l'account ha un'identità di accesso il cui provider non ha mai verificato quell'indirizzo. Il repository di autenticazione non può rimuoverla (non ha `unlinkUserIdentity`), quindi la prova viene rifiutata invece di lasciare quella via d'accesso su un account verificato. | Implementa `unlinkUserIdentity` nel repository di autenticazione personalizzato, o fai verificare l'account da un amministratore. |
 | `SETUP_REQUIRED` | 403 | Il progetto non ha ancora un amministratore, quindi questa route non è disponibile. | Completa la configurazione del primo amministratore. |
 | `TOKEN_ALREADY_USED` | 401 | È stato riutilizzato un token monouso. | Richiedine uno nuovo. |

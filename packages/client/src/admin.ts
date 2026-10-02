@@ -1,5 +1,5 @@
 import type { Transport } from "./transport";
-import { AdminUser } from "@rebasepro/types";
+import type { AdminUser, RoleSummary } from "@rebasepro/types";
 
 export type { AdminUser };
 
@@ -55,7 +55,11 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         });
     }
 
-    async function updateUser(userId: string, data: { email?: string, displayName?: string, password?: string, roles?: string[] }) {
+    /**
+     * Change an account. `disabled: true` switches it off — no sign-in, no
+     * refresh, and every token it holds refused at once — without deleting it.
+     */
+    async function updateUser(userId: string, data: { email?: string, displayName?: string, password?: string, roles?: string[], disabled?: boolean }) {
         return transport.request<{ user: AdminUser }>(adminPath + "/users/" + encodeURIComponent(userId), {
             method: "PUT",
             body: JSON.stringify(data)
@@ -66,6 +70,18 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         return transport.request<{ success: boolean }>(adminPath + "/users/" + encodeURIComponent(userId), {
             method: "DELETE"
         });
+    }
+
+    /**
+     * Remove every second factor and recovery code the account has, and end
+     * its sessions — for someone who lost their authenticator and their
+     * codes. Needs `users:write`.
+     */
+    async function resetMfa(userId: string) {
+        return transport.request<{ success: boolean; removedFactors: number }>(
+            adminPath + "/users/" + encodeURIComponent(userId) + "/mfa",
+            { method: "DELETE" }
+        );
     }
 
     async function resetPassword(userId: string, options?: { password?: string }) {
@@ -79,7 +95,7 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
     }
 
     async function listRoles() {
-        return transport.request<{ roles: Array<{ id: string; name: string }> }>(
+        return transport.request<{ roles: RoleSummary[] }>(
             adminPath + "/roles",
             { method: "GET" }
         );
@@ -98,6 +114,7 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         createUser,
         updateUser,
         deleteUser,
+        resetMfa,
         resetPassword,
         listRoles,
         bootstrap

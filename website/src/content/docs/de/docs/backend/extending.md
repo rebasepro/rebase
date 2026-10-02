@@ -1,5 +1,5 @@
 ---
-sourceHash: 41183c8dc79d618d
+sourceHash: 589741179a41eb37
 title: Rebase unterstützt X nicht
 sidebar_label: Server erweitern
 description: Die serverseitige Erweiterungsleiter – Deklaration, Collection-Callback, benutzerdefinierte Funktion, eigene Routen, eigener Server, Eject – und was die einzelnen Stufen erreichen können und was nicht.
@@ -181,8 +181,9 @@ für den genauen Aufbau.
 :::caution[Dort wurde keine Authentifizierungs-Middleware ausgeführt]
 Eine auf diese Weise registrierte Route liegt **außerhalb** jedes Rebase-Routers, daher ist
 `getDriver(c)` nicht gesetzt und kein Token wurde überprüft. Sichern Sie sie mit
-`requireAuth` / `requireAdmin` ab, importiert aus **`@rebasepro/server`** – dem
-Paket-Root –, welche das Token selbst verifizieren. Die aus
+`requireAuth` ab, importiert aus **`@rebasepro/server`** – dem Paket-Root –, das
+das Token selbst verifiziert, und danach mit `requireAdmin` oder `requireScope` aus demselben
+Import, um zu entscheiden, was der Aufrufer darf. Die aus
 `@rebasepro/server/functions` exportierten Guards lesen eine Identität aus, die bereits von einem
 Rebase-Router aufgelöst wurde, und antworten mit 500, anstatt vorzutäuschen, dass eine existiert.
 :::

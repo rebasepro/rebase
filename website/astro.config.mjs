@@ -174,6 +174,8 @@ export default defineConfig({
                         { label: "Endpoint index", slug: "docs/backend/endpoints" },
                         { label: "Live schema editing", slug: "docs/backend/live-schema-editing" },
                         { label: "Authentication", slug: "docs/backend/authentication" },
+                        { label: "Roles and scopes", slug: "docs/backend/roles-and-scopes" },
+                        { label: "Email verification", slug: "docs/backend/email-verification" },
                         { label: "Auth endpoints", slug: "docs/backend/auth-endpoints" },
                         { label: "Custom auth adapters", slug: "docs/backend/auth-adapters" },
                         { label: "Storage Configuration", slug: "docs/backend/storage" },

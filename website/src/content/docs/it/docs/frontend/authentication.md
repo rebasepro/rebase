@@ -1,5 +1,5 @@
 ---
-sourceHash: 8d1a98886641537e
+sourceHash: 59bdc8b898c974d7
 title: Autenticazione e Login
 sidebar_label: Autenticazione e Login
 description: Configura il controller di autenticazione, la vista di login e la simulazione dei ruoli nel tuo frontend React Rebase.
@@ -88,6 +88,8 @@ roles: {
 ```
 
 Per aggiungere o rimuovere opzioni di ruolo, aggiorna la mappa `enum` nella tua collection users e rigenera lo schema.
+
+Un ruolo in questo elenco è un nome a cui le tue [regole di sicurezza](/docs/collections/security-rules) possono corrispondere. Cosa può fare oltre alle sue righe (gestire gli utenti, leggere i log, modificare lo schema) si dichiara separatamente, sotto `auth.roles` nella stessa collection. `admin` è integrato e possiede tutto. Vedi [Ruoli e scope](/docs/backend/roles-and-scopes).
 
 ## Simulazione dei ruoli (Modalità Dev)
 

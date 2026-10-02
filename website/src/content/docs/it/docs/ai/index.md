@@ -1,5 +1,5 @@
 ---
-sourceHash: ec9977f5b00dc133
+sourceHash: 289adf93a568aac7
 title: AI e agenti
 sidebar_label: Panoramica
 description: Cosa offre Rebase per gli assistenti di programmazione IA e gli agenti autonomi — un server MCP, skill per agenti locali al progetto, file di istruzioni generati e il modello di credenziali che determina a cosa un agente può effettivamente accedere.
@@ -12,7 +12,7 @@ Rebase fornisce quattro elementi distinti per gli assistenti IA, e ciascuno riso
 | [**Server MCP**](/docs/ai/mcp) | Un server stdio Model Context Protocol con 42 strumenti per schema, dati, utenti, storage, cron e dev server | Un assistente, a runtime |
 | [**Skill per agenti**](/docs/ai/skills) | 21 file di skill in Markdown inseriti nella tua repo da `rebase skills install` | Un assistente, come materiale di riferimento |
 | [**File di istruzioni**](/docs/ai/instruction-files) | `ai-instructions.md` più file puntatore specifici per assistente, creati da `rebase init` | Un assistente, come regole sempre attive |
-| [**Chiavi API**](/docs/backend/api-keys) | Credenziali macchina con ambito limitato (scoped), per collezione e per operazione | Qualsiasi client che chiami l'API HTTP |
+| [**Chiavi API**](/docs/backend/api-keys) | Credenziali macchina che possiedono [scope](/docs/backend/roles-and-scopes), per collezione e per operazione | Qualsiasi client che chiami l'API HTTP |
 
 I primi tre servono a fornire a un assistente *conoscenza* e *strumenti*. Il quarto è l'unico che decide cosa esso possa effettivamente fare.
 
@@ -22,14 +22,14 @@ Un agente dotato di strumenti sul tuo database è un normale client API che si d
 
 Rebase fornisce a tale credenziale due gate indipendenti:
 
-1. **L'elenco dei permessi della chiave API.** Dichiarato per collezione *e* per operazione, dove `delete` è separabile da `write` — che è solitamente il permesso che si vuole negare a un agente a cui è altrimenti consentito modificare.
+1. **Gli scope della chiave.** Dichiarati per operazione *e*, quando vuoi, per collezione: `data:read:articles`, `data:write:articles`. `data:delete` è separato da `data:write`, ed è solitamente quello che si vuole negare a un agente a cui è altrimenti consentito modificare.
 2. **Row-Level Security (RLS).** Le chiavi API non ignorano l'RLS. Una chiave si connette come ruolo Postgres `rebase_user` come qualsiasi altro chiamante, quindi i criteri stabiliti (policy) determinano comunque quali righe vengono restituite.
 
-Entrambi devono autorizzare la richiesta. Nessuno dei due sostituisce l'altro, e il secondo è il motivo per cui una chiave con permessi `"*"` può comunque restituire un set di risultati vuoto.
+Entrambi devono autorizzare la richiesta. Nessuno dei due sostituisce l'altro, e il secondo è il motivo per cui una chiave che possiede `data:read` su ogni collezione può comunque restituire un set di risultati vuoto.
 
-Un punto che spesso trae in inganno: l'impostazione `access: "public"` di una collezione estende **quali righe un chiamante può vedere**, non **chi può effettuare chiamate**. È una dichiarazione sulla visibilità delle righe, non sull'autenticazione. Concederla non aggiunge un chiamante all'elenco dei permessi, e revocarla non ne blocca uno.
+Un punto che spesso trae in inganno: l'impostazione `access: "public"` di una collezione estende **quali righe un chiamante può vedere**, non **chi può effettuare chiamate**. È una dichiarazione sulla visibilità delle righe, non sull'autenticazione. Concederla non dà uno scope a una chiave, e revocarla non ne blocca una.
 
-Il funzionamento pratico — creazione delle chiavi, JSON dei permessi, rotazione, scadenza, rate limit — è trattato in [API REST → Chiavi API](/docs/backend/api-keys). Non tralasciare [Regole di sicurezza (RLS)](/docs/collections/security-rules); il secondo gate è efficace solo quanto le policy che hai scritto.
+Il funzionamento pratico — creazione delle chiavi, scelta degli scope, rotazione, scadenza, rate limit — è trattato in [Chiavi API](/docs/backend/api-keys). Non tralasciare [Regole di sicurezza (RLS)](/docs/collections/security-rules); il secondo gate è efficace solo quanto le policy che hai scritto.
 
 :::caution[Il server MCP non utilizza di default una chiave con ambito limitato]
 Il modello a due gate descritto sopra spiega il funzionamento di una chiave API. **Non** è ciò che `@rebasepro/mcp` usa, a meno che non venga configurato per farlo. Per impostazione predefinita, il server MCP si autentica con la **service key** del tuo dev server — una credenziale di amministrazione senza restrizioni che soddisfa le policy admin predefinite su ogni collezione. Consulta [A cosa può accedere il server MCP](/docs/ai/mcp#what-the-server-can-reach) prima di puntare un assistente verso qualcosa a cui tieni.

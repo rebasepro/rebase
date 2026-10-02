@@ -1,5 +1,5 @@
 ---
-sourceHash: 910d8d1deda89fdd
+sourceHash: cc9569d9e5b15674
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -369,9 +369,10 @@ bestimmte Control Plane anzusteuern (oder `REBASE_CLOUD_URL`), und `--project, -
 #### Auth
 
 ```bash
-rebase cloud login      # bei der Control Plane anmelden
-rebase cloud logout     # abmelden
-rebase cloud whoami     # die aktuelle Sitzung anzeigen
+rebase cloud login      # sign in to the control plane
+rebase cloud logout     # sign out
+rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
+rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
 ```
 
 #### Projekt-Verknüpfung
@@ -544,23 +545,23 @@ rebase auth reset-password --email admin@example.com --password NewPassword123!
 
 ### `rebase api-keys`
 
-Verwaltet berechtigungseingeschränkte Service-API-Keys — die Zugangsdaten, die ein Agent, Skript oder ein anderer
-Dienst verwendet, im Gegensatz zur Sitzung eines Endbenutzers:
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Verwaltet die Service-API-Keys des Projekts — die Zugangsdaten, die ein Agent, Skript oder ein
+anderer Dienst verwendet, im Gegensatz zur Sitzung eines Endbenutzers:
 
 ```bash
 rebase api-keys list
-rebase api-keys create --name "Analytics" --permissions '[{"collection":"events","operations":["read"]}]'
-rebase api-keys create --name "Full Access" --full-access --expires 90d
+rebase api-keys create --name "Blog CI" --scopes data:read:posts,data:write:posts --expires-in 90
+rebase api-keys create --name "Ops" --full-access --roles admin --expires-at 2027-01-31
 rebase api-keys revoke abc123-def456
 ```
 
-`--permissions` nimmt ein JSON-Array von `{ collection, operations }`-Objekten entgegen, oder verwenden Sie
-`--full-access` für Lese-/Schreib-/Löschzugriff auf jede Collection und Funktion. `--expires`
-akzeptiert `7d`, `30d`, `90d`, `1y` oder ein ISO-Datum, und `--rate-limit` legt Anfragen
-pro 15-Minuten-Fenster fest. Ein Schlüssel wird einmalig bei der Erstellung angezeigt.
+`--scopes` nennt, was der Schlüssel darf, kommagetrennt oder wiederholt; `--full-access`
+gibt ihm jeden Scope, den der Service-Key hält, außer `keys:*`. `--roles` fügt RLS-Rollen neben
+`service` hinzu, `--expires-in` nimmt Tage und `--expires-at` ein ISO-Datum.
+`rebase api-keys scopes` listet jeden Scope, den das Backend kennt. Ein Schlüssel wird einmal angezeigt.
 
-Schlüssel sind doppelt abgesichert: Sowohl die Berechtigungen des Schlüssels selbst als auch die Row-Level Security
-der Identität, als die er agiert, greifen, sodass ein Schlüssel niemals mehr lesen kann als diese Identität.
+Schlüssel sind doppelt abgesichert: Sowohl die Scopes des Schlüssels als auch die Row-Level Security
+der Identität, als die er agiert, greifen. Siehe [API-Schlüssel](/docs/backend/api-keys/).
 
 ### `rebase skills install`
 

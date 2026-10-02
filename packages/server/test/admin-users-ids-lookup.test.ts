@@ -35,6 +35,9 @@ roles: [] } : null;
         // that answers "admin" for everyone makes the 403 test pass for a
         // reason that has nothing to do with the gate.
         getUserRoleIds: async (id: string) => (id.startsWith("admin") ? ["admin"] : ["editor"]),
+        // The caller is an account too: the gate asks whether it still exists,
+        // and reads its roles in the same breath.
+        getAccountAccessState: async (id: string) => ({ roles: id.startsWith("admin") ? ["admin"] : ["editor"], tokensValidAfter: null }),
         getUserById: async (id: string) => users.find(u => u.id === id) ?? null,
         listUsersPaginated: async () => ({ users,
 total: users.length,
@@ -105,7 +108,7 @@ accessExpiresIn: "1h" });
         expect(getUserWithRoles).not.toHaveBeenCalled();
     });
 
-    it("rejects a signed-in non-admin with 403", async () => {
+    it("rejects a signed-in caller without users:read with 403", async () => {
         const { repo, getUserWithRoles } = mockRepo([user("u1", "Priscila")]);
         const app = createAdminUsersRoute({ authRepo: repo });
 
@@ -113,7 +116,7 @@ accessExpiresIn: "1h" });
 
         expect(res.status).toBe(403);
         const raw = await res.text();
-        expect((JSON.parse(raw) as { error: { code: string } }).error.code).toBe("FORBIDDEN");
+        expect((JSON.parse(raw) as { error: { code: string } }).error.code).toBe("SCOPE_MISSING");
         // Nothing about u1 leaked on the way to the refusal.
         expect(getUserWithRoles).not.toHaveBeenCalled();
         expect(raw).not.toContain("Priscila");

@@ -1,18 +1,11 @@
 import type { Transport } from "./transport";
 
-/**
- * These were re-declared here, under a comment saying they lived in the server
- * package rather than in `@rebasepro/types`. That stopped being true, and the
- * copy drifted: it never gained `admin`, the flag that grants a key the `admin`
- * role — admin routes plus the RLS `default_admin` policies — so the SDK could
- * describe every kind of key except a privileged one, and
- * `createKey({ …, admin: true })` was an excess-property error.
- */
 export type {
-    ApiKeyPermission,
+    ApiKeyKind,
     ApiKeyMasked,
     ApiKeyWithSecret,
     CreateApiKeyRequest,
+    CreatePersonalKeyRequest,
     UpdateApiKeyRequest
 } from "@rebasepro/types";
 
@@ -20,6 +13,8 @@ import type {
     ApiKeyMasked,
     ApiKeyWithSecret,
     CreateApiKeyRequest,
+    CreatePersonalKeyRequest,
+    ScopeSummary,
     UpdateApiKeyRequest
 } from "@rebasepro/types";
 
@@ -29,7 +24,8 @@ export interface CreateApiKeysOptions {
 }
 
 /**
- * Creates a client for managing API keys via the admin routes.
+ * Creates a client for the project's service keys, via the admin routes.
+ * Needs `keys:read` / `keys:write`.
  *
  * @param transport - The shared HTTP transport created by `createTransport`.
  * @param options   - Optional overrides (e.g. a custom base path).
@@ -83,5 +79,57 @@ export function createApiKeys(transport: Transport, options?: CreateApiKeysOptio
         createKey,
         updateKey,
         revokeKey
+    };
+}
+
+/** Options for the `createPersonalKeys` factory. */
+export interface CreatePersonalKeysOptions {
+    personalKeysPath?: string;
+    scopesPath?: string;
+}
+
+/**
+ * Creates a client for the signed-in account's own API keys — each acts as the
+ * account and holds no scope it does not. Answers `PERSONAL_KEYS_DISABLED`
+ * unless the backend sets `personalKeys: true` on the users collection.
+ */
+export function createPersonalKeys(transport: Transport, options?: CreatePersonalKeysOptions) {
+    const keysPath = options?.personalKeysPath || "/auth/keys";
+    const scopesPath = options?.scopesPath || "/auth/scopes";
+
+    /** List this account's keys (masked). */
+    async function listKeys(): Promise<{ keys: ApiKeyMasked[] }> {
+        return transport.request<{ keys: ApiKeyMasked[] }>(keysPath, { method: "GET" });
+    }
+
+    /** Create a key for this account. The full secret is included in the response. */
+    async function createKey(data: CreatePersonalKeyRequest): Promise<{ key: ApiKeyWithSecret }> {
+        return transport.request<{ key: ApiKeyWithSecret }>(keysPath, {
+            method: "POST",
+            body: JSON.stringify(data)
+        });
+    }
+
+    /** Revoke one of this account's keys. */
+    async function revokeKey(id: string): Promise<{ success: boolean }> {
+        return transport.request<{ success: boolean }>(
+            keysPath + "/" + encodeURIComponent(id),
+            { method: "DELETE" }
+        );
+    }
+
+    /**
+     * Every scope the backend knows, described, and the ones the caller holds —
+     * what a screen offering scopes for a key needs.
+     */
+    async function listScopes(): Promise<{ scopes: ScopeSummary[]; held: string[] }> {
+        return transport.request<{ scopes: ScopeSummary[]; held: string[] }>(scopesPath, { method: "GET" });
+    }
+
+    return {
+        listKeys,
+        createKey,
+        revokeKey,
+        listScopes
     };
 }

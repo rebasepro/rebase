@@ -1,5 +1,5 @@
 ---
-sourceHash: b49ac798fe385796
+sourceHash: 4c3ab79cfd150295
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Echtzeit-Datensynchronisierung, Broadcast-Kanäle und Presence-Tracking über WebSocket.
@@ -358,6 +358,15 @@ WebSocket-Abonnements berücksichtigen automatisch Richtlinien für Row-Level Se
 3. Das Token wird einmalig bei der Authentifizierung des Sockets verifiziert, und der Server überprüft es während der Lebensdauer der Verbindung nicht erneut. Ein ablaufendes Zugriffstoken, eine widerrufene Sitzung oder eine entzogene Rolle ändert nichts daran, was ein offener Socket lesen darf, bis er sich erneut authentifiziert oder wiederverbindet. Das SDK authentifiziert seinen Socket jedes Mal neu, wenn es sein Token aktualisiert, und trennt die Verbindung beim Abmelden; ein Client, der direkt mit dem Protokoll kommuniziert, behält die Identität, mit der er die Verbindung geöffnet hat, bis er sich neu verbindet.
 
 Dies bedeutet, dass jeder Socket nur Updates für Datensätze erhält, die seine authentifizierte Identität einsehen darf.
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Auch ein [API-Schlüssel](/docs/backend/api-keys/) authentifiziert den Socket: Senden Sie den
+`rk_…`-Schlüssel dort, wo das Zugriffstoken stehen würde. Der Socket prüft dann jeden Frame
+gegen die [Scopes](/docs/backend/roles-and-scopes/) des Schlüssels: Ein Abruf, eine Zählung oder eine
+Subscription braucht `data:read` auf ihrer Collection, ein Speichern `data:write`, ein Löschen
+`data:delete`. Ein verschachtelter Pfad braucht den einfachen Scope. Channels (Broadcast und
+Presence) werden für einen Schlüssel abgelehnt, weil kein Scope sie abdeckt. Der SQL-Editor und
+Branch-Nachrichten brauchen `database:read` oder `database:write`, für einen Schlüssel wie für eine
+Person.
 
 Der Betrieb mehrerer Instanzen – der LISTEN/NOTIFY-Bus, wie Presence über Prozesse hinweg funktioniert und das Schreiben eines eigenen Transports – wird auf einer eigenen Seite beschrieben:
 [Realtime über Instanzen hinweg](/docs/backend/realtime-transports/).

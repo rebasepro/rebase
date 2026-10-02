@@ -1,5 +1,5 @@
 ---
-sourceHash: 3c25626150027572
+sourceHash: ff7df07f90f558a9
 title: File di Istruzioni AI
 sidebar_label: File di Istruzioni AI
 description: Ogni progetto Rebase scaffoldato include ai-instructions.md più file puntatore di tre righe per Claude, Cursor, Windsurf, Copilot e AGENTS.md — un'unica fonte di verità, molti nomi di file.
@@ -111,6 +111,10 @@ Quest'ultima è quella fondamentale da ricordare. Fa la differenza tra un middle
 viene eseguito e uno che non lo è, e un assistente a cui non è stato detto
 scriverà puntualmente la versione che non lo fa — vedi
 [Funzioni personalizzate](/docs/backend/custom-functions).
+
+`requireAdmin` ammette solo il ruolo `admin`. Quando un ruolo più ristretto o una chiave API
+deve poter chiamare una route, la protezione da aggiungere è `requireScope`, con uno scope
+dichiarato dall'app — vedi [Ruoli e scope](/docs/backend/roles-and-scopes/#app-scopes).
 
 ## Personalizzarlo
 

@@ -4,7 +4,7 @@ import { ApiError } from "../api/errors";
 import { HonoEnv } from "../api/types";
 import { extractBearerToken } from "./middleware";
 import { logger } from "../utils/logger";
-import { createRateLimiter, strictAuthLimiter } from "./rate-limiter";
+import { createRateLimiter, strictAuthLimiter, requestClientAddress } from "./rate-limiter";
 import {
     generateTotpSecret,
     verifyTotpCounter,
@@ -22,7 +22,7 @@ import {
 import type { AuthModuleConfig } from "./routes";
 import type { AuthRepository } from "./interfaces";
 import { redactRefreshToken } from "./cookie-utils";
-import { isAccessTokenRevoked } from "./token-revocation";
+import { judgeAccessToken } from "./token-revocation";
 import { resolveAuthHooks } from "./auth-hooks";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
@@ -207,7 +207,9 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
         if (!principal) {
             throw ApiError.unauthorized("Not authenticated");
         }
-        if (await isAccessTokenRevoked(authRepo, principal)) {
+        // Revoked, or an account deleted since the first factor was accepted —
+        // the same judgement every other door makes. See `judgeAccessToken`.
+        if (!(await judgeAccessToken(authRepo, principal)).live) {
             throw ApiError.unauthorized("Session has been revoked", "SESSION_REVOKED");
         }
         return principal;
@@ -288,10 +290,18 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
             friendlyName
         );
 
-        // Generate recovery codes
-        const codes = generateRecoveryCodes(10);
-        const codeHashes = codes.map(hashRecoveryCode);
-        await authRepo.createRecoveryCodes(user.id, codeHashes);
+        // Recovery codes only with the account's first factor. Generating
+        // them here on every call replaced the codes a user had printed as
+        // soon as they *started* adding a second authenticator — before it
+        // was verified, and for good if they closed the dialog — so the one
+        // way back in after losing the phone stopped working. An account that
+        // already has a verified factor keeps the codes it has; new ones come
+        // from `POST /auth/mfa/recovery-codes`, at `aal2`.
+        let codes: string[] | null = null;
+        if (!(await authRepo.hasVerifiedMfaFactors(user.id))) {
+            codes = generateRecoveryCodes(10);
+            await authRepo.createRecoveryCodes(user.id, codes.map(hashRecoveryCode));
+        }
 
         return c.json(
             {
@@ -309,6 +319,30 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
             },
             201
         );
+    });
+
+    /**
+     * POST /auth/mfa/recovery-codes
+     * Replace the account's recovery codes with ten new ones, shown once.
+     *
+     * The deliberate way to get new codes — after using several, or after
+     * losing the printout. Needs `aal2` once a factor is verified, as every
+     * factor change does: whoever holds only the password must not be able to
+     * swap the codes for ones they know.
+     */
+    router.post("/mfa/recovery-codes", strictAuthLimiter, requireLiveSession, async (c) => {
+        const userCtx = c.get("user") as AccessTokenPayload | undefined;
+        if (!userCtx) {
+            throw ApiError.unauthorized("Not authenticated");
+        }
+        if (!(await authRepo.hasVerifiedMfaFactors(userCtx.uid))) {
+            throw ApiError.badRequest("This account has no verified second factor, so recovery codes would recover nothing.", "MFA_NOT_ENROLLED");
+        }
+        await requireStepUpForFactorChange(userCtx);
+
+        const codes = generateRecoveryCodes(10);
+        await authRepo.createRecoveryCodes(userCtx.uid, codes.map(hashRecoveryCode));
+        return c.json({ recoveryCodes: codes });
     });
 
     /**
@@ -380,7 +414,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
             throw ApiError.badRequest("MFA factor is not yet verified", "FACTOR_NOT_VERIFIED");
         }
 
-        const ipAddress = c.req.header("x-forwarded-for") || "unknown";
+        const ipAddress = requestClientAddress(c);
         const challenge = await authRepo.createMfaChallenge(factorId, ipAddress);
 
         return c.json({
@@ -471,10 +505,19 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             principal.uid,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown",
+            requestClientAddress(c),
             { skipMfaGate: true,
 aal: "aal2" }
         );
+
+        if (ops.onAuthenticated) {
+            const account = await authRepo.getUserById(principal.uid);
+            if (account) {
+                ops.onAuthenticated(account, "mfa").catch((err: unknown) => {
+                    logger.error("[AuthHooks] onAuthenticated error", { error: err instanceof Error ? err.message : err });
+                });
+            }
+        }
 
         // Fire onMfaVerified hook
         if (ops.onMfaVerified) {

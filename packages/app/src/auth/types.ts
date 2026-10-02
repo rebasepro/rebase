@@ -20,7 +20,12 @@ export type RebaseAuthController = AuthController & {
     /** Login with email and password */
     emailPasswordLogin: (email: string, password: string) => Promise<void>;
     /** Register a new user */
-    register: (email: string, password: string, displayName?: string) => Promise<void>;
+    /**
+     * Create an account. `confirmationRequired` when the backend registers
+     * confirm-first (`requireEmailVerification`): nobody is signed in until
+     * the address is confirmed.
+     */
+    register: (email: string, password: string, displayName?: string) => Promise<{ confirmationRequired: boolean }>;
     /** Skip login (for anonymous access if enabled) */
     skipLogin: () => void;
     /** Whether login was skipped */
@@ -35,8 +40,13 @@ export type RebaseAuthController = AuthController & {
     forgotPassword: (email: string) => Promise<void>;
     /** Reset password using token from email */
     resetPassword: (token: string, password: string) => Promise<void>;
-    /** Confirm an email address using the token from a verification email */
-    verifyEmail: (token: string) => Promise<void>;
+    /**
+     * Confirm an email address using the token from a verification email.
+     * Refused with `PROOF_REQUIRED` when the account holds a password this
+     * call does not prove: pass `password` to keep it (and sign in), or
+     * `removeUnproven` to verify without it.
+     */
+    verifyEmail: (token: string, options?: { password?: string; removeUnproven?: boolean }) => Promise<{ passwordRemoved: boolean; signedIn: boolean }>;
     /** Change password for authenticated user */
     changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
     /** Update user profile */
@@ -84,7 +94,7 @@ export interface ClientAuth {
     resetPasswordForEmail(email: string): Promise<unknown>;
     resetPassword(token: string, password: string): Promise<unknown>;
     /** Optional so a hand-built auth client need not implement it. */
-    verifyEmail?(token: string): Promise<unknown>;
+    verifyEmail?(token: string, options?: { password?: string; removeUnproven?: boolean }): Promise<unknown>;
     changePassword(oldPassword: string, newPassword: string): Promise<unknown>;
     updateUser(updates: { displayName?: string; photoURL?: string }): Promise<User>;
     getSessions(): Promise<DeviceSession[]>;

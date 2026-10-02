@@ -91,7 +91,6 @@
   "packages/server-postgres/src/services/PersistService.ts::primaryKeyFields": 1,
   "packages/server-postgres/src/services/RelationService.ts::options": 1,
   "packages/server-postgres/src/services/RelationWriteService.ts::sourceIdInfo": 1,
-  "packages/server/src/auth/api-keys/api-key-store.ts::HEX_CHARS": 1,
   "packages/server/src/init.ts::collectionAuthConfig": 1,
   "packages/server/src/utils/dev-port.ts::attempt": 1,
   "packages/studio/src/components/RLSEditor/RLSEditor.tsx::activeTab": 1,

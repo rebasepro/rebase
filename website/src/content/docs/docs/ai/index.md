@@ -12,7 +12,7 @@ problems. It is worth knowing which one you are reaching for:
 | [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 42 tools over your schema, data, users, storage, cron and dev server | An assistant, at runtime |
 | [**Agent skills**](/docs/ai/skills) | 21 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
-| [**API keys**](/docs/backend/api-keys) | Scoped machine credentials, per collection and per operation | Anything calling the HTTP API |
+| [**API keys**](/docs/backend/api-keys) | Machine credentials holding [scopes](/docs/backend/roles-and-scopes), per collection and per operation | Anything calling the HTTP API |
 
 The first three are about giving an assistant *knowledge* and *tools*. The
 fourth is the only one that decides what it may actually do.
@@ -27,24 +27,25 @@ constraint has to live below the agent, in the credential it carries.
 
 Rebase gives that credential two independent gates:
 
-1. **The API-key permission list.** Declared per collection *and* per operation,
-   where `delete` is separable from `write` — which is usually the one you want
-   to withhold from an agent that is otherwise allowed to edit.
+1. **The key's scopes.** Declared per operation *and*, when you want, per
+   collection: `data:read:articles`, `data:write:articles`. `data:delete` is
+   separate from `data:write`, which is usually the one you want to withhold
+   from an agent that is otherwise allowed to edit.
 2. **Row-Level Security.** API keys do not bypass RLS. A key connects as the
    `rebase_user` Postgres role like any other caller, so your policies still
    decide which rows come back.
 
 Both must allow a request. Neither is a substitute for the other, and the second
-one is the reason a key with `"*"` permissions can still return an empty result
-set.
+one is the reason a key holding `data:read` on every collection can still return
+an empty result set.
 
 A point that catches people: a collection's `access: "public"` widens **which
 rows a caller may see**, not **who may call**. It is a statement about row
-visibility, not about authentication. Granting it does not add a caller to the
-permission list, and withholding it does not stop one.
+visibility, not about authentication. Granting it does not give a key a scope,
+and withholding it does not stop one.
 
-The mechanics — creating keys, the permission JSON, rotation, expiry, rate
-limits — are covered in [REST API → API Keys](/docs/backend/api-keys).
+The mechanics — creating keys, choosing scopes, rotation, expiry, rate
+limits — are covered in [API keys](/docs/backend/api-keys).
 Do not skip [Security Rules (RLS)](/docs/collections/security-rules) on the way
 past; the second gate is only as good as the policies you wrote.
 

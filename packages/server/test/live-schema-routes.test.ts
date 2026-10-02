@@ -28,6 +28,8 @@ import {
 import type { SchemaEditRepository } from "../src/schema-edit/apply-schema-change";
 import { findCollectionConfigProblems } from "../src/collections/validate-config";
 import { resolveCollectionRelations } from "@rebasepro/common";
+import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
+import { configureAccess } from "../src/auth/access";
 
 const collection = (slug: string, properties: Record<string, unknown> = {}): CollectionConfig =>
     ({ slug, name: slug, properties }) as unknown as CollectionConfig;
@@ -379,9 +381,26 @@ describe("who may apply", () => {
         // Cannot happen in production — the admin gate runs first. Checked
         // anyway: a capability function that trusts its caller to have checked
         // is one refactor away from granting everything.
+        // `/apply` answers 401 before its capability check: its
+        // `schema:write` gate refuses a request with no caller as
+        // unauthenticated, which is what it is.
         const { post } = harness({ user: undefined });
         expect((await post("/plan", change)).status).toBe(403);
-        expect((await post("/apply", change)).status).toBe(403);
+        expect((await post("/apply", change)).status).toBe(401);
+    });
+
+    it("lets a person holding only schema:read plan, and refuses their apply", async () => {
+        configureAccess({ model: { roles: { developer: { scopes: ["schema:read"] } }, scopes: {} } });
+        try {
+            const { post, events } = harness({ user: { uid: "dev-1", roles: ["developer"] } });
+            expect((await post("/plan", change)).status).toBe(200);
+            const res = await post("/apply", change);
+            expect(res.status).toBe(403);
+            expect((await res.json() as { error: { details: { requiredScope: string } } }).error.details.requiredScope).toBe("schema:write");
+            expect(events).not.toContain("commit");
+        } finally {
+            configureAccess({ model: EMPTY_ACCESS_MODEL });
+        }
     });
 
     it("reports the caller's own capabilities on /status", async () => {

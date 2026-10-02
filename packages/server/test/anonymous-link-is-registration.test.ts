@@ -18,6 +18,7 @@ import { ApiError, errorHandler } from "../src/api/errors";
 import { createAuthRoutes } from "../src/auth/routes";
 import type { AuthHooks } from "../src/auth/auth-hooks";
 import type { CaptchaVerifier } from "../src/auth/captcha";
+import { oauthCodeFlowSchema } from "../src/auth/oauth-code-flow";
 import { configureJwt } from "../src/auth/jwt";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
 
@@ -45,14 +46,14 @@ const HOOKS: AuthHooks = {
 
 beforeAll(() => configureJwt({ secret: "anonymous-link-registration-secret-32-chars!!", accessExpiresIn: "1h" }));
 
-function world() {
+function world(allowRegistration = true) {
     const store = new MemoryAuthStore();
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.route("/auth", createAuthRoutes({
         authRepo: store.repo(),
         authHooks: HOOKS,
-        allowRegistration: true,
+        allowRegistration,
         allowAnonymous: true,
         captcha: { enabled: true, verify: verifyCaptcha, routes: ["register"] }
     }));
@@ -72,6 +73,23 @@ function world() {
 }
 
 describe("POST /auth/anonymous/link is registration", () => {
+    it("is refused while registration is closed, guests or no guests", async () => {
+        const { store, post } = world(false);
+        // A user exists, so the empty-table exception does not apply.
+        await store.repo().createUser({ email: "existing@corp.com" });
+        const guestRes = await post("/anonymous");
+        expect(guestRes.status).toBe(201);
+        const { tokens } = await guestRes.json() as { tokens: { accessToken: string } };
+
+        const res = await post("/anonymous/link", { email: "upgraded@corp.com", password: "Passw0rd-Guest", captchaToken: "solved" }, {
+            Authorization: `Bearer ${tokens.accessToken}`
+        });
+
+        expect(res.status).toBe(403);
+        expect((await res.json() as { error: { code: string } }).error.code).toBe("REGISTRATION_DISABLED");
+        expect([...store.users.values()].some(u => u.email === "upgraded@corp.com")).toBe(false);
+    });
+
     it("asks for the register challenge, which the guest sign-in before it does not", async () => {
         const { store, post, guest } = world();
         const { uid, auth } = await guest();
@@ -116,5 +134,60 @@ describe("POST /auth/anonymous/link is registration", () => {
             displayName: "person",
             isAnonymous: false
         });
+    });
+});
+
+/**
+ * Linking a provider to a guest makes it an account, as linking a password
+ * does. It used to answer success and leave a guest: `/me` still said
+ * `isAnonymous: true` with the synthetic address, and every later sign-in with
+ * that provider returned the guest.
+ */
+describe("POST /auth/link/:provider on a guest", () => {
+    function oauthWorld(allowRegistration: boolean) {
+        const store = new MemoryAuthStore();
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.route("/auth", createAuthRoutes({
+            authRepo: store.repo(),
+            authHooks: HOOKS,
+            allowRegistration,
+            allowAnonymous: true,
+            oauthProviders: [{
+                id: "google",
+                schema: oauthCodeFlowSchema(),
+                verify: async () => ({ providerId: "g-guest", email: "Guest.Person@corp.com", emailVerified: true })
+            }]
+        }));
+        const post = async (path: string, body: unknown, token?: string) => {
+            const res = await app.request(`/auth${path}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                body: JSON.stringify(body)
+            });
+            return { status: res.status, json: await res.json() as Record<string, any> };
+        };
+        return { store, post };
+    }
+
+    it("upgrades it: no longer a guest, the provider's address, and a session that says so", async () => {
+        const { post } = oauthWorld(true);
+        const guest = await post("/anonymous", {});
+
+        const linked = await post("/link/google", { code: "c", redirectUri: "https://app.test/cb" }, guest.json.tokens.accessToken);
+
+        expect(linked.status).toBe(200);
+        expect(linked.json.user).toMatchObject({ isAnonymous: false, email: "guest.person@corp.com", emailVerified: true });
+        const again = await post("/google", { code: "c", redirectUri: "https://app.test/cb" });
+        expect(again.json.user).toMatchObject({ uid: guest.json.user.uid, isAnonymous: false });
+    });
+
+    it("is refused while registration is closed", async () => {
+        const { store, post } = oauthWorld(false);
+        await store.repo().createUser({ email: "existing@corp.com" });
+        const guest = await post("/anonymous", {});
+        const linked = await post("/link/google", { code: "c", redirectUri: "https://app.test/cb" }, guest.json.tokens.accessToken);
+        expect(linked.json.error.code).toBe("REGISTRATION_DISABLED");
+        expect(store.providersOf(guest.json.user.uid)).toEqual([]);
     });
 });

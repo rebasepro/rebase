@@ -118,10 +118,10 @@ const tool = (name: string) => {
     return found;
 };
 
-const ctx = (driver: DataDriver, uid: string, scope = "mcp:read mcp:write") => ({
+const ctx = (driver: DataDriver, uid: string, scope = "data:read data:write data:delete") => ({
     driver,
     collections: [CANDIDATES],
-    caller: { uid, roles: ["recruiter"], scope, clientId: "mcp_test" }
+    caller: { uid, roles: ["recruiter"], scopes: scope.split(" "), clientId: "mcp_test" }
 });
 
 beforeEach(async () => {
@@ -212,15 +212,15 @@ describe("what an agent can read", () => {
     });
 
     it("a scope grant does not widen what the database allows", async () => {
-        // `mcp:read` vs `mcp:write` decides which tools exist. It has no bearing
+        // `data:read` vs `data:write` decides which tools exist. It has no bearing
         // on which rows come back — that is the point of putting the boundary in
         // the database.
         const driver = rlsDriver();
         const readOnly = await tool("query_collection").run(
-            { collection: "candidates" }, ctx(driver, "user-1", "mcp:read")
+            { collection: "candidates" }, ctx(driver, "user-1", "data:read")
         ) as { data: unknown[] };
         const readWrite = await tool("query_collection").run(
-            { collection: "candidates" }, ctx(driver, "user-1", "mcp:read mcp:write")
+            { collection: "candidates" }, ctx(driver, "user-1", "data:read data:write data:delete")
         ) as { data: unknown[] };
 
         expect(readOnly.data).toEqual(readWrite.data);
@@ -229,7 +229,7 @@ describe("what an agent can read", () => {
 
 describe("what an agent can write", () => {
     it("cannot create a row owned by somebody else", async () => {
-        // `WITH CHECK` refuses it. A `mcp:write` token is not a licence to
+        // `WITH CHECK` refuses it. A `data:write` token is not a licence to
         // write anything — it is a licence to write what its holder could.
         const driver = rlsDriver();
         await expect(

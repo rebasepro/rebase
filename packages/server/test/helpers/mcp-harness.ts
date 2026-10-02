@@ -18,7 +18,7 @@ import { Hono } from "hono";
 import type { AuthAdapter, CollectionConfig, DataDriver } from "@rebasepro/types";
 import { generateAccessToken } from "../../src/auth/jwt";
 import { createOAuthRoutes } from "../../src/mcp/oauth-routes";
-import { createMcpRoutes, createMcpWellKnownRoutes } from "../../src/mcp/mcp-routes";
+import { createMcpRoutes, createMcpWellKnownRoutes, type McpRoutesConfig } from "../../src/mcp/mcp-routes";
 import { base64UrlEncode } from "../../src/mcp/oauth-metadata";
 import { sha256Bytes } from "../../src/utils/portable-crypto";
 import type {
@@ -200,6 +200,8 @@ export interface HarnessOptions {
     rateLimit?: DataRateLimitConfig;
     /** The deployment's auth adapter — what a write to the auth collection answers to. */
     authAdapter?: AuthAdapter;
+    /** How `/mcp` verifies an `rk_` API key. Absent, keys are not accepted. */
+    resolveApiKey?: McpRoutesConfig["resolveApiKey"];
 }
 
 export function buildApp(options: HarnessOptions = {}) {
@@ -215,7 +217,8 @@ export function buildApp(options: HarnessOptions = {}) {
         getAuthAdapter: () => options.authAdapter,
         serverInfo: { name: "rebase", version: "test" },
         maxBodySize: options.maxBodySize,
-        rateLimit: options.rateLimit
+        rateLimit: options.rateLimit,
+        resolveApiKey: options.resolveApiKey
     };
     app.route("/", createMcpWellKnownRoutes(mcpConfig));
     app.route("/mcp", createMcpRoutes(mcpConfig));
@@ -270,7 +273,7 @@ export async function authorize(
         code_challenge: challenge,
         code_challenge_method: "S256",
         resource: RESOURCE,
-        scope: opts.scope ?? "mcp:read",
+        scope: opts.scope ?? "data:read",
         state: "xyz"
     });
     const page = await app.request(`/api/oauth/authorize?${query}`);

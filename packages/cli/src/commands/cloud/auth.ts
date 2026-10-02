@@ -24,8 +24,12 @@ import {
     note,
     noteBlank,
     warn,
-    requireInteractive
+    requireInteractive,
+    envToken,
+    TOKEN_ENV,
+    type CloudClient
 } from "./context";
+import { capabilitiesInScopes } from "./token-capabilities";
 
 /**
  * Every flag `rebase cloud login` accepts.
@@ -50,9 +54,10 @@ export const LOGIN_FLAGS = {
  * neither is something this CLI can redact after the fact — the same reasoning
  * `rls-check` states for its connection string, which carries one too.
  *
- * There is no machine token yet, so CI genuinely does need a human's password;
- * `REBASE_CLOUD_PASSWORD` is how a secret store hands it over without it
- * appearing on a command line.
+ * CI should not need a password at all: `rebase cloud tokens create` mints a
+ * token narrowed to one project, and `REBASE_TOKEN` hands it to every cloud
+ * command. Where a login is still wanted, `REBASE_CLOUD_PASSWORD` is how a
+ * secret store hands the password over without it appearing on a command line.
  */
 export const PASSWORD_ENV = "REBASE_CLOUD_PASSWORD";
 export const EMAIL_ENV = "REBASE_CLOUD_EMAIL";
@@ -257,6 +262,12 @@ commandWords: 2,
 command: "cloud whoami",
 maxPositionals: 0 });
     const { client, url } = await requireClient(rawArgs);
+    // A token is not a session: `/auth/me` takes only a person's login, so the
+    // question a token can answer is what it holds.
+    if (envToken()) {
+        await whoamiToken(client, url);
+        return;
+    }
     try {
         const user = await client.auth.getUser();
         if (!user) {
@@ -299,4 +310,43 @@ slug: link.slug ?? null }
     } catch (e) {
         reportError(e, "Failed to fetch session");
     }
+}
+
+/** `whoami` under `REBASE_TOKEN`: the host, the token, and what it may do. */
+async function whoamiToken(client: CloudClient, url: string): Promise<void> {
+    let held: string[];
+    try {
+        ({ held } = await client.personalKeys.listScopes());
+    } catch (e) {
+        reportError(e, "Failed to read the token's scopes");
+    }
+    const grants = capabilitiesInScopes(held).filter(grant => grant.capabilities.length > 0);
+    const link = readLink();
+    emit(
+        () => {
+            console.log("");
+            console.log(chalk.bold("  🔐 Rebase Cloud token"));
+            console.log("");
+            keyValues([
+                ["Host", url],
+                ["Credential", TOKEN_ENV],
+                ["Can", grants.length ? grants.map(g => `${g.capabilities.join(", ")} on ${g.projectId}`).join("; ") : undefined],
+                ["Scopes", held.join(", ")],
+                [
+                    "Linked project",
+                    link ? `${link.projectName ?? ""} (${link.projectId})`.trim() : undefined
+                ]
+            ]);
+            console.log("");
+        },
+        {
+            host: url,
+            credential: "token",
+            grants,
+            scopes: held,
+            linkedProject: link
+                ? { id: link.projectId, name: link.projectName ?? null, slug: link.slug ?? null }
+                : null
+        }
+    );
 }

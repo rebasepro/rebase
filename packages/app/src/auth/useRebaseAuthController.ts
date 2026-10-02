@@ -198,7 +198,10 @@ export function useRebaseAuthController(
         setAuthLoading(true);
         setAuthProviderError(null);
         try {
-            await auth.signUp(email, password, displayName);
+            const result = await auth.signUp(email, password, displayName);
+            const confirmationRequired = typeof result === "object" && result !== null
+                && "confirmationRequired" in result && result.confirmationRequired === true;
+            return { confirmationRequired };
         } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error));
             setAuthProviderError(err);
@@ -311,9 +314,14 @@ export function useRebaseAuthController(
         }
     }, [auth]);
 
-    const verifyEmail = useCallback(async (token: string) => {
+    const verifyEmail = useCallback(async (token: string, options?: { password?: string; removeUnproven?: boolean }) => {
         if (!auth?.verifyEmail) throw new Error("Rebase client with email verification is required");
-        await auth.verifyEmail(token);
+        const result = await auth.verifyEmail(token, options);
+        const isObject = typeof result === "object" && result !== null;
+        return {
+            passwordRemoved: isObject && "passwordRemoved" in result && result.passwordRemoved === true,
+            signedIn: isObject && "session" in result && Boolean(result.session)
+        };
     }, [auth]);
 
     const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
@@ -321,9 +329,9 @@ export function useRebaseAuthController(
         setAuthLoading(true);
         setAuthProviderError(null);
         try {
+            // The SDK adopts the fresh session the server answers with: this
+            // device stays signed in, every other one is signed out.
             await auth.changePassword(oldPassword, newPassword);
-            // Sign out after password change as sessions are usually invalidated
-            await auth.signOut();
         } catch (error: unknown) {
             const err = error instanceof Error ? error : new Error(String(error));
             setAuthProviderError(err);

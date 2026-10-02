@@ -1,5 +1,5 @@
 ---
-sourceHash: 5db546fe110a140a
+sourceHash: 2b5f4b5b83a711a3
 title: Applications et dépôts
 sidebar_label: Apps & dépôts
 description: Un projet est un backend accompagné des applications qui communiquent avec lui, chacune pouvant résider dans son propre dépôt.
@@ -220,7 +220,7 @@ rebase generate-sdk --from https://api.example.com --token $REBASE_SERVICE_KEY
 
 La CLI récupère `/api/meta/contract`, reconstruit les définitions des collections — y compris les cibles de relations, dont le générateur de types a besoin pour déterminer si une clé étrangère est une chaîne ou un nombre — et produit exactement le même résultat qu'elle aurait généré à partir du code source local.
 
-Le point de terminaison du contrat est réservé aux administrateurs. Les définitions de collections décrivent chaque table, colonne et relation du projet, y compris celles qu'aucune règle de sécurité n'exposerait jamais ; il s'agit d'une cartographie de la base de données, pas d'une documentation d'API publique.
+Le point de terminaison du contrat exige la portée `schema:read`, que détient un administrateur. Les définitions de collections décrivent chaque table, colonne et relation du projet, y compris celles qu'aucune règle de sécurité n'exposerait jamais ; il s'agit d'une cartographie de la base de données, pas d'une documentation d'API publique.
 
 ## Détecter les dérives
 

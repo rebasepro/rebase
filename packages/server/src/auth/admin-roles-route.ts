@@ -1,13 +1,17 @@
 /**
- * Admin endpoint for listing all roles.
+ * Admin endpoint for listing roles.
  *
- * Mounts: GET /roles
+ * Mounts: GET /roles — the built-in `admin` role and the roles the app
+ * declares under `auth.roles` on the users collection, with the scopes each
+ * holds. Requires `users:read`.
  */
 
 import { Hono } from "hono";
+import { summarizeRoles } from "@rebasepro/types";
 import { errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
-import { createRequireAuth, requireAdmin } from "./middleware";
+import { createRequireAuth } from "./middleware";
+import { getAccessModel, requireScope } from "./access";
 import type { HonoEnv } from "../api/types";
 
 export interface AdminRolesRouteConfig {
@@ -27,14 +31,12 @@ export function createAdminRolesRoute(config: AdminRolesRouteConfig): Hono<HonoE
     router.onError(errorHandler);
     router.use("/*", createRequireAuth({
         serviceKey: config.serviceKey,
-        // These routes can grant roles, so they must not trust a role claim.
         resolveRoles: uid => authRepo.getUserRoleIds(uid),
         revocationRepo: authRepo
     }));
 
-    router.get("/roles", requireAdmin, async (c) => {
-        const roles = await authRepo.listRoles();
-        return c.json({ roles });
+    router.get("/roles", requireScope("users:read"), (c) => {
+        return c.json({ roles: summarizeRoles(getAccessModel()) });
     });
 
     return router;

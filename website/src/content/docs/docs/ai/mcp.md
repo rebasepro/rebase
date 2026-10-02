@@ -177,7 +177,7 @@ fills a gap.
 :::danger[The zero-config path is an admin credential]
 Options 2 and 3 are the **service key** — an unscoped admin secret. The backend
 resolves it to `uid: "service"`, `roles: ["admin"]`, `isAdmin: true`. That
-identity skips the API-key permission list entirely, and it satisfies the
+identity holds every [scope](/docs/backend/roles-and-scopes/), and it satisfies the
 `_default_admin_read` / `_default_admin_write` policies that Rebase injects into
 every collection that has not set `disableDefaultPolicies`.
 
@@ -194,15 +194,15 @@ function, and run DDL against whatever `DATABASE_URL` the project resolves.
 
 ### Giving it a narrow credential instead
 
-Register a scoped [API key](/docs/backend/api-keys) and the two-gate model
-applies for real. A non-admin key runs with the roles `["service"]`, which the
+<span class="since-badge" data-since="0.24">Since 0.24</span> Register a scoped [API key](/docs/backend/api-keys) and the two-gate model
+applies for real. A service key runs with the roles `["service"]`, which the
 injected admin policies do **not** name — so RLS grants it nothing unless one of
-your own policies says otherwise, and the permission list narrows it further:
+your own policies says otherwise, and its scopes narrow it further:
 
 ```bash
 rebase api-keys create -n "claude-code" \
-  --permissions '[{"collection":"articles","operations":["read"]}]' \
-  --expires 30d
+  --scopes data:read:articles \
+  --expires-in 30
 ```
 
 Then hand the resulting `rk_live_…` key to the server rather than letting it
@@ -229,17 +229,21 @@ Two things this does **not** do, both worth knowing before you rely on it:
   `rebase_doctor` and the branch tools spawn the Rebase CLI, which connects with
   `DATABASE_URL` and never sees your token at all. The loopback gate below is the
   only thing standing in front of those.
-- **A non-admin key cannot use the admin tools.** `list_users`, `create_user`,
-  `update_user`, `delete_user`, `list_roles` and `rebase_auth_reset_password`
-  live behind `requireAdmin` and will fail with a scoped key. That is the system
-  working, but it does mean choosing between reach and narrowness rather than
-  getting both.
+- **A key reaches an admin tool only with that tool's scope.** `list_users` and
+  `list_roles` need `users:read`; `create_user`, `update_user`, `delete_user` and
+  `rebase_auth_reset_password` need `users:write`; the storage and cron tools
+  need the matching `storage:*` or `cron:*` scope; `invoke_function` needs
+  `functions:invoke`. Without
+  it the call answers `403 SCOPE_MISSING`. Even with `users:write`, a key cannot
+  change an admin's account: an admin holds `keys:read` and `keys:write`, which no
+  key can, and nobody may manage an account that holds more than they do.
 
-An API key with `admin: true` is a different matter: it carries the roles
-`["admin", "service"]`, which clears the same default admin policies the service
-key does. On the data plane its reach is the service key's. What it adds is that
-it is **revocable, expirable and rate-limited per key**, none of which is true of
-the service key — rotating that means editing `.env` and restarting the server.
+A key created with `--roles admin` is a different matter: it carries the roles
+`["service", "admin"]`, which clears the same default admin policies the service
+key does. Give it `--full-access` as well and its reach is the service key's,
+less key management. What it adds is that it is **revocable, expirable and
+rate-limited per key**, none of which is true of the service key — rotating that
+means editing `.env` and restarting the server.
 
 See [Agents and MCP Servers](/docs/backend/api-keys#agents-and-mcp-servers) for the
 key-scoping guidance in full.
@@ -556,11 +560,22 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` limits it
   to clients you register), and sends the person to a consent screen that signs
   them in through your existing `/auth/login`.
-- **Seven tools, two scopes.** `mcp:read` offers `list_collections`,
-  `query_collection`, `count_documents` and `get_document`; `mcp:write` adds
-  `create_document`, `update_document` and `delete_document`. A scope decides
-  which tools are offered, not which rows: an empty list can be RLS working, and
-  `mcp:write` still cannot write a row the person could not.
+- <span class="since-badge" data-since="0.24">Since 0.24</span> **Seven tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+  every credential uses. `data:read` offers `list_collections`,
+  `query_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
+  `update_document`; `data:delete` adds `delete_document`. A client that asks for
+  nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
+  lists and reads `posts` and nothing else. A scope decides which tools are
+  offered and which collections they reach, not which rows: an empty list can be
+  RLS working, and `data:write` still cannot write a row the person could not.
+- **Grants made before 0.24 keep their reach.** `mcp:read` is read as
+  `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and
+  on tokens already issued.
+- <span class="since-badge" data-since="0.24">Since 0.24</span> **An API key works too.** `/mcp` also accepts `Authorization: Bearer rk_…`, for
+  a client configured with a header rather than an OAuth flow. The key reaches
+  the tools its `data:*` scopes cover, as whoever it acts as: a
+  [personal key](/docs/backend/api-keys/#personal-keys) as its owner, a service key
+  as `api-key:<id>`.
 - **The SDK's vocabulary, REST's answers.** The tools take what the SDK takes —
   `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` or
   `"created_at:desc"`), `limit`, `offset`, `searchString`, and `data` for a

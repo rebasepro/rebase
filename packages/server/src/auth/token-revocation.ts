@@ -63,15 +63,102 @@ export async function isAccessTokenRevoked(
         return false;
     }
 
-    if (!validAfter) return false;
-
     // `iat` is whole seconds; the watermark is a millisecond timestamp. Compare
     // in seconds and floor the watermark, so a token issued in the same second
     // as the revocation is treated as revoked rather than surviving on a
     // rounding artefact.
-    const issuedAtSec = payload.iat;
-    const revokedFromSec = Math.floor(validAfter.getTime() / 1000);
-    return issuedAtSec < revokedFromSec;
+    return issuedBefore(payload, validAfter);
+}
+
+/**
+ * The repository reads {@link judgeAccessToken} may make. All optional: a
+ * repository answers what it can, and the judge says what it could not ask.
+ */
+export type AccessJudgeRepository = Partial<Pick<AuthRepository,
+    "getAccountAccessState" | "getUserWithRoles" | "getTokensValidAfter">>;
+
+/**
+ * Why an access token that verifies is not honoured.
+ *
+ * - `revoked`: issued before the account's revocation watermark — a sign-out
+ *   everywhere, a password change or reset.
+ * - `session-revoked`: its own sign-in was ended — `POST /auth/logout`, or
+ *   `DELETE /auth/sessions/:id` from another device. Needs the token's `sid`.
+ * - `account-deleted`: the account it names no longer exists.
+ * - `account-disabled`: an administrator switched the account off.
+ */
+export type AccessTokenRefusal = "revoked" | "session-revoked" | "account-deleted" | "account-disabled";
+
+export type AccessTokenVerdict =
+    | {
+        live: true;
+        /**
+         * The account's roles now, or `undefined` when the repository could
+         * not say (it reads neither the account nor its roles).
+         */
+        roles?: string[];
+    }
+    | { live: false; refusal: AccessTokenRefusal };
+
+/**
+ * Is the account behind this verified access token still the one that may use
+ * it — and with which roles?
+ *
+ * A verified signature says who the token was minted for, an hour ago at
+ * most. This asks the database what has happened to that account since. Every
+ * door that honours an access token — the data plane, the admin gates, the
+ * realtime socket — asks it here, so they cannot disagree about it.
+ *
+ * They did. A deleted account read as "not revoked": the watermark lives on
+ * the user row, so once the row was gone there was no watermark, and the
+ * roles lookup answered `[]` rather than "nobody". A token its owner had
+ * revoked came back to life when an administrator deleted the account, as an
+ * authenticated principal with that uid, for the rest of its lifetime. MCP
+ * refresh and personal API keys already treated a missing account as revoked;
+ * the main door did not.
+ *
+ * Throws when the repository does. Unlike the watermark read on its own, this
+ * one decides the roles a request runs with, so a failure is a refusal (the
+ * callers answer 503) rather than a guess.
+ */
+export async function judgeAccessToken(
+    authRepo: AccessJudgeRepository,
+    payload: Pick<AccessTokenPayload, "uid" | "iat" | "sid">
+): Promise<AccessTokenVerdict> {
+    let roles: string[] | undefined;
+    let validAfter: Date | null = null;
+
+    if (typeof authRepo.getAccountAccessState === "function") {
+        const state = await authRepo.getAccountAccessState(payload.uid, payload.sid);
+        if (!state) return { live: false, refusal: "account-deleted" };
+        if (state.disabled) return { live: false, refusal: "account-disabled" };
+        roles = state.roles;
+        validAfter = state.tokensValidAfter;
+        // Only an explicit `false`: a token minted before `sid` existed, or a
+        // store that cannot group sessions, is judged by the watermark alone.
+        if (payload.sid && state.sessionActive === false) return { live: false, refusal: "session-revoked" };
+    } else {
+        if (typeof authRepo.getUserWithRoles === "function") {
+            const account = await authRepo.getUserWithRoles(payload.uid);
+            if (!account) return { live: false, refusal: "account-deleted" };
+            if (account.user.disabled) return { live: false, refusal: "account-disabled" };
+            roles = account.roles;
+        }
+        if (typeof authRepo.getTokensValidAfter === "function") {
+            validAfter = await authRepo.getTokensValidAfter(payload.uid);
+        }
+    }
+
+    if (issuedBefore(payload, validAfter)) return { live: false, refusal: "revoked" };
+    return { live: true, roles };
+}
+
+/** The watermark comparison {@link isAccessTokenRevoked} and the judge share. */
+function issuedBefore(payload: Pick<AccessTokenPayload, "iat">, validAfter: Date | null): boolean {
+    // A token with no `iat` cannot be placed relative to the watermark; it
+    // expires on its own. See `isAccessTokenRevoked`.
+    if (!validAfter || typeof payload.iat !== "number") return false;
+    return payload.iat < Math.floor(validAfter.getTime() / 1000);
 }
 
 /**
@@ -124,10 +211,15 @@ export async function revokeAllSessions(
  * revocation: see `confirmAddressOwnership`.
  */
 export async function replaceUserPassword(
-    authRepo: Pick<AuthRepository, "updatePassword" | "deleteAllRefreshTokensForUser" | "setTokensValidAfter">,
+    authRepo: Pick<AuthRepository, "updatePassword" | "deleteAllRefreshTokensForUser" | "setTokensValidAfter">
+        & Partial<Pick<AuthRepository, "deleteAllPasswordResetTokensForUser">>,
     uid: string,
     passwordHash: string | null
 ): Promise<void> {
     await authRepo.updatePassword(uid, passwordHash);
     await revokeAllSessions(authRepo, uid);
+    // A reset link still in someone's inbox would set the password again for
+    // the rest of its hour — the one just replaced, perhaps because a link
+    // went to the wrong place. Every outstanding one goes with the old password.
+    await authRepo.deleteAllPasswordResetTokensForUser?.(uid);
 }

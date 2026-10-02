@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dcaffcacef692bc
+sourceHash: 9ab3b04e9fddf6d4
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -62,9 +62,9 @@ Envoyer le vôtre permet à une trace de traverser les sauts réseau : une passe
 | --- | --- | --- | --- |
 | `AAL2_REQUIRED` | 403 | La route nécessite un second facteur et la session n'en a qu'un. | Complétez le challenge MFA, puis réessayez. |
 | `ALREADY_VERIFIED` | 400 | L'adresse ou le facteur est déjà vérifié. | Rien — l'état souhaité est déjà atteint. |
+| `ACCOUNT_OUTRANKS_CALLER` | 403 | Le compte modifié, réinitialisé ou supprimé détient un rôle ou une portée que l'appelant ne détient pas. `details.beyond` les nomme. | Faites effectuer la modification par quelqu'un qui les détient. |
 | `ANONYMOUS_AUTH_DISABLED` | 403 | La connexion anonyme est désactivée sur ce serveur. | Activez-la ou connectez-vous avec une véritable identité. |
-| `API_KEY_FORBIDDEN` | 403 | Une clé API a été utilisée sur une route réservée aux humains. | Utilisez une session utilisateur. |
-| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | Une clé API a tenté de créer, lister ou révoquer des clés API. | Gérez les clés en tant qu'administrateur connecté. |
+| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | Une clé API a tenté de lister, créer, modifier ou révoquer des clés API, de son propre type ou personnelles. | Gérez les clés en tant que personne qui détient `keys:write`, ou avec la clé de service. |
 | `AUTH_MIDDLEWARE_MISSING` | 500 | Une route protégée a été exécutée sans middleware d'authentification Rebase en amont ; les identifiants n'ont donc jamais été vérifiés. | Montez l'application via le routeur de fonctions plutôt que directement sur votre propre serveur. |
 | `BOOTSTRAP_ANONYMOUS` | 403 | L'initialisation du premier administrateur a été tentée par un appelant anonyme. | Connectez-vous d'abord. |
 | `BOOTSTRAP_COMPLETED` | 403 | Le premier administrateur existe déjà. | Demandez à un administrateur existant d'accorder le rôle. |
@@ -81,19 +81,28 @@ Envoyer le vôtre permet à une trace de traverser les sauts réseau : une passe
 | `INVALID_CHALLENGE` | 400 | Le challenge MFA est inconnu ou expiré. | Démarrez-en un nouveau. |
 | `INVALID_CODE` | 400 / 401 | Le code OTP ou MFA est incorrect : 400 pour la connexion par code e-mail (`/auth/otp/verify`), 401 pour un enrôlement ou un challenge MFA. | Réessayez avec le code actuel. |
 | `INVALID_CREDENTIALS` | 401 | E-mail ou mot de passe incorrect — sans préciser délibérément lequel. | Réessayez ou réinitialisez le mot de passe. |
+| `INVALID_SCOPES` | 400 | La demande de clé contient quelque chose qui n'est pas une portée : malformée, inconnue, ou avec une cible que la portée n'accepte pas. `details.problems` indique laquelle et pourquoi ; `details.validScopes` les liste toutes. | Utilisez un nom de la liste. Voir [Rôles et portées](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | Un jeton de vérification, de réinitialisation ou de lien magique est malformé ou inconnu (400). Un identifiant de fournisseur OAuth ou un refresh token qui ne se vérifie pas donne un 401. | Demandez un nouveau lien, ou reconnectez-vous. |
+| `KEY_MANAGEMENT_SCOPE` | 400 | La demande de clé contient `keys:read` ou `keys:write`. Aucune clé ne peut gérer des clés. `details.scopes` les nomme. | Retirez-les. |
 | `LAST_ADMIN` | 403 | Cette modification laisserait le projet sans aucun administrateur. | Désignez un autre administrateur au préalable. |
 | `MFA_REQUIRED` | 401 | Le mot de passe était correct et le compte dispose d'un second facteur vérifié ; la connexion n'est donc qu'à moitié terminée. `details` contient un jeton éphémère limité au challenge MFA — il ne s'agit pas d'une session. | Ouvrez un challenge et répondez-y ; la réponse au challenge délivre la session. |
 | `NO_SESSION` | 401 | Aucun cookie de session ni jeton de rafraîchissement n'a été fourni. Normal lors du premier chargement de page. | Connectez-vous. |
 | `NOT_ANONYMOUS` | 400 | Une route de conversion de compte anonyme a été appelée par un vrai compte. | Rien à convertir. |
 | `OAUTH_ERROR` | 401 | Le fournisseur OAuth a refusé la demande ou a renvoyé une erreur. | Réessayez le flux ; le message contient la raison fournie par le fournisseur. |
+| `PERSONAL_KEYS_DISABLED` | 403 | Les clés API personnelles sont désactivées sur ce backend. | Définissez `personalKeys: true` dans le bloc `auth` de la collection des utilisateurs. |
+| `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | La clé de service ou une session invité a tenté d'utiliser les routes des clés personnelles. Aucune des deux n'a de compte au nom duquel une clé pourrait agir. | Connectez-vous à un compte, ou créez une clé de service sous `/api/admin/api-keys`. |
 | `RATE_LIMITED` | 429 | Trop de tentatives effectuées par cet appelant. | Ralentissez la cadence ; le message indique pendant combien de temps. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | L'URI de redirection ne figure pas sur la liste autorisée. | Ajoutez-la dans la configuration du fournisseur. |
 | `REGISTRATION_DISABLED` | 403 | L'inscription en libre-service est désactivée. | Demandez à un administrateur de créer le compte. |
+| `ROLE_EXCEEDS_CALLER` | 403 | Les rôles accordés détiennent une portée, ou `admin`, que l'appelant ne détient pas. `details.beyond` les nomme. | Faites accorder le rôle par quelqu'un qui les détient. |
+| `ROLE_EXCEEDS_CREATOR` | 403 | Une clé de service a reçu un rôle RLS que son créateur ne détient pas. Seul un administrateur peut donner n'importe quel rôle. `details.roles` les nomme. | Retirez le rôle, ou faites créer la clé par un administrateur. |
 | `ROLE_EXISTS` | 409 | Ce nom de rôle est déjà pris. | Choisissez un autre nom. |
 | `ROLE_LOOKUP_FAILED` | 503 | Impossible de lire les rôles de l'appelant — sur une route d'administration, ou sur une requête de données d'un backend avec `config.auth`. Échoue par sécurité plutôt que de faire confiance aux rôles du jeton. | Réessayez ; vérifiez la base de données. |
+| `SCOPE_EXCEEDS_CREATOR` | 403 | La demande de clé contient une portée que son créateur ne détient pas. Une clé ne détient jamais plus que le compte qui la crée. `details.scopes` les nomme. | Retirez-les, ou faites créer la clé par quelqu'un qui les détient. |
+| `SCOPE_MISSING` | 403 | L'identifiant ne détient pas la portée qu'exige cette route, cette collection, cette source de stockage ou cette fonction. `details.requiredScope` la nomme, cible comprise. | Pour une personne, un rôle qui déclare la portée. Pour une clé, une clé qui la détient. Voir [Rôles et portées](/docs/backend/roles-and-scopes/). |
 | `SELF_DELETE` | 400 | Un administrateur a tenté de supprimer son propre compte. | Demandez à un autre administrateur de le faire. |
 | `SESSION_REVOKED` | 401 | La session a été déconnectée ailleurs, ou toutes les sessions ont été révoquées. | Reconnectez-vous. |
+| `UNKNOWN_SCOPE_TARGET` | 400 | La cible d'une portée nomme une collection, une source de stockage ou une fonction que ce backend ne sert pas. `details` liste celles qu'il sert. | Corrigez la cible. |
 | `UNVERIFIED_IDENTITIES` | 409 | Un lien magique, un code par e-mail ou une réinitialisation du mot de passe a prouvé l'adresse d'un compte non vérifié, et ce compte porte une identité de connexion dont le fournisseur n'a jamais vérifié cette adresse. Le dépôt d'authentification ne peut pas la supprimer (il n'a pas `unlinkUserIdentity`), donc la preuve est refusée plutôt que de laisser ce moyen d'accès sur un compte vérifié. | Implémentez `unlinkUserIdentity` dans le dépôt d'authentification personnalisé, ou faites examiner le compte par un administrateur. |
 | `SETUP_REQUIRED` | 403 | Le projet n'a pas encore d'administrateur ; cette route n'est donc pas disponible. | Terminez la configuration du premier administrateur. |
 | `TOKEN_ALREADY_USED` | 401 | Un jeton à usage unique a été rejoué. | Demandez-en un nouveau. |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dcaffcacef692bc
+sourceHash: 9ab3b04e9fddf6d4
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -62,9 +62,9 @@ Einen eigenen Header zu senden stellt sicher, dass ein Trace über Hops hinweg e
 | --- | --- | --- | --- |
 | `AAL2_REQUIRED` | 403 | Die Route erfordert einen zweiten Faktor und die Session verfügt nur über einen. | Schließen Sie die MFA-Abfrage ab und versuchen Sie es erneut. |
 | `ALREADY_VERIFIED` | 400 | Die Adresse oder der Faktor ist bereits verifiziert. | Nichts – der gewünschte Zustand ist bereits erreicht. |
+| `ACCOUNT_OUTRANKS_CALLER` | 403 | Das Konto, das bearbeitet, zurückgesetzt oder gelöscht wird, hält eine Rolle oder einen Scope, die der Aufrufer nicht hält. `details.beyond` nennt sie. | Lassen Sie die Änderung von jemandem vornehmen, der sie hält. |
 | `ANONYMOUS_AUTH_DISABLED` | 403 | Anonyme Anmeldung ist auf diesem Server deaktiviert. | Aktivieren Sie sie oder melden Sie sich mit einer echten Identität an. |
-| `API_KEY_FORBIDDEN` | 403 | Ein API-Schlüssel wurde für eine Route verwendet, die nur von Personen aufgerufen werden darf. | Verwenden Sie eine Benutzersitzung. |
-| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | Ein API-Schlüssel hat versucht, API-Schlüssel zu erstellen, aufzulisten oder zu widerrufen. | Verwalten Sie Schlüssel als angemeldeter Administrator. |
+| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | Ein API-Schlüssel hat versucht, API-Schlüssel aufzulisten, zu erstellen, zu ändern oder zu widerrufen, seiner eigenen Art oder persönliche. | Verwalten Sie Schlüssel als Person, die `keys:write` hält, oder mit dem Service-Key. |
 | `AUTH_MIDDLEWARE_MISSING` | 500 | Eine geschützte Route wurde ohne vorherige Rebase-Auth-Middleware ausgeführt, sodass die Anmeldeinformationen des Aufrufers nie geprüft wurden. | Binden Sie die App über den Functions-Router ein, anstatt direkt auf Ihrem eigenen Server. |
 | `BOOTSTRAP_ANONYMOUS` | 403 | Das Bootstrapping des ersten Administrators wurde von einem anonymen Aufrufer versucht. | Melden Sie sich zuerst an. |
 | `BOOTSTRAP_COMPLETED` | 403 | Der erste Administrator existiert bereits. | Lassen Sie die Rolle von einem bestehenden Administrator gewähren. |
@@ -81,19 +81,28 @@ Einen eigenen Header zu senden stellt sicher, dass ein Trace über Hops hinweg e
 | `INVALID_CHALLENGE` | 400 | Die MFA-Abfrage ist unbekannt oder abgelaufen. | Starten Sie eine neue Abfrage. |
 | `INVALID_CODE` | 400 / 401 | Der OTP- oder MFA-Code ist falsch: 400 bei der Anmeldung per E-Mail-Code (`/auth/otp/verify`), 401 bei einer MFA-Einrichtung oder -Challenge. | Versuchen Sie es mit dem aktuellen Code erneut. |
 | `INVALID_CREDENTIALS` | 401 | Falsche E-Mail-Adresse oder falsches Passwort – bewusst ohne Angabe, was davon zutrifft. | Versuchen Sie es erneut oder setzen Sie das Passwort zurück. |
+| `INVALID_SCOPES` | 400 | Für einen Schlüssel wurde etwas angefordert, das kein Scope ist: fehlerhaft, unbekannt oder mit einem Ziel, das der Scope nicht annimmt. `details.problems` sagt, welche und warum; `details.validScopes` listet sie alle. | Verwenden Sie einen Namen aus der Liste. Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | Ein Verifizierungs-, Reset- oder Magic-Link-Token ist fehlerhaft oder unbekannt (400). Ein OAuth-Provider-Credential oder ein Refresh-Token, das sich nicht verifizieren lässt, ergibt 401. | Fordern Sie einen neuen Link an oder melden Sie sich erneut an. |
+| `KEY_MANAGEMENT_SCOPE` | 400 | Für einen Schlüssel wurde `keys:read` oder `keys:write` angefordert. Kein Schlüssel darf Schlüssel verwalten. `details.scopes` nennt sie. | Lassen Sie sie weg. |
 | `LAST_ADMIN` | 403 | Die Änderung würde dazu führen, dass das Projekt keinen Administrator mehr hat. | Befördern Sie zuerst eine andere Person. |
 | `MFA_REQUIRED` | 401 | Das Passwort war korrekt und das Konto verfügt über einen verifizierten zweiten Faktor, sodass die Anmeldung erst zur Hälfte abgeschlossen ist. `details` enthält ein kurzlebiges Token, das auf die MFA-Abfrage beschränkt ist – es handelt sich nicht um eine Session. | Starten Sie eine Abfrage und beantworten Sie diese; die Abfrage-Response stellt die Session aus. |
 | `NO_SESSION` | 401 | Es wurde kein Session-Cookie oder Refresh-Token übergeben. Normal beim ersten Laden der Seite. | Melden Sie sich an. |
 | `NOT_ANONYMOUS` | 400 | Eine Route zum Upgrade eines anonymen Kontos wurde von einem regulären Konto aufgerufen. | Es gibt nichts zu upgraden. |
 | `OAUTH_ERROR` | 401 | Der OAuth-Anbieter hat abgelehnt oder einen Fehler zurückgegeben. | Wiederholen Sie den Vorgang; die Nachricht enthält die Begründung des Anbieters. |
+| `PERSONAL_KEYS_DISABLED` | 403 | Persönliche API-Schlüssel sind auf diesem Backend deaktiviert. | Setzen Sie `personalKeys: true` im `auth`-Block der Users-Collection. |
+| `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | Der Service-Key oder eine Gast-Sitzung hat versucht, die Routen für persönliche Schlüssel zu verwenden. Keiner von beiden hat ein Konto, als das ein Schlüssel handeln könnte. | Melden Sie sich bei einem Konto an, oder erstellen Sie einen Service-Schlüssel unter `/api/admin/api-keys`. |
 | `RATE_LIMITED` | 429 | Zu viele Versuche von diesem Aufrufer. | Warten Sie ab; die Nachricht gibt an, wie lange. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | Das Weiterleitungsziel steht nicht auf der Allowlist. | Fügen Sie es zur Anbieterkonfiguration hinzu. |
 | `REGISTRATION_DISABLED` | 403 | Die Selbstregistrierung ist deaktiviert. | Lassen Sie das Konto von einem Administrator anlegen. |
+| `ROLE_EXCEEDS_CALLER` | 403 | Die gewährten Rollen halten einen Scope oder `admin`, den der Aufrufer nicht hält. `details.beyond` nennt sie. | Lassen Sie die Rolle von jemandem gewähren, der sie hält. |
+| `ROLE_EXCEEDS_CREATOR` | 403 | Ein Service-Schlüssel hat eine RLS-Rolle bekommen, die sein Ersteller nicht hält. Nur ein Admin darf jede Rolle vergeben. `details.roles` nennt sie. | Lassen Sie die Rolle weg, oder lassen Sie einen Admin den Schlüssel erstellen. |
 | `ROLE_EXISTS` | 409 | Dieser Rollenname ist bereits vergeben. | Wählen Sie einen anderen Namen. |
 | `ROLE_LOOKUP_FAILED` | 503 | Die Rollen des Aufrufers konnten nicht gelesen werden — auf einer Admin-Route oder bei einem Datenrequest auf einem Backend mit `config.auth`. Scheitert sicherheitshalber, statt den Rollen im Token zu vertrauen. | Erneut versuchen; die Datenbank prüfen. |
+| `SCOPE_EXCEEDS_CREATOR` | 403 | Für einen Schlüssel wurde ein Scope angefordert, den sein Ersteller nicht hält. Ein Schlüssel hält nie mehr als das Konto, das ihn erstellt. `details.scopes` nennt sie. | Lassen Sie sie weg, oder lassen Sie jemanden den Schlüssel erstellen, der sie hält. |
+| `SCOPE_MISSING` | 403 | Das Credential hält nicht den Scope, den diese Route, Collection, Storage-Quelle oder Funktion braucht. `details.requiredScope` nennt ihn, Ziel eingeschlossen. | Für eine Person eine Rolle, die den Scope deklariert. Für einen Schlüssel ein Schlüssel, der ihn hält. Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/). |
 | `SELF_DELETE` | 400 | Ein Administrator hat versucht, sein eigenes Konto zu löschen. | Lassen Sie dies einen anderen Administrator durchführen. |
 | `SESSION_REVOKED` | 401 | Die Session wurde an anderer Stelle abgemeldet oder alle Sessions wurden widerrufen. | Melden Sie sich erneut an. |
+| `UNKNOWN_SCOPE_TARGET` | 400 | Das Ziel eines Scopes nennt eine Collection, Storage-Quelle oder Funktion, die dieses Backend nicht bereitstellt. `details` listet die, die es bereitstellt. | Korrigieren Sie das Ziel. |
 | `UNVERIFIED_IDENTITIES` | 409 | Ein Magic Link, E-Mail-Code oder Passwort-Reset hat die Adresse eines unverifizierten Kontos nachgewiesen, und das Konto trägt eine Anmelde-Identität, deren Provider diese Adresse nie verifiziert hat. Das Auth-Repository kann sie nicht entfernen (es hat kein `unlinkUserIdentity`), daher wird der Nachweis abgelehnt, statt diesen Zugang auf einem verifizierten Konto zu belassen. | Implementieren Sie `unlinkUserIdentity` im eigenen Auth-Repository oder lassen Sie einen Admin das Konto prüfen. |
 | `SETUP_REQUIRED` | 403 | Das Projekt hat noch keinen Administrator, daher ist diese Route nicht verfügbar. | Schließen Sie das Setup des ersten Administrators ab. |
 | `TOKEN_ALREADY_USED` | 401 | Ein Einmal-Token wurde wiederholt verwendet. | Fordern Sie ein neues an. |

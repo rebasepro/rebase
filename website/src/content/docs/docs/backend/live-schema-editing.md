@@ -18,8 +18,9 @@ POST /api/admin/schema/plan     what would happen, without doing it
 POST /api/admin/schema/apply    commit, then apply
 ```
 
-All three are admin-gated, like every other `/api/admin` surface. Applying needs
-one thing more than being an admin — see [Who may apply](#who-may-apply).
+Status and plan need the `schema:read` scope, and apply needs `schema:write`, like
+every other `/api/admin` surface that names a scope. An admin holds both.
+Applying also needs one thing more than the scope — see [Who may apply](#who-may-apply).
 
 ## Plan before you apply
 
@@ -44,8 +45,9 @@ the expression it hit, so the change is made where that code lives. A whole
 what differs from it, and a key whose value is code is never removed that way.
 The admin panel sends patches.
 
-`$ADMIN_TOKEN` is an admin access token — the `accessToken` a sign-in returns
-for an account with the admin role. Nothing on the machine sets it for you.
+`$ADMIN_TOKEN` is an access token — the `accessToken` a sign-in returns — for an
+account holding `schema:read`: an admin, or a role that declares it. Nothing on
+the machine sets it for you.
 
 ```bash
 curl -X POST https://your-app/api/admin/schema/plan \
@@ -180,22 +182,23 @@ No SQL goes in the commit. `rebase db push` and `rebase db generate` write their
 from the collections on every run, into `.rebase/sql/`, which is gitignored.
 
 The commit message describes the change rather than announcing one, and is
-attributed to the admin who made it. A schema change with an author and a diff
+attributed to the person who made it. A schema change with an author and a diff
 in your project's history is something neither Firebase nor Supabase gives you —
 their table edits are invisible to your repository.
 
 ## Who may apply
 
-Being an admin is enough to **plan**. Planning has no side effects, and a CI job
-asking whether a proposed collection change is applicable is a good use of it.
+Holding `schema:read` is enough to **plan**. Planning has no side effects, and a
+CI job asking whether a proposed collection change is applicable is a good use of
+it.
 
 Applying is a second privilege, because applying writes a commit and a commit
 carries an author:
 
 | Caller | Plan | Apply |
 |---|---|---|
-| A signed-in admin | yes | yes |
-| An API key | yes | no |
+| A signed-in person holding `schema:write` | yes | yes |
+| An API key holding `schema:read` / `schema:write` | yes | no |
 | The server's service key | yes | no |
 
 A credential is not an author. `api-key:7c3f…` in your CI environment is not

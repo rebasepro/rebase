@@ -1,5 +1,5 @@
 ---
-sourceHash: dbaee87f7378ffd7
+sourceHash: 5d7dd80d4991fd97
 title: Live-Schema-Bearbeitung
 description: Erstellen und Ändern von Collections auf einem laufenden Backend – zuerst in Ihr Repository committet, dann angewendet.
 ---
@@ -19,16 +19,18 @@ POST /api/admin/schema/plan     what would happen, without doing it
 POST /api/admin/schema/apply    commit, then apply
 ```
 
-Alle drei sind Admin-geschützt, genau wie jede andere `/api/admin`-Oberfläche. Das Anwenden erfordert
-eine Sache mehr als nur Admin zu sein – siehe [Wer Änderungen anwenden darf](#wer-änderungen-anwenden-darf).
+Status und Plan brauchen den Scope `schema:read`, und Apply braucht `schema:write`, wie
+jede andere `/api/admin`-Oberfläche, die einen Scope nennt. Ein Admin hält beide.
+Das Anwenden erfordert außerdem eine Sache mehr als den Scope – siehe [Wer Änderungen anwenden darf](#wer-änderungen-anwenden-darf).
 
 ## Erst planen, dann anwenden
 
 `/plan` hat keine Nebeneffekte. Senden Sie die Collection so, wie sie am Ende aussehen soll, und
 der Endpunkt teilt Ihnen mit, was die Änderung bedeutet:
 
-`$ADMIN_TOKEN` ist ein Admin-Zugriffstoken – das `accessToken`, das ein Sign-in für
-ein Konto mit der Admin-Rolle zurückgibt. Nichts auf dem Rechner setzt es automatisch für Sie.
+`$ADMIN_TOKEN` ist ein Zugriffstoken – das `accessToken`, das ein Sign-in zurückgibt – für ein
+Konto, das `schema:read` hält: ein Admin oder eine Rolle, die den Scope deklariert. Nichts auf
+dem Rechner setzt es automatisch für Sie.
 
 ```bash
 curl -X POST https://your-app/api/admin/schema/plan \
@@ -131,13 +133,13 @@ Kein SQL landet im Commit. `rebase db push` und `rebase db generate` schreiben i
 SQL bei jedem Lauf aus den Collections nach `.rebase/sql/`, das von Git ignoriert wird.
 
 Die Commit-Nachricht beschreibt die Änderung, anstatt nur eine anzukündigen, und wird
-dem Admin zugeschrieben, der sie vorgenommen hat. Eine Schemaänderung mit einem Autor und einem Diff
+der Person zugeschrieben, die sie vorgenommen hat. Eine Schemaänderung mit einem Autor und einem Diff
 in der Historie Ihres Projekts ist etwas, das Ihnen weder Firebase noch Supabase bieten –
 deren Tabellenbearbeitungen sind für Ihr Repository unsichtbar.
 
 ## Wer Änderungen anwenden darf
 
-Ein Admin zu sein reicht aus, um zu **planen** (`plan`). Das Planen hat keine Nebeneffekte, und ein CI-Job,
+`schema:read` zu halten reicht aus, um zu **planen** (`plan`). Das Planen hat keine Nebeneffekte, und ein CI-Job,
 der abfragt, ob eine vorgeschlagene Collection-Änderung anwendbar ist, ist ein guter Einsatzzweck dafür.
 
 Das Anwenden (`apply`) ist ein zweites Privileg, da das Anwenden einen Commit schreibt und ein Commit
@@ -145,8 +147,8 @@ einen Autor trägt:
 
 | Aufrufer | Plan | Apply |
 |---|---|---|
-| Ein angemeldeter Admin | ja | ja |
-| Ein API-Key | ja | nein |
+| Eine angemeldete Person, die `schema:write` hält | ja | ja |
+| Ein API-Key, der `schema:read` / `schema:write` hält | ja | nein |
 | Der Service-Key des Servers | ja | nein |
 
 Ein Credential ist kein Autor. `api-key:7c3f…` in Ihrer CI-Umgebung ist nicht

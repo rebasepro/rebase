@@ -1,5 +1,5 @@
 ---
-sourceHash: 7c92103faece259e
+sourceHash: b39d5a790d94c656
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Programa tareas recurrentes en segundo plano con el sistema integrado de cron jobs de Rebase. Define tareas como archivos TypeScript, monitorízalas en Studio y gestiónalas a través de la API REST.
@@ -265,7 +265,16 @@ El handler puede devolver cualquier valor serializable en JSON. Se almacenará e
 
 ## API REST
 
-Todas las rutas de cron requieren **autenticación de administrador** (`requireAuth` + `requireAdmin`).
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Leer necesita el alcance `cron:read`. Disparar, pausar y reanudar necesitan
+`cron:write`. Un administrador tiene ambos. También los tiene una persona cuyo rol los
+declare, y una clave de API creada con ellos, que es lo que debería llevar un
+planificador externo:
+
+```bash
+rebase api-keys create -n "Scheduler" --scopes cron:read,cron:write
+```
+
+Consulta [Roles y alcances](/docs/backend/roles-and-scopes/).
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
@@ -277,7 +286,7 @@ Todas las rutas de cron requieren **autenticación de administrador** (`requireA
 
 ### Ejemplo: Listar todas las tareas
 
-`$TOKEN` es un token de acceso de administrador: inicia sesión y usa el `accessToken` devuelto en la respuesta de inicio de sesión. `$API_URL` es lo que haya impreso `rebase dev`; el puerto se deriva de la ruta del proyecto, por lo que no es fijo.
+`$TOKEN` es un token de acceso de una cuenta que tiene `cron:read`: inicia sesión y usa el `accessToken` devuelto en la respuesta de inicio de sesión. Una clave de API que tenga el alcance funciona igual. `$API_URL` es lo que haya impreso `rebase dev`; el puerto se deriva de la ruta del proyecto, por lo que no es fijo.
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/admin/cron"

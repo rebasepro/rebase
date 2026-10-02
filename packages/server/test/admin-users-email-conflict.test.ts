@@ -39,6 +39,8 @@ function world() {
         getUserById: async (id: string) => users.find(u => u.id === id) ?? null,
         getUserByEmail: async (email: string) => users.find(u => u.email === email) ?? null,
         getUserRoleIds: async (id: string) => (id === "admin-1" ? ["admin"] : ["editor"]),
+        // The caller is an account too: the gate asks whether it still exists.
+        getAccountAccessState: async (id: string) => ({ roles: id === "admin-1" ? ["admin"] : ["editor"], tokensValidAfter: null }),
         getUserWithRoles: async (id: string) => {
             const found = users.find(u => u.id === id);
             return found ? { user: found, roles: [] } : null;

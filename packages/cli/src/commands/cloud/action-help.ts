@@ -24,6 +24,7 @@
  */
 import chalk from "chalk";
 import { emitHelp, GLOBAL_HELP_FLAGS } from "./context";
+import { TOKEN_CAPABILITIES, TOKEN_CAPABILITY_NAMES } from "./token-capabilities";
 
 export interface ActionHelp {
     /** `cloud projects create` — no leading `rebase`. */
@@ -679,9 +680,68 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
     whoami: {
         command: "cloud whoami",
         usage: "cloud whoami",
-        summary: "Who this session is, which control plane it is against, and what this directory is linked to.",
+        summary:
+            "Who this session is, which control plane it is against, and what this directory is linked to. "
+            + "With REBASE_TOKEN set, what the token may do instead.",
         flags: [],
         examples: ["rebase cloud whoami", "rebase cloud whoami --json"]
+    },
+
+    tokens: {
+        command: "cloud tokens",
+        usage: "cloud tokens <list|create|revoke> [options]",
+        summary:
+            "API tokens for CI and agents. A token acts as your account, narrowed to what it was created "
+            + "for on one project; with REBASE_TOKEN set, every `rebase cloud` command uses it instead of "
+            + "your login. `list` is the default.",
+        flags: [],
+        examples: [
+            "rebase cloud tokens",
+            "rebase cloud tokens create --project shop --can deploy,logs",
+            "rebase cloud tokens revoke 3f2a9c1e --yes"
+        ],
+        notes: [
+            "Managing tokens takes your `rebase cloud login` session: a token cannot list, create or revoke tokens."
+        ]
+    },
+
+    "tokens list": {
+        command: "cloud tokens list",
+        usage: "cloud tokens list",
+        summary: "Your tokens: what each may do and on which project, when it expires, and when it was last used.",
+        flags: [],
+        examples: ["rebase cloud tokens list", "rebase cloud tokens list --json"]
+    },
+
+    "tokens create": {
+        command: "cloud tokens create",
+        usage: "cloud tokens create --can <capabilities> [--project <slug>] [--name <name>] [--expires-in <days>]",
+        summary:
+            "Create a token for one project — the linked one unless --project names another — holding only "
+            + "the capabilities --can names. The token is printed once, as the `export REBASE_TOKEN=…` line "
+            + "to hand to CI.",
+        flags: [
+            ["--can <capabilities>", `Comma-separated or repeated: ${TOKEN_CAPABILITY_NAMES.join(", ")}`],
+            ["--name <name>", "What to call it. Defaults to the project and its capabilities"],
+            ["--expires-in <days>", "Days until it stops working. Default: it does not expire"]
+        ],
+        examples: [
+            "rebase cloud tokens create --can deploy",
+            "rebase cloud tokens create --project shop --can deploy,logs --name \"GitHub Actions\" --expires-in 90",
+            "rebase cloud tokens create --project shop --can env,database"
+        ],
+        notes: [
+            ...TOKEN_CAPABILITY_NAMES.map(name => `${name}: ${TOKEN_CAPABILITIES[name].label}.`),
+            "A token never holds more than your account does when it is used, and cannot create tokens."
+        ]
+    },
+
+    "tokens revoke": {
+        command: "cloud tokens revoke",
+        usage: "cloud tokens revoke <id> [--yes]",
+        summary: "Revoke a token. Anything still using it is refused from then on.",
+        flags: [],
+        examples: ["rebase cloud tokens revoke 3f2a9c1e", "rebase cloud tokens revoke 3f2a9c1e --yes"]
     },
 
     link: {

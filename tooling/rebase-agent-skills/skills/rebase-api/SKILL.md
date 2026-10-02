@@ -22,15 +22,17 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | `/api/data/{slug}/aggregate` | count/sum/avg/min/max, optionally grouped |
 | `/api/data/{parent}/{parentId}/{child}` | Subcollection routes |
 | `/api/auth/*` | Authentication (login, register, refresh, OAuth) |
-| `/api/admin/*` | User & role management |
-| `/api/admin/api-keys` | Service API key management |
+| `/api/admin/*` | Admin surfaces (users, roles, keys, cron, backups, logs, schema), each behind its own admin-plane scope |
+| `/api/admin/api-keys` | Service API key management (`keys:read` / `keys:write`) |
+| `/api/auth/keys` | The caller's own personal API keys (when `auth.personalKeys` is on) |
+| `/api/auth/scopes` | Every scope the backend knows, and the ones the caller holds |
 | `/api/storage/*` | File uploads and downloads |
 | `/api/functions/{name}` | Custom backend functions |
 | `/api/schema-editor/*` | Visual schema editor (dev only) |
 | `/api/docs` | OpenAPI 3.0.3 JSON spec |
 | `/api/swagger` | Swagger UI (dev only) |
 | `/api/health` | Health check |
-| `/api/meta/contract` | Collection contract, for remote SDK generation (admin / service-key / admin API-key gated) |
+| `/api/meta/contract` | Collection contract, for remote SDK generation (needs `schema:read`) |
 | `/api/meta/schema-version` | The schema hash this backend was built from (unauthenticated) |
 
 ### CRUD Operations
@@ -332,8 +334,8 @@ The `details` field is optional and only present when additional context is avai
 | `401` | `UNAUTHORIZED` | Missing or invalid authentication token |
 | `401` | `INVALID_CREDENTIALS` | Wrong email/password |
 | `401` | `INVALID_TOKEN` | Expired or malformed JWT |
-| `403` | `FORBIDDEN` | Insufficient permissions (e.g., API key lacks permission) |
-| `403` | `API_KEY_FORBIDDEN` | API key does not have permission for this operation |
+| `403` | `FORBIDDEN` | Insufficient permissions |
+| `403` | `SCOPE_MISSING` | The credential lacks the scope this route needs; `details.requiredScope` names it (e.g. `data:write:orders`) |
 | `404` | `NOT_FOUND` | Entity not found |
 | `409` | `CONFLICT` | Duplicate resource (e.g., email exists) |
 | `409` | `EMAIL_EXISTS` | Registration with existing email |
@@ -381,29 +383,29 @@ Authorization: Bearer <service-key>
 
 ### API Keys (rk_ prefix)
 
-Service API keys start with the `rk_` prefix and are validated against the database. API keys have per-collection permissions controlling which CRUD operations are allowed:
+API keys start with the `rk_` prefix and are validated against the database. What a key may do is a list of **scopes**, `resource:action[:target]`:
 
 ```
 Authorization: Bearer rk_live_abc123...
 ```
 
-If an API key lacks the required permission for an operation, a `403 API_KEY_FORBIDDEN` error is returned.
+- `data:read`, `data:write`, `data:delete` — plain for every collection, or narrowed: `data:read:orders`. The operation comes from the HTTP method (`GET` → read, `POST`/`PUT`/`PATCH` → write, `DELETE` → delete; `POST /bulk/delete` is a delete). On a nested path the target collection needs the operation and each parent `data:read`.
+- `storage:read`, `storage:write`, `storage:delete` — target is a storage source id; the default source is `(default)`.
+- `functions:invoke` — or `functions:invoke:<name>` for one function.
+- Admin-plane scopes (`users:read`, `cron:write`, `logs:read`, `schema:read`, …) reach that admin surface. `keys:read`/`keys:write` can never go on a key.
 
-Beyond collections, the permission list also covers custom functions
-(`"functions"` for all, `"functions/<name>"` for one) and file storage
-(`"storage"`); the global `"*"` wildcard grants all three. API keys do NOT
-bypass RLS: admin keys pass via the built-in admin policies, while non-admin
-keys only see rows a security rule grants to the `service` role or the public.
-
-**Admin API keys** — set `"admin": true` when creating a key to grant it the `admin` role. This gives access to all `/api/admin/*` routes (schema, users, other API keys, etc.) plus cron, backups, and logs. Use this for agents, MCP servers, and CI pipelines:
+A missing scope answers `403 SCOPE_MISSING` with `details.requiredScope`. API keys do NOT bypass RLS: a **service key** runs as `uid: "api-key:<id>"` with roles `["service", ...key.roles]`, so it only sees rows a security rule grants to `service` (or to `admin`, when the key was given `roles: ["admin"]`). A **personal key** runs as its owner. See the `rebase-auth` skill for both kinds and the minting rules.
 
 ```bash
-# CLI (an explicit scope is required: --permissions '<json>' or --full-access)
-rebase api-keys create --name "My Agent" --admin --full-access
+# CLI: a scoped key
+rebase api-keys create --name "Order sync" --scopes data:read:orders,data:write:orders --expires-in 30
+
+# CLI: CI / migrations — every scope you hold (less keys:*), plus the admin RLS role
+rebase api-keys create --name "CI" --full-access --roles admin
 
 # REST
 POST /api/admin/api-keys
-{ "name": "My Agent", "admin": true, "permissions": [{ "collection": "*", "operations": ["read","write","delete"] }] }
+{ "name": "Order sync", "scopes": ["data:read:orders", "data:write:orders"] }
 ```
 
 ### Authentication Enforcement
@@ -600,7 +602,7 @@ There is no `GET /api/collections`. The equivalent is the contract endpoint, whi
 GET /api/meta/contract
 ```
 
-Gated — admin, a service key, or an admin API key.
+Gated — needs `schema:read`: an admin, the service key, or an API key holding it.
 
 ```json
 {

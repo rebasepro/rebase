@@ -122,13 +122,9 @@ class MemoryAuthStore {
                 return user ? this.toUserData(user) : null;
             },
             getUserRoleIds: async (uid) => this.users.get(uid)?.roles ?? [],
-            getUserRoles: async (uid) => (this.users.get(uid)?.roles ?? [])
-                .map(id => ({ id, name: id, isAdmin: id === "admin" })),
             getUserWithRoles: async (uid) => {
                 const user = this.users.get(uid);
-                return user
-                    ? { user: this.toUserData(user), roles: user.roles.map(id => ({ id, name: id, isAdmin: id === "admin" })) }
-                    : null;
+                return user ? { user: this.toUserData(user), roles: [...user.roles] } : null;
             },
             // Writes whatever it is handed, `passwordHash` included — so a route
             // that sets a password this way still changes it, and is caught by

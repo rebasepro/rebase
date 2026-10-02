@@ -3,17 +3,17 @@ import { BranchingUnsupportedError } from "./services/BranchService";
 import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
-import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketLimits, WebSocketMessage } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketOptions, WebSocketMessage } from "@rebasepro/types";
 import type { SqlScriptResult } from "@rebasepro/types";
 import { redactSqlLiterals } from "./utils/sql-redaction";
-import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AdminScope } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
 import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
 import { inspect } from "util";
 import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertUserCreationBodyValid, createUserThroughAuthCollection, type NestedWriteKind } from "@rebasepro/server";
-import { logger } from "@rebasepro/server";
+import { logger, getAccessModel } from "@rebasepro/server";
 
 /**
  * What this socket calls on the realtime side, and all of it.
@@ -75,6 +75,12 @@ interface WsUserIdentity {
     roles: string[];
     isAdmin: boolean;
     /**
+     * What this session may do, when its credential narrows its person — an
+     * API key. Absent for a person's own session, who holds what their roles
+     * hold.
+     */
+    scopes?: string[];
+    /**
      * Whether this session is a guest — anonymous sign-in rather than an
      * account. Read from the token, because a socket has no request to look
      * anything up on and every refetch it triggers needs the same principal the
@@ -95,6 +101,16 @@ interface ClientSession {
     ws: WebSocket;
     user?: WsUserIdentity;
     authenticated: boolean;
+    /**
+     * The credential `user` was resolved from, kept so the identity can be
+     * re-read: every frame asks again, and so does the sweep for a socket
+     * that only listens. See `recheckIdentity`.
+     */
+    credential?: string;
+    /** When `user` was last confirmed against the credential, in ms. */
+    checkedAt: number;
+    /** Ends the session the instant the credential expires. */
+    expiryTimer?: ReturnType<typeof setTimeout>;
     /** Sliding window message counter for rate limiting */
     messageCount: number;
     messageWindowStart: number;
@@ -137,6 +153,57 @@ const WS_CHANNEL_RATE_LIMIT = 7200;
  */
 const MAX_UNAUTHENTICATED_FRAME_BYTES = 64 * 1024;
 
+/**
+ * How often a socket that only listens has its identity re-read, in ms.
+ *
+ * A socket that sends frames is re-checked before each one, as an HTTP request
+ * is; a socket that only receives pushes sends none, so without this a
+ * subscription opened by an identity that has since signed out everywhere, been
+ * demoted or deleted went on receiving rows as that identity for as long as the
+ * connection lasted.
+ */
+const DEFAULT_IDENTITY_RECHECK_MS = 30_000;
+
+/**
+ * Channel frames are re-checked at most this often, in ms. They are the
+ * high-rate traffic (see `WS_CHANNEL_RATE_LIMIT`): a database read for every
+ * cursor position would make realtime presence the busiest query a backend
+ * runs, for a window no wider than this.
+ */
+const CHANNEL_RECHECK_MIN_MS = 1_000;
+
+/**
+ * The close code for a socket whose identity ended: signed out, revoked,
+ * demoted out of existence, deleted or expired. In the 4000–4999 range the
+ * protocol leaves to applications. The SDK reconnects and authenticates with
+ * whatever session it holds now — a refreshed token, or none.
+ */
+export const SESSION_ENDED_CLOSE_CODE = 4001;
+
+/**
+ * When a JWT expires, in ms, or undefined for a credential that is not one
+ * (an API key, the service key, an adapter's opaque token).
+ *
+ * Read without verifying, and only ever for a token that was verified a moment
+ * ago by the same request: the signature is not in question, only the instant.
+ */
+function jwtExpiryMs(token: string): number | undefined {
+    const parts = token.split(".");
+    if (parts.length !== 3) return undefined;
+    try {
+        const claims: unknown = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+        if (typeof claims !== "object" || claims === null || !("exp" in claims)) return undefined;
+        return typeof claims.exp === "number" ? claims.exp * 1000 : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/** Everything about an identity that decides what its frames may do. */
+function identityFingerprint(user: WsUserIdentity): string {
+    return JSON.stringify([user.uid, [...user.roles].sort(), user.isAdmin, user.isAnonymous, user.scopes ?? null, user.claims ?? null]);
+}
+
 /** Frames counted against the channel budget rather than the general one. */
 const CHANNEL_MESSAGE_TYPES = new Set([
     "join_channel",
@@ -149,33 +216,45 @@ const CHANNEL_MESSAGE_TYPES = new Set([
 ]);
 
 /**
- * WebSocket message types that require an admin session.
+ * WebSocket message types on the admin plane, and the scope each needs.
  *
- * Exported so the test can READ it. It used to be private, and the test that
- * exists to make "a privileged verb added without a role check" impossible held
- * a hand-typed copy of the same nine strings — so it agreed with itself, and
- * `FETCH_APPLICATION_ROLES` was added to neither. That verb runs
- * `SELECT DISTINCT unnest(roles)` over the users table through `executeSql`,
- * which is the owner connection and not subject to RLS, so any authenticated
- * non-admin could enumerate every role in the project — and any anonymous
- * socket could, on a deployment with `requireAuth: false`.
+ * Exported so the test can READ it. A privileged verb added without a scope
+ * check is what this list exists to make impossible: `PUBLIC_TYPES` below is
+ * its counterpart, and a test asserts that every `case` this file handles
+ * appears in exactly one of the two — so a verb added to neither fails rather
+ * than defaulting to reachable.
  *
- * The list is no longer the whole guarantee. `PUBLIC_TYPES` below is its
- * counterpart, and a test asserts that every `case` this file handles appears
- * in exactly one of the two — so a verb added to neither fails rather than
- * defaulting to reachable.
+ * All of these run on the owner connection, outside RLS. `database:read`
+ * covers the catalogue — including `FETCH_APPLICATION_ROLES`, which runs
+ * `SELECT DISTINCT unnest(roles)` over the users table — and
+ * `database:write` covers running SQL and creating or deleting branches.
  */
-export const ADMIN_ONLY_TYPES = new Set([
-    "EXECUTE_SQL",
-    "FETCH_DATABASES",
-    "FETCH_ROLES",
-    "FETCH_APPLICATION_ROLES",
-    "FETCH_UNMAPPED_TABLES",
-    "FETCH_TABLE_METADATA",
-    "FETCH_CURRENT_DATABASE",
-    "CREATE_BRANCH",
-    "DELETE_BRANCH",
-    "LIST_BRANCHES"
+export const ADMIN_PLANE_TYPES: ReadonlyMap<string, AdminScope> = new Map<string, AdminScope>([
+    ["EXECUTE_SQL", "database:write"],
+    ["CREATE_BRANCH", "database:write"],
+    ["DELETE_BRANCH", "database:write"],
+    ["FETCH_DATABASES", "database:read"],
+    ["FETCH_ROLES", "database:read"],
+    ["FETCH_APPLICATION_ROLES", "database:read"],
+    ["FETCH_UNMAPPED_TABLES", "database:read"],
+    ["FETCH_TABLE_METADATA", "database:read"],
+    ["FETCH_CURRENT_DATABASE", "database:read"],
+    ["LIST_BRANCHES", "database:read"]
+]);
+
+/**
+ * The data scope each data verb needs, for a session whose credential narrows
+ * it. A person's own session holds the whole data plane; RLS decides its rows.
+ */
+const DATA_VERB_SCOPES: ReadonlyMap<string, string> = new Map([
+    ["FETCH_COLLECTION", "data:read"],
+    ["FETCH_ONE", "data:read"],
+    ["COUNT", "data:read"],
+    ["CHECK_UNIQUE_FIELD", "data:read"],
+    ["subscribe_collection", "data:read"],
+    ["subscribe_one", "data:read"],
+    ["SAVE", "data:write"],
+    ["DELETE", "data:delete"]
 ]);
 
 /**
@@ -213,9 +292,6 @@ function extractErrorMessage(error: unknown): string {
 }
 
 /**
- * Check if the current session belongs to an admin user.
- */
-/**
  * Who a socket reads and writes as, for its request frames and its
  * subscriptions alike.
  *
@@ -241,12 +317,25 @@ function sessionAuthContext(session: ClientSession | undefined): SubscriptionAut
     };
 }
 
-function isAdminSession(session: ClientSession | undefined): boolean {
-    if (!session?.user) return false;
-    // Fast path: new adapter-aware sessions set isAdmin directly
-    if (session.user.isAdmin) return true;
-    if (!session.user.roles) return false;
-    return session.user.roles.some((r) => r === "admin");
+/** Everything a session may do: its credential's scopes, or its roles'. */
+function sessionScopes(session: ClientSession | undefined): string[] {
+    if (!session?.user) return [];
+    return session.user.scopes ?? scopesForRoles(session.user.roles, getAccessModel());
+}
+
+/**
+ * The collection a data frame addresses, for a narrowed session's scope check.
+ * A nested path (`authors/1/posts`) answers undefined: its target is a
+ * relation's, not a slug on the wire, so only an unqualified scope covers it.
+ */
+function frameCollection(type: string, payload: unknown): string | undefined {
+    if (typeof payload !== "object" || payload === null) return undefined;
+    let path: unknown = "path" in payload ? payload.path : undefined;
+    if (type === "DELETE" && "row" in payload && typeof payload.row === "object" && payload.row !== null && "path" in payload.row) {
+        path = payload.row.path;
+    }
+    if (typeof path !== "string" || path === "" || isNestedPath(path)) return undefined;
+    return path;
 }
 
 /** A frame's size in bytes, however `ws` delivered it. */
@@ -271,7 +360,7 @@ function connectionOrigin(request: IncomingMessage | undefined): Omit<DataRateLi
 }
 
 /**
- * `limits` are the data API's, for the same rows reached through this door:
+ * `options` carry the data API's limits, for the same rows reached through this door:
  * frames larger than its body limit close the socket with 1009 before they are
  * read, and every data frame counts in the caller's data-API bucket — the one
  * their HTTP requests count in — rather than only in a budget per connection,
@@ -283,7 +372,7 @@ export function createPostgresWebSocket(
     driver: PostgresBackendDriver,
     authConfig?: WsAuthConfig,
     authAdapter?: AuthAdapter,
-    limits?: RealtimeSocketLimits
+    options?: RealtimeSocketOptions
 ) {
     // Session map scoped to this factory invocation — prevents stale sessions
     // leaking across hot reloads or multiple factory calls.
@@ -313,7 +402,7 @@ export function createPostgresWebSocket(
     // `ws` defaults to 100 MiB. The data API refuses a body over its limit
     // before any handler runs; this is the same limit, enforced by `ws` while
     // it reads the frame. `0` is "none" to both.
-    const maxPayload = limits?.maxPayload ?? RUNTIME_DEFAULT_MAX_BODY_SIZE;
+    const maxPayload = options?.maxPayload ?? RUNTIME_DEFAULT_MAX_BODY_SIZE;
     const wss = new WebSocketServer({ server, maxPayload: maxPayload > 0 ? maxPayload : 0 });
 
     // Handle errors on the WSS so that EADDRINUSE from the underlying HTTP
@@ -343,6 +432,187 @@ export function createPostgresWebSocket(
         );
     }
 
+    /**
+     * Who a credential is, now: the same verification `AUTHENTICATE` runs, so
+     * re-asking it later answers what signing in would answer. A refusal is a
+     * value; a store that cannot answer throws.
+     */
+    async function resolveIdentity(token: string): Promise<{ user: WsUserIdentity } | { refused: string; apiKey?: true }> {
+        if (token.startsWith("rk_")) {
+            // An API key: the same verification the HTTP middlewares run, so a
+            // key means one thing on both — revoked or expired included.
+            const resolved = options?.resolveApiKey ? await options.resolveApiKey(token) : undefined;
+            if (!resolved || !("uid" in resolved)) {
+                return { refused: resolved?.message ?? "API keys are not enabled on this server", apiKey: true };
+            }
+            return {
+                user: {
+                    uid: resolved.uid,
+                    roles: resolved.roles,
+                    isAdmin: hasAdminRole(resolved.roles),
+                    isAnonymous: false,
+                    scopes: resolved.scopes
+                }
+            };
+        }
+
+        if (authAdapter) {
+            // Custom auth, Clerk, the built-in auth — anything that is an
+            // adapter. One that throws could not answer (its store is
+            // unreachable); that is not a refusal, and the caller decides
+            // what a question nobody could answer means.
+            const adapterUser = authAdapter.verifyToken
+                ? await authAdapter.verifyToken(token)
+                : await authAdapter.verifyRequest(new Request("http://localhost/_ws_auth", {
+                    headers: { Authorization: `Bearer ${token}` }
+                }));
+            if (!adapterUser) return { refused: "Invalid or expired token" };
+            return {
+                user: {
+                    uid: adapterUser.uid,
+                    roles: adapterUser.roles,
+                    isAdmin: adapterUser.isAdmin,
+                    // Read, as the JWT path reads it: dropped here, a guest
+                    // signed in through an adapter subscribed as an account.
+                    // Absent from an adapter with no such concept, and absent
+                    // reads as "not a guest".
+                    isAnonymous: adapterUser.isAnonymous === true,
+                    // Kept, as the JWT branch keeps them: the built-in auth is
+                    // an adapter, so dropping them here left every
+                    // claim-tenanted collection with no tenant on the socket.
+                    ...(adapterUser.claims ? { claims: adapterUser.claims } : {})
+                }
+            };
+        }
+
+        if (authConfig?.serviceKey && safeCompare(token, authConfig.serviceKey)) {
+            // Service key: a static secret, not a JWT. Checked before
+            // verification, mirroring the HTTP middleware — verifying it as a
+            // JWT can only ever fail.
+            return { user: { uid: "service", roles: ["admin"], isAdmin: true, isAnonymous: false } };
+        }
+
+        // Standard JWT path: the signature and the expiry, nothing more —
+        // there is no account store on this path to ask.
+        const jwtPayload = await extractUserFromToken(token);
+        if (!jwtPayload) return { refused: "Invalid or expired token" };
+        return {
+            user: {
+                uid: jwtPayload.uid,
+                roles: jwtPayload.roles ?? [],
+                isAdmin: hasAdminRole(jwtPayload.roles ?? []),
+                isAnonymous: jwtPayload.isAnonymous === true,
+                claims: jwtPayload.claims
+            }
+        };
+    }
+
+    /** Stop honouring the session at the instant its token expires. */
+    function scheduleExpiry(clientId: string, token: string): void {
+        const session = clientSessions.get(clientId);
+        if (!session) return;
+        if (session.expiryTimer) clearTimeout(session.expiryTimer);
+        session.expiryTimer = undefined;
+        const expiresAt = jwtExpiryMs(token);
+        if (expiresAt === undefined) return;
+        // `setTimeout` overflows past 2^31-1 ms (~24.8 days) and fires at once;
+        // a token living longer than that is re-checked by the sweep instead.
+        const delay = Math.max(0, expiresAt - Date.now());
+        if (delay > 2_147_483_647) return;
+        session.expiryTimer = setTimeout(() => {
+            const current = clientSessions.get(clientId);
+            if (current?.credential === token) {
+                endSession(clientId, "TOKEN_EXPIRED", "The token this socket authenticated with has expired.");
+            }
+        }, delay);
+        session.expiryTimer.unref?.();
+    }
+
+    /**
+     * The identity this socket authenticated as is over: say so, forget it,
+     * and close. Closing rather than carrying on anonymously, because every
+     * subscription the socket holds was opened as that identity — the SDK
+     * reconnects, authenticates with whatever session it has now, and
+     * re-subscribes as that.
+     */
+    function endSession(clientId: string, code: string, message: string): void {
+        const session = clientSessions.get(clientId);
+        if (!session) return;
+        if (session.expiryTimer) clearTimeout(session.expiryTimer);
+        session.expiryTimer = undefined;
+        session.user = undefined;
+        session.credential = undefined;
+        session.authenticated = !requireAuth;
+        wsDebug(`[WS] ${clientId} session ended: ${code}`);
+        try {
+            session.ws.send(JSON.stringify({ type: "AUTH_ERROR", payload: { error: { code, message } } }));
+        } catch {
+            // Already closing.
+        }
+        session.ws.close(SESSION_ENDED_CLOSE_CODE, message.slice(0, 120));
+    }
+
+    /**
+     * Is the identity this socket authenticated as still the one its
+     * credential names?
+     *
+     * Asked of the database, through the same verification as
+     * `AUTHENTICATE`, before each frame and by the sweep — never by an event
+     * one instance publishes to the others. A sign-out, a demotion or a
+     * deletion is written to the database by whichever instance served it;
+     * re-reading there is correct on every instance with nothing in between,
+     * where an event would reach only the instances a bus connects (and the
+     * bus is opt-in).
+     *
+     * - `"live"`: still honoured; roles or claims that changed are applied,
+     *   and the socket's subscriptions are re-scoped to them.
+     * - `"ended"`: refused — revoked, signed out, deleted, expired. The
+     *   socket is closed.
+     * - `"unavailable"`: the store could not answer. The frame is refused,
+     *   the session kept, and the next frame or sweep asks again.
+     */
+    async function recheckIdentity(clientId: string): Promise<"live" | "ended" | "unavailable"> {
+        const session = clientSessions.get(clientId);
+        const credential = session?.credential;
+        if (!session?.user || !credential) return "live";
+        let outcome: Awaited<ReturnType<typeof resolveIdentity>>;
+        try {
+            outcome = await resolveIdentity(credential);
+        } catch {
+            return "unavailable";
+        }
+        // Re-authenticated while this was in flight: that answer is newer.
+        if (session.credential !== credential || !session.user) return session.user ? "live" : "ended";
+        session.checkedAt = Date.now();
+        if (!("user" in outcome)) {
+            endSession(clientId, "SESSION_ENDED", "This session has ended: it was signed out, revoked, or its account changed. Authenticate again.");
+            return "ended";
+        }
+        if (identityFingerprint(outcome.user) !== identityFingerprint(session.user)) {
+            session.user = outcome.user;
+            await realtimeService.rescopeClient(clientId, sessionAuthContext(session));
+        }
+        return "live";
+    }
+
+    // The sweep: a socket that only listens sends nothing to be re-checked
+    // before, so it is re-checked on a timer instead.
+    const identityRecheckMs = Math.max(250, options?.identityRecheckIntervalMs ?? DEFAULT_IDENTITY_RECHECK_MS);
+    const identitySweep = setInterval(() => {
+        const now = Date.now();
+        for (const [id, session] of clientSessions) {
+            if (session.user && session.credential && now - session.checkedAt >= identityRecheckMs / 2) {
+                void recheckIdentity(id).catch(() => undefined);
+            }
+        }
+    }, identityRecheckMs);
+    // Unref'd, so it never holds a process open; stopped with whichever goes
+    // first, the socket server or the HTTP server it is attached to.
+    identitySweep.unref?.();
+    const stopSweep = () => clearInterval(identitySweep);
+    wss.on("close", stopSweep);
+    if (typeof server.on === "function") server.on("close", stopSweep);
+
     wss.on("connection", (ws, request?: IncomingMessage) => {
         const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         const origin = connectionOrigin(request);
@@ -351,6 +621,7 @@ export function createPostgresWebSocket(
         // Initialize client session
         clientSessions.set(clientId, { ws,
 authenticated: !requireAuth,
+checkedAt: Date.now(),
 messageCount: 0,
 messageWindowStart: Date.now(),
 channelMessageCount: 0,
@@ -359,6 +630,8 @@ channelWindowStart: Date.now() });
 
         ws.on("close", () => {
             wsDebug(`WebSocket client disconnected: ${clientId}`);
+            const session = clientSessions.get(clientId);
+            if (session?.expiryTimer) clearTimeout(session.expiryTimer);
             clientSessions.delete(clientId);
         });
 
@@ -453,63 +726,33 @@ channelWindowStart: Date.now() });
                         return;
                     }
 
-                    // Use the auth adapter when available (custom auth, Clerk, etc.)
-                    // Fall back to JWT extraction otherwise.
-                    let verifiedUser: WsUserIdentity | null = null;
-
-                    if (authAdapter) {
-                        try {
-                            const adapterUser = authAdapter.verifyToken
-                                ? await authAdapter.verifyToken(token)
-                                : await authAdapter.verifyRequest(new Request("http://localhost/_ws_auth", {
-                                    headers: { Authorization: `Bearer ${token}` }
-                                }));
-
-                            if (adapterUser) {
-                                verifiedUser = {
-                                    uid: adapterUser.uid,
-                                    roles: adapterUser.roles,
-                                    isAdmin: adapterUser.isAdmin,
-                                    // Read, as the JWT path reads it: dropped
-                                    // here, a guest signed in through an adapter
-                                    // subscribed as an account. Absent from an
-                                    // adapter with no such concept, and absent
-                                    // reads as "not a guest".
-                                    isAnonymous: adapterUser.isAnonymous === true,
-                                    // Kept, as the JWT branch keeps them: the
-                                    // built-in auth is an adapter, so dropping
-                                    // them here left every claim-tenanted
-                                    // collection with no tenant on the socket.
-                                    ...(adapterUser.claims ? { claims: adapterUser.claims } : {})
-                                };
-                            }
-                        } catch {
-                            // Adapter threw — treat as invalid token
-                        }
-                    } else if (authConfig?.serviceKey && safeCompare(token, authConfig.serviceKey)) {
-                        // Service key: a static secret, not a JWT. Checked
-                        // before verification, mirroring the HTTP middleware —
-                        // verifying it as a JWT can only ever fail.
-                        verifiedUser = { uid: "service", roles: ["admin"], isAdmin: true, isAnonymous: false };
-                    } else {
-                        // Standard JWT path
-                        const jwtPayload = await extractUserFromToken(token);
-                        if (jwtPayload) {
-                            verifiedUser = {
-                                uid: jwtPayload.uid,
-                                roles: jwtPayload.roles ?? [],
-                                isAdmin: (jwtPayload.roles ?? []).some((r: string) => r === "admin"),
-                                isAnonymous: jwtPayload.isAnonymous === true,
-                                claims: jwtPayload.claims
-                            };
-                        }
+                    // An adapter that throws (its store unreachable) is an
+                    // invalid token here, as it always was: there is no
+                    // session yet to keep.
+                    let resolved: Awaited<ReturnType<typeof resolveIdentity>>;
+                    try {
+                        resolved = await resolveIdentity(token);
+                    } catch (error) {
+                        if (token.startsWith("rk_") || !authAdapter) throw error;
+                        resolved = { refused: "Invalid or expired token" };
                     }
+                    if ("refused" in resolved && resolved.apiKey) {
+                        sendError("AUTH_ERROR", "INVALID_TOKEN", resolved.refused);
+                        return;
+                    }
+                    const verifiedUser = "user" in resolved ? resolved.user : null;
 
                     if (verifiedUser) {
                         const session = clientSessions.get(clientId);
                         if (session) {
                             session.user = verifiedUser;
                             session.authenticated = true;
+                            // Kept to be asked again: before every frame, by
+                            // the sweep, and — for a token that expires — at
+                            // the instant it does.
+                            session.credential = token;
+                            session.checkedAt = Date.now();
+                            scheduleExpiry(clientId, token);
                             // What this socket already holds open — a session
                             // refresh, a demotion, another account — is read
                             // as the identity it has now, before it is told
@@ -531,6 +774,24 @@ roles: verifiedUser.roles }
                     return;
                 }
 
+                // The identity this socket authenticated as is asked again
+                // before the frame runs, as an HTTP request asks on every
+                // request: a sign-out everywhere, a revoked session, a
+                // demotion, a deleted account or an expired token stops being
+                // honoured here, not when the socket happens to reconnect.
+                {
+                    const session = clientSessions.get(clientId);
+                    if (session?.user && session.credential
+                        && Date.now() - session.checkedAt >= (CHANNEL_MESSAGE_TYPES.has(type) ? CHANNEL_RECHECK_MIN_MS : 0)) {
+                        const outcome = await recheckIdentity(clientId);
+                        if (outcome === "ended") return;
+                        if (outcome === "unavailable") {
+                            sendError("ERROR", "ROLE_LOOKUP_FAILED", "Could not verify your permissions. Please try again.");
+                            return;
+                        }
+                    }
+                }
+
                 // Check authentication for protected operations
                 if (requireAuth) {
                     const session = clientSessions.get(clientId);
@@ -540,11 +801,29 @@ roles: verifiedUser.roles }
                     }
                 }
 
-                // Admin-only operations require admin role
-                if (ADMIN_ONLY_TYPES.has(type)) {
+                // Admin-plane verbs need their scope; a narrowed session needs
+                // the data scope for the collection a data frame addresses, and
+                // cannot use channels, which no scope covers.
+                const adminScope = ADMIN_PLANE_TYPES.get(type);
+                if (adminScope) {
                     const session = clientSessions.get(clientId);
-                    if (!isAdminSession(session)) {
-                        sendError("ERROR", "FORBIDDEN", "Admin access required for this operation");
+                    if (!scopeGrants(sessionScopes(session), adminScope)) {
+                        sendError("ERROR", "SCOPE_MISSING", `This operation needs the "${adminScope}" scope`);
+                        return;
+                    }
+                }
+                const narrowedScopes = clientSessions.get(clientId)?.user?.scopes;
+                if (narrowedScopes) {
+                    const dataScope = DATA_VERB_SCOPES.get(type);
+                    if (dataScope) {
+                        const collection = frameCollection(type, payload);
+                        if (!scopeGrants(narrowedScopes, dataScope, collection)) {
+                            const wanted = collection ? `${dataScope}:${collection}` : dataScope;
+                            sendError("ERROR", "SCOPE_MISSING", `This API key does not hold the "${wanted}" scope`);
+                            return;
+                        }
+                    } else if (CHANNEL_MESSAGE_TYPES.has(type)) {
+                        sendError("ERROR", "SCOPE_MISSING", "An API key cannot use channels");
                         return;
                     }
                 }
@@ -555,8 +834,8 @@ roles: verifiedUser.roles }
                 // requests and their other sockets. The counter above is per
                 // connection, so on its own a caller bought budget by
                 // opening sockets.
-                if (limits?.dataRateLimit && PUBLIC_TYPES.has(type)) {
-                    const decision = await limits.dataRateLimit({
+                if (options?.dataRateLimit && PUBLIC_TYPES.has(type)) {
+                    const decision = await options.dataRateLimit({
                         ...origin,
                         uid: clientSessions.get(clientId)?.user?.uid
                     });

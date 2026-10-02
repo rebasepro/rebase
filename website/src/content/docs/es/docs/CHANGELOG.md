@@ -36,7 +36,66 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   Passing `--generate` or `-g` now stops with a message telling you to drop
   it, and `REBASE_AUTO_GENERATE` and `REBASE_GENERATE` are no longer read.
 
+- **`rebase api-keys create` takes scopes.** `--scopes data:read:posts,logs:read`
+  names what the key may do, `--roles` the RLS roles it runs as, and
+  `--expires-in <days>` or `--expires-at <date>` when it stops. `--full-access`
+  is every scope the service key holds except `keys:*`. `--permissions`,
+  `--admin` and `--expires` are removed and refused by name with their
+  replacement. `rebase api-keys scopes` lists every scope this backend knows.
+
 #### Server & REST
+
+- **Permissions are scopes: one `resource:action` vocabulary for every
+  credential.** A scope names what a caller may do — `data:read`,
+  `storage:write`, `functions:invoke`, `users:write`, `schema:write`,
+  `database:write`, `backups:read`, `cron:write`, `logs:read`, `keys:write` —
+  and may name one target: `data:read:posts` is `data:read` on `posts` alone.
+  Every signed-in person holds the data plane (`data:*`, `storage:*`,
+  `functions:invoke`), because their rows are still decided by
+  `securityRules`. The admin plane is held by the `admin` role, and by any role
+  the app declares under `auth.roles` on the users collection. Every admin
+  surface now asks for its scope instead of "is admin": users and roles
+  (`users:read`/`users:write`), the schema editors, the RLS audit, the contract
+  and the private API docs (`schema:read`, and `schema:write` to apply), the
+  SQL editor and branches on the realtime socket (`database:read`/
+  `database:write`), backups, cron, logs, the development mailbox
+  (`users:write`, since a captured message carries a working sign-in link) and
+  service keys (`keys:read`/`keys:write`). A refusal answers `403
+  SCOPE_MISSING` with `details.requiredScope`.
+
+- **API keys hold scopes, not a permission list and an `admin` flag.**
+  `permissions: [{ collection, operations }]` and `admin: true` are gone from
+  `CreateApiKeyRequest`, `UpdateApiKeyRequest` and `ApiKeyMasked`, along with
+  `isOperationAllowed`, `ApiKeyPermission` and `ApiKeyOperation`. A service key
+  has `scopes` and `roles` — the RLS roles it runs as beside `service`, where
+  `["admin"]` reads every row. Keys already stored are converted on boot to
+  the scopes they held and never more: `{ collection: "posts", operations:
+  ["read"] }` becomes `data:read:posts`, `"*"` becomes the data plane,
+  `admin: true` becomes the `admin` role and the users, schema, backups, cron
+  and logs scopes. A function grant without `write` becomes nothing, since
+  calling a function is not a read. `"storage"` and `"functions"` are no
+  longer names in the collection field, so a collection called `storage` no
+  longer shares a grant with the files.
+
+- **`schema-admin` is no longer an administrator, and roles are no longer
+  stored objects.** `admin` is the one built-in role. A project that used
+  `schema-admin` declares it with the scopes it should hold, under
+  `auth.roles`. `createRole`, `updateRole`, `deleteRole`, `getRoleById`,
+  `getUserRoles`, `RoleRepository`, `RoleData` and `CreateRoleData` are
+  removed: the Postgres driver's versions saved nothing, and nothing read the
+  `isAdmin`, `defaultPermissions` and `collectionPermissions` they carried.
+  `getUserWithRoles` returns role ids. `GET /api/admin/roles` lists `admin` and
+  the declared roles with their scopes, and `BootstrappedAuth.roleService` is
+  gone. The MongoDB driver no longer seeds a `rebase_roles` collection.
+
+- **The hosted MCP server's scopes are `data:read`, `data:write` and
+  `data:delete`.** Each can be narrowed to collections (`data:read:posts`),
+  and the tools reach only the collections granted. Grants made with
+  `mcp:read` and `mcp:write` keep their reach: they are read as `data:read`
+  and as `data:write data:delete`.
+
+- **`RealtimeSocketLimits` is now `RealtimeSocketOptions`.** It carries the API-key
+  resolver beside the limits, as the sixth argument of `initializeWebsockets`.
 
 - **A live schema edit commits the collection and `schema.generated.ts`, and
   no SQL.** The commit also carried the five SQL files, but it wrote them at
@@ -74,6 +133,55 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   once they are. The console's *Open CMS* link then points at the hostname.
   Before, every app answered on every hostname the project had, so the admin
   could only be a path such as `/admin`.
+
+- **Tokens for CI and agents on Rebase Cloud.** `rebase cloud tokens create
+  --can deploy,logs` mints a key that acts as you, narrowed to one project and
+  those actions; `rebase cloud tokens` lists them and `rebase cloud tokens
+  revoke` ends one. Set it as `REBASE_TOKEN` and every `rebase cloud` command
+  uses it instead of a login session, with no session file read or written.
+  The capabilities are `deploy`, `logs`, `env`, `database` and `backups`; none
+  of them can restore over a live database, which stays with a signed-in owner
+  or admin.
+
+#### Server & REST
+
+- **Personal API keys.** With `personalKeys: true` in the users collection's
+  `auth` block, any signed-in account can create keys at `/api/auth/keys`
+  (`client.personalKeys`). A personal key acts as its owner, with the owner's
+  roles as they are when it is used, and holds no scope the owner does not:
+  demote the owner and the key shrinks, delete the account and it stops. A
+  service key is still created under `/api/admin/api-keys`. No key may manage
+  keys, and no key is created with a scope or an RLS role its creator does not
+  hold (`SCOPE_EXCEEDS_CREATOR`, `ROLE_EXCEEDS_CREATOR`, `KEY_MANAGEMENT_SCOPE`).
+  A target that names nothing this backend serves is refused
+  (`UNKNOWN_SCOPE_TARGET`).
+
+- **Apps declare their own scopes and roles.** `auth.scopes` on the users
+  collection names app scopes such as `project:deploy`, with a label and an
+  optional target, and `auth.roles` gives a role its admin-plane and app
+  scopes. Boot refuses a declaration that reads as a grant it is not: a role
+  listing a data-plane scope, an app scope reusing a built-in resource name,
+  or a declared `admin`. A function checks an app scope with `requireScope`,
+  `hasScope` or `getScopes` from `@rebasepro/server/functions`; a person always
+  holds app scopes, so they narrow keys. `GET /api/auth/scopes` lists every
+  scope with its wording and the ones the caller holds.
+
+- **API keys work on the realtime socket and at `/mcp`.** A key authenticates
+  the socket with the same check as a request, and its data scopes decide
+  which collections it reads and writes there; it cannot use channels. An MCP
+  client configured with a header can present a key instead of going through
+  OAuth. `verifyCredential` gives an app's own socket or tunnel the same
+  answer for a session token or a key: who it acts as and its scopes.
+
+#### Admin (CMS & app)
+
+- **The API keys panel speaks scopes.** A key shows its scopes grouped into
+  data, admin and app, with the collections, buckets or functions each is
+  narrowed to, and the RLS roles it runs as — a key running as `admin` is
+  marked as reading every row. The create dialog offers only the scopes you
+  hold, narrows data, storage and function scopes to chosen targets, and says
+  in words what the key will be able to do. A *My keys* tab manages your
+  personal keys when the backend enables them.
 
 ### Fixed
 
@@ -114,6 +222,27 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   `.vscode/` whole, so the MCP server registered for GitHub Copilot never
   reached the first commit. Other editor settings in `.vscode/` are still
   ignored.
+
+### Security
+
+#### Auth
+
+- **A `users:write` role cannot reach past itself.** Nobody edits, resets the
+  password of, or deletes an account holding a scope they do not hold
+  (`ACCOUNT_OUTRANKS_CALLER`), and nobody grants a role holding more than they
+  do (`ROLE_EXCEEDS_CALLER`). Only an administrator grants `admin`. Without
+  this, a support role could reset an administrator's password and sign in as
+  them.
+
+- **The registration default role may hold no admin-plane scope.** Every
+  registrant receives it, so boot refuses a `defaultRole` that is `admin` or a
+  declared role holding `users:write`, `schema:write` or any other admin
+  scope.
+
+- **"Admin" is decided one way on every door.** Storage, the upload handler
+  and both realtime sockets compared against `"admin"` by hand while the REST
+  admin gate also accepted `schema-admin`; they all read the same roles and
+  scopes now.
 
 ## [0.23.0] - 2026-09-27
 

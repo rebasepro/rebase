@@ -193,7 +193,6 @@
   "packages/cms/src/preview/PropertyPreview.tsx::unexpected_value": 1,
   "packages/cms/src/routes/RebaseRoute.tsx::unsaved_changes_in_entity": 1,
   "packages/studio/src/components/ApiExplorer/EndpointDetail.tsx::description": 1,
-  "packages/studio/src/components/ApiKeys/CreateApiKeyDialog.tsx::studio_api_keys_stat_rate_limit": 1,
   "packages/studio/src/components/JSEditor/JSEditorSidebar.tsx::find_by_id": 1,
   "packages/studio/src/components/JSEditor/JSEditorSidebar.tsx::no_collections_found": 1,
   "packages/studio/src/components/JSEditor/JSEditorSidebar.tsx::studio_sql_sidebar_snippets": 2,

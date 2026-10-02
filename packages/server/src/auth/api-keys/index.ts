@@ -1,8 +1,7 @@
 /**
- * Service API Keys module.
+ * API keys module.
  *
- * Re-exports types, store, middleware, permission guard, and routes
- * for the API key authentication system.
+ * Re-exports types, store, middleware and routes for API key authentication.
  *
  * @module
  */
@@ -10,30 +9,34 @@
 // Types
 export type {
     ApiKey,
+    ApiKeyKind,
     ApiKeyMasked,
-    ApiKeyPermission,
     ApiKeyWithSecret,
     CreateApiKeyRequest,
+    CreatePersonalKeyRequest,
     UpdateApiKeyRequest
 } from "./api-key-types";
 
 // Store
 export { createApiKeyStore } from "./api-key-store";
-export type { ApiKeyStore } from "./api-key-store";
+export type { ApiKeyStore, ApiKeyFilter, NewApiKey } from "./api-key-store";
 
 // Middleware
-export { isApiKeyToken, validateApiKey, createApiKeyPreAuth, createFunctionApiKeyGuard, createStorageApiKeyGuard } from "./api-key-middleware";
-export type { ApiKeyAuthOptions } from "./api-key-middleware";
-
-// Permission guard
 export {
-    httpMethodToOperation,
-    isOperationAllowed,
-    isFunctionAllowed,
-    isStorageAllowed
-} from "./api-key-permission-guard";
-export type { ApiKeyOperation } from "./api-key-permission-guard";
+    isApiKeyToken,
+    resolveApiKey,
+    validateApiKey,
+    createApiKeyPreAuth,
+    createFunctionScopeGuard,
+    createTusScopeGuard
+} from "./api-key-middleware";
+export type { ApiKeyAuthOptions, ApiKeyIdentity, ApiKeyRefusal } from "./api-key-middleware";
+
+// Operations
+export { httpMethodToOperation } from "./http-operation";
+export type { DataOperation } from "./http-operation";
 
 // Routes
-export { createApiKeyRoutes } from "./api-key-routes";
-export type { ApiKeyRouteOptions } from "./api-key-routes";
+export { createApiKeyRoutes, createPersonalKeyRoutes } from "./api-key-routes";
+export type { ApiKeyRouteOptions, PersonalKeyRouteOptions } from "./api-key-routes";
+export type { KeyTargets } from "./key-grant";

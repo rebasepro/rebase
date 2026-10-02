@@ -1,5 +1,5 @@
 ---
-sourceHash: 8d1a98886641537e
+sourceHash: 59bdc8b898c974d7
 title: Authentification et connexion
 sidebar_label: Authentification et connexion
 description: Configurez le contrôleur d'authentification, la vue de connexion et la simulation de rôles dans votre frontend React Rebase.
@@ -88,6 +88,8 @@ roles: {
 ```
 
 Pour ajouter ou supprimer des options de rôles, mettez à jour la structure `enum` dans votre collection d'utilisateurs et régénérez le schéma.
+
+Un rôle de cette liste est un nom que vos [règles de sécurité](/docs/collections/security-rules) peuvent cibler. Ce qu'il peut faire au-delà de ses lignes (gérer les utilisateurs, lire les journaux, modifier le schéma) se déclare à part, sous `auth.roles` dans la même collection. `admin` est intégré et détient tout. Voir [Rôles et portées](/docs/backend/roles-and-scopes).
 
 ## Simulation de rôles (Mode Dev)
 

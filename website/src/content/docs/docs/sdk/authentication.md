@@ -105,11 +105,15 @@ await client.auth.signInWithOAuth("custom-provider", {
 
 ## Magic Links
 
-A one-click sign-in link by email. The link lands on a page of yours carrying a
-token; hand the token back to trade it for a session.
+A one-click sign-in link by email. The link is always
+`<base>/auth/magic-link?token=…`, where `<base>` is the backend's `email.magicLinkUrl`,
+or its reset-password base (`FRONTEND_URL` on the runtime) when that is not set.
+There is no per-request `redirectTo`. Serve that path in your frontend, and hand
+the token back to trade it for a session. The CMS does not handle this path: an
+app that enables magic links needs its own landing page for it.
 
 ```typescript
-// 1. Ask for the link. `redirectTo` is where the link points.
+// 1. Ask for the link.
 await client.auth.sendMagicLink("user@example.com");
 
 // 2. On the landing page, trade the token for a session.
@@ -207,11 +211,26 @@ const { factor, totp, recoveryCodes } = await client.auth.mfa.enroll({
 });
 
 showQrCode(totp.uri);        // otpauth://… — what the authenticator scans
-showRecoveryCodes(recoveryCodes);
+if (recoveryCodes) showRecoveryCodes(recoveryCodes);
 ```
 
 **Show the recovery codes once and never again.** Only their hashes are stored,
-so nothing can display them later.
+so nothing can display them later. They come with the account's first factor.
+Adding another factor keeps the codes the account already has, and
+`recoveryCodes` is `null`. Starting an enrolment and abandoning it never touches
+them.
+
+To replace them, after using several or losing the printout, call
+`regenerateRecoveryCodes()` from an `aal2` session. The old codes stop working:
+
+```typescript
+const { recoveryCodes } = await client.auth.mfa.regenerateRecoveryCodes();
+```
+
+Someone who lost both the authenticator and the codes is let back in by an
+administrator: `client.admin.resetMfa(uid)` (`DELETE /api/admin/users/:uid/mfa`,
+`users:write`) removes the account's factors and codes and ends its sessions,
+so the password signs in again without a second factor.
 
 The factor is not usable until the user proves their authenticator produced a
 code from that secret:
@@ -434,21 +453,50 @@ const { success, message } = await client.auth.changePassword(
 );
 ```
 
+Every other session of the account ends: whoever else held one has to sign in
+with the new password. This device stays signed in. The server answers with a
+fresh session, and the client adopts it (emitting `TOKEN_REFRESHED`).
+
 ## Email Verification
+
+Registering mails the new account its verification link when email is
+configured. `sendVerificationEmail()` mails it again.
 
 ```typescript
 // Send verification email to the current user
 await client.auth.sendVerificationEmail();
 
-// Verify with the token from the email link
-await client.auth.verifyEmail(token);
+// Verify with the token from the email link. Signed in as that account, this
+// keeps everything on it.
+const { passwordRemoved } = await client.auth.verifyEmail(token);
+
+// Signed out, an account that holds a password answers PROOF_REQUIRED:
+try {
+    await client.auth.verifyEmail(token);
+} catch (e) {
+    if (e instanceof Error && "code" in e && e.code === "PROOF_REQUIRED") {
+        // Keep the password, and sign in:
+        await client.auth.verifyEmail(token, { password });
+        // …or verify without it, which removes it:
+        // await client.auth.verifyEmail(token, { removeUnproven: true });
+    }
+}
 ```
+
+The link proves the inbox, not who registered the address, so a password
+neither the session nor the call proves is removed rather than kept — see
+[Email verification](/docs/backend/email-verification/).
+
+On a backend with `requireEmailVerification`, `signUp()` resolves with
+`{ confirmationRequired: true, user: null }` and no session: the account
+signs in once the link is followed with its password.
 
 ## Session Management (Multi-Device)
 
 ```typescript
-// List all active sessions
+// List all active sessions, one per sign-in
 const sessions = await client.auth.getSessions();
+// [{ id, userAgent, ipAddress, createdAt, isCurrentSession }, …]
 
 // Revoke a specific session
 await client.auth.revokeSession(sessionId);
@@ -456,6 +504,13 @@ await client.auth.revokeSession(sessionId);
 // Revoke ALL sessions (logs out everywhere)
 await client.auth.revokeAllSessions();
 ```
+
+Every access token names the sign-in it belongs to, so exactly one entry has
+`isCurrentSession: true`: the device asking. Revoking a session ends that
+device's refresh token and its access token together, from the next request,
+over HTTP and over an open realtime socket. Signing out (`signOut()`) does the
+same for the device that signs out. An access token issued before this release
+names no session; it keeps working until it expires, within the hour.
 
 ## Auth Configuration
 

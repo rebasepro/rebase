@@ -1,5 +1,5 @@
 ---
-sourceHash: 925edb3f8c355de4
+sourceHash: 094f9184d2977cef
 title: Backend-Übersicht
 sidebar_label: Backend
 description: Das Rebase-Backend bietet einen vollständigen Server mit REST-API, Authentifizierung, Storage, WebSocket-Echtzeit und Entitätshistorie – alles initialisiert mit einem einzigen Funktionsaufruf.
@@ -92,16 +92,16 @@ Nach der Initialisierung werden diese Routen gemountet:
 | Pfad | Zweck |
 |------|-------|
 | `/api/auth/*` | Authentifizierung (Registrierung, Login, Refresh, OAuth, Magic Links, Einmalcodes, MFA) |
-| `/api/admin/*` | Benutzer- und Rollenverwaltung (nur Administratoren) |
+| `/api/admin/*` | Benutzer, Rollen, Service-Schlüssel, Cron, Backups, Logs und Schema, jeweils hinter einem eigenen [Scope](/docs/backend/roles-and-scopes/) |
 | `/api/storage/*` | Datei-Upload, -Download und -Löschung |
 | `/api/data/:slug` | CRUD-Operationen pro Collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Änderungshistorie der Entität (wenn aktiviert) |
 | `/api/docs` | OpenAPI-Spezifikation (wenn `enableSwagger: true`) |
 | `/api/swagger` | Swagger UI (Dev-Modus, wenn `enableSwagger: true`) |
-| `/api/meta/contract` | Das Collection-Schema des Projekts (nur Administratoren) |
+| `/api/meta/contract` | Das Collection-Schema des Projekts (braucht `schema:read`) |
 | `/api/meta/schema-version` | Ein Versions-String für dieses Schema (nicht authentifiziert) |
 | `/api/functions/*` | Benutzerdefinierte Funktionsrouten (wenn `functionsDir` gesetzt ist) |
-| `/api/cron/*` | Cron-Job-Verwaltung (nur Administratoren, wenn `cronsDir` gesetzt ist) |
+| `/api/cron/*` | Cron-Job-Verwaltung (`cron:read` / `cron:write`, wenn `cronsDir` gesetzt ist) |
 | WebSocket beim Upgrade | Echtzeit-Abonnements |
 
 ---
@@ -229,7 +229,6 @@ instance.driver              // Default data driver
 instance.driverRegistry      // All drivers (for multi-database)
 instance.realtimeService     // Default realtime service
 instance.auth?.userService       // User management
-instance.auth?.roleService       // Role management
 instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata

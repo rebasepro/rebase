@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import type { AuthModuleConfig } from "./routes";
+import { accountForPasswordlessRequest } from "./passwordless-signup";
 import type { ResolvedAuthHooks } from "./auth-hooks";
 import type { HonoEnv } from "../api/types";
 import { ApiError } from "../api/errors";
@@ -12,8 +13,7 @@ import {
     captureRecipientEmail,
     notBefore,
     recipientEmailLimiter,
-    strictAuthLimiter
-} from "./rate-limiter";
+    strictAuthLimiter, requestClientAddress } from "./rate-limiter";
 import { z } from "zod";
 import { logger } from "../utils/logger";
 import { redactRefreshToken } from "./cookie-utils";
@@ -102,9 +102,6 @@ export function mountMagicLinkRoutes(deps: {
             throw ApiError.serviceUnavailable("Email service not configured. Magic link login is not available.", "EMAIL_NOT_CONFIGURED");
         }
 
-        // Always return success (security: don't reveal if email exists)
-        const user = await authRepo.getUserByEmail(email);
-
         // Fired for every attempt, not only the ones that name a real account,
         // for the reason `/otp` gives: an enumeration run is made entirely of
         // addresses that do not exist, and a hook called only for real ones
@@ -112,6 +109,10 @@ export function mountMagicLinkRoutes(deps: {
         if (ops.beforeLogin) {
             await ops.beforeLogin(email, "magic-link");
         }
+
+        // Always return success (security: don't reveal if email exists). With
+        // `magicLinkCreatesUsers`, an unknown address gets its account here.
+        const user = await accountForPasswordlessRequest(config, ops, email);
 
         if (user) {
             // Generate magic link token
@@ -190,7 +191,7 @@ export function mountMagicLinkRoutes(deps: {
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            requestClientAddress(c)
         );
 
         // Fire onAuthenticated hook (fire-and-forget)

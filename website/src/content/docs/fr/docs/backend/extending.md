@@ -1,5 +1,5 @@
 ---
-sourceHash: 41183c8dc79d618d
+sourceHash: 589741179a41eb37
 title: Rebase ne fait pas X
 sidebar_label: Étendre le serveur
 description: L'échelle d'extension côté serveur — déclaration, callback de collection, fonction personnalisée, vos propres routes, votre propre serveur, eject — avec ce que chacun peut et ne peut pas atteindre.
@@ -129,7 +129,7 @@ export default defineFunction((app, { rebase }) => {
 `initializeRebaseBackend` prend l'application que vous lui passez, donc tout ce que vous enregistrez sur cette application *avant* de l'appeler s'exécute avant chaque routeur Rebase — voir [Route Registration Order](/docs/backend/custom-functions#route-registration-order) pour la structure.
 
 :::caution[Aucun middleware d'authentification ne s'y est exécuté]
-Une route enregistrée de cette manière est **en dehors** de tout routeur Rebase : `getDriver(c)` n'est pas défini et rien n'a vérifié de jeton. Protégez-la avec `requireAuth` / `requireAdmin` importés depuis **`@rebasepro/server`** — la racine du package — qui vérifient le jeton eux-mêmes. Les gardes exportés depuis `@rebasepro/server/functions` lisent une identité qu'un routeur Rebase a déjà résolue, et renvoient une 500 plutôt que de feindre qu'elle existe.
+Une route enregistrée de cette manière est **en dehors** de tout routeur Rebase : `getDriver(c)` n'est pas défini et rien n'a vérifié de jeton. Protégez-la avec `requireAuth` importé depuis **`@rebasepro/server`** — la racine du package — qui vérifie le jeton lui-même, puis avec `requireAdmin` ou `requireScope` issus du même import pour décider de ce que l'appelant peut faire. Les gardes exportés depuis `@rebasepro/server/functions` lisent une identité qu'un routeur Rebase a déjà résolue, et renvoient une 500 plutôt que de feindre qu'elle existe.
 :::
 
 Un piège de Hono bon à connaître, car il est silencieux : `app.use("/*", guard)` ne couvre que les routes déclarées *en dessous* de lui. Une route ajoutée plus tard — tout en bas du fichier, dans plusieurs mois — ne sera pas protégée. Placez les gardes dans l'emplacement de middleware propre à la route.

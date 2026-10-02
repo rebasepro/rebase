@@ -131,6 +131,8 @@ function world(options: MemoryAuthStoreOptions = {}) {
             await store.repo().createPasswordResetToken(uid, hashToken("mailed-reset"), new Date(Date.now() + 60_000));
             return call("/auth/reset-password", { token: "mailed-reset", password });
         },
+        /** Follow a reset link whose token is already on file. */
+        resetWithToken: (token: string, password: string) => call("/auth/reset-password", { token, password }),
         me: async (accessToken: string) => (await app.request("/auth/me", { headers: { Authorization: `Bearer ${accessToken}` } })).status,
         asAdmin: async (path: string, body: Record<string, unknown>) => {
             const admin = await store.repo().createUser({ email: "admin@corp.com", emailVerified: true });
@@ -315,5 +317,18 @@ describe("an account an administrator created", () => {
 
         expect(google.status).toBe(200);
         expect(google.uid).toBe(invited!.id);
+    });
+});
+
+describe("reset links after a password change", () => {
+    it("stop working once any of them, or a change of password, has set a new one", async () => {
+        const w = world();
+        const registered = await w.register(OWNER_PASSWORD);
+        await w.store.repo().createPasswordResetToken(registered.uid!, hashToken("first-link"), new Date(Date.now() + 60_000));
+        await w.store.repo().createPasswordResetToken(registered.uid!, hashToken("second-link"), new Date(Date.now() + 60_000));
+
+        expect((await w.resetWithToken("first-link", "Fresh-Passw0rd-One")).status).toBe(200);
+
+        expect((await w.resetWithToken("second-link", "Fresh-Passw0rd-Two")).code).toBe("INVALID_TOKEN");
     });
 });

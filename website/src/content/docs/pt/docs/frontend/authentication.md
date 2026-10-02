@@ -1,5 +1,5 @@
 ---
-sourceHash: 8d1a98886641537e
+sourceHash: 59bdc8b898c974d7
 title: Autenticação e Login
 sidebar_label: Autenticação e Login
 description: Configure o controlador de autenticação, a tela de login e a simulação de papéis no seu frontend React do Rebase.
@@ -88,6 +88,8 @@ roles: {
 ```
 
 Para adicionar ou remover opções de papéis, atualize o mapeamento `enum` na sua coleção de usuários e gere o schema novamente.
+
+Um papel nesta lista é um nome ao qual suas [regras de segurança](/docs/collections/security-rules) podem corresponder. O que ele pode fazer além das suas linhas (gerenciar usuários, ler logs, alterar o schema) é declarado separadamente, em `auth.roles` na mesma coleção. `admin` é embutido e tem tudo. Consulte [Papéis e escopos](/docs/backend/roles-and-scopes).
 
 ## Simulação de Papéis (Modo Dev)
 

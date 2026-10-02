@@ -21,7 +21,7 @@ import {
     InitializedDriver,
     RealtimeProvider,
     type RealtimeChannelsConfig,
-    type RealtimeSocketLimits
+    type RealtimeSocketOptions
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import { RealtimeService, parseMaxSubscriptionsPerSocket } from "./services/realtimeService";
@@ -1254,7 +1254,6 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
             const authRepository = new PostgresAuthRepository(db, authTables);
 
             return { userService,
-roleService: userService,
 emailService,
 authRepository,
 // Bound to the same schema `ensureAuthTablesExist` just migrated, so the
@@ -1583,7 +1582,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             // Currently Postgres doesn't need additional routes beyond what the coordinator mounts.
         },
 
-        async initializeWebsockets(server: unknown, realtimeService: RealtimeProvider, driver: DataDriver, config?: unknown, adapter?: unknown, limits?: RealtimeSocketLimits): Promise<void> {
+        async initializeWebsockets(server: unknown, realtimeService: RealtimeProvider, driver: DataDriver, config?: unknown, adapter?: unknown, limits?: RealtimeSocketOptions): Promise<void> {
             const { createPostgresWebSocket, isSocketRealtimeService, socketRealtimeMissing } = await import("./websocket");
             // Narrowed, not cast: on a multi-source project this is the routed
             // composite, and a cast to the Postgres service is what let the

@@ -87,9 +87,6 @@ function createApp(opts: { withEmail?: boolean; knownEmail?: string } = {}) {
         getUserByEmail: jest.fn(async (email: string) =>
             email.toLowerCase() === user.email.toLowerCase() ? user : null),
         getUserById: jest.fn(async (uid: string) => (uid === user.id ? user : null)),
-        getUserRoles: jest.fn(async () => [
-            { id: "editor", name: "Editor", isAdmin: false, defaultPermissions: null, collectionPermissions: null }
-        ]),
         getUserRoleIds: jest.fn(async () => ["editor"]),
         getUserWithRoles: jest.fn(async () => ({ user, roles: [] })),
         setEmailVerified: jest.fn(async () => { user.emailVerified = true; }),

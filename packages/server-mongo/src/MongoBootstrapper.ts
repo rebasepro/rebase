@@ -13,7 +13,7 @@ import type {
 import { MongoDriver } from "./services/MongoDriver";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoCollectionRegistry } from "./factory";
-import { MongoAuthRepository, MongoUserService, MongoRoleService } from "./auth/services";
+import { MongoAuthRepository, MongoUserService } from "./auth/services";
 import { logger } from "@rebasepro/server";
 import { assertBeforeQueryIsPostgresOnly } from "@rebasepro/common";
 
@@ -107,12 +107,10 @@ export function createMongoBootstrapper(mongoConfig: MongoDriverConfig): Backend
             }
 
             const userService = new MongoUserService(db);
-            const roleService = new MongoRoleService(db);
             const authRepository = new MongoAuthRepository(db);
 
             return {
                 userService,
-                roleService,
                 authRepository,
                 emailService
             };

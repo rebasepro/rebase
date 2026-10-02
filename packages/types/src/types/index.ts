@@ -30,6 +30,7 @@ export * from "./component_ref";
 export * from "./auth_adapter";
 export * from "./database_adapter";
 export * from "./api_keys";
+export * from "./scopes";
 export * from "./history";
 export * from "./postgres_introspection";
 export * from "./project_manifest";

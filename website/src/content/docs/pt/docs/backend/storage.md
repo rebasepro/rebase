@@ -1,5 +1,5 @@
 ---
-sourceHash: 68889c97cefde465
+sourceHash: 2becc78f920b157e
 title: Configuração de Armazenamento
 sidebar_label: Configuração de Armazenamento
 description: Configure backends de armazenamento em sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -532,6 +532,17 @@ Vale a pena saber:
 - **O `list` é controlado no prefixo.** Listar é a forma de descobrir chaves que ninguém informou a você.
 - **Uploads retomáveis (TUS) são controlados no momento da criação**, de forma que um upload negado não deixa nenhum arquivo temporário para trás.
 - Omitir o hook preserva o comportamento anterior, de modo que aplicativos single-tenant não são afetados.
+
+### Chaves de API e tokens
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Uma pessoa autenticada tem todos os escopos de storage, então o hook e as políticas acima
+decidem por ela. Uma [chave de API](/docs/backend/api-keys/) também precisa do escopo
+de storage da operação, na fonte que a requisição nomeia: `storage:read` para
+downloads, metadados e listagens, `storage:write` para uploads, pastas e cada
+etapa de um upload retomável, `storage:delete` para exclusões. O alvo é o
+id da fonte, e o da fonte padrão é `(default)`: `storage:read:(default)`,
+`storage:write:avatars`. Sem ele, a resposta é `403 SCOPE_MISSING`. Com ele,
+o hook ainda é executado, como quem quer que a chave represente.
 
 ## Reagindo a um Upload
 

@@ -23,8 +23,8 @@ import type {
 } from "@rebasepro/types";
 
 import { Hono } from "hono";
-import { isAccessTokenRevoked, replaceUserPassword } from "./token-revocation";
-import { hasAdministrativeRole } from "./admin-roles";
+import { hasAdminRole } from "@rebasepro/types";
+import { judgeAccessToken, replaceUserPassword, type AccessTokenVerdict } from "./token-revocation";
 import { verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
@@ -101,6 +101,14 @@ export interface BuiltinAuthAdapterConfig {
     enableEmailOtp?: boolean;
     /** Opt-in httpOnly cookie mode for refresh tokens. */
     cookieAuth?: import("./routes").CookieAuthConfig;
+    /** Refuse password sign-in until the address is verified; confirm-first registration. */
+    requireEmailVerification?: boolean;
+    /** Seconds a rotated-away refresh token still mints a sibling. Default 10. */
+    refreshTokenReuseIntervalSeconds?: number;
+    /** What a refresh token replayed after that window does to its session. Default `"reject"`. */
+    refreshTokenReuse?: import("./routes").RefreshTokenReusePolicy;
+    /** A magic-link or email-code request for an unknown address creates its account, while registration is open. */
+    magicLinkCreatesUsers?: boolean;
 }
 
 /**
@@ -128,7 +136,11 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         collectionAuthConfig,
         enableMagicLink = false,
         enableEmailOtp = false,
-        cookieAuth
+        cookieAuth,
+        requireEmailVerification = false,
+        refreshTokenReuseIntervalSeconds,
+        refreshTokenReuse,
+        magicLinkCreatesUsers = false
     } = config;
 
     const resolvedOps = resolveAuthHooks(authHooks);
@@ -152,6 +164,31 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             logger.warn("[Auth] Could not resolve roles for a request; refusing it", { uid, error });
             throw new ApiError(503, "ROLE_LOOKUP_FAILED", "Could not verify your permissions. Please try again.");
         }
+    }
+
+    /**
+     * The roles a verified access token runs with now, or `null` when it must
+     * not be honoured at all: revoked, or its account deleted. See
+     * `judgeAccessToken`, which both verify paths ask. A repository that
+     * cannot answer refuses the request (503), as `resolveLiveRoles` does.
+     */
+    async function liveRoles(payload: AccessTokenPayload): Promise<string[] | null> {
+        let verdict: AccessTokenVerdict;
+        try {
+            verdict = await judgeAccessToken(authRepository, payload);
+        } catch (error: unknown) {
+            logger.warn("[Auth] Could not judge an access token; refusing it", { uid: payload.uid, error });
+            throw new ApiError(503, "ROLE_LOOKUP_FAILED", "Could not verify your permissions. Please try again.");
+        }
+        if (!verdict.live) {
+            logger.warn("[Security Audit] Refused an access token", {
+                eventType: verdict.refusal === "revoked" ? "auth.token.revoked" : "auth.token.account_gone",
+                refusal: verdict.refusal,
+                uid: payload.uid
+            });
+            return null;
+        }
+        return verdict.roles ?? await resolveLiveRoles(payload.uid);
     }
 
     const adapter: AuthAdapter = {
@@ -191,22 +228,15 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             }
 
             // A token issued before the user's revocation watermark is void,
-            // however well it verifies. This is the read that makes `logout`,
-            // `change-password`, `reset-password` and `DELETE /auth/sessions`
-            // reach the access token instead of only the refresh row.
-            if (await isAccessTokenRevoked(authRepository, payload)) {
-                logger.warn("[Security Audit] Refused a revoked access token", {
-                    eventType: "auth.token.revoked",
-                    uid: payload.uid
-                });
-                return null;
-            }
+            // however well it verifies, and so is one whose account is gone.
+            // This is the read that makes `logout`, `change-password`,
+            // `reset-password`, `DELETE /auth/sessions` and deleting the
+            // account reach the access token instead of only the refresh row.
+            // Roles come from the same read — never from the token.
+            const roles = await liveRoles(payload);
+            if (!roles) return null;
 
-            // Resolve roles from the repository. Never from the token when
-            // that fails — see `resolveLiveRoles`.
-            const roles = await resolveLiveRoles(payload.uid);
-
-            const isAdmin = hasAdministrativeRole(roles);
+            const isAdmin = hasAdminRole(roles);
 
             return {
                 uid: payload.uid,
@@ -245,30 +275,14 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 return null;
             }
 
-            // The same watermark read the request path does above, for the same
-            // reason. This function is what the WebSocket AUTHENTICATE handler
-            // calls, and without it `logout`, `change-password`,
-            // `reset-password` and `DELETE /auth/sessions` voided an access
-            // token for HTTP and left it working over the socket — so signing
-            // out on a stolen session closed the browser's requests and not its
-            // realtime connection.
-            //
-            // This closes the entry point. An ALREADY OPEN socket is a separate
-            // question: nothing re-checks a connection after AUTHENTICATE, so a
-            // session revoked mid-connection survives until it reconnects. That
-            // is a decision about socket lifetime, stated on the realtime docs
-            // page (backend/realtime.md), not a line missing from here.
-            if (await isAccessTokenRevoked(authRepository, payload)) {
-                logger.warn("[Security Audit] Refused a revoked access token", {
-                    eventType: "auth.token.revoked",
-                    uid: payload.uid
-                });
-                return null;
-            }
+            // The same judgement the request path makes above, for the same
+            // reason. This function is what the WebSocket handler calls — at
+            // AUTHENTICATE, and again on the frames that follow — so a token
+            // voided for HTTP is voided over the socket too.
+            const roles = await liveRoles(payload);
+            if (!roles) return null;
 
-            const roles = await resolveLiveRoles(payload.uid);
-
-            const isAdmin = hasAdministrativeRole(roles);
+            const isAdmin = hasAdminRole(roles);
 
             return {
                 uid: payload.uid,
@@ -305,7 +319,11 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 enableMagicLink,
                 enableEmailOtp,
                 cookieAuth,
-                captcha
+                captcha,
+                requireEmailVerification,
+                refreshTokenReuseIntervalSeconds,
+                refreshTokenReuse,
+                magicLinkCreatesUsers
             });
         },
 
@@ -456,7 +474,8 @@ function createUserManagementFromRepo(repo: AuthRepository, resolvedOps: Resolve
                 passwordHash,
                 displayName: data.displayName,
                 photoUrl: data.photoUrl,
-                metadata: data.metadata
+                metadata: data.metadata,
+                ...(data.emailVerified !== undefined ? { emailVerified: data.emailVerified } : {})
             };
             if (resolvedOps.beforeUserCreate) {
                 createData = await resolvedOps.beforeUserCreate(createData);

@@ -4,7 +4,7 @@ import { createAuth, CreateAuthOptions } from "./auth";
 import { createAdmin, CreateAdminOptions } from "./admin";
 import { createCron, CreateCronOptions } from "./cron";
 import { createBackups } from "./backups";
-import { createApiKeys, CreateApiKeysOptions } from "./api-keys";
+import { createApiKeys, CreateApiKeysOptions, createPersonalKeys, CreatePersonalKeysOptions } from "./api-keys";
 import { CollectionClient, createCollectionClient } from "./collection";
 import { createFunctionsClient } from "./functions";
 import { createStorage } from "./storage";
@@ -86,11 +86,13 @@ export type { CreateCronOptions } from "./cron";
 export { createBackups } from "./backups";
 export type { CreateBackupsOptions } from "./backups";
 export type {
+    ApiKeyKind,
     ApiKeyMasked,
-    ApiKeyPermission,
     ApiKeyWithSecret,
     CreateApiKeyRequest,
     CreateApiKeysOptions,
+    CreatePersonalKeyRequest,
+    CreatePersonalKeysOptions,
     UpdateApiKeyRequest
 } from "./api-keys";
 export type { FunctionInvokeOptions, FunctionsClient } from "./functions";
@@ -133,6 +135,7 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
     admin?: CreateAdminOptions;
     cron?: CreateCronOptions;
     apiKeys?: CreateApiKeysOptions;
+    personalKeys?: CreatePersonalKeysOptions;
     /**
      * Declared storage sources for multi-backend support. Server-transport
      * entries are auto-wired into `client.storageRegistry`; `direct` sources
@@ -226,6 +229,7 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
     cron: ReturnType<typeof createCron>;
     backups: ReturnType<typeof createBackups>;
     apiKeys: ReturnType<typeof createApiKeys>;
+    personalKeys: ReturnType<typeof createPersonalKeys>;
     functions: ReturnType<typeof createFunctionsClient>;
     ws?: RebaseWebSocketClient;
     /**
@@ -392,6 +396,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     const cron = createCron(transport, options.cron);
     const backups = createBackups(transport);
     const apiKeys = createApiKeys(transport, options.apiKeys);
+    const personalKeys = createPersonalKeys(transport, options.personalKeys);
     const storage = createStorage(transport);
     const functions = createFunctionsClient(transport);
 
@@ -678,6 +683,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         cron,
         backups,
         apiKeys,
+        personalKeys,
         functions,
         storage,
         storageRegistry,

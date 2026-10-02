@@ -37,7 +37,7 @@ owner connection, no policies.
 
 ### API Key Scoping
 
-API keys use a service identity for RLS scoping: `uid: "api-key:{id}"`, `roles: ["service"]` (or `["admin", "service"]` when `admin: true`). They do not inherit the `created_by` user's identity.
+A **service key** uses its own identity for RLS scoping: `uid: "api-key:{id}"`, `roles: ["service", ...key.roles]` — `["service", "admin"]` for a key created with `roles: ["admin"]`. It does not inherit the `created_by` user's identity. A **personal key** is the opposite: it runs as its owner — their uid and their roles as they are at each request — so owner-style rules match it. Either way the key's scopes are a second, independent ceiling on top of RLS.
 
 ### Reserved System Identities
 
@@ -47,8 +47,9 @@ The auth middleware assigns these reserved identities automatically. They are vi
 |---|---|---|---|
 | JWT (end-user) | Real user ID (e.g. `"abc123"`) | User's assigned roles (e.g. `["viewer"]`) | Normal authenticated requests |
 | Service Key | `"service"` | `["admin"]` | Server-side `rebase.dataAsAdmin` calls, cron jobs, or any request with `Authorization: Bearer <serviceKey>` |
-| API Key (default) | `"api-key:{id}"` | `["service"]` | Machine-to-machine API key requests |
-| API Key (admin) | `"api-key:{id}"` | `["admin", "service"]` | Admin API key requests |
+| Service API key | `"api-key:{id}"` | `["service"]` | Machine-to-machine API key requests |
+| Service API key with `roles: ["admin"]` | `"api-key:{id}"` | `["service", "admin"]` | Keys meant to read every row (CI, migrations) |
+| Personal API key | the owner's uid | the owner's current roles | A person's own scripts and tools |
 | Anonymous | `"anonymous"` | `["anon"]` | Unauthenticated when `requireAuth: false` |
 | No token + `requireAuth: true` | — | — | **Rejected (401)** |
 

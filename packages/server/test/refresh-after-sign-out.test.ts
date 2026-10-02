@@ -85,8 +85,8 @@ describe("POST /auth/refresh racing a sign-out", () => {
         // round trips, and sign out meanwhile.
         let release!: () => void;
         const gate = new Promise<void>(resolve => { release = resolve; });
-        const roles = repo.getUserRoles;
-        repo.getUserRoles = async (uid) => {
+        const roles = repo.getUserRoleIds;
+        repo.getUserRoleIds = async (uid) => {
             await gate;
             return roles(uid);
         };

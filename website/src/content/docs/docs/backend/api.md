@@ -541,7 +541,7 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 | `GET` | `/api/docs` | none | The OpenAPI 3.0 JSON specification |
 | `GET` | `/api/swagger` | none | Swagger UI. On in development, off in production; `REBASE_ENABLE_SWAGGER` overrides either way |
 | `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from — deliberately unauthenticated, and it returns only that hash |
-| `GET` | `/api/meta/contract` | admin, service key or admin API key | The full collection contract, for `rebase generate-sdk --from`. Fail-closed: `404` when no auth is configured |
+| `GET` | `/api/meta/contract` | `schema:read`: an admin, the service key, or an API key holding it | The full collection contract, for `rebase generate-sdk --from`. Fail-closed: `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
@@ -560,7 +560,7 @@ is served to an authenticated admin:
 GET /api/meta/contract
 ```
 
-It is **admin-only**, and on a deployment with no authentication configured it
+It needs the **`schema:read`** scope, which an admin holds, and on a deployment with no authentication configured it
 is not served at all (404 `CONTRACT_UNAVAILABLE`) rather than exposing the
 schema to anyone. Its sibling returns a version string that stands for the
 schema without describing it, and is deliberately reachable with no credential

@@ -59,6 +59,7 @@ jest.mock("@rebasepro/app", () => ({
 }));
 
 jest.mock("@rebasepro/types", () => ({
+    ...jest.requireActual<Record<string, unknown>>("@rebasepro/types"),
     isBranchAdmin: () => true
 }));
 
@@ -204,9 +205,11 @@ describe("the revoked-keys heading", () => {
         const revoked: ApiKeyMasked = {
             id: "k1",
             name: "Old integration",
+            kind: "service",
             key_prefix: "rbk_live_abc",
-            permissions: [],
-            admin: false,
+            scopes: ["data:read"],
+            roles: [],
+            owner_uid: null,
             rate_limit: null,
             created_by: "admin",
             created_at: "2026-01-01T00:00:00Z",

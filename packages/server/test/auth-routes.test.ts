@@ -40,6 +40,8 @@ jest.mock("../src/utils/logger", () => {
 jest.mock("../src/auth/rate-limiter", () => {
     const passthrough = async (_c: unknown, next: () => Promise<void>) => next();
     return {
+        // The address a session records; a header fixture is all these need.
+        requestClientAddress: () => "127.0.0.1",
         createRateLimiter: () => passthrough,
         defaultAuthLimiter: passthrough,
         strictAuthLimiter: passthrough,
@@ -80,14 +82,6 @@ function mockUser(overrides: Partial<{ id: string; email: string; passwordHash: 
     };
 }
 
-function mockRole(id: string, isAdmin = false) {
-    return { id,
-name: id.charAt(0).toUpperCase() + id.slice(1),
-isAdmin,
-defaultPermissions: null,
-collectionPermissions: null };
-}
-
 let mockAuthRepo: jest.Mocked<AuthRepository>;
 let mockEmailService: { send: jest.Mock; isConfigured: jest.Mock };
 
@@ -114,7 +108,6 @@ passwordHash: data.passwordHash }))
 total: 0,
 limit: 1,
 offset: 0 }),
-        getUserRoles: jest.fn().mockResolvedValue([mockRole("editor")]),
         getUserRoleIds: jest.fn().mockResolvedValue(["editor"]),
         assignDefaultRole: jest.fn().mockResolvedValue(undefined),
         setUserRoles: jest.fn().mockResolvedValue(undefined),
@@ -130,7 +123,7 @@ offset: 0 }),
         getUserWithRoles: jest.fn().mockImplementation(async (uid) => {
             const user = mockUser({ id: uid });
             return { user,
-roles: [mockRole("editor")] };
+roles: ["editor"] };
         }),
         createRefreshToken: jest.fn().mockResolvedValue(undefined),
         findRefreshTokenByHash: jest.fn().mockResolvedValue(null),
@@ -746,7 +739,7 @@ withEmail: false }); // Hack to pass empty list of providers
                 userAgent: "",
                 ipAddress: ""
             });
-            mockAuthRepo.getUserRoles.mockResolvedValueOnce([mockRole("editor")]);
+            mockAuthRepo.getUserRoleIds.mockResolvedValueOnce(["editor"]);
 
             const res = await app.request("/auth/refresh", {
                 method: "POST",
@@ -784,7 +777,7 @@ withEmail: false }); // Hack to pass empty list of providers
                 userAgent: "",
                 ipAddress: ""
             });
-            mockAuthRepo.getUserRoles.mockResolvedValueOnce([mockRole("editor")]);
+            mockAuthRepo.getUserRoleIds.mockResolvedValueOnce(["editor"]);
 
             const res = await app.request("/auth/refresh", json({ refreshToken: "valid-refresh-token" }));
             expect(res.status).toBe(200);
@@ -804,7 +797,7 @@ withEmail: false }); // Hack to pass empty list of providers
                 userAgent: "",
                 ipAddress: ""
             });
-            mockAuthRepo.getUserRoles.mockResolvedValueOnce([mockRole("editor")]);
+            mockAuthRepo.getUserRoleIds.mockResolvedValueOnce(["editor"]);
             mockAuthRepo.getUserById.mockResolvedValueOnce(mockUser({ id: "user-1", email: "restore@example.com" }));
 
             const res = await app.request("/auth/refresh", json({ refreshToken: "valid-refresh-token" }));
@@ -826,7 +819,7 @@ withEmail: false }); // Hack to pass empty list of providers
                 userAgent: "",
                 ipAddress: ""
             });
-            mockAuthRepo.getUserRoles.mockResolvedValueOnce([mockRole("editor")]);
+            mockAuthRepo.getUserRoleIds.mockResolvedValueOnce(["editor"]);
             // The user lookup blows up (the regression that 500'd /refresh on CI).
             mockAuthRepo.getUserById.mockRejectedValueOnce(new Error("db exploded"));
 
@@ -1351,14 +1344,18 @@ newPassword: "New1Pass" }),
             expect(res.status).toBe(401);
         });
 
-        it("returns 404 when user is deleted", async () => {
+        it("refuses the token of an account that was deleted", async () => {
+            // The live-session guard asks whether the account still exists
+            // before the route runs, so a deleted account's token is a revoked
+            // one (401), not a session whose user went missing (404).
             const app = createApp();
             mockAuthRepo.getUserWithRoles.mockResolvedValueOnce(null);
 
             const res = await app.request("/auth/me", {
                 headers: { ...await authHeader() }
             });
-            expect(res.status).toBe(404);
+            expect(res.status).toBe(401);
+            expect((await res.json() as { error: { code: string } }).error.code).toBe("SESSION_REVOKED");
         });
     });
 

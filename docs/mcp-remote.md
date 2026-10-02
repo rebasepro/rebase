@@ -6,8 +6,8 @@ by that person's own row-level security.
 
 That "as the person" is the whole design, and it is what makes this different
 from the stdio server in `@rebasepro/mcp`. That one is a developer tool: it runs
-on a laptop and authenticates with a service or API key, which is admin-scoped
-by construction. This one is for the *users of the application you built*.
+on a laptop and authenticates with the service key or an API key, which acts as
+the project rather than as one of its users. This one is for the *users of the application you built*.
 
 Off unless you turn it on. See [Enabling it](#enabling-it).
 
@@ -107,16 +107,34 @@ whether its own work happened, and throws if not.
 
 ## Scopes
 
-Two, and no more:
+The data-plane scopes every other credential uses (`packages/types/src/types/scopes.ts`),
+and no others — `MCP_SCOPES` in `mcp/oauth-metadata.ts`:
 
 | Scope | What it grants |
 |---|---|
-| `mcp:read` | `list_collections`, `query_collection`, `count_documents`, `get_document` |
-| `mcp:write` | The above plus `create_document`, `update_document`, `delete_document` |
+| `data:read` | `list_collections`, `query_collection`, `count_documents`, `get_document` |
+| `data:write` | `create_document`, `update_document` |
+| `data:delete` | `delete_document` |
 
-A scope decides whether a tool is *offered*. It is not the access-control
-mechanism — a `mcp:write` token still cannot write a row the user could not
-write themselves.
+A client that asks for nothing gets `data:read`. Each scope can be narrowed to a
+collection — `data:read:posts` — and then the tools it offers reach that
+collection only (`list_collections` lists only what `data:read` covers). An
+unknown scope in a request is dropped, not refused.
+
+Grants made before the shared vocabulary are read as what they granted:
+`mcp:read` → `data:read`, `mcp:write` → `data:write data:delete`
+(`upgradeStoredMcpScope`, applied to stored refresh grants and to access tokens
+still in flight).
+
+A scope decides whether a tool is *offered* and which collections it reaches.
+It is not the access-control mechanism — a `data:write` token still cannot write
+a row the user could not write themselves.
+
+`/mcp` also accepts an `rk_` API key in the `Authorization` header, for a client
+configured with a header instead of an OAuth flow. It is verified by the same
+`resolveApiKey` the HTTP middlewares use, reaches the tools its `data:*` scopes
+cover, and acts as whoever the key acts as — a personal key as its owner, a
+service key as `api-key:<id>`.
 
 ## The tools speak REST
 

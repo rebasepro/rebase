@@ -1,5 +1,5 @@
 ---
-sourceHash: 5db546fe110a140a
+sourceHash: 2b5f4b5b83a711a3
 title: App e repository
 sidebar_label: App & repository
 description: Un progetto è un backend insieme alle app che comunicano con esso, ognuna delle quali può risiedere nel proprio repository.
@@ -321,7 +321,7 @@ inclusi i target delle relazioni, di cui il generatore di tipi ha bisogno per st
 se una foreign key è una stringa o un numero — ed emette esattamente lo stesso output
 che avrebbe prodotto a partire dai sorgenti locali.
 
-L'endpoint del contratto è accessibile solo agli amministratori. Le definizioni delle
+L'endpoint del contratto richiede lo scope `schema:read`, che un amministratore possiede. Le definizioni delle
 collection descrivono ogni tabella, colonna e relazione nel progetto, comprese quelle
 che nessuna regola di sicurezza esporrebbe mai; si tratta di una mappa del database,
 non di una documentazione pubblica dell'API.

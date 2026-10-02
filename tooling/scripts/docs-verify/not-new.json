@@ -1,4 +1,5 @@
 {
+    "admin": "the built-in role has shipped since the first release; the entries change what it holds and how it is checked",
     "rebase db generate": "the command has shipped since 0.1; the entry moves the SQL it renders from `drizzle/` to `.rebase/sql/`",
     "rebase db push": "the command has shipped since 0.1; the entry moves the SQL it renders from `drizzle/` to `.rebase/sql/`",
     "schema.generated.ts": "the generated Drizzle schema has shipped since the first release; the entry stops a live schema edit committing SQL beside it"

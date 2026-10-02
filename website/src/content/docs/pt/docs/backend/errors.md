@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dcaffcacef692bc
+sourceHash: 9ab3b04e9fddf6d4
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, significado e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -89,9 +89,9 @@ ID recebido. Leia o cabeçalho de resposta.
 | --- | --- | --- | --- |
 | `AAL2_REQUIRED` | 403 | A rota requer um segundo fator e a sessão possui apenas um. | Complete o desafio de MFA e tente novamente. |
 | `ALREADY_VERIFIED` | 400 | O endereço ou fator já foi verificado. | Nada — o estado desejado já é verdadeiro. |
+| `ACCOUNT_OUTRANKS_CALLER` | 403 | A conta sendo editada, redefinida ou excluída tem uma role ou escopo que o chamador não tem. `details.beyond` os nomeia. | Peça a alguém que os tenha para fazer a alteração. |
 | `ANONYMOUS_AUTH_DISABLED` | 403 | O login anônimo está desativado neste servidor. | Ative-o ou faça login com uma identidade real. |
-| `API_KEY_FORBIDDEN` | 403 | Uma chave de API foi usada em uma rota que apenas pessoas podem chamar. | Use uma sessão de usuário. |
-| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | Uma chave de API tentou criar, listar ou revogar chaves de API. | Gerencie as chaves como um administrador autenticado. |
+| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | Uma chave de API tentou listar, criar, alterar ou revogar chaves de API, sejam do seu próprio tipo ou pessoais. | Gerencie as chaves como uma pessoa que tem `keys:write`, ou com a chave de serviço. |
 | `AUTH_MIDDLEWARE_MISSING` | 500 | Uma rota protegida foi executada sem o middleware de autenticação do Rebase antes dela, portanto a credencial do chamador nunca foi avaliada. | Monte o aplicativo por meio do roteador de funções em vez de diretamente no seu próprio servidor. |
 | `BOOTSTRAP_ANONYMOUS` | 403 | O bootstrap do primeiro administrador foi tentado por um chamador anônimo. | Faça login primeiro. |
 | `BOOTSTRAP_COMPLETED` | 403 | O primeiro administrador já existe. | Solicite que um administrador existente conceda a role. |
@@ -108,19 +108,28 @@ ID recebido. Leia o cabeçalho de resposta.
 | `INVALID_CHALLENGE` | 400 | O desafio de MFA é desconhecido ou expirou. | Inicie um novo. |
 | `INVALID_CODE` | 400 / 401 | O código OTP ou MFA está incorreto: 400 no login por código de e-mail (`/auth/otp/verify`), 401 em um cadastro ou desafio de MFA. | Tente novamente com o código atual. |
 | `INVALID_CREDENTIALS` | 401 | E-mail ou senha incorretos — deliberadamente sem especificar qual. | Tente novamente ou redefina a senha. |
+| `INVALID_SCOPES` | 400 | Foi pedido para uma chave algo que não é um escopo: malformado, desconhecido ou com um alvo que o escopo não aceita. `details.problems` diz qual e por quê; `details.validScopes` lista todos. | Use um nome da lista. Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | Um token de verificação, redefinição ou magic link está malformado ou é desconhecido (400). Uma credencial de provedor OAuth ou um refresh token que não se verifica resulta em 401. | Solicite um novo link, ou entre novamente. |
+| `KEY_MANAGEMENT_SCOPE` | 400 | Foi pedido `keys:read` ou `keys:write` para uma chave. Nenhuma chave pode gerenciar chaves. `details.scopes` os nomeia. | Deixe-os de fora. |
 | `LAST_ADMIN` | 403 | A alteração deixaria o projeto sem nenhum administrador. | Promova outra pessoa primeiro. |
 | `MFA_REQUIRED` | 401 | A senha estava correta e a conta possui um segundo fator verificado, portanto o login foi concluído apenas pela metade. `details` traz um token de curta duração com escopo para o desafio de MFA — não é uma sessão. | Abra um desafio e responda-o; a resposta do desafio emitirá a sessão. |
 | `NO_SESSION` | 401 | Nenhum cookie de sessão ou refresh token foi apresentado. Normal no primeiro carregamento de página. | Faça login. |
 | `NOT_ANONYMOUS` | 400 | Uma rota de upgrade a partir de anônimo foi chamada por uma conta real. | Nada para atualizar. |
 | `OAUTH_ERROR` | 401 | O provedor de OAuth recusou ou retornou um erro. | Tente o fluxo novamente; a mensagem contém o motivo do provedor. |
+| `PERSONAL_KEYS_DISABLED` | 403 | As chaves de API pessoais estão desativadas neste backend. | Defina `personalKeys: true` no bloco `auth` da coleção de usuários. |
+| `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | A chave de serviço ou uma sessão de convidado tentou usar as rotas de chaves pessoais. Nenhuma das duas tem uma conta como a qual uma chave possa agir. | Entre em uma conta, ou crie uma chave de serviço em `/api/admin/api-keys`. |
 | `RATE_LIMITED` | 429 | Muitas tentativas deste chamador. | Aguarde; a mensagem diz por quanto tempo. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | O destino do redirecionamento não está na lista de permissões. | Adicione-o à configuração do provedor. |
 | `REGISTRATION_DISABLED` | 403 | O cadastro de autoatendimento está desativado. | Peça a um administrador para criar a conta. |
+| `ROLE_EXCEEDS_CALLER` | 403 | As roles sendo concedidas têm um escopo, ou `admin`, que o chamador não tem. `details.beyond` os nomeia. | Peça a alguém que os tenha para conceder a role. |
+| `ROLE_EXCEEDS_CREATOR` | 403 | Uma chave de serviço recebeu uma role de RLS que seu criador não tem. Apenas um administrador pode dar qualquer role. `details.roles` as nomeia. | Remova a role, ou peça a um administrador para criar a chave. |
 | `ROLE_EXISTS` | 409 | Esse nome de role já está em uso. | Escolha outro nome. |
 | `ROLE_LOOKUP_FAILED` | 503 | Não foi possível ler as roles do chamador — em uma rota de administração, ou em uma requisição de dados em um backend com `config.auth`. Falha de forma segura em vez de confiar nas roles do token. | Tente novamente; verifique o banco de dados. |
+| `SCOPE_EXCEEDS_CREATOR` | 403 | Foi pedido para uma chave um escopo que seu criador não tem. Uma chave nunca tem mais do que a conta que a cria. `details.scopes` os nomeia. | Remova-os, ou peça a alguém que os tenha para criar a chave. |
+| `SCOPE_MISSING` | 403 | A credencial não tem o escopo de que esta rota, coleção, fonte de storage ou função precisa. `details.requiredScope` o nomeia, alvo incluído. | Para uma pessoa, uma role que declare o escopo. Para uma chave, uma chave que o tenha. Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/). |
 | `SELF_DELETE` | 400 | Um administrador tentou excluir a própria conta. | Peça a outro administrador para fazê-lo. |
 | `SESSION_REVOKED` | 401 | A sessão foi encerrada em outro lugar ou todas as sessões foram revogadas. | Faça login novamente. |
+| `UNKNOWN_SCOPE_TARGET` | 400 | O alvo de um escopo nomeia uma coleção, fonte de storage ou função que este backend não serve. `details` lista as que ele serve. | Corrija o alvo. |
 | `UNVERIFIED_IDENTITIES` | 409 | Um magic link, código por e-mail ou redefinição de senha comprovou o endereço de uma conta não verificada, e a conta tem uma identidade de login cujo provedor nunca verificou esse endereço. O repositório de autenticação não consegue removê-la (não tem `unlinkUserIdentity`), então a prova é recusada em vez de deixar essa forma de acesso em uma conta verificada. | Implemente `unlinkUserIdentity` no repositório de autenticação próprio, ou peça a um administrador que revise a conta. |
 | `SETUP_REQUIRED` | 403 | O projeto ainda não possui nenhum administrador, portanto esta rota não está disponível. | Conclua a configuração do primeiro administrador. |
 | `TOKEN_ALREADY_USED` | 401 | Um token de uso único foi reutilizado. | Solicite um novo. |

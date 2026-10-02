@@ -239,10 +239,14 @@ rebase auth reset-password user@example.com MyNewPass!
 
 | Command | Description |
 |---------|-------------|
-| `rebase api-keys list` | List all service API keys |
-| `rebase api-keys create` | Create a scoped key: `--name`, and `--permissions '<json>'` or `--full-access`; optionally `--admin`, `--rate-limit`, `--expires 90d` |
+| `rebase api-keys list` | List the service API keys: kind, scopes, roles |
+| `rebase api-keys get <id>` | Show one key |
+| `rebase api-keys create` | Create a service key: `--name`, and `--scopes data:read:posts,cron:write` (comma-separated or repeated) or `--full-access` (every scope you hold, less `keys:*`); optionally `--roles admin`, `--rate-limit`, `--expires-in <days>` or `--expires-at <ISO date>` |
 | `rebase api-keys revoke <id>` | Revoke a key |
+| `rebase api-keys scopes` | List every scope the backend knows, including the app's own, and which you hold |
 | `rebase api-keys --help` | Show API key command help |
+
+`--permissions`, `--admin` and `--expires` are gone; the command names the option that replaced each.
 
 ### Agent Skills
 

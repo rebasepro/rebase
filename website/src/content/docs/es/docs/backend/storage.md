@@ -1,5 +1,5 @@
 ---
-sourceHash: 68889c97cefde465
+sourceHash: 2becc78f920b157e
 title: Configuración de almacenamiento
 sidebar_label: Configuración de almacenamiento
 description: Configure backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para la subida de archivos, imágenes y contenido multimedia.
@@ -535,6 +535,18 @@ Conviene saber:
 - **`list` se restringe en función del prefijo.** Listar es la forma de descubrir claves de las que nadie le informó.
 - **Las subidas reanudables (TUS) se restringen en el momento de la creación**, de modo que una subida denegada no deja ningún archivo temporal atrás.
 - Omitir el hook conserva el comportamiento anterior, por lo que las aplicaciones de inquilino único no se ven afectadas.
+
+### Claves de API y tokens
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Una persona con la sesión iniciada tiene todos los alcances de almacenamiento, así que
+el hook y las políticas anteriores deciden por ella. Una [clave de API](/docs/backend/api-keys/)
+necesita además el alcance de almacenamiento de la operación, en el origen que nombra
+la solicitud: `storage:read` para descargas, metadatos y listados, `storage:write` para
+subidas, carpetas y cada paso de una subida reanudable, `storage:delete` para
+eliminaciones. El destino es el id del origen, y el del origen predeterminado es
+`(default)`: `storage:read:(default)`, `storage:write:avatars`. Sin él, la respuesta es
+`403 SCOPE_MISSING`. Con él, el hook sigue ejecutándose, como quien sea que represente
+la clave.
 
 ## Reaccionar a una subida
 

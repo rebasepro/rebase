@@ -4,15 +4,16 @@ import React, { useState } from "react";
  * "The backend an agent can't screw up" is the page's headline, so the page
  * should let you try to screw it up.
  *
- * Revoke a permission on the left and the same four MCP tool calls re-evaluate
- * on the right. Each call is checked twice — once against the key's permission
- * list, once by Postgres — and the figure shows both gates rather than asserting
- * them, because "enforced twice" is the only claim here that a competitor
- * cannot also make.
+ * Revoke a scope on the left and the same four MCP tool calls re-evaluate on
+ * the right. Each call is checked twice — once against the key's scopes, once
+ * by Postgres — and the figure shows both gates rather than asserting them,
+ * because "enforced twice" is the only claim here that a competitor cannot
+ * also make.
  *
- * Tool names are the real ones exported by @rebasepro/mcp. The permission shape
- * is ApiKeyPermission from @rebasepro/types: a collection, and any of
- * read/write/delete — plus a separate `admin` flag that grants the admin role.
+ * Tool names are the real ones the hosted MCP server exposes. The scopes are
+ * the real vocabulary from @rebasepro/types: `data:<operation>:<collection>`.
+ * The second toggle is the key's RLS roles — `admin` reads every row — which
+ * is a separate setting from its scopes on purpose.
  */
 
 type Op = "read" | "write" | "delete";
@@ -27,13 +28,13 @@ interface Grant {
 interface Call {
     tool: string;
     args: string;
-    /** Gate one. null = needs the admin flag rather than a collection grant. */
-    needs: { collection: string; op: Op } | null;
+    /** Gate one: the scope the call needs, `data:<op>:<collection>`. */
+    needs: { collection: string; op: Op };
     /**
      * Gate two, and genuinely independent of gate one: whether a policy on that
-     * table names the `service` role for that operation. Granting the key a
-     * permission does not create a policy, which is the whole point — turn on
-     * orders:delete and the call still comes back having deleted nothing.
+     * table lets the key's role through for that operation. Granting the key a
+     * scope does not create a policy, which is the whole point — turn on
+     * data:delete:orders and the call still comes back having deleted nothing.
      */
     rlsAllows: boolean;
     /** What comes back when both gates pass. */
@@ -41,31 +42,22 @@ interface Call {
     /** Why Postgres refuses, when it does. */
     rlsNote: string;
     /**
-     * The wire answer when gate one passes and Postgres does not. Only the
-     * delete row can reach that state here. Postgres does not raise for a
-     * policy-filtered DELETE — it reports zero rows, exactly like a delete that
-     * had nothing to do — so the driver re-reads the target on the same handle:
-     * still visible means refused (403 WRITE_DENIED), gone means 404.
+     * The wire answer when gate one passes and Postgres does not. Postgres does
+     * not raise for a policy-filtered read or DELETE — it returns nothing, as if
+     * there were nothing — so a refused delete is re-read on the same handle:
+     * still visible means refused (403 WRITE_DENIED); a refused read is a 404.
      */
     blocked?: string;
-    /**
-     * The `error.code` in the 403 body. Collection routes raise
-     * API_KEY_FORBIDDEN from the permission guard; the admin surfaces
-     * (`/admin/users`, which is what list_users calls) raise FORBIDDEN from
-     * requireAdmin.
-     */
-    deniedCode: string;
 }
 
 const CALLS: Call[] = [
     {
-        tool: "list_documents",
+        tool: "query_collection",
         args: `{ "collection": "products", "limit": 20 }`,
         needs: { collection: "products", op: "read" },
         rlsAllows: true,
         ok: `20 rows · id, title, price, stock`,
-        rlsNote: `products has a select policy naming "service"`,
-        deniedCode: "API_KEY_FORBIDDEN"
+        rlsNote: `products has a select policy naming "service"`
     },
     {
         tool: "update_document",
@@ -73,8 +65,7 @@ const CALLS: Call[] = [
         needs: { collection: "orders", op: "write" },
         rlsAllows: true,
         ok: `1 row updated · orders/8f21`,
-        rlsNote: `orders grants update to "service"`,
-        deniedCode: "API_KEY_FORBIDDEN"
+        rlsNote: `orders grants update to "service"`
     },
     {
         tool: "delete_document",
@@ -83,17 +74,16 @@ const CALLS: Call[] = [
         rlsAllows: false,
         ok: `1 row deleted · orders/8f21`,
         rlsNote: `no delete policy on orders names "service", so 0 rows match`,
-        blocked: `403  WRITE_DENIED · orders/8f21 is still there`,
-        deniedCode: "API_KEY_FORBIDDEN"
+        blocked: `403  WRITE_DENIED · orders/8f21 is still there`
     },
     {
-        tool: "list_users",
-        args: `{}`,
-        needs: null,
+        tool: "get_document",
+        args: `{ "collection": "customers", "id": "c7" }`,
+        needs: { collection: "customers", op: "read" },
         rlsAllows: false,
-        ok: `142 users · id, email, roles`,
-        rlsNote: `the users table is covered by default_admin, which the service role is not`,
-        deniedCode: "FORBIDDEN"
+        ok: `1 row · customers/c7 · name, email, plan`,
+        rlsNote: `customers lets each customer read their own row, and "service" is nobody's`,
+        blocked: `404  NOT_FOUND · customers/c7`
     }
 ];
 
@@ -101,7 +91,8 @@ const INITIAL: Grant[] = [
     { collection: "products", op: "read", on: true },
     { collection: "orders", op: "read", on: true },
     { collection: "orders", op: "write", on: true },
-    { collection: "orders", op: "delete", on: false }
+    { collection: "orders", op: "delete", on: false },
+    { collection: "customers", op: "read", on: true }
 ];
 
 export function McpSessionDemo() {
@@ -111,13 +102,11 @@ export function McpSessionDemo() {
     const toggle = (i: number) =>
         setGrants((prev) => prev.map((g, j) => (j === i ? { ...g, on: !g.on } : g)));
 
-    /** Gate one: the key's own permission list. */
+    /** Gate one: the key's own scopes. */
     const keyAllows = (call: Call) =>
-        call.needs === null
-            ? admin
-            : grants.some((g) => g.collection === call.needs!.collection && g.op === call.needs!.op && g.on);
+        grants.some((g) => g.collection === call.needs.collection && g.op === call.needs.op && g.on);
 
-    /** Gate two: what Postgres will return for the role this key carries. */
+    /** Gate two: what Postgres will return for the roles this key runs as. */
     const rlsAllows = (call: Call) => admin || call.rlsAllows;
 
     const denied = CALLS.filter((c) => !(keyAllows(c) && rlsAllows(c))).length;
@@ -137,7 +126,7 @@ export function McpSessionDemo() {
                     </p>
 
                     <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
-                        permissions
+                        scopes
                     </p>
                     <ul className="space-y-1.5">
                         {grants.map((g, i) => (
@@ -152,7 +141,7 @@ export function McpSessionDemo() {
                                             : "text-surface-600 ring-1 ring-inset ring-surface-800 hover:text-surface-400"
                                     }`}>
                                     <span className={g.on ? "" : "line-through decoration-surface-700"}>
-                                        {g.collection}<span className="text-surface-500">:</span>{g.op}
+                                        data<span className="text-surface-500">:</span>{g.op}<span className="text-surface-500">:</span>{g.collection}
                                     </span>
                                     <Switch on={g.on}/>
                                 </button>
@@ -161,7 +150,7 @@ export function McpSessionDemo() {
                     </ul>
 
                     <p className="mb-2.5 mt-5 text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
-                        admin flag
+                        RLS roles
                     </p>
                     <button
                         type="button"
@@ -172,12 +161,13 @@ export function McpSessionDemo() {
                                 ? "bg-amber-500/[0.08] text-amber-200 ring-1 ring-inset ring-amber-500/30"
                                 : "text-surface-600 ring-1 ring-inset ring-surface-800 hover:text-surface-400"
                         }`}>
-                        <span>admin: {admin ? "true" : "false"}</span>
+                        <span>roles: [{admin ? "\"service\", \"admin\"" : "\"service\""}]</span>
                         <Switch on={admin} tone="amber"/>
                     </button>
                     <p className="mt-2.5 text-[11px] leading-relaxed text-surface-500">
-                        Without it the key carries the <span className="font-mono text-surface-400">service</span> role,
-                        and Postgres grants that role nothing unless a policy names it.
+                        Scopes decide which calls the key may make; roles decide which rows those calls see.
+                        As <span className="font-mono text-surface-400">service</span> alone, Postgres grants it nothing
+                        unless a policy names it.
                     </p>
                 </div>
 
@@ -218,7 +208,7 @@ export function McpSessionDemo() {
 
                                     {/* Two gates, evaluated separately — that is the claim */}
                                     <div className="mt-3 flex flex-wrap gap-2">
-                                        <Gate label="API key permission" pass={gateKey}/>
+                                        <Gate label="API key scope" pass={gateKey}/>
                                         <Gate label="Postgres RLS" pass={gateRls}/>
                                     </div>
 
@@ -229,18 +219,18 @@ export function McpSessionDemo() {
                                             ? `200  ${call.ok}`
                                             : gateKey
                                                 ? call.blocked ?? `200  0 rows affected`
-                                                : `403  ${call.deniedCode}`}
+                                                : `403  SCOPE_MISSING · data:${call.needs.op}:${call.needs.collection}`}
                                     </p>
 
                                     {!pass && (
                                         <p className="mt-1.5 border-l-2 border-rose-500/25 pl-2.5 text-[11px] leading-relaxed text-surface-500">
                                             {gateKey
-                                                /* The most useful state in the figure: permission granted,
-                                                   database unmoved. Granting a key does not write a policy. */
-                                                ? <>The key permits this. Postgres does not — {call.rlsNote}, so the row survives and the write is reported as refused.</>
+                                                /* The most useful state in the figure: scope granted,
+                                                   database unmoved. Granting a scope does not write a policy. */
+                                                ? <>The key holds the scope. Postgres does not agree — {call.rlsNote}.</>
                                                 : gateRls
                                                     ? <>Postgres would have allowed it; the key is what stopped it.</>
-                                                    : <>Refused twice: the key has no such permission, and {call.rlsNote}.</>}
+                                                    : <>Refused twice: the key has no such scope, and {call.rlsNote}.</>}
                                         </p>
                                     )}
                                 </div>
@@ -250,8 +240,8 @@ export function McpSessionDemo() {
 
                     <p className="mt-4 text-[11px] leading-relaxed text-surface-500">
                         The two gates are independent, which is the part worth sitting with: grant
-                        <span className="font-mono text-surface-400"> orders:delete</span> above and the call still
-                        deletes nothing, because a key permission is not a policy — and it comes back 403 rather
+                        <span className="font-mono text-surface-400"> data:delete:orders</span> above and the call still
+                        deletes nothing, because a scope is not a policy — and it comes back 403 rather
                         than reporting a delete that never happened. No prompt, jailbreak or bug in the tool layer
                         widens what the database will return.
                     </p>

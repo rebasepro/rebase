@@ -427,10 +427,19 @@ password };
         } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
+        // A backend with `requireEmailVerification` registers confirm-first:
+        // no session until the address is proven, and the same answer whether
+        // or not the address already had an account.
+        if (body && typeof body === "object" && "confirmationRequired" in body && body.confirmationRequired === true) {
+            return { confirmationRequired: true as const, user: null, accessToken: null, refreshToken: null };
+        }
         const session = handleAuthResponse(body, "SIGNED_IN");
-        return { user: session.user,
-accessToken: session.accessToken,
-refreshToken: session.refreshToken };
+        return {
+            confirmationRequired: false as const,
+            user: session.user,
+            accessToken: session.accessToken,
+            refreshToken: session.refreshToken
+        };
     }
 
     /**
@@ -823,12 +832,37 @@ password })
         return body as { success: boolean; message: string; };
     }
 
+    /**
+     * Change the signed-in account's password. Every other session ends; this
+     * one is replaced by the fresh session the server answers with, so the
+     * client stays signed in.
+     */
     async function changePassword(oldPassword: string, newPassword: string) {
-        return transport.request<{ success: boolean; message: string; }>(authPath + "/change-password", {
+        // Sent with this client's own fetch rather than the transport, so that
+        // in cookie mode the new refresh cookie the answer sets is kept — so
+        // the transport's refresh-on-401 is done here, before the call.
+        if (currentSession && currentSession.expiresAt <= Date.now() + 10_000) {
+            await refreshSession().catch(() => undefined);
+        }
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl("/change-password"), {
             method: "POST",
-            body: JSON.stringify({ oldPassword,
-newPassword })
-        });
+            headers: {
+                "Content-Type": "application/json",
+                ...(currentSession?.accessToken ? { Authorization: `Bearer ${currentSession.accessToken}` } : {})
+            },
+            body: JSON.stringify({ oldPassword, newPassword }),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        const result = body as { success: boolean; message: string; tokens?: AuthTokens; user?: Record<string, unknown> };
+        // A server from before this release answers without a session, having
+        // revoked this one: nothing to adopt, and the next call signs out.
+        if (result.tokens && result.user) {
+            handleAuthResponse({ tokens: result.tokens, user: result.user }, "TOKEN_REFRESHED");
+        }
+        return { success: result.success, message: result.message };
     }
 
     /**
@@ -877,15 +911,43 @@ newPassword })
         });
     }
 
-    async function verifyEmail(token: string) {
+    /**
+     * Verify the address with the token from the link.
+     *
+     * The link proves the inbox, not who registered the address, so the
+     * server keeps only what this call also proves: the current session (sent
+     * when this client is signed in as that account) or `password`. An account
+     * carrying a password or identity neither proves is refused with
+     * `PROOF_REQUIRED` and the token is left unspent — ask for the password,
+     * or pass `removeUnproven: true` to verify without it. With `password`,
+     * the call also signs in.
+     */
+    async function verifyEmail(token: string, options?: { password?: string; removeUnproven?: boolean }) {
         const fetchFn = getFetch();
-        const res = await fetchFn(authUrl("/verify-email?token=" + encodeURIComponent(token)), {
-            method: "GET",
-            headers: { "Content-Type": "application/json" }
-        });
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (currentSession?.accessToken) headers.Authorization = `Bearer ${currentSession.accessToken}`;
+        const res = await fetchFn(authUrl("/verify-email"), {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ token, ...options }),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
-        return body as { success: boolean; message: string; };
+        const result = body as {
+            success: boolean;
+            message?: string;
+            /** A password nobody proved was on the account, and is gone. */
+            passwordRemoved: boolean;
+            /** Providers whose identities were detached for not vouching for the address. */
+            removedProviders: string[];
+            tokens?: AuthTokens;
+            user?: Record<string, unknown>;
+        };
+        const session = result.tokens && result.user
+            ? handleAuthResponse({ tokens: result.tokens, user: result.user }, "SIGNED_IN")
+            : null;
+        return { success: result.success, passwordRemoved: result.passwordRemoved, removedProviders: result.removedProviders ?? [], session };
     }
 
     async function sendMagicLink(email: string) {
@@ -1023,8 +1085,11 @@ refreshToken: session.refreshToken };
          * Start enrolling a TOTP factor.
          *
          * Returns the secret and an `otpauth://` URI to render as a QR code,
-         * plus ten single-use recovery codes. **Show the recovery codes once
-         * and never again** — only their hashes are stored.
+         * plus — with the account's first factor — ten single-use recovery
+         * codes. **Show the recovery codes once and never again**: only their
+         * hashes are stored. Adding another factor keeps the codes the account
+         * has, and `recoveryCodes` is then `null`; `regenerateRecoveryCodes()`
+         * replaces them.
          *
          * The factor is not usable until `verify` confirms the user's
          * authenticator produced a correct code from it.
@@ -1033,7 +1098,7 @@ refreshToken: session.refreshToken };
             return transport.request<{
                 factor: { id: string; factorType: string; friendlyName?: string };
                 totp: { secret: string; uri: string; qrUri: string };
-                recoveryCodes: string[];
+                recoveryCodes: string[] | null;
             }>(authPath + "/mfa/enroll", {
                 method: "POST",
                 body: JSON.stringify(options ?? {})
@@ -1060,6 +1125,14 @@ refreshToken: session.refreshToken };
          * Remove a factor. Requires an `aal2` session — one that has already
          * answered a challenge — so a stolen `aal1` token cannot turn MFA off.
          */
+        /**
+         * Replace the account's recovery codes with ten new ones, shown once.
+         * Needs an `aal2` session. Adding a second factor keeps the codes the
+         * account already has; this is how to get new ones.
+         */
+        async regenerateRecoveryCodes() {
+            return transport.request<{ recoveryCodes: string[] }>(authPath + "/mfa/recovery-codes", { method: "POST" });
+        },
         async unenroll(factorId: string) {
             return transport.request<{ success: boolean; message: string }>(
                 authPath + "/mfa/unenroll",

@@ -95,11 +95,11 @@ function getExtension(name: string): string {
     return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : "";
 }
 
-function breadcrumbSegments(path: string): { label: string; path: string }[] {
-    if (!path || path === "/") return [{ label: "Root",
+function breadcrumbSegments(path: string, rootLabel: string): { label: string; path: string }[] {
+    if (!path || path === "/") return [{ label: rootLabel,
 path: "" }];
     const parts = path.split("/").filter(Boolean);
-    const segments = [{ label: "Root",
+    const segments = [{ label: rootLabel,
 path: "" }];
     let accumulated = "";
     for (const part of parts) {
@@ -125,6 +125,7 @@ function UploadDialog({
     onClose: () => void;
     onUpload: (files: File[]) => Promise<void>;
 }) {
+    const { t } = useTranslation();
     const [uploading, setUploading] = useState(false);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -146,11 +147,11 @@ function UploadDialog({
             setSelectedFiles([]);
             onClose();
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Upload failed");
+            setError(err instanceof Error ? err.message : t("studio_storage_upload_failed"));
         } finally {
             setUploading(false);
         }
-    }, [selectedFiles, onUpload, onClose]);
+    }, [selectedFiles, onUpload, onClose, t]);
 
     const handleClose = useCallback(() => {
         if (!uploading) {
@@ -163,9 +164,9 @@ function UploadDialog({
     return (
         <Dialog open={open} onOpenChange={(o) => !o && handleClose()} maxWidth="md">
             <DialogTitle>
-                Upload Files
+                {t("studio_storage_upload_dialog_title")}
                 <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark mt-0.5 block">
-                    to <span className="font-mono text-primary">/{currentPath || "root"}</span>
+                    {t("studio_storage_upload_to")} <span className="font-mono text-primary">/{currentPath || t("studio_storage_root_folder")}</span>
                 </Typography>
             </DialogTitle>
             <DialogContent className="space-y-4">
@@ -176,10 +177,10 @@ function UploadDialog({
                         <div className="flex flex-col items-center justify-center pointer-events-none">
                             <UploadCloudIcon className="text-surface-accent-400 mb-2 w-8 h-8"/>
                             <Typography variant="label">
-                                Drop files here or click to browse
+                                {t("studio_storage_drop_or_browse")}
                             </Typography>
                             <Typography variant="caption" color="secondary">
-                                Any file type supported
+                                {t("studio_storage_any_file_type")}
                             </Typography>
                         </div>
                     }
@@ -194,7 +195,7 @@ function UploadDialog({
                 {selectedFiles.length > 0 && (
                     <div className="space-y-2">
                         <Typography variant="caption" color="secondary">
-                            Selected files ({selectedFiles.length})
+                            {t("studio_storage_selected_files", { count: selectedFiles.length })}
                         </Typography>
                         <div className="max-h-40 overflow-auto space-y-1">
                             {selectedFiles.map((file, index) => (
@@ -229,7 +230,7 @@ function UploadDialog({
 
             <DialogActions>
                 <Button variant="text" onClick={handleClose} disabled={uploading}>
-                    Cancel
+                    {t("studio_storage_cancel")}
                 </Button>
                 <Button
                     variant="filled"
@@ -237,7 +238,11 @@ function UploadDialog({
                     disabled={selectedFiles.length === 0 || uploading}
                     startIcon={uploading ? <CircularProgress size="smallest"/> : <UploadCloudIcon size={14}/>}
                 >
-                    {uploading ? "Uploading..." : `Upload${selectedFiles.length > 0 ? ` (${selectedFiles.length})` : ""}`}
+                    {uploading
+                        ? t("studio_storage_uploading")
+                        : selectedFiles.length > 0
+                            ? t("studio_storage_upload_count", { count: selectedFiles.length })
+                            : t("studio_storage_upload")}
                 </Button>
             </DialogActions>
         </Dialog>
@@ -259,6 +264,7 @@ function FilePreviewPanel({
     onDelete: () => void;
     downloadUrl: string | null;
 }) {
+    const { t } = useTranslation();
     const isImage = file.contentType?.startsWith("image/");
     const isVideo = file.contentType?.startsWith("video/");
     const isAudio = file.contentType?.startsWith("audio/");
@@ -281,8 +287,8 @@ function FilePreviewPanel({
                     </Typography>
                     <div className="flex items-center gap-0.5">
                         {downloadUrl && (
-                            <Tooltip title={t("download")}>
-                                <IconButton aria-label={t("download")}
+                            <Tooltip title={t("studio_storage_download")}>
+                                <IconButton aria-label={t("studio_storage_download")}
                                     size="small"
                                     onClick={() => window.open(downloadUrl, "_blank")}
                                 >
@@ -290,8 +296,8 @@ function FilePreviewPanel({
                                 </IconButton>
                             </Tooltip>
                         )}
-                        <Tooltip title="Delete">
-                            <IconButton aria-label="Delete"
+                        <Tooltip title={t("studio_storage_delete")}>
+                            <IconButton aria-label={t("studio_storage_delete")}
                                 size="small"
                                 onClick={() => setDeleteDialogOpen(true)}
                                 className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
@@ -343,7 +349,7 @@ function FilePreviewPanel({
                                     <div className="flex flex-col items-center gap-3 text-surface-accent-400">
                                         <FileIconComponent className="w-10 h-10"/>
                                         <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">
-                                            No preview available
+                                            {t("studio_storage_no_preview")}
                                         </Typography>
                                     </div>
                                 );
@@ -356,13 +362,13 @@ function FilePreviewPanel({
                     <div className="p-4 space-y-3">
                         <div>
                             <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark text-[10px] uppercase tracking-wider font-semibold mb-1 block">
-                                File Info
+                                {t("studio_storage_file_info")}
                             </Typography>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <Typography variant="caption" className="text-surface-accent-500 text-[11px]">
-                                    Name
+                                    {t("studio_storage_name")}
                                 </Typography>
                                 <Typography variant="body2" className="text-[13px] break-all">
                                     {file.name}
@@ -370,16 +376,16 @@ function FilePreviewPanel({
                             </div>
                             <div>
                                 <Typography variant="caption" className="text-surface-accent-500 text-[11px]">
-                                    Type
+                                    {t("studio_storage_type")}
                                 </Typography>
                                 <Typography variant="body2" className="text-[13px]">
-                                    {file.contentType || "Unknown"}
+                                    {file.contentType || t("studio_storage_type_unknown")}
                                 </Typography>
                             </div>
                             {file.size !== undefined && (
                                 <div>
                                     <Typography variant="caption" className="text-surface-accent-500 text-[11px]">
-                                        Size
+                                        {t("studio_storage_size")}
                                     </Typography>
                                     <Typography variant="body2" className="text-[13px]">
                                         {formatFileSize(file.size)}
@@ -388,7 +394,7 @@ function FilePreviewPanel({
                             )}
                             <div>
                                 <Typography variant="caption" className="text-surface-accent-500 text-[11px]">
-                                    Extension
+                                    {t("studio_storage_extension")}
                                 </Typography>
                                 <Typography variant="body2" className="text-[13px] font-mono">
                                     {getExtension(file.name) || "—"}
@@ -396,7 +402,7 @@ function FilePreviewPanel({
                             </div>
                             <div className="col-span-2">
                                 <Typography variant="caption" className="text-surface-accent-500 text-[11px]">
-                                    Path
+                                    {t("studio_storage_path")}
                                 </Typography>
                                 <Typography variant="body2" className="text-[13px] font-mono break-all">
                                     {file.fullPath}
@@ -407,7 +413,7 @@ function FilePreviewPanel({
                         {downloadUrl && (
                             <div className="pt-2">
                                 <Typography variant="caption" className="text-surface-accent-500 text-[11px] block mb-1">
-                                    URL
+                                    {t("studio_storage_url")}
                                 </Typography>
                                 <div
                                     className={cls(
@@ -432,7 +438,7 @@ function FilePreviewPanel({
                                             return fullUrl;
                                         })()}
                                     </Typography>
-                                    <Tooltip title={urlCopied ? "Copied!" : "Copy URL"}>
+                                    <Tooltip title={urlCopied ? t("studio_storage_url_copied") : t("studio_storage_copy_url")}>
                                         <div className="shrink-0">
                                             {urlCopied
                                                 ? <CheckIcon size={14} className="text-green-500"/>
@@ -448,19 +454,18 @@ function FilePreviewPanel({
 
             {/* Delete Confirmation */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                <DialogTitle hidden>Delete File</DialogTitle>
+                <DialogTitle hidden>{t("studio_storage_delete_file_title")}</DialogTitle>
                 <DialogContent>
                     <Typography variant="subtitle1" className="mb-2">
-                        Delete File?
+                        {t("studio_storage_delete_file_question")}
                     </Typography>
                     <Typography className="text-surface-accent-600 dark:text-surface-accent-400">
-                        Are you sure you want to delete &quot;{file.name}&quot;?
-                        This action cannot be undone.
+                        {t("studio_storage_delete_file_body", { name: file.name })}
                     </Typography>
                 </DialogContent>
                 <DialogActions>
                     <Button variant="text" onClick={() => setDeleteDialogOpen(false)}>
-                        Cancel
+                        {t("studio_storage_cancel")}
                     </Button>
                     <Button
                         variant="filled"
@@ -470,7 +475,7 @@ function FilePreviewPanel({
                             onDelete();
                         }}
                     >
-                        Delete
+                        {t("studio_storage_delete")}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -483,6 +488,7 @@ function FilePreviewPanel({
 // ──────────────────────────────────────────────
 
 export const StorageView = () => {
+    const { t } = useTranslation();
     const defaultStorageSource = useStorageSource();
     const storageSources = useStorageSources();
     const snackbarController = useSnackbarController();
@@ -716,10 +722,10 @@ export const StorageView = () => {
         }
         snackbarController.open({
             type: "success",
-            message: `${uploadFiles.length} file${uploadFiles.length > 1 ? "s" : ""} uploaded successfully`
+            message: t("studio_storage_files_uploaded", { count: uploadFiles.length })
         });
         await fetchContents(currentPath);
-    }, [currentPath, snackbarController, fetchContents]);
+    }, [currentPath, snackbarController, fetchContents, t]);
 
     // Create new folder
     const handleCreateFolder = useCallback(async () => {
@@ -729,7 +735,7 @@ export const StorageView = () => {
         const name = newFolderName.trim();
         if (name.includes("/") || name.includes("\\")) {
             snackbarController.open({ type: "error",
-message: "Folder name cannot contain slashes" });
+message: t("studio_storage_folder_name_has_slash") });
             return;
         }
 
@@ -737,7 +743,7 @@ message: "Folder name cannot contain slashes" });
         const existingFolder = folders.find(f => f.name === name);
         if (existingFolder) {
             snackbarController.open({ type: "error",
-message: `Folder "${name}" already exists` });
+message: t("studio_storage_folder_exists", { name }) });
             return;
         }
 
@@ -761,12 +767,12 @@ message: `Folder "${name}" already exists` });
             });
 
             if (!response.ok) {
-                const err = await response.json().catch(() => ({ error: "Failed to create folder" }));
-                throw new Error(err.error || "Failed to create folder");
+                const err = await response.json().catch(() => ({ error: t("studio_storage_create_folder_failed") }));
+                throw new Error(err.error || t("studio_storage_create_folder_failed"));
             }
 
             snackbarController.open({ type: "success",
-message: `Folder "${name}" created` });
+message: t("studio_storage_folder_created", { name }) });
             setNewFolderDialogOpen(false);
             setNewFolderName("");
             await fetchContents(currentPath);
@@ -776,7 +782,7 @@ message: e instanceof Error ? e.message : String(e) });
         } finally {
             setCreatingFolder(false);
         }
-    }, [newFolderName, currentPath, apiConfig, apiBase, snackbarController, fetchContents, folders, selectedSourceKey]);
+    }, [newFolderName, currentPath, apiConfig, apiBase, snackbarController, fetchContents, folders, selectedSourceKey, t]);
 
     // Drag-and-drop on main view
     const handleDropFiles = useCallback(async (droppedFiles: File[]) => {
@@ -789,7 +795,7 @@ key });
             }
             snackbarController.open({
                 type: "success",
-                message: `${droppedFiles.length} file${droppedFiles.length > 1 ? "s" : ""} uploaded successfully`
+                message: t("studio_storage_files_uploaded", { count: droppedFiles.length })
             });
             await fetchContents(currentPath);
         } catch (e) {
@@ -798,7 +804,7 @@ key });
                 message: e instanceof Error ? e.message : String(e)
             });
         }
-    }, [currentPath, snackbarController, fetchContents]);
+    }, [currentPath, snackbarController, fetchContents, t]);
 
     const {
         getRootProps: getDropRootProps,
@@ -839,7 +845,7 @@ key });
                 await storageSourceRef.current.deleteObject(file.fullPath);
             }
             snackbarController.open({ type: "success",
-message: `"${file.name}" deleted` });
+message: t("studio_storage_file_deleted", { name: file.name }) });
             setSelectedFile(null);
             setSelectedDownloadUrl(null);
             setSelectedPaths(prev => {
@@ -852,7 +858,7 @@ message: `"${file.name}" deleted` });
             snackbarController.open({ type: "error",
 message: e instanceof Error ? e.message : String(e) });
         }
-    }, [currentPath, snackbarController, fetchContents, deleteFolderRecursive]);
+    }, [currentPath, snackbarController, fetchContents, deleteFolderRecursive, t]);
 
     // Bulk delete (selected items)
     const handleBulkDelete = useCallback(async () => {
@@ -867,7 +873,7 @@ message: e instanceof Error ? e.message : String(e) });
                 }
             }
             snackbarController.open({ type: "success",
-message: `${items.length} item${items.length !== 1 ? "s" : ""} deleted` });
+message: t("studio_storage_items_deleted", { count: items.length }) });
             setSelectedPaths(new Set());
             setSelectedFile(null);
             setSelectedDownloadUrl(null);
@@ -880,7 +886,7 @@ message: e instanceof Error ? e.message : String(e) });
             setDeleteDialogOpen(false);
             setDeleteDialogTarget(null);
         }
-    }, [allItems, selectedPaths, currentPath, snackbarController, fetchContents, deleteFolderRecursive]);
+    }, [allItems, selectedPaths, currentPath, snackbarController, fetchContents, deleteFolderRecursive, t]);
 
     // Confirm delete for a single file or folder
     const handleConfirmDeleteItem = useCallback(async () => {
@@ -893,7 +899,9 @@ message: e instanceof Error ? e.message : String(e) });
                 await storageSourceRef.current.deleteObject(deleteDialogTarget.fullPath);
             }
             snackbarController.open({ type: "success",
-message: deleteDialogTarget.isFolder ? `Folder "${deleteDialogTarget.name}" deleted` : `"${deleteDialogTarget.name}" deleted` });
+message: deleteDialogTarget.isFolder
+    ? t("studio_storage_folder_deleted", { name: deleteDialogTarget.name })
+    : t("studio_storage_file_deleted", { name: deleteDialogTarget.name }) });
             if (!deleteDialogTarget.isFolder && selectedFile?.fullPath === deleteDialogTarget.fullPath) {
                 setSelectedFile(null);
                 setSelectedDownloadUrl(null);
@@ -912,7 +920,7 @@ message: e instanceof Error ? e.message : String(e) });
             setDeleteDialogOpen(false);
             setDeleteDialogTarget(null);
         }
-    }, [deleteDialogTarget, selectedFile, currentPath, snackbarController, fetchContents, deleteFolderRecursive]);
+    }, [deleteDialogTarget, selectedFile, currentPath, snackbarController, fetchContents, deleteFolderRecursive, t]);
 
     // Select all / deselect
     const handleSelectAll = useCallback(() => {
@@ -960,7 +968,7 @@ message: e instanceof Error ? e.message : String(e) });
         fetchContents(currentPath);
     }, [currentPath, fetchContents]);
 
-    const segments = breadcrumbSegments(currentPath);
+    const segments = breadcrumbSegments(currentPath, t("studio_storage_root"));
 
 
     // ── Render file grid/list ──
@@ -971,7 +979,7 @@ message: e instanceof Error ? e.message : String(e) });
                     <div className="text-center">
                         <CircularProgress size="medium"/>
                         <Typography variant="body2" className="mt-4 text-text-secondary dark:text-text-secondary-dark font-mono tracking-tight animate-pulse">
-                            Loading...
+                            {t("studio_storage_loading")}
                         </Typography>
                     </div>
                 </div>
@@ -983,13 +991,10 @@ message: e instanceof Error ? e.message : String(e) });
                 <div className="flex-grow flex items-center justify-center p-6 overflow-auto">
                     <div className="max-w-md text-center">
                         <Typography variant="subtitle2" className="block">
-                            This project&apos;s storage rules refused this listing
+                            {t("studio_storage_denied_title")}
                         </Typography>
                         <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark block mt-2">
-                            Nothing is wrong with the project. Its <code>storageAuthorize</code> hook
-                            decides who may read which keys, and it declined this path for the
-                            signed-in account — commonly because a listing must name a prefix the
-                            rule recognises rather than the bucket root.
+                            {t("studio_storage_denied_hint")}
                         </Typography>
                         <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark block mt-3 font-mono break-all">
                             {failure.detail}
@@ -1003,7 +1008,7 @@ message: e instanceof Error ? e.message : String(e) });
             return (
                 <div className="flex-grow flex items-center justify-center p-6 overflow-auto">
                     <ErrorView
-                        title="Could not read this project's storage"
+                        title={t("studio_storage_read_failed")}
                         error={failure.detail}
                         onRetry={failure.retryable ? handleRefresh : undefined}
                     />
@@ -1020,7 +1025,7 @@ message: e instanceof Error ? e.message : String(e) });
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
                         </svg>
                         <Typography variant="body2">
-                            This folder is empty
+                            {t("studio_storage_empty")}
                         </Typography>
                         <div className="flex items-center gap-2 mt-3">
                             <Button variant="text" onClick={() => {
@@ -1028,11 +1033,11 @@ message: e instanceof Error ? e.message : String(e) });
                                 setNewFolderDialogOpen(true);
                             }}>
                                 <FolderPlusIcon size={iconSize.smallest}/>
-                                New folder
+                                {t("studio_storage_new_folder")}
                             </Button>
                             <Button onClick={() => setUploadDialogOpen(true)}>
                                 <PlusIcon size={iconSize.smallest}/>
-                                Upload files
+                                {t("studio_storage_upload_files")}
                             </Button>
                         </div>
                     </div>
@@ -1054,9 +1059,9 @@ message: e instanceof Error ? e.message : String(e) });
                                         onCheckedChange={handleSelectAll}
                                     />
                                 </th>
-                                <th className="px-2 py-2 font-semibold">Name</th>
-                                <th className="px-4 py-2 font-semibold w-24">Type</th>
-                                <th className="px-4 py-2 font-semibold w-24 text-right">Size</th>
+                                <th className="px-2 py-2 font-semibold">{t("studio_storage_name")}</th>
+                                <th className="px-4 py-2 font-semibold w-24">{t("studio_storage_type")}</th>
+                                <th className="px-4 py-2 font-semibold w-24 text-right">{t("studio_storage_size")}</th>
                                 <th className="px-2 py-2 w-10"/>
                             </tr>
                         </thead>
@@ -1101,7 +1106,7 @@ message: e instanceof Error ? e.message : String(e) });
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
-                                                Folder
+                                                {t("studio_storage_folder")}
                                             </Typography>
                                         </td>
                                         <td className="px-4 py-2.5 text-right">
@@ -1190,7 +1195,7 @@ message: e instanceof Error ? e.message : String(e) });
                 {folders.length > 0 && (
                     <div className="mb-4">
                         <Typography variant="caption" className="text-[10px] uppercase tracking-wider font-semibold text-text-disabled dark:text-text-disabled-dark mb-2 block">
-                            Folders
+                            {t("studio_storage_folders")}
                         </Typography>
                         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
                             {folders.map(folder => {
@@ -1225,7 +1230,7 @@ message: e instanceof Error ? e.message : String(e) });
                 {files.length > 0 && (
                     <div>
                         <Typography variant="caption" className="text-[10px] uppercase tracking-wider font-semibold text-text-disabled dark:text-text-disabled-dark mb-2 block">
-                            Files ({files.length})
+                            {t("studio_storage_files_heading", { count: files.length })}
                         </Typography>
                         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
                             {files.map(file => {
@@ -1298,8 +1303,8 @@ message: e instanceof Error ? e.message : String(e) });
                                 <div className="flex items-center gap-1.5 flex-grow overflow-hidden px-3 py-2">
                                     {/* Breadcrumbs — always visible */}
                                     {currentPath && (
-                                        <Tooltip title="Go up">
-                                            <IconButton aria-label="Go up" size="small" onClick={handleNavigateUp}>
+                                        <Tooltip title={t("studio_storage_go_up")}>
+                                            <IconButton aria-label={t("studio_storage_go_up")} size="small" onClick={handleNavigateUp}>
                                                 <ArrowLeftIcon size={iconSize.smallest}/>
                                             </IconButton>
                                         </Tooltip>
@@ -1333,7 +1338,7 @@ message: e instanceof Error ? e.message : String(e) });
                                     {selectedPaths.size > 0 ? (
                                         <div className="flex items-center gap-1.5 shrink-0">
                                             <Typography variant="body2" className="text-[13px] font-medium whitespace-nowrap">
-                                                {selectedPaths.size} selected
+                                                {t("studio_storage_selected_count", { count: selectedPaths.size })}
                                             </Typography>
                                             <Button
                                                 size="small"
@@ -1344,7 +1349,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                 }}
                                             >
                                                 <Trash2Icon size={14} className="mr-1"/>
-                                                Delete
+                                                {t("studio_storage_delete")}
                                             </Button>
                                             <Button
                                                 size="small"
@@ -1356,13 +1361,13 @@ message: e instanceof Error ? e.message : String(e) });
                                                 }}
                                             >
                                                 <XIcon size={14} className="mr-1"/>
-                                                Deselect
+                                                {t("studio_storage_deselect")}
                                             </Button>
                                         </div>
                                     ) : !loading ? (
                                         <Chip size="small" className="shrink-0 text-[10px]">
-                                            {files.length} file{files.length !== 1 ? "s" : ""}
-                                            {folders.length > 0 ? `, ${folders.length} folder${folders.length !== 1 ? "s" : ""}` : ""}
+                                            {t("studio_storage_file_count", { count: files.length })}
+                                            {folders.length > 0 ? `, ${t("studio_storage_folder_count", { count: folders.length })}` : ""}
                                         </Chip>
                                     ) : null}
                                 </div>
@@ -1380,19 +1385,19 @@ message: e instanceof Error ? e.message : String(e) });
                                             }}
                                             renderValue={(key) => {
                                                 const label = storageSources.registry[key]?.label;
-                                                return label ?? (key === DEFAULT_STORAGE_SOURCE_KEY ? "Default" : key);
+                                                return label ?? (key === DEFAULT_STORAGE_SOURCE_KEY ? t("studio_storage_default_source") : key);
                                             }}>
                                             {sourceKeys.map((key) => (
                                                 <SelectItem key={key} value={key}>
                                                     {storageSources.registry[key]?.label
-                                                        ?? (key === DEFAULT_STORAGE_SOURCE_KEY ? "Default" : key)}
+                                                        ?? (key === DEFAULT_STORAGE_SOURCE_KEY ? t("studio_storage_default_source") : key)}
                                                 </SelectItem>
                                             ))}
                                         </Select>
                                     )}
 
-                                    <Tooltip title="Grid view">
-                                        <IconButton aria-label="Grid view"
+                                    <Tooltip title={t("studio_storage_grid_view")}>
+                                        <IconButton aria-label={t("studio_storage_grid_view")}
                                             size="small"
                                             onClick={() => setViewMode("grid")}
                                             className={cls(viewMode === "grid" && "bg-surface-raised")}
@@ -1400,8 +1405,8 @@ message: e instanceof Error ? e.message : String(e) });
                                             <LayoutGridIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </Tooltip>
-                                    <Tooltip title="List view">
-                                        <IconButton aria-label="List view"
+                                    <Tooltip title={t("studio_storage_list_view")}>
+                                        <IconButton aria-label={t("studio_storage_list_view")}
                                             size="small"
                                             onClick={() => setViewMode("list")}
                                             className={cls(viewMode === "list" && "bg-surface-raised")}
@@ -1412,14 +1417,14 @@ message: e instanceof Error ? e.message : String(e) });
 
                                     <div className={cls("h-4 w-px mx-0.5", defaultBorderMixin, "bg-surface-raised")}/>
 
-                                    <Tooltip title="Refresh">
-                                        <IconButton aria-label="Refresh" size="small" onClick={handleRefresh} disabled={loading}>
+                                    <Tooltip title={t("studio_storage_refresh")}>
+                                        <IconButton aria-label={t("studio_storage_refresh")} size="small" onClick={handleRefresh} disabled={loading}>
                                             <RefreshCwIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </Tooltip>
 
-                                    <Tooltip title="New folder">
-                                        <IconButton aria-label="New folder"
+                                    <Tooltip title={t("studio_storage_new_folder")}>
+                                        <IconButton aria-label={t("studio_storage_new_folder")}
                                             size="small"
                                             onClick={() => {
                                                 setNewFolderName("");
@@ -1435,7 +1440,7 @@ message: e instanceof Error ? e.message : String(e) });
                                         onClick={() => setUploadDialogOpen(true)}
                                     >
                                         <UploadCloudIcon size={iconSize.smallest} className="mr-1"/>
-                                        Upload
+                                        {t("studio_storage_upload")}
                                     </Button>
                                 </div>
                             </div>
@@ -1460,10 +1465,10 @@ message: e instanceof Error ? e.message : String(e) });
                                         <div className="flex flex-col items-center gap-2 p-6 rounded-xl border-2 border-dashed border-primary bg-surface-scrim">
                                             <UploadCloudIcon className="w-10 h-10 text-primary"/>
                                             <Typography variant="subtitle2" className="text-primary font-semibold">
-                                                Drop files to upload
+                                                {t("studio_storage_drop_to_upload")}
                                             </Typography>
                                             <Typography variant="caption" color="secondary">
-                                                to /{currentPath || "root"}
+                                                {t("studio_storage_upload_to")} /{currentPath || t("studio_storage_root_folder")}
                                             </Typography>
                                         </div>
                                     </div>
@@ -1474,7 +1479,7 @@ message: e instanceof Error ? e.message : String(e) });
                             <div className={cls("px-4 py-1.5 border-t bg-surface-sheet flex items-center justify-between shrink-0", defaultBorderMixin)}>
                                 <div className="flex items-center gap-4 text-[11px]">
                                     <span className="text-text-disabled dark:text-text-disabled-dark font-semibold uppercase tracking-tighter">
-                                        Path
+                                        {t("studio_storage_path")}
                                     </span>
                                     <span className="font-mono text-text-secondary dark:text-text-secondary-dark">
                                         /{currentPath || ""}
@@ -1482,11 +1487,11 @@ message: e instanceof Error ? e.message : String(e) });
                                 </div>
                                 {selectedPaths.size > 0 ? (
                                     <div className="text-[11px] text-text-secondary dark:text-text-secondary-dark">
-                                        {selectedPaths.size} item{selectedPaths.size !== 1 ? "s" : ""} selected
+                                        {t("studio_storage_items_selected", { count: selectedPaths.size })}
                                     </div>
                                 ) : selectedFile ? (
                                     <div className="text-[11px] text-text-secondary dark:text-text-secondary-dark">
-                                        Selected: <span className="font-mono">{selectedFile.name}</span>
+                                        {t("studio_storage_selected_label")} <span className="font-mono">{selectedFile.name}</span>
                                     </div>
                                 ) : null}
                             </div>
@@ -1526,23 +1531,23 @@ message: e instanceof Error ? e.message : String(e) });
                     }
                 }}
             >
-                <DialogTitle hidden>Delete Confirmation</DialogTitle>
+                <DialogTitle hidden>{t("studio_storage_delete_confirmation_title")}</DialogTitle>
                 <DialogContent>
                     <Typography variant="subtitle1" className="font-semibold mb-2">
                         {deleteDialogTarget === "selection"
-                            ? `Delete ${selectedPaths.size} item${selectedPaths.size !== 1 ? "s" : ""}?`
+                            ? t("studio_storage_delete_items_question", { count: selectedPaths.size })
                             : deleteDialogTarget?.isFolder
-                                ? `Delete folder "${deleteDialogTarget.name}"?`
+                                ? t("studio_storage_delete_folder_question", { name: deleteDialogTarget.name })
                                 : deleteDialogTarget
-                                    ? "Delete File?"
-                                    : "Delete?"}
+                                    ? t("studio_storage_delete_file_question")
+                                    : t("studio_storage_delete_question")}
                     </Typography>
                     <Typography variant="body2" color="secondary">
                         {deleteDialogTarget === "selection"
-                            ? "This will permanently delete all selected files and folders, including their contents. This action cannot be undone."
+                            ? t("studio_storage_delete_selection_body")
                             : deleteDialogTarget && !deleteDialogTarget.isFolder
-                                ? <>Are you sure you want to delete &quot;{deleteDialogTarget.name}&quot;? This action cannot be undone.</>
-                                : "This will permanently delete the folder and all of its contents. This action cannot be undone."}
+                                ? t("studio_storage_delete_file_body", { name: deleteDialogTarget.name })
+                                : t("studio_storage_delete_folder_body")}
                     </Typography>
                 </DialogContent>
                 <DialogActions>
@@ -1554,7 +1559,7 @@ message: e instanceof Error ? e.message : String(e) });
                         }}
                         disabled={deleting}
                     >
-                        Cancel
+                        {t("studio_storage_cancel")}
                     </Button>
                     <LoadingButton
                         color="error"
@@ -1562,7 +1567,7 @@ message: e instanceof Error ? e.message : String(e) });
                         onClick={deleteDialogTarget === "selection" ? handleBulkDelete : handleConfirmDeleteItem}
                     >
                         <Trash2Icon size={14} className="mr-1"/>
-                        Delete
+                        {t("studio_storage_delete")}
                     </LoadingButton>
                 </DialogActions>
             </Dialog>
@@ -1577,12 +1582,12 @@ message: e instanceof Error ? e.message : String(e) });
                     }
                 }}
             >
-                <DialogTitle hidden>New Folder</DialogTitle>
+                <DialogTitle hidden>{t("studio_storage_new_folder_title")}</DialogTitle>
                 <DialogContent>
                     <TextField
                         autoFocus
                         size="small"
-                        label="Folder name"
+                        label={t("studio_storage_folder_name")}
                         value={newFolderName}
                         onChange={(e) => setNewFolderName(e.target.value)}
                         onKeyDown={(e) => {
@@ -1592,11 +1597,11 @@ message: e instanceof Error ? e.message : String(e) });
                             }
                         }}
                         disabled={creatingFolder}
-                        placeholder="Enter folder name"
+                        placeholder={t("studio_storage_folder_name_placeholder")}
                     />
                     {currentPath && (
                         <Typography variant="caption" color="secondary" className="mt-2">
-                            Will be created in <span className="font-mono">/{currentPath}/</span>
+                            {t("studio_storage_created_in")} <span className="font-mono">/{currentPath}/</span>
                         </Typography>
                     )}
                 </DialogContent>
@@ -1609,7 +1614,7 @@ message: e instanceof Error ? e.message : String(e) });
                         }}
                         disabled={creatingFolder}
                     >
-                        Cancel
+                        {t("studio_storage_cancel")}
                     </Button>
                     <LoadingButton
                         color="primary"
@@ -1618,7 +1623,7 @@ message: e instanceof Error ? e.message : String(e) });
                         onClick={handleCreateFolder}
                     >
                         <FolderPlusIcon size={14} className="mr-1"/>
-                        Create
+                        {t("studio_storage_create")}
                     </LoadingButton>
                 </DialogActions>
             </Dialog>

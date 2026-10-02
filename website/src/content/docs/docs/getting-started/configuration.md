@@ -145,6 +145,9 @@ answers.
 | `REBASE_RATE_LIMIT_STORE` | Where auth rate-limit counters live: `memory` (per-process) or `sql` (shared across replicas). A process cannot see its own replica count, so a deployment with peers has to say so — three replicas on the default enforce three times the limit. Any other value **refuses to boot** rather than falling back, `postgres` included. | `memory` |
 | `AUTH_MAGIC_LINK` | Mount the passwordless sign-in-link flow. Needs an email service configured, or the link has nowhere to go. | `false` |
 | `AUTH_EMAIL_OTP` | Mount passwordless sign-in with a six-digit code sent by email. Same email requirement as above. | `false` |
+| `AUTH_MAGIC_LINK_CREATES_USERS` | Passwordless sign-up: a magic-link or email-code request for an unknown address creates the account, while registration is open. | `false` |
+| `AUTH_REFRESH_TOKEN_REUSE` | What a refresh token replayed after its reuse window does: `reject` (refuse it, keep the session) or `revoke-session` (end the sign-in). Anything else fails the boot. | `reject` |
+| `AUTH_REQUIRE_EMAIL_VERIFICATION` | Confirm-first registration: no password sign-in until the address is verified. Needs email; the boot refuses it without. | `false` |
 | `CAPTCHA_PROVIDER` | Turn on captcha verification on the auth routes: `turnstile` or `hcaptcha`. Unset means no captcha. | — |
 | `CAPTCHA_SECRET` | The provider's secret, used server-side to verify the token the browser sends. Required once `CAPTCHA_PROVIDER` is set. | — |
 | `CAPTCHA_ROUTES` | Comma-separated auth routes to protect (for example `register,login`). Unset protects the provider's default set. | — |
@@ -340,6 +343,7 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
 | `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
 | `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |
+| `REBASE_TOKEN` | A token from `rebase cloud tokens create`. Set, every `rebase cloud` command authenticates with it instead of the `rebase cloud login` session, and never reads or writes the stored session. The way to run `rebase cloud` in CI — see [CI and agents](/docs/deployment/cloud/#ci-and-agents). The [MCP server](/docs/ai/mcp/) reads the same name as an alias of `REBASE_API_TOKEN`. | — |
 | `REBASE_DEBUG` | `1` prints the underlying error and request detail instead of the short message. The first thing to set when a `rebase cloud` command fails unhelpfully. | — |
 | `REBASE_DEV_NO_DB` | `rebase dev` starts no database and provisions nothing — you bring your own. Same as `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Pins the frontend dev server's port, which `rebase dev` otherwise derives from the project's path. | — |

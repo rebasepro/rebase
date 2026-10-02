@@ -1,5 +1,5 @@
 ---
-sourceHash: 65910bc3708c9f5d
+sourceHash: ec641aaae29499e9
 title: Funções Personalizadas
 sidebar_label: Funções Personalizadas
 description: Adicione endpoints de API Hono personalizados junto com suas rotas CRUD do Rebase. Descoberta automática a partir de um diretório, com acesso total à instância do backend.
@@ -130,7 +130,7 @@ Arquivos que são **ignorados**:
 - `*.d.ts` — declarações de tipos
 - Subdiretórios e arquivos `.mts` / `.cts` / `.tsx` / `.jsx` / `.mjs` / `.cjs` — reportados como problemas, já que a compilação (build) compila mais do que o runtime carrega
 
-O nome é a identidade da função em todos os outros lugares também: é o segmento da URL, a permissão da chave de API `functions/<name>`, e o valor pelo qual `REBASE_FUNCTIONS_ONLY` faz a seleção quando você atribui um processo próprio para uma função.
+O nome é a identidade da função em todos os outros lugares também: é o segmento da URL, o alvo do escopo `functions:invoke:<name>` de que uma chave precisa para chamá-la, e o valor pelo qual `REBASE_FUNCTIONS_ONLY` faz a seleção quando você atribui um processo próprio para uma função.
 
 ## Formatos de Exportação
 
@@ -209,18 +209,18 @@ Um chamador que apresente um token *inválido* nunca chega ao seu manipulador: u
 ### Lendo o chamador
 
 ```typescript
-import { defineFunction, getUser, getUserId, getRoles, isAdmin } from "@rebasepro/server/functions";
+import { defineFunction, getUser, getUserId, getRoles, getScopes, isAdmin } from "@rebasepro/server/functions";
 
 export default defineFunction((app) => {
     app.get("/me", (c) => {
         const user = getUser(c);          // { uid, roles, ...claims } | undefined
         if (!user) return c.json({ error: "Unauthorized" }, 401);
-        return c.json({ uid: user.uid, roles: user.roles, admin: isAdmin(c) });
+        return c.json({ uid: user.uid, roles: user.roles, admin: isAdmin(c), scopes: getScopes(c) });
     });
 });
 ```
 
-`getUser` retorna um objeto restrito: `uid` é uma string e `roles` é sempre um array, independentemente do método de autenticação utilizado pelo chamador. `getUserId(c)` e `getRoles(c)` são atalhos.
+`getUser` retorna um objeto restrito: `uid` é uma string e `roles` é sempre um array, independentemente do método de autenticação utilizado pelo chamador. `getUserId(c)` e `getRoles(c)` são atalhos. `getScopes(c)` é tudo o que o chamador pode fazer, como strings de [escopo](/docs/backend/roles-and-scopes/): para uma pessoa, o plano de dados, os escopos do próprio app e os escopos dos seus papéis; para uma chave de API, exatamente o que a chave tem.
 
 ### Protegendo Rotas
 
@@ -234,7 +234,7 @@ export default defineFunction((app) => {
     // 401 for anonymous callers.
     app.post("/protected", requireAuth, (c) => c.json({ message: `Hello, ${getUserId(c)}` }));
 
-    // 401 anonymous, 403 without an administrative role. Order matters.
+    // 401 anonymous, 403 without the admin role. Order matters.
     app.post("/admin-only", requireAuth, requireAdmin, (c) => c.json({ ok: true }));
 
     // Any one of the named roles.
@@ -247,6 +247,26 @@ Coloque os guards no **slot de middleware da própria rota**, como acima, em vez
 :::important
 Ler `getUser(c)` **não** é um guard. Um chamador anônimo recebe `undefined` e o seu manipulador é executado mesmo assim. Apenas um guard, ou um `if (!user) return 401` explícito, interrompe a requisição.
 :::
+
+### Escopos e escopos de app
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> `requireAdmin` admite o papel `admin` e mais ninguém. Para uma ação que um papel mais restrito ou uma chave de API deva alcançar, proteja a rota com `requireScope`. Ele aceita um [escopo](/docs/backend/roles-and-scopes/) embutido, ou um que o app declara em `auth.scopes` na coleção de usuários, como `"project:deploy": { label: "Deploy projects", target: "project" }`:
+
+```typescript
+import { defineFunction, requireAuth, requireScope, hasScope } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    // 403 SCOPE_MISSING unless the caller holds project:deploy, or project:deploy:<this project>.
+    app.post("/:project", requireAuth, requireScope("project:deploy", c => c.req.param("project")), (c) => {
+        return c.json({ deploying: c.req.param("project") });
+    });
+
+    // The same question inside a handler.
+    app.get("/:project/can-deploy", requireAuth, (c) => c.json({ allowed: hasScope(c, "project:deploy", c.req.param("project")) }));
+});
+```
+
+Toda pessoa autenticada tem todos os escopos de app, então para uma pessoa `requireScope` não decide nada: verifique no manipulador se esta pessoa pode fazer o deploy deste projeto. O que o escopo acrescenta é uma forma de **restringir uma chave**: uma chave que tem `project:deploy:p1` passa apenas para `p1`. Uma chave também precisa de `functions:invoke`, ou de `functions:invoke:<name>`, antes de sequer alcançar a função. Consulte [Escopos de app](/docs/backend/roles-and-scopes/#app-scopes).
 
 ### Autenticação por Chave de Serviço (Service Key)
 
@@ -553,7 +573,7 @@ Se o carregamento falhar, o carregador fornecerá uma saída de diagnóstico:
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
 ```
 
-O roteador é montado para o **diretório**, não para as funções nele contidas. Se todos os arquivos falharem ao importar — uma única variável de ambiente ausente no escopo do módulo é suficiente para derrubar todos eles —, `GET /api/functions` ainda responderá `200` com uma lista vazia mais uma contagem de `skipped`, de modo que "nada carregado" possa ser distinguido de "esta compilação não incluiu funções". A listagem em si requer um chamador autenticado, uma chave de API ou a chave de serviço — as funções continuam acessíveis por quem quer que cada uma permita, mas o inventário delas não é público. Os motivos permanecem no log de inicialização.
+O roteador é montado para o **diretório**, não para as funções nele contidas. Se todos os arquivos falharem ao importar — uma única variável de ambiente ausente no escopo do módulo é suficiente para derrubar todos eles —, `GET /api/functions` ainda responderá `200` com uma lista vazia mais uma contagem de `skipped`, de modo que "nada carregado" possa ser distinguido de "esta compilação não incluiu funções". A listagem em si requer um chamador autenticado, uma chave de API que tenha o escopo simples `functions:invoke`, ou a chave de serviço — as funções continuam acessíveis por quem quer que cada uma permita, mas o inventário delas não é público. Os motivos permanecem no log de inicialização.
 
 ## Timeouts e Limites de Taxa (Rate Limits)
 

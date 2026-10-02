@@ -3,9 +3,8 @@ import { HonoEnv } from "../api/types";
 import { BackendCollectionRegistry } from "../collections/BackendCollectionRegistry";
 import { ApiError, errorHandler } from "../api/errors";
 import { resolveListLimitParam } from "../api/rest/query-parser";
-import { CollectionConfig, DataDriver } from "@rebasepro/types";
-import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
-import { httpMethodToOperation, isOperationAllowed } from "../auth/api-keys/api-key-permission-guard";
+import { CollectionConfig, DataDriver, scopeGrants } from "@rebasepro/types";
+import { httpMethodToOperation } from "../auth/api-keys/http-operation";
 import { type FieldViewer, restrictedFieldNames } from "@rebasepro/common";
 import { requestViewer } from "../api/rest/field-access-query";
 import { assertNoClosedFields } from "../api/rest/write-validation";
@@ -214,13 +213,12 @@ export function createHistoryRoutes(params: {
         collection: CollectionConfig,
         id: string
     ): Promise<Record<string, unknown>> {
-        const apiKey = c.get("apiKey") as ApiKeyMasked | undefined;
-        const operation = httpMethodToOperation(c.req.method);
-        if (apiKey && !isOperationAllowed(apiKey.permissions, collection.slug, operation)) {
-            throw ApiError.forbidden(
-                `API key does not have "${operation}" permission for collection "${collection.slug}"`,
-                "API_KEY_FORBIDDEN"
-            );
+        const narrowed = c.get("scopes");
+        const scope = `data:${httpMethodToOperation(c.req.method)}`;
+        if (narrowed && !scopeGrants(narrowed, scope, collection.slug)) {
+            throw new ApiError(403, "SCOPE_MISSING",
+                `This credential does not hold "${scope}" for collection "${collection.slug}".`,
+                { requiredScope: `${scope}:${collection.slug}` });
         }
 
         const scoped = c.get("driver") as DataDriver | undefined;

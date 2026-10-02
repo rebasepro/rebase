@@ -1,5 +1,5 @@
 ---
-sourceHash: 82e083381f34098d
+sourceHash: 494cc48e060fb2f1
 title: API REST
 sidebar_label: API REST
 description: Points de terminaison d'API REST générés automatiquement pour chaque collection, avec filtrage, tri, pagination et inclusion de relations.
@@ -453,7 +453,7 @@ Chaque hook est attendu, et une exception levée par l'un d'eux annule toute l'�
 | `GET` | `/api/docs` | aucune | La spécification JSON OpenAPI 3.0 |
 | `GET` | `/api/swagger` | aucune | Swagger UI. Activé en développement, désactivé en production ; `REBASE_ENABLE_SWAGGER` permet de forcer l'un ou l'autre |
 | `GET` | `/api/meta/schema-version` | aucune | Le hash du schéma à partir duquel ce backend a été construit — délibérément sans authentification, et il ne retourne que ce hash |
-| `GET` | `/api/meta/contract` | admin, clé de service ou clé API admin | Le contrat complet des collections, pour `rebase generate-sdk --from`. Sécurisé par défaut : `404` lorsqu'aucune authentification n'est configurée |
+| `GET` | `/api/meta/contract` | `schema:read` : un administrateur, la clé de service, ou une clé API qui la détient | Le contrat complet des collections, pour `rebase generate-sdk --from`. Sécurisé par défaut : `404` lorsqu'aucune authentification n'est configurée |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` si défini | Métriques Prometheus, lorsque `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
@@ -470,7 +470,7 @@ Le schéma complet des collections du projet — chaque collection, propriété 
 GET /api/meta/contract
 ```
 
-Il est **réservé aux administrateurs**, et sur un déploiement où aucune authentification n'est configurée, il n'est pas du tout accessible (404 `CONTRACT_UNAVAILABLE`) plutôt que d'exposer le schéma à tous. Son point de terminaison homologue renvoie une chaîne de version représentant le schéma sans le décrire, et est délibérément accessible sans aucun identifiant — ce qu'un job CI interroge régulièrement :
+Il exige la portée **`schema:read`**, que détient un administrateur, et sur un déploiement où aucune authentification n'est configurée, il n'est pas du tout accessible (404 `CONTRACT_UNAVAILABLE`) plutôt que d'exposer le schéma à tous. Son point de terminaison homologue renvoie une chaîne de version représentant le schéma sans le décrire, et est délibérément accessible sans aucun identifiant — ce qu'un job CI interroge régulièrement :
 
 ```bash
 GET /api/meta/schema-version

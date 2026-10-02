@@ -69,7 +69,7 @@ const CLIENT = {
     clientName: "Claude",
     redirectUris: ["https://claude.ai/api/mcp/auth_callback", "http://127.0.0.1:1234/cb"],
     grantTypes: ["authorization_code", "refresh_token"],
-    scope: "mcp:read mcp:write",
+    scope: "data:read data:write data:delete",
     tokenEndpointAuthMethod: "none"
 };
 
@@ -80,7 +80,7 @@ const CODE_RECORD = {
     redirectUri: "https://claude.ai/api/mcp/auth_callback",
     codeChallenge: "challenge",
     codeChallengeMethod: "S256",
-    scope: "mcp:read",
+    scope: "data:read",
     resource: "https://talent.sustentalent.com/mcp"
 };
 
@@ -88,7 +88,7 @@ const REFRESH_RECORD = {
     clientId: "mcp_abc",
     uid: "user-1",
     roles: ["recruiter"],
-    scope: "mcp:read",
+    scope: "data:read",
     resource: "https://talent.sustentalent.com/mcp",
     family: "fam-1"
 };
@@ -306,12 +306,12 @@ describe("consent and grants", () => {
     });
 
     it("records consent and lists it", async () => {
-        await store.recordConsent("user-1", "mcp_abc", "mcp:read");
+        await store.recordConsent("user-1", "mcp_abc", "data:read");
         const grants = await store.listGrants("user-1");
 
         expect(grants).toHaveLength(1);
         expect(grants[0]).toMatchObject({
-            clientId: "mcp_abc", clientName: "Claude", scope: "mcp:read", activeTokens: 0
+            clientId: "mcp_abc", clientName: "Claude", scope: "data:read", activeTokens: 0
         });
         // ISO, not a Date and not a Postgres timestamp string, because it goes
         // straight out over JSON.
@@ -319,16 +319,16 @@ describe("consent and grants", () => {
     });
 
     it("updates the scope on a second consent rather than inserting twice", async () => {
-        await store.recordConsent("user-1", "mcp_abc", "mcp:read");
-        await store.recordConsent("user-1", "mcp_abc", "mcp:read mcp:write");
+        await store.recordConsent("user-1", "mcp_abc", "data:read");
+        await store.recordConsent("user-1", "mcp_abc", "data:read data:write data:delete");
 
         const grants = await store.listGrants("user-1");
         expect(grants).toHaveLength(1);
-        expect(grants[0].scope).toBe("mcp:read mcp:write");
+        expect(grants[0].scope).toBe("data:read data:write data:delete");
     });
 
     it("counts only live refresh tokens", async () => {
-        await store.recordConsent("user-1", "mcp_abc", "mcp:read");
+        await store.recordConsent("user-1", "mcp_abc", "data:read");
         await store.saveRefreshToken("live", REFRESH_RECORD, soon());
         await store.saveRefreshToken("stale", { ...REFRESH_RECORD, family: "fam-x" }, past());
         await store.saveRefreshToken("spent", { ...REFRESH_RECORD, family: "fam-y" }, soon());
@@ -339,19 +339,19 @@ describe("consent and grants", () => {
 
     it("lists a grant whose client row is gone, as an unnamed entry", async () => {
         // An INNER JOIN would hide exactly the grants nobody can account for.
-        await store.recordConsent("user-1", "mcp_ghost", "mcp:read");
+        await store.recordConsent("user-1", "mcp_ghost", "data:read");
         const grants = await store.listGrants("user-1");
         expect(grants).toHaveLength(1);
         expect(grants[0].clientName).toBe("(unknown application)");
     });
 
     it("shows one user nothing of another's", async () => {
-        await store.recordConsent("user-1", "mcp_abc", "mcp:read");
+        await store.recordConsent("user-1", "mcp_abc", "data:read");
         expect(await store.listGrants("user-2")).toEqual([]);
     });
 
     it("revokes a grant: tokens dead, consent forgotten", async () => {
-        await store.recordConsent("user-1", "mcp_abc", "mcp:read");
+        await store.recordConsent("user-1", "mcp_abc", "data:read");
         await store.saveRefreshToken("rt-1", REFRESH_RECORD, soon());
 
         expect(await store.revokeGrant("user-1", "mcp_abc")).toBe(true);
@@ -360,7 +360,7 @@ describe("consent and grants", () => {
     });
 
     it("revokes every token in the grant, not only the newest", async () => {
-        await store.recordConsent("user-1", "mcp_abc", "mcp:read");
+        await store.recordConsent("user-1", "mcp_abc", "data:read");
         await store.saveRefreshToken("rt-1", REFRESH_RECORD, soon());
         await store.saveRefreshToken("rt-2", { ...REFRESH_RECORD, family: "fam-2" }, soon());
 
@@ -371,8 +371,8 @@ describe("consent and grants", () => {
     });
 
     it("does not touch another user's tokens for the same client", async () => {
-        await store.recordConsent("user-1", "mcp_abc", "mcp:read");
-        await store.recordConsent("user-2", "mcp_abc", "mcp:read");
+        await store.recordConsent("user-1", "mcp_abc", "data:read");
+        await store.recordConsent("user-2", "mcp_abc", "data:read");
         await store.saveRefreshToken("mine", REFRESH_RECORD, soon());
         await store.saveRefreshToken("theirs", { ...REFRESH_RECORD, uid: "user-2", family: "fam-2" }, soon());
 
@@ -387,7 +387,7 @@ describe("consent and grants", () => {
     });
 
     it("is idempotent", async () => {
-        await store.recordConsent("user-1", "mcp_abc", "mcp:read");
+        await store.recordConsent("user-1", "mcp_abc", "data:read");
         expect(await store.revokeGrant("user-1", "mcp_abc")).toBe(true);
         expect(await store.revokeGrant("user-1", "mcp_abc")).toBe(false);
     });
@@ -418,7 +418,7 @@ describe("hostile input reaches the database as data", () => {
     });
 
     it.each(NASTY)("survives %j as a uid", async (uid) => {
-        await store.recordConsent(uid, "mcp_abc", "mcp:read");
+        await store.recordConsent(uid, "mcp_abc", "data:read");
         const grants = await store.listGrants(uid);
         expect(grants).toHaveLength(1);
     });

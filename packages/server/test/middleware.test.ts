@@ -71,7 +71,8 @@ describe("Auth Middleware", () => {
                 aal: "aal1",
                 // `iat` is carried through verification now: revocation compares the
                 // token\'s issue time against the user\'s `tokensValidAfter` watermark.
-                iat: expect.any(Number)
+                iat: expect.any(Number),
+                exp: expect.any(Number)
             });
         });
 
@@ -144,7 +145,8 @@ describe("Auth Middleware", () => {
             expect(getUser()).toEqual({ uid: "user-123",
 roles: ["admin"],
 aal: "aal1",
-iat: expect.any(Number) });
+iat: expect.any(Number),
+                exp: expect.any(Number) });
         });
 
         it("should handle an uppercase BEARER prefix", async () => {
@@ -157,7 +159,8 @@ iat: expect.any(Number) });
             expect(getUser()).toEqual({ uid: "user-123",
 roles: ["admin"],
 aal: "aal1",
-iat: expect.any(Number) });
+iat: expect.any(Number),
+                exp: expect.any(Number) });
         });
 
         it("should still reject a non-Bearer scheme", async () => {
@@ -206,7 +209,8 @@ iat: expect.any(Number) });
                 aal: "aal1",
                 // `iat` is carried through verification now: revocation compares the
                 // token\'s issue time against the user\'s `tokensValidAfter` watermark.
-                iat: expect.any(Number)
+                iat: expect.any(Number),
+                exp: expect.any(Number)
             });
         });
 
@@ -241,7 +245,8 @@ iat: expect.any(Number) });
                 aal: "aal1",
                 // `iat` is carried through verification now: revocation compares the
                 // token\'s issue time against the user\'s `tokensValidAfter` watermark.
-                iat: expect.any(Number)
+                iat: expect.any(Number),
+                exp: expect.any(Number)
             });
         });
 
@@ -328,13 +333,16 @@ roles: ["editor", "admin"] } });
             expect(getStatus()).toBeUndefined(); // No error response
         });
 
-        it("should allow access if user has 'schema-admin' role", async () => {
-            const { c } = createMockContext({ user: { uid: "user-123",
+        it("should block a role that only sounds administrative", async () => {
+            // `admin` is the one role holding every scope; a role declared with
+            // a narrower set is not an administrator.
+            const { c, getStatus } = createMockContext({ user: { uid: "user-123",
 roles: ["schema-admin"] } });
 
             await requireAdmin(c, nextFn);
 
-            expect(nextFn).toHaveBeenCalled();
+            expect(getStatus()).toBe(403);
+            expect(nextFn).not.toHaveBeenCalled();
         });
 
         it("should block access for malformed spoofed string roles", async () => {
@@ -359,7 +367,8 @@ roles: ["schema-adminstration", "admins", "admin "] } });
                 aal: "aal1",
                 // `iat` is carried through verification now: revocation compares the
                 // token\'s issue time against the user\'s `tokensValidAfter` watermark.
-                iat: expect.any(Number)
+                iat: expect.any(Number),
+                exp: expect.any(Number)
             });
         });
 
@@ -383,7 +392,8 @@ roles: ["schema-adminstration", "admins", "admin "] } });
                 aal: "aal1",
                 // `iat` is carried through verification now: revocation compares the
                 // token\'s issue time against the user\'s `tokensValidAfter` watermark.
-                iat: expect.any(Number)
+                iat: expect.any(Number),
+                exp: expect.any(Number)
             });
         });
     });

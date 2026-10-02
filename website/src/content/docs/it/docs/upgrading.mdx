@@ -1,5 +1,5 @@
 ---
-sourceHash: 01f06c4ce72b27dc
+sourceHash: 9ea72d42a00c7f9a
 slug: it/docs/upgrading
 title: Aggiornamento
 description: Cosa si interrompe quando si passa da un'app esistente alla versione attuale, e cosa fare per ciascun problema.
@@ -11,7 +11,7 @@ Sette passaggi, a partire dal più recente. Inizia da quello immediatamente supe
 
 | Sei sulla | Leggi | Cosa comporta per te |
 |---|---|---|
-| **0.23** | [0.23 → prossima](/docs/upgrading/0-23-to-next/) | Non ancora rilasciata: ciò che è stato unito su `main` ed è già descritto in questa documentazione. L'SQL prodotto da `db push` e `db generate` si sposta da `drizzle/` alla directory non committata `.rebase/sql/`, l'opzione `--generate` di `rebase dev` scompare perché `dev` rigenera sempre i tipi dell'SDK, e una modifica live dello schema non committa alcun SQL. |
+| **0.23** | [0.23 → prossima](/docs/upgrading/0-23-to-next/) | Non ancora rilasciata: ciò che è stato unito su `main` ed è già descritto in questa documentazione. L'SQL prodotto da `db push` e `db generate` si sposta da `drizzle/` alla directory non committata `.rebase/sql/`, l'opzione `--generate` di `rebase dev` scompare perché `dev` rigenera sempre i tipi dell'SDK, e una modifica live dello schema non committa alcun SQL. I permessi diventano scope: le superfici di amministrazione chiedono uno scope invece del ruolo admin, le chiavi API hanno scope al posto di un elenco di permessi e di un flag `admin`, e `schema-admin` non è più un amministratore. |
 | **0.21 – 0.22** | [0.21 → 0.23](/docs/upgrading/0-21-to-0-23/) | Una chiave API su un percorso annidato richiede `read` sui parent, variabili numeriche e durate di sessione illeggibili impediscono l'avvio, un repository di autenticazione personalizzato richiede `unlinkUserIdentity`, e trasformare un ospite in account richiede il captcha `register`. 0.22 non dichiara modifiche incompatibili, quindi è un solo passaggio da 0.21. |
 | **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` non compila più all'interno di una callback di collection — esegui le query tramite `context.data` — e `selectedEntities` lascia il posto a una selezione che può rappresentare righe che nessuno ha caricato. Le versioni 0.19 e 0.20 non dichiarano breaking change, quindi questo è un singolo passaggio a partire da 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Undici breaking change, per la maggior parte errori di compilazione anziché modifiche silenziose del comportamento. `rebase.data` scompare a runtime, i range dei peer si restringono ai caret, e il requisito minimo di Node sale a 22.22.0. |

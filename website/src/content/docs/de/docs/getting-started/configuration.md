@@ -1,5 +1,5 @@
 ---
-sourceHash: 13da9556eb061931
+sourceHash: dada1405f6a44e36
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -330,6 +330,7 @@ Wird von `rebase` gelesen, nicht vom Server. Nichts hier hat Auswirkungen auf ei
 | `REBASE_CLOUD_URL` | Die Control Plane, mit der `rebase cloud` kommuniziert. | — |
 | `REBASE_CLOUD_EMAIL` | Das Konto, als das sich `rebase cloud login` anmeldet, anstatt danach zu fragen. | — |
 | `REBASE_CLOUD_PASSWORD` | Dessen Passwort, damit ein Secret-Speicher es übergeben kann, ohne dass es in den Verlauf der Shell gelangt. | — |
+| `REBASE_TOKEN` | Ein Token aus `rebase cloud tokens create`. Ist sie gesetzt, authentifiziert sich jeder `rebase cloud`-Befehl damit statt mit der Sitzung von `rebase cloud login` und liest oder schreibt nie die gespeicherte Sitzung. So läuft `rebase cloud` in CI — siehe [CI und Agenten](/docs/deployment/cloud/#ci-and-agents). Der [MCP-Server](/docs/ai/mcp/) liest denselben Namen als Alias von `REBASE_API_TOKEN`. | — |
 | `REBASE_DEBUG` | `1` gibt den zugrunde liegenden Fehler und Anfragedetails anstelle der Kurznachricht aus. Das Erste, was gesetzt werden sollte, wenn ein `rebase cloud`-Befehl ohne hilfreiche Meldung fehlschlägt. | — |
 | `REBASE_DEV_NO_DB` | `rebase dev` startet keine Datenbank und stellt nichts bereit – Sie bringen Ihre eigene mit. Entspricht `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Fixiert den Port des Frontend-Dev-Servers, den `rebase dev` ansonsten aus dem Projektpfad ableitet. | — |

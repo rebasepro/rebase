@@ -16,26 +16,31 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/login` | Login with email/password |
 | `POST` | `/api/auth/refresh` | Refresh the access token |
 | `POST` | `/api/auth/<provider>` | OAuth sign-in (e.g., `/api/auth/google`, `/api/auth/linkedin`) |
-| `POST` | `/api/auth/link/<provider>` | Link an OAuth provider to the authenticated account |
+| `POST` | `/api/auth/link/<provider>` | Link an OAuth provider to the authenticated account. On a guest this is registration: it needs `allowRegistration`, takes the provider's address when the provider vouches for it, and answers with a session for the account the guest became |
 | `POST` | `/api/auth/logout` | Revoke refresh token |
 | `POST` | `/api/auth/forgot-password` | Send password reset email |
 | `POST` | `/api/auth/reset-password` | Reset password with token |
 | `POST` | `/api/auth/find-user` | Resolve an email to a minimal public profile (opt-in — `AUTH_ALLOW_USER_LOOKUP`) |
-| `POST` | `/api/auth/change-password` | Change the caller's own password (authenticated) |
+| `POST` | `/api/auth/change-password` | Change the caller's own password (authenticated). Ends every other session and answers with a fresh one for the caller |
 | `GET` | `/api/auth/me` | The caller's own profile |
 | `PATCH` | `/api/auth/me` | Update the caller's own profile |
 | `GET` | `/api/auth/config` | What this backend offers a sign-in screen — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Unauthenticated, and computed from the same predicates the routes enforce, so what the screen advertises cannot drift from what it can do |
 | `POST` | `/api/auth/send-verification` | Send the caller an email-verification link |
-| `GET` | `/api/auth/verify-email` | Consume a verification link (the URL in that email) |
+| `GET` | `/api/auth/verify-email` | Consume a verification link (the URL in that email). Keeps what a live session of the account proves and removes what nobody proved — see [Email verification](/docs/backend/email-verification/) |
+| `POST` | `/api/auth/verify-email` | The same with `{ token, password?, removeUnproven? }`: the password keeps it and signs in; with neither proof an account holding one answers `409 PROOF_REQUIRED` |
 | `POST` | `/api/auth/magic-link` | Email a one-time sign-in link. `503 EMAIL_NOT_CONFIGURED` without SMTP |
 | `POST` | `/api/auth/magic-link/verify` | Exchange a magic-link token for a session |
 | `POST` | `/api/auth/otp` | Email a six-digit sign-in code. Answers the same whether or not the address has an account |
 | `POST` | `/api/auth/otp/verify` | Exchange `{ email, code }` for a session |
 | `POST` | `/api/auth/anonymous` | Create an anonymous session (opt-in — `ALLOW_ANONYMOUS`) |
 | `POST` | `/api/auth/anonymous/link` | Attach real credentials to the anonymous account already signed in |
-| `GET` | `/api/auth/sessions` | List the caller's active sessions (refresh tokens) |
+| `GET` | `/api/auth/sessions` | List the caller's active sessions, one per sign-in. The caller's own is marked `isCurrentSession` |
 | `DELETE` | `/api/auth/sessions` | Revoke every session, this one included — remote logout on every device |
-| `DELETE` | `/api/auth/sessions/:id` | Revoke one session |
+| `DELETE` | `/api/auth/sessions/:id` | Revoke one session: its refresh token, and the access token that device holds |
+| `GET` | `/api/auth/scopes` | Every [scope](/docs/backend/roles-and-scopes/) this backend knows, and the ones the caller holds |
+| `GET` | `/api/auth/keys` | The caller's own [personal API keys](/docs/backend/api-keys/#personal-keys) |
+| `POST` | `/api/auth/keys` | Create a personal key. `403 PERSONAL_KEYS_DISABLED` unless the users collection sets `auth.personalKeys` |
+| `DELETE` | `/api/auth/keys/:id` | Revoke one of the caller's own keys |
 | `GET` | `/.well-known/jwks.json` | The public JWKS — mounted at the root, not under `basePath`, because that is where a verifier looks. Present when [asymmetric signing](#asymmetric-tokens-and-jwks) is configured |
 | `POST` | `/api/auth/mfa/enroll` | Start TOTP enrolment (returns the secret and recovery codes) |
 | `POST` | `/api/auth/mfa/verify` | Confirm an enrolment with a code from the authenticator |
@@ -43,20 +48,24 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/mfa/challenge` | Open a challenge against a verified factor |
 | `POST` | `/api/auth/mfa/challenge/verify` | Answer a challenge — this is what issues the session |
 | `DELETE` | `/api/auth/mfa/unenroll` | Remove a factor (requires an `aal2` session) |
+| `POST` | `/api/auth/mfa/recovery-codes` | Replace the caller's recovery codes with ten new ones (requires an `aal2` session) |
 
 Administrative user and role management is a **separate surface**, mounted at
-`/api/admin/` rather than `/api/auth/`, and gated on the `admin` role or the
-service key:
+`/api/admin/` rather than `/api/auth/`. Reading needs the `users:read` scope and
+changing needs `users:write`. An admin and the service key hold both; so does a
+role that declares them. Nobody may change an account that holds more than they
+do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/admin/users` | List users (paginated) |
 | `POST` | `/api/admin/users` | Create a user |
 | `GET` | `/api/admin/users/:uid` | Read one user |
-| `PUT` | `/api/admin/users/:uid` | Update one user |
-| `DELETE` | `/api/admin/users/:uid` | Delete one user |
+| `PUT` | `/api/admin/users/:uid` | Update one user. `{ disabled: true }` switches the account off without deleting it: every sign-in and refresh is refused (`ACCOUNT_DISABLED`), its sessions end and every token it holds is refused; `false` switches it back on |
+| `DELETE` | `/api/admin/users/:uid` | Delete one user. Their sessions end, and every access token they hold is refused from that request on |
 | `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one |
-| `GET` | `/api/admin/roles` | List the roles this backend knows |
+| `DELETE` | `/api/admin/users/:uid/mfa` | Remove a user's second factors and recovery codes, and end their sessions — for someone who lost both |
+| `GET` | `/api/admin/roles` | `admin` and the roles the users collection declares, with their scopes |
 | `POST` | `/api/admin/bootstrap` | Let the earliest-registered user claim the admin role while none exists. Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).

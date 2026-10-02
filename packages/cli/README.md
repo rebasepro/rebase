@@ -36,7 +36,7 @@ The CLI is also bundled with every Rebase project as a local dependency.
 | `rebase db reset` | Delete the managed development database and start over |
 | `rebase generate-sdk` | Generate a typed TypeScript SDK from collections |
 | `rebase auth reset-password` | Reset a user's password |
-| `rebase api-keys list \| create \| revoke` | Manage scoped service API keys |
+| `rebase api-keys list \| get \| create \| revoke \| scopes` | Manage service API keys and the scopes they hold |
 | `rebase doctor` | Detect schema drift between collections, Drizzle schema, and database |
 | `rebase status` | Show every resource this project declares and whether its variables are set |
 | `rebase resources` | List the databases, buckets and topics this project declares |
@@ -64,7 +64,7 @@ rebase cloud status                # project status at a glance
 
 | Group | Commands |
 |-------|----------|
-| Auth | `login`, `logout`, `whoami` |
+| Auth | `login`, `logout`, `whoami`, `tokens list \| create \| revoke` |
 | Link/context | `link`, `unlink`, `use [org]`, `open` |
 | Projects | `projects list \| create \| info \| delete` |
 | Deploy/observe | `deploy`, `logs [--runtime] [-f]`, `status`, `metrics` |
@@ -74,6 +74,22 @@ rebase cloud status                # project status at a glance
 
 Most commands act on the linked project unless you pass `--project <id>`.
 Run `rebase cloud --help` for the full list.
+
+### Tokens for CI and agents
+
+A token acts as your account, narrowed to what it was created for on one project.
+Create it from a signed-in terminal, then hand it to CI as `REBASE_TOKEN` — every
+`rebase cloud` command uses it instead of a login, and never reads or writes the
+stored session:
+
+```bash
+rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
+# → export REBASE_TOKEN=rk_live_…   (shown once)
+REBASE_TOKEN=rk_live_… rebase cloud deploy --project shop
+```
+
+`--can` takes `deploy`, `logs`, `env`, `database` and `backups`. A token cannot
+create, list or revoke tokens, and none can restore a backup.
 
 ## Quick Start
 

@@ -7,22 +7,21 @@ import type { CollectionConfig } from "../../types/src/types/collections";
 /**
  * `POST /:slug/bulk/delete` deletes, whatever its verb says.
  *
- * The permission guard derived the operation from the HTTP method, so this
- * route — a POST for transport reasons its own docblock explains, since a body
- * on DELETE is dropped by proxies and by several OpenAPI generators — was
- * classified `write`. A key scoped `["read","write"]` with `delete`
- * deliberately withheld, which is the shape the docs recommend for an agent,
- * therefore deleted every row it named and got a 200 back. The `delete`
- * permission was not a boundary at all.
+ * Deriving the operation from the HTTP method would classify this route — a
+ * POST for transport reasons its own docblock explains, since a body on DELETE
+ * is dropped by proxies and by several OpenAPI generators — as `write`. A key
+ * holding `data:read` and `data:write` with `data:delete` deliberately
+ * withheld, which is the shape the docs recommend for an agent, would then
+ * delete every row it named and get a 200 back.
  *
- * The route states its operation now. These tests pin both directions: the
- * withheld permission refuses, and the granted one still works — a guard that
- * refused everything would satisfy the first assertion alone.
+ * The route states its operation. These tests pin both directions: the
+ * withheld scope refuses, and the granted one works — a guard that refused
+ * everything would satisfy the first assertion alone.
  */
-describe("API key permissions on bulk delete", () => {
+describe("API key scopes on bulk delete", () => {
     let deleted: { path: string; ids: (string | number)[] }[] = [];
 
-    function harness(permissions: unknown) {
+    function harness(scopes: string[]) {
         deleted = [];
         const driver = {
             key: "postgres",
@@ -43,7 +42,8 @@ describe("API key permissions on bulk delete", () => {
         app.use("/*", async (c, next) => {
             c.set("driver", driver);
             c.set("user", { uid: "user-1" });
-            c.set("apiKey", { id: "key-1", permissions });
+            c.set("apiKey", { id: "key-1", scopes } as never);
+            c.set("scopes", scopes);
             await next();
         });
         app.route("/", new RestApiGenerator(collections, driver, undefined, 3).generateRoutes());
@@ -58,21 +58,21 @@ describe("API key permissions on bulk delete", () => {
         });
 
     it("refuses a read+write key — `delete` was withheld on purpose", async () => {
-        const app = harness([{ collection: "posts", operations: ["read", "write"] }]);
+        const app = harness(["data:read:posts", "data:write:posts"]);
 
         const res = await bulkDelete(app);
 
         expect(res.status).toBe(403);
         const body = await res.json() as { error: { code: string; message: string } };
-        expect(body.error.code).toBe("API_KEY_FORBIDDEN");
-        // The message must name the operation the caller actually lacked.
-        expect(body.error.message).toContain("delete");
+        expect(body.error.code).toBe("SCOPE_MISSING");
+        // The message must name the scope the caller actually lacked.
+        expect(body.error.message).toContain("data:delete");
         // And nothing may have reached the driver.
         expect(deleted).toEqual([]);
     });
 
-    it("allows a key that holds delete", async () => {
-        const app = harness([{ collection: "posts", operations: ["read", "write", "delete"] }]);
+    it("allows a key that holds data:delete on the collection", async () => {
+        const app = harness(["data:read:posts", "data:delete:posts"]);
 
         const res = await bulkDelete(app);
 

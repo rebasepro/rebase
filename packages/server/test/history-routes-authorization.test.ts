@@ -48,12 +48,12 @@ const ALICES_SECRET = { title: "alice's private draft", salary: 145000 };
 function mount(options: {
     /** Ids this caller's RLS context can see. Anything else reads as denied. */
     visibleToCaller: string[];
-    /** Present only for API-key requests. */
-    apiKey?: { id: string; permissions: unknown };
+    /** Present only for API-key requests: the scopes the key holds. */
+    keyScopes?: string[];
     /** Omit to model a request that reached the route with no scoped driver. */
     withScopedDriver?: boolean;
 }) {
-    const { visibleToCaller, apiKey, withScopedDriver = true } = options;
+    const { visibleToCaller, keyScopes, withScopedDriver = true } = options;
 
     // The privileged reader: table + id, no caller, no policies. What
     // `HistoryService` is.
@@ -83,7 +83,10 @@ function mount(options: {
     const app = new Hono<HonoEnv>();
     app.use("/*", async (c, next) => {
         if (withScopedDriver) c.set("driver", scopedDriver);
-        if (apiKey) c.set("apiKey", apiKey as never);
+        if (keyScopes) {
+            c.set("apiKey", { id: "k1", scopes: keyScopes } as never);
+            c.set("scopes", keyScopes);
+        }
         await next();
     });
     app.route("/api/data", createHistoryRoutes({
@@ -168,11 +171,11 @@ describe("GET /:slug/:id/history — RLS", () => {
     });
 });
 
-describe("GET /:slug/:id/history — API key permissions", () => {
-    it("refuses a key with no permission for the collection", async () => {
+describe("GET /:slug/:id/history — API key scopes", () => {
+    it("refuses a key with no scope for the collection", async () => {
         const { app, fetchHistory } = mount({
             visibleToCaller: ["post-alice"],
-            apiKey: { id: "k1", permissions: [{ collection: "comments", operations: ["read"] }] }
+            keyScopes: ["data:read:comments"]
         });
 
         const res = await listHistory(app, "/api/data/posts/post-alice/history");
@@ -184,19 +187,19 @@ describe("GET /:slug/:id/history — API key permissions", () => {
     it("allows a key scoped to this collection", async () => {
         const { app } = mount({
             visibleToCaller: ["post-alice"],
-            apiKey: { id: "k1", permissions: [{ collection: "posts", operations: ["read"] }] }
+            keyScopes: ["data:read:posts"]
         });
 
         expect((await listHistory(app, "/api/data/posts/post-alice/history")).status).toBe(200);
     });
 
     it("refuses a read-only key attempting a revert", async () => {
-        // The permission check follows the request's method. A revert is a
-        // write to the collection, and a key that may only read it must not be
-        // able to reach one through the history route.
+        // The scope check follows the request's method. A revert is a write
+        // to the collection, and a key that may only read it must not be able
+        // to reach one through the history route.
         const { app, save } = mount({
             visibleToCaller: ["post-alice"],
-            apiKey: { id: "k1", permissions: [{ collection: "posts", operations: ["read"] }] }
+            keyScopes: ["data:read:posts"]
         });
 
         const res = await revert(app, "/api/data/posts/post-alice/history/h1/revert");

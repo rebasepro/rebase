@@ -14,7 +14,8 @@
 import { Hono } from "hono";
 import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
-import { createRequireAuth, requireAdmin } from "./middleware";
+import { createRequireAuth } from "./middleware";
+import { assertMayManageAccount, requireScope } from "./access";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import { generateSecurePassword, generateSecureToken, hashToken } from "./admin-user-ops";
@@ -55,12 +56,14 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
         revocationRepo: authRepo
     }));
 
-    router.post("/users/:uid/reset-password", requireAdmin, async (c) => {
+    router.post("/users/:uid/reset-password", requireScope("users:write"), async (c) => {
         const uid = c.req.param("uid");
         const existing = await authRepo.getUserById(uid);
         if (!existing) {
             throw ApiError.notFound("User not found");
         }
+        // A reset hands the caller the account. Not one that outranks them.
+        assertMayManageAccount(c, await authRepo.getUserRoleIds(uid));
 
         let invitationSent = false;
         let temporaryPassword: string | undefined;

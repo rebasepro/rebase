@@ -288,7 +288,15 @@ The handler can return any JSON-serializable value. It will be stored in the log
 
 ## REST API
 
-All cron routes require **admin authentication** (`requireAuth` + `requireAdmin`).
+<span class="since-badge" data-since="0.24">Since 0.24</span> Reading needs the `cron:read` scope. Triggering, pausing and resuming need
+`cron:write`. An admin holds both. So does a person whose role declares them, and
+an API key created with them, which is what an external scheduler should carry:
+
+```bash
+rebase api-keys create -n "Scheduler" --scopes cron:read,cron:write
+```
+
+See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -300,8 +308,9 @@ All cron routes require **admin authentication** (`requireAuth` + `requireAdmin`
 
 ### Example: List All Jobs
 
-`$TOKEN` is an admin access token: sign in and use the `accessToken` the login
-response returns. `$API_URL` is whatever `rebase dev` printed — the port is derived from the
+`$TOKEN` is an access token for an account holding `cron:read`: sign in and use
+the `accessToken` the login response returns. An API key holding the scope works
+the same way. `$API_URL` is whatever `rebase dev` printed — the port is derived from the
 project's path, so there is no fixed one.
 
 ```bash

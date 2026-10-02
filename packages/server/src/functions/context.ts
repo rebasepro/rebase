@@ -30,7 +30,7 @@ import type { Context } from "hono";
 import type { DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
-import { hasAdministrativeRole } from "../auth/admin-roles";
+import { heldScopesGrant, holdsAdminRole } from "../auth/admin-roles";
 
 /**
  * The caller, as a custom function sees them.
@@ -117,16 +117,33 @@ export function hasRole(c: CtxLike, ...roles: string[]): boolean {
     return roles.some(role => held.has(role));
 }
 
-/**
- * Whether the caller holds an administrative role.
- *
- * Delegates to the single definition in `auth/admin-roles.ts` — which is
- * `admin` **or** `schema-admin` — rather than comparing against `"admin"`.
- * Those two lists disagreed once, and the gap made every public registrant an
- * administrator; see that file.
- */
+/** Whether the caller holds the `admin` role, which holds every scope. */
 export function isAdmin(c: CtxLike): boolean {
-    return hasAdministrativeRole(getRoles(c));
+    return holdsAdminRole(getRoles(c));
+}
+
+/**
+ * Everything the caller may do, as `resource:action[:target]` scope strings —
+ * the data plane, the app's own `auth.scopes`, and whatever their roles (or
+ * their API key) hold. Empty for an anonymous request.
+ *
+ * Resolved by the framework before the handler runs; `undefined` only when no
+ * Rebase auth middleware ran (see {@link identityResolved}).
+ */
+export function getScopes(c: CtxLike): string[] | undefined {
+    return read(c, "scopes");
+}
+
+/**
+ * Whether the caller holds `scope`, on `target` when one is given.
+ *
+ * For an app scope declared under `auth.scopes` — `project:deploy` — a
+ * signed-in person always holds it, so this narrows only API keys and tokens.
+ * Whether the *person* may deploy *this* project is still the handler's to
+ * decide.
+ */
+export function hasScope(c: CtxLike, scope: string, target?: string): boolean {
+    return heldScopesGrant(getScopes(c) ?? [], scope, target);
 }
 
 /** Whether the request carries an identity at all. */

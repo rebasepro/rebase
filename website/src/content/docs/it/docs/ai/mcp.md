@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a7a97c334fa87c6
+sourceHash: c30cc2c794d1f805
 title: Server MCP
 sidebar_label: Server MCP
 description: Connetti Claude Code, Cursor, Gemini CLI o qualsiasi client MCP a un progetto Rebase — i 42 tool esposti, le credenziali con cui si autentica e il loopback gate che si interpone tra un agent e la produzione.
@@ -174,7 +174,7 @@ serve solo a colmare le lacune.
 :::danger[Il percorso zero-config è una credenziale di amministrazione]
 Le opzioni 2 e 3 sono la **service key** — un segreto di amministrazione senza restrizioni (unscoped). Il backend
 lo risolve in `uid: "service"`, `roles: ["admin"]`, `isAdmin: true`. Tale
-identità ignora completamente l'elenco dei permessi delle API key e soddisfa le
+identità possiede ogni [scope](/docs/backend/roles-and-scopes/) e soddisfa le
 policy `_default_admin_read` / `_default_admin_write` che Rebase inietta in
 ogni collection in cui non sia impostato `disableDefaultPolicies`.
 
@@ -191,15 +191,15 @@ di backend ed eseguire DDL su qualsiasi `DATABASE_URL` risolto dal progetto.
 
 ### Fornire una credenziale con permessi ristretti
 
-Registra una [API key](/docs/backend/api-keys) con ambito limitato e il modello a
-doppio controllo (two-gate) si applicherà realmente. Una chiave non di amministrazione viene eseguita con i ruoli `["service"]`, che le
+<span class="since-badge" data-since="0.24">Da 0.24</span> Registra una [API key](/docs/backend/api-keys) con ambito limitato e il modello a
+doppio controllo (two-gate) si applicherà realmente. Una service key viene eseguita con i ruoli `["service"]`, che le
 policy di amministrazione iniettate **non** menzionano — pertanto l'RLS non le concede nulla a meno che una
-delle tue policy non disponga diversamente, e l'elenco dei permessi la restringe ulteriormente:
+delle tue policy non disponga diversamente, e i suoi scope la restringono ulteriormente:
 
 ```bash
 rebase api-keys create -n "claude-code" \
-  --permissions '[{"collection":"articles","operations":["read"]}]' \
-  --expires 30d
+  --scopes data:read:articles \
+  --expires-in 30
 ```
 
 Quindi fornisci la chiave `rk_live_…` risultante al server anziché lasciare che
@@ -226,15 +226,19 @@ Due aspetti che questo **non** fa, entrambi utili da sapere prima di farvi affid
   `rebase_doctor` e i tool dei branch avviano la CLI di Rebase, che si connette tramite
   `DATABASE_URL` e non vede mai il tuo token. Il loopback gate descritto di seguito è l'unica
   protezione a monte di questi ultimi.
-- **Una chiave non di amministrazione non può usare i tool di amministrazione.** `list_users`, `create_user`,
-  `update_user`, `delete_user`, `list_roles` e `rebase_auth_reset_password`
-  richiedono `requireAdmin` e falliranno con una chiave con restrizioni. Questo è il comportamento
-  corretto del sistema, ma implica dover scegliere tra ampiezza di accesso o restrizione, invece di
-  avere entrambe contemporaneamente.
+- **Una chiave raggiunge un tool di amministrazione solo con lo scope di quel tool.** `list_users` e
+  `list_roles` richiedono `users:read`; `create_user`, `update_user`, `delete_user` e
+  `rebase_auth_reset_password` richiedono `users:write`; i tool dello storage e dei cron
+  richiedono lo scope `storage:*` o `cron:*` corrispondente; `invoke_function` richiede
+  `functions:invoke`. Senza
+  di esso la chiamata risponde `403 SCOPE_MISSING`. Anche con `users:write`, una chiave non può
+  modificare l'account di un admin: un admin possiede `keys:read` e `keys:write`, che nessuna
+  chiave può avere, e nessuno può gestire un account che possiede più di quanto possieda lui.
 
-Un'API key con `admin: true` è un discorso differente: possiede i ruoli
-`["admin", "service"]`, che superano le medesime policy di amministrazione predefinite superate dalla service
-key. Sul piano dei dati il suo raggio d'azione coincide con quello della service key. Il vantaggio aggiuntivo è che
+Una chiave creata con `--roles admin` è un discorso differente: possiede i ruoli
+`["service", "admin"]`, che superano le medesime policy di amministrazione predefinite superate dalla service
+key. Aggiungi anche `--full-access` e il suo raggio d'azione coincide con quello della service key,
+esclusa la gestione delle chiavi. Il vantaggio aggiuntivo è che
 è **revocabile, con scadenza e soggetta a rate limit per chiave**, caratteristiche assenti
 nella service key — per ruotare quest'ultima occorre modificare `.env` e riavviare il server.
 
@@ -550,11 +554,22 @@ a un singolo utente, l'endpoint si rifiuta di essere montato e ne spiega il moti
   è attiva per impostazione predefinita; `REBASE_MCP_OPEN_REGISTRATION=false` la limita
   ai client registrati manualmente) e reindirizza la persona a una schermata di consenso che ne esegue
   l'accesso tramite il tuo `/auth/login` esistente.
-- **Sei tool, due ambiti (scope).** `mcp:read` offre `list_collections`,
-  `query_collection` e `get_document`; `mcp:write` aggiunge `create_document`,
-  `update_document` e `delete_document`. Uno scope determina quali tool vengono
-  offerti, non quali righe: un elenco vuoto può essere il normale funzionamento dell'RLS, e `mcp:write` continua
-  a non poter scrivere una riga che la persona non avrebbe il permesso di modificare.
+- <span class="since-badge" data-since="0.24">Da 0.24</span> **Sei tool, tre scope.** Gli stessi [scope](/docs/backend/roles-and-scopes/)
+  usati da ogni credenziale. `data:read` offre `list_collections`,
+  `query_collection` e `get_document`; `data:write` aggiunge `create_document` e
+  `update_document`; `data:delete` aggiunge `delete_document`. Un client che non chiede
+  nulla riceve `data:read`. Ognuno si restringe a una collection: `data:read:posts`
+  elenca e legge `posts` e nient'altro. Uno scope determina quali tool vengono
+  offerti e quali collection raggiungono, non quali righe: un elenco vuoto può essere il normale
+  funzionamento dell'RLS, e `data:write` continua a non poter scrivere una riga che la persona non potrebbe scrivere.
+- **Le autorizzazioni concesse prima della 0.24 mantengono la loro portata.** `mcp:read` viene letto come
+  `data:read`, e `mcp:write` come `data:write data:delete`, sulle autorizzazioni memorizzate e
+  sui token già emessi.
+- <span class="since-badge" data-since="0.24">Da 0.24</span> **Funziona anche una API key.** `/mcp` accetta anche `Authorization: Bearer rk_…`, per
+  un client configurato con un header anziché con un flusso OAuth. La chiave raggiunge
+  i tool coperti dai suoi scope `data:*`, con l'identità con cui agisce: una
+  [chiave personale](/docs/backend/api-keys/#personal-keys) come il suo proprietario, una service key
+  come `api-key:<id>`.
 - **Un token valido solo per questo endpoint.** Un token di accesso MCP viene rifiutato da
   `/api/data`, `/api/admin` e dai WebSocket, quindi connettere un assistente non
   equivale a fornirgli una sessione generale.

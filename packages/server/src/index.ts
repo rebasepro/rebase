@@ -117,11 +117,13 @@ export {
     providerVerifiedEmail,
     verifyOidcIdToken,
     tryVerifyOidcIdToken,
-    // API-key permission helpers
+    // API keys and scopes
     isApiKeyToken,
     validateApiKey,
     httpMethodToOperation,
-    isOperationAllowed,
+    requireScope,
+    hasScope,
+    callerScopes,
     // Constant-time compare for static secrets — drivers checking a service key
     // must not fall back to ===.
     safeCompare,
@@ -139,7 +141,12 @@ export {
     // plainly did configure it. `rebase-backend-postgres`'s SKILL.md tells you
     // to call `configureJwt` yourself before init — sound advice that could not
     // be followed, because the symbol was internal.
-    configureJwt
+    configureJwt,
+    // The same, for the access model: a server wired by hand — or a test that
+    // drives a credential through `verifyCredential` without booting — installs
+    // the app's roles and scopes the way `initializeRebaseBackend` does.
+    configureAccess,
+    accessModelFromCollections
 } from "./auth";
 export type {
     // Named by `RebaseAuthConfig.signingKeys`, so it has to be nameable.
@@ -156,14 +163,23 @@ export type {
     AuthMiddlewareOptions,
     AuthResult,
     ApiKey,
+    ApiKeyKind,
     ApiKeyMasked,
-    ApiKeyPermission,
     ApiKeyWithSecret,
     CreateApiKeyRequest,
+    CreatePersonalKeyRequest,
     UpdateApiKeyRequest,
     ApiKeyStore,
-    ApiKeyOperation
+    DataOperation
 } from "./auth";
+// The other request boundaries — the realtime socket and `/mcp` — resolve keys
+// and person scopes with the same functions the HTTP middlewares use.
+export { resolveApiKey, getAccessModel } from "./auth";
+// For an app's own socket or tunnel: a session token or an API key, as one
+// identity with scopes.
+export { verifyCredential } from "./auth/verify-credential";
+export type { VerifiedCredential } from "./auth/verify-credential";
+export type { ApiKeyIdentity, ApiKeyRefusal } from "./auth/api-keys";
 
 // =============================================================================
 // API Layer — public types + error surface only. The `RestApiGenerator`

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5db546fe110a140a
+sourceHash: 2b5f4b5b83a711a3
 title: Apps e Repositórios
 sidebar_label: Apps & Repositórios
 description: Um projeto é um backend mais os apps que se comunicam com ele, os quais podem viver cada um em seu próprio repositório.
@@ -317,7 +317,7 @@ incluindo alvos de relacionamentos, que o gerador de tipos precisa para decidir 
 chave estrangeira é uma string ou um número — e emite exatamente a mesma saída que
 produziria a partir do código-fonte local.
 
-O endpoint de contrato é exclusivo para administradores. As definições de collections descrevem cada tabela,
+O endpoint de contrato requer o escopo `schema:read`, que um administrador tem. As definições de collections descrevem cada tabela,
 coluna e relação no projeto, incluindo aquelas que nenhuma regra de segurança jamais
 exporia; trata-se de um mapa do banco de dados, não de uma documentação pública da API.
 

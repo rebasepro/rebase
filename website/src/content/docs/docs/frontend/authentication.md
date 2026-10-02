@@ -88,6 +88,8 @@ roles: {
 
 To add or remove role options, update the `enum` map in your users collection and regenerate the schema.
 
+A role in this list is a name your [security rules](/docs/collections/security-rules) can match. What it may do beyond its rows (manage users, read logs, change the schema) is declared separately, under `auth.roles` on the same collection. `admin` is built in and holds everything. See [Roles and scopes](/docs/backend/roles-and-scopes).
+
 ## Role Simulation (Dev Mode)
 
 In developer mode, you can simulate different roles without logging out. This is useful for testing RLS policies:

@@ -1,5 +1,5 @@
 ---
-sourceHash: 13da9556eb061931
+sourceHash: dada1405f6a44e36
 title: Entorno y configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos Rebase.
@@ -327,6 +327,7 @@ Leído por `rebase`, no por el servidor. Ninguno de estos valores afecta a un de
 | `REBASE_CLOUD_URL` | El plano de control con el que se comunica `rebase cloud`. | — |
 | `REBASE_CLOUD_EMAIL` | La cuenta con la que inicia sesión `rebase cloud login`, en lugar de solicitarla. | — |
 | `REBASE_CLOUD_PASSWORD` | Su contraseña, para que un gestor de secretos pueda suministrarla sin que pase por el historial de la shell. | — |
+| `REBASE_TOKEN` | Un token de `rebase cloud tokens create`. Si está definida, todos los comandos `rebase cloud` se autentican con él en lugar de la sesión de `rebase cloud login`, y nunca leen ni escriben la sesión guardada. Es la forma de ejecutar `rebase cloud` en CI — consulta [CI y agentes](/docs/deployment/cloud/#ci-and-agents). El [servidor MCP](/docs/ai/mcp/) lee el mismo nombre como alias de `REBASE_API_TOKEN`. | — |
 | `REBASE_DEBUG` | `1` imprime el error subyacente y los detalles de la petición en lugar de un mensaje abreviado. Lo primero a configurar si un comando de `rebase cloud` falla sin aportar información útil. | — |
 | `REBASE_DEV_NO_DB` | `rebase dev` no inicia ninguna base de datos ni aprovisiona nada; debes proveer la tuya. Equivalente a `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Fija el puerto del servidor de desarrollo del frontend, el cual `rebase dev` deduce habitualmente a partir de la ruta del proyecto. | — |

@@ -157,8 +157,8 @@ project: add `@rebasepro/rls-check` to its dependencies so the bundle carries it
 The runtime ships no copy of its own, and a boot that asks for the audit without
 the package refuses before opening a connection, naming the package to add.
 
-The result is served at `GET /api/admin/rls-audit`, admin-gated like every other
-admin surface, and each run logs one line — at `warn` when a finding reaches
+The result is served at `GET /api/admin/rls-audit`, gated on the `schema:read`
+scope, and each run logs one line — at `warn` when a finding reaches
 `warnAtSeverity`, at `info` otherwise:
 
 ```

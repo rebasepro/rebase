@@ -7,6 +7,7 @@
  *   POST /users
  *   PUT /users/:uid
  *   DELETE /users/:uid
+ *   DELETE /users/:uid/mfa
  *   POST /bootstrap
  */
 
@@ -16,7 +17,8 @@ import { isBootstrapWindowOpen, SETUP_REQUIRED_MESSAGE } from "./registration-po
 import { normalizeEmail } from "@rebasepro/common";
 import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
-import { createRequireAuth, requireAdmin } from "./middleware";
+import { createRequireAuth } from "./middleware";
+import { assertMayGrantRoles, assertMayManageAccount, requireScope } from "./access";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import {
@@ -28,7 +30,7 @@ import {
     normalizeUserEmailChange,
     runAfterUserDelete
 } from "./admin-user-ops";
-import { replaceUserPassword } from "./token-revocation";
+import { replaceUserPassword, revokeAllSessions } from "./token-revocation";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import type { AdminUser, AuthCollectionConfig } from "@rebasepro/types";
@@ -61,6 +63,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             photoUrl?: string | null;
             createdAt?: Date | string;
             updatedAt?: Date | string;
+            disabled?: boolean;
         },
         roles: string[]
     ): AdminUser {
@@ -71,6 +74,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             photoURL: u.photoUrl ?? null,
             providerId: "custom",
             roles,
+            disabled: u.disabled === true,
             createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : (u.createdAt ?? new Date().toISOString()),
             updatedAt: u.updatedAt instanceof Date ? u.updatedAt.toISOString() : (u.updatedAt ?? new Date().toISOString())
         };
@@ -210,7 +214,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
         });
     });
 
-    router.get("/users", requireAdmin, async (c) => {
+    router.get("/users", requireScope("users:read"), async (c) => {
         // `?ids=a,b,c` resolves a known set of users in one round trip. The admin
         // UI needs it to turn the ids stored in `userSelect` columns into names
         // without firing one request per row.
@@ -220,7 +224,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
                 .slice(0, MAX_USER_IDS_PER_LOOKUP);
             const resolved = await Promise.all(ids.map(async (id) => {
                 const result = await authRepo.getUserWithRoles(id);
-                return result ? toAdminUser(result.user, result.roles.map((r) => r.id)) : undefined;
+                return result ? toAdminUser(result.user, result.roles) : undefined;
             }));
             const users = resolved.filter((u): u is AdminUser => u !== undefined);
             return c.json({ users,
@@ -266,7 +270,7 @@ offset: 0 });
         });
     });
 
-    router.get("/users/:uid", requireAdmin, async (c) => {
+    router.get("/users/:uid", requireScope("users:read"), async (c) => {
         const uid = c.req.param("uid");
         const result = await authRepo.getUserWithRoles(uid);
 
@@ -274,15 +278,19 @@ offset: 0 });
             throw ApiError.notFound("User not found");
         }
 
-        const adminUser = toAdminUser(result.user, result.roles.map((r) => r.id));
+        const adminUser = toAdminUser(result.user, result.roles);
         return c.json({ user: adminUser });
     });
 
-    router.post("/users", requireAdmin, async (c) => {
+    router.post("/users", requireScope("users:write"), async (c) => {
         const body = await c.req.json();
         const { email, roles } = body;
         if (!email) {
             throw ApiError.badRequest("Email is required");
+        }
+
+        if (roles !== undefined && Array.isArray(roles)) {
+            assertMayGrantRoles(c, roles.filter((role): role is string => typeof role === "string"));
         }
 
         const existing = await authRepo.getUserByEmail(normalizeEmail(email));
@@ -354,19 +362,34 @@ values: prepResult.values },
         return c.json({ user: adminUser, ...delivery }, 201);
     });
 
-    router.put("/users/:uid", requireAdmin, async (c) => {
+    router.put("/users/:uid", requireScope("users:write"), async (c) => {
         const uid = c.req.param("uid");
         const body = await c.req.json();
-        const { password, email, displayName, roles } = body;
+        const { password, email, displayName, roles, disabled } = body;
 
         const existing = await authRepo.getUserById(uid);
         if (!existing) {
             throw ApiError.notFound("User not found");
         }
+        if (disabled !== undefined) {
+            if (typeof disabled !== "boolean") {
+                throw ApiError.badRequest("`disabled` must be true or false", "INVALID_INPUT");
+            }
+            const caller = c.get("user") as { uid?: string } | undefined;
+            if (disabled && caller?.uid === uid) {
+                throw ApiError.badRequest("Cannot disable your own account", "SELF_DISABLE");
+            }
+            if (typeof authRepo.setUserDisabled !== "function") {
+                throw new ApiError(501, "NOT_SUPPORTED", "This backend's auth repository cannot disable accounts.");
+            }
+        }
 
-        // Refused before anything is written, so a refused demotion does not
-        // leave the email or password it arrived with applied.
+        // Refused before anything is written, so a refused change does not
+        // leave the email or password it arrived with applied. Nobody edits an
+        // account holding more than they do, nor grants more than they hold.
+        assertMayManageAccount(c, await authRepo.getUserRoleIds(uid));
         if (roles !== undefined && Array.isArray(roles)) {
+            assertMayGrantRoles(c, roles.filter((role): role is string => typeof role === "string"));
             await assertRoleChangesAllowed(authRepo, [{ uid, roles }]);
         }
 
@@ -399,13 +422,61 @@ values: prepResult.values },
             await authRepo.setUserRoles(uid, roles);
         }
 
+        // Disabling is how an administrator stops an account without deleting
+        // it: it signs in nowhere, and every session and token it holds ends
+        // now, on every door — see `judgeAccessToken`.
+        if (typeof disabled === "boolean" && authRepo.setUserDisabled) {
+            await authRepo.setUserDisabled(uid, disabled);
+            if (disabled) await revokeAllSessions(authRepo, uid);
+            logger.info("[Security Audit] Account " + (disabled ? "disabled" : "re-enabled") + " by an administrator", {
+                eventType: disabled ? "auth.account.disabled" : "auth.account.enabled",
+                uid,
+                by: (c.get("user") as { uid?: string } | undefined)?.uid
+            });
+        }
+
         const result = await authRepo.getUserWithRoles(uid);
-        const adminUser = toAdminUser(result!.user, result!.roles.map((r) => r.id));
+        const adminUser = toAdminUser(result!.user, result!.roles);
 
         return c.json({ user: adminUser });
     });
 
-    router.delete("/users/:uid", requireAdmin, async (c) => {
+    /**
+     * DELETE /users/:uid/mfa — remove every second factor and recovery code
+     * an account has, and end its sessions.
+     *
+     * The way back in for someone who lost their authenticator and their
+     * codes, which used to be SQL. It lowers the account's protection, so it
+     * is held to what a password reset is held to: `users:write`, never on an
+     * account that outranks the caller, and every session ends — a session
+     * that passed the old factor must not outlive its removal.
+     */
+    router.delete("/users/:uid/mfa", requireScope("users:write"), async (c) => {
+        const uid = c.req.param("uid");
+        const existing = await authRepo.getUserById(uid);
+        if (!existing) {
+            throw ApiError.notFound("User not found");
+        }
+        assertMayManageAccount(c, await authRepo.getUserRoleIds(uid));
+
+        const factors = await authRepo.getMfaFactors(uid);
+        for (const factor of factors) {
+            await authRepo.deleteMfaFactor(factor.id, uid);
+        }
+        await authRepo.deleteAllRecoveryCodes(uid);
+        await revokeAllSessions(authRepo, uid);
+
+        const caller = c.get("user") as { uid?: string } | undefined;
+        logger.info("[Security Audit] Second factors reset by an administrator", {
+            eventType: "auth.mfa.admin_reset",
+            uid,
+            by: caller?.uid,
+            removedFactors: factors.length
+        });
+        return c.json({ success: true, removedFactors: factors.length });
+    });
+
+    router.delete("/users/:uid", requireScope("users:write"), async (c) => {
         const uid = c.req.param("uid");
         const authUser = c.get("user") as { uid?: string } | undefined;
 
@@ -418,6 +489,7 @@ values: prepResult.values },
             throw ApiError.notFound("User not found");
         }
 
+        assertMayManageAccount(c, await authRepo.getUserRoleIds(uid));
         await assertUserDeletionsAllowed(authRepo, [uid]);
 
         // The delete hooks fire here, because this is where users are deleted.

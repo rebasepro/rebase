@@ -61,6 +61,7 @@ import {
     schemaEditCapabilities,
     type SchemaEditPolicy
 } from "../schema-edit/schema-edit-permissions";
+import { requireScope } from "../auth/access";
 
 export interface LiveSchemaRoutesConfig {
     /**
@@ -807,7 +808,9 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         });
     });
 
-    router.post("/apply", async (c) => {
+    // Planning is `schema:read`, which the router's gate already checked;
+    // applying alters the database and the project's source.
+    router.post("/apply", requireScope("schema:write"), async (c) => {
         const body = await readBody(c);
         const change = parseProposed(body);
         // "Edit source only": commit the collection and the generated schema

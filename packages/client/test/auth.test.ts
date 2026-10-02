@@ -462,6 +462,22 @@ user: mockUser })
     // signUp
     // -----------------------------------------------------------------------
     describe("signUp", () => {
+        it("resolves without a session when the backend registers confirm-first", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            const events: string[] = [];
+            auth.onAuthStateChange((event) => { events.push(event); });
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ success: true, confirmationRequired: true, message: "Check your inbox" })
+            });
+
+            const result = await auth.signUp("new@example.com", "Passw0rd-New");
+
+            expect(result).toEqual({ confirmationRequired: true, user: null, accessToken: null, refreshToken: null });
+            expect(auth.getSession()).toBeNull();
+            expect(events).not.toContain("SIGNED_IN");
+        });
+
         it("creates a user and initiates session", async () => {
             mockFetch.mockResolvedValueOnce({
                 ok: true,
@@ -852,18 +868,28 @@ password: "newPass" })
             });
         });
 
-        it("changePassword calls transport", async () => {
+        it("changePassword adopts the fresh session the server answers with, and stays signed in", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
-            mockRequest.mockResolvedValueOnce({ success: true,
-message: "Changed" });
+            const tokens = (accessToken: string) => ({ accessToken, refreshToken: `r-${accessToken}`, accessTokenExpiresAt: Date.now() + 3_600_000 });
+            mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ user: { uid: "u1", email: "a@b.c", roles: [] }, tokens: tokens("before") }) });
+            await auth.signInWithEmail("a@b.c", "oldPass");
+            const events: string[] = [];
+            auth.onAuthStateChange((event) => { events.push(event); });
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ success: true, message: "Changed", user: { uid: "u1", email: "a@b.c", roles: [] }, tokens: tokens("after") })
+            });
 
             const result = await auth.changePassword("oldPass", "newPass");
-            expect(result.success).toBe(true);
-            expect(mockRequest).toHaveBeenCalledWith("/auth/change-password", {
-                method: "POST",
-                body: JSON.stringify({ oldPassword: "oldPass",
-newPassword: "newPass" })
-            });
+
+            expect(result).toEqual({ success: true, message: "Changed" });
+            const [url, init] = mockFetch.mock.calls[1] as [string, RequestInit];
+            expect(url).toBe("http://localhost/api/v1/auth/change-password");
+            expect(JSON.parse(String(init.body))).toEqual({ oldPassword: "oldPass", newPassword: "newPass" });
+            expect((init.headers as Record<string, string>).Authorization).toBe("Bearer before");
+            expect(auth.getSession()?.accessToken).toBe("after");
+            expect(events).not.toContain("SIGNED_OUT");
+            auth.stopAutoRefresh();
         });
     });
 
@@ -881,35 +907,64 @@ message: "Sent" });
             expect(mockRequest).toHaveBeenCalledWith("/auth/send-verification", { method: "POST" });
         });
 
-        it("verifyEmail makes GET request with token", async () => {
+        it("verifyEmail posts the token, with no session to prove", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ success: true,
-message: "Verified" })
+                json: async () => ({ success: true, message: "Verified", passwordRemoved: false, removedProviders: [] })
             });
 
-            const result = await auth.verifyEmail("verification-token");
-            expect(result.success).toBe(true);
-            expect(mockFetch).toHaveBeenCalledWith(
-                "http://localhost/api/v1/auth/verify-email?token=verification-token",
-                expect.objectContaining({ method: "GET" })
-            );
+            const result = await auth.verifyEmail("token with spaces&special=chars");
+            expect(result).toEqual({ success: true, passwordRemoved: false, removedProviders: [], session: null });
+            const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+            expect(url).toBe("http://localhost/api/v1/auth/verify-email");
+            expect(init.method).toBe("POST");
+            // The token travels in the body, never in a URL a log keeps.
+            expect(JSON.parse(String(init.body))).toEqual({ token: "token with spaces&special=chars" });
+            expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
         });
 
-        it("verifyEmail URL-encodes the token", async () => {
+        it("verifyEmail sends the signed-in session, which proves the account's credentials", async () => {
             const auth = createAuth(transport, { storage: createMemoryStorage() });
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ success: true,
-message: "Verified" })
+                json: async () => ({
+                    user: { uid: "u1", email: "a@b.c", roles: [] },
+                    tokens: { accessToken: "access-1", refreshToken: "refresh-1", accessTokenExpiresAt: Date.now() + 3_600_000 }
+                })
+            });
+            await auth.signInWithEmail("a@b.c", "pw");
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ success: true, passwordRemoved: false, removedProviders: [] })
             });
 
-            await auth.verifyEmail("token with spaces&special=chars");
-            expect(mockFetch).toHaveBeenCalledWith(
-                expect.stringContaining("token%20with%20spaces%26special%3Dchars"),
-                expect.any(Object)
-            );
+            await auth.verifyEmail("t");
+
+            const [, init] = mockFetch.mock.calls[1] as [string, RequestInit];
+            expect((init.headers as Record<string, string>).Authorization).toBe("Bearer access-1");
+            auth.stopAutoRefresh();
+        });
+
+        it("verifyEmail with the password adopts the session it answers with", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    success: true,
+                    passwordRemoved: false,
+                    removedProviders: [],
+                    user: { uid: "u1", email: "a@b.c", roles: [] },
+                    tokens: { accessToken: "access-2", refreshToken: "refresh-2", accessTokenExpiresAt: Date.now() + 3_600_000 }
+                })
+            });
+
+            const result = await auth.verifyEmail("t", { password: "pw" });
+
+            expect(JSON.parse(String((mockFetch.mock.calls[0] as [string, RequestInit])[1].body))).toEqual({ token: "t", password: "pw" });
+            expect(result.session?.accessToken).toBe("access-2");
+            expect(auth.getSession()?.accessToken).toBe("access-2");
+            auth.stopAutoRefresh();
         });
     });
 

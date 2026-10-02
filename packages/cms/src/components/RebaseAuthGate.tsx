@@ -4,7 +4,7 @@ import {
     useAuthController
 } from "@rebasepro/app";
 import { CircularProgressCenter } from "@rebasepro/ui";
-import { LoginView } from "@rebasepro/app";
+import { LoginView, readEmailLinkAction } from "@rebasepro/app";
 import type { AuthControllerExtended } from "@rebasepro/cms-types";
 
 /**
@@ -33,7 +33,14 @@ export function RebaseAuthGate({ children }: { children: React.ReactNode }) {
         return <CircularProgressCenter size={"large"}/>;
     }
 
-    if (!authController?.user) {
+    // A verification link opened while signed in is verified by the session
+    // itself — which keeps everything on the account — on the screen that
+    // knows the link. Left to the app's router it was a page that does not
+    // exist, so the link mailed at registration went unconfirmed.
+    const openedVerificationLink = typeof window !== "undefined"
+        && readEmailLinkAction(window.location)?.kind === "verify-email";
+
+    if (!authController?.user || openedVerificationLink) {
         const ActiveLoginView = registry.authConfig?.loginView ?? (
             <LoginView authController={authController as AuthControllerExtended}/>
         );

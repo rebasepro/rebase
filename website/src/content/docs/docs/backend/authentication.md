@@ -86,16 +86,20 @@ const backend = await initializeRebaseBackend({
 | `activeKid` | `string` | first key | Which of `signingKeys` mints new tokens |
 | `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
 | `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
+| `refreshTokenReuseIntervalSeconds` | `number` | `10` | How long a refresh token that was rotated away still mints a sibling of its session, so a client that lost a refresh answer is not signed out |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | What a refresh token presented after that window does. `"reject"` refuses it (`TOKEN_ALREADY_USED`) and logs it, and the session stands: this is not reuse detection, since whoever refreshed first keeps the session. `"revoke-session"` ends the whole sign-in on such a replay (`SESSION_REVOKED`), as GoTrue does, and the owner signs in again. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Require a session for the data API |
 | `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
-| `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts |
+| `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts. Turning a guest into an account (`POST /api/auth/anonymous/link`) is registration, and needs `allowRegistration` too |
 | `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` for invite-by-email flows |
-| `defaultRole` | `string` | — | Role given to a newly registered user when none is specified |
+| `defaultRole` | `string` | — | Role given to a newly registered user when none is specified. It may not be `admin`, or a declared role that holds an admin-plane scope: the boot refuses both |
 | `serviceKey` | `string` | — | Static key for server-to-server calls — see [Service Key Authentication](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, for password reset, verification, invitations and magic links |
 | `magicLink` | `boolean` | `false` | Enable passwordless email sign-in. Needs `email` configured; without it the routes answer `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Enable six-digit sign-in codes by email — see [One-time codes](#one-time-codes-by-email). Same email requirement |
+| `magicLinkCreatesUsers` | `boolean` | `false` | Passwordless sign-up: a magic-link or email-code request for an address with no account creates one (no password, unverified until the link or code is used), while `allowRegistration` is on. Runs `beforeUserCreate` and the default role. Off, those requests create nothing and answer an unknown address as they answer a known one. `AUTH_MAGIC_LINK_CREATES_USERS` |
+| `requireEmailVerification` | `boolean` | `false` | Refuse password sign-in until the address is verified, and register confirm-first — see [Email verification](/docs/backend/email-verification/). Needs `email`; the boot refuses it without |
 | `cookieAuth` | `CookieAuthConfig` | — | Deliver the refresh token as an `httpOnly` `Secure` `SameSite` cookie instead of in the JSON body — see below |
 | `providers` | `OAuthProvider[]` | `[]` | The canonical OAuth array; the named provider fields resolve into it |
 | `allowedRedirectUris` | `string[]` | — | Narrow which redirect URIs the OAuth routes accept |
@@ -143,10 +147,18 @@ side effects like provisioning a personal team on signup, use the auth lifecycle
 hooks (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), which
 receive the fully-populated user record.
 
-OAuth runs fewer of them than registration does. A provider sign-in fires
-`afterUserCreate` when it creates the account, and no other lifecycle hook:
-`beforeUserCreate`, `beforeLogin` and `onAuthenticated` do not run on the OAuth
-route, so a check or an audit trail hung on them never sees an OAuth user.
+<span class="since-badge" data-since="0.24">Since 0.24</span> OAuth runs the same hooks as the other sign-ins: `beforeLogin` (with the
+provider's address and `"oauth"`), `beforeUserCreate` when the sign-in creates
+the account, `afterUserCreate`, and `onAuthenticated`. `onAuthenticated` also
+fires on a token refresh (`"refresh"`), a password reset (`"password-reset"`) and
+a second factor (`"mfa"`). `beforeLogin` does not run on a refresh, which is not
+a sign-in. To stop an account that is already signed in, disable it with
+`PUT /api/admin/users/:uid { disabled: true }`: that refuses every sign-in and
+refresh and ends every session and token it holds.
+
+A hook that refuses (`beforeUserCreate`, `beforeLogin`, `beforeUserDelete`)
+throws. The caller gets `400 HOOK_REJECTED` with the error's message, or the
+status the error carries: an `ApiError`, or any error with a 4xx `status`.
 :::
 
 ### Bot protection
@@ -218,9 +230,12 @@ request, a development server captures the message and prints its links:
              http://localhost:5173/auth/magic-link?token=…
 ```
 
-Follow the link and the flow completes. Nothing about the token changes — it is
-minted, stored and validated exactly as it would be from a real inbox; only
-delivery is different.
+Follow the link and the flow completes, on whatever page serves that path: the
+CMS serves `/reset-password` and `/verify-email`, and a magic link's
+`/auth/magic-link` needs a page of your own (see the SDK's
+[Magic Links](/docs/sdk/authentication/#magic-links)). Nothing about the token
+changes — it is minted, stored and validated exactly as it would be from a
+real inbox; only delivery is different.
 
 This is on whenever all three hold, and there is no setting that changes them:
 
@@ -250,7 +265,7 @@ Each message carries `to`, `subject`, `at`, the `html` and `text` parts, and
 `links` — the absolute URLs found in the body, in document order, which is the
 part anyone actually wants.
 
-It is admin-only, through the same gate cron, logs and backups use, and it
+It needs the `users:write` scope, through the same gate cron, logs and backups use, and it
 answers `501 DEV_MAILBOX_UNAVAILABLE` when there is nothing to serve — with SMTP
 configured, mail was delivered rather than held. `NODE_ENV=production` refuses
 it regardless of anything else: what these messages contain is a working login.
@@ -439,11 +454,14 @@ with a password, or sign in as it through a provider that does not vouch for
 it, and wait. Linking the owner's Google sign-in onto that account would leave
 the other person's way in on it.
 
-A magic link, an email code or a password reset proves the address and
-verifies the account. On an account that was not verified yet, the first such
-proof removes the password (a reset sets the new one) and every linked identity
-whose provider did not verify that address, and ends every session, before it
-marks the account verified. After that, step 2 applies. Accounts created by an
+A verification link, a magic link, an email code or a password reset proves
+the address and verifies the account. On an account that was not verified yet,
+the first such proof removes the password (a reset sets the new one) and every
+linked identity whose provider did not verify that address, and ends every
+session, before it marks the account verified. After that, step 2 applies.
+
+A verification link keeps what the person following it also proves: a live
+session of the account, or its password. See [Email verification](/docs/backend/email-verification/). Accounts created by an
 admin with `POST /api/admin/users` are stored verified, so an invitee can use
 "Sign in with Google" straight away. A custom auth repository without
 `unlinkUserIdentity` refuses such a proof with `409 UNVERIFIED_IDENTITIES` when
@@ -452,42 +470,19 @@ there is an identity to remove.
 This behavior is not configurable — there is deliberately no option to link on
 unverified emails.
 
-To recover from a step-3 rejection, the user signs in with their existing
-method and calls the explicit link endpoint:
+### Email verification
 
-```http
-POST /api/auth/link/google
-Authorization: Bearer <access token>
-
-{ "idToken": "..." }
-```
-
-Linking while authenticated intentionally does **not** require a verified
-email, and does not require the emails to match at all — a user's Google
-address is often not their app address. The asymmetry is deliberate: on
-sign-in the provider's email is the only evidence tying the incoming identity
-to an account, whereas here the caller has already proven ownership by holding
-a valid session. It returns `409 IDENTITY_ALREADY_LINKED` if that provider
-identity belongs to another user, and is idempotent if it is already linked to
-the caller.
-
-#### The reverse direction
-
-A user who signed up with Google and has no password:
-
-- **Registering with the same email** is refused with `409 EMAIL_EXISTS`.
-- **`POST /api/auth/change-password`** returns `400 INVALID_ACCOUNT` — there is
-  no existing password to verify against.
-- **`forgot-password` → `reset-password` is the supported way to add one.**
-  It re-proves ownership of the address by email, after which the account has
-  both sign-in methods.
+<span class="since-badge" data-since="0.24">Since 0.24</span> Registering mails the new account a
+verification link, and following it keeps only what the person following it
+also proves. `requireEmailVerification` makes registration confirm-first. See
+[Email verification](/docs/backend/email-verification/).
 
 ## Auto-Created Tables
 
 On first startup, Rebase automatically provisions the `auth` schema and the following tables in the database (bound to the schema defined in your collection, e.g., `rebase`):
 
 - **`rebase.users`** — User accounts with email, password hash, metadata, and a `roles` text[] column (roles are stored as inline text arrays to optimize queries and avoid joins).
-- **`rebase.refresh_tokens`** — Long-lived sessions carrying hashed refresh tokens, user agents, and IP addresses. Includes a unique index on `token_hash` and a unique constraint on `(user_id, user_agent, ip_address)` to track active device sessions.
+- **`rebase.refresh_tokens`** — Long-lived sessions carrying hashed refresh tokens, user agents, and IP addresses. Includes a unique index on `token_hash`. One sign-in is one `session_id`, shared by every token rotated out of it; there is no per-device constraint, so two browsers behind one address are two sessions.
 - **`rebase.password_reset_tokens`** — Expirable single-use tokens for password recovery flows.
 - **`rebase.mfa_factors`** — Enrolled multi-factor authentication methods (e.g. TOTP secrets encrypted with AES-256).
 - **`rebase.mfa_challenges`** — Verification logs tracking active MFA verification attempts.
@@ -541,11 +536,26 @@ const membersCollection = defineCollection({
     // Inject/override auth-specific actions (e.g. show/hide the reset password button)
     actions: {
       resetPassword: true // Or false to disable, or a custom EntityAction
-    }
+    },
+
+    // What each role may do beyond its rows, the app's own scopes,
+    // and whether accounts may create personal API keys
+    roles: {
+      support: { name: "Support", scopes: ["users:read", "users:write", "logs:read"] }
+    },
+    scopes: {
+      "project:deploy": { label: "Deploy projects", target: "project" }
+    },
+    personalKeys: true
   },
   properties: { ... }
 });
 ```
+
+`roles`, `scopes` and `personalKeys` declare the access model: which admin-plane
+scopes each role holds, the scopes the app defines for its own operations, and
+whether each account may mint [personal API keys](/docs/backend/api-keys/#personal-keys).
+See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 A `temporaryPassword` returned from `onResetPassword` becomes the account's password. Rebase hashes it with the configured algorithm, saves it, signs the user out of every existing session, and shows it to the admin to pass on. The hook does not store it, and has no way to. Return no `temporaryPassword` when the hook emails its own reset link instead: the password then stays as it is until the user sets a new one, though their sessions still end.
 
@@ -559,6 +569,7 @@ When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive a
 ## Next Steps
 
 - **[Endpoints and tokens](/docs/backend/auth-endpoints/)** — every route this configuration mounts
+- **[Roles and scopes](/docs/backend/roles-and-scopes/)** — what each role may do, and how keys and tokens narrow it
 - **[Custom auth adapters](/docs/backend/auth-adapters/)** — bringing your own identity provider
 - **[Frontend Authentication](/docs/frontend/authentication/)** — login UI, auth controller, user management
 - **[Security Rules (RLS)](/docs/collections/security-rules/)** — row-level access control

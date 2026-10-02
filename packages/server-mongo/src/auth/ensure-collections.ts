@@ -2,45 +2,6 @@ import { Db } from "mongodb";
 import { logger } from "@rebasepro/server";
 
 /**
- * Default roles to seed on first run
- */
-const DEFAULT_ROLES = [
-    {
-        _id: "admin",
-        id: "admin",
-        name: "Admin",
-        isAdmin: true,
-        defaultPermissions: { read: true,
-create: true,
-edit: true,
-delete: true },
-        createdAt: new Date()
-    },
-    {
-        _id: "editor",
-        id: "editor",
-        name: "Editor",
-        isAdmin: false,
-        defaultPermissions: { read: true,
-create: true,
-edit: true,
-delete: true },
-        createdAt: new Date()
-    },
-    {
-        _id: "viewer",
-        id: "viewer",
-        name: "Viewer",
-        isAdmin: false,
-        defaultPermissions: { read: true,
-create: false,
-edit: false,
-delete: false },
-        createdAt: new Date()
-    }
-];
-
-/**
  * Indexes created by releases up to 0.13.0, on snake_case field names the auth
  * services never wrote.
  *
@@ -102,9 +63,6 @@ roleId: 1 }, { unique: true });
         await resetTokens.createIndex({ tokenHash: 1 }, { unique: true });
         await resetTokens.createIndex({ uid: 1 });
 
-        // Seed roles
-        await seedDefaultRoles(db);
-
         logger.info("✅ MongoDB Auth collections ready");
     } catch (error) {
         // Not swallowed. Every index here is load-bearing for auth — a boot
@@ -128,26 +86,4 @@ async function dropLegacyIndexes(db: Db): Promise<void> {
             }
         }
     }
-}
-
-async function seedDefaultRoles(db: Db): Promise<void> {
-    const roles = db.collection("rebase_roles");
-    const count = await roles.countDocuments();
-
-    if (count > 0) {
-        logger.info(`📋 Found ${count} existing roles`);
-        return;
-    }
-
-    logger.info("🌱 Seeding default roles...");
-
-    for (const role of DEFAULT_ROLES) {
-        await roles.updateOne(
-            { id: role.id },
-            { $setOnInsert: role },
-            { upsert: true }
-        );
-    }
-
-    logger.info("✅ Default roles created: admin, editor, viewer");
 }

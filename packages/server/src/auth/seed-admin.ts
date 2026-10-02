@@ -158,7 +158,11 @@ export async function seedInitialAdmin(
             return { status: "already-bootstrapped" };
         }
 
-        const created = await users.createUser({ email, password });
+        // Verified: the operator named this address, as an administrator
+        // names an invitee's. Left unverified, the operator's own account was
+        // refused "Sign in with Google" (`local-account-unverified`), and its
+        // first magic link removed the seeded password.
+        const created = await users.createUser({ email, password, emailVerified: true });
         await users.setUserRoles(created.id, ["admin"]);
 
         logger.info(

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a7a97c334fa87c6
+sourceHash: c30cc2c794d1f805
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: Conecte o Claude Code, Cursor, Gemini CLI ou qualquer cliente MCP a um projeto Rebase — as 42 ferramentas que ele expõe, a credencial com a qual se autentica e o gate de loopback que fica entre um agente e a produção.
@@ -175,7 +175,7 @@ apenas preenche uma lacuna.
 :::danger[O caminho sem configuração usa uma credencial de administrador]
 As opções 2 e 3 são a **service key** — um segredo de administrador irrestrito. O backend
 a resolve para `uid: "service"`, `roles: ["admin"]`, `isAdmin: true`. Essa
-identidade ignora completamente a lista de permissões de API keys e satisfaz as
+identidade tem todos os [escopos](/docs/backend/roles-and-scopes/) e satisfaz as
 políticas `_default_admin_read` / `_default_admin_write` que o Rebase injeta em
 cada coleção que não tenha configurado `disableDefaultPolicies`.
 
@@ -191,15 +191,15 @@ do backend e executar DDL contra qualquer `DATABASE_URL` resolvida pelo projeto.
 
 ### Fornecendo uma credencial restrita em vez disso
 
-Registre uma [API key](/docs/backend/api-keys) com escopo e o modelo de duas etapas
-se aplicará de fato. Uma chave não-admin é executada com as roles `["service"]`, as quais
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Registre uma [API key](/docs/backend/api-keys) com escopo e o modelo de duas etapas
+se aplicará de fato. Uma chave de serviço é executada com as roles `["service"]`, as quais
 as políticas de administrador injetadas **não** contemplam — portanto, o RLS não concede nada a ela a menos que uma
-das suas próprias políticas declare o contrário, e a lista de permissões a restringe ainda mais:
+das suas próprias políticas declare o contrário, e os escopos dela a restringem ainda mais:
 
 ```bash
 rebase api-keys create -n "claude-code" \
-  --permissions '[{"collection":"articles","operations":["read"]}]' \
-  --expires 30d
+  --scopes data:read:articles \
+  --expires-in 30
 ```
 
 Em seguida, passe a chave `rk_live_…` resultante para o servidor em vez de deixá-lo
@@ -226,17 +226,21 @@ Duas coisas que isso **não** faz, ambas importantes antes de você confiar niss
   `rebase_doctor` e as ferramentas de branch executam a CLI do Rebase, que se conecta com
   `DATABASE_URL` e nunca enxerga seu token. O gate de loopback abaixo é a
   única proteção diante delas.
-- **Uma chave não-admin não pode usar as ferramentas de administração.** `list_users`, `create_user`,
-  `update_user`, `delete_user`, `list_roles` e `rebase_auth_reset_password`
-  estão protegidas por `requireAdmin` e falharão com uma chave de escopo restrito. Isso faz parte do
-  funcionamento do sistema, mas significa escolher entre alcance e restrição em vez de
-  obter ambos.
+- **Uma chave só alcança uma ferramenta de administração com o escopo dessa ferramenta.** `list_users` e
+  `list_roles` precisam de `users:read`; `create_user`, `update_user`, `delete_user` e
+  `rebase_auth_reset_password` precisam de `users:write`; as ferramentas de storage e de cron
+  precisam do escopo `storage:*` ou `cron:*` correspondente; `invoke_function` precisa de
+  `functions:invoke`. Sem
+  ele, a chamada responde `403 SCOPE_MISSING`. Mesmo com `users:write`, uma chave não pode
+  alterar a conta de um administrador: um administrador tem `keys:read` e `keys:write`, que nenhuma
+  chave pode ter, e ninguém pode gerenciar uma conta que tenha mais do que ele próprio.
 
-Uma API key com `admin: true` é diferente: ela carrega as roles
-`["admin", "service"]`, o que atende às mesmas políticas padrão de admin que a service
-key atende. No plano de dados, seu alcance é o mesmo da service key. A diferença é que
-ela é **revogável, expirável e possui rate limit por chave**, nada do qual é verdadeiro
-para a service key — rotacioná-la exige editar o `.env` e reiniciar o servidor.
+Uma chave criada com `--roles admin` é diferente: ela carrega as roles
+`["service", "admin"]`, o que atende às mesmas políticas padrão de admin que a service
+key atende. Dê a ela também `--full-access` e seu alcance passa a ser o da service key,
+exceto o gerenciamento de chaves. A diferença é que ela é **revogável, expirável e possui
+rate limit por chave**, nada do qual é verdadeiro para a service key — rotacioná-la
+exige editar o `.env` e reiniciar o servidor.
 
 Consulte [Agentes e Servidores MCP](/docs/backend/api-keys#agents-and-mcp-servers) para obter as
 orientações completas sobre escopo de chaves.
@@ -550,11 +554,22 @@ a um usuário, o endpoint se recusa a inicializar e informa o motivo no log de b
   vem ativado por padrão; `REBASE_MCP_OPEN_REGISTRATION=false` limita-o
   aos clientes que você registrar) e envia a pessoa para uma tela de consentimento que faz
   o login através do seu `/auth/login` existente.
-- **Seis ferramentas, dois escopos.** `mcp:read` oferece `list_collections`,
-  `query_collection` e `get_document`; `mcp:write` adiciona `create_document`,
-  `update_document` e `delete_document`. O escopo decide quais ferramentas são
-  oferecidas, não quais linhas: uma lista vazia pode ser o RLS atuando, e `mcp:write` ainda
-  assim não poderá gravar uma linha que a pessoa não pudesse gravar.
+- <span class="since-badge" data-since="0.24">Desde 0.24</span> **Seis ferramentas, três escopos.** Os mesmos [escopos](/docs/backend/roles-and-scopes/)
+  que toda credencial usa. `data:read` oferece `list_collections`,
+  `query_collection` e `get_document`; `data:write` adiciona `create_document` e
+  `update_document`; `data:delete` adiciona `delete_document`. Um cliente que não pede
+  nada recebe `data:read`. Cada um pode ser restringido a uma coleção: `data:read:posts`
+  lista e lê `posts` e nada mais. Um escopo decide quais ferramentas são
+  oferecidas e quais coleções elas alcançam, não quais linhas: uma lista vazia pode ser
+  o RLS atuando, e `data:write` ainda assim não poderá gravar uma linha que a pessoa não pudesse gravar.
+- **Concessões feitas antes da 0.24 mantêm seu alcance.** `mcp:read` é lido como
+  `data:read`, e `mcp:write` como `data:write data:delete`, nas concessões armazenadas e
+  nos tokens já emitidos.
+- <span class="since-badge" data-since="0.24">Desde 0.24</span> **Uma chave de API também funciona.** `/mcp` também aceita `Authorization: Bearer rk_…`, para
+  um cliente configurado com um header em vez de um fluxo OAuth. A chave alcança
+  as ferramentas que seus escopos `data:*` cobrem, como quem quer que ela represente: uma
+  [chave pessoal](/docs/backend/api-keys/#personal-keys) como seu proprietário, uma chave de serviço
+  como `api-key:<id>`.
 - **Um token apenas para este endpoint.** Um token de acesso MCP é recusado por
   `/api/data`, `/api/admin` e pelo WebSocket, logo conectar um assistente não
   entrega uma sessão a ele.

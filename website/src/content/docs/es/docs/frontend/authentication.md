@@ -1,5 +1,5 @@
 ---
-sourceHash: 8d1a98886641537e
+sourceHash: 59bdc8b898c974d7
 title: Autenticación e inicio de sesión
 sidebar_label: Autenticación e inicio de sesión
 description: Configura el controlador de autenticación, la vista de inicio de sesión y la simulación de roles en tu frontend React de Rebase.
@@ -88,6 +88,8 @@ roles: {
 ```
 
 Para agregar o eliminar opciones de roles, actualiza el mapa `enum` en tu colección de usuarios y regenera el esquema.
+
+Un rol de esta lista es un nombre con el que pueden coincidir tus [reglas de seguridad](/docs/collections/security-rules). Lo que puede hacer más allá de sus filas (gestionar usuarios, leer registros, cambiar el esquema) se declara por separado, bajo `auth.roles` en la misma colección. `admin` está integrado y lo tiene todo. Consulta [Roles y alcances](/docs/backend/roles-and-scopes).
 
 ## Simulación de roles (modo de desarrollo)
 

@@ -24,16 +24,17 @@ const mcpConfigCode = `<span class="text-surface-500">// .cursor/mcp.json — or
   }
 }`;
 
-const keyCode = `<span class="text-surface-500">// The key behind that token. Three operations, not two —</span>
-<span class="text-surface-500">// and \`admin\` is a separate flag, off by default.</span>
+const keyCode = `<span class="text-surface-500">// The key behind that token. Scopes say which calls it may make —</span>
+<span class="text-surface-500">// delete is its own scope — and roles say which rows those calls see.</span>
 {
   <span class="text-blue-400">"name"</span>: <span class="text-emerald-400">"support-agent"</span>,
-  <span class="text-blue-400">"permissions"</span>: [
-    { <span class="text-blue-400">"collection"</span>: <span class="text-emerald-400">"products"</span>, <span class="text-blue-400">"operations"</span>: [<span class="text-emerald-400">"read"</span>] },
-    { <span class="text-blue-400">"collection"</span>: <span class="text-emerald-400">"orders"</span>,   <span class="text-blue-400">"operations"</span>: [<span class="text-emerald-400">"read"</span>, <span class="text-emerald-400">"write"</span>] }
+  <span class="text-blue-400">"scopes"</span>: [
+    <span class="text-emerald-400">"data:read:products"</span>,
+    <span class="text-emerald-400">"data:read:orders"</span>,
+    <span class="text-emerald-400">"data:write:orders"</span>
   ],
-  <span class="text-blue-400">"admin"</span>: <span class="text-amber-400">false</span>,
-  <span class="text-blue-400">"expires_at"</span>: <span class="text-emerald-400">"2026-10-01"</span>
+  <span class="text-blue-400">"roles"</span>: [],
+  <span class="text-blue-400">"expires_at"</span>: <span class="text-emerald-400">"2026-12-31"</span>
 }`;
 
 // The tool surface, taken from the exported tool names in @rebasepro/mcp.

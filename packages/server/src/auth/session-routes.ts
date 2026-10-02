@@ -7,12 +7,12 @@ import { HonoEnv } from "../api/types";
 import type { MiddlewareHandler } from "hono";
 import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
-import { strictAuthLimiter, defaultAuthLimiter } from "./rate-limiter";
+import { strictAuthLimiter, defaultAuthLimiter, requestClientAddress } from "./rate-limiter";
 import { hashRefreshToken } from "./jwt";
 import type { AuthModuleConfig } from "./routes";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import { readRefreshToken, clearRefreshCookie, redactRefreshToken } from "./cookie-utils";
-import { isAnonymousAuthOpen } from "./registration-policy";
+import { isAnonymousAuthOpen, isSteadyStateRegistrationOpen } from "./registration-policy";
 import { revokeAllSessions } from "./token-revocation";
 import type { resolveAuthHooks } from "./auth-hooks";
 import type { CreateUserData } from "./interfaces";
@@ -56,10 +56,15 @@ interface SessionRoutesConfig {
      * `/register`. Absent when captcha is off or `register` is not protected.
      */
     registerCaptcha?: MiddlewareHandler<HonoEnv>;
+    /**
+     * Mail the account a verification link, in the background. Upgrading a
+     * guest is registration, and registration starts the address proof.
+     */
+    sendVerificationMail?: (user: { id: string; email: string; displayName?: string | null }) => void;
 }
 
 export function mountSessionRoutes(opts: SessionRoutesConfig): void {
-    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession, registerCaptcha } = opts;
+    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession, registerCaptcha, sendVerificationMail } = opts;
     const authRepo = config.authRepo;
 
     /**
@@ -110,6 +115,10 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const parsed = parseBody(logoutSchema, body);
         const refreshToken = readRefreshToken(c, parsed, config.cookieAuth);
 
+        // Whose sign-out this is: the refresh token's row says, and it is what
+        // the SDK and the CMS send. Read from the bearer token alone, as it
+        // was, `afterLogout` never fired for either of them.
+        let signedOutUid: string | undefined;
         if (refreshToken) {
             const tokenHash = await hashRefreshToken(refreshToken);
             // Kill the whole sign-in, not just the token that happened to be
@@ -118,6 +127,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             // leave the others perfectly usable — a logout that does not log
             // you out is worse than no logout at all.
             const stored = await authRepo.findRefreshTokenByHash(tokenHash).catch(() => null);
+            signedOutUid = stored?.uid;
             const sessionId = stored?.sessionId;
             if (sessionId && authRepo.revokeRefreshTokenSession) {
                 await authRepo.revokeRefreshTokenSession(sessionId);
@@ -129,14 +139,18 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         // Always clear the cookie if in cookie mode
         clearRefreshCookie(c, config.cookieAuth);
 
-        // Call afterLogout hook (fire-and-forget)
-        // Extract uid from the access token if present
-        const accessToken = extractBearerToken(c.req.header("authorization"));
-        if (ops.afterLogout && accessToken !== undefined) {
-            const { verifyAccessToken } = await import("./jwt");
-            const payload = await verifyAccessToken(accessToken);
-            if (payload) {
-                ops.afterLogout(payload.uid).catch((err: unknown) => {
+        // Call afterLogout hook (fire-and-forget). The refresh token's owner,
+        // or failing that the access token's.
+        if (ops.afterLogout) {
+            if (!signedOutUid) {
+                const accessToken = extractBearerToken(c.req.header("authorization"));
+                if (accessToken !== undefined) {
+                    const { verifyAccessToken } = await import("./jwt");
+                    signedOutUid = (await verifyAccessToken(accessToken))?.uid;
+                }
+            }
+            if (signedOutUid) {
+                ops.afterLogout(signedOutUid).catch((err: unknown) => {
                     logger.error("[AuthHooks] afterLogout error", {
                         error: err instanceof Error ? err.message : err
                     });
@@ -152,12 +166,18 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * Get active refresh tokens (sessions) for the current user
      */
     router.get("/sessions", requireLiveSession, async (c) => {
-        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[]; sid?: string } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
 
-        const currentRefreshToken = c.req.header("x-refresh-token") as string;
+        // Which of these is the caller's own: the access token says, by its
+        // `sid`. The `x-refresh-token` header was the only way before, and no
+        // first-party client sent it — in cookie mode none could — so every
+        // row read "not this device", and revoking your own row signed nobody
+        // out until the next request failed. Kept for a token minted before
+        // `sid` existed.
+        const currentRefreshToken = userCtx.sid ? undefined : c.req.header("x-refresh-token");
         const currentTokenHash = currentRefreshToken ? await hashRefreshToken(currentRefreshToken) : null;
 
         const tokens = await authRepo.listRefreshTokensForUser(userCtx.uid);
@@ -185,9 +205,11 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             // The sign-in, not the last rotation — otherwise every session
             // looks like it started an hour ago, whatever its real age.
             createdAt: s.sessionStartedAt ?? s.createdAt,
-            isCurrentSession: currentTokenHash
-                ? tokens.some(t => t.tokenHash === currentTokenHash && (t.sessionId ?? t.id) === (s.sessionId ?? s.id))
-                : false
+            isCurrentSession: userCtx.sid
+                ? (s.sessionId ?? s.id) === userCtx.sid
+                : currentTokenHash
+                    ? tokens.some(t => t.tokenHash === currentTokenHash && (t.sessionId ?? t.id) === (s.sessionId ?? s.id))
+                    : false
         }));
 
         return c.json({ sessions: mappedSessions });
@@ -268,7 +290,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
                 providerId: "password",
                 isAnonymous: result.user.isAnonymous ?? false,
                 emailVerified: result.user.emailVerified,
-                roles: result.roles.map((r) => r.id),
+                roles: result.roles,
                 metadata: result.user.metadata ?? {}
             }
         });
@@ -333,7 +355,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
                 providerId: "password",
                 isAnonymous: result.user.isAnonymous ?? false,
                 emailVerified: result.user.emailVerified,
-                roles: result.roles.map((r) => r.id),
+                roles: result.roles,
                 metadata: result.user.metadata ?? {}
             }
         });
@@ -375,7 +397,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            requestClientAddress(c)
         );
 
         // Fire afterUserCreate hook
@@ -413,12 +435,24 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * an account that passed neither.
      */
     router.post("/anonymous/link", strictAuthLimiter, requireLiveSession, ...(registerCaptcha ? [registerCaptcha] : []), async (c) => {
-        // Gated on the same predicate as `/anonymous`, not on registration: this
-        // route cannot create an account, only put credentials on one that
-        // `/anonymous` already made. If anonymous auth is off, any session
-        // reaching here predates the switch, and letting it finish would be a
-        // second way to reach the state the switch exists to prevent.
+        // Gated on the same predicate as `/anonymous`: if anonymous auth is
+        // off, any session reaching here predates the switch, and letting it
+        // finish would be a second way to reach the state the switch exists to
+        // prevent.
         assertAnonymousAuthOpen();
+        // And on registration's, because this is registration: the guest
+        // becomes an account that signs in with a password. Gated on anonymous
+        // auth alone, a backend with registration closed still made password
+        // accounts for anyone — sign in as a guest, then link.
+        if (!isSteadyStateRegistrationOpen({
+            disableSelfRegistration: config.disableSelfRegistration,
+            allowRegistration: config.allowRegistration ?? false
+        })) {
+            throw ApiError.forbidden(
+                "A guest cannot become an account here: registration is disabled on this backend.",
+                "REGISTRATION_DISABLED"
+            );
+        }
 
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
@@ -471,12 +505,13 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         if (!updatedUser) {
             throw ApiError.notFound("User not found");
         }
+        sendVerificationMail?.(updatedUser);
 
         // Generate new tokens with updated identity
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            requestClientAddress(c)
         );
 
         const authResponse = buildAuthResponse(updatedUser, roleIds, accessToken, refreshToken, "password") as AuthResponsePayload;

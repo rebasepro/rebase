@@ -121,7 +121,11 @@ export interface AuthControllerExtended<USER extends User = User, ExtraData = un
     /** Generic OAuth login — works with any provider. Posts payload to /auth/{providerId}. */
     oauthLogin?: (providerId: string, payload: Record<string, unknown>) => Promise<void>;
     /** Register a new user */
-    register?(email: string, password: string, displayName?: string): Promise<void>;
+    /**
+     * `confirmationRequired` when the backend registers confirm-first: the
+     * account exists but nobody is signed in until the mailed link is followed.
+     */
+    register?(email: string, password: string, displayName?: string): Promise<{ confirmationRequired?: boolean } | void>;
     /** Skip login (for anonymous access if enabled) */
     skipLogin?(): void;
     /** Request password reset email */
@@ -129,7 +133,13 @@ export interface AuthControllerExtended<USER extends User = User, ExtraData = un
     /** Reset password using a token */
     resetPassword?(token: string, password: string): Promise<void>;
     /** Confirm an email address using the token from a verification email */
-    verifyEmail?(token: string): Promise<void>;
+    /**
+     * Confirm an address with the token from its link. Refused with
+     * `PROOF_REQUIRED` when the account holds a password the call does not
+     * prove: pass `password` to keep it (and sign in), or `removeUnproven` to
+     * verify without it.
+     */
+    verifyEmail?(token: string, options?: { password?: string; removeUnproven?: boolean }): Promise<{ passwordRemoved?: boolean; signedIn?: boolean } | void>;
     /** Change password for the authenticated user */
     changePassword?(oldPassword: string, newPassword: string): Promise<void>;
     /** Update user profile */

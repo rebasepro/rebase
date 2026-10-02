@@ -53,6 +53,13 @@
   gets the devDependency added, with a message to install it, the next time
   `configureAgents` or `skills install --mcp` runs.
 
+- **`rebase api-keys create` takes scopes.** `--scopes data:read:posts,logs:read`
+  names what the key may do, `--roles` the RLS roles it runs as, and
+  `--expires-in <days>` or `--expires-at <date>` when it stops. `--full-access`
+  is every scope the service key holds except `keys:*`. `--permissions`,
+  `--admin` and `--expires` are removed and refused by name with their
+  replacement. `rebase api-keys scopes` lists every scope this backend knows.
+
 #### Server & REST
 
 - **A live schema edit commits the collection and `schema.generated.ts`, and
@@ -76,6 +83,58 @@
   force HTTPS on a subdomain that cannot itself speak HTTPS yet should set
   `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` to keep the old header. See the
   entry under Security.
+
+- **Permissions are scopes: one `resource:action` vocabulary for every
+  credential.** A scope names what a caller may do — `data:read`,
+  `storage:write`, `functions:invoke`, `users:write`, `schema:write`,
+  `database:write`, `backups:read`, `cron:write`, `logs:read`, `keys:write` —
+  and may name one target: `data:read:posts` is `data:read` on `posts` alone.
+  Every signed-in person holds the data plane (`data:*`, `storage:*`,
+  `functions:invoke`), because their rows are still decided by
+  `securityRules`. The admin plane is held by the `admin` role, and by any role
+  the app declares under `auth.roles` on the users collection. Every admin
+  surface now asks for its scope instead of "is admin": users and roles
+  (`users:read`/`users:write`), the schema editors, the RLS audit, the contract
+  and the private API docs (`schema:read`, and `schema:write` to apply), the
+  SQL editor and branches on the realtime socket (`database:read`/
+  `database:write`), backups, cron, logs, the development mailbox
+  (`users:write`, since a captured message carries a working sign-in link) and
+  service keys (`keys:read`/`keys:write`). A refusal answers `403
+  SCOPE_MISSING` with `details.requiredScope`.
+
+- **API keys hold scopes, not a permission list and an `admin` flag.**
+  `permissions: [{ collection, operations }]` and `admin: true` are gone from
+  `CreateApiKeyRequest`, `UpdateApiKeyRequest` and `ApiKeyMasked`, along with
+  `isOperationAllowed`, `ApiKeyPermission` and `ApiKeyOperation`. A service key
+  has `scopes` and `roles` — the RLS roles it runs as beside `service`, where
+  `["admin"]` reads every row. Keys already stored are converted on boot to
+  the scopes they held and never more: `{ collection: "posts", operations:
+  ["read"] }` becomes `data:read:posts`, `"*"` becomes the data plane,
+  `admin: true` becomes the `admin` role and the users, schema, backups, cron
+  and logs scopes. A function grant without `write` becomes nothing, since
+  calling a function is not a read. `"storage"` and `"functions"` are no
+  longer names in the collection field, so a collection called `storage` no
+  longer shares a grant with the files.
+
+- **`schema-admin` is no longer an administrator, and roles are no longer
+  stored objects.** `admin` is the one built-in role. A project that used
+  `schema-admin` declares it with the scopes it should hold, under
+  `auth.roles`. `createRole`, `updateRole`, `deleteRole`, `getRoleById`,
+  `getUserRoles`, `RoleRepository`, `RoleData` and `CreateRoleData` are
+  removed: the Postgres driver's versions saved nothing, and nothing read the
+  `isAdmin`, `defaultPermissions` and `collectionPermissions` they carried.
+  `getUserWithRoles` returns role ids. `GET /api/admin/roles` lists `admin` and
+  the declared roles with their scopes, and `BootstrappedAuth.roleService` is
+  gone. The MongoDB driver no longer seeds a `rebase_roles` collection.
+
+- **The hosted MCP server's scopes are `data:read`, `data:write` and
+  `data:delete`.** Each can be narrowed to collections (`data:read:posts`),
+  and the tools reach only the collections granted. Grants made with
+  `mcp:read` and `mcp:write` keep their reach: they are read as `data:read`
+  and as `data:write data:delete`.
+
+- **`RealtimeSocketLimits` is now `RealtimeSocketOptions`.** It carries the API-key
+  resolver beside the limits, as the sixth argument of `initializeWebsockets`.
 
 #### MCP
 
@@ -101,6 +160,41 @@
   including `IconButton`'s old `color` attribute (which never did anything),
   is now a compile error. Fix a call site by dropping the prop; nothing about
   what renders changes.
+
+#### Auth
+
+- **An open realtime socket is re-checked, and closed when its identity has
+  ended.** Before each frame, every 30 seconds for a socket that only listens,
+  and when its token expires, the socket asks whether the account still
+  exists, is still signed in and still has its roles. An ended identity gets
+  `AUTH_ERROR` (`SESSION_ENDED` or `TOKEN_EXPIRED`) and close code 4001, and a
+  changed role re-scopes its subscriptions. The SDK reconnects with a fresh
+  token on its own; a client speaking the socket protocol directly must send a
+  fresh token in `AUTHENTICATE` before the old one expires.
+
+- **Following an email-verification link proves the address, and nothing
+  else.** Without a live session of the account or its password, the link now
+  removes the password and any identity nobody proved, and ends every
+  session, as magic links, email codes and password resets already did. This
+  closes an account pre-hijack (see Security). `client.auth.verifyEmail(token,
+  options?)` now POSTs, sends the session when signed in, and may throw
+  `PROOF_REQUIRED`: pass `{ password }` to keep the password, or
+  `{ removeUnproven: true }`.
+
+- **`client.auth.signUp` resolves `{ confirmationRequired, user | null, … }`**,
+  because with `requireEmailVerification` on there is no session until the
+  address is confirmed.
+
+- **`mfa.enroll().recoveryCodes` is `null` when adding a second factor.** The
+  codes are made once, with the first factor; `mfa.regenerateRecoveryCodes()`
+  replaces them on request.
+
+- **`/auth/anonymous/link` and linking a provider to a guest need
+  registration open** (`allowRegistration`), since both turn a guest into an
+  account.
+
+- **A deleted account's token answers 401 `SESSION_REVOKED`** on every door
+  (`/me` used to answer 404).
 
 ### Added
 
@@ -138,6 +232,15 @@
   `--mcp`, it names the agents whose config is missing the server. Use it for
   a project that already exists.
 
+- **Tokens for CI and agents on Rebase Cloud.** `rebase cloud tokens create
+  --can deploy,logs` mints a key that acts as you, narrowed to one project and
+  those actions; `rebase cloud tokens` lists them and `rebase cloud tokens
+  revoke` ends one. Set it as `REBASE_TOKEN` and every `rebase cloud` command
+  uses it instead of a login session, with no session file read or written.
+  The capabilities are `deploy`, `logs`, `env`, `database` and `backups`; none
+  of them can restore over a live database, which stays with a signed-in owner
+  or admin.
+
 #### Admin (CMS & app)
 
 - **A data-import preview lists every value that will not be imported, per
@@ -158,6 +261,14 @@
 
 - **`CollectionWindow` and `isPropertyFilterable` are exported from
   `@rebasepro/app`.** Empty-state overrides now also receive `isFiltered`.
+
+- **The API keys panel speaks scopes.** A key shows its scopes grouped into
+  data, admin and app, with the collections, buckets or functions each is
+  narrowed to, and the RLS roles it runs as — a key running as `admin` is
+  marked as reading every row. The create dialog offers only the scopes you
+  hold, narrows data, storage and function scopes to chosen targets, and says
+  in words what the key will be able to do. A *My keys* tab manages your
+  personal keys when the backend enables them.
 
 #### MCP
 
@@ -222,11 +333,70 @@
 
 - New docs: "Running more than one instance" and "Backups and restore".
 
+- **Personal API keys.** With `personalKeys: true` in the users collection's
+  `auth` block, any signed-in account can create keys at `/api/auth/keys`
+  (`client.personalKeys`). A personal key acts as its owner, with the owner's
+  roles as they are when it is used, and holds no scope the owner does not:
+  demote the owner and the key shrinks, delete the account and it stops. A
+  service key is still created under `/api/admin/api-keys`. No key may manage
+  keys, and no key is created with a scope or an RLS role its creator does not
+  hold (`SCOPE_EXCEEDS_CREATOR`, `ROLE_EXCEEDS_CREATOR`, `KEY_MANAGEMENT_SCOPE`).
+  A target that names nothing this backend serves is refused
+  (`UNKNOWN_SCOPE_TARGET`).
+
+- **Apps declare their own scopes and roles.** `auth.scopes` on the users
+  collection names app scopes such as `project:deploy`, with a label and an
+  optional target, and `auth.roles` gives a role its admin-plane and app
+  scopes. Boot refuses a declaration that reads as a grant it is not: a role
+  listing a data-plane scope, an app scope reusing a built-in resource name,
+  or a declared `admin`. A function checks an app scope with `requireScope`,
+  `hasScope` or `getScopes` from `@rebasepro/server/functions`; a person always
+  holds app scopes, so they narrow keys. `GET /api/auth/scopes` lists every
+  scope with its wording and the ones the caller holds.
+
+- **API keys work on the realtime socket and at `/mcp`.** A key authenticates
+  the socket with the same check as a request, and its data scopes decide
+  which collections it reads and writes there; it cannot use channels. An MCP
+  client configured with a header can present a key instead of going through
+  OAuth. `verifyCredential` gives an app's own socket or tunnel the same
+  answer for a session token or a key: who it acts as and its scopes.
+
 #### CI & tooling
 
 - **`pnpm check:tsconfig-entries`** fails a tsconfig `include`/`paths`/
   `extends` entry that resolves to nothing. `pnpm typecheck` reads
   `tests/e2e` again.
+
+#### Auth
+
+- **`sid` and `exp` on access tokens**, and `isCurrentSession` in the
+  sessions list. Signing one device out now ends that device's access token
+  too.
+
+- **`auth.requireEmailVerification`** (`AUTH_REQUIRE_EMAIL_VERIFICATION`, off
+  by default): registration sends a confirmation and password sign-in answers
+  `403 EMAIL_NOT_CONFIRMED` until the address is verified; `/register` then
+  no longer says whether an address has an account. Registration now mails
+  the verification link either way; `POST /auth/verify-email` is the new
+  door the SDK uses.
+
+- **`auth.refreshTokenReuse`** (`"reject"`, the default and today's
+  behaviour, or `"revoke-session"`) and `auth.refreshTokenReuseIntervalSeconds`.
+
+- **`auth.magicLinkCreatesUsers`** (`AUTH_MAGIC_LINK_CREATES_USERS`, off by
+  default): magic links and email codes may create the account, under the
+  registration policy.
+
+- **Disabling an account**: `PUT /admin/users/:uid { disabled }`,
+  `admin.updateUser({ disabled })`, answered with `ACCOUNT_DISABLED`; stored in
+  the new `users.disabled_at` column, which `db push` plans.
+
+- **Admin MFA reset and new recovery codes**: `DELETE /admin/users/:uid/mfa`
+  (`users:write`, never on an account that outranks the caller; it ends the
+  user's sessions), `client.admin.resetMfa(uid)`, and
+  `POST /auth/mfa/recovery-codes` / `mfa.regenerateRecoveryCodes()`.
+
+- **`RealtimeSocketOptions.identityRecheckIntervalMs`** (default 30000).
 
 ### Changed
 
@@ -306,6 +476,31 @@
 - **The unit test suites run under `TZ=America/Los_Angeles` in CI and in
   `verify-quality.sh`.** A test that needs a specific zone pins it with
   `tooling/scripts/jest/zone-environment.cjs`.
+
+#### Auth
+
+- `change-password` answers with a fresh session, which the SDK adopts, so
+  the CMS stays signed in after a password change.
+
+- Linking a provider to a guest turns it into an account, with the
+  registration policy and hooks.
+
+- A refusing auth hook answers 400 `HOOK_REJECTED` (or the 4xx its error
+  carries) instead of 500; malformed JSON on an auth or admin route is 400
+  `INVALID_JSON`.
+
+- `onAuthenticated` also fires for OAuth, refresh, password reset and MFA;
+  `beforeLogin("oauth")` and `beforeUserCreate` run on OAuth sign-in and
+  sign-up; `afterLogout` fires for SDK and CMS sign-outs.
+
+- Sessions record the client address the rate limiter resolves
+  (`TRUSTED_PROXY_HOPS`) instead of a raw `X-Forwarded-For`.
+
+- The seeded admin is stored verified; the MFA key falls back to
+  `auth.jwtSecret`; the welcome email's button links to the app's root.
+
+- A database failure while judging a token is 503 on every door; the
+  watermark-only check failed open.
 
 ### Fixed
 
@@ -503,6 +698,16 @@
 - **The CLI end-to-end suite passes again,** and no longer leaves the
   backend it starts running after the suite exits.
 
+- **`rebase skills install --agent codex` writes where Codex reads.** It wrote
+  `.codex/skills`, which Codex never opens: Codex reads repository skills from
+  `.agents/skills`. It now writes there, the directory Gemini CLI and
+  Antigravity read too, and installs it once when both are named.
+
+- **The scaffold's `.gitignore` keeps `.vscode/mcp.json`.** It ignored
+  `.vscode/` whole, so the MCP server registered for GitHub Copilot never
+  reached the first commit. Other editor settings in `.vscode/` are still
+  ignored.
+
 #### Admin (CMS & app)
 
 - **The list view keeps its scroll position when you come back from a
@@ -581,6 +786,13 @@
 - **An open record form no longer saves back the old value of a nested map
   field someone else changed while you edited a different field of the same
   map.**
+
+- **The list view keeps its scroll position when you come back from a record
+  opened full screen.** Full screen replaces the collection view, and the list
+  view, unlike the table and card views, never saved or restored its offset.
+  Going back landed at the top with only the first page loaded. It now returns
+  to the same rows. The card view also stops jumping back slightly the first
+  time more rows load after a fresh visit.
 
 #### Studio
 
@@ -738,6 +950,9 @@
   and a resend.** A mistyped step-up code used to spend two of the
   challenge's five attempts instead of one.
 
+- The CMS verifies a verification link opened while signed in; it rendered a
+  not-found page.
+
 #### MCP
 
 - **Remote MCP reads return REST's rows** (ISO dates, a `belongsTo` as its
@@ -863,6 +1078,48 @@
   Breaking). Static apps, the CMS included, now send
   `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri 'self'`
   unless the response already set its own.
+
+#### Auth
+
+- **A `users:write` role cannot reach past itself.** Nobody edits, resets the
+  password of, or deletes an account holding a scope they do not hold
+  (`ACCOUNT_OUTRANKS_CALLER`), and nobody grants a role holding more than they
+  do (`ROLE_EXCEEDS_CALLER`). Only an administrator grants `admin`. Without
+  this, a support role could reset an administrator's password and sign in as
+  them.
+
+- **The registration default role may hold no admin-plane scope.** Every
+  registrant receives it, so boot refuses a `defaultRole` that is `admin` or a
+  declared role holding `users:write`, `schema:write` or any other admin
+  scope.
+
+- **"Admin" is decided one way on every door.** Storage, the upload handler
+  and both realtime sockets compared against `"admin"` by hand while the REST
+  admin gate also accepted `schema-admin`; they all read the same roles and
+  scopes now.
+
+- **A deleted account's tokens are refused at once on every door.** The
+  revocation watermark lived on the user row, so deleting the row brought
+  back tokens the user had revoked. One check now reads existence, watermark
+  and live roles together, and a source guard fails if anything reads the
+  watermark alone.
+
+- **The email-verification pre-hijack is closed.** Registering someone's
+  address with a password and getting them to click a genuine verification
+  link left the attacker's password working on the account they later
+  joined by OAuth.
+
+- **A second MFA enrolment no longer destroys the printed recovery codes.**
+
+- **Password sign-in no longer reveals by timing whether an address has an
+  account.**
+
+- **A new password voids outstanding reset links, and verification links
+  expire after 24 hours.**
+
+- **The CLI no longer writes a refused password straight into the
+  database:** it falls back to the direct-database reset only on a network
+  error.
 
 ## [0.23.0] - 2026-09-27
 

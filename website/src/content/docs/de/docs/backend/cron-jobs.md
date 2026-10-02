@@ -1,5 +1,5 @@
 ---
-sourceHash: 7c92103faece259e
+sourceHash: b39d5a790d94c656
 title: Cron-Jobs
 sidebar_label: Cron-Jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.
@@ -266,7 +266,15 @@ Der Handler kann jeden JSON-serialisierbaren Wert zurückgeben. Dieser wird im L
 
 ## REST-API
 
-Alle Cron-Routen erfordern **Admin-Authentifizierung** (`requireAuth` + `requireAdmin`).
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Lesen braucht den Scope `cron:read`. Auslösen, Pausieren und Fortsetzen brauchen
+`cron:write`. Ein Admin hält beide. Ebenso eine Person, deren Rolle sie deklariert, und
+ein API-Schlüssel, der mit ihnen erstellt wurde – genau das sollte ein externer Scheduler tragen:
+
+```bash
+rebase api-keys create -n "Scheduler" --scopes cron:read,cron:write
+```
+
+Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/).
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
@@ -278,7 +286,7 @@ Alle Cron-Routen erfordern **Admin-Authentifizierung** (`requireAuth` + `require
 
 ### Beispiel: Alle Jobs auflisten
 
-`$TOKEN` ist ein Admin-Zugriffstoken: Melden Sie sich an und verwenden Sie das `accessToken`, das die Login-Antwort zurückgibt. `$API_URL` ist das, was `rebase dev` ausgegeben hat – der Port wird vom Projektpfad abgeleitet, es gibt also keinen festen Port.
+`$TOKEN` ist ein Zugriffstoken für ein Konto, das `cron:read` hält: Melden Sie sich an und verwenden Sie das `accessToken`, das die Login-Antwort zurückgibt. Ein API-Schlüssel, der den Scope hält, funktioniert genauso. `$API_URL` ist das, was `rebase dev` ausgegeben hat – der Port wird vom Projektpfad abgeleitet, es gibt also keinen festen Port.
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/admin/cron"

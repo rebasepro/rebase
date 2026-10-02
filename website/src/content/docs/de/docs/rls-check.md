@@ -1,5 +1,5 @@
 ---
-sourceHash: 4027ec7cdd5a1a2f
+sourceHash: 2239bbe27163e9dc
 slug: de/docs/rls-check
 title: rls-check
 description: Überprüfen Sie Row-Level Security auf jeder PostgreSQL-Datenbank – Supabase, Neon, RDS oder Ihr eigener Server. Schreibgeschützt, keine Registrierung, kein Rebase erforderlich.
@@ -163,8 +163,8 @@ Standardintervall und -schwellenwert. Der Scanner muss dennoch aus Ihrem Projekt
 liefert keine eigene Kopie mit, und ein Start, der die Prüfung anfordert, ohne dass das Paket
 vorhanden ist, verweigert, bevor eine Verbindung geöffnet wird, und nennt das hinzuzufügende Paket.
 
-Das Ergebnis wird unter `GET /api/admin/rls-audit` bereitgestellt, per Admin-Berechtigung geschützt
-wie jede andere Admin-Oberfläche, und jeder Durchlauf protokolliert eine Zeile – als `warn`, wenn ein
+Das Ergebnis wird unter `GET /api/admin/rls-audit` bereitgestellt, geschützt durch den Scope
+`schema:read`, und jeder Durchlauf protokolliert eine Zeile – als `warn`, wenn ein
 Befund `warnAtSeverity` erreicht, andernfalls als `info`:
 
 ```

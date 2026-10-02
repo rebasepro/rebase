@@ -21,6 +21,11 @@ export interface UserData {
     emailVerificationToken?: string | null;
     emailVerificationSentAt?: Date | null;
     isAnonymous?: boolean;
+    /**
+     * An administrator switched the account off: no sign-in, no refresh, and
+     * no token it already holds is honoured. See `setUserDisabled`.
+     */
+    disabled?: boolean;
     metadata?: Record<string, unknown>;
     createdAt: Date;
     updatedAt: Date;
@@ -102,38 +107,6 @@ export interface OAuthProvider<T = unknown> {
 }
 
 /**
- * Role data structure
- */
-export interface RoleData {
-    id: string;
-    name: string;
-    isAdmin: boolean;
-    defaultPermissions: {
-        read?: boolean;
-        create?: boolean;
-        edit?: boolean;
-        delete?: boolean;
-    } | null;
-    collectionPermissions: Record<string, {
-        read?: boolean;
-        create?: boolean;
-        edit?: boolean;
-        delete?: boolean;
-    }> | null;
-}
-
-/**
- * Data for creating a new role
- */
-export interface CreateRoleData {
-    id: string;
-    name: string;
-    isAdmin?: boolean;
-    defaultPermissions?: RoleData["defaultPermissions"];
-    collectionPermissions?: RoleData["collectionPermissions"];
-}
-
-/**
  * Refresh token info
  */
 export interface RefreshTokenInfo {
@@ -172,6 +145,25 @@ export interface RefreshTokenInfo {
      * that do not store it; both read as `aal1`, the restrictive value.
      */
     aal?: "aal1" | "aal2";
+}
+
+/**
+ * What {@link TokenRepository.getAccountAccessState} reads about an account
+ * that exists.
+ */
+export interface AccountAccessState {
+    /** The account's roles as the database has them now. */
+    roles: string[];
+    /** The revocation watermark: sessions that began before it are void. */
+    tokensValidAfter: Date | null;
+    /**
+     * Whether the session asked about has a refresh token that is not
+     * revoked. `undefined` when no session was asked about, or the store
+     * cannot tell (a refresh-token table without session grouping).
+     */
+    sessionActive?: boolean;
+    /** The account is switched off (`UserData.disabled`). */
+    disabled?: boolean;
 }
 
 /**
@@ -356,11 +348,6 @@ export interface UserRepository {
     getUserByVerificationToken(token: string): Promise<UserData | null>;
 
     /**
-     * Get roles for a user
-     */
-    getUserRoles(uid: string): Promise<RoleData[]>;
-
-    /**
      * Get role IDs for a user
      */
     getUserRoleIds(uid: string): Promise<string[]>;
@@ -378,38 +365,15 @@ export interface UserRepository {
     /**
      * Get user with their roles
      */
-    getUserWithRoles(uid: string): Promise<{ user: UserData; roles: RoleData[] } | null>;
-}
-
-/**
- * Abstract role repository interface.
- * Handles all role-related database operations.
- */
-export interface RoleRepository {
-    /**
-     * Get a role by ID
-     */
-    getRoleById(id: string): Promise<RoleData | null>;
+    getUserWithRoles(uid: string): Promise<{ user: UserData; roles: string[] } | null>;
 
     /**
-     * List all roles
+     * Switch an account off, or back on. Off, it cannot sign in or refresh,
+     * and the tokens it holds are refused (`judgeAccessToken`). Optional: a
+     * repository without it cannot disable accounts, and the admin route says
+     * so rather than pretending.
      */
-    listRoles(): Promise<RoleData[]>;
-
-    /**
-     * Create a new role
-     */
-    createRole(data: CreateRoleData): Promise<RoleData>;
-
-    /**
-     * Update a role
-     */
-    updateRole(id: string, data: Partial<Omit<RoleData, "id">>): Promise<RoleData | null>;
-
-    /**
-     * Delete a role
-     */
-    deleteRole(id: string): Promise<void>;
+    setUserDisabled?(uid: string, disabled: boolean): Promise<void>;
 }
 
 /**
@@ -468,6 +432,25 @@ export interface TokenRepository {
      * user's tokens so a rotation racing the delete cannot survive it.
      */
     setTokensValidAfter?(uid: string, at: Date): Promise<void>;
+
+    /**
+     * Everything an access token is judged against, in one read — or `null`
+     * when there is no such account.
+     *
+     * An access token is a bearer credential minted up to an hour ago, and the
+     * account it names may since have been deleted, revoked or demoted. Every
+     * door that honours one asks this before it does: the data plane, the admin
+     * gates, the realtime socket on every frame. See `judgeAccessToken`.
+     *
+     * `sessionId` is the token's `sid`: when given, the state also says
+     * whether that sign-in is still live, which is how signing one device out
+     * reaches the access token that device holds.
+     *
+     * Optional. Without it the judge composes the answer from
+     * `getUserWithRoles` and `getTokensValidAfter`, two reads instead of one,
+     * and cannot see one revoked session — only every session at once.
+     */
+    getAccountAccessState?(uid: string, sessionId?: string): Promise<AccountAccessState | null>;
 
     /**
      * Find a refresh token by hash
@@ -702,4 +685,4 @@ export interface MfaRepository {
 /**
  * Combined auth repository interface for convenience
  */
-export interface AuthRepository extends UserRepository, RoleRepository, TokenRepository, MfaRepository { }
+export interface AuthRepository extends UserRepository, TokenRepository, MfaRepository { }

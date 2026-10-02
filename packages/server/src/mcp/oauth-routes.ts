@@ -46,9 +46,11 @@ import {
     narrowScope,
     redirectUriAllowed,
     resourceMatches,
-    verifyPkce,
-    MCP_SCOPES
+    scopeList,
+    upgradeStoredMcpScope,
+    verifyPkce
 } from "./oauth-metadata.js";
+import { intersectScopes, parseScope } from "@rebasepro/types";
 import { renderConsentPage, consentPageHeaders } from "./consent-page.js";
 
 /** How long an issued MCP access token lives. */
@@ -118,7 +120,9 @@ export function grantIdentityFromRepository(
     if (!repo || !getUser || !getRoles) return undefined;
     return {
         async currentRoles(uid) {
-            return await getUser(uid) ? getRoles(uid) : null;
+            // Deleted or disabled: no grant acts for it any more.
+            const user = await getUser(uid);
+            return user && !user.disabled ? getRoles(uid) : null;
         },
         revocation: repo
     };
@@ -603,17 +607,20 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         // A refresh may narrow the scope but never widen it (RFC 6749 §6). The
         // intersection is taken rather than refusing, so a client repeating its
         // original request keeps working.
-        const held = new Set(record.scope.split(" ").filter(Boolean));
-        let scope = record.scope;
+        // A grant stored before `/mcp` spoke the shared vocabulary is read as
+        // what it granted — see `upgradeStoredMcpScope`.
+        const heldScope = upgradeStoredMcpScope(record.scope);
+        const held = scopeList(heldScope);
+        let scope = heldScope;
         if (form.scope) {
-            const asked = narrowScope(String(form.scope)).split(" ").filter(Boolean);
-            const granted = asked.filter(s => held.has(s));
-            // An empty intersection must NOT fall back to the held scope. The
-            // first version of this line ended `|| record.scope`, which meant a
-            // client holding `mcp:write` and asking for `mcp:read` was handed
-            // `mcp:write` — a refresh that WIDENS the grant, which is precisely
-            // what RFC 6749 §6 forbids. Asking for nothing you hold is a bad
-            // request, not a request for everything.
+            const asked = scopeList(narrowScope(String(form.scope)));
+            // Covered, not merely equal: `data:read:posts` narrows `data:read`.
+            const granted = intersectScopes(asked, held);
+            // An empty intersection must NOT fall back to the held scope: a
+            // client holding `data:write` and asking for `data:read` would be
+            // handed `data:write` — a refresh that WIDENS the grant, which is
+            // precisely what RFC 6749 §6 forbids. Asking for nothing you hold
+            // is a bad request, not a request for everything.
             if (granted.length === 0) {
                 return c.json({
                     error: "invalid_scope",
@@ -764,6 +771,10 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         if (!session) return null;
         const revocation = config.identity?.revocation;
         if (revocation && await isAccessTokenRevoked(revocation, session)) return null;
+        // And the account itself: a deleted one's watermark went with its row,
+        // so the check above reads "nothing set" for it. Refresh already treats
+        // a missing account as revoked; consent is the door that mints the grant.
+        if (config.identity && await config.identity.currentRoles(session.uid) === null) return null;
         return session;
     }
 
@@ -910,16 +921,25 @@ function escapeHtml(value: string): string {
         .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-/** Human-readable consent lines, one per granted scope. */
+/**
+ * Human-readable consent lines, one per granted scope.
+ *
+ * Worded for the person consenting, not taken from the scope catalogue: what
+ * they need to read here is that the client gets *their own* access and no
+ * more, and which collections it reaches when the grant names some.
+ */
 export function describeScopes(scope: string): { scope: string; description: string }[] {
-    const text: Record<string, string> = {
-        "mcp:read": "Read data you already have access to",
-        "mcp:write": "Create, change and delete data you already have access to"
+    const verbs: Record<string, string> = {
+        "data:read": "Read data you already have access to",
+        "data:write": "Create and change data you already have access to",
+        "data:delete": "Delete data you already have access to"
     };
-    return scope
-        .split(" ")
-        .filter(s => (MCP_SCOPES as readonly string[]).includes(s))
-        .map(s => ({ scope: s, description: text[s] }));
+    return scopeList(scope).flatMap(entry => {
+        const parsed = parseScope(entry);
+        const verb = parsed ? verbs[parsed.scope] : undefined;
+        if (!parsed || !verb) return [];
+        return [{ scope: entry, description: parsed.target ? `${verb}, in ${parsed.target} only` : verb }];
+    });
 }
 
 function decodeBasic(header: string | undefined): { id: string; secret: string } | null {

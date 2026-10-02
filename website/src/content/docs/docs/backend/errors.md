@@ -85,9 +85,9 @@ the ID you got. Read the response header.
 | --- | --- | --- | --- |
 | `AAL2_REQUIRED` | 403 | The route needs a second factor and the session has only one. | Complete the MFA challenge, then retry. |
 | `ALREADY_VERIFIED` | 400 | The address or factor is already verified. | Nothing — the desired state is already true. |
+| `ACCOUNT_OUTRANKS_CALLER` | 403 | The account being edited, reset or deleted holds a role or scope the caller does not. `details.beyond` names them. | Have someone who holds them make the change. |
 | `ANONYMOUS_AUTH_DISABLED` | 403 | Anonymous sign-in is off on this server. | Enable it, or sign in with a real identity. |
-| `API_KEY_FORBIDDEN` | 403 | An API key was used on a route only people may call. | Use a user session. |
-| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | An API key tried to create, list or revoke API keys. | Manage keys as a signed-in admin. |
+| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | An API key tried to list, create, change or revoke API keys, its own kind or personal ones. | Manage keys as a person holding `keys:write`, or with the service key. |
 | `AUTH_MIDDLEWARE_MISSING` | 500 | A guarded route ran with no Rebase auth middleware before it, so the caller's credential was never looked at. | Mount the app through the functions router rather than onto your own server directly. |
 | `BOOTSTRAP_ANONYMOUS` | 403 | First-admin bootstrap was attempted by an anonymous caller. | Sign in first. |
 | `BOOTSTRAP_COMPLETED` | 403 | The first admin already exists. | Have an existing admin grant the role. |
@@ -104,22 +104,40 @@ the ID you got. Read the response header.
 | `INVALID_CHALLENGE` | 400 | The MFA challenge is unknown or expired. | Start a new one. |
 | `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |
 | `INVALID_CREDENTIALS` | 401 | Wrong email or password — deliberately not saying which. | Retry, or reset the password. |
+| `INVALID_SCOPES` | 400 | A key was asked for something that is not a scope: malformed, unknown, or with a target the scope does not take. `details.problems` says which and why; `details.validScopes` lists them all. | Use a name from the list. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | A verification, reset or magic-link token is malformed or unknown (400). An OAuth provider credential or a refresh token that does not verify is a 401. | Request a fresh link, or sign in again. |
+| `KEY_MANAGEMENT_SCOPE` | 400 | A key was asked for `keys:read` or `keys:write`. No key may manage keys. `details.scopes` names them. | Leave them out. |
 | `LAST_ADMIN` | 403 | The change would leave the project with no admin. | Promote someone else first. |
 | `MFA_REQUIRED` | 401 | The password was right and the account has a verified second factor, so sign-in is only half done. `details` carries a short-lived token scoped to the MFA challenge — it is not a session. | Open a challenge and answer it; the challenge response issues the session. |
 | `NO_SESSION` | 401 | No session cookie or refresh token was presented. Normal on a first page load. | Sign in. |
 | `NOT_ANONYMOUS` | 400 | An upgrade-from-anonymous route was called by a real account. | Nothing to upgrade. |
 | `OAUTH_ERROR` | 401 | The OAuth provider refused, or returned an error. | Retry the flow; the message carries the provider's reason. |
+| `PERSONAL_KEYS_DISABLED` | 403 | Personal API keys are off on this backend. | Set `personalKeys: true` in the users collection's `auth` block. |
+| `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | The service key or a guest session tried to use the personal-key routes. Neither has an account for a key to act as. | Sign in to an account, or create a service key under `/api/admin/api-keys`. |
 | `RATE_LIMITED` | 429 | Too many attempts from this caller. | Back off; the message says for how long. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | The redirect target is not on the allow-list. | Add it to the provider configuration. |
 | `REGISTRATION_DISABLED` | 403 | Self-service sign-up is off. | Have an admin create the account. |
+| `ROLE_EXCEEDS_CALLER` | 403 | The roles being granted hold a scope, or `admin`, that the caller does not. `details.beyond` names them. | Have someone who holds them grant the role. |
+| `ROLE_EXCEEDS_CREATOR` | 403 | A service key was given an RLS role its creator does not hold. Only an admin may give any role. `details.roles` names them. | Drop the role, or have an admin create the key. |
 | `ROLE_EXISTS` | 409 | That role name is taken. | Pick another name. |
 | `ROLE_LOOKUP_FAILED` | 503 | The caller's roles could not be read — on an admin route, or on a data request on a backend with `config.auth`. Fails closed rather than trusting the roles in the token. | Retry; check the database. |
+| `SCOPE_EXCEEDS_CREATOR` | 403 | A key was asked for a scope its creator does not hold. A key never holds more than the account that makes it. `details.scopes` names them. | Drop them, or have someone who holds them create the key. |
+| `SCOPE_MISSING` | 403 | The credential does not hold the scope this route, collection, storage source or function needs. `details.requiredScope` names it, target included. | For a person, a role that declares the scope. For a key, a key that holds it. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
 | `SELF_DELETE` | 400 | An admin tried to delete their own account. | Have another admin do it. |
-| `SESSION_REVOKED` | 401 | The session was signed out elsewhere, or every session was revoked. | Sign in again. |
+| `SESSION_REVOKED` | 401 | The session was signed out elsewhere, or every session was revoked, or the account was deleted. | Sign in again. |
+| `ACCOUNT_DISABLED` | 401/403 | An administrator switched the account off: sign-in (403), refresh and every token it holds (401) are refused. | Ask an administrator. |
+| `EMAIL_NOT_CONFIRMED` | 403 | `requireEmailVerification` is on and the address is not verified yet. Answered only for a correct password; a new link is mailed. | Follow the link in the mail. |
+| `PROOF_REQUIRED` | 409 | `POST /auth/verify-email`: the account holds a password or identity nobody proved, and the request proves neither. The token is not spent. | Send `password` to keep it, or `removeUnproven: true` to verify without it. |
+| `UNDELIVERABLE_ADDRESS` | 400 | A verification mail was asked for an address mail cannot reach (a guest's, or X's placeholder). | Set a real address first. |
+| `MFA_NOT_ENROLLED` | 400 | Recovery codes were asked for an account with no verified second factor. | Enrol a factor first. |
+| `HOOK_REJECTED` | 400 | A `beforeUserCreate`, `beforeLogin` or `beforeUserDelete` hook threw. The message is the hook's; a hook that chose a 4xx status answers with it. | See the message. |
+| `INVALID_JSON` | 400 | The request body is not JSON. | Send a JSON body. |
+| `SELF_DISABLE` | 400 | An administrator tried to disable their own account. | Ask another administrator. |
+| `NOT_SUPPORTED` | 501 | This backend's auth repository cannot do what was asked (disable accounts). | Restart the server so the column is added, or use a repository that supports it. |
+| `UNKNOWN_SCOPE_TARGET` | 400 | A scope's target names a collection, storage source or function this backend does not serve. `details` lists the ones it does. | Fix the target. |
 | `UNVERIFIED_IDENTITIES` | 409 | A magic link, email code or password reset proved an unverified account's address, and the account carries a sign-in identity whose provider never verified that address. The auth repository cannot remove it (it has no `unlinkUserIdentity`), so the proof is refused rather than leave that way in on a verified account. | Implement `unlinkUserIdentity` in the custom auth repository, or have an admin review the account. |
 | `SETUP_REQUIRED` | 403 | The project has no admin yet, so this route is not available. | Complete first-admin setup. |
-| `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed. | Request a fresh one. |
+| `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed, or a refresh token that was rotated away more than `refreshTokenReuseIntervalSeconds` ago. | Request a fresh one, or sign in again. |
 | `TOKEN_EXPIRED` | 401 | The token is past its lifetime. | Request a fresh one. |
 | `USER_NOT_FOUND` | 404 | No account with that id. | Check the id. |
 | `WEAK_PASSWORD` | 400 | The password does not meet the configured policy. | Choose a stronger one. |

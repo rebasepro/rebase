@@ -1,5 +1,5 @@
 ---
-sourceHash: b49ac798fe385796
+sourceHash: 4c3ab79cfd150295
 title: Tempo Real & WebSocket
 sidebar_label: Tempo Real
 description: Sincronização de dados em tempo real, canais de broadcast e rastreamento de presença via WebSocket.
@@ -358,6 +358,15 @@ As assinaturas WebSocket respeitam automaticamente as políticas de Segurança e
 3. O token é verificado uma única vez, quando o socket se autentica, e o servidor não o verifica novamente durante a vida útil da conexão. Um token de acesso que expira, uma sessão que é revogada ou um papel (role) que é removido não altera o que um socket aberto pode ler até que ele se reautentique ou se reconecte. O SDK reautentica seu socket a cada vez que atualiza seu token e o desconecta no logout; um cliente que se comunica diretamente com o protocolo mantém a identidade com a qual foi aberto até que se reconecte.
 
 Isso significa que cada socket recebe apenas atualizações de registros que sua identidade autenticada tem permissão para ver.
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Uma [chave de API](/docs/backend/api-keys/) também autentica o socket: envie a
+chave `rk_…` onde iria o token de acesso. O socket então verifica cada frame
+contra os [escopos](/docs/backend/roles-and-scopes/) da chave: uma busca, uma contagem ou uma
+inscrição precisa de `data:read` na sua coleção, um salvamento de `data:write`, uma exclusão de
+`data:delete`. Um caminho aninhado precisa do escopo simples. Canais (broadcast e
+presence) são recusados para uma chave, porque nenhum escopo os cobre. O editor SQL e as
+mensagens de branch precisam de `database:read` ou `database:write`, tanto para uma chave quanto para uma
+pessoa.
 
 Executar mais de uma instância — o barramento LISTEN/NOTIFY, o comportamento da presença entre processos e como escrever seu próprio transporte — tem uma página dedicada:
 [Tempo real entre instâncias](/docs/backend/realtime-transports/).

@@ -1,5 +1,5 @@
 ---
-sourceHash: 78b489b0acdcc296
+sourceHash: 2a2328d2d6223346
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Konfigurieren Sie JWT-Authentifizierung, OAuth-Provider, SMTP-E-Mail, Bot-Schutz und die Users-Collection im Rebase-Backend.
@@ -92,7 +92,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Kill-Switch: Schließt auch das Bootstrap-Fenster für den ersten Benutzer, das `allowRegistration: false` offen lässt |
 | `allowAnonymous` | `boolean` | `false` | Aktiviert `POST /api/auth/anonymous`. Bewusst nicht an `allowRegistration` gekoppelt — eine öffentlich lesbare App benötigt möglicherweise Sitzungen ohne Benutzerkonten |
 | `allowUserLookup` | `boolean` | `false` | Stellt `POST /api/auth/find-user` für Einladungs-Flows per E-Mail bereit |
-| `defaultRole` | `string` | — | Rolle, die einem neu registrierten Benutzer zugewiesen wird, wenn keine angegeben ist |
+| `defaultRole` | `string` | — | Rolle, die einem neu registrierten Benutzer zugewiesen wird, wenn keine angegeben ist. Sie darf weder `admin` noch eine deklarierte Rolle sein, die einen Scope der Admin-Ebene hält: Der Boot lehnt beides ab |
 | `serviceKey` | `string` | — | Statischer Schlüssel für Server-zu-Server-Aufrufe — siehe [Service-Key-Authentifizierung](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP für Passwort-Reset, Verifizierung, Einladungen und Magic Links |
 | `magicLink` | `boolean` | `false` | Aktiviert passwortlose E-Mail-Anmeldung. Erfordert konfiguriertes `email`; andernfalls antworten die Routen mit `503 EMAIL_NOT_CONFIGURED` |
@@ -251,7 +251,7 @@ Jede Nachricht enthält `to`, `subject`, `at`, die `html`- und `text`-Teile sowi
 `links` — die im Text gefundenen absoluten URLs in Dokumentreihenfolge, was
 genau der Teil ist, den man benötigt.
 
-Dieser Endpunkt ist nur für Admins zugänglich (über dieselbe Zugriffskontrolle wie Cron, Logs und Backups)
+Dieser Endpunkt braucht den Scope `users:write` (über dieselbe Zugriffskontrolle wie Cron, Logs und Backups)
 und antwortet mit `501 DEV_MAILBOX_UNAVAILABLE`, wenn nichts auszuliefern ist — bei konfiguriertem SMTP
 wurden die E-Mails zugestellt statt abgefangen. `NODE_ENV=production` lehnt den Zugriff
 unabhängig von allen anderen Parametern ab: Der Inhalt dieser Nachrichten ermöglicht einen funktionierenden Login.
@@ -555,11 +555,26 @@ const membersCollection = defineCollection({
     // Inject/override auth-specific actions (e.g. show/hide the reset password button)
     actions: {
       resetPassword: true // Or false to disable, or a custom EntityAction
-    }
+    },
+
+    // What each role may do beyond its rows, the app's own scopes,
+    // and whether accounts may create personal API keys
+    roles: {
+      support: { name: "Support", scopes: ["users:read", "users:write", "logs:read"] }
+    },
+    scopes: {
+      "project:deploy": { label: "Deploy projects", target: "project" }
+    },
+    personalKeys: true
   },
   properties: { ... }
 });
 ```
+
+`roles`, `scopes` und `personalKeys` deklarieren das Zugriffsmodell: welche Scopes der Admin-Ebene
+jede Rolle hält, die Scopes, die die App für ihre eigenen Operationen definiert, und
+ob jedes Konto [persönliche API-Schlüssel](/docs/backend/api-keys/#personal-keys) erstellen darf.
+Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/).
 
 Ein von `onResetPassword` zurückgegebenes `temporaryPassword` wird zum Passwort des Kontos. Rebase hasht es mit dem konfigurierten Algorithmus, speichert es, meldet den Benutzer von allen bestehenden Sitzungen ab und zeigt es dem Admin zur Weitergabe an. Der Hook speichert es nicht selbst und hat auch keine Möglichkeit dazu. Geben Sie kein `temporaryPassword` zurück, wenn der Hook stattdessen einen eigenen Link zum Zurücksetzen per E-Mail versendet: Das Passwort bleibt dann unverändert, bis der Benutzer ein neues festlegt – seine Sitzungen enden trotzdem.
 
@@ -573,6 +588,7 @@ Wenn benutzerdefinierte Hooks (`onCreateUser`, `onResetPassword`) aufgerufen wer
 ## Nächste Schritte
 
 - **[Endpunkte und Tokens](/docs/backend/auth-endpoints/)** — alle Routen, die diese Konfiguration bereitstellt
+- **[Rollen und Scopes](/docs/backend/roles-and-scopes/)** — was jede Rolle darf, und wie Schlüssel und Tokens das einschränken
 - **[Benutzerdefinierte Auth-Adapter](/docs/backend/auth-adapters/)** — Anbindung eigener Identity-Provider
 - **[Frontend-Authentifizierung](/docs/frontend/authentication/)** — Login-UI, Auth-Controller, Benutzerverwaltung
 - **[Sicherheitsregeln (RLS)](/docs/collections/security-rules/)** — Zugriffskontrolle auf Zeilenebene (Row-Level Security)

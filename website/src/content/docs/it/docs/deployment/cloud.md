@@ -1,5 +1,5 @@
 ---
-sourceHash: be8521ab898e66ea
+sourceHash: 52e128ca94563aec
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud è lo stesso Rebase, gestito per te. Di cosa si tratta, come collegare ed eseguire il deploy di un progetto e cosa non include ancora la beta privata.
@@ -101,6 +101,58 @@ Due tipi di deployment vengono rifiutati, e la CLI indica quali: uno non andato 
 
 Un rollback aggiunge un nuovo deployment invece di riavvolgere la cronologia, e attende che la versione ripristinata sia operativa prima di segnalare l'esito positivo. Seguilo con `rebase cloud logs -f`.
 
+## CI e agent
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> Un job di CI o un agent non dovrebbe portarsi dietro la tua password. Dagli invece un token: una chiave che agisce come il tuo account, limitata a poche azioni su un progetto. Crealo da un terminale in cui hai effettuato l'accesso:
+
+```bash
+rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
+```
+
+Il token viene stampato una sola volta, come riga `export REBASE_TOKEN=rk_live_…`. Con `REBASE_TOKEN` impostata, ogni comando `rebase cloud` si autentica con il token invece che con il tuo login, e non legge né scrive mai la sessione salvata. In GitHub Actions, salvalo come secret del repository ed esponilo con quel nome:
+
+```yaml title=".github/workflows/deploy.yml"
+name: Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec rebase cloud deploy --project shop
+        env:
+          REBASE_TOKEN: ${{ secrets.REBASE_TOKEN }}
+```
+
+`--can` accetta una o più capacità, separate da virgole o ripetute:
+
+| Capacità | Cosa può fare il token |
+|---|---|
+| `deploy` | Fare il deploy del progetto e seguirne le build: `deploy`, `deployments` |
+| `logs` | Leggere i log di build e di runtime, e le metriche in tempo reale: `logs`, `metrics` |
+| `env` | Leggere e modificare le variabili d'ambiente, secret compresi |
+| `database` | `db list`, `db info` e `db connect`, che include la password del database |
+| `backups` | Elencare, creare, ispezionare e scaricare i backup, e leggere la finestra di point-in-time recovery |
+
+Internamente un token è una [chiave API personale](/docs/backend/api-keys/#personal-keys) sul control plane. Ogni capacità diventa alcuni [scope](/docs/backend/roles-and-scopes/): `deploy` su `shop` possiede `project:deploy:<id>`, con l'id del progetto, più gli scope di dati e di funzioni che i comandi di deploy chiamano. Il token non possiede mai più di quanto possieda il tuo account nel momento in cui viene usato, quindi perde tutto ciò che perde il tuo account.
+
+Due cose restano a una persona che ha effettuato l'accesso:
+
+- **Gestire i token.** `rebase cloud tokens list`, `create` e `revoke <id>` usano la tua sessione di `rebase cloud login`. Un token non può elencare, creare né revocare token, perché un token in grado di creare token potrebbe creare il proprio successore.
+- **Ripristinare.** Nessuna capacità consente di ripristinare un backup né di eseguire `restore` e `cutover` di un point-in-time recovery. Rimettere dati vecchi su un database in produzione resta compito di un owner o di un admin che ha effettuato l'accesso.
+
+`rebase cloud whoami`, con un token impostato, mostra cosa può fare e su quale progetto. `rebase cloud tokens revoke <id> --yes` lo ferma subito.
+
 ## Risorse di calcolo e relativi costi
 
 Il prezzo di un progetto si basa sulle risorse riservate, non su un piano tariffario (tier). `compute` mostra ogni parametro e il relativo preventivo dettagliato fornito dal control plane. (`rebase cloud resources` è una cosa diversa: i database e i bucket dichiarati dal codice, e lo stato di provisioning di ciascuno — consulta il [riferimento della CLI](/docs/cli/#rebase-cloud).)
@@ -130,6 +182,7 @@ Nessun valore viene convalidato dalla CLI, intenzionalmente: i limiti appartengo
 | Gruppo di comandi | Cosa comprende |
 |---|---|
 | `login`, `logout`, `whoami` | La tua sessione |
+| `tokens` | Token per la CI e gli agent, ciascuno limitato a un progetto. Vedi [CI e agent](#ci-e-agent) |
 | `link`, `unlink`, `use`, `open` | Associazione di questa directory a un progetto, selezione dell'organizzazione, apertura della console |
 | `projects` | Creazione, visualizzazione, ispezione, eliminazione |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Rilascio e monitoraggio |
@@ -157,7 +210,7 @@ Detto chiaramente, perché scoprirlo in seguito è peggio:
 - **Nessun servizio self-service.** L'accesso viene concesso a scaglioni; non è prevista una procedura di registrazione e pagamento immediata.
 - **Nessun SLA pubblicato** e nessuna certificazione SOC 2. Se hai bisogno di uno dei due, segnalalo al momento della richiesta di accesso anziché darlo per scontato.
 - **Nessun deploy di preview o di branch**, e nessuna GitHub App proprietaria. Gli hook di deploy — URL segreti a cui puntare il webhook del repository — sono l'automazione supportata.
-- **La CI richiede credenziali umane.** Non è ancora disponibile un token macchina; `rebase cloud login` accetta un'email e una password. Passali come `REBASE_CLOUD_EMAIL` e `REBASE_CLOUD_PASSWORD` da un gestore di segreti — `--password` memorizza la password nella cronologia della shell e nella tabella dei processi, e lo segnala prima di effettuare l'accesso. Se il `.rebase/cloud.json` del repository indica un control plane diverso da quello della piattaforma, passalo anche come `--url`: senza un terminale, `login` si rifiuta di inviare una password a un host indicato soltanto dal file estratto.
+- **I token agiscono come una persona.** Un [token](#ci-e-agent) viene creato da un account e agisce come quell'account; non esiste ancora un'identità macchina di proprietà dell'organizzazione. Se invece accedi dalla CI, passa `REBASE_CLOUD_EMAIL` e `REBASE_CLOUD_PASSWORD` da un gestore di segreti — `--password` memorizza la password nella cronologia della shell e nella tabella dei processi, e lo segnala prima di effettuare l'accesso. Se il `.rebase/cloud.json` del repository indica un control plane diverso da quello della piattaforma, passalo anche come `--url`: senza un terminale, `login` si rifiuta di inviare una password a un host indicato soltanto dal file estratto.
 - **Il point-in-time recovery è disponibile solo da CLI.** La console mostra i backup; il flusso di lavoro di PITR a stadi si esegue con `rebase cloud db pitr`.
 - **Nessun endpoint pubblico per il database.** Un database gestito non è esposto a Internet, pertanto l'host visualizzato nella console è l'indirizzo utilizzato dal backend e non si risolve a nulla sulla tua macchina locale. `rebase cloud db connect` apre una porta locale collegata al database, incanalata tramite tunnel attraverso il control plane per tutto il tempo in cui viene mantenuta attiva — tuttavia non esiste un hostname permanente a cui un servizio di terze parti possa connettersi. Quel tunnel e la password visibile tramite `rebase cloud db info --reveal` richiedono entrambi il ruolo di owner o admin dell'organizzazione: lo stesso richiesto dall'editor SQL di Studio, poiché tutti e tre consentono l'accesso a una sessione sui tuoi dati di produzione.
 

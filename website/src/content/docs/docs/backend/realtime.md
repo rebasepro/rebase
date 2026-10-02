@@ -449,9 +449,18 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies.
 
 1. The WebSocket connection authenticates using the same JWT token as the REST API.
 2. Every subscription refetch runs inside a PostgreSQL transaction with `set_config('app.user_id', ...)` and `set_config('app.user_roles', ...)` — ensuring RLS policies are enforced.
-3. The token is verified once, when the socket authenticates, and the server does not check it again for the life of the connection. An access token that expires, a session that is revoked or a role that is taken away does not change what an open socket may read until it re-authenticates or reconnects. The SDK re-authenticates its socket each time it refreshes its token, and disconnects it on sign-out; a client speaking the protocol directly keeps the identity it opened with until it reconnects.
+3. <span class="since-badge" data-since="0.24">Since 0.24</span> The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame, to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame with the code `SESSION_ENDED` or `TOKEN_EXPIRED` and is closed with code `4001`. The SDK authenticates its socket again each time it refreshes its token, and after a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
 
 This means each socket only receives updates for records its authenticated identity may see.
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> An [API key](/docs/backend/api-keys/) authenticates the socket too: send the
+`rk_…` key where the access token would go. The socket then checks each frame
+against the key's [scopes](/docs/backend/roles-and-scopes/): a fetch, a count or a
+subscription needs `data:read` on its collection, a save `data:write`, a delete
+`data:delete`. A nested path needs the plain scope. Channels (broadcast and
+presence) are refused for a key, because no scope covers them. The SQL editor and
+branch messages need `database:read` or `database:write`, for a key and a person
+alike.
 
 Running more than one instance — the LISTEN/NOTIFY bus, what presence does
 across processes, and writing your own transport — has a page of its own:

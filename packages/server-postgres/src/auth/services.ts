@@ -5,14 +5,11 @@ import { asRebasePgTable, type RebasePgTable } from "../types";
 import { users, refreshTokens, passwordResetTokens, userIdentities, magicLinkTokens } from "../schema/auth-schema";
 import {
     UserRepository,
-    RoleRepository,
     TokenRepository,
     MfaRepository,
     AuthRepository,
     UserData,
     CreateUserData,
-    RoleData,
-    CreateRoleData,
     RefreshTokenInfo,
     RefreshTokenSession,
     PasswordResetTokenInfo,
@@ -22,14 +19,12 @@ import {
     PaginatedUsersResult,
     MfaFactor,
     MfaChallengeInfo,
-    RoleData as Role,
+    AccountAccessState,
     ApiError
 } from "@rebasepro/server";
 import { toSnakeCase, camelCase } from "@rebasepro/utils";
 import { escapeLikePattern } from "../utils/drizzle-conditions";
 import { extractPgError } from "../utils/pg-error-utils";
-
-export type { Role };
 
 export interface AuthSchemaTables {
     users: RebasePgTable;
@@ -50,6 +45,15 @@ function getColumnKey(table: RebasePgTable | undefined, ...keys: string[]): stri
     }
     return undefined;
 }
+
+/** `"schema"."table"`, for the statements written as raw SQL. */
+function qualifiedTableName(table: RebasePgTable): string {
+    const schema = getTableConfig(table).schema || "public";
+    return `"${schema}"."${getTableName(table)}"`;
+}
+
+/** The shape of a session id sign-in mints (`randomUUID()`). */
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function getColumn(table: RebasePgTable | undefined, ...keys: string[]): RebasePgTable[string] | undefined {
     if (!table) return undefined;
@@ -86,6 +90,8 @@ export { normalizeEmail };
 export class UserService implements UserRepository {
     private usersTable: RebasePgTable;
     private userIdentitiesTable: RebasePgTable;
+    /** Read by `getAccountAccessState`, to say whether one sign-in is still live. */
+    private refreshTokensTable: RebasePgTable;
 
     constructor(
         private db: NodePgDatabase,
@@ -95,10 +101,12 @@ export class UserService implements UserRepository {
             const tables = tableOrTables as Partial<AuthSchemaTables>;
             this.usersTable = (tables.users || users) as RebasePgTable;
             this.userIdentitiesTable = (tables.userIdentities || userIdentities) as RebasePgTable;
+            this.refreshTokensTable = (tables.refreshTokens || refreshTokens) as RebasePgTable;
         } else {
             const table = tableOrTables as RebasePgTable | undefined;
             this.usersTable = table || asRebasePgTable(users);
             this.userIdentitiesTable = asRebasePgTable(userIdentities);
+            this.refreshTokensTable = asRebasePgTable(refreshTokens);
         }
     }
 
@@ -147,6 +155,7 @@ export class UserService implements UserRepository {
         const emailVerificationToken = (row.email_verification_token ?? row.emailVerificationToken ?? null) as string | null | undefined;
         const emailVerificationSentAt = (row.email_verification_sent_at ?? row.emailVerificationSentAt ?? null) as string | number | Date | null;
         const isAnonymous = (row.is_anonymous ?? row.isAnonymous ?? false) as boolean;
+        const disabledAt = row.disabled_at ?? row.disabledAt ?? null;
         const createdAt = (row.created_at ?? row.createdAt) as string | number | Date | undefined;
         const updatedAt = (row.updated_at ?? row.updatedAt) as string | number | Date | undefined;
 
@@ -161,6 +170,8 @@ export class UserService implements UserRepository {
             "email_verification_token", "emailVerificationToken",
             "email_verification_sent_at", "emailVerificationSentAt",
             "is_anonymous", "isAnonymous",
+            "disabled_at", "disabledAt",
+            "tokens_valid_after", "tokensValidAfter",
             "roles",
             "created_at", "createdAt",
             "updated_at", "updatedAt",
@@ -184,6 +195,7 @@ export class UserService implements UserRepository {
             emailVerificationToken,
             emailVerificationSentAt: emailVerificationSentAt ? new Date(emailVerificationSentAt) : null,
             isAnonymous,
+            ...(disabledAt ? { disabled: true } : {}),
             createdAt: createdAt ? new Date(createdAt) : new Date(),
             updatedAt: updatedAt ? new Date(updatedAt) : new Date(),
             metadata
@@ -521,29 +533,6 @@ export class UserService implements UserRepository {
     }
 
     /**
-     * Get roles for a user from database (inline TEXT[] column)
-     */
-    async getUserRoles(uid: string): Promise<Role[]> {
-        const usersTableName = this.getQualifiedUsersTableName();
-        const result = await this.db.execute(sql`
-            SELECT roles FROM ${sql.raw(usersTableName)} WHERE id = ${uid}
-        `);
-
-        if (result.rows.length === 0) return [];
-
-        const row = result.rows[0] as { roles: string[] | null };
-        const roleIds = row.roles ?? [];
-
-        return roleIds.map(id => ({
-            id,
-            name: id,
-            isAdmin: id === "admin",
-            defaultPermissions: null,
-            collectionPermissions: null
-        }));
-    }
-
-    /**
      * Get role IDs for a user
      */
     async getUserRoleIds(uid: string): Promise<string[]> {
@@ -584,13 +573,97 @@ export class UserService implements UserRepository {
     }
 
     /**
+     * One read of what an access token is judged against: whether the account
+     * exists, its roles, and its revocation watermark. See
+     * `TokenRepository.getAccountAccessState`.
+     *
+     * The watermark is read only where the table declares it, as
+     * `RefreshTokenService.getTokensValidAfter` reads it — a table without the
+     * column has no watermark rather than an error on every request.
+     */
+    async getAccountAccessState(uid: string, sessionId?: string): Promise<AccountAccessState | null> {
+        const usersTableName = this.getQualifiedUsersTableName();
+        const watermark = getColumnKey(this.usersTable, "tokensValidAfter", "tokens_valid_after")
+            ? sql`u.tokens_valid_after`
+            : sql`NULL::timestamptz`;
+        // A session is live while one of its refresh tokens is not revoked:
+        // logout and `DELETE /auth/sessions/:id` revoke every row of it, and
+        // signing out everywhere deletes them. Asked only for an id shaped like
+        // the ones sign-in mints, so a `uuid` column is never handed text it
+        // cannot cast, and only where the table groups tokens by session.
+        const tokens = this.refreshTokensTable;
+        const canAskSession = Boolean(sessionId)
+            && UUID_SHAPE.test(sessionId ?? "")
+            && Boolean(getColumnKey(tokens, "sessionId", "session_id"));
+        const revokedClause = getColumnKey(tokens, "revoked")
+            ? sql`AND rt.revoked IS NOT TRUE`
+            : sql``;
+        const sessionActive = canAskSession
+            ? sql`EXISTS (
+                SELECT 1 FROM ${sql.raw(qualifiedTableName(tokens))} rt
+                WHERE rt.uid = u.id AND rt.session_id = ${sessionId} ${revokedClause}
+            )`
+            : sql`NULL::boolean`;
+        const disabled = await this.hasDisabledColumn()
+            ? sql`u.disabled_at IS NOT NULL`
+            : sql`FALSE`;
+        const result = await this.db.execute(sql`
+            SELECT u.roles, ${watermark} AS tokens_valid_after, ${sessionActive} AS session_active, ${disabled} AS disabled
+            FROM ${sql.raw(usersTableName)} u WHERE u.id = ${uid}
+        `);
+        if (result.rows.length === 0) return null;
+        const row = result.rows[0] as { roles: string[] | null; tokens_valid_after: Date | string | null; session_active: boolean | null; disabled: boolean };
+        return {
+            roles: row.roles ?? [],
+            tokensValidAfter: row.tokens_valid_after ? new Date(row.tokens_valid_after) : null,
+            ...(row.session_active === null ? {} : { sessionActive: row.session_active }),
+            ...(row.disabled ? { disabled: true } : {})
+        };
+    }
+
+    /**
+     * Whether the users table has `disabled_at`. `ensureAuthTablesExist` adds
+     * it to every auth table at boot, but the app's own drizzle object may
+     * predate it, so the database is asked — once — rather than the object.
+     */
+    private disabledColumn?: Promise<boolean>;
+    private hasDisabledColumn(): Promise<boolean> {
+        this.disabledColumn ??= (async () => {
+            const name = getTableName(this.usersTable);
+            const schema = getTableConfig(this.usersTable).schema || "public";
+            const result = await this.db.execute(sql`
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = ${schema} AND table_name = ${name} AND column_name = 'disabled_at'
+            `);
+            return result.rows.length > 0;
+        })().catch(() => {
+            this.disabledColumn = undefined;
+            return false;
+        });
+        return this.disabledColumn;
+    }
+
+    /** @see UserRepository.setUserDisabled */
+    async setUserDisabled(uid: string, disabled: boolean): Promise<void> {
+        if (!(await this.hasDisabledColumn())) {
+            throw new ApiError(501, "NOT_SUPPORTED", "The users table has no disabled_at column; restart the server so it is added.");
+        }
+        const usersTableName = this.getQualifiedUsersTableName();
+        await this.withServerContext(async (db) => db.execute(sql`
+            UPDATE ${sql.raw(usersTableName)}
+            SET disabled_at = ${disabled ? sql`NOW()` : sql`NULL`}, updated_at = NOW()
+            WHERE id = ${uid}
+        `));
+    }
+
+    /**
      * Get user with their roles
      */
-    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: Role[] } | null> {
+    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: string[] } | null> {
         const user = await this.getUserById(uid);
         if (!user) return null;
 
-        const roles = await this.getUserRoles(uid);
+        const roles = await this.getUserRoleIds(uid);
         return { user,
             roles };
     }
@@ -1237,10 +1310,6 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.userService.getUserByVerificationToken(token);
     }
 
-    async getUserRoles(uid: string): Promise<RoleData[]> {
-        return this.userService.getUserRoles(uid);
-    }
-
     async getUserRoleIds(uid: string): Promise<string[]> {
         return this.userService.getUserRoleIds(uid);
     }
@@ -1253,64 +1322,16 @@ export class PostgresAuthRepository implements AuthRepository {
         await this.userService.assignDefaultRole(uid, roleId);
     }
 
-    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: RoleData[] } | null> {
+    async getUserWithRoles(uid: string): Promise<{ user: UserData; roles: string[] } | null> {
         return this.userService.getUserWithRoles(uid);
     }
 
-    // Role operations (roles are inline on users, synthesized from string IDs)
-
-    async getRoleById(id: string): Promise<RoleData | null> {
-        return {
-            id,
-            name: id,
-            isAdmin: id === "admin",
-            defaultPermissions: null,
-            collectionPermissions: null
-        };
+    async getAccountAccessState(uid: string, sessionId?: string): Promise<AccountAccessState | null> {
+        return this.userService.getAccountAccessState(uid, sessionId);
     }
 
-    async listRoles(): Promise<RoleData[]> {
-        return [
-            { id: "admin",
-name: "Admin",
-isAdmin: true,
-defaultPermissions: null,
-collectionPermissions: null },
-            { id: "editor",
-name: "Editor",
-isAdmin: false,
-defaultPermissions: null,
-collectionPermissions: null },
-            { id: "viewer",
-name: "Viewer",
-isAdmin: false,
-defaultPermissions: null,
-collectionPermissions: null }
-        ];
-    }
-
-    async createRole(_data: CreateRoleData): Promise<RoleData> {
-        return {
-            id: _data.id,
-            name: _data.name,
-            isAdmin: _data.isAdmin ?? false,
-            defaultPermissions: _data.defaultPermissions ?? null,
-            collectionPermissions: _data.collectionPermissions ?? null
-        };
-    }
-
-    async updateRole(id: string, data: Partial<Omit<RoleData, "id">>): Promise<RoleData | null> {
-        return {
-            id,
-            name: data.name ?? id,
-            isAdmin: data.isAdmin ?? (id === "admin"),
-            defaultPermissions: data.defaultPermissions ?? null,
-            collectionPermissions: data.collectionPermissions ?? null
-        };
-    }
-
-    async deleteRole(_id: string): Promise<void> {
-        // No-op: roles are inline strings on users
+    async setUserDisabled(uid: string, disabled: boolean): Promise<void> {
+        await this.userService.setUserDisabled(uid, disabled);
     }
 
     // Token operations (delegate to PostgresTokenRepository)

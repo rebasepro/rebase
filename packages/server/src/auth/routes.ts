@@ -1,15 +1,15 @@
 import { Hono } from "hono";
-import { ADMINISTRATIVE_ROLES, isAdministrativeRole } from "./admin-roles";
 import { normalizeEmail } from "@rebasepro/common";
 import { ApiError, errorHandler } from "../api/errors";
 import { randomBytes, randomUUID } from "crypto";
 import { generateSecureToken, hashToken } from "./admin-user-ops";
 import type { AuthRepository, OAuthProvider, OAuthProviderProfile, CreateUserData } from "./interfaces";
-import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
+import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry, verifyAccessToken } from "./jwt";
+import { extractBearerToken } from "./bearer-token";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import { createRequireAuth, requireAuth } from "./middleware";
-import { replaceUserPassword } from "./token-revocation";
+import { judgeAccessToken, replaceUserPassword } from "./token-revocation";
 import { EmailService, EmailConfig, resolveEmailLinkBase } from "../email";
 import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate, resolveEmailBranding } from "../email/templates";
 import { HonoEnv } from "../api/types";
@@ -20,8 +20,7 @@ import {
     notBefore,
     recipientEmailLimiter,
     strictAuthLimiter,
-    verificationEmailLimiter
-} from "./rate-limiter";
+    verificationEmailLimiter, requestClientAddress } from "./rate-limiter";
 import { buildCaptchaMiddlewares, type CaptchaConfig } from "./captcha";
 import { z } from "zod";
 import { logger } from "../utils/logger";
@@ -32,8 +31,10 @@ import { mountMagicLinkRoutes } from "./magic-link-routes";
 import { mountOtpRoutes } from "./otp-routes";
 import { isBootstrapWindowOpen, isSteadyStateRegistrationOpen, SETUP_REQUIRED_MESSAGE } from "./registration-policy";
 import { decideOAuthAutoLink, isRedirectUriAllowed } from "./oauth-signin-policy";
-import { confirmAddressOwnership, identityProfileData } from "./address-ownership";
+import { confirmAddressOwnership, identityProfileData, identityVouchesForAddress } from "./address-ownership";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
+import { ADMIN_ROLE, isAdminScope, parseScope } from "@rebasepro/types";
+import { getAccessModel } from "./access";
 import type { Context } from "hono";
 import { readRefreshToken, redactRefreshToken, clearRefreshCookie } from "./cookie-utils";
 
@@ -119,7 +120,42 @@ export interface AuthModuleConfig {
      * how long a captured token stays useful to someone who copied it.
      */
     refreshTokenReuseIntervalSeconds?: number;
+    /**
+     * Let a magic-link or email-code request for an address with no account
+     * create one (no password, unverified until the link or code is used),
+     * while registration is open. Off by default. See `passwordless-signup.ts`.
+     */
+    magicLinkCreatesUsers?: boolean;
+    /**
+     * What a refresh token presented after its reuse window does to its
+     * session. See `RebaseAuthConfig.refreshTokenReuse`. Default `"reject"`.
+     */
+    refreshTokenReuse?: RefreshTokenReusePolicy;
+    /**
+     * Refuse password sign-in until the account's address is verified, and
+     * register confirm-first: `POST /auth/register` answers the same "check
+     * your inbox" whether or not the address already has an account, and
+     * signs nobody in. Off by default. Needs email; the boot refuses it
+     * without. See `RebaseAuthConfig.requireEmailVerification`.
+     */
+    requireEmailVerification?: boolean;
 }
+
+/**
+ * Addresses no mail can reach: the synthetic ones a guest and an X (Twitter)
+ * account are given, because `email` is NOT NULL. Nothing is mailed to them.
+ */
+export function isDeliverableAddress(email: string): boolean {
+    const domain = email.slice(email.lastIndexOf("@") + 1).toLowerCase();
+    return domain !== "anonymous.local" && domain !== "twitter.placeholder.rebase";
+}
+
+/** What a refresh token replayed after its reuse window does to its session. */
+export type RefreshTokenReusePolicy = "reject" | "revoke-session";
+const REFRESH_TOKEN_REUSE_POLICIES: readonly RefreshTokenReusePolicy[] = ["reject", "revoke-session"];
+
+/** How long an email-verification link stays usable. */
+export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Configuration for httpOnly refresh-token cookies.
@@ -183,18 +219,35 @@ function getPasswordResetExpiry(): Date {
 }
 
 export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
-    // Every administrative role, not just the one named "admin". This compared
-    // against `"admin"` alone while `requireAdmin` accepted `schema-admin` too,
-    // so `AUTH_DEFAULT_ROLE=schema-admin` walked past it and handed every public
-    // registrant the schema editor and the SQL surfaces — from which real
-    // `admin` is one user edit away.
-    if (config.defaultRole && isAdministrativeRole(config.defaultRole)) {
+    // Refused at boot, by name: a misspelt policy would otherwise be the
+    // default one, silently, which is the opposite of what was asked for.
+    if (config.refreshTokenReuse !== undefined && !REFRESH_TOKEN_REUSE_POLICIES.includes(config.refreshTokenReuse)) {
         throw new Error(
-            `CRITICAL SECURITY ERROR: defaultRole cannot be '${config.defaultRole}'. ` +
-            `Administrative privilege escalation via registration is strictly forbidden ` +
-            `(administrative roles: ${ADMINISTRATIVE_ROLES.join(", ")}). ` +
-            "Use the POST /admin/bootstrap endpoint to promote the initial administrator."
+            `auth.refreshTokenReuse is "${String(config.refreshTokenReuse)}"; it must be one of ` +
+            `${REFRESH_TOKEN_REUSE_POLICIES.map(p => `"${p}"`).join(", ")}.`
         );
+    }
+    if (config.refreshTokenReuseIntervalSeconds !== undefined
+        && !(Number.isFinite(config.refreshTokenReuseIntervalSeconds) && config.refreshTokenReuseIntervalSeconds >= 0)) {
+        throw new Error(`auth.refreshTokenReuseIntervalSeconds is ${String(config.refreshTokenReuseIntervalSeconds)}; give a number of seconds, 0 or more.`);
+    }
+    // Every registrant gets the default role, so it may carry nothing a
+    // stranger should hold: not `admin`, and no declared role with an
+    // admin-plane scope — from `users:write`, real `admin` is one edit away.
+    if (config.defaultRole) {
+        const declared = getAccessModel().roles;
+        const adminPlane = config.defaultRole === ADMIN_ROLE
+            ? ["every scope"]
+            : Object.prototype.hasOwnProperty.call(declared, config.defaultRole)
+                ? declared[config.defaultRole].scopes.filter(scope => isAdminScope(parseScope(scope)?.scope ?? ""))
+                : [];
+        if (adminPlane.length > 0) {
+            throw new Error(
+                `CRITICAL SECURITY ERROR: defaultRole cannot be '${config.defaultRole}': every registrant would hold ` +
+                `${adminPlane.join(", ")}. Give the default role no admin-plane scopes, and use the ` +
+                "POST /admin/bootstrap endpoint to promote the initial administrator."
+            );
+        }
     }
 
     // Built here rather than per request: `resolveCaptchaVerifier` throws on a
@@ -268,6 +321,11 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         token: z.string().min(1, "Token is required"),
         password: z.string().min(1, "Password is required").max(128)
     });
+    const verifyEmailSchema = z.object({
+        token: z.string().min(1, "Token is required"),
+        password: z.string().min(1).max(128).optional(),
+        removeUnproven: z.boolean().optional()
+    });
     const changePasswordSchema = z.object({
         oldPassword: z.string().min(1, "Old password is required").max(128),
         newPassword: z.string().min(1, "New password is required").max(128)
@@ -334,7 +392,10 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         const templateFn = emailConfig?.templates?.welcomeEmail;
         const emailContent = templateFn
             ? templateFn(user, appName)
-            : getWelcomeEmailTemplate(user, appName, loginUrl ? `${loginUrl}/app` : undefined, logoUrl);
+            // The app's own address. `<base>/app` is a route no frontend has —
+            // the CMS answered it with its not-found page, after sign-in —
+            // and it was the button in every self-registered user's first mail.
+            : getWelcomeEmailTemplate(user, appName, loginUrl || undefined, logoUrl);
 
         emailService!.send({
             to: user.email,
@@ -344,6 +405,58 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         }).catch(err => {
             logger.error("Failed to send welcome email", { error: err instanceof Error ? err.message : err });
         });
+    }
+
+    /**
+     * Mail a verification link for `user`'s address, and record its token.
+     *
+     * Sent at registration as well as on request, so a self-registered
+     * account proves its address on its owner's terms — and keeps the
+     * password its owner chose, which a later first proof by link or code
+     * would otherwise have to remove (see `confirmAddressOwnership`).
+     * Returns whether a mail was handed to the email service.
+     */
+    async function sendVerificationMail(user: { id: string; email: string; displayName?: string | null }): Promise<boolean> {
+        if (!isEmailConfigured() || !isDeliverableAddress(user.email)) return false;
+        const token = generateSecureToken();
+        await authRepo.setVerificationToken(user.id, hashToken(token));
+
+        // `verifyEmailUrl` is set by no boot path, so this used to be `""` — a
+        // relative href, dead in every mail client. The resolver falls back to
+        // the reset base, and `createEmailService` refuses to boot when neither
+        // is absolute.
+        const baseUrl = resolveEmailLinkBase(emailConfig, "verifyEmail");
+        const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
+        const { appName, logoUrl } = resolveEmailBranding(emailConfig);
+        const templateFn = emailConfig?.templates?.emailVerification;
+        const emailContent = templateFn
+            ? templateFn(verifyUrl, { email: user.email, displayName: user.displayName })
+            : getEmailVerificationTemplate(verifyUrl, { email: user.email, displayName: user.displayName }, appName, logoUrl);
+        await emailService!.send({
+            to: user.email,
+            subject: emailContent.subject,
+            html: emailContent.html,
+            text: emailContent.text
+        });
+        return true;
+    }
+
+    /** {@link sendVerificationMail}, not awaited: a failure is logged, never answered. */
+    function sendVerificationMailInBackground(user: { id: string; email: string; displayName?: string | null }): void {
+        sendVerificationMail(user).catch((err: unknown) => {
+            logger.error("Failed to send verification email", { error: err instanceof Error ? err.message : err });
+        });
+    }
+
+    /**
+     * A hash of nothing anyone knows, made with this deployment's own
+     * `hashPassword`, so verifying against it costs what verifying a real
+     * password costs. Made once, on first use.
+     */
+    let dummyHash: Promise<string> | undefined;
+    function dummyPasswordHash(): Promise<string> {
+        dummyHash ??= ops.hashPassword(randomBytes(24).toString("hex"));
+        return dummyHash;
     }
 
     /**
@@ -382,8 +495,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             await assertMfaSatisfied(authRepo, uid);
         }
         const aal = options?.aal ?? "aal1";
-        const roles = await authRepo.getUserRoles(uid);
-        const roleIds = roles.map(r => r.id);
+        const roleIds = await authRepo.getUserRoleIds(uid);
 
         // Is this session a GUEST — anonymous sign-in rather than an account?
         //
@@ -396,6 +508,11 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         // configured; this is the same read, hoisted so it happens either way.
         const sessionUser = await authRepo.getUserById(uid);
         const isAnonymous = sessionUser?.isAnonymous === true;
+        // Every door that signs somebody in comes through here, so a disabled
+        // account is refused on all of them at once.
+        if (sessionUser?.disabled) {
+            throw ApiError.forbidden("This account has been disabled. Contact an administrator.", "ACCOUNT_DISABLED");
+        }
 
         // Allow customization of access token claims via hook
         let customClaims: Record<string, unknown> | undefined;
@@ -409,21 +526,23 @@ aal };
             }
         }
 
-        const accessToken = await generateAccessToken(uid, roleIds, aal, customClaims, isAnonymous);
-        const refreshToken = generateRefreshToken();
-
         // A sign-in opens a session; every token later rotated out of it
         // inherits this id and start time. `startedAt` is what
         // `tokens_valid_after` is judged against, so it must NOT advance on
         // rotation — otherwise a session could stay one step ahead of a
-        // revocation forever simply by refreshing.
+        // revocation forever simply by refreshing. The access token carries
+        // the id too (`sid`), so signing this one device out reaches it.
+        const sessionId = randomUUID();
+        const accessToken = await generateAccessToken(uid, roleIds, aal, customClaims, isAnonymous, sessionId);
+        const refreshToken = generateRefreshToken();
+
         await authRepo.createRefreshToken(
             uid,
             await hashRefreshToken(refreshToken),
             getRefreshTokenExpiry(),
             userAgent,
             ipAddress,
-            { id: randomUUID(), startedAt: new Date(), aal }
+            { id: sessionId, startedAt: new Date(), aal }
         );
 
         return { roleIds,
@@ -436,6 +555,7 @@ refreshToken };
      * Create a new account with email/password
      */
     router.post("/register", defaultAuthLimiter, ...(captcha.register ? [captcha.register] : []), async (c) => {
+        const startedAt = Date.now();
         const { email, password, displayName } = parseBody(registerSchema, await c.req.json());
 
         // Hard kill switch — blocks registration regardless of allowRegistration,
@@ -473,9 +593,25 @@ refreshToken };
             throw ApiError.badRequest(passwordValidation.errors.join(". "), "WEAK_PASSWORD");
         }
 
+        // Confirm-first registration answers the same whether or not the
+        // address has an account, held to the same floor as every route that
+        // mails an address, so neither the words nor the time say which. An
+        // existing account that never confirmed gets its link again — the
+        // registrant whose first mail went missing — and its password is not
+        // touched: whoever follows the link proves which password they know.
+        const confirmFirst = () => notBefore(startedAt, RECIPIENT_ROUTE_FLOOR_MS, c.json({
+            success: true,
+            confirmationRequired: true,
+            message: "Check your inbox: follow the link we sent to confirm your address, then sign in."
+        }));
+
         // Check if email already exists
         const existingUser = await authRepo.getUserByEmail(email);
         if (existingUser) {
+            if (config.requireEmailVerification) {
+                if (!existingUser.emailVerified) sendVerificationMailInBackground(existingUser);
+                return confirmFirst();
+            }
             throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
         }
 
@@ -520,15 +656,34 @@ refreshToken };
             }
         }
 
+        // The address is proven by its owner from here, at registration, on
+        // the owner's terms: followed while signed in, the link keeps the
+        // password they just chose. Left for later, the first proof was a
+        // magic link or an email code, which has to remove a password nobody
+        // proved — the owner's own included.
+        if (config.requireEmailVerification) {
+            // Confirm-first: no session until the address is proven.
+            sendVerificationMailInBackground(user);
+            if (ops.afterUserCreate) {
+                try {
+                    await ops.afterUserCreate(user);
+                } catch (err) {
+                    logger.error("[AuthHooks] afterUserCreate error", { error: err instanceof Error ? err.message : err });
+                }
+            }
+            return confirmFirst();
+        }
+
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            requestClientAddress(c)
         );
 
         // Send welcome email (fire-and-forget, don't block registration)
         sendWelcomeEmail({ email: user.email,
 displayName: user.displayName });
+        sendVerificationMailInBackground(user);
 
         // Fire afterUserCreate hook
         if (ops.afterUserCreate) {
@@ -575,11 +730,13 @@ displayName: user.displayName });
         } else {
             // Default: email lookup + password hash verification
             user = await authRepo.getUserByEmail(email);
-            if (!user) {
-                throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
-            }
-
-            if (!user.passwordHash) {
+            if (!user || !user.passwordHash) {
+                // One key derivation either way, so the time to answer does
+                // not say whether the address has an account. Refusing before
+                // any hash work answered an unknown address ~15× faster than a
+                // wrong password, which is the question every other route that
+                // takes an address is careful not to answer.
+                await ops.verifyPassword(password, await dummyPasswordHash());
                 throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
             }
 
@@ -594,10 +751,26 @@ displayName: user.displayName });
             }
         }
 
+        // Only after the password is proven, so the answer tells nobody but
+        // its holder that the address is unconfirmed.
+        if (config.requireEmailVerification && !user.emailVerified) {
+            // Mailed again, but not more than once a minute however often
+            // the holder tries.
+            const lastSent = user.emailVerificationSentAt?.getTime() ?? 0;
+            if (Date.now() - lastSent > 60_000) sendVerificationMailInBackground(user);
+            // Not `EMAIL_NOT_VERIFIED`: that is the OAuth sign-in's refusal to
+            // link onto an unverified account, and a login screen says
+            // something else for it.
+            throw ApiError.forbidden(
+                "Confirm your email address first: follow the link we sent to it, then sign in.",
+                "EMAIL_NOT_CONFIRMED"
+            );
+        }
+
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            requestClientAddress(c)
         );
 
         // Fire onAuthenticated hook (fire-and-forget)
@@ -676,6 +849,12 @@ displayName: user.displayName });
                 const payload = parseBody(provider.schema, await c.req.json());
                 const externalUser = await verifyProviderPayload(provider, payload);
 
+                // A sign-in like any other, so the hook a deployment uses to
+                // refuse one hears about it — it fired for passwords alone.
+                if (ops.beforeLogin) {
+                    await ops.beforeLogin(normalizeEmail(externalUser.email), "oauth");
+                }
+
                 // Find or create user
                 let user = await authRepo.getUserByIdentity(provider.id, externalUser.providerId);
 
@@ -752,12 +931,19 @@ displayName: user.displayName });
                         // every OAuth account sat unverified forever — and was
                         // then exactly the unverified local account the link
                         // decision refuses to trust.
-                        user = await authRepo.createUser({
+                        // `beforeUserCreate` runs here too: a deployment that
+                        // limits sign-ups to its own domain wrote it for every
+                        // account, and an OAuth button created them unasked.
+                        let createData: CreateUserData = {
                             email: normalizeEmail(externalUser.email),
                             displayName: externalUser.displayName || undefined,
                             photoUrl: externalUser.photoUrl || undefined,
                             emailVerified: externalUser.emailVerified === true
-                        });
+                        };
+                        if (ops.beforeUserCreate) {
+                            createData = await ops.beforeUserCreate(createData);
+                        }
+                        user = await authRepo.createUser(createData);
 
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, identityProfileData(externalUser));
 
@@ -802,8 +988,15 @@ displayName: user.displayName });
                 const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
                     user.id,
                     c.req.header("user-agent") || "unknown",
-                    c.req.header("x-forwarded-for") || "unknown"
+                    requestClientAddress(c)
                 );
+
+                if (ops.onAuthenticated) {
+                    const signedIn = user;
+                    ops.onAuthenticated(signedIn, "oauth").catch(err => {
+                        logger.error("[AuthHooks] onAuthenticated error", { error: err instanceof Error ? err.message : err });
+                    });
+                }
 
                 const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, provider.id);
                 const transformedResponse = await applyTransformHook(authResponse, "oauth", c.req.raw, user.id);
@@ -855,6 +1048,52 @@ displayName: user.displayName });
                         success: true,
                         provider: provider.id,
                         alreadyLinked: true,
+                        photoURL: externalUser.photoUrl ?? null
+                    });
+                }
+
+                // A guest that links a provider is becoming an account — the
+                // same step `/anonymous/link` takes with a password — so it
+                // answers to registration's controls and comes out of it an
+                // account: not a guest, with the provider's address when the
+                // provider vouches for it, and a session that says so. Linked
+                // and left a guest, every later sign-in with that provider
+                // returned the guest, and `rebase.is_anonymous()` kept refusing it.
+                const linking = await authRepo.getUserById(userCtx.uid);
+                if (linking?.isAnonymous) {
+                    if (!isRegistrationAllowed()) {
+                        throw ApiError.forbidden("A guest cannot become an account here: registration is disabled on this backend.", "REGISTRATION_DISABLED");
+                    }
+                    const vouchedEmail = externalUser.emailVerified === true ? normalizeEmail(externalUser.email) : undefined;
+                    if (vouchedEmail && await authRepo.getUserByEmail(vouchedEmail)) {
+                        throw ApiError.conflict(
+                            `An account with this ${provider.id} address already exists. Sign in to it instead.`,
+                            "EMAIL_EXISTS"
+                        );
+                    }
+                    let upgrade: CreateUserData = {
+                        email: vouchedEmail ?? linking.email,
+                        ...(vouchedEmail ? { emailVerified: true } : {})
+                    };
+                    if (ops.beforeUserCreate) upgrade = await ops.beforeUserCreate(upgrade);
+                    await authRepo.linkUserIdentity(userCtx.uid, provider.id, externalUser.providerId, identityProfileData(externalUser));
+                    const upgraded = await authRepo.updateUser(userCtx.uid, {
+                        email: normalizeEmail(upgrade.email),
+                        ...(upgrade.emailVerified !== undefined ? { emailVerified: upgrade.emailVerified } : {}),
+                        isAnonymous: false
+                    });
+                    if (!upgraded) throw ApiError.notFound("User not found");
+                    const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
+                        upgraded.id,
+                        c.req.header("user-agent") || "unknown",
+                        requestClientAddress(c)
+                    );
+                    const authResponse = buildAuthResponse(upgraded, roleIds, accessToken, refreshToken, provider.id);
+                    return c.json({
+                        ...redactRefreshToken(authResponse, c, refreshToken, config.cookieAuth),
+                        success: true,
+                        provider: provider.id,
+                        alreadyLinked: false,
                         photoURL: externalUser.photoUrl ?? null
                     });
                 }
@@ -1011,6 +1250,12 @@ displayName: user.displayName }, appName, logoUrl);
         // Mark token as used
         await authRepo.markPasswordResetTokenUsed(tokenHash);
 
+        if (ops.onAuthenticated && account) {
+            ops.onAuthenticated(account, "password-reset").catch(err => {
+                logger.error("[AuthHooks] onAuthenticated error", { error: err instanceof Error ? err.message : err });
+            });
+        }
+
         // Fire onPasswordReset hook (fire-and-forget)
         if (ops.onPasswordReset) {
             ops.onPasswordReset(storedToken.uid).catch(err => {
@@ -1027,7 +1272,7 @@ message: "Password has been reset successfully" });
      * Change password for authenticated user
      */
     router.post("/change-password", requireLiveSession, async (c) => {
-        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[]; aal?: "aal1" | "aal2" } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -1052,12 +1297,27 @@ message: "Password has been reset successfully" });
             throw ApiError.badRequest(passwordValidation.errors.join(". "), "WEAK_PASSWORD");
         }
 
-        // Update the password and log out every session, this one included
+        // Update the password and log out every session, this one included —
+        // then sign this device back in. Every other device has to sign in
+        // with the new password, which is why the password was changed; this
+        // one just proved the old password, so it gets a fresh session at the
+        // level it already had, rather than a success answer and a session the
+        // server had just revoked (which signed the app out on its next call).
         const passwordHash = await ops.hashPassword(newPassword);
         await replaceUserPassword(authRepo, user.id, passwordHash);
 
-        return c.json({ success: true,
-message: "Password has been changed successfully" });
+        const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
+            user.id,
+            c.req.header("user-agent") || "unknown",
+            requestClientAddress(c),
+            { skipMfaGate: true, aal: userCtx.aal === "aal2" ? "aal2" : "aal1" }
+        );
+        const authResponse = buildAuthResponse(user, roleIds, accessToken, refreshToken, "password");
+        return c.json({
+            ...redactRefreshToken(authResponse, c, refreshToken, config.cookieAuth),
+            success: true,
+            message: "Password has been changed successfully"
+        });
     });
 
     /**
@@ -1090,63 +1350,142 @@ message: "Password has been changed successfully" });
         if (user.emailVerified) {
             throw ApiError.badRequest("Email is already verified", "ALREADY_VERIFIED");
         }
+        if (!isDeliverableAddress(user.email)) {
+            throw ApiError.badRequest("This account has no address mail can reach. Set a real email address first.", "UNDELIVERABLE_ADDRESS");
+        }
 
-        // Generate verification token
-        const token = generateSecureToken();
-
-        // Store hashed token in user record (raw token goes in the email URL)
-        await authRepo.setVerificationToken(user.id, hashToken(token));
-
-        // Build verification URL. `verifyEmailUrl` is set by no boot path, so
-        // this used to be `""` — a relative href, dead in every mail client,
-        // reported as `{ success: true }`. The resolver falls back to the reset
-        // base, and `createEmailService` refuses to boot when neither is absolute.
-        const baseUrl = resolveEmailLinkBase(emailConfig, "verifyEmail");
-        const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
-
-        // Get email template
-        const { appName, logoUrl } = resolveEmailBranding(emailConfig);
-        const templateFn = emailConfig?.templates?.emailVerification;
-        const emailContent = templateFn
-            ? templateFn(verifyUrl, { email: user.email,
-displayName: user.displayName })
-            : getEmailVerificationTemplate(verifyUrl, { email: user.email,
-displayName: user.displayName }, appName, logoUrl);
-
-        // Send email
-        await emailService!.send({
-            to: user.email,
-            subject: emailContent.subject,
-            html: emailContent.html,
-            text: emailContent.text
-        });
+        await sendVerificationMail(user);
 
         return c.json({ success: true,
 message: "Verification email sent" });
     });
 
     /**
-     * GET /auth/verify-email
-     * Verify email address using token
+     * Who proved what, when a verification link is followed.
+     *
+     * The link proves the inbox. It does not prove whoever registered the
+     * address is that inbox's owner: anyone can register someone else's
+     * address, leave a password on it, and ask for the link to be mailed. So a
+     * first proof of address keeps only what the person following the link
+     * also proved — and takes the rest off, as a magic link, an email code or
+     * a reset does (`confirmAddressOwnership`):
+     *
+     * - `session`: the request carries a live session of this very account.
+     *   Only whoever put the credentials on it can hold one, and they now hold
+     *   the inbox too — nothing on the account is a stranger's.
+     * - `password`: the request carries the account's password.
+     * - `none`: the password and every identity whose provider did not vouch
+     *   for the address are removed, and every session ends.
      */
-    router.get("/verify-email", async (c) => {
-        const token = c.req.query("token");
+    async function verificationProof(c: Context<HonoEnv>, user: { id: string; passwordHash?: string | null }, password: string | undefined): Promise<"session" | "password" | "none"> {
+        const bearer = extractBearerToken(c.req.header("authorization"));
+        if (bearer !== undefined) {
+            const payload = await verifyAccessToken(bearer);
+            if (payload?.uid === user.id && (await judgeAccessToken(authRepo, payload)).live) return "session";
+        }
+        if (password !== undefined) {
+            if (!user.passwordHash || !(await ops.verifyPassword(password, user.passwordHash))) {
+                throw ApiError.unauthorized("That is not this account's password.", "INVALID_CREDENTIALS");
+            }
+            return "password";
+        }
+        return "none";
+    }
 
+    /** The account a verification token names, if the token is live. */
+    async function accountForVerificationToken(token: string) {
+        const user = await authRepo.getUserByVerificationToken(hashToken(token));
+        const sentAt = user?.emailVerificationSentAt?.getTime();
+        if (!user || (sentAt !== undefined && Date.now() - sentAt > EMAIL_VERIFICATION_TTL_MS)) {
+            throw ApiError.badRequest("Invalid or expired verification token", "INVALID_TOKEN");
+        }
+        return user;
+    }
+
+    /**
+     * GET /auth/verify-email?token=
+     * Verify an address by its link. Keeps what the request proves — a live
+     * session of the account — and removes what nobody proved. See
+     * `verificationProof`; `POST` is the same with a password and a choice.
+     */
+    router.get("/verify-email", strictAuthLimiter, async (c) => {
+        const token = c.req.query("token");
         if (!token) {
             throw ApiError.badRequest("Verification token is required", "INVALID_INPUT");
         }
+        const user = await accountForVerificationToken(token);
+        const proof = await verificationProof(c, user, undefined);
+        const outcome = await confirmAddressOwnership(authRepo, user, null, { everythingProven: proof === "session" });
+        return c.json({
+            success: true,
+            message: "Email verified successfully",
+            passwordRemoved: outcome.removedPassword,
+            removedProviders: outcome.removedProviders
+        });
+    });
 
-        // Find user by hashed verification token
-        const user = await authRepo.getUserByVerificationToken(hashToken(token));
-        if (!user) {
-            throw ApiError.badRequest("Invalid or expired verification token", "INVALID_TOKEN");
+    /**
+     * POST /auth/verify-email { token, password?, removeUnproven? }
+     *
+     * The same proof as `GET`, with the two things a link alone cannot say:
+     *
+     * - `password` proves the account's password, which is then kept, and
+     *   signs the caller in — they have just proven both the address and the
+     *   password. This is how a confirm-first registration completes.
+     * - With neither a session nor a password, an account carrying a password
+     *   or an identity nobody proved is answered `409 PROOF_REQUIRED` and the
+     *   token is left unspent, so the person holding the link can choose:
+     *   prove the password, or `removeUnproven: true` to verify without it.
+     */
+    router.post("/verify-email", strictAuthLimiter, async (c) => {
+        const { token, password, removeUnproven } = parseBody(verifyEmailSchema, await c.req.json());
+        const user = await accountForVerificationToken(token);
+        const proof = await verificationProof(c, user, password);
+
+        if (proof === "none" && !removeUnproven) {
+            const unprovenProviders = (await authRepo.getUserIdentities(user.id))
+                .filter(identity => !identityVouchesForAddress(identity, user.email))
+                .map(identity => identity.provider);
+            if (user.passwordHash || unprovenProviders.length > 0) {
+                throw new ApiError(409, "PROOF_REQUIRED",
+                    "This account has a way to sign in that was set before its address was verified. " +
+                    "Enter its password to keep it, or verify without it and it is removed.",
+                    { password: Boolean(user.passwordHash), providers: unprovenProviders });
+            }
         }
 
-        // Mark email as verified
-        await authRepo.setEmailVerified(user.id, true);
+        const outcome = await confirmAddressOwnership(
+            authRepo,
+            user,
+            proof === "password" ? user.passwordHash ?? null : null,
+            { everythingProven: proof === "session" }
+        );
 
-        return c.json({ success: true,
-message: "Email verified successfully" });
+        if (proof !== "password") {
+            return c.json({
+                success: true,
+                message: "Email verified successfully",
+                passwordRemoved: outcome.removedPassword,
+                removedProviders: outcome.removedProviders
+            });
+        }
+
+        // Address and password both proven: a sign-in. Through the same
+        // session minting every sign-in uses, the MFA gate included.
+        const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
+            user.id,
+            c.req.header("user-agent") || "unknown",
+            requestClientAddress(c)
+        );
+        const verified = { ...user, emailVerified: true };
+        const authResponse = buildAuthResponse(verified, roleIds, accessToken, refreshToken, "password");
+        const transformedResponse = await applyTransformHook(authResponse, "login", c.req.raw, user.id);
+        return c.json({
+            ...redactRefreshToken(transformedResponse, c, refreshToken, config.cookieAuth),
+            success: true,
+            passwordRemoved: false,
+            removedProviders: outcome.removedProviders
+        });
     });
 
     /**
@@ -1225,24 +1564,44 @@ message: "Email verified successfully" });
         const reuseWindowMs = Math.max(0, config.refreshTokenReuseIntervalSeconds ?? 10) * 1000;
         const supersededAt = storedToken.rotatedAt ? new Date(storedToken.rotatedAt) : null;
         if (supersededAt && Date.now() - supersededAt.getTime() > reuseWindowMs) {
-            // Outside the window we decline the request but leave the session
-            // standing: the live token this one was rotated into is still good,
-            // and punishing its holder for a late straggler is how a legitimate
-            // user gets signed out. Logged because a genuine replay of an old
-            // token — long after it was superseded — is also what a stolen
-            // token looks like, and that signal should not vanish silently.
-            logger.warn("[Auth] Refresh token replayed after the reuse window", {
+            // A token replayed long after it was superseded is either a
+            // straggler — a client that lost an answer and slept — or a copy
+            // someone else is using. Which risk to take is the deployment's
+            // call (`refreshTokenReuse`):
+            //
+            // - "reject" (default): decline the request, leave the session
+            //   standing. Its live token is still good, and punishing its
+            //   holder for a late straggler is how a legitimate user gets
+            //   signed out. This is not reuse *detection*: a thief who
+            //   refreshes first keeps the session and the owner is the one
+            //   refused.
+            // - "revoke-session": end the whole sign-in, both holders included,
+            //   as GoTrue does — the owner signs in again, the thief is out.
+            //
+            // Logged either way: it is what a stolen token looks like.
+            const revoke = config.refreshTokenReuse === "revoke-session";
+            logger.warn("[Security Audit] Refresh token replayed after the reuse window", {
+                eventType: "auth.refresh.reuse",
                 uid: storedToken.uid,
                 sessionId: storedToken.sessionId,
                 supersededSecondsAgo: Math.round((Date.now() - supersededAt.getTime()) / 1000),
-                userAgent: c.req.header("user-agent") || "unknown"
+                userAgent: c.req.header("user-agent") || "unknown",
+                sessionRevoked: revoke
             });
+            if (revoke) {
+                if (storedToken.sessionId && authRepo.revokeRefreshTokenSession) {
+                    await authRepo.revokeRefreshTokenSession(storedToken.sessionId);
+                } else {
+                    await authRepo.deleteRefreshToken(tokenHash);
+                }
+                clearRefreshCookie(c, config.cookieAuth);
+                throw ApiError.unauthorized("Refresh token already used; this session has been ended", "SESSION_REVOKED");
+            }
             throw ApiError.unauthorized("Refresh token already used", "TOKEN_ALREADY_USED");
         }
 
         // Generate new tokens
-        const roles = await authRepo.getUserRoles(storedToken.uid);
-        const roleIds = roles.map(r => r.id);
+        const roleIds = await authRepo.getUserRoleIds(storedToken.uid);
 
         // Best-effort: load the user so we can return it in the response, which
         // lets the client restore a session from an httpOnly cookie alone (cold
@@ -1256,6 +1615,14 @@ message: "Email verified successfully" });
             });
             return null;
         });
+
+        // A disabled account keeps no session: refresh is how a session lives
+        // past its access token, so it ends here too.
+        if (user?.disabled) {
+            await authRepo.deleteRefreshToken(tokenHash);
+            clearRefreshCookie(c, config.cookieAuth);
+            throw ApiError.unauthorized("This account has been disabled", "ACCOUNT_DISABLED");
+        }
 
         // The assurance level is a property of the sign-in, and rotation is not
         // a new sign-in — so it is read off the presented token's row and
@@ -1280,8 +1647,9 @@ aal: sessionAal };
         // rather than from the old token: a session that WAS anonymous and has
         // since been upgraded to a real account should stop being a guest at
         // its next refresh, not at its next sign-in.
+        const sessionId = storedToken.sessionId ?? storedToken.id;
         const newAccessToken = await generateAccessToken(
-            storedToken.uid, roleIds, sessionAal, customClaims, user?.isAnonymous === true
+            storedToken.uid, roleIds, sessionAal, customClaims, user?.isAnonymous === true, sessionId
         );
         const newRefreshToken = generateRefreshToken();
 
@@ -1295,9 +1663,9 @@ aal: sessionAal };
         // and simply add a sibling: two tabs then hold two live tokens of one
         // session, which is exactly what we want them to have.
         const userAgent = c.req.header("user-agent") || "unknown";
-        const ipAddress = c.req.header("x-forwarded-for") || "unknown";
+        const ipAddress = requestClientAddress(c);
         const session = {
-            id: storedToken.sessionId ?? storedToken.id,
+            id: sessionId,
             startedAt: sessionStartedAt,
             aal: sessionAal
         };
@@ -1364,6 +1732,11 @@ aal: sessionAal };
                 refreshResponse = tokensOnlyResponse;
             }
         }
+        if (ops.onAuthenticated && user) {
+            ops.onAuthenticated(user, "refresh").catch(err => {
+                logger.error("[AuthHooks] onAuthenticated error", { error: err instanceof Error ? err.message : err });
+            });
+        }
         const transformedResponse = await applyTransformHook(refreshResponse, "refresh", c.req.raw, storedToken.uid);
         const finalResponse = redactRefreshToken(transformedResponse, c, newRefreshToken, config.cookieAuth);
         return c.json(finalResponse);
@@ -1378,7 +1751,8 @@ aal: sessionAal };
         createSessionAndTokens,
         applyTransformHook,
         requireLiveSession,
-        registerCaptcha: captcha.register
+        registerCaptcha: captcha.register,
+        sendVerificationMail: sendVerificationMailInBackground
     });
 
     // ═══════════════════════════════════════════════════════════════════════

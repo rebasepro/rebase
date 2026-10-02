@@ -149,5 +149,5 @@ buckets](/docs/backend/multiple-sources/).
 | `GET /health` | Readiness. Performs a database round-trip. |
 | `GET /livez` | Liveness. Deliberately does *not* touch the database, so a database blip cannot make an orchestrator kill a healthy process. |
 | `GET /api/meta/schema-version` | The current schema version. Unauthenticated — it is a version stamp, not a schema. |
-| `GET /api/meta/contract` | The full collection contract. Admin-only. |
+| `GET /api/meta/contract` | The full collection contract. Needs `schema:read`. |
 | `GET /metrics` | Prometheus metrics, when `REBASE_METRICS=true`. |

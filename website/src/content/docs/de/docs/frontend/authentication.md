@@ -1,5 +1,5 @@
 ---
-sourceHash: 8d1a98886641537e
+sourceHash: 59bdc8b898c974d7
 title: Authentifizierung & Anmeldung
 sidebar_label: Authentifizierung & Anmeldung
 description: Richten Sie den Auth-Controller, die Login-Ansicht und die Rollensimulation in Ihrem Rebase-React-Frontend ein.
@@ -88,6 +88,8 @@ roles: {
 ```
 
 Um Rollenoptionen hinzuzufügen oder zu entfernen, aktualisieren Sie die `enum`-Map in Ihrer Users-Collection und generieren Sie das Schema neu.
+
+Eine Rolle in dieser Liste ist ein Name, auf den Ihre [Sicherheitsregeln](/docs/collections/security-rules) passen können. Was sie über ihre Zeilen hinaus darf (Benutzer verwalten, Logs lesen, das Schema ändern), wird separat deklariert, unter `auth.roles` in derselben Collection. `admin` ist integriert und hält alles. Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes).
 
 ## Rollensimulation (Dev-Modus)
 

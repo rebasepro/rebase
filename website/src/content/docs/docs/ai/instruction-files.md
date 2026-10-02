@@ -115,6 +115,10 @@ runs and one that does not, and an assistant that has not been told will
 reliably write the version that does not — see
 [Custom Functions](/docs/backend/custom-functions).
 
+`requireAdmin` admits the `admin` role only. When a narrower role or an API key
+should be able to call a route, the guard to add is `requireScope`, with a scope
+the app declares — see [Roles and scopes](/docs/backend/roles-and-scopes/#app-scopes).
+
 ## Making it yours
 
 `ai-instructions.md` is your file. Nothing regenerates or overwrites it — unlike

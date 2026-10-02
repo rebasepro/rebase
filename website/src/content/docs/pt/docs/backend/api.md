@@ -1,5 +1,5 @@
 ---
-sourceHash: 82e083381f34098d
+sourceHash: 494cc48e060fb2f1
 title: API REST
 sidebar_label: API REST
 description: Endpoints de API REST gerados automaticamente para cada coleção, com filtragem, ordenação, paginação e inclusão de relações.
@@ -533,7 +533,7 @@ Todo hook é aguardado, e um erro lançado por qualquer um deles desfaz a escrit
 | `GET` | `/api/docs` | nenhuma | A especificação OpenAPI 3.0 em JSON |
 | `GET` | `/api/swagger` | nenhuma | Swagger UI. Ativo em desenvolvimento, desativado em produção; `REBASE_ENABLE_SWAGGER` sobrescreve em ambos os casos |
 | `GET` | `/api/meta/schema-version` | nenhuma | O hash do schema a partir do qual este backend foi construído — deliberadamente não autenticado, e retorna apenas esse hash |
-| `GET` | `/api/meta/contract` | admin, chave de serviço ou chave de API de admin | O contrato completo da coleção, para `rebase generate-sdk --from`. Comportamento fail-closed: `404` quando nenhuma autenticação está configurada |
+| `GET` | `/api/meta/contract` | `schema:read`: um admin, a chave de serviço ou uma chave de API que o tenha | O contrato completo da coleção, para `rebase generate-sdk --from`. Comportamento fail-closed: `404` quando nenhuma autenticação está configurada |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` quando definido | Métricas do Prometheus, quando `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
@@ -552,7 +552,7 @@ O schema completo das coleções do projeto — cada coleção, propriedade e re
 GET /api/meta/contract
 ```
 
-É **exclusivo para admins**, e em uma implantação sem autenticação configurada ele
+Ele requer o escopo **`schema:read`**, que um admin tem, e em uma implantação sem autenticação configurada ele
 não é disponibilizado de forma alguma (404 `CONTRACT_UNAVAILABLE`), evitando
 expor o schema publicamente. Seu endpoint irmão retorna uma string de versão que
 representa o schema sem descrevê-lo, sendo deliberadamente acessível sem credenciais

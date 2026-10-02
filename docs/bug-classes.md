@@ -45,9 +45,10 @@ zero side does — and whether any test ever reaches it. `first`, `needsSetup`,
 
 **Watch for:** a zero-state branch that opens access rather than closing it. An
 empty permission list must mean *no permissions*, never *all permissions*.
-`api-key-permission-guard.ts` is the reference: it loops and returns `false` at
-the end, so an empty or unparseable list fails closed by construction rather than
-by a check someone has to remember.
+`scopeGrants` in `packages/types/src/types/scopes.ts` is the reference: it loops
+over the held scopes and returns `false` at the end, so an empty or unparseable
+list fails closed by construction rather than by a check someone has to
+remember.
 
 ---
 
@@ -693,6 +694,31 @@ object after building it. Mutation-tested: each half removed turns ten cases red
 | MongoDB driver | **OPEN** — no watermark, so an access token outlives any revocation until it expires. |
 | collection `onResetPassword` returning `temporaryPassword` | **BUG** — the route never wrote it and the hook's context cannot, so the documented example showed the admin a password that did not work. Fixed the same day; see class 21's 2026-09-14 entry. |
 | `isAccessTokenRevoked`, same-second token | **OPEN** (class 55) — the comment and the test's title say a token from the watermark's own second is revoked; the code (`<`) and the test's assertion let it through. |
+
+### A deleted account is a revoked one — 2026-10-02
+
+The watermark lives on the user row, so deleting the row deleted the
+revocation: a token its owner had signed out everywhere came back, as an
+authenticated principal with no roles, the moment an administrator deleted the
+account (identity audit, IDENTITY-2). Four doors asked "does this account still
+exist" and the main one — the built-in adapter, i.e. the data plane and the
+socket — answered "yes" by reading `[]` roles for nobody.
+
+One judge now, `judgeAccessToken` in `auth/token-revocation.ts`: existence,
+watermark and live roles in one repository read (`getAccountAccessState`),
+asked by the adapter's `verifyRequest`/`verifyToken`, every `createRequireAuth`
+gate with a repository, and the MFA step-up routes. A source guard in
+`account-deletion-revokes-tokens.test.ts` fails if anything but the MCP grant
+paths (which pair the watermark with `currentRoles`) reads the watermark on its
+own. `identity-e2e.test.ts` holds it over real Postgres.
+
+| checked | result |
+|---|---|
+| adapter `verifyRequest` / `verifyToken` (data plane, socket `AUTHENTICATE`) | **BUG** — fixed |
+| admin gates and the auth routes' live-session guard | **BUG** — fixed |
+| MFA step-up (`/mfa/verify`, `/mfa/challenge*` with a pending token) | **BUG** — fixed |
+| MCP consent (`verifiedSession`) | **BUG** — a deleted account's session could still consent; fixed |
+| MCP refresh, personal API keys, `GET /auth/me` | clean — already refused |
 
 ---
 
@@ -3912,6 +3938,26 @@ stays true when the next cache is added.
 | socket token after a failed refresh | **BUG**. Fell back to the token read before the refresh — the signed-out one. |
 | MCP grant roles | **BUG**. Roles, account existence and the revocation watermark re-read on every refresh. |
 | `useFetch`, `useCollection`, `useRelationSelector` caches | clean. Keyed by query and cleared by the fetch-cache reset. |
+
+**Sweep (2026-10-02, the server's half of "a connection authenticated once"):**
+the Postgres socket stored `session.user` at `AUTHENTICATE` and scoped every
+later frame with it, so an open socket read *and wrote* as an identity that had
+signed out everywhere, been demoted, deleted, or whose token had expired
+(IDENTITY-3). It now keeps the credential and asks `resolveIdentity` — the same
+verification `AUTHENTICATE` runs — before each frame (channel frames at most
+once a second), on a sweep for sockets that only listen, and on a timer at the
+token's `exp`. An ended identity gets `AUTH_ERROR` and close `4001`; changed
+roles re-scope the socket's subscriptions. Re-reading the database rather than
+publishing a kick event is what makes it hold across instances without the
+opt-in bus. `identity-e2e.test.ts` mutation-tests each of the three triggers.
+
+| checked | result |
+|---|---|
+| Postgres socket, frames after sign-out / logout / demotion / deletion | **BUG**. Re-checked per frame. |
+| Postgres socket, subscriptions that only listen | **BUG**. Re-checked by the sweep (30 s, `identityRecheckIntervalMs`). |
+| Postgres socket, token expiry | **BUG**. Closed at `exp`; the SDK re-authenticates on every refresh. |
+| API-key sockets | **BUG** by construction (same stored identity). The same re-check re-resolves the key; not separately tested. |
+| Mongo socket | **OPEN** — same shape, Mongo is out of scope for now. |
 
 ## 68. A value the store replaces whole, written as a diff
 

@@ -1,8 +1,6 @@
 import { MiddlewareHandler, Context } from "hono";
-import type { AuthRepository } from "./interfaces";
-import { isAccessTokenRevoked } from "./token-revocation";
-import { hasAdministrativeRole } from "./admin-roles";
-import { ANONYMOUS_USER_ID, DataDriver, isPublicStoragePath } from "@rebasepro/types";
+import { judgeAccessToken, type AccessJudgeRepository } from "./token-revocation";
+import { ANONYMOUS_USER_ID, DataDriver, hasAdminRole, isPublicStoragePath } from "@rebasepro/types";
 import { verifyAccessToken, AccessTokenPayload, isJwtConfigured, verifyDownloadToken, type DownloadTokenPayload } from "./jwt";
 import type { HonoEnv } from "../api/types";
 import { ApiError, errorHandler } from "../api/errors";
@@ -171,7 +169,7 @@ export function createRequireAuth(options?: {
      * invalidated by `logout` or a password reset stops working on admin routes
      * too, not just on the data plane.
      */
-    revocationRepo?: Pick<AuthRepository, "getTokensValidAfter">;
+    revocationRepo?: AccessJudgeRepository;
 }): MiddlewareHandler<HonoEnv> {
     // Only when there is nothing at all to add. Keyed on the service key alone,
     // this dropped `resolveRoles` and `revocationRepo` silently for any caller
@@ -210,13 +208,25 @@ roles: ["admin"] } as AccessTokenPayload);
 
         if (resolveRoles || revocationRepo) {
             try {
-                // Same watermark the data plane checks. An admin route is the
-                // last place a revoked token should still work.
-                if (revocationRepo && await isAccessTokenRevoked(revocationRepo, payload)) {
-                    return refuse(c, ApiError.unauthorized("Session has been revoked", "SESSION_REVOKED"));
+                // The same judgement the data plane makes: revoked, or an
+                // account that no longer exists. An admin route is the last
+                // place such a token should still work. When the judgement
+                // already read the roles, they are the roles — one read, not two.
+                let judgedRoles: string[] | undefined;
+                if (revocationRepo) {
+                    const verdict = await judgeAccessToken(revocationRepo, payload);
+                    if (!verdict.live) {
+                        return refuse(c, verdict.refusal === "account-disabled"
+                            ? ApiError.unauthorized("This account has been disabled", "ACCOUNT_DISABLED")
+                            : ApiError.unauthorized(
+                                verdict.refusal === "account-deleted" ? "This account no longer exists" : "Session has been revoked",
+                                "SESSION_REVOKED"
+                            ));
+                    }
+                    judgedRoles = verdict.roles;
                 }
                 c.set("user", resolveRoles
-                    ? { ...payload, roles: await resolveRoles(payload.uid) }
+                    ? { ...payload, roles: judgedRoles ?? await resolveRoles(payload.uid) }
                     : payload);
                 return next();
             } catch (error) {
@@ -242,8 +252,12 @@ roles: ["admin"] } as AccessTokenPayload);
 }
 
 /**
- * Middleware that requires the user to have an admin or schema-admin role.
- * Must be used AFTER requireAuth or on a route where user is guaranteed.
+ * Middleware that requires the user to hold the `admin` role, which holds
+ * every scope. Must be used AFTER requireAuth or on a route where user is
+ * guaranteed.
+ *
+ * Prefer `requireScope` from `./access` for anything a scope names: a scope
+ * can be granted to a narrower role and to a key, and `admin` cannot.
  */
 export const requireAdmin: MiddlewareHandler<HonoEnv> = async (
     c,
@@ -254,8 +268,10 @@ export const requireAdmin: MiddlewareHandler<HonoEnv> = async (
         return refuse(c, ApiError.unauthorized("User not authenticated. requireAuth middleware is missing?"));
     }
 
-    const roles = (typeof user === "object" && user !== null && "roles" in user) ? (user.roles || []) : [];
-    const isAdmin = hasAdministrativeRole(roles as string[]);
+    const roles = typeof user === "object" && user !== null && "roles" in user && Array.isArray(user.roles)
+        ? user.roles.filter((role): role is string => typeof role === "string")
+        : [];
+    const isAdmin = hasAdminRole(roles);
 
     if (!isAdmin) {
         return refuse(c, ApiError.forbidden("Admin privileges required for this operation"));

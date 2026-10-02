@@ -1,5 +1,5 @@
 ---
-sourceHash: b49ac798fe385796
+sourceHash: 4c3ab79cfd150295
 title: Temps réel & WebSocket
 sidebar_label: Temps réel
 description: Synchronisation des données en temps réel, canaux de diffusion et suivi de présence via WebSocket.
@@ -358,6 +358,15 @@ Les abonnements WebSocket respectent automatiquement les politiques de sécurit�
 3. Le jeton est vérifié une seule fois, lors de l'authentification du socket, et le serveur ne le revérifie pas pendant toute la durée de la connexion. Un jeton d'accès qui expire, une session révoquée ou un rôle retiré ne modifie pas ce qu'un socket ouvert peut lire tant qu'il ne se réauthentifie pas ou ne se reconnecte pas. Le SDK réauthentifie son socket chaque fois qu'il actualise son jeton, et le déconnecte lors de la déconnexion ; un client utilisant directement le protocole conserve l'identité avec laquelle il a ouvert la connexion jusqu'à ce qu'il se reconnecte.
 
 Cela signifie que chaque socket ne reçoit que les mises à jour relatives aux enregistrements que son identité authentifiée est autorisée à voir.
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une [clé API](/docs/backend/api-keys/) authentifie aussi le socket : envoyez la clé
+`rk_…` là où irait le jeton d'accès. Le socket vérifie alors chaque trame
+au regard des [portées](/docs/backend/roles-and-scopes/) de la clé : une lecture, un comptage ou un
+abonnement exige `data:read` sur sa collection, un enregistrement `data:write`, une suppression
+`data:delete`. Un chemin imbriqué exige la portée simple. Les canaux (diffusion et
+présence) sont refusés pour une clé, car aucune portée ne les couvre. Les messages de l'éditeur SQL
+et des branches exigent `database:read` ou `database:write`, pour une clé comme pour une
+personne.
 
 L'exécution de plusieurs instances — le bus LISTEN/NOTIFY, le comportement de la présence inter-processus et l'écriture de votre propre transport — dispose de sa propre page :
 [Le temps réel multi-instances](/docs/backend/realtime-transports/).

@@ -33,7 +33,7 @@ This is the central orchestrator for any Rebase backend. It provides the framewo
 
 Also exports `HonoEnv`, the auth, email, storage, history and cron modules, custom functions, logging utilities, and the driver registry. The abstract driver interfaces (`DatabaseAdapter`, `AuthAdapter`, `DataDriver`, …) are not re-exported: import them from `@rebasepro/types`.
 
-`@rebasepro/server/functions` is the portable surface a function file imports — `defineFunction`, the `requireAuth`/`requireAdmin` guards, `getUser`, `rebase` and the rest. The package also ships the `rebase-server` binary, which runs a built project bundle (`rebase-server ./dist-bundle`); it is what the `rebasepro/server` image executes.
+`@rebasepro/server/functions` is the portable surface a function file imports — `defineFunction`, the `requireAuth`/`requireAdmin`/`requireScope` guards, `getUser`, `getScopes`, `hasScope`, `rebase` and the rest. The package also ships the `rebase-server` binary, which runs a built project bundle (`rebase-server ./dist-bundle`); it is what the `rebasepro/server` image executes.
 
 ## Quick Start
 

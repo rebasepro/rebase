@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dcaffcacef692bc
+sourceHash: 9ab3b04e9fddf6d4
 title: Códigos de error
 sidebar_label: Códigos de error
 description: Todos los códigos de error que un backend de Rebase puede devolver, con su estado HTTP, qué significan y qué hacer al respecto; además del envelope de respuesta, X-Request-ID y las reglas de details.
@@ -91,9 +91,9 @@ que enviaste es el ID que obtuviste. Lee la cabecera de respuesta.
 | --- | --- | --- | --- |
 | `AAL2_REQUIRED` | 403 | La ruta necesita un segundo factor y la sesión solo tiene uno. | Completa el desafío MFA y vuelve a intentarlo. |
 | `ALREADY_VERIFIED` | 400 | La dirección o el factor ya están verificados. | Nada: el estado deseado ya se cumple. |
+| `ACCOUNT_OUTRANKS_CALLER` | 403 | La cuenta que se edita, restablece o elimina tiene un rol o un alcance que el llamante no tiene. `details.beyond` los nombra. | Haz que el cambio lo haga alguien que los tenga. |
 | `ANONYMOUS_AUTH_DISABLED` | 403 | El inicio de sesión anónimo está desactivado en este servidor. | Habilítalo o inicia sesión con una identidad real. |
-| `API_KEY_FORBIDDEN` | 403 | Se utilizó una clave de API en una ruta a la que solo pueden llamar personas. | Utiliza una sesión de usuario. |
-| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | Una clave de API intentó crear, listar o revocar claves de API. | Gestiona las claves como un administrador autenticado. |
+| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | Una clave de API intentó listar, crear, cambiar o revocar claves de API, ya sean de su mismo tipo o personales. | Gestiona las claves como una persona que tenga `keys:write`, o con la clave de servicio. |
 | `AUTH_MIDDLEWARE_MISSING` | 500 | Se ejecutó una ruta protegida sin ningún middleware de autenticación de Rebase previo, por lo que nunca se evaluó la credencial del cliente. | Monta la app a través del router de funciones en lugar de directamente sobre tu propio servidor. |
 | `BOOTSTRAP_ANONYMOUS` | 403 | Un cliente anónimo intentó el bootstrap del primer administrador. | Inicia sesión primero. |
 | `BOOTSTRAP_COMPLETED` | 403 | El primer administrador ya existe. | Haz que un administrador existente otorgue el rol. |
@@ -110,19 +110,28 @@ que enviaste es el ID que obtuviste. Lee la cabecera de respuesta.
 | `INVALID_CHALLENGE` | 400 | El desafío MFA es desconocido o ha expirado. | Inicia uno nuevo. |
 | `INVALID_CODE` | 400 / 401 | El código OTP o MFA es incorrecto: 400 en el inicio de sesión por código de correo (`/auth/otp/verify`), 401 en un registro o desafío de MFA. | Reintenta con el código actual. |
 | `INVALID_CREDENTIALS` | 401 | Correo electrónico o contraseña incorrectos (deliberadamente no se especifica cuál). | Reintenta o restablece la contraseña. |
+| `INVALID_SCOPES` | 400 | Se pidió para una clave algo que no es un alcance: mal formado, desconocido o con un destino que el alcance no admite. `details.problems` dice cuál y por qué; `details.validScopes` los enumera todos. | Usa un nombre de la lista. Consulta [Roles y alcances](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | Un token de verificación, restablecimiento o enlace mágico está malformado o es desconocido (400). Una credencial de proveedor OAuth o un refresh token que no se puede verificar es un 401. | Solicita un enlace nuevo, o vuelve a iniciar sesión. |
+| `KEY_MANAGEMENT_SCOPE` | 400 | Se pidió `keys:read` o `keys:write` para una clave. Ninguna clave puede gestionar claves. `details.scopes` los nombra. | Déjalos fuera. |
 | `LAST_ADMIN` | 403 | El cambio dejaría al proyecto sin administradores. | Promociona a otra persona primero. |
 | `MFA_REQUIRED` | 401 | La contraseña era correcta y la cuenta tiene un segundo factor verificado, por lo que el inicio de sesión está a medio completar. `details` contiene un token de corta duración con ámbito para el desafío MFA; no es una sesión. | Inicia un desafío y respóndelo; la respuesta al desafío emite la sesión. |
 | `NO_SESSION` | 401 | No se presentó ninguna cookie de sesión ni refresh token. Normal en la primera carga de una página. | Inicia sesión. |
 | `NOT_ANONYMOUS` | 400 | Se llamó a una ruta de actualización desde anónimo con una cuenta real. | Nada que actualizar. |
 | `OAUTH_ERROR` | 401 | El proveedor de OAuth lo rechazó o devolvió un error. | Reintenta el flujo; el mensaje contiene el motivo del proveedor. |
+| `PERSONAL_KEYS_DISABLED` | 403 | Las claves de API personales están desactivadas en este backend. | Establece `personalKeys: true` en el bloque `auth` de la colección de usuarios. |
+| `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | La clave de servicio o una sesión de invitado intentó usar las rutas de claves personales. Ninguna de las dos tiene una cuenta como la que pueda actuar una clave. | Inicia sesión en una cuenta, o crea una clave de servicio en `/api/admin/api-keys`. |
 | `RATE_LIMITED` | 429 | Demasiados intentos desde este cliente. | Reduce la frecuencia de peticiones; el mensaje indica durante cuánto tiempo. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | El destino de redirección no está en la lista de permitidos. | Añádelo a la configuración del proveedor. |
 | `REGISTRATION_DISABLED` | 403 | El registro de autoservicio está desactivado. | Haz que un administrador cree la cuenta. |
+| `ROLE_EXCEEDS_CALLER` | 403 | Los roles que se conceden tienen un alcance, o `admin`, que el llamante no tiene. `details.beyond` los nombra. | Haz que conceda el rol alguien que los tenga. |
+| `ROLE_EXCEEDS_CREATOR` | 403 | Se dio a una clave de servicio un rol de RLS que su creador no tiene. Solo un administrador puede dar cualquier rol. `details.roles` los nombra. | Quita el rol, o haz que un administrador cree la clave. |
 | `ROLE_EXISTS` | 409 | Ese nombre de rol ya está en uso. | Elige otro nombre. |
 | `ROLE_LOOKUP_FAILED` | 503 | No se pudieron leer los roles del llamante — en una ruta de administración, o en una solicitud de datos en un backend con `config.auth`. Falla de forma cerrada en lugar de confiar en los roles del token. | Reintenta; revisa la base de datos. |
+| `SCOPE_EXCEEDS_CREATOR` | 403 | Se pidió para una clave un alcance que su creador no tiene. Una clave nunca tiene más que la cuenta que la crea. `details.scopes` los nombra. | Quítalos, o haz que cree la clave alguien que los tenga. |
+| `SCOPE_MISSING` | 403 | La credencial no tiene el alcance que necesita esta ruta, colección, origen de almacenamiento o función. `details.requiredScope` lo nombra, destino incluido. | Para una persona, un rol que declare el alcance. Para una clave, una clave que lo tenga. Consulta [Roles y alcances](/docs/backend/roles-and-scopes/). |
 | `SELF_DELETE` | 400 | Un administrador intentó eliminar su propia cuenta. | Haz que lo haga otro administrador. |
 | `SESSION_REVOKED` | 401 | Se cerró la sesión en otro lugar, o se revocaron todas las sesiones. | Inicia sesión de nuevo. |
+| `UNKNOWN_SCOPE_TARGET` | 400 | El destino de un alcance nombra una colección, un origen de almacenamiento o una función que este backend no sirve. `details` enumera los que sí sirve. | Corrige el destino. |
 | `UNVERIFIED_IDENTITIES` | 409 | Un enlace mágico, código por correo o restablecimiento de contraseña demostró la dirección de una cuenta no verificada, y la cuenta tiene una identidad de inicio de sesión cuyo proveedor nunca verificó esa dirección. El repositorio de autenticación no puede eliminarla (no tiene `unlinkUserIdentity`), así que la prueba se rechaza en lugar de dejar esa vía de acceso en una cuenta verificada. | Implementa `unlinkUserIdentity` en el repositorio de autenticación propio, o pide a un administrador que revise la cuenta. |
 | `SETUP_REQUIRED` | 403 | El proyecto aún no tiene administrador, por lo que esta ruta no está disponible. | Completa la configuración del primer administrador. |
 | `TOKEN_ALREADY_USED` | 401 | Se reutilizó un token de un solo uso. | Solicita uno nuevo. |

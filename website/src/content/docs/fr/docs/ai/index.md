@@ -1,5 +1,5 @@
 ---
-sourceHash: ec9977f5b00dc133
+sourceHash: 289adf93a568aac7
 title: IA et agents
 sidebar_label: Aperçu
 description: Ce que Rebase fournit pour les assistants de code IA et les agents autonomes — un serveur MCP, des compétences d'agent locales au projet, des fichiers d'instructions échafaudés et le modèle d'identifiants qui détermine ce à quoi un agent peut réellement accéder.
@@ -13,7 +13,7 @@ problèmes différents. Il est utile de savoir lequel vous utilisez :
 | [**Serveur MCP**](/docs/ai/mcp) | Un serveur Model Context Protocol stdio doté de 42 outils couvrant votre schéma, vos données, vos utilisateurs, votre stockage, vos crons et votre serveur de développement | Un assistant, au moment de l'exécution |
 | [**Compétences d'agent**](/docs/ai/skills) | 21 fichiers de compétences Markdown écrits dans votre dépôt par `rebase skills install` | Un assistant, comme documentation de référence |
 | [**Fichiers d'instructions**](/docs/ai/instruction-files) | `ai-instructions.md` ainsi que des fichiers de pointeurs spécifiques à chaque assistant, générés par `rebase init` | Un assistant, comme règles permanentes |
-| [**Clés d'API**](/docs/backend/api-keys) | Identifiants machine restreints, par collection et par opération | Tout ce qui appelle l'API HTTP |
+| [**Clés d'API**](/docs/backend/api-keys) | Identifiants machine qui détiennent des [portées](/docs/backend/roles-and-scopes), par collection et par opération | Tout ce qui appelle l'API HTTP |
 
 Les trois premiers visent à fournir à un assistant des *connaissances* et des *outils*. Le
 quatrième est le seul qui détermine ce qu'il est réellement autorisé à faire.
@@ -28,24 +28,25 @@ doit résider en dessous de l'agent, dans les identifiants qu'il transporte.
 
 Rebase attribue à cet identifiant deux barrières indépendantes :
 
-1. **La liste des permissions de la clé d'API.** Déclarée par collection *et* par opération,
-   où `delete` est séparable de `write` — qui est généralement celle que vous souhaitez
-   refuser à un agent par ailleurs autorisé à modifier.
+1. **Les portées de la clé.** Déclarées par opération *et*, si vous le souhaitez, par
+   collection : `data:read:articles`, `data:write:articles`. `data:delete` est
+   séparée de `data:write` ; c'est généralement celle que vous souhaitez refuser
+   à un agent par ailleurs autorisé à modifier.
 2. **La sécurité au niveau des lignes (RLS).** Les clés d'API ne contournent pas la RLS. Une
    clé se connecte sous le rôle Postgres `rebase_user` comme n'importe quel autre appelant,
    de sorte que vos politiques déterminent toujours quelles lignes sont renvoyées.
 
 Les deux doivent autoriser une requête. L'une ne remplace pas l'autre, et la seconde
-est la raison pour laquelle une clé avec des permissions `"*"` peut toujours renvoyer
-un ensemble de résultats vide.
+est la raison pour laquelle une clé qui détient `data:read` sur toutes les collections peut
+toujours renvoyer un ensemble de résultats vide.
 
 Un piège classique : `access: "public"` sur une collection élargit **les lignes qu'un appelant
 peut voir**, et non **qui peut appeler**. C'est une déclaration sur la visibilité des lignes,
-pas sur l'authentification. L'accorder n'ajoute pas un appelant à la liste des permissions,
-et le refuser n'en bloque aucun.
+pas sur l'authentification. L'accorder ne donne aucune portée à une clé,
+et le refuser n'en bloque aucune.
 
-Le fonctionnement détaillé — création de clés, JSON des permissions, rotation, expiration, limites
-de débit — est couvert dans [API REST → Clés d'API](/docs/backend/api-keys).
+Le fonctionnement détaillé — création de clés, choix des portées, rotation, expiration, limites
+de débit — est couvert dans [Clés d'API](/docs/backend/api-keys).
 Ne sautez pas [Règles de sécurité (RLS)](/docs/collections/security-rules) au passage ;
 la deuxième barrière n'est efficace que si les politiques que vous avez écrites le sont.
 

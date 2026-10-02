@@ -1,5 +1,5 @@
 ---
-sourceHash: 82e083381f34098d
+sourceHash: 494cc48e060fb2f1
 title: API REST
 sidebar_label: API REST
 description: Endpoints de la API REST autogenerados para cada colección, con filtrado, ordenación, paginación e inclusión de relaciones.
@@ -453,7 +453,7 @@ Cada hook se espera, y un error en cualquiera de ellos deshace toda la escritura
 | `GET` | `/api/docs` | ninguna | La especificación JSON de OpenAPI 3.0 |
 | `GET` | `/api/swagger` | ninguna | Swagger UI. Activado en desarrollo, desactivado en producción; `REBASE_ENABLE_SWAGGER` lo anula en cualquier sentido |
 | `GET` | `/api/meta/schema-version` | ninguna | El hash del esquema a partir del cual se construyó este backend: deliberadamente sin autenticación, y solo devuelve ese hash |
-| `GET` | `/api/meta/contract` | admin, service key o admin API key | El contrato completo de las colecciones, para `rebase generate-sdk --from`. Cierre por fallo (fail-closed): `404` cuando no hay autenticación configurada |
+| `GET` | `/api/meta/contract` | `schema:read`: un administrador, la service key o una clave de API que lo tenga | El contrato completo de las colecciones, para `rebase generate-sdk --from`. Cierre por fallo (fail-closed): `404` cuando no hay autenticación configurada |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` cuando esté configurado | Métricas de Prometheus, cuando `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
@@ -470,7 +470,7 @@ El esquema completo de colecciones del proyecto (cada colección, propiedad y re
 GET /api/meta/contract
 ```
 
-Es **solo para administradores**, y en un despliegue sin autenticación configurada no se sirve en absoluto (404 `CONTRACT_UNAVAILABLE`) para evitar exponer el esquema a cualquiera. Su endpoint hermano devuelve una cadena de versión que representa el esquema sin describirlo, y es deliberadamente accesible sin credenciales, que es lo que consulta un proceso de CI:
+Necesita el alcance **`schema:read`**, que tiene un administrador, y en un despliegue sin autenticación configurada no se sirve en absoluto (404 `CONTRACT_UNAVAILABLE`) para evitar exponer el esquema a cualquiera. Su endpoint hermano devuelve una cadena de versión que representa el esquema sin describirlo, y es deliberadamente accesible sin credenciales, que es lo que consulta un proceso de CI:
 
 ```bash
 GET /api/meta/schema-version

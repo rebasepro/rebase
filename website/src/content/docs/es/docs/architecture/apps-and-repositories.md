@@ -1,5 +1,5 @@
 ---
-sourceHash: 5db546fe110a140a
+sourceHash: 2b5f4b5b83a711a3
 title: Apps y repositorios
 sidebar_label: Apps y repositorios
 description: Un proyecto es un backend más las apps que se comunican con él, cada una de las cuales puede residir en su propio repositorio.
@@ -318,7 +318,7 @@ La CLI obtiene `/api/meta/contract`, reconstruye las definiciones de las colecci
 clave foránea es una cadena de texto o un número— y emite exactamente la misma salida que habría
 producido a partir del código fuente local.
 
-El endpoint del contrato es solo para administradores. Las definiciones de colección describen cada tabla,
+El endpoint del contrato necesita el alcance `schema:read`, que tiene un administrador. Las definiciones de colección describen cada tabla,
 columna y relación en el proyecto, incluidas aquellas que ninguna regla de seguridad expondría
 jamás; eso es un mapa de la base de datos, no documentación pública de la API.
 

@@ -244,6 +244,18 @@ function socketAddress(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string | u
  * resort only, and it is a single shared bucket by design: better that
  * anonymous callers throttle each other than that any of them throttles nobody.
  */
+/**
+ * Where a request comes from, as the rate limiters judge it: the socket's own
+ * address, or — only behind as many proxies as `TRUSTED_PROXY_HOPS` declares —
+ * the address they report. What a session row records as its IP, so the
+ * sessions list shows the same address the limiter counted, rather than the
+ * raw `X-Forwarded-For` (whose leftmost entry the caller chooses) or
+ * `"unknown"` for every direct connection.
+ */
+export function requestClientAddress(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string {
+    return defaultKeyGenerator(c);
+}
+
 function defaultKeyGenerator(
     c: Parameters<MiddlewareHandler<HonoEnv>>[0],
     trustedProxyHops: number = resolveTrustedProxyHops()

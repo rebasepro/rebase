@@ -107,16 +107,16 @@ After initialization, these routes are mounted:
 | Path | Purpose |
 |------|---------|
 | `/api/auth/*` | Authentication (signup, login, refresh, OAuth, magic links, one-time codes, MFA) |
-| `/api/admin/*` | User and role management (admin-only) |
+| `/api/admin/*` | Users, roles, service keys, cron, backups, logs and schema, each behind its own [scope](/docs/backend/roles-and-scopes/) |
 | `/api/storage/*` | File upload, download, and deletion |
 | `/api/data/:slug` | CRUD operations per collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
 | `/api/docs` | OpenAPI spec (when `enableSwagger: true`) |
 | `/api/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
-| `/api/meta/contract` | The project's collection schema (admin-only) |
+| `/api/meta/contract` | The project's collection schema (needs `schema:read`) |
 | `/api/meta/schema-version` | A version string for that schema (unauthenticated) |
 | `/api/functions/*` | Custom function routes (when `functionsDir` is set) |
-| `/api/cron/*` | Cron job management (admin-only, when `cronsDir` is set) |
+| `/api/cron/*` | Cron job management (`cron:read` / `cron:write`, when `cronsDir` is set) |
 | WebSocket on upgrade | Real-time subscriptions |
 
 ---
@@ -264,7 +264,6 @@ instance.driver              // Default data driver
 instance.driverRegistry      // All drivers (for multi-database)
 instance.realtimeService     // Default realtime service
 instance.auth?.userService       // User management
-instance.auth?.roleService       // Role management
 instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata

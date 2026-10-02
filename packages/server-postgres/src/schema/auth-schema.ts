@@ -47,6 +47,8 @@ export function createAuthSchema(usersSchemaName = "rebase") {
          * `refresh_tokens.session_started_at`, which rotation carries forward.
          */
         tokensValidAfter: timestamp("tokens_valid_after"),
+        /** When an administrator switched the account off; NULL while it is on. */
+        disabledAt: timestamp("disabled_at", { withTimezone: true }),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
     });

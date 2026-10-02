@@ -4,7 +4,6 @@ import type {
     MfaChallengeInfo,
     MfaFactor,
     RefreshTokenInfo,
-    RoleData,
     UserData,
     UserIdentityData
 } from "../../src/auth/interfaces";
@@ -48,22 +47,13 @@ export class MemoryAuthStore {
     readonly resetTokens = new Map<string, StoredSingleUseToken>();
     readonly validAfter = new Map<string, Date>();
     factors: StoredFactor[] = [];
+    recoveryCodes: { uid: string; codeHash: string; used: boolean }[] = [];
     readonly challenges = new Map<string, MfaChallengeInfo>();
 
     constructor(private readonly options: MemoryAuthStoreOptions = {}) {}
 
     private snapshot(user: UserData): UserData {
         return { ...user };
-    }
-
-    private roleData(uid: string): RoleData[] {
-        return (this.roles.get(uid) ?? []).map(id => ({
-            id,
-            name: id,
-            isAdmin: id === "admin",
-            defaultPermissions: null,
-            collectionPermissions: null
-        }));
     }
 
     private findUserByEmail(email: string): UserData | undefined {
@@ -133,7 +123,11 @@ export class MemoryAuthStore {
                 return this.snapshot(user);
             },
             deleteUser: async (id) => {
+                // Everything that lives on the user row goes with it, as it
+                // does in Postgres: the roles and the revocation watermark.
                 this.users.delete(id);
+                this.roles.delete(id);
+                this.validAfter.delete(id);
                 this.identities = this.identities.filter(i => i.uid !== id);
             },
             listUsers: async () => [...this.users.values()].map(u => this.snapshot(u)),
@@ -149,12 +143,26 @@ export class MemoryAuthStore {
             },
             setEmailVerified: async (id, verified) => {
                 const user = this.users.get(id);
-                if (user) user.emailVerified = verified;
+                if (!user) return;
+                user.emailVerified = verified;
+                // As Postgres does: verifying spends the outstanding link.
+                user.emailVerificationToken = null;
             },
-            setVerificationToken: async () => undefined,
-            getUserByVerificationToken: async () => null,
-            getUserRoles: async (uid) => this.roleData(uid),
+            setVerificationToken: async (id, token) => {
+                const user = this.users.get(id);
+                if (!user) return;
+                user.emailVerificationToken = token;
+                user.emailVerificationSentAt = token ? new Date() : null;
+            },
+            getUserByVerificationToken: async (token) => {
+                const user = [...this.users.values()].find(u => u.emailVerificationToken === token);
+                return user ? this.snapshot(user) : null;
+            },
             getUserRoleIds: async (uid) => [...(this.roles.get(uid) ?? [])],
+            setUserDisabled: async (uid, disabled) => {
+                const user = this.users.get(uid);
+                if (user) user.disabled = disabled;
+            },
             setUserRoles: async (uid, roleIds) => {
                 this.roles.set(uid, [...roleIds]);
             },
@@ -164,7 +172,7 @@ export class MemoryAuthStore {
             },
             getUserWithRoles: async (uid) => {
                 const user = this.users.get(uid);
-                return user ? { user: this.snapshot(user), roles: this.roleData(uid) } : null;
+                return user ? { user: this.snapshot(user), roles: [...(this.roles.get(uid) ?? [])] } : null;
             },
 
             // ── refresh tokens and the revocation mark ──
@@ -190,6 +198,18 @@ export class MemoryAuthStore {
                 }
             },
             pruneRefreshTokens: async () => undefined,
+            getAccountAccessState: async (uid, sessionId) => {
+                const user = this.users.get(uid);
+                if (!user) return null;
+                return {
+                    ...(user.disabled ? { disabled: true } : {}),
+                    roles: [...(this.roles.get(uid) ?? [])],
+                    tokensValidAfter: this.validAfter.get(uid) ?? null,
+                    ...(sessionId
+                        ? { sessionActive: this.refreshTokens.some(r => r.uid === uid && r.sessionId === sessionId && !r.revoked) }
+                        : {})
+                };
+            },
             getTokensValidAfter: async (uid) => this.validAfter.get(uid) ?? null,
             setTokensValidAfter: async (uid, at) => {
                 this.validAfter.set(uid, at);
@@ -285,10 +305,21 @@ export class MemoryAuthStore {
                 challenge.attempts = (challenge.attempts ?? 0) + 1;
                 return challenge.attempts;
             },
-            createRecoveryCodes: async () => undefined,
-            useRecoveryCode: async () => false,
-            getUnusedRecoveryCodeCount: async () => 0,
-            deleteAllRecoveryCodes: async () => undefined
+            // Replaces the account's codes, as the Postgres repository does.
+            createRecoveryCodes: async (uid, codeHashes) => {
+                this.recoveryCodes = this.recoveryCodes.filter(c => c.uid !== uid)
+                    .concat(codeHashes.map(codeHash => ({ uid, codeHash, used: false })));
+            },
+            useRecoveryCode: async (uid, codeHash) => {
+                const code = this.recoveryCodes.find(c => c.uid === uid && c.codeHash === codeHash && !c.used);
+                if (!code) return false;
+                code.used = true;
+                return true;
+            },
+            getUnusedRecoveryCodeCount: async (uid) => this.recoveryCodes.filter(c => c.uid === uid && !c.used).length,
+            deleteAllRecoveryCodes: async (uid) => {
+                this.recoveryCodes = this.recoveryCodes.filter(c => c.uid !== uid);
+            }
         };
         if (this.options.unlinkIdentities !== false) {
             repo.unlinkUserIdentity = async (uid, provider, providerId) => {

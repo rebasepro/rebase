@@ -1,5 +1,5 @@
 ---
-sourceHash: 925edb3f8c355de4
+sourceHash: 094f9184d2977cef
 title: Visão Geral do Backend
 sidebar_label: Backend
 description: O backend do Rebase fornece um servidor completo com API REST, autenticação, armazenamento, tempo real com WebSocket e histórico de entidades — tudo inicializado com uma única chamada de função.
@@ -108,16 +108,16 @@ Após a inicialização, estas rotas são montadas:
 | Rota | Propósito |
 |------|-----------|
 | `/api/auth/*` | Autenticação (cadastro, login, refresh, OAuth, magic links, códigos de uso único, MFA) |
-| `/api/admin/*` | Gerenciamento de usuários e papéis (apenas admin) |
+| `/api/admin/*` | Usuários, papéis, chaves de serviço, cron, backups, logs e esquema, cada um protegido pelo seu próprio [escopo](/docs/backend/roles-and-scopes/) |
 | `/api/storage/*` | Upload, download e exclusão de arquivos |
 | `/api/data/:slug` | Operações CRUD por coleção (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Histórico de alterações da entidade (quando ativado) |
 | `/api/docs` | Especificação OpenAPI (quando `enableSwagger: true`) |
 | `/api/swagger` | Swagger UI (modo dev, quando `enableSwagger: true`) |
-| `/api/meta/contract` | O esquema de coleções do projeto (apenas admin) |
+| `/api/meta/contract` | O esquema de coleções do projeto (requer `schema:read`) |
 | `/api/meta/schema-version` | Uma string de versão para esse esquema (não autenticado) |
 | `/api/functions/*` | Rotas de funções personalizadas (quando `functionsDir` está definido) |
-| `/api/cron/*` | Gerenciamento de tarefas cron (apenas admin, quando `cronsDir` está definido) |
+| `/api/cron/*` | Gerenciamento de tarefas cron (`cron:read` / `cron:write`, quando `cronsDir` está definido) |
 | WebSocket no upgrade | Inscrições em tempo real |
 
 ---
@@ -265,7 +265,6 @@ instance.driver              // Default data driver
 instance.driverRegistry      // All drivers (for multi-database)
 instance.realtimeService     // Default realtime service
 instance.auth?.userService       // User management
-instance.auth?.roleService       // Role management
 instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata
