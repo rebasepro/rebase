@@ -1052,6 +1052,52 @@ displayName: user.displayName });
                     });
                 }
 
+                // A guest that links a provider is becoming an account — the
+                // same step `/anonymous/link` takes with a password — so it
+                // answers to registration's controls and comes out of it an
+                // account: not a guest, with the provider's address when the
+                // provider vouches for it, and a session that says so. Linked
+                // and left a guest, every later sign-in with that provider
+                // returned the guest, and `rebase.is_anonymous()` kept refusing it.
+                const linking = await authRepo.getUserById(userCtx.uid);
+                if (linking?.isAnonymous) {
+                    if (!isRegistrationAllowed()) {
+                        throw ApiError.forbidden("A guest cannot become an account here: registration is disabled on this backend.", "REGISTRATION_DISABLED");
+                    }
+                    const vouchedEmail = externalUser.emailVerified === true ? normalizeEmail(externalUser.email) : undefined;
+                    if (vouchedEmail && await authRepo.getUserByEmail(vouchedEmail)) {
+                        throw ApiError.conflict(
+                            `An account with this ${provider.id} address already exists. Sign in to it instead.`,
+                            "EMAIL_EXISTS"
+                        );
+                    }
+                    let upgrade: CreateUserData = {
+                        email: vouchedEmail ?? linking.email,
+                        ...(vouchedEmail ? { emailVerified: true } : {})
+                    };
+                    if (ops.beforeUserCreate) upgrade = await ops.beforeUserCreate(upgrade);
+                    await authRepo.linkUserIdentity(userCtx.uid, provider.id, externalUser.providerId, identityProfileData(externalUser));
+                    const upgraded = await authRepo.updateUser(userCtx.uid, {
+                        email: normalizeEmail(upgrade.email),
+                        ...(upgrade.emailVerified !== undefined ? { emailVerified: upgrade.emailVerified } : {}),
+                        isAnonymous: false
+                    });
+                    if (!upgraded) throw ApiError.notFound("User not found");
+                    const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
+                        upgraded.id,
+                        c.req.header("user-agent") || "unknown",
+                        requestClientAddress(c)
+                    );
+                    const authResponse = buildAuthResponse(upgraded, roleIds, accessToken, refreshToken, provider.id);
+                    return c.json({
+                        ...redactRefreshToken(authResponse, c, refreshToken, config.cookieAuth),
+                        success: true,
+                        provider: provider.id,
+                        alreadyLinked: false,
+                        photoURL: externalUser.photoUrl ?? null
+                    });
+                }
+
                 await authRepo.linkUserIdentity(
                     userCtx.uid,
                     provider.id,

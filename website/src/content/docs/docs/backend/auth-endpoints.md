@@ -16,7 +16,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/login` | Login with email/password |
 | `POST` | `/api/auth/refresh` | Refresh the access token |
 | `POST` | `/api/auth/<provider>` | OAuth sign-in (e.g., `/api/auth/google`, `/api/auth/linkedin`) |
-| `POST` | `/api/auth/link/<provider>` | Link an OAuth provider to the authenticated account |
+| `POST` | `/api/auth/link/<provider>` | Link an OAuth provider to the authenticated account. On a guest this is registration: it needs `allowRegistration`, takes the provider's address when the provider vouches for it, and answers with a session for the account the guest became |
 | `POST` | `/api/auth/logout` | Revoke refresh token |
 | `POST` | `/api/auth/forgot-password` | Send password reset email |
 | `POST` | `/api/auth/reset-password` | Reset password with token |
