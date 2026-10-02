@@ -128,9 +128,10 @@ export const relations = {  };
 
 Three things in there are worth reading twice. The `id` column you did not
 declare: every collection gets a `text` primary key unless a property claims
-`isId`, and the database fills it with a uuid (`gen_random_uuid()::text`), so a
+`isId`, and <span class="since-badge" data-since="0.24">Since 0.24</span> the database fills it with a uuid (`gen_random_uuid()::text`), so a
 row created from the admin panel, the REST API or the SDK needs no key of its
-own. A key you do send is used as given. The `pgPolicy` block: row level security is enabled on every table, and
+own. A key you do send is used as given. On 0.23 the column has no default, and
+a create that sends no key fails. The `pgPolicy` block: row level security is enabled on every table, and
 those baseline policies are what keep the trusted server context and the `admin`
 role able to read it at all — see
 [Security Rules](/docs/collections/security-rules). And `active`, which carries

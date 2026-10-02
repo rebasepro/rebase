@@ -17,7 +17,7 @@ There is no separate admin service: the admin panel is part of a frontend, so wh
 |--------------|----------------|-------------------|
 | Default scaffold (`rebase init`) | The admin panel | `/` — the frontend **is** the admin |
 | Custom product frontend | Your app | Wherever you mount it, commonly `/admin` — see [Changing the Base URL](#changing-the-base-url) |
-| Admin as an app on its own hostname | Your app | `https://admin.example.com/`, served by the same server — see [Changing the Base URL](#changing-the-base-url) |
+| Admin as an app on its own hostname | Your app | <span class="since-badge" data-since="0.24">Since 0.24</span> `https://admin.example.com/`, served by the same server — see [Changing the Base URL](#changing-the-base-url) |
 | Backend-only project | Nothing (API only) | Not deployed |
 
 :::note[First visit]

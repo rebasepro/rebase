@@ -77,7 +77,7 @@ rebase schema introspect
 
 This is useful when adopting Rebase on an existing database — introspect first, then customize the generated collections.
 
-**Introspect, then push, changes nothing.** The generated properties say exactly what each column is — `columnType`, `precision`/`scale`, `defaultValue`, `required`, a key's `isId` (`"increment"` for an integer identity, `columnType: "serial"` for a serial, `"manual"` for a key with no default), a relation's `onDelete`, and a collection's `search` block read back from the column it built — so `rebase db push --dry-run` right after an introspection plans no changes. Where no property can state a column — a `timestamp` without time zone, an `interval`, an `inet`, an enum type not named `<table>_<column>`, a default like `CURRENT_DATE` — introspection says so, per column, on the terminal and at the top of the file, with what a push would do to it and, when there is one, the statement that makes the two agree (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). A table keyed on more than one column is left out with its reason: a collection reads a row by one key column, and `db push` leaves a table that is not a collection alone.
+<span class="since-badge" data-since="0.24">Since 0.24</span> **Introspect, then push, changes nothing.** The generated properties say exactly what each column is — `columnType`, `precision`/`scale`, `defaultValue`, `required`, a key's `isId` (`"increment"` for an integer identity, `columnType: "serial"` for a serial, `"manual"` for a key with no default), a relation's `onDelete`, and a collection's `search` block read back from the column it built — so `rebase db push --dry-run` right after an introspection plans no changes. Where no property can state a column — a `timestamp` without time zone, an `interval`, an `inet`, an enum type not named `<table>_<column>`, a default like `CURRENT_DATE` — introspection says so, per column, on the terminal and at the top of the file, with what a push would do to it and, when there is one, the statement that makes the two agree (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). A table keyed on more than one column is left out with its reason: a collection reads a row by one key column, and `db push` leaves a table that is not a collection alone. On 0.23 the push right after an introspection can still plan type changes, dropped defaults and NOT NULLs, and a phantom `id` key.
 
 **What the generated files look like**
 
@@ -241,6 +241,11 @@ rebase generate-sdk
 `rebase dev` runs this for you on start and on every save under
 `config/collections/`. Run it yourself in CI, in a repository that has no
 collections (see `--from` below), or anywhere `rebase dev` is not running.
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> for reading every file, stopping on a broken one, `rebase dev` running it
+and `--collections` on this command. On 0.23 it reads the files the `index.ts`
+barrel lists, skips one that does not load with a warning, and takes the
+directory as `--collections-dir`; `rebase dev` regenerates the schema only.
 
 **Options:**
 

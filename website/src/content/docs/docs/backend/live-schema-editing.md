@@ -25,7 +25,7 @@ Applying also needs one thing more than the scope — see [Who may apply](#who-m
 ## Plan before you apply
 
 `/plan` has no side effects. Post the change, and it tells you what the change
-means. A change to an existing collection is a `patch` — what changed, as
+means. <span class="since-badge" data-since="0.24">Since 0.24</span> A change to an existing collection is a `patch` — what changed, as
 operations on paths of keys — and a new collection is the whole `collection`:
 
 ```json
@@ -43,7 +43,8 @@ elsewhere. A patch that reaches *into* something defined in code
 the expression it hit, so the change is made where that code lives. A whole
 `collection` posted for a collection that exists is turned into the patch of
 what differs from it, and a key whose value is code is never removed that way.
-The admin panel sends patches.
+The admin panel sends patches. On 0.23 `/plan` and `/apply` take only the whole
+`collection` as it should end up.
 
 `$ADMIN_TOKEN` is an access token — the `accessToken` a sign-in returns — for an
 account holding `schema:read`: an admin, or a role that declares it. Nothing on
@@ -137,7 +138,7 @@ refused too. Each refusal names the change and what to do instead.
 The verdict is read from the schema each side produces — the same plan
 `schema.generated.ts` and `db push` are rendered from — so an edit that changes
 the database cannot be reported as no change. Two edits that look like changes
-and are not refused:
+and are not refused (<span class="since-badge" data-since="0.24">Since 0.24</span>; 0.23 reports both as needing a migration):
 
 - **Renaming a property's key while keeping its column** (`columnName` set to
   the old column) moves no data. It is `safe`; API clients read the new name.
@@ -148,7 +149,7 @@ and are not refused:
 
 A refused change can still be written to your collection source and committed,
 leaving the database as it is — removing a property you no longer serve is the
-usual case. Post `/apply` with `"sourceOnly": true`. Nothing runs; the commit
+usual case. <span class="since-badge" data-since="0.24">Since 0.24</span> Post `/apply` with `"sourceOnly": true`. Nothing runs; the commit
 message names what the database keeps, for example
 `chore(schema): remove sku from products (source only — column products.sku kept)`,
 and each change in the plan carries a `sourceOnly` sentence saying what it
@@ -162,6 +163,9 @@ Deleting a collection from the admin panel takes the same path: `/apply` with
 entry in `index.ts` and commits both; the table and its rows stay. It is
 refused while another collection imports the file (a relation to it), naming
 the importer — deleting it would stop every collection from loading.
+
+On 0.23 `/apply` takes neither `sourceOnly` nor `remove`, and the panel's "Edit
+source only" writes the file without a commit.
 
 ## What gets committed
 
@@ -178,8 +182,10 @@ repository, the paths are prefixed with it, found by walking up from your
 collections directory to the nearest `rebase.json`. A project with no
 `rebase.json` keeps the plain paths.
 
-No SQL goes in the commit. `rebase db push` and `rebase db generate` write theirs
+<span class="since-badge" data-since="0.24">Since 0.24</span> No SQL goes in the commit. `rebase db push` and `rebase db generate` write theirs
 from the collections on every run, into `.rebase/sql/`, which is gitignored.
+On 0.23 the commit also carries `drizzle/schema.sql`, `drizzle/policies.sql` and
+`drizzle/search.sql`, written at the project root.
 
 The commit message describes the change rather than announcing one, and is
 attributed to the person who made it. A schema change with an author and a diff
@@ -188,7 +194,7 @@ their table edits are invisible to your repository.
 
 ## Who may apply
 
-Holding `schema:read` is enough to **plan**. Planning has no side effects, and a
+<span class="since-badge" data-since="0.24">Since 0.24</span> Holding `schema:read` is enough to **plan**. Planning has no side effects, and a
 CI job asking whether a proposed collection change is applicable is a good use of
 it.
 
@@ -204,6 +210,9 @@ carries an author:
 A credential is not an author. `api-key:7c3f…` in your CI environment is not
 somebody, and letting it write to your repository produces exactly the
 unattributable history this feature exists to replace.
+
+On 0.23 the line is the `admin` role: an admin plans and applies, and any API
+key may plan.
 
 If an automated schema change is what you want — a migration pipeline, say —
 turn it on deliberately:

@@ -37,12 +37,18 @@ console.log(user.uid, user.email);
 ### Sign Up
 
 ```typescript
-const { user } = await client.auth.signUp(
+const { user, confirmationRequired } = await client.auth.signUp(
     "user@example.com",
     "password",
     "Jane Doe"   // optional displayName
 );
 ```
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> With [`requireEmailVerification`](/docs/backend/email-verification/) on,
+there is no session until the address is confirmed: `confirmationRequired` is
+`true` and `user` is `null`, so tell the person to open the mail. Otherwise
+`confirmationRequired` is `false` and `user` is the signed-in account. On 0.23
+`signUp` resolves `{ user, accessToken, refreshToken }` and always signs in.
 
 ## OAuth Providers
 
@@ -215,7 +221,7 @@ if (recoveryCodes) showRecoveryCodes(recoveryCodes);
 ```
 
 **Show the recovery codes once and never again.** Only their hashes are stored,
-so nothing can display them later. They come with the account's first factor.
+so nothing can display them later. <span class="since-badge" data-since="0.24">Since 0.24</span> They come with the account's first factor.
 Adding another factor keeps the codes the account already has, and
 `recoveryCodes` is `null`. Starting an enrolment and abandoning it never touches
 them.
@@ -230,7 +236,9 @@ const { recoveryCodes } = await client.auth.mfa.regenerateRecoveryCodes();
 Someone who lost both the authenticator and the codes is let back in by an
 administrator: `client.admin.resetMfa(uid)` (`DELETE /api/admin/users/:uid/mfa`,
 `users:write`) removes the account's factors and codes and ends its sessions,
-so the password signs in again without a second factor.
+so the password signs in again without a second factor. On 0.23 every enrolment
+returns a new set of codes that replaces the old one, and neither
+`regenerateRecoveryCodes()` nor `resetMfa` exists.
 
 The factor is not usable until the user proves their authenticator produced a
 code from that secret:

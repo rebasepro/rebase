@@ -242,14 +242,15 @@ narrower subscriptions (a page, a filter on the user's own rows) or a
 [broadcast channel](#broadcast-channels) carrying the change for clients to
 re-fetch on their own schedule.
 
-**One socket may hold at most 1,000 subscriptions.** The next is refused with
+<span class="since-badge" data-since="0.24">Since 0.24</span> **One socket may hold at most 1,000 subscriptions.** The next is refused with
 an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the
 socket already holds replaces that subscription and does not count again. The
 SDK shares identical subscriptions on a socket, so this counts the distinct
 lists and records a page has open. Change it with
 `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket`
 on the Postgres adapter (the environment variable wins); a value that is not a
-positive whole number stops the server at boot.
+positive whole number stops the server at boot. On 0.23 a socket's subscriptions
+are not limited.
 
 A subscription id is the socket's own: two clients that both name a
 subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the
@@ -416,7 +417,9 @@ The typed SDK automatically reconnects when the WebSocket connection drops:
 - **Automatic resubscription** — On successful reconnect, all active subscriptions are re-registered with the server, and each one's next `onUpdate` carries whatever was written while the client was away. That update is the recovery signal. No manual intervention needed.
 - **Requests are at-most-once** — A request made while the socket is down waits for it, for up to 30 seconds from the call, and then fails with `REQUEST_TIMEOUT` without ever being sent. A request that was already sent when the connection dropped fails with `CONNECTION_LOST` and is **not** sent again: the server may or may not have run it, and only the caller knows whether running it twice is safe.
 
-`client.ws.state` says where the connection is, and `onStateChange` is told every change:
+<span class="since-badge" data-since="0.24">Since 0.24</span> `client.ws.state` says where the connection is, and `onStateChange` is told every
+change. On 0.23 neither exists, the client stops after 5 failed attempts, and
+messages sent while disconnected are queued and sent after reconnecting:
 
 | State | Meaning |
 |---|---|

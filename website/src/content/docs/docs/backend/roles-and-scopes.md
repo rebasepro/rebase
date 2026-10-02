@@ -265,7 +265,7 @@ and the database's policies for the identity it acts as are another.
 
 ## When a scope is missing
 
-The answer is `403 SCOPE_MISSING`, and `details.requiredScope` names the scope,
+<span class="since-badge" data-since="0.24">Since 0.24</span> The answer is `403 SCOPE_MISSING`, and `details.requiredScope` names the scope,
 with its target when there is one:
 
 ```json

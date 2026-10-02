@@ -468,7 +468,7 @@ a bare `count()` as `count`. Letting you name them would mean checking the name
 is not also a `groupBy` field — a rule nobody would guess, and a silently
 overwritten value if it went unchecked.
 
-Groups are paged like a listing's rows: `limit` bounds them and `offset` skips
+<span class="since-badge" data-since="0.24">Since 0.24</span> Groups are paged like a listing's rows: `limit` bounds them and `offset` skips
 them (grouping by a high-cardinality column is a whole table's worth of rows in
 one response). A grouped aggregate with no `limit` gets the listing default —
 **50 groups** over HTTP — so read `meta` on the result before trusting it to be
@@ -487,7 +487,9 @@ The result is still an array of rows; `meta` is a non-enumerable property on
 it, so a spread or a `JSON.stringify` sees only the rows. It is there whenever
 the groups were cut at a `limit`. Without a `groupBy` there is one row, `limit`
 does nothing and `offset` is refused. In a server function (`rebase.data`,
-`context.data`) a grouped aggregate with no `limit` returns every group.
+`context.data`) a grouped aggregate with no `limit` returns every group. On 0.23
+there is no `meta` and no `offset`, so a list of groups cut at the limit looks
+complete.
 `include` is not sent with an aggregate: it has no relations to load. The SDK
 does not yet sort groups; over HTTP they can be sorted too — see
 [Aggregates and search](/docs/sdk/aggregates-and-search/).

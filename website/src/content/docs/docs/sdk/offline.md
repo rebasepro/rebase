@@ -146,7 +146,7 @@ const client = createRebaseClient({
 });
 ```
 
-The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A discarded write was never sent, and is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused.
+The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A discarded write was never sent. <span class="since-badge" data-since="0.24">Since 0.24</span> It is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused. On 0.23 it carries the refused write's own error instead.
 
 Consecutive edits to one row while offline are merged into a single queued write, so a form being typed into does not grow the queue. If the server refuses the merged write over its contents (a 400, 403 or 422 — say, a field removed by a schema change while the user was offline), the engine splits it back into the separate edits and replays each one. Only the edit the server refuses is rolled back and reported; the others are kept.
 
