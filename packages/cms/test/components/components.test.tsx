@@ -11,14 +11,15 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 jest.mock("@rebasepro/app", () => ({
     useRebaseRegistry: jest.fn(),
     useAuthController: jest.fn(),
-    readEmailLinkAction: (location: { pathname: string; search: string }) => {
+    // One stub for both kinds of test: it reads the link from the URL as the
+    // real one does, and a test can still override a single answer.
+    readEmailLinkAction: jest.fn((location: { pathname: string; search: string }) => {
         const token = new URLSearchParams(location.search).get("token");
         const kind = location.pathname.split("/").pop();
         return token && kind ? { kind, token } : null;
-    },
+    }),
     useTranslation: () => ({ t: (key: string) => key === "copy" ? "Copy" : key }),
-    LoginView: ({ authController }: any) => <div data-testid="login-view">Login View</div>,
-    readEmailLinkAction: jest.fn(() => null)
+    LoginView: ({ authController }: any) => <div data-testid="login-view">Login View</div>
 }));
 
 // Mock some of @rebasepro/ui components that require theme context or specific providers
