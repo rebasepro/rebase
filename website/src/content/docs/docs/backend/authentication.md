@@ -489,6 +489,15 @@ On first startup, Rebase automatically provisions the `auth` schema and the foll
 - **`rebase.recovery_codes`** — Hashed multi-factor backup/recovery codes.
 - **`rebase.app_config`** — Key-value store for system configurations.
 
+Tokens that expire — reset links, magic links and email codes, refresh tokens,
+MFA challenges — are deleted once an hour after they expire. The sweep runs on
+the process that owns the timers (the `worker` role in a split deployment) and
+on one instance of the fleet: each hour is claimed in `rebase.cron_claims`
+under the job id `rebase:auth:expired-tokens`, as a cron slot is. With
+`cronPersistence: false` there is no claims table, and every such instance
+sweeps. An expired token is refused when presented whether or not the sweep has
+run; the sweep only keeps the tables from growing.
+
 ## First User Bootstrap
 
 When no users exist in the database and the server is **not** running with `NODE_ENV=production`, the first person to register automatically becomes an admin. After that, registration is controlled by the `allowRegistration` setting.

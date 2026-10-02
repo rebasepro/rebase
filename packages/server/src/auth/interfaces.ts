@@ -515,7 +515,11 @@ export interface TokenRepository {
     deleteAllPasswordResetTokensForUser(uid: string): Promise<void>;
 
     /**
-     * Clean up expired tokens
+     * Delete every token past its expiry: reset links, magic links and email
+     * codes, refresh tokens, and whatever else the repository keeps that
+     * expires. A token is refused when presented whether or not this has run,
+     * so it is housekeeping, not revocation. The server calls it once an hour
+     * on one instance of the fleet (`startExpiredTokenSweep`).
      */
     deleteExpiredTokens(): Promise<void>;
 

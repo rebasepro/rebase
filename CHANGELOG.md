@@ -297,6 +297,13 @@
 
 #### Auth
 
+- **Expired auth tokens are deleted.** `deleteExpiredTokens` had no caller,
+  so every expired reset link, magic link, email code, abandoned refresh token
+  and MFA challenge stayed in the database. The server now sweeps them once an
+  hour, on the process that owns the timers and on one instance of the fleet:
+  the hour is claimed in `rebase.cron_claims` as `rebase:auth:expired-tokens`.
+  The Postgres repository's sweep now covers magic links, email codes,
+  refresh tokens and MFA challenges as well as reset links.
 - **`providerId` keeps saying how the session was signed in after a refresh.**
   `/auth/refresh` and `/auth/me` answered `password` for every session, so a
   Google user read `google` at sign-in and `password` an hour later, and a

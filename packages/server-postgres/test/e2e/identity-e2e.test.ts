@@ -36,6 +36,8 @@ import { ensureAppRole, REBASE_USER_ROLE } from "../../src/security/rls-enforcem
 // checkout's build. See bootstrap-e2e.test.ts.
 import { createBuiltinAuthAdapter } from "../../../server/src/auth/builtin-auth-adapter.js";
 import { configureJwt, generateAccessToken } from "../../../server/src/auth/jwt.js";
+import { createExpiredTokenSweep } from "../../../server/src/auth/expired-token-sweep.js";
+import { createCronStore } from "../../../server/src/cron/cron-store.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
 import { oauthCodeFlowSchema } from "../../../server/src/auth/oauth-code-flow.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
@@ -67,6 +69,7 @@ describe("identity after the account changes (E2E)", () => {
     let repo: PostgresAuthRepository;
     let adapter: AuthAdapter;
     let realtime: RealtimeService;
+    let driver: PostgresBackendDriver;
     let server: Server;
     /** The same socket with the default sweep (thirty seconds), for the expiry timer alone. */
     let quietServer: Server;
@@ -142,7 +145,7 @@ describe("identity after the account changes (E2E)", () => {
         registry.registerMultiple([notesCollection]);
         registry.registerTable(notesTable, "notes");
         realtime = new RealtimeService(db as never, registry);
-        const driver = new PostgresBackendDriver(db as never, realtime as never, registry);
+        driver = new PostgresBackendDriver(db as never, realtime as never, registry);
         realtime.setDataDriver(driver);
         driver.rlsUserRole = REBASE_USER_ROLE;
         realtime.rlsUserRole = REBASE_USER_ROLE;
@@ -429,6 +432,49 @@ describe("identity after the account changes (E2E)", () => {
 
             const { rows } = await observer.query("SELECT DISTINCT method FROM rebase.refresh_tokens WHERE uid = $1", [signedIn.json.user.uid]);
             expect(rows).toEqual([{ method: "google" }]);
+        });
+    });
+
+    describe("IDENTITY-21: expired auth tokens are deleted on a schedule", () => {
+        it("deletes what has expired, keeps what has not, and runs once per hour across instances", async () => {
+            const member = await register("sweep");
+            const live = await signIn(member.email);
+            const factor = await repo.createMfaFactor(member.uid, "totp", "secret");
+            const past = new Date(Date.now() - 60_000);
+            const future = new Date(Date.now() + 3_600_000);
+            await repo.createPasswordResetToken(member.uid, "sweep-reset-expired", past);
+            await repo.createMagicLinkToken(member.uid, "sweep-magic-expired", past);
+            await repo.createRefreshToken(member.uid, "sweep-refresh-expired", past, "ua", "ip", { id: crypto.randomUUID(), startedAt: past });
+            await observer.query(
+                "INSERT INTO rebase.mfa_challenges (factor_id, expires_at) VALUES ($1, $2), ($1, $3)",
+                [factor.id, past, future]
+            );
+            const count = async (table: string) =>
+                (await observer.query(`SELECT count(*)::int AS n FROM rebase.${table} WHERE ${table === "mfa_challenges" ? "factor_id" : "uid"} = $1`,
+                    [table === "mfa_challenges" ? factor.id : member.uid])).rows[0].n as number;
+            expect(await count("password_reset_tokens")).toBe(1);
+
+            // Two instances, the same hour, one claims table.
+            const store = createCronStore(driver)!;
+            await store.ensureTable();
+            const claimSlot = (jobId: string, slot: string) => store.tryClaimRun(jobId, slot);
+            const now = () => Date.now();
+            let sweeps = 0;
+            const authRepo = { deleteExpiredTokens: async () => { sweeps++; await repo.deleteExpiredTokens(); } };
+            const outcomes = await Promise.all([
+                createExpiredTokenSweep({ authRepo, claimSlot, now }).runSlot(),
+                createExpiredTokenSweep({ authRepo, claimSlot, now }).runSlot()
+            ]);
+            expect(outcomes.sort()).toEqual(["claimed-elsewhere", "swept"]);
+            expect(sweeps).toBe(1);
+
+            expect(await count("password_reset_tokens")).toBe(0);
+            expect(await count("magic_link_tokens")).toBe(0);
+            expect(await count("mfa_challenges")).toBe(1);
+            const refresh = await observer.query("SELECT token_hash FROM rebase.refresh_tokens WHERE uid = $1", [member.uid]);
+            expect(refresh.rows.map(r => r.token_hash)).not.toContain("sweep-refresh-expired");
+            // The session signed in above is untouched.
+            expect((await http("POST", "/api/auth/refresh", { refreshToken: live.refreshToken })).status).toBe(200);
         });
     });
 

@@ -968,6 +968,16 @@ export class RefreshTokenService {
         await this.db.delete(this.refreshTokensTable)
             .where(sql`${this.refreshTokensTable.id} = ${id} AND ${this.refreshTokensTable.uid} = ${uid}`);
     }
+
+    /**
+     * Every token past its expiry, whoever holds it. `prune` clears a user's
+     * expired rows when that user refreshes; a session nobody comes back to
+     * is only ever cleared here.
+     */
+    async deleteExpired(): Promise<void> {
+        await this.db.delete(this.refreshTokensTable)
+            .where(sql`${this.refreshTokensTable.expiresAt} < NOW()`);
+    }
 }
 
 /**
@@ -1127,6 +1137,15 @@ export class MagicLinkTokenService {
         };
     }
 
+    /** Links and email codes past their expiry, used or not. */
+    async deleteExpired(): Promise<void> {
+        const tableName = this.getQualifiedTableName();
+        await this.db.execute(sql`
+            DELETE FROM ${sql.raw(tableName)}
+            WHERE expires_at < NOW()
+        `);
+    }
+
     async markAsUsed(tokenHash: string): Promise<void> {
         await this.db
             .update(this.magicLinkTokensTable)
@@ -1217,8 +1236,14 @@ export class PostgresTokenRepository implements TokenRepository {
         await this.passwordResetTokenService.deleteAllForUser(uid);
     }
 
+    /**
+     * @see TokenRepository.deleteExpiredTokens — reset links, magic links and
+     * email codes, and refresh tokens, each past its own expiry.
+     */
     async deleteExpiredTokens(): Promise<void> {
         await this.passwordResetTokenService.deleteExpired();
+        await this.magicLinkTokenService.deleteExpired();
+        await this.refreshTokenService.deleteExpired();
     }
 
     // Magic link token operations
@@ -1403,6 +1428,7 @@ export class PostgresAuthRepository implements AuthRepository {
 
     async deleteExpiredTokens(): Promise<void> {
         await this.tokenRepository.deleteExpiredTokens();
+        await this.getMfaService().deleteExpiredChallenges();
     }
 
     // Magic link token operations
@@ -1689,6 +1715,15 @@ export class MfaService implements MfaRepository {
 
         if (result.rows.length === 0) return 0;
         return Number((result.rows[0] as { attempts: number | string }).attempts);
+    }
+
+    /** Challenges past their five minutes, answered or not. */
+    async deleteExpiredChallenges(): Promise<void> {
+        const tableName = this.qualify("mfa_challenges");
+        await this.db.execute(sql`
+            DELETE FROM ${sql.raw(tableName)}
+            WHERE expires_at < NOW()
+        `);
     }
 
     async verifyMfaChallenge(challengeId: string): Promise<void> {

@@ -97,6 +97,7 @@ import { createLocalGitRepository, findRepositoryRoot } from "./schema-edit/loca
 import nodePath from "node:path";
 import nodeFs from "node:fs/promises";
 import { createRlsAudit, type RlsAuditConfig, type RlsAudit } from "./rls-audit";
+import { startExpiredTokenSweep } from "./auth/expired-token-sweep";
 import type { CaptchaConfig } from "./auth/captcha";
 import {
     ALL_RUNTIME_SURFACES,
@@ -3665,12 +3666,23 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         rlsAudit.start();
     }
 
+    // ── Expired auth tokens ───────────────────────────────────────────────
+    // Housekeeping with a timer, so it runs where the timers do: once an
+    // hour, on one instance of the fleet, claimed as a cron slot is.
+    const authTokenSweep = startExpiredTokenSweep({
+        authRepo: adminIdentityRepo,
+        driver: defaultDriver,
+        ownsTimers: ownership.cronScheduler,
+        persistClaims: config.cronPersistence !== false
+    });
+
     // ── Graceful Shutdown ─────────────────────────────────────────────────
     const shutdown = createShutdown({
         server: config.server,
         cronScheduler,
         jobQueue,
         rlsAudit,
+        authTokenSweep,
         stopMetricsSampler,
         realtimeServices
     });

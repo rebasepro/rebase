@@ -11,6 +11,8 @@ interface ShutdownConfig {
     jobQueue?: { stop(timeoutMs?: number): Promise<void> };
     /** Structural, same reason. */
     rlsAudit?: { stop(): void };
+    /** The expired-token sweep's timer. */
+    authTokenSweep?: { stop(): void };
     /** The stop `MetricsHistory.start()` returned: its interval writes to the pool. */
     stopMetricsSampler?: () => void;
     realtimeServices: Record<string, RealtimeProvider>;
@@ -185,6 +187,8 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 if (config.rlsAudit) {
                     config.rlsAudit.stop();
                 }
+                // And the token sweep's: one DELETE, nothing to wait for.
+                config.authTokenSweep?.stop();
                 // And the metrics sampler, whose next tick would write to a
                 // pool the embedder closes once this resolves.
                 config.stopMetricsSampler?.();
