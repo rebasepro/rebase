@@ -427,10 +427,19 @@ password };
         } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
+        // A backend with `requireEmailVerification` registers confirm-first:
+        // no session until the address is proven, and the same answer whether
+        // or not the address already had an account.
+        if (body && typeof body === "object" && "confirmationRequired" in body && body.confirmationRequired === true) {
+            return { confirmationRequired: true as const, user: null, accessToken: null, refreshToken: null };
+        }
         const session = handleAuthResponse(body, "SIGNED_IN");
-        return { user: session.user,
-accessToken: session.accessToken,
-refreshToken: session.refreshToken };
+        return {
+            confirmationRequired: false as const,
+            user: session.user,
+            accessToken: session.accessToken,
+            refreshToken: session.refreshToken
+        };
     }
 
     /**
@@ -877,15 +886,43 @@ newPassword })
         });
     }
 
-    async function verifyEmail(token: string) {
+    /**
+     * Verify the address with the token from the link.
+     *
+     * The link proves the inbox, not who registered the address, so the
+     * server keeps only what this call also proves: the current session (sent
+     * when this client is signed in as that account) or `password`. An account
+     * carrying a password or identity neither proves is refused with
+     * `PROOF_REQUIRED` and the token is left unspent — ask for the password,
+     * or pass `removeUnproven: true` to verify without it. With `password`,
+     * the call also signs in.
+     */
+    async function verifyEmail(token: string, options?: { password?: string; removeUnproven?: boolean }) {
         const fetchFn = getFetch();
-        const res = await fetchFn(authUrl("/verify-email?token=" + encodeURIComponent(token)), {
-            method: "GET",
-            headers: { "Content-Type": "application/json" }
-        });
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (currentSession?.accessToken) headers.Authorization = `Bearer ${currentSession.accessToken}`;
+        const res = await fetchFn(authUrl("/verify-email"), {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ token, ...options }),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throwApiError(res.status, body, res.statusText);
-        return body as { success: boolean; message: string; };
+        const result = body as {
+            success: boolean;
+            message?: string;
+            /** A password nobody proved was on the account, and is gone. */
+            passwordRemoved: boolean;
+            /** Providers whose identities were detached for not vouching for the address. */
+            removedProviders: string[];
+            tokens?: AuthTokens;
+            user?: Record<string, unknown>;
+        };
+        const session = result.tokens && result.user
+            ? handleAuthResponse({ tokens: result.tokens, user: result.user }, "SIGNED_IN")
+            : null;
+        return { success: result.success, passwordRemoved: result.passwordRemoved, removedProviders: result.removedProviders ?? [], session };
     }
 
     async function sendMagicLink(email: string) {

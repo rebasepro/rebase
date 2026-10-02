@@ -729,6 +729,16 @@ export interface RebaseTranslations {
     auth_email_verified_body: string;
     auth_email_verification_failed_title: string;
     auth_email_verification_unavailable: string;
+    auth_verify_email_proof_title: string;
+    auth_verify_email_proof_body: string;
+    auth_verify_email_password_label: string;
+    auth_verify_email_with_password: string;
+    auth_verify_email_without_password: string;
+    auth_verify_email_wrong_password: string;
+    auth_email_verified_password_removed_body: string;
+    auth_confirm_email_sent_title: string;
+    auth_confirm_email_sent_body: string;
+    auth_email_not_confirmed: string;
     auth_mfa_title?: string;
     auth_mfa_subtitle?: string;
     auth_mfa_factor_label?: string;

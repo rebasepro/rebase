@@ -436,13 +436,37 @@ const { success, message } = await client.auth.changePassword(
 
 ## Email Verification
 
+Registering mails the new account its verification link when email is
+configured. `sendVerificationEmail()` mails it again.
+
 ```typescript
 // Send verification email to the current user
 await client.auth.sendVerificationEmail();
 
-// Verify with the token from the email link
-await client.auth.verifyEmail(token);
+// Verify with the token from the email link. Signed in as that account, this
+// keeps everything on it.
+const { passwordRemoved } = await client.auth.verifyEmail(token);
+
+// Signed out, an account that holds a password answers PROOF_REQUIRED:
+try {
+    await client.auth.verifyEmail(token);
+} catch (e) {
+    if (e.code === "PROOF_REQUIRED") {
+        // Keep the password, and sign in:
+        await client.auth.verifyEmail(token, { password });
+        // …or verify without it, which removes it:
+        // await client.auth.verifyEmail(token, { removeUnproven: true });
+    }
+}
 ```
+
+The link proves the inbox, not who registered the address, so a password
+neither the session nor the call proves is removed rather than kept — see
+[Email verification](/docs/backend/authentication/#email-verification).
+
+On a backend with `requireEmailVerification`, `signUp()` resolves with
+`{ confirmationRequired: true, user: null }` and no session: the account
+signs in once the link is followed with its password.
 
 ## Session Management (Multi-Device)
 

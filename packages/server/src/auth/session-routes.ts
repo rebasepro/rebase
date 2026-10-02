@@ -56,10 +56,15 @@ interface SessionRoutesConfig {
      * `/register`. Absent when captcha is off or `register` is not protected.
      */
     registerCaptcha?: MiddlewareHandler<HonoEnv>;
+    /**
+     * Mail the account a verification link, in the background. Upgrading a
+     * guest is registration, and registration starts the address proof.
+     */
+    sendVerificationMail?: (user: { id: string; email: string; displayName?: string | null }) => void;
 }
 
 export function mountSessionRoutes(opts: SessionRoutesConfig): void {
-    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession, registerCaptcha } = opts;
+    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession, registerCaptcha, sendVerificationMail } = opts;
     const authRepo = config.authRepo;
 
     /**
@@ -479,6 +484,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         if (!updatedUser) {
             throw ApiError.notFound("User not found");
         }
+        sendVerificationMail?.(updatedUser);
 
         // Generate new tokens with updated identity
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(

@@ -26,7 +26,8 @@ All auth endpoints are mounted at `/api/auth/`:
 | `PATCH` | `/api/auth/me` | Update the caller's own profile |
 | `GET` | `/api/auth/config` | What this backend offers a sign-in screen — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Unauthenticated, and computed from the same predicates the routes enforce, so what the screen advertises cannot drift from what it can do |
 | `POST` | `/api/auth/send-verification` | Send the caller an email-verification link |
-| `GET` | `/api/auth/verify-email` | Consume a verification link (the URL in that email) |
+| `GET` | `/api/auth/verify-email` | Consume a verification link (the URL in that email). Keeps what a live session of the account proves and removes what nobody proved — see [Email verification](/docs/backend/authentication/#email-verification) |
+| `POST` | `/api/auth/verify-email` | The same with `{ token, password?, removeUnproven? }`: the password keeps it and signs in; with neither proof an account holding one answers `409 PROOF_REQUIRED` |
 | `POST` | `/api/auth/magic-link` | Email a one-time sign-in link. `503 EMAIL_NOT_CONFIGURED` without SMTP |
 | `POST` | `/api/auth/magic-link/verify` | Exchange a magic-link token for a session |
 | `POST` | `/api/auth/otp` | Email a six-digit sign-in code. Answers the same whether or not the address has an account |

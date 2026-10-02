@@ -101,6 +101,8 @@ export interface BuiltinAuthAdapterConfig {
     enableEmailOtp?: boolean;
     /** Opt-in httpOnly cookie mode for refresh tokens. */
     cookieAuth?: import("./routes").CookieAuthConfig;
+    /** Refuse password sign-in until the address is verified; confirm-first registration. */
+    requireEmailVerification?: boolean;
 }
 
 /**
@@ -128,7 +130,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         collectionAuthConfig,
         enableMagicLink = false,
         enableEmailOtp = false,
-        cookieAuth
+        cookieAuth,
+        requireEmailVerification = false
     } = config;
 
     const resolvedOps = resolveAuthHooks(authHooks);
@@ -307,7 +310,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 enableMagicLink,
                 enableEmailOtp,
                 cookieAuth,
-                captcha
+                captcha,
+                requireEmailVerification
             });
         },
 

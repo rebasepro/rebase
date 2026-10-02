@@ -4,11 +4,12 @@ import { ApiError, errorHandler } from "../api/errors";
 import { randomBytes, randomUUID } from "crypto";
 import { generateSecureToken, hashToken } from "./admin-user-ops";
 import type { AuthRepository, OAuthProvider, OAuthProviderProfile, CreateUserData } from "./interfaces";
-import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
+import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry, verifyAccessToken } from "./jwt";
+import { extractBearerToken } from "./bearer-token";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import { createRequireAuth, requireAuth } from "./middleware";
-import { replaceUserPassword } from "./token-revocation";
+import { judgeAccessToken, replaceUserPassword } from "./token-revocation";
 import { EmailService, EmailConfig, resolveEmailLinkBase } from "../email";
 import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate, resolveEmailBranding } from "../email/templates";
 import { HonoEnv } from "../api/types";
@@ -31,7 +32,7 @@ import { mountMagicLinkRoutes } from "./magic-link-routes";
 import { mountOtpRoutes } from "./otp-routes";
 import { isBootstrapWindowOpen, isSteadyStateRegistrationOpen, SETUP_REQUIRED_MESSAGE } from "./registration-policy";
 import { decideOAuthAutoLink, isRedirectUriAllowed } from "./oauth-signin-policy";
-import { confirmAddressOwnership, identityProfileData } from "./address-ownership";
+import { confirmAddressOwnership, identityProfileData, identityVouchesForAddress } from "./address-ownership";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import { ADMIN_ROLE, isAdminScope, parseScope } from "@rebasepro/types";
 import { getAccessModel } from "./access";
@@ -120,7 +121,27 @@ export interface AuthModuleConfig {
      * how long a captured token stays useful to someone who copied it.
      */
     refreshTokenReuseIntervalSeconds?: number;
+    /**
+     * Refuse password sign-in until the account's address is verified, and
+     * register confirm-first: `POST /auth/register` answers the same "check
+     * your inbox" whether or not the address already has an account, and
+     * signs nobody in. Off by default. Needs email; the boot refuses it
+     * without. See `RebaseAuthConfig.requireEmailVerification`.
+     */
+    requireEmailVerification?: boolean;
 }
+
+/**
+ * Addresses no mail can reach: the synthetic ones a guest and an X (Twitter)
+ * account are given, because `email` is NOT NULL. Nothing is mailed to them.
+ */
+export function isDeliverableAddress(email: string): boolean {
+    const domain = email.slice(email.lastIndexOf("@") + 1).toLowerCase();
+    return domain !== "anonymous.local" && domain !== "twitter.placeholder.rebase";
+}
+
+/** How long an email-verification link stays usable. */
+export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Configuration for httpOnly refresh-token cookies.
@@ -274,6 +295,11 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         token: z.string().min(1, "Token is required"),
         password: z.string().min(1, "Password is required").max(128)
     });
+    const verifyEmailSchema = z.object({
+        token: z.string().min(1, "Token is required"),
+        password: z.string().min(1).max(128).optional(),
+        removeUnproven: z.boolean().optional()
+    });
     const changePasswordSchema = z.object({
         oldPassword: z.string().min(1, "Old password is required").max(128),
         newPassword: z.string().min(1, "New password is required").max(128)
@@ -349,6 +375,47 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             text: emailContent.text
         }).catch(err => {
             logger.error("Failed to send welcome email", { error: err instanceof Error ? err.message : err });
+        });
+    }
+
+    /**
+     * Mail a verification link for `user`'s address, and record its token.
+     *
+     * Sent at registration as well as on request, so a self-registered
+     * account proves its address on its owner's terms — and keeps the
+     * password its owner chose, which a later first proof by link or code
+     * would otherwise have to remove (see `confirmAddressOwnership`).
+     * Returns whether a mail was handed to the email service.
+     */
+    async function sendVerificationMail(user: { id: string; email: string; displayName?: string | null }): Promise<boolean> {
+        if (!isEmailConfigured() || !isDeliverableAddress(user.email)) return false;
+        const token = generateSecureToken();
+        await authRepo.setVerificationToken(user.id, hashToken(token));
+
+        // `verifyEmailUrl` is set by no boot path, so this used to be `""` — a
+        // relative href, dead in every mail client. The resolver falls back to
+        // the reset base, and `createEmailService` refuses to boot when neither
+        // is absolute.
+        const baseUrl = resolveEmailLinkBase(emailConfig, "verifyEmail");
+        const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
+        const { appName, logoUrl } = resolveEmailBranding(emailConfig);
+        const templateFn = emailConfig?.templates?.emailVerification;
+        const emailContent = templateFn
+            ? templateFn(verifyUrl, { email: user.email, displayName: user.displayName })
+            : getEmailVerificationTemplate(verifyUrl, { email: user.email, displayName: user.displayName }, appName, logoUrl);
+        await emailService!.send({
+            to: user.email,
+            subject: emailContent.subject,
+            html: emailContent.html,
+            text: emailContent.text
+        });
+        return true;
+    }
+
+    /** {@link sendVerificationMail}, not awaited: a failure is logged, never answered. */
+    function sendVerificationMailInBackground(user: { id: string; email: string; displayName?: string | null }): void {
+        sendVerificationMail(user).catch((err: unknown) => {
+            logger.error("Failed to send verification email", { error: err instanceof Error ? err.message : err });
         });
     }
 
@@ -443,6 +510,7 @@ refreshToken };
      * Create a new account with email/password
      */
     router.post("/register", defaultAuthLimiter, ...(captcha.register ? [captcha.register] : []), async (c) => {
+        const startedAt = Date.now();
         const { email, password, displayName } = parseBody(registerSchema, await c.req.json());
 
         // Hard kill switch — blocks registration regardless of allowRegistration,
@@ -480,9 +548,25 @@ refreshToken };
             throw ApiError.badRequest(passwordValidation.errors.join(". "), "WEAK_PASSWORD");
         }
 
+        // Confirm-first registration answers the same whether or not the
+        // address has an account, held to the same floor as every route that
+        // mails an address, so neither the words nor the time say which. An
+        // existing account that never confirmed gets its link again — the
+        // registrant whose first mail went missing — and its password is not
+        // touched: whoever follows the link proves which password they know.
+        const confirmFirst = () => notBefore(startedAt, RECIPIENT_ROUTE_FLOOR_MS, c.json({
+            success: true,
+            confirmationRequired: true,
+            message: "Check your inbox: follow the link we sent to confirm your address, then sign in."
+        }));
+
         // Check if email already exists
         const existingUser = await authRepo.getUserByEmail(email);
         if (existingUser) {
+            if (config.requireEmailVerification) {
+                if (!existingUser.emailVerified) sendVerificationMailInBackground(existingUser);
+                return confirmFirst();
+            }
             throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
         }
 
@@ -527,6 +611,24 @@ refreshToken };
             }
         }
 
+        // The address is proven by its owner from here, at registration, on
+        // the owner's terms: followed while signed in, the link keeps the
+        // password they just chose. Left for later, the first proof was a
+        // magic link or an email code, which has to remove a password nobody
+        // proved — the owner's own included.
+        if (config.requireEmailVerification) {
+            // Confirm-first: no session until the address is proven.
+            sendVerificationMailInBackground(user);
+            if (ops.afterUserCreate) {
+                try {
+                    await ops.afterUserCreate(user);
+                } catch (err) {
+                    logger.error("[AuthHooks] afterUserCreate error", { error: err instanceof Error ? err.message : err });
+                }
+            }
+            return confirmFirst();
+        }
+
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
             user.id,
             c.req.header("user-agent") || "unknown",
@@ -536,6 +638,7 @@ refreshToken };
         // Send welcome email (fire-and-forget, don't block registration)
         sendWelcomeEmail({ email: user.email,
 displayName: user.displayName });
+        sendVerificationMailInBackground(user);
 
         // Fire afterUserCreate hook
         if (ops.afterUserCreate) {
@@ -599,6 +702,22 @@ displayName: user.displayName });
                 });
                 throw ApiError.unauthorized("Invalid email or password", "INVALID_CREDENTIALS");
             }
+        }
+
+        // Only after the password is proven, so the answer tells nobody but
+        // its holder that the address is unconfirmed.
+        if (config.requireEmailVerification && !user.emailVerified) {
+            // Mailed again, but not more than once a minute however often
+            // the holder tries.
+            const lastSent = user.emailVerificationSentAt?.getTime() ?? 0;
+            if (Date.now() - lastSent > 60_000) sendVerificationMailInBackground(user);
+            // Not `EMAIL_NOT_VERIFIED`: that is the OAuth sign-in's refusal to
+            // link onto an unverified account, and a login screen says
+            // something else for it.
+            throw ApiError.forbidden(
+                "Confirm your email address first: follow the link we sent to it, then sign in.",
+                "EMAIL_NOT_CONFIRMED"
+            );
         }
 
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
@@ -1097,63 +1216,142 @@ message: "Password has been changed successfully" });
         if (user.emailVerified) {
             throw ApiError.badRequest("Email is already verified", "ALREADY_VERIFIED");
         }
+        if (!isDeliverableAddress(user.email)) {
+            throw ApiError.badRequest("This account has no address mail can reach. Set a real email address first.", "UNDELIVERABLE_ADDRESS");
+        }
 
-        // Generate verification token
-        const token = generateSecureToken();
-
-        // Store hashed token in user record (raw token goes in the email URL)
-        await authRepo.setVerificationToken(user.id, hashToken(token));
-
-        // Build verification URL. `verifyEmailUrl` is set by no boot path, so
-        // this used to be `""` — a relative href, dead in every mail client,
-        // reported as `{ success: true }`. The resolver falls back to the reset
-        // base, and `createEmailService` refuses to boot when neither is absolute.
-        const baseUrl = resolveEmailLinkBase(emailConfig, "verifyEmail");
-        const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
-
-        // Get email template
-        const { appName, logoUrl } = resolveEmailBranding(emailConfig);
-        const templateFn = emailConfig?.templates?.emailVerification;
-        const emailContent = templateFn
-            ? templateFn(verifyUrl, { email: user.email,
-displayName: user.displayName })
-            : getEmailVerificationTemplate(verifyUrl, { email: user.email,
-displayName: user.displayName }, appName, logoUrl);
-
-        // Send email
-        await emailService!.send({
-            to: user.email,
-            subject: emailContent.subject,
-            html: emailContent.html,
-            text: emailContent.text
-        });
+        await sendVerificationMail(user);
 
         return c.json({ success: true,
 message: "Verification email sent" });
     });
 
     /**
-     * GET /auth/verify-email
-     * Verify email address using token
+     * Who proved what, when a verification link is followed.
+     *
+     * The link proves the inbox. It does not prove whoever registered the
+     * address is that inbox's owner: anyone can register someone else's
+     * address, leave a password on it, and ask for the link to be mailed. So a
+     * first proof of address keeps only what the person following the link
+     * also proved — and takes the rest off, as a magic link, an email code or
+     * a reset does (`confirmAddressOwnership`):
+     *
+     * - `session`: the request carries a live session of this very account.
+     *   Only whoever put the credentials on it can hold one, and they now hold
+     *   the inbox too — nothing on the account is a stranger's.
+     * - `password`: the request carries the account's password.
+     * - `none`: the password and every identity whose provider did not vouch
+     *   for the address are removed, and every session ends.
      */
-    router.get("/verify-email", async (c) => {
-        const token = c.req.query("token");
+    async function verificationProof(c: Context<HonoEnv>, user: { id: string; passwordHash?: string | null }, password: string | undefined): Promise<"session" | "password" | "none"> {
+        const bearer = extractBearerToken(c.req.header("authorization"));
+        if (bearer !== undefined) {
+            const payload = await verifyAccessToken(bearer);
+            if (payload?.uid === user.id && (await judgeAccessToken(authRepo, payload)).live) return "session";
+        }
+        if (password !== undefined) {
+            if (!user.passwordHash || !(await ops.verifyPassword(password, user.passwordHash))) {
+                throw ApiError.unauthorized("That is not this account's password.", "INVALID_CREDENTIALS");
+            }
+            return "password";
+        }
+        return "none";
+    }
 
+    /** The account a verification token names, if the token is live. */
+    async function accountForVerificationToken(token: string) {
+        const user = await authRepo.getUserByVerificationToken(hashToken(token));
+        const sentAt = user?.emailVerificationSentAt?.getTime();
+        if (!user || (sentAt !== undefined && Date.now() - sentAt > EMAIL_VERIFICATION_TTL_MS)) {
+            throw ApiError.badRequest("Invalid or expired verification token", "INVALID_TOKEN");
+        }
+        return user;
+    }
+
+    /**
+     * GET /auth/verify-email?token=
+     * Verify an address by its link. Keeps what the request proves — a live
+     * session of the account — and removes what nobody proved. See
+     * `verificationProof`; `POST` is the same with a password and a choice.
+     */
+    router.get("/verify-email", strictAuthLimiter, async (c) => {
+        const token = c.req.query("token");
         if (!token) {
             throw ApiError.badRequest("Verification token is required", "INVALID_INPUT");
         }
+        const user = await accountForVerificationToken(token);
+        const proof = await verificationProof(c, user, undefined);
+        const outcome = await confirmAddressOwnership(authRepo, user, null, { everythingProven: proof === "session" });
+        return c.json({
+            success: true,
+            message: "Email verified successfully",
+            passwordRemoved: outcome.removedPassword,
+            removedProviders: outcome.removedProviders
+        });
+    });
 
-        // Find user by hashed verification token
-        const user = await authRepo.getUserByVerificationToken(hashToken(token));
-        if (!user) {
-            throw ApiError.badRequest("Invalid or expired verification token", "INVALID_TOKEN");
+    /**
+     * POST /auth/verify-email { token, password?, removeUnproven? }
+     *
+     * The same proof as `GET`, with the two things a link alone cannot say:
+     *
+     * - `password` proves the account's password, which is then kept, and
+     *   signs the caller in — they have just proven both the address and the
+     *   password. This is how a confirm-first registration completes.
+     * - With neither a session nor a password, an account carrying a password
+     *   or an identity nobody proved is answered `409 PROOF_REQUIRED` and the
+     *   token is left unspent, so the person holding the link can choose:
+     *   prove the password, or `removeUnproven: true` to verify without it.
+     */
+    router.post("/verify-email", strictAuthLimiter, async (c) => {
+        const { token, password, removeUnproven } = parseBody(verifyEmailSchema, await c.req.json());
+        const user = await accountForVerificationToken(token);
+        const proof = await verificationProof(c, user, password);
+
+        if (proof === "none" && !removeUnproven) {
+            const unprovenProviders = (await authRepo.getUserIdentities(user.id))
+                .filter(identity => !identityVouchesForAddress(identity, user.email))
+                .map(identity => identity.provider);
+            if (user.passwordHash || unprovenProviders.length > 0) {
+                throw new ApiError(409, "PROOF_REQUIRED",
+                    "This account has a way to sign in that was set before its address was verified. " +
+                    "Enter its password to keep it, or verify without it and it is removed.",
+                    { password: Boolean(user.passwordHash), providers: unprovenProviders });
+            }
         }
 
-        // Mark email as verified
-        await authRepo.setEmailVerified(user.id, true);
+        const outcome = await confirmAddressOwnership(
+            authRepo,
+            user,
+            proof === "password" ? user.passwordHash ?? null : null,
+            { everythingProven: proof === "session" }
+        );
 
-        return c.json({ success: true,
-message: "Email verified successfully" });
+        if (proof !== "password") {
+            return c.json({
+                success: true,
+                message: "Email verified successfully",
+                passwordRemoved: outcome.removedPassword,
+                removedProviders: outcome.removedProviders
+            });
+        }
+
+        // Address and password both proven: a sign-in. Through the same
+        // session minting every sign-in uses, the MFA gate included.
+        const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
+            user.id,
+            c.req.header("user-agent") || "unknown",
+            c.req.header("x-forwarded-for") || "unknown"
+        );
+        const verified = { ...user, emailVerified: true };
+        const authResponse = buildAuthResponse(verified, roleIds, accessToken, refreshToken, "password");
+        const transformedResponse = await applyTransformHook(authResponse, "login", c.req.raw, user.id);
+        return c.json({
+            ...redactRefreshToken(transformedResponse, c, refreshToken, config.cookieAuth),
+            success: true,
+            passwordRemoved: false,
+            removedProviders: outcome.removedProviders
+        });
     });
 
     /**
@@ -1385,7 +1583,8 @@ aal: sessionAal };
         createSessionAndTokens,
         applyTransformHook,
         requireLiveSession,
-        registerCaptcha: captcha.register
+        registerCaptcha: captcha.register,
+        sendVerificationMail: sendVerificationMailInBackground
     });
 
     // ═══════════════════════════════════════════════════════════════════════

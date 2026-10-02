@@ -37,6 +37,7 @@ import { ensureAppRole, REBASE_USER_ROLE } from "../../src/security/rls-enforcem
 import { createBuiltinAuthAdapter } from "../../../server/src/auth/builtin-auth-adapter.js";
 import { configureJwt, generateAccessToken } from "../../../server/src/auth/jwt.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
+import { oauthCodeFlowSchema } from "../../../server/src/auth/oauth-code-flow.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 
 const JWT_SECRET = "identity-e2e-secret-key-that-is-definitely-32-chars-long!!";
@@ -72,6 +73,7 @@ describe("identity after the account changes (E2E)", () => {
     let base: string;
     let adminToken: string;
     const sockets: NodeWebSocket[] = [];
+    const mails: { to: string; subject: string; text?: string }[] = [];
 
     beforeAll(async () => {
         configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h", refreshExpiresIn: "7d" });
@@ -103,7 +105,29 @@ describe("identity after the account changes (E2E)", () => {
         `);
         await ensureAppRole(async (text) => (await pool.query(text)).rows as Record<string, unknown>[], ["public"]);
 
-        adapter = createBuiltinAuthAdapter({ authRepository: repo, allowRegistration: true });
+        adapter = createBuiltinAuthAdapter({
+            authRepository: repo,
+            allowRegistration: true,
+            // Mail is captured, so a test can follow the link the owner was sent.
+            emailService: {
+                isConfigured: () => true,
+                send: async (mail: { to: string; subject: string; text?: string }) => {
+                    mails.push(mail);
+                    return { messageId: "e2e" };
+                }
+            } as never,
+            emailConfig: { from: "noreply@corp.example", appName: "IdentityE2E", resetPasswordUrl: "https://app.corp.example" },
+            // A Google that vouches for whatever address it is asked about:
+            // the code is `<subject>|<address>`.
+            oauthProviders: [{
+                id: "google",
+                schema: oauthCodeFlowSchema(),
+                verify: async (payload: { code: string }) => {
+                    const [providerId, email] = payload.code.split("|");
+                    return { providerId, email, emailVerified: true };
+                }
+            }] as never
+        });
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/api/auth", adapter.createAuthRoutes!() as Hono<HonoEnv>);
@@ -341,6 +365,52 @@ describe("identity after the account changes (E2E)", () => {
             expect(expiring.unsolicited.map(frame => frame.payload?.error?.code)).toContain("TOKEN_EXPIRED");
             expect(kept.closed()).toBeUndefined();
             expect((await kept.send("FETCH_COLLECTION", { path: "notes" })).type).toBe("FETCH_COLLECTION_SUCCESS");
+        });
+    });
+
+    describe("IDENTITY-1: the pre-hijack through the verification link", () => {
+        /** The token in the latest verification mail to `to`, once the background send has run. */
+        async function mailedVerificationToken(to: string): Promise<string> {
+            for (let i = 0; i < 20; i++) {
+                const mail = [...mails].reverse().find(m => m.to === to && /verify-email\?token=/.test(m.text ?? ""));
+                if (mail) return /verify-email\?token=([A-Za-z0-9_-]+)/.exec(mail.text!)![1];
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            throw new Error(`no verification mail to ${to}`);
+        }
+
+        it("is closed: the owner follows the link the attacker asked for, and only the owner gets in", async () => {
+            // 1. The attacker registers the owner's address with a password.
+            const attacker = await register("victim");
+            // 2. … and asks for the genuine verification mail to be sent to it.
+            expect((await http("POST", "/api/auth/send-verification", undefined, attacker.accessToken)).status).toBe(200);
+            const link = await mailedVerificationToken(attacker.email);
+
+            // 3. The owner follows it, in their own browser.
+            const followed = await http("GET", `/api/auth/verify-email?token=${link}`);
+            expect(followed.status).toBe(200);
+            expect(followed.json.passwordRemoved).toBe(true);
+
+            // 4. The owner later signs in with Google, which auto-links now
+            //    that both sides are verified: the same account.
+            const owner = await http("POST", "/api/auth/google", { code: `google-${attacker.uid}|${attacker.email}`, redirectUri: "https://app.corp.example/cb" });
+            expect(owner.status).toBe(200);
+            expect(owner.json.user.uid).toBe(attacker.uid);
+
+            // 5. The attacker's password, session and token are all gone.
+            expect((await http("POST", "/api/auth/login", { email: attacker.email, password: PASSWORD })).status).toBe(401);
+            expect((await http("POST", "/api/auth/refresh", { refreshToken: attacker.refreshToken })).status).toBe(401);
+            expect((await http("GET", "/api/whoami", undefined, attacker.accessToken)).status).toBe(401);
+        });
+
+        it("keeps the owner's own password when they follow their link signed in", async () => {
+            const owner = await register("owner");
+            const link = await mailedVerificationToken(owner.email);
+
+            const followed = await http("GET", `/api/auth/verify-email?token=${link}`, undefined, owner.accessToken);
+
+            expect(followed.json).toMatchObject({ success: true, passwordRemoved: false });
+            expect((await http("POST", "/api/auth/login", { email: owner.email, password: PASSWORD })).status).toBe(200);
         });
     });
 

@@ -371,6 +371,23 @@ export interface RebaseAuthConfig {
      * auth endpoints, and CORS must allow credentials (no `origin: "*"`).
      */
     cookieAuth?: import("./auth").CookieAuthConfig;
+    /**
+     * Refuse password sign-in until the account's email address is verified,
+     * and make registration confirm-first. Off by default.
+     *
+     * Off, `POST /auth/register` signs the new account in and mails it a
+     * verification link; an address that already has an account is answered
+     * `409 EMAIL_EXISTS`. On, register signs nobody in and answers the same
+     * "check your inbox" whether or not the address has an account (an
+     * unconfirmed one is mailed its link again), and `POST /auth/login`
+     * answers `403 EMAIL_NOT_CONFIRMED` for an unverified account —
+     * only once the password is right. Following the link with the password completes
+     * the sign-up (`POST /auth/verify-email`).
+     *
+     * Needs email: the boot refuses it without, since nobody could ever
+     * confirm. Set by `AUTH_REQUIRE_EMAIL_VERIFICATION=true`.
+     */
+    requireEmailVerification?: boolean;
 }
 
 /** @see RebaseBackendConfig.baas */
@@ -1879,8 +1896,21 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 collectionAuthConfig,
                 enableMagicLink: safeAuthConfig.magicLink ?? false,
                 enableEmailOtp: safeAuthConfig.emailOtp ?? false,
-                cookieAuth: safeAuthConfig.cookieAuth
+                cookieAuth: safeAuthConfig.cookieAuth,
+                requireEmailVerification: safeAuthConfig.requireEmailVerification ?? false
             });
+
+            // A requirement nobody can meet is a backend nobody can sign in
+            // to by password. Refused here, where it names the setting, rather
+            // than discovered when the first registrant waits for a mail.
+            if (safeAuthConfig.requireEmailVerification
+                && !(authConfigResult!.emailService as import("./email").EmailService | undefined)?.isConfigured()) {
+                throw new Error(
+                    "auth.requireEmailVerification is on, but no email service is configured, so no address could ever be " +
+                    "verified and nobody could sign in with a password. Configure auth.email (SMTP_* or the email settings), " +
+                    "or turn requireEmailVerification off."
+                );
+            }
 
             if (safeAuthConfig.cookieAuth) {
                 if (!isProduction && !process.env.CORS_ORIGINS && !process.env.FRONTEND_URL) {

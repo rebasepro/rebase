@@ -68,8 +68,22 @@ export function identityVouchesForAddress(identity: UserIdentityData, email: str
 export async function confirmAddressOwnership(
     authRepo: AuthRepository,
     user: Pick<UserData, "id" | "email" | "passwordHash">,
-    passwordHash: string | null
-): Promise<void> {
+    passwordHash: string | null,
+    options?: {
+        /**
+         * Whoever proved the address also holds a live session of this very
+         * account, so nothing on it is a stranger's: it was all put there by
+         * the person now holding the inbox. Nothing is removed and no session
+         * ends; the account is only marked verified. See `GET /auth/verify-email`.
+         */
+        everythingProven?: boolean;
+    }
+): Promise<AddressProofOutcome> {
+    if (options?.everythingProven) {
+        await authRepo.setEmailVerified(user.id, true);
+        return { removedPassword: false, removedProviders: [] };
+    }
+
     const unproven = (await authRepo.getUserIdentities(user.id))
         .filter(identity => !identityVouchesForAddress(identity, user.email));
 
@@ -94,12 +108,27 @@ export async function confirmAddressOwnership(
     await replaceUserPassword(authRepo, user.id, passwordHash);
     await authRepo.setEmailVerified(user.id, true);
 
+    const outcome: AddressProofOutcome = {
+        // Removed means a password was there and is not any more; keeping the
+        // same hash (the owner proved it) or setting a new one is not removal.
+        removedPassword: Boolean(user.passwordHash) && passwordHash === null,
+        removedProviders: unproven.map(identity => identity.provider)
+    };
     if (unproven.length > 0 || user.passwordHash) {
         logger.info("[Security Audit] First proof of address removed sign-in methods nobody proved", {
             eventType: "auth.address_proof.cleared",
             uid: user.id,
-            removedProviders: unproven.map(identity => identity.provider),
-            replacedPassword: Boolean(user.passwordHash)
+            removedProviders: outcome.removedProviders,
+            replacedPassword: Boolean(user.passwordHash) && passwordHash !== user.passwordHash
         });
     }
+    return outcome;
+}
+
+/** What a first proof of address took off the account. */
+export interface AddressProofOutcome {
+    /** A password was on the account, nobody proved it, and it is gone. */
+    removedPassword: boolean;
+    /** The providers whose identities were detached for not vouching for the address. */
+    removedProviders: string[];
 }

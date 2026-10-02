@@ -142,10 +142,21 @@ export class MemoryAuthStore {
             },
             setEmailVerified: async (id, verified) => {
                 const user = this.users.get(id);
-                if (user) user.emailVerified = verified;
+                if (!user) return;
+                user.emailVerified = verified;
+                // As Postgres does: verifying spends the outstanding link.
+                user.emailVerificationToken = null;
             },
-            setVerificationToken: async () => undefined,
-            getUserByVerificationToken: async () => null,
+            setVerificationToken: async (id, token) => {
+                const user = this.users.get(id);
+                if (!user) return;
+                user.emailVerificationToken = token;
+                user.emailVerificationSentAt = token ? new Date() : null;
+            },
+            getUserByVerificationToken: async (token) => {
+                const user = [...this.users.values()].find(u => u.emailVerificationToken === token);
+                return user ? this.snapshot(user) : null;
+            },
             getUserRoleIds: async (uid) => [...(this.roles.get(uid) ?? [])],
             setUserRoles: async (uid, roleIds) => {
                 this.roles.set(uid, [...roleIds]);

@@ -952,6 +952,7 @@ function LoginForm({
     // until focus, which would redesign the login screen to fix a name.
     const emailId = useId();
     const passwordId = useId();
+    const [confirmationSent, setConfirmationSent] = useState(false);
     const displayNameId = useId();
 
     const [email, setEmail] = useState<string | undefined>(defaultEmail);
@@ -994,7 +995,12 @@ function LoginForm({
     function handleRegistration() {
         if (email && password && authController.register) {
             void Promise.resolve(authController.register(email, password, displayName))
-                .then(() => reportSignedIn(email))
+                .then((result) => {
+                    // Confirm-first: nobody is signed in until the link in the
+                    // mail is followed.
+                    if (result?.confirmationRequired) setConfirmationSent(true);
+                    else reportSignedIn(email);
+                })
                 .catch(() => undefined);
         }
     }
@@ -1020,6 +1026,25 @@ function LoginForm({
             : "Enter your credentials to continue";
 
     const buttonLabel = registrationMode ? "Create account" : "Sign in";
+
+    if (confirmationSent) {
+        return (
+            <div className="flex flex-col w-full gap-4 mt-2">
+                <div className="flex flex-col items-center text-center rounded-xl p-6 bg-surface-raised">
+                    <CheckCircle2Icon size={iconSize.large} className="mb-3 text-primary"/>
+                    <Typography variant="subtitle1" className="mb-2">
+                        {t("auth_confirm_email_sent_title")}
+                    </Typography>
+                    <Typography variant="body2" color="secondary">
+                        {t("auth_confirm_email_sent_body")}
+                    </Typography>
+                </div>
+                <Button onClick={onClose} variant="filled" color="primary" size="large" className="w-full">
+                    {t("auth_continue_to_sign_in")}
+                </Button>
+            </div>
+        );
+    }
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col w-full gap-1 mt-2">
@@ -1512,8 +1537,13 @@ function ResetPasswordForm({
 }
 
 /**
- * The step a verification link opens. There is nothing to ask: the token is
- * spent as soon as the screen opens, and the result is what it shows.
+ * The step a verification link opens.
+ *
+ * The link proves the inbox, not who registered the address. So when the
+ * account holds a password, the server asks for it before keeping it
+ * (`PROOF_REQUIRED`): the owner types the password they chose and is signed
+ * in; someone who never set one — whose address a stranger registered —
+ * verifies without it, and the stranger's password is removed.
  */
 function VerifyEmailView({
     token,
@@ -1525,12 +1555,36 @@ function VerifyEmailView({
     onDone: () => void
 }) {
     const { t } = useTranslation();
-    const [status, setStatus] = useState<"verifying" | "verified" | "failed">("verifying");
+    const [status, setStatus] = useState<"verifying" | "proof" | "verified" | "failed">("verifying");
     const [error, setError] = useState<string | null>(null);
-    // Once per token. The server spends it on the first call, so a second one —
-    // a development double-mount, say — would answer "invalid" and overwrite
-    // the success the first one reported.
+    const [password, setPassword] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const [passwordRemoved, setPasswordRemoved] = useState(false);
+    const passwordId = useId();
+    // Once per token. A second call — a development double-mount, say —
+    // would race the first for the same token.
     const requestedRef = useRef(false);
+
+    const verify = useCallback(async (options?: { password?: string; removeUnproven?: boolean }) => {
+        setError(null);
+        try {
+            if (!authController.verifyEmail) return;
+            const result = await authController.verifyEmail(token, options);
+            setPasswordRemoved(result?.passwordRemoved === true);
+            setStatus("verified");
+        } catch (err: unknown) {
+            if (err instanceof Error && "code" in err && err.code === "PROOF_REQUIRED") {
+                setStatus("proof");
+                return;
+            }
+            if (options?.password !== undefined && err instanceof Error && "code" in err && err.code === "INVALID_CREDENTIALS") {
+                setError(t("auth_verify_email_wrong_password"));
+                return;
+            }
+            setError(emailLinkErrorMessage(err, t));
+            setStatus("failed");
+        }
+    }, [authController, token, t]);
 
     useEffect(() => {
         if (requestedRef.current) return;
@@ -1540,13 +1594,8 @@ function VerifyEmailView({
             setStatus("failed");
             return;
         }
-        authController.verifyEmail(token)
-            .then(() => setStatus("verified"))
-            .catch((err: unknown) => {
-                setError(emailLinkErrorMessage(err, t));
-                setStatus("failed");
-            });
-    }, [authController, token, t]);
+        void verify();
+    }, [authController, verify, t]);
 
     if (status === "verifying") {
         return (
@@ -1556,6 +1605,68 @@ function VerifyEmailView({
                     {t("auth_verifying_email")}
                 </Typography>
             </div>
+        );
+    }
+
+    if (status === "proof") {
+        const submit = (options: { password?: string; removeUnproven?: boolean }) => {
+            setSubmitting(true);
+            void verify(options).finally(() => setSubmitting(false));
+        };
+        return (
+            <form
+                className="flex flex-col w-full gap-1 mt-2"
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    if (password) submit({ password });
+                }}
+            >
+                <Typography variant="h6" className="mb-0.5">
+                    {t("auth_verify_email_proof_title")}
+                </Typography>
+                <Typography variant="body2" color="secondary" className="mb-5">
+                    {t("auth_verify_email_proof_body")}
+                </Typography>
+                {error && (
+                    <div className="w-full mb-3">
+                        <ErrorView error={error}/>
+                    </div>
+                )}
+                <div className="w-full mb-3">
+                    <Typography variant="label" component="label" color="secondary" className="mb-1" htmlFor={passwordId}>
+                        {t("auth_verify_email_password_label")}
+                    </Typography>
+                    <TextField
+                        id={passwordId}
+                        className={loginFieldClasses}
+                        autoFocus
+                        autoComplete="current-password"
+                        value={password}
+                        type="password"
+                        size="medium"
+                        onChange={(event) => setPassword(event.target.value)}
+                    />
+                </div>
+                <LoadingButton
+                    type="submit"
+                    variant="filled"
+                    color="primary"
+                    className="w-full mt-1"
+                    size="large"
+                    loading={submitting}
+                    disabled={submitting || !password}
+                >
+                    {t("auth_verify_email_with_password")}
+                </LoadingButton>
+                <Button
+                    variant="text"
+                    className="w-full mt-1"
+                    disabled={submitting}
+                    onClick={() => submit({ removeUnproven: true })}
+                >
+                    {t("auth_verify_email_without_password")}
+                </Button>
+            </form>
         );
     }
 
@@ -1569,7 +1680,7 @@ function VerifyEmailView({
                             {t("auth_email_verified_title")}
                         </Typography>
                         <Typography variant="body2" color="secondary">
-                            {t("auth_email_verified_body")}
+                            {passwordRemoved ? t("auth_email_verified_password_removed_body") : t("auth_email_verified_body")}
                         </Typography>
                     </div>
                 )

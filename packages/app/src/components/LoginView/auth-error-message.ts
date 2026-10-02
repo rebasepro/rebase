@@ -25,5 +25,10 @@ export function authErrorMessage(error: unknown, t: (key: string) => string): st
             ? t("auth_account_exists_sign_in_with_password")
             : t("auth_account_exists_with_different_credential");
     }
+    // Confirm-first registration: the password is right, the address is not
+    // confirmed yet, and a new link is on its way.
+    if (error instanceof Error && "code" in error && error.code === "EMAIL_NOT_CONFIRMED") {
+        return t("auth_email_not_confirmed");
+    }
     return error instanceof Error ? error.message : String(error);
 }
