@@ -545,14 +545,6 @@ Authentication management commands:
 rebase auth reset-password --email admin@example.com --password NewPassword123!
 ```
 
-With a running backend and a service key, the reset goes through
-`POST /api/admin/users/:uid/reset-password`, and a refusal there (a password
-too weak, an unknown address) is final. Only when the backend cannot be reached
-does the command write to the project's database directly. Either way the
-account's sessions end: its refresh tokens and outstanding reset links are
-deleted, and `tokens_valid_after` is stamped, so the access tokens it already
-holds are refused too.
-
 ### `rebase api-keys`
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> Manage the project's service API keys — the credential an agent, script or

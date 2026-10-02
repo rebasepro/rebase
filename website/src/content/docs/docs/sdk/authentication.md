@@ -109,10 +109,8 @@ A one-click sign-in link by email. The link is always
 `<base>/auth/magic-link?token=…`, where `<base>` is the backend's `email.magicLinkUrl`,
 or its reset-password base (`FRONTEND_URL` on the runtime) when that is not set.
 There is no per-request `redirectTo`. Serve that path in your frontend, and hand
-the token back to trade it for a session. <span class="since-badge" data-since="0.24">Since 0.24</span> The CMS serves it: the link signs in
-(through the code step on an account with a second factor) and opens the app at
-its own address, and a visitor already signed in is sent on without spending the
-link. Any other frontend needs its own landing page for it.
+the token back to trade it for a session. <span class="since-badge" data-since="0.24">Since 0.24</span> The CMS serves it, signing in (through the
+code step when there is a second factor); other frontends need a landing page.
 
 ```typescript
 // 1. Ask for the link.
@@ -506,19 +504,10 @@ const { pendingEmail, expiresAt } = await client.auth.changeEmail("jane@new.exam
 const { email, removedProviders } = await client.auth.confirmEmailChange(token);
 ```
 
-The link lives 24 hours, and asking again replaces it. `getUser()` reports the
-address that is waiting as `pendingEmail`. Confirming needs no session; when
-this client is signed in as the account that moved, its user takes the new
-address and `USER_UPDATED` is emitted. The new address is verified, sessions
-are kept, and `removedProviders` names the sign-in providers detached because
-they vouched for the old address.
-
-`changeEmail` rejects with `EMAIL_EXISTS` or `UNDELIVERABLE_ADDRESS` (409),
-`EMAIL_UNCHANGED` (400), `AAL2_REQUIRED` when the account has a second factor
-this session did not present, and `ANONYMOUS_USER` for a guest.
-`confirmEmailChange` rejects with `INVALID_TOKEN` for a spent, replaced or
-expired link, and `EMAIL_EXISTS` when another account took the address while
-the link waited. See [Changing an email address](/docs/backend/auth-endpoints/#changing-an-email-address).
+The link lives 24 hours; `getUser()` reports the waiting address as
+`pendingEmail`. Confirming needs no session, and a client signed in as that
+account takes the new address and emits `USER_UPDATED`. The refusals are listed
+in [Changing an email address](/docs/backend/auth-endpoints/#changing-an-email-address).
 
 ## Session Management (Multi-Device)
 

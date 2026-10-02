@@ -65,7 +65,7 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/users/:uid` | Read one user |
 | `PUT` | `/api/admin/users/:uid` | Update one user. `{ disabled: true }` switches the account off without deleting it: every sign-in and refresh is refused (`ACCOUNT_DISABLED`), its sessions end and every token it holds is refused; `false` switches it back on |
 | `DELETE` | `/api/admin/users/:uid` | Delete one user. Their sessions end, and every access token they hold is refused from that request on |
-| `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one |
+| `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one. `rebase auth reset-password` calls it, and writes to the database directly only when the backend cannot be reached; either way the account's sessions end |
 | `DELETE` | `/api/admin/users/:uid/mfa` | Remove a user's second factors and recovery codes, and end their sessions — for someone who lost both |
 | `GET` | `/api/admin/roles` | `admin` and the roles the users collection declares, with their scopes |
 | `POST` | `/api/admin/bootstrap` | Let the earliest-registered user claim the admin role while none exists. Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
