@@ -11,15 +11,9 @@ The `client.auth` module handles user authentication, token management, and sess
 The SDK persists sessions to `localStorage` by default and automatically refreshes tokens before they expire.
 
 :::note[Every sign-in method resolves to a flattened session]
-`signInWithEmail`, `signUp` and every `signInWith*` method return
-**`{ user, accessToken, refreshToken }`** — the SDK has already unwrapped the
-envelope for you.
+`signInWithEmail`, `signUp` and every `signInWith*` method return **`{ user, accessToken, refreshToken }`** — the SDK has already unwrapped the envelope for you.
 
-The REST API underneath returns the token nested instead, as
-`{ user, tokens: { accessToken, … } }`. That difference only matters if you also
-call `/api/auth/*` directly with `fetch`, where `body.accessToken` is `undefined`
-and the token is at `body.tokens.accessToken`. See
-[the wire format](/docs/backend/auth-endpoints/#response-format).
+The REST API underneath returns the token nested instead, as `{ user, tokens: { accessToken, … } }`. That difference only matters if you also call `/api/auth/*` directly with `fetch`, where `body.accessToken` is `undefined` and the token is at `body.tokens.accessToken`. See [the wire format](/docs/backend/auth-endpoints/#response-format).
 :::
 
 ## Email / Password
@@ -45,10 +39,7 @@ const { user, confirmationRequired } = await client.auth.signUp(
 ```
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> With [`requireEmailVerification`](/docs/backend/email-verification/) on,
-there is no session until the address is confirmed: `confirmationRequired` is
-`true` and `user` is `null`, so tell the person to open the mail. Otherwise
-`confirmationRequired` is `false` and `user` is the signed-in account. On 0.23
-`signUp` resolves `{ user, accessToken, refreshToken }` and always signs in.
+there is no session until the address is confirmed: `confirmationRequired` is `true` and `user` is `null`, so tell the person to open the mail. Otherwise `confirmationRequired` is `false` and `user` is the signed-in account. On 0.23 `signUp` resolves `{ user, accessToken, refreshToken }` and always signs in.
 
 ## OAuth Providers
 
@@ -111,12 +102,7 @@ await client.auth.signInWithOAuth("custom-provider", {
 
 ## Magic Links
 
-A one-click sign-in link by email. The link is always
-`<base>/auth/magic-link?token=…`, where `<base>` is the backend's `email.magicLinkUrl`,
-or its reset-password base (`FRONTEND_URL` on the runtime) when that is not set.
-There is no per-request `redirectTo`. Serve that path in your frontend, and hand
-the token back to trade it for a session. <span class="since-badge" data-since="0.24">Since 0.24</span> The CMS serves it, signing in (through the
-code step when there is a second factor); other frontends need a landing page.
+A one-click sign-in link by email. The link is always `<base>/auth/magic-link?token=…`, where `<base>` is the backend's `email.magicLinkUrl`, or its reset-password base (`FRONTEND_URL` on the runtime) when that is not set. There is no per-request `redirectTo`. Serve that path in your frontend, and hand the token back to trade it for a session. <span class="since-badge" data-since="0.24">Since 0.24</span> The CMS serves it, signing in (through the code step when there is a second factor); other frontends need a landing page.
 
 ```typescript
 // 1. Ask for the link.
