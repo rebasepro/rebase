@@ -109,39 +109,105 @@ describe("the direct-database reset", () => {
         expect(errors.join("\n")).toContain("Password too weak");
     });
 
-    it("exits non-zero when the update fails, rather than printing a stack and exiting 0", () => {
-        // The generated script, run for real against stand-ins for its four
-        // imports whose update rejects the way a refused connection does.
+    /**
+     * Run the generated script for real, against stand-ins for its imports.
+     * The `pg` client the stand-in hands out records every statement in
+     * `statements.json`, and answers each query with `answer(text)`.
+     */
+    function runResetScript(clientSource: string): { status: number | null; stderr: string; statements: { text: string; values?: unknown[] }[] } {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-auth-script-"));
         try {
-            const stub = (name: string, source: string) => {
+            const stub = (name: string, files: Record<string, string>, exports?: Record<string, string>) => {
                 const pkg = path.join(dir, "node_modules", name);
                 fs.mkdirSync(pkg, { recursive: true });
-                fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name, type: "module", main: "index.js" }));
-                fs.writeFileSync(path.join(pkg, "index.js"), source);
+                fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name, type: "module", main: "index.js", ...(exports ? { exports } : {}) }));
+                for (const [file, source] of Object.entries(files)) fs.writeFileSync(path.join(pkg, file), source);
             };
-            stub("@rebasepro/server-postgres", `
-                const refused = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:5432"), { code: "ECONNREFUSED" });
-                const chain = { set: () => chain, where: () => chain, returning: () => Promise.reject(refused) };
-                export const users = { id: "id", email: "email", passwordHash: "password_hash" };
-                export function createPostgresDatabaseConnection() { return { db: { update: () => chain } }; }
-            `);
-            stub("@rebasepro/server", "export async function hashPassword() { return \"hash\"; }");
-            stub("drizzle-orm", "export function eq() { return undefined; }");
-            stub("dotenv", "export function config() { return {}; }");
+            const log = path.join(dir, "statements.json");
+            stub("@rebasepro/server-postgres", {
+                "index.js": `
+                    import fs from "fs";
+                    const recorded = [];
+                    const record = (text, values) => {
+                        recorded.push({ text, values });
+                        fs.writeFileSync(${JSON.stringify(log)}, JSON.stringify(recorded));
+                    };
+                    ${clientSource}
+                    const column = (name) => ({ name });
+                    const config = Symbol.for("stub:table");
+                    export const users = { id: column("id"), email: column("email"), passwordHash: column("password_hash"), [config]: { name: "users", schema: "rebase" } };
+                    export function createPostgresDatabaseConnection() {
+                        return { pool: { connect: async () => client(record), end: async () => undefined } };
+                    }
+                `
+            });
+            stub("@rebasepro/server", { "index.js": "export async function hashPassword() { return \"hash\"; }" });
+            stub("drizzle-orm", {
+                "index.js": "export function eq() { return undefined; }",
+                "pg-core.js": "export function getTableConfig(table) { return table[Symbol.for(\"stub:table\")]; }"
+            }, { ".": "./index.js", "./pg-core": "./pg-core.js" });
+            stub("dotenv", { "index.js": "export function config() { return {}; }" });
 
             const script = path.join(dir, "reset.ts");
             fs.writeFileSync(script, resetPasswordScript(false));
             const run = spawnSync(process.execPath, [TSX_CLI, script], {
                 cwd: dir,
                 encoding: "utf8",
-                env: { ...process.env, REBASE_RESET_EMAIL: "admin@example.com", REBASE_RESET_PASSWORD: "x" }
+                env: { ...process.env, REBASE_RESET_EMAIL: "Admin@Example.com", REBASE_RESET_PASSWORD: "x" }
             });
-
-            expect(run.stderr).toContain("ECONNREFUSED");
-            expect(run.status).toBe(1);
+            const statements = fs.existsSync(log) ? JSON.parse(fs.readFileSync(log, "utf8")) : [];
+            return { status: run.status, stderr: run.stderr, statements };
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
+        }
+    }
+
+    it("exits non-zero when the update fails, rather than printing a stack and exiting 0", () => {
+        // The connection is refused, the way a stopped database refuses it.
+        const run = runResetScript(`
+            const refused = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:5432"), { code: "ECONNREFUSED" });
+            const client = async () => { throw refused; };
+        `);
+
+        expect(run.stderr).toContain("ECONNREFUSED");
+        expect(run.status).toBe(1);
+    });
+
+    it("ends the account's sessions in the same transaction that sets the password", () => {
+        // Every other door that sets a password ends the sessions the account
+        // holds (`replaceUserPassword`): an operator resetting a phished account
+        // is the reason to reset it. This one wrote the hash and left the
+        // attacker's refresh token minting access tokens.
+        const run = runResetScript(`
+            const client = (record) => ({
+                async query(text, values) {
+                    record(text, values);
+                    if (/^UPDATE/.test(text) && /RETURNING/.test(text)) return { rowCount: 1, rows: [{ id: "u-1", email: "admin@example.com" }] };
+                    if (/information_schema/.test(text)) return { rowCount: 1, rows: [{ present: true }] };
+                    if (/to_regclass/.test(text)) return { rowCount: 1, rows: [{ present: true }] };
+                    return { rowCount: 0, rows: [] };
+                },
+                release() {}
+            });
+        `);
+
+        expect(run.stderr).toBe("");
+        expect(run.status).toBe(0);
+        const texts = run.statements.map(s => s.text.replace(/\s+/g, " ").trim());
+        const inTransaction = texts.slice(texts.indexOf("BEGIN") + 1, texts.indexOf("COMMIT"));
+        expect(texts.indexOf("BEGIN")).toBeGreaterThanOrEqual(0);
+        expect(texts.indexOf("COMMIT")).toBeGreaterThan(texts.indexOf("BEGIN"));
+
+        const password = run.statements.find(s => /SET "password_hash" = \$1/.test(s.text));
+        expect(password?.values).toEqual(["hash", "admin@example.com"]);
+        expect(inTransaction.some(t => /SET "password_hash"/.test(t))).toBe(true);
+
+        const statementFor = (pattern: RegExp) => run.statements.find(s => pattern.test(s.text));
+        expect(statementFor(/SET tokens_valid_after = NOW\(\)/)?.values).toEqual(["u-1"]);
+        expect(statementFor(/DELETE FROM "rebase"\."refresh_tokens" WHERE uid = \$1/)?.values).toEqual(["u-1"]);
+        expect(statementFor(/DELETE FROM "rebase"\."password_reset_tokens" WHERE uid = \$1/)?.values).toEqual(["u-1"]);
+        for (const pattern of [/tokens_valid_after = NOW/, /"refresh_tokens"/, /"password_reset_tokens"/]) {
+            expect(inTransaction.some(t => pattern.test(t) && /^(UPDATE|DELETE)/.test(t))).toBe(true);
         }
     });
 });

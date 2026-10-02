@@ -344,6 +344,13 @@
   database:** it falls back to the direct-database reset only on a network
   error.
 
+- **`rebase auth reset-password` ends the account's sessions when it resets
+  in the database directly.** With the backend unreachable it wrote the new
+  hash and nothing else, so an operator recovering a phished account left the
+  attacker's refresh token minting access tokens. It now deletes the refresh
+  tokens and outstanding reset links and stamps `tokens_valid_after` in the
+  same transaction, as the API reset does.
+
 ## [0.23.0] - 2026-09-27
 
 ### Breaking
