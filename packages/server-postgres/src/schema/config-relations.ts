@@ -20,7 +20,7 @@
  */
 import { getTableColumns, relations, type Relations } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
-import { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
+import { CollectionConfig, ResolvedRelation, type ResolvedForeignKeyOnTarget } from "@rebasepro/types";
 import { fieldKeyForColumn, getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 
@@ -49,6 +49,19 @@ function primaryKeyFieldKey(collection: CollectionConfig): string {
 }
 
 /**
+ * The field key on the source table that a `hasOne`/`hasMany` foreign key
+ * holds: its `sourceKey` when the link names one, else the primary key.
+ */
+function sourceKeyFieldKey(
+    relation: ResolvedForeignKeyOnTarget,
+    collection: CollectionConfig
+): string {
+    return relation.sourceKey
+        ? fieldKeyForColumn(collection, relation.sourceKey)
+        : primaryKeyFieldKey(collection);
+}
+
+/**
  * A column of a built table, by its Drizzle key or by its column name.
  *
  * The key is the answer in the ordinary case, and the name is the fallback for
@@ -74,8 +87,8 @@ function columnOf(table: PgTable | undefined, key: string): unknown {
 interface OneSpec {
     key: string;
     target: PgTable;
-    fields?: unknown[];
-    references?: unknown[];
+    fields: unknown[];
+    references: unknown[];
     relationName: string;
 }
 
@@ -162,10 +175,26 @@ export function buildDrizzleRelationsFromCollections(
                 case "hasOne": {
                     if (!targetTable) continue;
                     if (!claim(tableName, name, relation.kind)) continue;
-                    // No fields/references: the foreign key lives on the target,
-                    // and drizzle pairs this with the owning side by name alone.
-                    // Passing them here crashes `normalizeRelation`.
-                    addOne(tableName, { key: relationKey, target: targetTable, relationName: name });
+                    // The foreign key lives on the target, so this side states
+                    // the join from its own end: its source key against the
+                    // target's foreign key. Drizzle has no `one()` that is paired
+                    // by `relationName` alone — `createOne` reads
+                    // `config.fields.reduce(...)` as the relations are evaluated,
+                    // which is at `drizzle({ schema })` — and a bare `one(target)`
+                    // is paired by table, which is ambiguous as soon as the target
+                    // has two links back here or the link is to its own table.
+                    // These are the columns drizzle would infer from the owning
+                    // side, given outright.
+                    const field = columnOf(table, sourceKeyFieldKey(relation, collection));
+                    const reference = columnOf(targetTable, fieldKeyForColumn(target, relation.foreignKeyOnTarget));
+                    if (!field || !reference) continue;
+                    addOne(tableName, {
+                        key: relationKey,
+                        target: targetTable,
+                        fields: [field],
+                        references: [reference],
+                        relationName: name
+                    });
                     break;
                 }
 
@@ -198,6 +227,8 @@ export function buildDrizzleRelationsFromCollections(
     // join on; it finds them on the owning side, which exists only if the other
     // collection happens to declare a `belongsTo` back. Where it does not, the
     // generated file synthesizes one under a `_synth_` key, and so does this.
+    // A `hasOne` names its own columns, and gets the same owning side so the
+    // target's table carries the link back under the same `relationName`.
     for (const [tableName, collection] of byTable) {
         const table = tables[tableName];
         for (const [, relation] of Object.entries(resolveCollectionRelations(collection))) {
@@ -216,11 +247,8 @@ export function buildDrizzleRelationsFromCollections(
             if (!claim(targetTableName, name, "belongsTo")) continue;
 
             const fkKey = fieldKeyForColumn(target, relation.foreignKeyOnTarget);
-            const referencedKey = relation.sourceKey
-                ? fieldKeyForColumn(collection, relation.sourceKey)
-                : primaryKeyFieldKey(collection);
             const field = columnOf(targetTable, fkKey);
-            const reference = columnOf(table, referencedKey);
+            const reference = columnOf(table, sourceKeyFieldKey(relation, collection));
             if (!field || !reference) continue;
 
             addOne(targetTableName, {
@@ -243,17 +271,11 @@ export function buildDrizzleRelationsFromCollections(
         built[`${tableName}Relations`] = relations(table, ({ one, many }) => {
             const map: Record<string, unknown> = {};
             for (const spec of tableOnes) {
-                map[spec.key] = spec.fields
-                    ? one(spec.target, {
-                        fields: spec.fields as never,
-                        references: spec.references as never,
-                        relationName: spec.relationName
-                    })
-                    // A `hasOne` names its counterpart and gives no columns —
-                    // drizzle's own type demands `fields`/`references` here, but
-                    // supplying them is what crashes `normalizeRelation`, so the
-                    // config is the shape the runtime wants and the cast says so.
-                    : one(spec.target, { relationName: spec.relationName } as never);
+                map[spec.key] = one(spec.target, {
+                    fields: spec.fields as never,
+                    references: spec.references as never,
+                    relationName: spec.relationName
+                });
             }
             for (const spec of tableManys) {
                 if (map[spec.key]) continue;

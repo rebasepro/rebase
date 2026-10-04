@@ -319,23 +319,38 @@ export interface TablePlan {
  * pair them; the rule that derives it is `sharedRelationName`, which both sides
  * compute independently from the table that owns the column.
  */
-export interface RelationPlan {
+export type RelationPlan = OneRelationPlan | ManyRelationPlan;
+
+interface RelationPlanBase {
     /** The Drizzle table variable this entry belongs to. */
     tableVar: string;
     /** The key in the relations object. */
     key: string;
-    kind: "one" | "many";
     targetVar: string;
-    /**
-     * Absent only for a `hasOne` inverse, which is the documented FK-less form:
-     * `one(target)` with no config. `one(target, { relationName })` is not a
-     * `RelationConfig` (TS2345) and throws at runtime besides.
-     */
-    relationName?: string;
+    relationName: string;
+}
+
+/**
+ * A `one()`. Every one names its join — Drizzle has no `one()` paired by
+ * `relationName` alone, and one paired by table is ambiguous as soon as two
+ * links join the same pair of tables.
+ */
+export interface OneRelationPlan extends RelationPlanBase {
+    kind: "one";
     /** Property keys on this table. */
-    fields?: string[];
+    fields: string[];
     /** Property keys on the target table. */
-    references?: string[];
+    references: string[];
+    /**
+     * Set on a `hasOne`, whose `fields` are this table's own key: the target
+     * row may not exist although every column in `fields` is NOT NULL, which
+     * is what Drizzle reads a `one()`'s nullability from.
+     */
+    nullable?: true;
+}
+
+export interface ManyRelationPlan extends RelationPlanBase {
+    kind: "many";
 }
 
 export interface PlanOptions {

@@ -95,6 +95,32 @@ describe("the generated Drizzle schema compiles", () => {
         expect(compileDiagnostics(schema)).toEqual([]);
     }, 60_000);
 
+    // The file is what a project's relational queries are typed by, so the
+    // types have to say what the database returns. A `hasOne` names its join
+    // with this table's key, which is NOT NULL, and drizzle would infer from
+    // that a related row that is always there. An author may have no profile.
+    it("types a hasOne's related row as possibly absent", async () => {
+        const schema = await generateSchema(groups.relations);
+        const usage = [
+            "import { drizzle } from 'drizzle-orm/node-postgres';",
+            "const db = drizzle.mock({ schema: { ...tables, ...relations } });",
+            "export async function profileOf() {",
+            "    const author = await db.query.authors.findFirst({ with: { profile: true } });",
+            "    if (!author) return undefined;",
+            "    const absent: typeof author.profile = null;",
+            "    return absent;",
+            "}"
+        ].join("\n");
+
+        expect(compileDiagnostics(`${schema}\n${usage}\n`)).toEqual([]);
+
+        // And the check can fail: the same `one()` without its type arguments
+        // is typed as never null.
+        const inferred = schema.replace(/one<typeof profiles, \[[^\]]*\]>\(profiles,/, "one(profiles,");
+        expect(inferred).not.toBe(schema);
+        expect(compileDiagnostics(`${inferred}\n${usage}\n`).join("\n")).toContain("TS2322");
+    }, 60_000);
+
     // A green gate that cannot go red is not a gate. Both halves are checked:
     // a type error in the file, and a drizzle builder used without its import —
     // which is the exact shape of four of the six bugs above.

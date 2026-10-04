@@ -393,12 +393,10 @@ relationName: "author" }
             // Should create owning relation on profiles
             expect(cleanResult).toContain("export const profilesRelations = drizzleRelations(profiles, ({ one, many }) => ({ \"author\": one(authors, { fields: [profiles.authorId], references: [authors.id], relationName: \"profiles_authorId\" }) }));");
 
-            // Should create inverse relation on authors. The FK-less side is a
-            // bare `one(profiles)`: it has no fields/references to give, and
-            // `one(t, { relationName })` is neither valid against drizzle's
-            // types nor survivable at runtime — see the one-to-one pairing test
-            // below.
-            expect(cleanResult).toContain("export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ \"profile\": one(profiles) }));");
+            // Should create inverse relation on authors. The side without the
+            // foreign key names the same join from its own end, under the same
+            // relationName — see the one-to-one pairing test below.
+            expect(cleanResult).toContain("export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ \"profile\": one<typeof profiles, [AnyPgColumn<{ tableName: \"authors\" }>]>(profiles, { fields: [authors.id], references: [profiles.authorId], relationName: \"profiles_authorId\" }) }));");
         });
 
         it("should generate owning one-to-many relations", async () => {
@@ -779,7 +777,7 @@ relationName: "company" }
         expect(matchingNames).toHaveLength(2);
     });
 
-    it("emits the FK-less side of a one-to-one as a bare one(), which is the only form drizzle accepts", async () => {
+    it("emits the FK-less side of a one-to-one with its own columns, under the owning side's relationName", async () => {
         const usersCollection: CollectionConfig = {
             slug: "users",
             table: "users",
@@ -827,20 +825,118 @@ relationName: "user" }
             `"user": one(users, { fields: [profiles.userId], references: [users.id], relationName: \"${expectedSharedName}\" })`
         );
 
-        // Inverse side (users → profiles). The foreign key is on the TARGET, so
-        // this side has no `fields`/`references` to give — and drizzle has no
-        // third form. `one(profiles, { relationName })` was emitted for it, and
-        // that is not a `RelationConfig` (TS2345) *and* not something the
-        // runtime survives: `createOne` reads `config.fields.reduce(...)`
-        // unconditionally, so building the relational config threw "Cannot read
-        // properties of undefined (reading 'reduce')" — every generated schema
-        // with a `hasOne` inverse broke drizzle's relational queries outright.
+        // Inverse side (users → profiles). The foreign key is on the TARGET.
+        // Drizzle has no `one()` paired by `relationName` alone:
+        // `one(profiles, { relationName })` is not a `RelationConfig` (TS2345)
+        // and `createOne` reads `config.fields.reduce(...)`, so it throws as the
+        // relations are evaluated. A bare `one(profiles)` is paired by table,
+        // which fails as soon as the target has a second link back or the link
+        // is to its own table. So this side gives the join from its own end —
+        // its key against the target's foreign key — under the same name.
         //
-        // A bare `one(profiles)` is drizzle's documented FK-less form:
-        // `normalizeRelation` pairs it with the `belongsTo` on the target that
-        // points back here.
-        expect(cleanResult).toContain(`"profile": one(profiles)`);
+        // The explicit `TColumns` keeps the relation nullable in the query's
+        // type: drizzle derives that from `fields`, and `users.id` is NOT NULL
+        // while a user may have no profile.
+        expect(cleanResult).toContain(
+            `"profile": one<typeof profiles, [AnyPgColumn<{ tableName: "users" }>]>(profiles, { fields: [users.id], references: [profiles.userId], relationName: \"${expectedSharedName}\" })`
+        );
         expect(cleanResult).not.toContain(`one(profiles, { relationName`);
+        expect(cleanResult).not.toContain(`one(profiles)`);
+        expect(extractRelationNames(result).filter(n => n === expectedSharedName)).toHaveLength(2);
+    });
+
+    it("keeps two hasOne relations to the same target apart", async () => {
+        const companiesCollection: CollectionConfig = {
+            slug: "companies",
+            table: "companies",
+            name: "Companies",
+            properties: { name: { type: "string" } },
+            relations: [
+                { kind: "hasOne", relationName: "billingConfig", target: () => billingCollection, foreignKeyOnTarget: "company_id" },
+                { kind: "hasOne", relationName: "backupBillingConfig", target: () => billingCollection, foreignKeyOnTarget: "backup_company_id" }
+            ]
+        };
+
+        const billingCollection: CollectionConfig = {
+            slug: "billing_configs",
+            table: "billing_configs",
+            name: "Billing configs",
+            properties: {
+                plan: { type: "string" },
+                company: { type: "relation", relation: { kind: "belongsTo", target: () => companiesCollection, localKey: "company_id" } },
+                backupCompany: { type: "relation", relation: { kind: "belongsTo", target: () => companiesCollection, localKey: "backup_company_id" } }
+            }
+        };
+
+        const cleanResult = cleanSchema(await generateSchema([companiesCollection, billingCollection]));
+
+        // Each names its own foreign key and shares its name with the matching
+        // owning side. A bare `one(billingConfigs)` here throws in drizzle:
+        // "There are multiple relations between…".
+        expect(cleanResult).toContain(
+            `"billingConfig": one<typeof billingConfigs, [AnyPgColumn<{ tableName: "companies" }>]>(billingConfigs, { fields: [companies.id], references: [billingConfigs.companyId], relationName: "billing_configs_companyId" })`
+        );
+        expect(cleanResult).toContain(
+            `"backupBillingConfig": one<typeof billingConfigs, [AnyPgColumn<{ tableName: "companies" }>]>(billingConfigs, { fields: [companies.id], references: [billingConfigs.backupCompanyId], relationName: "billing_configs_backupCompanyId" })`
+        );
+        expect(cleanResult).toContain(
+            `"company": one(companies, { fields: [billingConfigs.companyId], references: [companies.id], relationName: "billing_configs_companyId" })`
+        );
+        expect(cleanResult).toContain(
+            `"backupCompany": one(companies, { fields: [billingConfigs.backupCompanyId], references: [companies.id], relationName: "billing_configs_backupCompanyId" })`
+        );
+    });
+
+    it("emits a self-referencing hasOne beside its belongsTo", async () => {
+        const employeesCollection: CollectionConfig = {
+            slug: "employees",
+            table: "employees",
+            name: "Employees",
+            properties: {
+                name: { type: "string" },
+                mentor: { type: "relation", relation: { kind: "belongsTo", target: () => employeesCollection, localKey: "mentor_id" } },
+                mentee: { type: "relation", relation: { kind: "hasOne", target: () => employeesCollection, foreignKeyOnTarget: "mentor_id" } }
+            }
+        };
+
+        const cleanResult = cleanSchema(await generateSchema([employeesCollection]));
+
+        // A bare `one(employees)` counts itself as its own counterpart.
+        expect(cleanResult).toContain(
+            `"mentor": one(employees, { fields: [employees.mentorId], references: [employees.id], relationName: "employees_mentorId" })`
+        );
+        expect(cleanResult).toContain(
+            `"mentee": one<typeof employees, [AnyPgColumn<{ tableName: "employees" }>]>(employees, { fields: [employees.id], references: [employees.mentorId], relationName: "employees_mentorId" })`
+        );
+    });
+
+    it("joins a hasOne on its sourceKey", async () => {
+        const companiesCollection: CollectionConfig = {
+            slug: "companies",
+            table: "companies",
+            name: "Companies",
+            properties: { external_ref: { type: "string" } },
+            relations: [
+                { kind: "hasOne", relationName: "billingConfig", target: () => billingCollection, foreignKeyOnTarget: "company_ref", sourceKey: "external_ref" }
+            ]
+        };
+
+        const billingCollection: CollectionConfig = {
+            slug: "billing_configs",
+            table: "billing_configs",
+            name: "Billing configs",
+            properties: { company_ref: { type: "string" } }
+        };
+
+        const cleanResult = cleanSchema(await generateSchema([companiesCollection, billingCollection]));
+
+        expect(cleanResult).toContain(
+            `"billingConfig": one<typeof billingConfigs, [AnyPgColumn<{ tableName: "companies" }>]>(billingConfigs, { fields: [companies.external_ref], references: [billingConfigs.company_ref], relationName: "billing_configs_company_ref" })`
+        );
+        // The owning side the target does not declare.
+        expect(cleanResult).toContain(
+            `"_synth_companies_company_ref": one(companies, { fields: [billingConfigs.company_ref], references: [companies.external_ref], relationName: "billing_configs_company_ref" })`
+        );
     });
 
     it("should emit different shared names for multiple relations between same tables", async () => {

@@ -666,6 +666,15 @@ description: Every released change to Rebase — new features, fixes, and the br
   before this gets the default at its next boot, and a key you send is
   still used.
 
+- **A `hasOne` relation no longer stops the Postgres backend from booting.**
+  A collection declaring one (a company with its billing config, the
+  foreign key on the child) crashed at startup with "Cannot read properties
+  of undefined (reading 'reduce')". The generated `schema.generated.ts` booted,
+  but reading the relation with `include` failed with "There are multiple
+  relations between…" once the child had two links back to the parent, and
+  for every `hasOne` to its own collection. Both now name the join columns,
+  and the related row is typed as possibly `null`.
+
 #### CLI
 
 - **`rebase db push` stops before a column type change that can lose
