@@ -108,55 +108,6 @@ export interface MfaFactorSummary {
 }
 
 /**
- * A second factor on the signed-in account, as its settings list it.
- * @group Hooks and utilities
- */
-export interface MfaFactorInfo {
-    id: string;
-    /** `"totp"` for an authenticator app. */
-    factorType: string;
-    friendlyName?: string;
-    /** `false` until a code from the authenticator confirmed the enrolment. */
-    verified: boolean;
-    createdAt: string;
-}
-
-/**
- * An authenticator being added: the key to put in the app, and — with the
- * account's first factor — recovery codes, shown once.
- * @group Hooks and utilities
- */
-export interface MfaEnrollment {
-    factorId: string;
-    /** The TOTP secret, base32, for typing into an authenticator. */
-    secret: string;
-    /** The `otpauth://` URI an authenticator app opens. */
-    uri: string;
-    recoveryCodes: string[] | null;
-}
-
-/**
- * The signed-in account's own second factors. Changing them needs a session
- * that presented one (`aal2`) once the account has a verified factor; such a
- * call is refused with `AAL2_REQUIRED`, and {@link stepUp} is the answer.
- * @group Hooks and utilities
- */
-export interface MfaSettingsController {
-    listFactors(): Promise<MfaFactorInfo[]>;
-    enroll(friendlyName?: string): Promise<MfaEnrollment>;
-    /** Confirm an enrolment with a code from the authenticator. */
-    verifyEnrollment(factorId: string, code: string): Promise<void>;
-    removeFactor(factorId: string): Promise<void>;
-    /** Replace the recovery codes with new ones, shown once. */
-    regenerateRecoveryCodes(): Promise<string[]>;
-    /**
-     * Present a code from a verified factor (or a recovery code), which turns
-     * this session into an `aal2` one.
-     */
-    stepUp(factorId: string, code: string): Promise<void>;
-}
-
-/**
  * Extended auth controller with common optional auth methods.
  * Backend implementations (Rebase backend, Firebase, etc.)
  * extend this with their own backend-specific extras.
@@ -221,8 +172,6 @@ export interface AuthControllerExtended<USER extends User = User, ExtraData = un
      * code. On success the user is signed in, as by any other sign-in.
      */
     verifyMfaChallenge?(mfaToken: string, challengeId: string, code: string): Promise<void>;
-    /** The signed-in account's own second factors. Absent when the client has no MFA support. */
-    mfaSettings?: MfaSettingsController;
     /**
      * The scopes the signed-in user holds (`GET /auth/scopes`), so a screen
      * can offer an action only to those its route admits. `undefined` until

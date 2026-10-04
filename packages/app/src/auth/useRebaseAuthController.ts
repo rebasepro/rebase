@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { User, AuthChangeEvent, RebaseSession } from "@rebasepro/types";
-import type { MfaSettingsController } from "@rebasepro/cms-types";
 import type { AuthConfigResponse } from "./api";
 import { RebaseAuthController, RebaseAuthControllerProps } from "./types";
 import { bindSessionCachesToUser, clearSessionCaches } from "./session_caches";
@@ -378,41 +377,6 @@ export function useRebaseAuthController(
         }
     }, [auth]);
 
-    /**
-     * The account's own second factors, over the client's `mfa`. Only when
-     * the client can enrol, list, remove and replace codes — a hand-built
-     * client that can only answer a sign-in challenge gets no settings.
-     */
-    const mfaSettings = useMemo((): MfaSettingsController | undefined => {
-        const mfa = auth?.mfa;
-        if (!mfa) return undefined;
-        const enroll = mfa.enroll?.bind(mfa);
-        const verify = mfa.verify?.bind(mfa);
-        const listFactors = mfa.listFactors?.bind(mfa);
-        const unenroll = mfa.unenroll?.bind(mfa);
-        const regenerateRecoveryCodes = mfa.regenerateRecoveryCodes?.bind(mfa);
-        if (!enroll || !verify || !listFactors || !unenroll || !regenerateRecoveryCodes) return undefined;
-        return {
-            listFactors: () => listFactors(),
-            enroll: async (friendlyName?: string) => {
-                const { factor, totp, recoveryCodes } = await enroll(friendlyName ? { friendlyName } : undefined);
-                return { factorId: factor.id, secret: totp.secret, uri: totp.uri, recoveryCodes };
-            },
-            verifyEnrollment: async (factorId: string, code: string) => {
-                await verify(factorId, code);
-            },
-            removeFactor: async (factorId: string) => {
-                await unenroll(factorId);
-            },
-            regenerateRecoveryCodes: async () => (await regenerateRecoveryCodes()).recoveryCodes,
-            // No pending token: the challenge steps up the session the client
-            // already holds, and the SDK adopts the `aal2` session it mints.
-            stepUp: async (factorId: string, code: string) => {
-                const { challengeId } = await mfa.challenge(factorId);
-                await mfa.verifyChallenge(challengeId, code);
-            }
-        };
-    }, [auth]);
 
     const changeEmail = useCallback(async (newEmail: string) => {
         if (!auth?.changeEmail) throw new Error("Rebase client with email change is required");
@@ -492,7 +456,6 @@ export function useRebaseAuthController(
         // view can tell a second step it can take from one it cannot.
         startMfaChallenge: auth?.mfa ? startMfaChallenge : undefined,
         verifyMfaChallenge: auth?.mfa ? verifyMfaChallenge : undefined,
-        mfaSettings,
         heldScopes,
         extra,
         setExtra,

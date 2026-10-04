@@ -547,40 +547,6 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
             expect(result.current.heldScopes).toBeUndefined();
         });
 
-        it("manages the account's second factors through the client, stepping up with a challenge", async () => {
-            const mfa = {
-                challenge: jest.fn().mockResolvedValue({ challengeId: "ch-1" }),
-                verifyChallenge: jest.fn().mockResolvedValue(undefined),
-                enroll: jest.fn().mockResolvedValue({
-                    factor: { id: "f-1", factorType: "totp" },
-                    totp: { secret: "SECRET", uri: "otpauth://x", qrUri: "otpauth://x" },
-                    recoveryCodes: ["c-1"]
-                }),
-                verify: jest.fn().mockResolvedValue({ success: true }),
-                listFactors: jest.fn().mockResolvedValue([]),
-                unenroll: jest.fn().mockResolvedValue({ success: true }),
-                regenerateRecoveryCodes: jest.fn().mockResolvedValue({ recoveryCodes: ["n-1"] })
-            };
-            mockAuth.mfa = mfa;
-
-            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
-            const settings = result.current.mfaSettings!;
-
-            expect(await settings.enroll("Phone")).toEqual({ factorId: "f-1", secret: "SECRET", uri: "otpauth://x", recoveryCodes: ["c-1"] });
-            expect(mfa.enroll).toHaveBeenCalledWith({ friendlyName: "Phone" });
-            expect(await settings.regenerateRecoveryCodes()).toEqual(["n-1"]);
-            await settings.stepUp("f-1", "123456");
-            // No pending token: the challenge steps up the session the client holds.
-            expect(mfa.challenge).toHaveBeenCalledWith("f-1");
-            expect(mfa.verifyChallenge).toHaveBeenCalledWith("ch-1", "123456");
-        });
-
-        it("offers no factor management when the client cannot enrol", () => {
-            mockAuth.mfa = { challenge: jest.fn(), verifyChallenge: jest.fn() };
-            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
-            expect(result.current.mfaSettings).toBeUndefined();
-        });
-
         it("offers no magic-link sign-in when the client has none", () => {
             const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
             expect(result.current.magicLinkLogin).toBeUndefined();

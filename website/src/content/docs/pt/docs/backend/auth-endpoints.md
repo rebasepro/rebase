@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b15e7eb390a6548
+sourceHash: eb3d7dba66d373fb
 title: Endpoints de autenticação e tokens
 sidebar_label: Endpoints de autenticação
 description: As rotas de autenticação que o backend do Rebase disponibiliza, seus formatos de resposta, autenticação multifator, o contexto de banco de dados que uma política visualiza, JWKS e chaves de serviço.
@@ -197,12 +197,7 @@ incorretas, cada conta é limitada a dez tentativas de verificação a cada 15 m
 registrado para aquele fator, impedindo que seja reutilizado pelo restante da sua
 janela de ±1 etapa.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> No CMS, **Account settings → Two-step verification** cadastra um
-aplicativo autenticador (sua chave, e um link que o abre no aplicativo, depois o código
-que ele exibe), lista os fatores da conta, remove um e substitui os códigos
-de recuperação. Quando uma alteração requer `aal2`, ela pede um código primeiro e eleva a sessão
-com ele. Os códigos de recuperação são exibidos uma vez, depois que o primeiro fator é
-confirmado. Na tabela de usuários, **Reset two-step verification**
+<span class="since-badge" data-since="0.24">Since 0.24</span> Na tabela de usuários, **Reset two-step verification**
 (`DELETE /api/admin/users/:uid/mfa`) e **Disable or enable account**
 (`PUT /api/admin/users/:uid { disabled }`) são oferecidos a quem possui
 `users:write`, assim como as rotas são; a opção nunca é oferecida na própria

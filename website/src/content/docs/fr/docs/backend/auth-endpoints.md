@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b15e7eb390a6548
+sourceHash: eb3d7dba66d373fb
 title: Endpoints d'authentification et jetons
 sidebar_label: Endpoints d'authentification
 description: Les routes d'authentification montées par le backend Rebase, le format de leurs réponses, l'authentification multifacteur, le contexte de base de données vu par une politique, JWKS et clés de service.
@@ -198,13 +198,7 @@ chaque compte est limité à dix tentatives de vérification par tranche de 15 m
 enregistré pour ce facteur afin qu'il ne puisse pas être rejoué durant le reste de sa fenêtre de validité
 de ±1 intervalle (step).
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Dans le CMS, **Paramètres du compte → Vérification en deux
-étapes** permet d'enrôler une application d'authentification (sa clé, et un lien
-qui l'ouvre dans l'application, puis le code qu'elle affiche), de lister les
-facteurs du compte, d'en supprimer un et de remplacer les codes de récupération.
-Lorsqu'un changement exige `aal2`, elle demande d'abord un code et élève la
-session avec celui-ci. Les codes de récupération sont affichés une seule fois,
-après la confirmation du premier facteur. Dans la table des utilisateurs,
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Dans la table des utilisateurs,
 **Réinitialiser la vérification en deux étapes** (`DELETE /api/admin/users/:uid/mfa`)
 et **Désactiver ou activer le compte** (`PUT /api/admin/users/:uid { disabled }`)
 sont proposées à quiconque détient `users:write`, comme le sont les routes ;

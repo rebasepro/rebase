@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b15e7eb390a6548
+sourceHash: eb3d7dba66d373fb
 title: Endpoint e token di autenticazione
 sidebar_label: Endpoint di autenticazione
 description: Le route di autenticazione montate dal backend Rebase, la struttura delle loro risposte, l'autenticazione a più fattori, il contesto del database visibile a una policy, JWKS e chiavi di servizio.
@@ -201,14 +201,7 @@ utente, quindi cambiare IP non serve a nulla) e un codice accettato viene regist
 fattore in modo che non possa essere riutilizzato (replay attack) per il resto della sua
 finestra di tolleranza di ±1 step.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Nel CMS, **Account
-settings → Two-step verification** registra un'app di autenticazione (la sua
-chiave, e un link che la apre nell'app, poi il codice che mostra), elenca i
-fattori dell'account, ne rimuove uno e sostituisce i codici di recupero.
-Quando una modifica richiede `aal2`, chiede prima un codice ed esegue lo
-step-up della sessione con esso. I codici di recupero vengono mostrati una
-sola volta, dopo che il primo fattore è stato confermato. Nella tabella degli
-utenti, **Reset two-step verification** (`DELETE /api/admin/users/:uid/mfa`) e
+<span class="since-badge" data-since="0.24">Da 0.24</span> Nella tabella degli utenti, **Reset two-step verification** (`DELETE /api/admin/users/:uid/mfa`) e
 **Disable or enable account** (`PUT /api/admin/users/:uid { disabled }`) sono
 offerti a chiunque possieda `users:write`, così come lo sono le route;
 l'interruttore non viene mai offerto sul proprio account, e un account che

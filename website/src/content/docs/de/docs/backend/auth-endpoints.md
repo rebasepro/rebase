@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b15e7eb390a6548
+sourceHash: eb3d7dba66d373fb
 title: Auth-Endpunkte und Tokens
 sidebar_label: Auth-Endpunkte
 description: Die Authentifizierungs-Routen, die das Rebase-Backend bereitstellt, ihre Antwortstrukturen, Multi-Faktor-Authentifizierung, der Datenbankkontext für Richtlinien, JWKS und Service-Schlüssel.
@@ -195,12 +195,7 @@ jedes Konto ist auf zehn Verifizierungsversuche pro 15 Minuten beschränkt
 für den Faktor vermerkt, sodass er für den Rest seines Zeitfensters von
 ±1 Schritt nicht erneut verwendet werden kann.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Im CMS registriert **Kontoeinstellungen → Zwei-Schritt-Verifizierung** eine
-Authenticator-App (ihren Schlüssel und einen Link, der sie in der App öffnet, dann den
-Code, den sie zeigt), listet die Faktoren des Kontos auf, entfernt einen und ersetzt die
-Wiederherstellungscodes. Braucht eine Änderung `aal2`, fragt es zuerst nach einem Code
-und stuft die Sitzung damit hoch. Die Wiederherstellungscodes werden einmal angezeigt,
-nachdem der erste Faktor bestätigt wurde. In der Benutzertabelle werden **Zwei-Schritt-Verifizierung zurücksetzen**
+<span class="since-badge" data-since="0.24">Seit 0.24</span> In der Benutzertabelle werden **Zwei-Schritt-Verifizierung zurücksetzen**
 (`DELETE /api/admin/users/:uid/mfa`) und **Konto deaktivieren oder aktivieren**
 (`PUT /api/admin/users/:uid { disabled }`) jedem angeboten, der `users:write` hält,
 genau wie die Routen selbst; der Schalter wird nie für das eigene Konto angeboten, und

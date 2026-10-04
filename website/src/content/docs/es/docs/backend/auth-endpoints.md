@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b15e7eb390a6548
+sourceHash: eb3d7dba66d373fb
 title: Endpoints y tokens de autenticación
 sidebar_label: Endpoints de autenticación
 description: Las rutas de autenticación que monta el backend de Rebase, las estructuras de sus respuestas, autenticación multifactor, el contexto de base de datos que ve una directiva, JWKS y claves de servicio.
@@ -164,13 +164,7 @@ El registro de factores también está restringido. El primer factor en una cuen
 
 La verificación está acotada en ambos ejes: un desafío expira tras cinco intentos fallidos, cada cuenta está limitada a diez intentos de verificación cada 15 minutos (contabilizados por usuario, por lo que rotar direcciones IP no sirve de nada) y un código aceptado se registra contra el factor para que no pueda reutilizarse durante el resto de su ventana de tolerancia de ±1 paso.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> En el CMS, **Configuración de la cuenta → Verificación en dos pasos** registra una
-app de autenticación (su clave, y un enlace que la abre en la app, y luego el
-código que muestra), lista los factores de la cuenta, elimina uno y sustituye
-los códigos de recuperación. Cuando un cambio necesita `aal2`, primero pide un
-código y con él eleva el nivel de la sesión. Los códigos de recuperación se
-muestran una sola vez, tras confirmar el primer factor. En la tabla de
-usuarios, **Restablecer verificación en dos pasos**
+<span class="since-badge" data-since="0.24">Desde 0.24</span> En la tabla de usuarios, **Restablecer verificación en dos pasos**
 (`DELETE /api/admin/users/:uid/mfa`) y **Deshabilitar o habilitar cuenta**
 (`PUT /api/admin/users/:uid { disabled }`) se ofrecen a quien tenga
 `users:write`, igual que las rutas; el interruptor nunca se ofrece sobre la
