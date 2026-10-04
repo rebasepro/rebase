@@ -59,7 +59,9 @@ export function resolveCollectionPathIds(path: string, allCollections: AdminColl
                 col,
                 match: col.slug
             }])
-            .filter(p => p.match && remainingPath.startsWith(p.match))
+            // Whole segments only: a bare `startsWith` read `users/abc123` as the
+            // collection `user` followed by the id `s`.
+            .filter(p => p.match && (remainingPath === p.match || remainingPath.startsWith(`${p.match}/`)))
             .sort((a, b) => b.match.length - a.match.length);
 
         if (potentialMatches.length > 0) {
@@ -126,12 +128,8 @@ export function resolveCollectionPathIds(path: string, allCollections: AdminColl
  */
 export function getCollectionBySlugWithin(slugOrPath: string, collections: AdminCollection[]): AdminCollection | undefined {
 
-    const subpaths = removeInitialAndTrailingSlashes(slugOrPath).split("/");
-    if (subpaths.length % 2 === 0) {
-        throw Error(`getCollectionBySlug: Collection paths must have an odd number of segments: ${slugOrPath}`);
-    }
-
-    const subpathCombinations = getCollectionPathsCombinations(subpaths);
+    const path = removeInitialAndTrailingSlashes(slugOrPath);
+    const subpathCombinations = getCollectionPathsCombinations(path.split("/"));
     let result: AdminCollection | undefined;
     for (let i = 0; i < subpathCombinations.length; i++) {
         const subpathCombination = subpathCombinations[i];
@@ -140,13 +138,18 @@ export function getCollectionBySlugWithin(slugOrPath: string, collections: Admin
             .find((entry) => entry.slug === subpathCombination);
 
         if (navigationEntry) {
-
-            if (subpathCombination === slugOrPath) {
+            // Counted from where the slug ends, not over the whole path, whose
+            // count the slug's own slashes would decide. What follows a
+            // collection pairs up as (entity id, subcollection), so an odd
+            // remainder ends at a record.
+            const rest = path.split("/").slice(subpathCombination.split("/").length);
+            if (rest.length % 2 !== 0) {
+                throw Error(`getCollectionBySlug: Collection paths must end at a collection, not at a record: ${slugOrPath}`);
+            }
+            if (rest.length === 0) {
                 result = navigationEntry;
             } else if (getSubcollections(navigationEntry).length > 0) {
-                const newPath = slugOrPath.replace(subpathCombination, "").split("/").slice(2).join("/");
-                if (newPath.length > 0)
-                    result = getCollectionBySlugWithin(newPath, getSubcollections(navigationEntry));
+                result = getCollectionBySlugWithin(rest.slice(1).join("/"), getSubcollections(navigationEntry));
             }
         }
         if (result) break;
@@ -155,17 +158,20 @@ export function getCollectionBySlugWithin(slugOrPath: string, collections: Admin
 }
 
 /**
- * Get the subcollection combinations from a path:
- * "sites/es/locales" => ["sites/es/locales", "sites"]
+ * Every leading run of whole segments of a path, longest first: the
+ * candidates for the collection the path starts with.
+ * "sites/es/locales" => ["sites/es/locales", "sites/es", "sites"]
+ *
+ * Every length, not only the odd ones. A slug may contain slashes, so
+ * `content/podcasts/abc123/episodes` starts with the two-segment collection
+ * `content/podcasts`, and a path's own segment count says nothing about where
+ * its first collection ends.
  * @param subpaths
  */
 export function getCollectionPathsCombinations(subpaths: string[]): string[] {
-    const entries = subpaths.length > 0 && subpaths.length % 2 === 0 ? subpaths.splice(0, subpaths.length - 1) : subpaths;
-
-    const length = entries.length;
     const result: string[] = [];
-    for (let i = length; i > 0; i = i - 2) {
-        result.push(entries.slice(0, i).join("/"));
+    for (let i = subpaths.length; i > 0; i--) {
+        result.push(subpaths.slice(0, i).join("/"));
     }
     return result;
 }

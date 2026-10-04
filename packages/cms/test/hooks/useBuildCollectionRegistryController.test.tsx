@@ -45,6 +45,43 @@ name: "Title" }
     }
 } as unknown as CollectionConfig;
 
+/**
+ * A slashed slug with subcollections under it. The collection itself resolved by
+ * exact match; its subcollections did not, because the walker still started
+ * from `medico`, and the joint's tabs rendered empty.
+ */
+const movements = {
+    name: "Movements",
+    slug: "movements",
+    engine: "firestore",
+    subcollections: () => [locales],
+    properties: {}
+} as unknown as CollectionConfig;
+
+const locales = {
+    name: "Locales",
+    slug: "locales",
+    engine: "firestore",
+    properties: {}
+} as unknown as CollectionConfig;
+
+const joints = {
+    name: "Joints",
+    slug: "medico/v2.0.0/joints",
+    engine: "firestore",
+    subcollections: () => [movements, locales],
+    properties: {}
+} as unknown as CollectionConfig;
+
+/** Two segments, so the whole path's segment count misreads every path under it. */
+const podcasts = {
+    name: "Podcasts",
+    slug: "content/podcasts",
+    engine: "firestore",
+    subcollections: () => [locales],
+    properties: {}
+} as unknown as CollectionConfig;
+
 const companies = {
     id: "companies",
     name: "Companies",
@@ -62,7 +99,7 @@ const companies = {
 function renderWithCollections(props: Parameters<typeof useBuildCollectionRegistryController>[0] = {}) {
     const rendered = renderHook(() => useBuildCollectionRegistryController(props));
     act(() => {
-        rendered.result.current.collectionRegistryRef.current.registerMultiple([jobs, companies, localePodcasts]);
+        rendered.result.current.collectionRegistryRef.current.registerMultiple([jobs, companies, localePodcasts, joints, podcasts]);
     });
     rendered.rerender();
     return rendered;
@@ -111,6 +148,52 @@ describe("useBuildCollectionRegistryController", () => {
 
         expect(result.current.getCollection("content/de-DE/podcasts/abc123")?.slug)
             .toBe("content/de-DE/podcasts");
+    });
+
+    it("resolves a subcollection under a slug that contains slashes", () => {
+        const { result } = renderWithCollections();
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+        expect(result.current.getCollection("medico/v2.0.0/joints/j1/movements")?.slug).toBe("movements");
+        expect(result.current.getCollection("medico/v2.0.0/joints/j1/locales")?.slug).toBe("locales");
+        // One level further down, and a record inside it.
+        expect(result.current.getCollection("medico/v2.0.0/joints/j1/movements/m1/locales")?.slug).toBe("locales");
+        expect(result.current.getCollection("medico/v2.0.0/joints/j1/movements/m1")?.slug).toBe("movements");
+
+        // Resolved, so nothing to warn about: the warning is what an unresolved
+        // route leaves behind.
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+    });
+
+    it("tells a collection path from a record path by what follows the slug", () => {
+        const { result } = renderWithCollections();
+
+        // Two segments and a collection; three and a record; four and a
+        // subcollection. Counting the whole path gets all three wrong.
+        expect(result.current.getCollection("content/podcasts")?.slug).toBe("content/podcasts");
+        expect(result.current.getCollection("content/podcasts/p1")?.slug).toBe("content/podcasts");
+        expect(result.current.getCollection("content/podcasts/p1/locales")?.slug).toBe("locales");
+    });
+
+    it("splits a path under a slashed slug into parent collection slugs and parent ids", () => {
+        const { result } = renderWithCollections();
+
+        expect(result.current.getParentCollectionSlugs("medico/v2.0.0/joints/j1/movements")).toEqual(["medico/v2.0.0/joints"]);
+        expect(result.current.getParentEntityIds("medico/v2.0.0/joints/j1/movements")).toEqual(["j1"]);
+
+        expect(result.current.getParentCollectionSlugs("medico/v2.0.0/joints/j1/movements/m1/locales"))
+            .toEqual(["medico/v2.0.0/joints", "movements"]);
+        expect(result.current.getParentEntityIds("medico/v2.0.0/joints/j1/movements/m1/locales")).toEqual(["j1", "m1"]);
+
+        // A record path: its own id is not a parent.
+        expect(result.current.getParentCollectionSlugs("medico/v2.0.0/joints/j1")).toEqual([]);
+        expect(result.current.getParentEntityIds("medico/v2.0.0/joints/j1")).toEqual([]);
+        expect(result.current.getParentEntityIds("content/podcasts/p1/locales/l1")).toEqual(["p1"]);
+
+        // A record route that ends in the tab it opens keeps the record's parents.
+        expect(result.current.getParentCollectionSlugs("medico/v2.0.0/joints/j1/movements/m1/edit")).toEqual(["medico/v2.0.0/joints"]);
+        expect(result.current.getParentEntityIds("medico/v2.0.0/joints/j1/movements/m1/edit")).toEqual(["j1"]);
     });
 
     it("returns undefined for a path that matches nothing", () => {

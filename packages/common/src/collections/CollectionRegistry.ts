@@ -444,9 +444,19 @@ export class CollectionRegistry {
 
     /**
      * Resolves a multi-segment path like "products/123/locales" and returns
-     * information about the collections and entity IDs along the path
+     * information about the collections and entity IDs along the path.
+     *
+     * A slug may contain slashes (`content/de-DE/podcasts`), so the root is
+     * the longest leading run of segments naming a registered collection, and
+     * each subcollection is matched the same way among its parent's.
+     *
+     * @param options.allowRecordPath accept a path that ends at a record
+     * (`…/{id}`) and resolve it to the collection holding that record, with the
+     * id last in `entityIds`. Without it such a path is an error. Only the
+     * registry can tell the two shapes apart, because only it knows where each
+     * slug ends.
      */
-    resolvePathToCollections(path: string): {
+    resolvePathToCollections(path: string, options?: { allowRecordPath?: boolean }): {
         collections: CollectionConfig[],
         entityIds: (string | number)[],
         finalCollection: CollectionConfig
@@ -457,45 +467,49 @@ export class CollectionRegistry {
             throw new Error(`Invalid path: ${path}`);
         }
 
-        if (pathSegments.length % 2 !== 1) {
-            throw new Error(`Invalid collection path: ${path}. It must have an odd number of segments.`);
+        // Not `pathSegments[0]`: for `medico/v2.0.0/joints/j1/movements` that
+        // looked for a root collection called `medico`, threw, and left every
+        // subcollection under a slashed slug unreachable.
+        const root = splitAtLeadingCollection(pathSegments, (candidate) => this.get(candidate));
+        if (!root) {
+            throw new Error(`Unknown collection path or slug: ${path}`);
         }
 
-        const collections: CollectionConfig[] = [];
+        let currentCollection = root.collection;
+        const collections: CollectionConfig[] = [currentCollection];
         const entityIds: (string | number)[] = [];
 
-        // Start with the first collection
-        let currentCollection = this.get(pathSegments[0]);
-
-        if (!currentCollection) {
-            throw new Error(`Unknown collection path or slug: ${pathSegments[0]}`);
-        }
-
-        collections.push(currentCollection);
-
-        // Process the rest of the path in pairs (entityId, subcollectionSlug)
-        for (let i = 1; i < pathSegments.length; i += 2) {
-            const entityId = pathSegments[i];
+        // What follows a collection is (entityId, subcollection) pairs, so a
+        // collection path is one whose *remainder* pairs up. Counting the whole
+        // path's segments instead is off by one for every slug with an odd
+        // number of slashes: `content/podcasts` and everything under it read
+        // as a record path.
+        let rest = root.rest;
+        while (rest.length > 0) {
+            const [entityId, ...afterEntity] = rest;
             entityIds.push(entityId);
 
-            if (i + 1 < pathSegments.length) {
-                const subcollectionSlug = pathSegments[i + 1];
-                const subcollections: CollectionConfig[] | undefined = getSubcollections(currentCollection);
-                if (!subcollections || subcollections.length === 0) {
-                    throw new Error(`No subcollections found for ${currentCollection.slug} in path: ${path}`);
-                }
-
-                const subcollection: CollectionConfig | undefined = subcollections.find(c => c.slug === subcollectionSlug);
-                if (!subcollection) {
-                    throw new Error(`Subcollection '${subcollectionSlug}' not found in ${currentCollection.slug}`);
-                }
-                // The child as resolved, not whatever root collection happens to
-                // share its slug. Re-looking it up globally both risked the wrong
-                // collection and discarded the relation's `overrides`, which are
-                // applied when the child view is built.
-                currentCollection = this.normalizeCollection(subcollection);
-                collections.push(currentCollection);
+            if (afterEntity.length === 0) {
+                if (options?.allowRecordPath) break;
+                throw new Error(`Invalid collection path: ${path}. It ends at the record '${entityId}' of '${currentCollection.slug}', not at a collection.`);
             }
+
+            const subcollections: CollectionConfig[] | undefined = getSubcollections(currentCollection);
+            if (!subcollections || subcollections.length === 0) {
+                throw new Error(`No subcollections found for ${currentCollection.slug} in path: ${path}`);
+            }
+
+            const child = splitAtLeadingCollection(afterEntity, (candidate) => subcollections.find(c => c.slug === candidate));
+            if (!child) {
+                throw new Error(`Subcollection '${afterEntity[0]}' not found in ${currentCollection.slug}`);
+            }
+            // The child as resolved, not whatever root collection happens to
+            // share its slug. Re-looking it up globally both risked the wrong
+            // collection and discarded the relation's `overrides`, which are
+            // applied when the child view is built.
+            currentCollection = this.normalizeCollection(child.collection);
+            collections.push(currentCollection);
+            rest = child.rest;
         }
 
         return {
@@ -507,3 +521,29 @@ export class CollectionRegistry {
 
 }
 
+/**
+ * Split path segments at the collection they start with.
+ *
+ * A slug may contain slashes, and several drivers need it to: a Firestore
+ * collection partitioned by locale is declared as `content/de-DE/podcasts`,
+ * and that string is its *name*. So the collection a path starts with is not
+ * its first segment but the longest run of whole leading segments that names
+ * one, and what follows it is `entityId/subcollection/…`.
+ *
+ * Whole segments only, so `content` never matches the start of `contents/1`.
+ */
+function splitAtLeadingCollection(
+    segments: string[],
+    find: (candidate: string) => CollectionConfig | undefined
+): { collection: CollectionConfig; rest: string[] } | undefined {
+    for (let length = segments.length; length > 0; length--) {
+        const collection = find(segments.slice(0, length).join("/"));
+        if (collection) {
+            return {
+                collection,
+                rest: segments.slice(length)
+            };
+        }
+    }
+    return undefined;
+}

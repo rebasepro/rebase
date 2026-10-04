@@ -847,6 +847,17 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   to the same rows. The card view also stops jumping back slightly the first
   time more rows load after a fresh visit.
 
+- **A collection whose slug contains slashes can have subcollections that
+  open.** A versioned or locale-partitioned collection such as
+  `medico/v2.0.0/joints` opened, but nothing under it did: its subcollection
+  tabs rendered empty, because every path reader took the first segment as
+  the collection and alternate segments as ids. The admin now finds the
+  longest leading run of segments that names a collection, so breadcrumbs,
+  the side panel, subcollection tabs and data routing reach
+  `medico/v2.0.0/joints/j1/movements`. A reference filter in the URL into
+  such a collection keeps its whole path, and `users/abc123` is no longer
+  read as the collection `user`.
+
 #### Studio
 
 - **The source-only schema editor no longer overwrites edits made on disk

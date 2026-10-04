@@ -639,6 +639,23 @@ function encodeRelation(val: EntityRelation) {
     return `rel::${val.path}/${val.id}`;
 }
 
+/**
+ * Read a `ref::<path>/<id>` or `rel::<path>/<id>` filter value back.
+ *
+ * The id is the last segment and the path is everything before it. Taking the
+ * first two segments instead turned a reference to
+ * `content/de-DE/podcasts/abc123` into the record `de-DE` of `content`, and
+ * every reference into a subcollection the same way.
+ */
+function splitEncodedAddress(value: string): { path: string; id: string } {
+    const address = value.slice(value.indexOf("::") + 2);
+    const separator = address.lastIndexOf("/");
+    return {
+        path: address.substring(0, separator),
+        id: address.substring(separator + 1)
+    };
+}
+
 function decodeString(val: string): EntityReference | EntityRelation | Date | string {
     let parsedFilterVal: EntityReference | EntityRelation | Date | string = val;
     if (isDate(val)) {
@@ -653,12 +670,12 @@ function decodeString(val: string): EntityReference | EntityRelation | Date | st
             parsedFilterVal = JSON.parse(parsedFilterVal, (key, value) => {
                 if (typeof value === "string") {
                     if (value.startsWith("ref::")) {
-                        const [path, id] = value.substring(5).split("/");
+                        const { path, id } = splitEncodedAddress(value);
                         return new EntityReference({ id,
 path });
                     }
                     if (value.startsWith("rel::")) {
-                        const [path, id] = value.substring(5).split("/");
+                        const { path, id } = splitEncodedAddress(value);
                         return new EntityRelation(id, path);
                     }
                 }
@@ -671,12 +688,12 @@ path });
 
     if (typeof parsedFilterVal === "string") {
         if (parsedFilterVal.startsWith("ref::")) {
-            const [path, id] = parsedFilterVal.substring(5).split("/");
+            const { path, id } = splitEncodedAddress(parsedFilterVal);
             return new EntityReference({ id,
 path });
         }
         if (parsedFilterVal.startsWith("rel::")) {
-            const [path, id] = parsedFilterVal.substring(5).split("/");
+            const { path, id } = splitEncodedAddress(parsedFilterVal);
             return new EntityRelation(id, path);
         }
     }

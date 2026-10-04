@@ -100,6 +100,51 @@ describe("getNavigationEntriesFromPath", () => {
         expect(result[2].type).toBe("custom_view");
     });
 
+    describe("a slug that contains slashes", () => {
+        // Firestore collections are declared this way — `medico/v2.0.0/joints`
+        // is one collection's name — and have subcollections under them. The
+        // breadcrumbs, the split view and the side panel all read these entries.
+        const movements = makeCollection({ name: "Movements",
+slug: "movements",
+table: "movements" });
+        const joints = makeCollection({
+            name: "Joints",
+            slug: "medico/v2.0.0/joints",
+            table: "joints",
+            childCollections: () => [movements]
+        });
+        const podcasts = makeCollection({
+            name: "Podcasts",
+            slug: "content/podcasts",
+            table: "podcasts",
+            childCollections: () => [movements]
+        });
+
+        it("resolves a subcollection under it, and a record inside that", () => {
+            const result = getNavigationEntriesFromPath({
+                path: "medico/v2.0.0/joints/j1/movements/m1",
+                collections: [joints]
+            });
+            expect(result.map(entry => [entry.type, entry.path])).toEqual([
+                ["collection", "medico/v2.0.0/joints"],
+                ["entity", "medico/v2.0.0/joints/j1"],
+                ["collection", "medico/v2.0.0/joints/j1/movements"],
+                ["entity", "medico/v2.0.0/joints/j1/movements/m1"]
+            ]);
+        });
+
+        it("resolves under a slug with an even number of segments", () => {
+            // Only odd-length prefixes were tried, and `content/podcasts` is two
+            // segments long: none of these paths produced a single entry.
+            expect(getNavigationEntriesFromPath({ path: "content/podcasts",
+collections: [podcasts] }).map(entry => entry.type))
+                .toEqual(["collection"]);
+            expect(getNavigationEntriesFromPath({ path: "content/podcasts/p1/movements",
+collections: [podcasts] }).map(entry => entry.type))
+                .toEqual(["collection", "entity", "collection"]);
+        });
+    });
+
     it("returns empty array for empty collections", () => {
         const result = getNavigationEntriesFromPath({
             path: "unknown",

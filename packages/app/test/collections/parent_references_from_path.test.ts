@@ -85,6 +85,23 @@ describe("getParentReferencesFromPath", () => {
         expect(result[2].path).toBe("products/123/variants/abc/images");
     });
 
+    it("returns the parent record under a slug that contains slashes", () => {
+        const movements = makeCollection({ name: "Movements",
+slug: "movements",
+table: "movements" });
+        const collections = [makeCollection({
+            name: "Podcasts",
+            slug: "content/podcasts",
+            table: "podcasts",
+            childCollections: () => [movements]
+        })];
+        const result = getParentReferencesFromPath({
+            path: "content/podcasts/p1/movements",
+            collections
+        });
+        expect(result.map(reference => reference.pathWithId)).toEqual(["content/podcasts/p1"]);
+    });
+
     it("returns empty if collection not found", () => {
         const result = getParentReferencesFromPath({
             path: "unknown/123",
