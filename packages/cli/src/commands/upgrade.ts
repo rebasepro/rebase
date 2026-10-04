@@ -54,9 +54,10 @@ ${chalk.bold("Options")}
 
 ${chalk.bold("What it changes")}
   Every @rebasepro/* entry in dependencies, devDependencies and optionalDependencies,
-  in every package.json under the project (node_modules, dist* and hidden
-  directories excepted). ^ and ~ are kept. peerDependencies are left alone, and so
-  are workspace:, link:, file:, git and tag specs, which are listed with the reason.
+  in every package.json under the project that git does not ignore (node_modules,
+  dist* and hidden directories excepted, in a repository or not). ^ and ~ are kept.
+  peerDependencies are left alone, and so are workspace:, link:, file:, git and tag
+  specs, which are listed with the reason.
   Overrides in pnpm-workspace.yaml and package.json are bumped the same way, and so
   are the entries of pnpm-workspace.yaml's catalog: and catalogs: blocks, which is
   where a catalog: pin's version lives.
