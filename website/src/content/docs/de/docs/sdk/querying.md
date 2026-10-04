@@ -1,5 +1,5 @@
 ---
-sourceHash: 6dea8dc014a1c282
+sourceHash: 42fa2047884b640a
 title: Daten abfragen
 sidebar_label: Daten abfragen
 description: CRUD-Operationen, Fluent Query Builder, Filteroperatoren, Sortierung, Spaltenauswahl und Aggregate mit dem typisierten SDK von Rebase.
@@ -108,22 +108,22 @@ const { data } = await client.data.products
 | Methode | Beschreibung | Beispiel |
 |---------|--------------|----------|
 | `.where(field, op, value)` | Filterbedingung hinzufügen | `.where("age", ">=", 18)` |
-| `.where(path, op, value)` | Nach einer [Relation](#querying-through-a-relation) oder einem [JSON-Pfad](#filtering-inside-json) filtern | `.where("author.name", "==", "bob")` |
-| `.where(group)` | Eine [OR/AND-Gruppe](#logical-conditions-or--and) hinzufügen | `.where(or(cond(…), cond(…)))` |
+| `.where(path, op, value)` | Nach einer [Relation](/docs/sdk/relations#querying-through-a-relation) oder einem [JSON-Pfad](/docs/sdk/aggregates-and-search#filtering-inside-json) filtern | `.where("author.name", "==", "bob")` |
+| `.where(group)` | Eine [OR/AND-Gruppe](#logische-bedingungen-or--and--not) hinzufügen | `.where(or(cond(…), cond(…)))` |
 | `.orderBy(field, dir, nulls?)` | Ergebnisse sortieren | `.orderBy("name", "asc")` |
-| `.orderBy(aggregate, dir)` | Nach einem [Aggregat über eine Relation](#sort-by-an-aggregate-over-a-relation) sortieren | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
+| `.orderBy(aggregate, dir)` | Nach einem [Aggregat über eine Relation](/docs/sdk/relations#sort-by-an-aggregate-over-a-relation) sortieren | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
 | `.limit(n)` | Ergebnisanzahl begrenzen | `.limit(25)` |
 | `.offset(n)` | Erste N Ergebnisse überspringen | `.offset(50)` |
-| `.after(cursor)` | Nach einem [Cursor](#cursor-pagination) fortsetzen | `.after(meta.nextCursor)` |
-| `.fields(...columns)` | [Nur diese Spalten](#returning-fewer-columns) zurückgeben | `.fields("id", "title")` |
+| `.after(cursor)` | Nach einem [Cursor](/docs/sdk/pagination#cursor-pagination) fortsetzen | `.after(meta.nextCursor)` |
+| `.fields(...columns)` | [Nur diese Spalten](#weniger-spalten-zurückgeben) zurückgeben | `.fields("id", "title")` |
 | `.distinct()` | Zeilen zusammenfassen, die in diesen Spalten identisch sind | `.fields("status").distinct()` |
 | `.search(text)` | Textsuche – siehe [Suche](/docs/backend/search) | `.search("laptop")` |
 | `.vectorSearch(prop, vector, opts?)` | Nearest-Neighbour-Suche über eine `vector`-Eigenschaft | `.vectorSearch("embedding", vec)` |
 | `.include(...relations)` | [Zugehörige Zeilen laden](/docs/sdk/relations#loading-related-rows) | `.include("author", "tags")` |
 | `.find()` | Abfrage ausführen | Gibt `FindResult<M>` zurück |
-| `.aggregate(params)` | [Aggregieren statt Zeilen zurückzugeben](#aggregates) | `.aggregate({ select: [{ fn: "count" }] })` |
-| `.iterate(options?)` | [Jede passende Zeile streamen](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
-| `.findAll(options?)` | [Jede passende Zeile sammeln](#reading-everything-iterate-and-findall) | Gibt `M[]` zurück |
+| `.aggregate(params)` | [Aggregieren statt Zeilen zurückzugeben](#aggregate) | `.aggregate({ select: [{ fn: "count" }] })` |
+| `.iterate(options?)` | [Jede passende Zeile streamen](/docs/sdk/pagination#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
+| `.findAll(options?)` | [Jede passende Zeile sammeln](/docs/sdk/pagination#reading-everything-iterate-and-findall) | Gibt `M[]` zurück |
 | `.count()` | Passende Zeilen zählen | Gibt `number` zurück |
 | `.listen(onUpdate, onError?)` | Echtzeit-Updates abonnieren | Gibt `unsubscribe()` zurück |
 
@@ -201,7 +201,7 @@ const { data } = await client.data.products
     .find();
 ```
 
-`cond` akzeptiert den kanonischen Operator – die linke Spalte der Tabelle [Filteroperatoren](#filter-operators). Ein Operator, den der Dialekt nicht unterstützt, führt bei der Serialisierung der Abfrage zu einem `TypeError` und nicht zu einer stillschweigend veränderten Abfrage.
+`cond` akzeptiert den kanonischen Operator – die linke Spalte der Tabelle [Filteroperatoren](#filteroperatoren). Ein Operator, den der Dialekt nicht unterstützt, führt bei der Serialisierung der Abfrage zu einem `TypeError` und nicht zu einer stillschweigend veränderten Abfrage.
 
 ### Negation
 
@@ -248,7 +248,7 @@ Drei Encodings sind wissenswert, da sie bei manuell geschriebenen Query-Strings 
 |-----------|-----------|---------|
 | `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` sucht nach dem vier Zeichen langen String `null` |
 | `cond("id", "in", [])` | `id.in.(\)` | `in.()` ist eine Liste, die einen leeren String enthält, was eine andere Abfrage darstellt |
-| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | Ein [Relationspfad](#querying-through-a-relation) behält seinen Punkt |
+| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | Ein [Relationspfad](/docs/sdk/relations#querying-through-a-relation) behält seinen Punkt |
 
 Kommas, Klammern und Backslashes innerhalb eines Werts werden mit einem Backslash maskiert, sodass `cond("name", "==", "Doe, John")` als `name.eq.Doe\, John` übertragen wird und die Gruppe nicht aufteilt.
 
@@ -297,7 +297,7 @@ const { data } = await client.data.products
 
 Jede Sortierung endet mit der Zeilen-ID in absteigender Reihenfolge, unabhängig davon, ob dies explizit angegeben wurde. Genau das macht die Sortierung *vollständig*: Ohne sie würden zwei Zeilen mit demselben Wert in beliebiger Reihenfolge von der Datenbank zurückgegeben werden, und das Paginieren über eine Sortierung, die sich zwischen zwei Durchläufen derselben Abfrage unterscheiden kann, würde einige Zeilen wiederholen und andere überspringen.
 
-Eine mehrspaltige Sortierung lässt sich problemlos mit einem [Cursor](#cursor-pagination) paginieren: Der Vergleich wird der Reihe nach über jeden Schlüssel aufgebaut. Die einzige Sortierung, die ein Cursor nicht beschreiben kann, ist **`_score`** – siehe [Suche](/docs/backend/search). Die Relevanz wird pro Abfrage berechnet und nicht gespeichert, sodass auf der Cursor-Zeile kein Wert vorhanden ist, mit dem die nächste Seite verglichen werden könnte, und eine solche Auflistung enthält keinen `nextCursor`.
+Eine mehrspaltige Sortierung lässt sich problemlos mit einem [Cursor](/docs/sdk/pagination#cursor-pagination) paginieren: Der Vergleich wird der Reihe nach über jeden Schlüssel aufgebaut. Die einzige Sortierung, die ein Cursor nicht beschreiben kann, ist **`_score`** – siehe [Suche](/docs/backend/search). Die Relevanz wird pro Abfrage berechnet und nicht gespeichert, sodass auf der Cursor-Zeile kein Wert vorhanden ist, mit dem die nächste Seite verglichen werden könnte, und eine solche Auflistung enthält keinen `nextCursor`.
 
 ### Platzierung von NULL-Werten bei der Sortierung
 
@@ -320,7 +320,7 @@ const { data } = await client.data.posts
 
 Über HTTP ist dies ein drittes, durch Doppelpunkt getrenntes Segment (`?orderBy=publishedAt:desc:last`) oder ein `"nulls"`-Schlüssel in der JSON-Array-Form. Alles andere als `first`/`last` führt zu einem 400-Fehler statt zu einer stillschweigend abweichenden Sortierung.
 
-Der [Cursor](#cursor-pagination) berücksichtigt die definierte Sortierung, sodass das Paginieren über einen Nullable-Schlüssel bei beiden Platzierungen korrekt bleibt.
+Der [Cursor](/docs/sdk/pagination#cursor-pagination) berücksichtigt die definierte Sortierung, sodass das Paginieren über einen Nullable-Schlüssel bei beiden Platzierungen korrekt bleibt.
 
 ## Weniger Spalten zurückgeben
 

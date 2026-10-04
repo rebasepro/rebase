@@ -163,7 +163,7 @@ Os grupos podem ser aninhados em até 32 níveis de profundidade; além disso, a
 `INVALID_LOGICAL_GROUP`.
 
 Um grupo **restringe** juntamente com os filtros de campo em vez de substituí-los — veja
-[Como os filtros se combinam](#how-the-filters-combine).
+[Como os filtros se combinam](#como-os-filtros-se-combinam).
 
 ### O dialeto JSON de `where`
 

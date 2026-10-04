@@ -1,5 +1,5 @@
 ---
-sourceHash: c63661257e39dcba
+sourceHash: 917e92f2baabde99
 title: Extender Rebase
 sidebar_label: Extender Rebase
 description: "Una guía de decisión para elegir el mecanismo de extensión adecuado: plugins, slots, reemplazos de componentes, vistas de entidad, acciones y más."
@@ -31,7 +31,7 @@ para el backend.
 | Agregar una columna calculada a una tabla | `additionalFields` | colección | [Columnas adicionales](/docs/frontend/additional-columns) |
 | Agregar un widget de campo personalizado para un tipo de propiedad | `propertyConfigs` | tipo de propiedad | [Campos personalizados](/docs/frontend/custom-fields) |
 | Agregar una pestaña de entidad | `entityViews` | entidad | [Vistas de entidad](/docs/frontend/entity-views) |
-| Renderizar las filas de una colección de una forma diferente | `admin.customViews` | colección | [más abajo](#customviews) |
+| Renderizar las filas de una colección de una forma diferente | `admin.customViews` | colección | [más abajo](#modos-de-vista-personalizados) |
 | Agregar una acción de fila/contexto o un botón de entidad | `entityActions` | entidad | [Acciones de entidad](/docs/frontend/entity-actions) |
 | Poner una cifra o gráfico en la tarjeta de la página de inicio de una colección | slot `home.card.widget` | app/plugin | [Slots](/docs/frontend/slots) |
 | Inyectar interfaz de usuario en una ubicación específica de la estructura (chrome) | `slots` | app/plugin | [Slots](/docs/frontend/slots) |
@@ -125,8 +125,7 @@ Componentes de React a nivel de barra de herramientas que reciben `CollectionAct
 
 → [Acciones de entidad — Acciones de colección](/docs/frontend/entity-actions#collection-actions)
 
-### Modos de vista personalizados {#customviews}
-
+### Modos de vista personalizados
 **Alcance:** colección (agrega un modo de vista).
 
 Un mapa, un calendario, una galería, una línea de tiempo: otra representación de *las mismas filas*,
@@ -181,8 +180,7 @@ es otra representación de la consulta de una colección. Si su componente ignor
 [`AppView`](/docs/frontend#custom-views); la barra de herramientas superior, con su casilla
 de búsqueda y su conteo de registros, estaría describiendo una consulta que este no renderiza.
 
-### `formView` {#formview}
-
+### `formView`
 **Alcance:** colección.
 
 Reemplaza todo el formulario de entidad predeterminado por un componente personalizado. Se configura en la definición de una colección:

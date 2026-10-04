@@ -30,7 +30,7 @@ for the backend.
 | Add a computed column to a table | `additionalFields` | collection | [Additional Columns](/docs/frontend/additional-columns) |
 | Add a custom field widget for a property type | `propertyConfigs` | property type | [Custom Fields](/docs/frontend/custom-fields) |
 | Add an entity tab | `entityViews` | entity | [Entity Views](/docs/frontend/entity-views) |
-| Render one collection's rows a different way | `admin.customViews` | collection | [below](#customviews) |
+| Render one collection's rows a different way | `admin.customViews` | collection | [below](#custom-view-modes) |
 | Add a row/context action or entity button | `entityActions` | entity | [Entity Actions](/docs/frontend/entity-actions) |
 | Put a figure on a collection's home-page card | `home.card.widget` slot | app/plugin | [Slots](/docs/frontend/slots) |
 | Inject UI at a specific chrome location | `slots` | app/plugin | [Slots](/docs/frontend/slots) |
@@ -124,8 +124,7 @@ Toolbar-level React components that receive `CollectionActionsProps` (selected e
 
 → [Entity Actions — Collection Actions](/docs/frontend/entity-actions#collection-actions)
 
-### Custom view modes {#customviews}
-
+### Custom view modes
 **Scope:** collection (adds a view mode).
 
 A map, a calendar, a gallery, a timeline — another rendering of *the same rows*,
@@ -180,8 +179,7 @@ is another rendering of one collection's query. If your component ignores
 [`AppView`](/docs/frontend#custom-views) — the toolbar above it, with its search
 box and its record count, would be describing a query it does not render.
 
-### `formView` {#formview}
-
+### `formView`
 **Scope:** collection.
 
 Replaces the entire default entity form with a custom component. Set on a collection definition:

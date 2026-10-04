@@ -1,5 +1,5 @@
 ---
-sourceHash: c38fdefef238a009
+sourceHash: 4449046fbaa30bb3
 title: Paginierung
 sidebar_label: Paginierung
 description: Paginieren Sie eine Collection mit Limit/Offset, Seitenzahlen oder einem Keyset-Cursor – und wann die jeweilige Methode nicht mehr korrekt funktioniert.
@@ -73,7 +73,7 @@ Aus der Funktionsweise eines Cursors ergeben sich vier Dinge:
   `CURSOR_WITH_OFFSET`). Beide geben an, wo die Seite beginnt, und die Berücksichtigung beider würde
   Zeilen überspringen.
 - **Sortierungen über mehrere Schlüssel und null-fähige Schlüssel funktionieren beide.** Der Vergleich
-  wird über jeden Schlüssel der Reihe nach aufgebaut, mit der [NULL-Platzierung](#where-nulls-sort),
+  wird über jeden Schlüssel der Reihe nach aufgebaut, mit der [NULL-Platzierung](/docs/sdk/querying#where-nulls-sort),
   die die Sortierung deklariert hat – nicht ein einzelnes `>` auf einer Spalte.
 - **Relevanz kann kein Cursor sein.** Ein `_score` wird pro Abfrage berechnet und nirgendwo
   gespeichert, und zwei Abfragen mit unterschiedlichen Suchbegriffen erzeugen Scores, die nicht auf
@@ -160,7 +160,7 @@ for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ 
 
 `cursor` bedeutet hier „Seek statt Paginierung per Offset“ und gibt die Spalte an, nach der sortiert
 werden soll, wenn die Abfrage dies nicht bereits definiert. Das Seeking selbst ist
-[der Cursor des Servers](#cursor-pagination): Der Durchlauf gibt `meta.nextCursor` als `after` zurück
+[der Cursor des Servers](#cursor-paginierung): Der Durchlauf gibt `meta.nextCursor` als `after` zurück
 und baut keinen eigenen Vergleich auf, weshalb auch eine Sortierung über mehrere Schlüssel funktioniert –
 
 ```typescript

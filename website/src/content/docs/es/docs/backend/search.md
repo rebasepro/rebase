@@ -140,7 +140,7 @@ El comportamiento por defecto y el comportamiento sin bloque tienen carencias op
 
 **Cuál es su coste.** La parte de la subcadena no puede usar el índice GIN; un `%` inicial nunca puede. La parte de `@@` aún se ejecuta primero y sigue usando el índice, por lo que lo que este modo añade es un escaneo sobre las filas que el índice descartó. En una tabla grande, esa es la diferencia entre un escaneo de índice y uno secuencial, razón por la cual esto es un modo opcional y no el comportamiento por defecto.
 
-**Cambiarlo en una colección en producción es seguro**, la única opción en este bloque que lo es. `mode` actúa del lado de la consulta: no modifica ninguna columna generada, ninguna expresión de generación ni ningún índice, por lo que no provoca el rechazo descrito en [Modificar el bloque más adelante](#changing-the-block-later). Activarlo solo requiere un despliegue y nada más.
+**Cambiarlo en una colección en producción es seguro**, la única opción en este bloque que lo es. `mode` actúa del lado de la consulta: no modifica ninguna columna generada, ninguna expresión de generación ni ningún índice, por lo que no provoca el rechazo descrito en [Modificar el bloque más adelante](#modificar-el-bloque-más-adelante). Activarlo solo requiere un despliegue y nada más.
 
 Normaliza los acentos en la parte de la subcadena **esté o no configurado `unaccent`**, porque esa normalización también se realiza del lado de la consulta. Esto es intencionado: `unaccent` es el ajuste que no puedes activar más tarde sin reescribir la tabla, por lo que una colección que no lo tenga configurado puede evitar perder `Muñoz`. Lo que `unaccent` sigue aportando es la normalización en la parte de `@@`, donde se almacenan los lexemas.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: c38fdefef238a009
+sourceHash: 4449046fbaa30bb3
 title: Paginación
 sidebar_label: Paginación
 description: Pagina una colección con limit/offset, números de página o un cursor keyset — y cuándo cada uno deja de ser correcto.
@@ -58,7 +58,7 @@ No intentes analizarlo ni construir uno: la codificación existe sujeta a cambio
 De la naturaleza de un cursor se desprenden cuatro cosas:
 
 - **`after` no se puede combinar con `offset` o `page`** (400 `CURSOR_WITH_OFFSET`). Ambos definen dónde comienza la página, y respetar ambos omitiría filas.
-- **Tanto las ordenaciones por múltiples claves como las claves que admiten nulos funcionan.** La comparación se construye sobre cada clave en orden, con la [ubicación de los NULL](#where-nulls-sort) que declaró la ordenación, no un simple `>` sobre una sola columna.
+- **Tanto las ordenaciones por múltiples claves como las claves que admiten nulos funcionan.** La comparación se construye sobre cada clave en orden, con la [ubicación de los NULL](/docs/sdk/querying#where-nulls-sort) que declaró la ordenación, no un simple `>` sobre una sola columna.
 - **La relevancia no puede ser un cursor.** El `_score` se calcula por consulta y no se almacena en ninguna parte, y dos consultas con diferentes cadenas de búsqueda producen puntuaciones que no están en la misma escala. Dicho listado simplemente no incluye `nextCursor`; pagínalo con `offset`. La distancia de una búsqueda vectorial es igual, y un cursor enviado con una se rechaza con `VECTOR_CURSOR_UNSUPPORTED`.
 - **Una suscripción no puede continuar desde un cursor.** `listen()` vuelve a ejecutar su consulta con cada escritura, y `after` nombra un punto en una ejecución de ella, así que `listen({ after })` se rechaza con `CURSOR_NOT_LIVE` antes de enviar nada. Usa `offset` o `page` para una ventana en vivo, o `find({ after })` para leer la página una vez.
 
@@ -127,7 +127,7 @@ Tres opciones configuran el recorrido:
 for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
 ```
 
-Aquí, `cursor` significa «buscar en lugar de paginar por offset», e indica la columna por la cual ordenar cuando la consulta no lo especifica previamente. La búsqueda en sí es [el cursor del servidor](#cursor-pagination): el recorrido devuelve `meta.nextCursor` como `after` y no construye ninguna comparación propia, razón por la cual funciona la ordenación por múltiples claves —
+Aquí, `cursor` significa «buscar en lugar de paginar por offset», e indica la columna por la cual ordenar cuando la consulta no lo especifica previamente. La búsqueda en sí es [el cursor del servidor](#paginación-por-cursor): el recorrido devuelve `meta.nextCursor` como `after` y no construye ninguna comparación propia, razón por la cual funciona la ordenación por múltiples claves —
 
 ```typescript
 for await (const job of client.data.jobs.iterate({

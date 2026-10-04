@@ -150,7 +150,7 @@ GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 
 I gruppi possono essere annidati fino a 32 livelli di profondità; oltre questo limite la richiesta viene rifiutata con `INVALID_LOGICAL_GROUP`.
 
-Un gruppo **restringe** i risultati insieme ai filtri di campo anziché sostituirli — vedi [Come si combinano i filtri](#how-the-filters-combine).
+Un gruppo **restringe** i risultati insieme ai filtri di campo anziché sostituirli — vedi [Come si combinano i filtri](#come-si-combinano-i-filtri).
 
 ### Il dialetto JSON `where`
 

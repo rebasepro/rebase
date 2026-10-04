@@ -18,7 +18,7 @@ de vous présenter le bloc de configuration.
 
 Un backend déployé peut également servir du MCP lui-même, via HTTP, aux personnes qui utilisent
 votre application. Il s'agit d'une chose différente avec un modèle d'identifiants différent :
-voir [Le point de terminaison distant](#the-remote-endpoint).
+voir [Le point de terminaison distant](#le-point-de-terminaison-distant).
 
 ## Connecter un client
 

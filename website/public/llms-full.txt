@@ -1798,7 +1798,7 @@ subscriptions from the next frame.
 
 **What to change:** nothing with the SDK, which re-authenticates on every token
 refresh and reconnects after a `4001`. A client that speaks the
-[socket protocol](/docs/backend/realtime/#authentication-rls) directly must send
+[socket protocol](/docs/backend/realtime/#authentication--rls) directly must send
 a fresh token in `AUTHENTICATE` before the old one expires, and treat close
 code `4001` as a reason to reconnect with a new session.
 
@@ -24391,7 +24391,7 @@ The limit worth watching is not capacity, it is that every notification is a que
 
 Per client, the socket accepts up to **7,200 channel frames a minute** (120/s — 60 fps of cursor broadcasts plus the presence update each one carries), counted separately from the budget queries and subscriptions share. Frames past that are refused with a `RATE_LIMITED` error rather than queued.
 
-The refusal arrives on `channel.onError()`, not as a rejected `broadcast()` — see [When a channel frame is refused](#when-a-channel-frame-is-refused).
+The refusal arrives on `channel.onError()`, not as a rejected `broadcast()` — see [When a channel frame is refused](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
 If you are still pushing it after that, throttle cursor-grade events on the client (last-write-wins state does not need 60 updates a second), and consider routing a document's collaborators to the same instance — sticky routing drops cross-instance traffic to nearly nothing regardless of user count. Only past that is another transport worth it, and then the answer is a transport package, not a fork. See [Writing your own transport](#writing-your-own-transport).
 
@@ -24467,7 +24467,7 @@ Delivery to local clients is not your concern — the realtime service owns whic
 
 `pg_notify` refuses a payload of 8000 bytes or more. Cursors and presence fit with room to spare; a document snapshot does not. Rebase handles this the same way it handles large entity changes — by sending an address instead of a body:
 
-- **On a retained channel** (see [Channel Retention](#channel-retention)) the message is already stored with a sequence number, so the notification carries only `(channel, seq)` and each receiving instance reads the body back. There is no size limit at all. This holds for every retained message, small or large: any database login can `LISTEN`, so the body never travels in the notification. It costs one primary-key read per message on each instance with a member on the channel.
+- **On a retained channel** (see [Channel Retention](/docs/backend/realtime#channel-retention)) the message is already stored with a sequence number, so the notification carries only `(channel, seq)` and each receiving instance reads the body back. There is no size limit at all. This holds for every retained message, small or large: any database login can `LISTEN`, so the body never travels in the notification. It costs one primary-key read per message on each instance with a member on the channel.
 - **Ephemeral broadcasts and presence** still travel in the notification itself, so any login to the database can read them. Put anything that must not be readable that way on a retained channel.
 - **On an ephemeral channel** there is nothing to point at. The broadcast is delivered locally, the sender receives a `CHANNEL_BUS_PAYLOAD_TOO_LARGE` error on `channel.onError()`, and a warning names the channel — rather than the message silently reaching half the cluster.
 
@@ -27918,7 +27918,7 @@ for the backend.
 | Add a computed column to a table | `additionalFields` | collection | [Additional Columns](/docs/frontend/additional-columns) |
 | Add a custom field widget for a property type | `propertyConfigs` | property type | [Custom Fields](/docs/frontend/custom-fields) |
 | Add an entity tab | `entityViews` | entity | [Entity Views](/docs/frontend/entity-views) |
-| Render one collection's rows a different way | `admin.customViews` | collection | [below](#customviews) |
+| Render one collection's rows a different way | `admin.customViews` | collection | [below](#custom-view-modes) |
 | Add a row/context action or entity button | `entityActions` | entity | [Entity Actions](/docs/frontend/entity-actions) |
 | Put a figure on a collection's home-page card | `home.card.widget` slot | app/plugin | [Slots](/docs/frontend/slots) |
 | Inject UI at a specific chrome location | `slots` | app/plugin | [Slots](/docs/frontend/slots) |
@@ -28012,8 +28012,7 @@ Toolbar-level React components that receive `CollectionActionsProps` (selected e
 
 → [Entity Actions — Collection Actions](/docs/frontend/entity-actions#collection-actions)
 
-#### Custom view modes {#customviews}
-
+#### Custom view modes
 **Scope:** collection (adds a view mode).
 
 A map, a calendar, a gallery, a timeline — another rendering of *the same rows*,
@@ -28068,8 +28067,7 @@ is another rendering of one collection's query. If your component ignores
 [`AppView`](/docs/frontend#custom-views) — the toolbar above it, with its search
 box and its record count, would be describing a query it does not render.
 
-#### `formView` {#formview}
-
+#### `formView`
 **Scope:** collection.
 
 Replaces the entire default entity form with a custom component. Set on a collection definition:
@@ -36485,13 +36483,13 @@ const { data } = await client.data.products
 | Method | Description | Example |
 |--------|-------------|---------|
 | `.where(field, op, value)` | Add a filter condition | `.where("age", ">=", 18)` |
-| `.where(path, op, value)` | Filter on a [relation](#querying-through-a-relation) or [JSON](#filtering-inside-json) path | `.where("author.name", "==", "bob")` |
-| `.where(group)` | Add an [OR/AND group](#logical-conditions-or--and) | `.where(or(cond(…), cond(…)))` |
+| `.where(path, op, value)` | Filter on a [relation](/docs/sdk/relations#querying-through-a-relation) or [JSON](/docs/sdk/aggregates-and-search#filtering-inside-json) path | `.where("author.name", "==", "bob")` |
+| `.where(group)` | Add an [OR/AND group](#logical-conditions-or--and--not) | `.where(or(cond(…), cond(…)))` |
 | `.orderBy(field, dir, nulls?)` | Sort results | `.orderBy("name", "asc")` |
-| `.orderBy(aggregate, dir)` | Sort by an [aggregate over a relation](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
+| `.orderBy(aggregate, dir)` | Sort by an [aggregate over a relation](/docs/sdk/relations#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
 | `.limit(n)` | Limit result count | `.limit(25)` |
 | `.offset(n)` | Skip first N results | `.offset(50)` |
-| `.after(cursor)` | Continue after a [cursor](#cursor-pagination) | `.after(meta.nextCursor)` |
+| `.after(cursor)` | Continue after a [cursor](/docs/sdk/pagination#cursor-pagination) | `.after(meta.nextCursor)` |
 | `.fields(...columns)` | Return [only these columns](#returning-fewer-columns) | `.fields("id", "title")` |
 | `.distinct()` | Collapse rows identical over those columns | `.fields("status").distinct()` |
 | `.search(text)` | Text search — see [Search](/docs/backend/search) | `.search("laptop")` |
@@ -36499,8 +36497,8 @@ const { data } = await client.data.products
 | `.include(...relations)` | [Load related rows](/docs/sdk/relations#loading-related-rows) | `.include("author", "tags")` |
 | `.find()` | Execute the query | Returns `FindResult<M>` |
 | `.aggregate(params)` | [Reduce instead of returning rows](#aggregates) | `.aggregate({ select: [{ fn: "count" }] })` |
-| `.iterate(options?)` | [Stream every matching row](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
-| `.findAll(options?)` | [Collect every matching row](#reading-everything-iterate-and-findall) | Returns `M[]` |
+| `.iterate(options?)` | [Stream every matching row](/docs/sdk/pagination#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
+| `.findAll(options?)` | [Collect every matching row](/docs/sdk/pagination#reading-everything-iterate-and-findall) | Returns `M[]` |
 | `.count()` | Count the matching rows | Returns `number` |
 | `.listen(onUpdate, onError?)` | Subscribe to real-time updates | Returns `unsubscribe()` |
 
@@ -36646,7 +36644,7 @@ query string gets wrong:
 |-----------|-----------|------|
 | `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` is a search for the four-character string `null` |
 | `cond("id", "in", [])` | `id.in.(\)` | `in.()` is a list holding one empty string, which is a different query |
-| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | a [relation path](#querying-through-a-relation) keeps its dot |
+| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | a [relation path](/docs/sdk/relations#querying-through-a-relation) keeps its dot |
 
 Commas, parentheses and backslashes inside a value are backslash-escaped, so
 `cond("name", "==", "Doe, John")` travels as `name.eq.Doe\, John` and does not
@@ -36706,7 +36704,7 @@ returned in whatever order the database pleased, and paging over an order that
 can differ between two runs of the same query repeats some rows and skips
 others.
 
-A multi-column sort pages fine under a [cursor](#cursor-pagination): the
+A multi-column sort pages fine under a [cursor](/docs/sdk/pagination#cursor-pagination): the
 comparison is built over every key, in order. The one ordering a cursor cannot
 describe is **`_score`** — see [Search](/docs/backend/search). Relevance is
 computed per query rather than stored, so there is no value on the cursor row to
@@ -36738,7 +36736,7 @@ Over HTTP it is a third colon-segment, `?orderBy=publishedAt:desc:last`, or a
 `"nulls"` key in the JSON array form. Anything other than `first`/`last` is a
 400 rather than a silently different order.
 
-The [cursor](#cursor-pagination) honours whatever the sort declared, so paging
+The [cursor](/docs/sdk/pagination#cursor-pagination) honours whatever the sort declared, so paging
 over a nullable key stays correct under either placement.
 
 ### Returning fewer columns
@@ -36991,7 +36989,7 @@ Four things follow from what a cursor is:
   `CURSOR_WITH_OFFSET`). Both say where the page starts, and honouring both
   would skip rows.
 - **Multi-key sorts and nullable keys both work.** The comparison is built over
-  every key in order, with the [NULL placement](#where-nulls-sort) the sort
+  every key in order, with the [NULL placement](/docs/sdk/querying#where-nulls-sort) the sort
   declared — not a single `>` on one column.
 - **Relevance cannot be a cursor.** A `_score` is computed per query and stored
   nowhere, and two queries with different search strings produce scores that are
@@ -38810,7 +38808,7 @@ The WebSocket client handles authentication automatically:
 - On **sign-in** or **token refresh**, the new token is sent to an already-open socket via an `authenticate` message. If none is open, nothing happens — signing in is not a request for realtime, and a socket opened later authenticates itself.
 - On **sign-out**, the WebSocket connection is disconnected. The client stays usable; a later subscription reconnects anonymously.
 - If the connection drops, the client **reconnects automatically** and re-establishes all active subscriptions. It never stops trying while a subscription or a joined channel exists; the delay between attempts grows to at most 30 seconds.
-- If the server ends the socket's session — the user signed out everywhere, this session was revoked, the account was deleted, or the token expired before a refresh reached the socket — it closes the socket with code `4001`. The client reconnects like after any drop, authenticating with the session it holds then (refreshed if it can be), or anonymously when there is none. A role taken away does not close the socket: it applies from the next frame. See [Authentication & RLS](/docs/backend/realtime/#authentication-rls).
+- If the server ends the socket's session — the user signed out everywhere, this session was revoked, the account was deleted, or the token expired before a refresh reached the socket — it closes the socket with code `4001`. The client reconnects like after any drop, authenticating with the session it holds then (refreshed if it can be), or anonymously when there is none. A role taken away does not close the socket: it applies from the next frame. See [Authentication & RLS](/docs/backend/realtime/#authentication--rls).
 - If the connection stays down for more than about 15 seconds, each subscription's `onError` (and each joined channel's `onError`) is called **once** with a `RebaseApiError` whose `code` is `CONNECTION_LOST`. The subscription is not ended: keep showing what you have, mark it as possibly stale, and wait. When the socket is back, the subscription's next `onUpdate` carries everything written in the meantime.
 - `client.ws.state` is the connection's state — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` or `closed` — and `client.ws.onStateChange(listener)` is told every change. `disconnected` is the state in which `CONNECTION_LOST` has been reported.
 - Requests sent over the socket are **at-most-once**. One that was sent when the connection dropped fails with `CONNECTION_LOST` and is never sent again, since the server may already have run it. One that is still waiting for a socket after 30 seconds fails with `REQUEST_TIMEOUT` without being sent.

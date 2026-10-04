@@ -218,7 +218,7 @@ der Standard ist.
 **Das Ändern auf einer Produktivumgebung ist sicher** – die einzige Option in
 diesem Block, bei der das der Fall ist. `mode` wirkt sich nur auf Abfrageseite
 aus: Es ändert keine generierte Spalte, keinen Generierungsausdruck und keinen
-Index, löst also nicht die unter [Nachträgliches Ändern des Blocks](#changing-the-block-later)
+Index, löst also nicht die unter [Nachträgliches Ändern des Blocks](#nachträgliches-ändern-des-blocks)
 beschriebene Verweigerung aus. Das Aktivieren erfordert lediglich ein Deployment.
 
 Es bereinigt Akzente im Substring-Teil **unabhängig davon, ob `unaccent` gesetzt ist**,

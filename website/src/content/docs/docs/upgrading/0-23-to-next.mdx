@@ -424,7 +424,7 @@ subscriptions from the next frame.
 
 **What to change:** nothing with the SDK, which re-authenticates on every token
 refresh and reconnects after a `4001`. A client that speaks the
-[socket protocol](/docs/backend/realtime/#authentication-rls) directly must send
+[socket protocol](/docs/backend/realtime/#authentication--rls) directly must send
 a fresh token in `AUTHENTICATE` before the old one expires, and treat close
 code `4001` as a reason to reconnect with a new session.
 

@@ -205,7 +205,7 @@ Importe-o de `@rebasepro/types`, não de `@rebasepro/server`. Um arquivo de cole
 
 ### `afterSave`
 
-Chamado após a linha ser gravada e antes do commit, dentro da mesma transação. Lançar um erro desfaz o salvamento (rollback) — veja [Semântica de Transações](#transaction-semantics).
+Chamado após a linha ser gravada e antes do commit, dentro da mesma transação. Lançar um erro desfaz o salvamento (rollback) — veja [Semântica de Transações](#semântica-de-transações).
 
 ```typescript
 afterSave: async ({

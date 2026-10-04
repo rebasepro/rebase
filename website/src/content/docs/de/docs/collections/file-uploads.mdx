@@ -61,7 +61,7 @@ Alles innerhalb von `storage`.
 | `fileName` | `string \| function` | Der Dateiname des hochgeladenen Objekts mit denselben Platzhaltern. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
 | `storageSource` | `string` | Welcher registrierte Bucket verwendet werden soll, wenn ein Projekt mehr als einen hat. Das `bucket("media")`-Handle funktioniert hier ebenfalls. |
 | `public` | `boolean` | Unter dem öffentlichen Präfix speichern und über eine stabile, tokenlose, cachebare URL bereitstellen. Standardmäßig `false`, was private Objekte und kurzlebige signierte URLs bedeutet. |
-| `acceptedFiles` | `FileType[]` | MIME-Typen, die diese Eigenschaft akzeptiert. Die Sternchen-Form funktioniert – `image/*`. **Wird vom Server erzwungen** für jeden Upload in den `storagePath` der Eigenschaft — siehe [Was der Server prüft](#what-the-server-checks). |
+| `acceptedFiles` | `FileType[]` | MIME-Typen, die diese Eigenschaft akzeptiert. Die Sternchen-Form funktioniert – `image/*`. **Wird vom Server erzwungen** für jeden Upload in den `storagePath` der Eigenschaft — siehe [Was der Server prüft](#was-der-server-prüft). |
 | `maxSize` | `number` | Größte akzeptierte Datei in Bytes. **Wird vom Server erzwungen**, ebenso wie `acceptedFiles`, sowohl bei normalen als auch bei fortsetzbaren (resumable) Upload-Pfaden. |
 | `metadata` | `Record<string, unknown>` | Objekt-Metadaten, die zusammen mit der Datei gespeichert werden sollen. |
 | `includeBucketUrl` | `boolean` | Schreibt `s3://my-bucket/path/to/file.png` in die Spalte anstelle von `path/to/file.png`. Standardmäßig `false`. |

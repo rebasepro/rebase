@@ -84,7 +84,7 @@ cosa scritta dal tuo codice server va controllata nel codice che la scrive.
 
 | Regola | Tipo | Descrizione |
 |------|------|-------------|
-| `min` / `max` | `number` | Numero minimo / massimo di caratteri, inclusi. Con `columnType: "varchar"` o `"char"`, `max` definisce anche la dimensione della colonna (`VARCHAR(max)`), quindi ridurlo su una tabella che contiene già righe più lunghe è una migrazione che il database rifiuterà. La colonna predefinita è `TEXT`, che `max` lascia senza limite — il vincolo resta allora solo il [controllo della richiesta](#where-validation-runs) del server |
+| `min` / `max` | `number` | Numero minimo / massimo di caratteri, inclusi. Con `columnType: "varchar"` o `"char"`, `max` definisce anche la dimensione della colonna (`VARCHAR(max)`), quindi ridurlo su una tabella che contiene già righe più lunghe è una migrazione che il database rifiuterà. La colonna predefinita è `TEXT`, che `max` lascia senza limite — il vincolo resta allora solo il [controllo della richiesta](#dove-viene-eseguita-la-validazione) del server |
 | `length` | `number` | Esattamente questo numero di caratteri — un codice paese, un riferimento a lunghezza fissa |
 | `matches` | `string \| RegExp` | Un pattern che l'intero valore deve rispettare. Una stringa viene compilata per richiesta, quindi una che non si compila viene rifiutata all'avvio anziché trasformarsi silenziosamente in nessuna regola |
 | `matchesMessage` | `string` | Cosa mostra il modulo quando `matches` fallisce |
@@ -156,7 +156,7 @@ L'oggetto conditions ti dà accesso a:
 `disabledMessage` è la frase che l'utente vede al posto del controllo. Senza di essa, un campo disattivato non spiega nulla, e questa è la differenza tra un modulo che guida l'utente e uno che lo blocca senza spiegazioni.
 
 :::caution[Le condizioni sono un comportamento del modulo]
-**Solo modulo di amministrazione — non applicato dall'API o dal database.** Vengono eseguite nel browser, sull'entità in corso di modifica, e definiscono ciò che il pannello propone. Una regola che deve valere per ogni chiamante dell'API appartiene a `validation`, che il server controlla sulle scritture REST, socket e MCP (non sulle [scritture in-process](#where-validation-runs) del tuo codice server), oppure a una [regola di sicurezza](/docs/collections/security-rules/), che il database impone a chiunque — pannello, SDK o `curl`.
+**Solo modulo di amministrazione — non applicato dall'API o dal database.** Vengono eseguite nel browser, sull'entità in corso di modifica, e definiscono ciò che il pannello propone. Una regola che deve valere per ogni chiamante dell'API appartiene a `validation`, che il server controlla sulle scritture REST, socket e MCP (non sulle [scritture in-process](#dove-viene-eseguita-la-validazione) del tuo codice server), oppure a una [regola di sicurezza](/docs/collections/security-rules/), che il database impone a chiunque — pannello, SDK o `curl`.
 :::
 
 ### 2. Property Builder (Programmatici)

@@ -1,5 +1,5 @@
 ---
-sourceHash: c63661257e39dcba
+sourceHash: 917e92f2baabde99
 title: Estendere Rebase
 sidebar_label: Estendere Rebase
 description: Una guida alle decisioni per scegliere il giusto meccanismo di estensione — plugin, slot, override di componenti, viste entità, azioni e altro ancora.
@@ -28,7 +28,7 @@ Tutto ciò che viene trattato qui riguarda il **pannello di amministrazione**. P
 | Aggiungere una colonna calcolata a una tabella | `additionalFields` | collezione | [Colonne aggiuntive](/docs/frontend/additional-columns) |
 | Aggiungere un widget di campo personalizzato per un tipo di proprietà | `propertyConfigs` | tipo di proprietà | [Campi personalizzati](/docs/frontend/custom-fields) |
 | Aggiungere una scheda entità | `entityViews` | entità | [Viste entità](/docs/frontend/entity-views) |
-| Renderizzare le righe di una collezione in modo diverso | `admin.customViews` | collezione | [sotto](#customviews) |
+| Renderizzare le righe di una collezione in modo diverso | `admin.customViews` | collezione | [sotto](#modalità-di-visualizzazione-personalizzate) |
 | Aggiungere un'azione su riga/contesto o un pulsante entità | `entityActions` | entità | [Azioni entità](/docs/frontend/entity-actions) |
 | Inserire un dato numerico/grafico nella scheda della home page di una collezione | slot `home.card.widget` | app/plugin | [Slot](/docs/frontend/slots) |
 | Iniettare UI in una posizione specifica del chrome | `slots` | app/plugin | [Slot](/docs/frontend/slots) |
@@ -118,8 +118,7 @@ Componenti React a livello di barra degli strumenti che ricevono `CollectionActi
 
 → [Azioni entità — Azioni di collezione](/docs/frontend/entity-actions#collection-actions)
 
-### Modalità di visualizzazione personalizzate {#customviews}
-
+### Modalità di visualizzazione personalizzate
 **Ambito:** collezione (aggiunge una modalità di visualizzazione).
 
 Una mappa, un calendario, una galleria, una cronologia — un'altra resa grafica de *le stesse righe*, offerta nel selettore delle viste della collezione accanto a Lista, Tabella, Card e Lavagna (Board).
@@ -163,8 +162,7 @@ La selezione della vista aggiorna `?__view=`, persiste dopo il ricaricamento del
 
 **Questo non è un modo per creare una vista che abbraccia più collezioni.** Una modalità di visualizzazione è una resa alternativa della query di una singola collezione. Se il tuo componente ignora `tableController` e recupera autonomamente quattro tabelle, dovrebbe essere una [`AppView`](/docs/frontend#custom-views) — la barra degli strumenti sopra di essa, con la relativa casella di ricerca e il conteggio dei record, descriverebbe una query che la vista non renderizza.
 
-### `formView` {#formview}
-
+### `formView`
 **Ambito:** collezione.
 
 Sostituisce l'intero form predefinito dell'entità con un componente personalizzato. Si imposta nella definizione di una collezione:

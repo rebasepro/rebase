@@ -113,13 +113,13 @@ const { data } = await client.data.products
 | Method | Description | Example |
 |--------|-------------|---------|
 | `.where(field, op, value)` | Add a filter condition | `.where("age", ">=", 18)` |
-| `.where(path, op, value)` | Filter on a [relation](#querying-through-a-relation) or [JSON](#filtering-inside-json) path | `.where("author.name", "==", "bob")` |
-| `.where(group)` | Add an [OR/AND group](#logical-conditions-or--and) | `.where(or(cond(…), cond(…)))` |
+| `.where(path, op, value)` | Filter on a [relation](/docs/sdk/relations#querying-through-a-relation) or [JSON](/docs/sdk/aggregates-and-search#filtering-inside-json) path | `.where("author.name", "==", "bob")` |
+| `.where(group)` | Add an [OR/AND group](#logical-conditions-or--and--not) | `.where(or(cond(…), cond(…)))` |
 | `.orderBy(field, dir, nulls?)` | Sort results | `.orderBy("name", "asc")` |
-| `.orderBy(aggregate, dir)` | Sort by an [aggregate over a relation](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
+| `.orderBy(aggregate, dir)` | Sort by an [aggregate over a relation](/docs/sdk/relations#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
 | `.limit(n)` | Limit result count | `.limit(25)` |
 | `.offset(n)` | Skip first N results | `.offset(50)` |
-| `.after(cursor)` | Continue after a [cursor](#cursor-pagination) | `.after(meta.nextCursor)` |
+| `.after(cursor)` | Continue after a [cursor](/docs/sdk/pagination#cursor-pagination) | `.after(meta.nextCursor)` |
 | `.fields(...columns)` | Return [only these columns](#returning-fewer-columns) | `.fields("id", "title")` |
 | `.distinct()` | Collapse rows identical over those columns | `.fields("status").distinct()` |
 | `.search(text)` | Text search — see [Search](/docs/backend/search) | `.search("laptop")` |
@@ -127,8 +127,8 @@ const { data } = await client.data.products
 | `.include(...relations)` | [Load related rows](/docs/sdk/relations#loading-related-rows) | `.include("author", "tags")` |
 | `.find()` | Execute the query | Returns `FindResult<M>` |
 | `.aggregate(params)` | [Reduce instead of returning rows](#aggregates) | `.aggregate({ select: [{ fn: "count" }] })` |
-| `.iterate(options?)` | [Stream every matching row](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
-| `.findAll(options?)` | [Collect every matching row](#reading-everything-iterate-and-findall) | Returns `M[]` |
+| `.iterate(options?)` | [Stream every matching row](/docs/sdk/pagination#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
+| `.findAll(options?)` | [Collect every matching row](/docs/sdk/pagination#reading-everything-iterate-and-findall) | Returns `M[]` |
 | `.count()` | Count the matching rows | Returns `number` |
 | `.listen(onUpdate, onError?)` | Subscribe to real-time updates | Returns `unsubscribe()` |
 
@@ -274,7 +274,7 @@ query string gets wrong:
 |-----------|-----------|------|
 | `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` is a search for the four-character string `null` |
 | `cond("id", "in", [])` | `id.in.(\)` | `in.()` is a list holding one empty string, which is a different query |
-| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | a [relation path](#querying-through-a-relation) keeps its dot |
+| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | a [relation path](/docs/sdk/relations#querying-through-a-relation) keeps its dot |
 
 Commas, parentheses and backslashes inside a value are backslash-escaped, so
 `cond("name", "==", "Doe, John")` travels as `name.eq.Doe\, John` and does not
@@ -334,7 +334,7 @@ returned in whatever order the database pleased, and paging over an order that
 can differ between two runs of the same query repeats some rows and skips
 others.
 
-A multi-column sort pages fine under a [cursor](#cursor-pagination): the
+A multi-column sort pages fine under a [cursor](/docs/sdk/pagination#cursor-pagination): the
 comparison is built over every key, in order. The one ordering a cursor cannot
 describe is **`_score`** — see [Search](/docs/backend/search). Relevance is
 computed per query rather than stored, so there is no value on the cursor row to
@@ -366,7 +366,7 @@ Over HTTP it is a third colon-segment, `?orderBy=publishedAt:desc:last`, or a
 `"nulls"` key in the JSON array form. Anything other than `first`/`last` is a
 400 rather than a silently different order.
 
-The [cursor](#cursor-pagination) honours whatever the sort declared, so paging
+The [cursor](/docs/sdk/pagination#cursor-pagination) honours whatever the sort declared, so paging
 over a nullable key stays correct under either placement.
 
 ## Returning fewer columns

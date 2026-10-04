@@ -82,7 +82,7 @@ const { data } = await client.data.posts.include({
 
 Ein Name, der keine Relation der Collection ist, führt auf jeder Ebene des Baums zu einem **400 `UNKNOWN_RELATION`** – auch innerhalb eines verschachtelten `include`. Früher wurde dies ignoriert, was mit 200 beantwortet wurde, wobei das Feld einfach fehlte. Ein fehlendes Relationsfeld ist jedoch nicht von einer Zeile zu unterscheiden, die tatsächlich keine verknüpfte Zeile hat. Ein Tippfehler sah daher genauso aus wie leere Daten.
 
-Mit einem generierten `Database`-Typ kommt es gar nicht erst so weit: `include`-Schlüssel werden zur Compile-Zeit rekursiv mit den echten Relationen der Collection abgeglichen. Siehe [Typisierte Includes](#typed-includes).
+Mit einem generierten `Database`-Typ kommt es gar nicht erst so weit: `include`-Schlüssel werden zur Compile-Zeit rekursiv mit den echten Relationen der Collection abgeglichen. Siehe [Typisierte Includes](#typisierte-includes).
 
 ### Übertragungsprotokoll (On the wire)
 
@@ -156,7 +156,7 @@ data[0].authorId;       // "uuid-1234" — still there
 data[0].author?.name;   // "Jane Doe"
 ```
 
-Ein generiertes `Database` typisiert alle drei präzise: `Insert` und `Update` akzeptieren beide Schreibweisen, `Row` besitzt `authorId` bedingungslos, und `author` ist auf `Row` optional — <span class="since-badge" data-since="0.24">Seit 0.24</span> `RowWith<"posts", ["author"]>` ist die Zeile, auf der es **erforderlich** ist, für einen Lesevorgang, der danach gefragt hat. Siehe [Typisierte Includes](#typed-includes).
+Ein generiertes `Database` typisiert alle drei präzise: `Insert` und `Update` akzeptieren beide Schreibweisen, `Row` besitzt `authorId` bedingungslos, und `author` ist auf `Row` optional — <span class="since-badge" data-since="0.24">Seit 0.24</span> `RowWith<"posts", ["author"]>` ist die Zeile, auf der es **erforderlich** ist, für einen Lesevorgang, der danach gefragt hat. Siehe [Typisierte Includes](#typisierte-includes).
 
 Der einzige Fall, in dem die drei zusammenfallen, ist eine Relation, die identisch zu ihrem eigenen Fremdschlüssel benannt ist. Dort wird die eingebundene Zeile *über* der Spalte ausgeliefert, und der generierte Typ bildet dies ab, indem er diesen Schlüssel als beides typisiert.
 

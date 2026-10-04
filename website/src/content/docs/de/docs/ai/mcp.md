@@ -19,7 +19,7 @@ Konfigurationsblock zeigt.
 
 Ein bereitgestelltes Backend kann MCP auch selbst über HTTP für die Benutzer Ihrer
 Anwendung bereitstellen. Das ist ein anderer Anwendungsfall mit einem anderen
-Modell für Zugangsdaten: siehe [Der Remote-Endpunkt](#the-remote-endpoint).
+Modell für Zugangsdaten: siehe [Der Remote-Endpunkt](#der-remote-endpunkt).
 
 ## Verbinden eines Clients
 

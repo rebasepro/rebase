@@ -1,5 +1,5 @@
 ---
-sourceHash: b03a0dfd0577d1ee
+sourceHash: 67d0f85a988d0aa9
 title: Temps réel entre plusieurs instances
 sidebar_label: Temps réel entre plusieurs instances
 description:"\"Comment les canaux de diffusion et la présence fonctionnent sur plusieurs processus serveur : le bus LISTEN/NOTIFY, la gestion par instance et l'écriture de votre propre transport.\""
@@ -9,7 +9,7 @@ description:"\"Comment les canaux de diffusion et la présence fonctionnent sur 
 
 Pour les environnements de cluster multi-instances (par exemple, s'exécutant dans Kubernetes ou des conteneurs Docker derrière un équilibreur de charge), Rebase s'appuie sur `LISTEN/NOTIFY` de PostgreSQL pour synchroniser les **modifications de lignes** entre les instances. Les abonnements aux collections et aux entités s'étendent ainsi à toutes les instances sans aucune configuration — c'est ce que décrit cette section.
 
-**Les canaux de diffusion et la présence sont distincts**, et sont limités à chaque instance tant que vous n'activez pas un bus de canaux. Voir [Canaux et présence entre plusieurs instances](#channels-and-presence-across-instances) ci-dessous.
+**Les canaux de diffusion et la présence sont distincts**, et sont limités à chaque instance tant que vous n'activez pas un bus de canaux. Voir [Canaux et présence entre plusieurs instances](#canaux-et-présence-entre-plusieurs-instances) ci-dessous.
 
 ### Contourner les pools pgBouncer
 
@@ -76,9 +76,9 @@ La limite à surveiller n'est pas la capacité, mais le fait que chaque notifica
 
 Par client, le socket accepte jusqu'à **7 200 trames de canaux par minute** (120/s — 60 fps de diffusion de curseur plus la mise à jour de présence associée à chacune), comptabilisées séparément du budget partagé par les requêtes et les abonnements. Les trames au-delà sont refusées avec une erreur `RATE_LIMITED` plutôt que mises en file d'attente.
 
-Le refus survient sur `channel.onError()`, et non sous la forme d'un `broadcast()` rejeté — voir [Lorsqu'une trame de canal est refusée](#when-a-channel-frame-is-refused).
+Le refus survient sur `channel.onError()`, et non sous la forme d'un `broadcast()` rejeté — voir [Lorsqu'une trame de canal est refusée](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
-Si vous dépassez encore cette limite après cela, limitez le débit (throttle) des événements de type curseur côté client (un état de type « last-write-wins » n'a pas besoin de 60 mises à jour par seconde), et envisagez de router les collaborateurs d'un même document vers la même instance — le routage persistant (sticky routing) réduit le trafic inter-instances à presque rien, quel que soit le nombre d'utilisateurs. Ce n'est qu'au-delà qu'un autre transport devient pertinent, et la solution réside alors dans un package de transport, et non dans un fork. Voir [Écrire votre propre transport](#writing-your-own-transport).
+Si vous dépassez encore cette limite après cela, limitez le débit (throttle) des événements de type curseur côté client (un état de type « last-write-wins » n'a pas besoin de 60 mises à jour par seconde), et envisagez de router les collaborateurs d'un même document vers la même instance — le routage persistant (sticky routing) réduit le trafic inter-instances à presque rien, quel que soit le nombre d'utilisateurs. Ce n'est qu'au-delà qu'un autre transport devient pertinent, et la solution réside alors dans un package de transport, et non dans un fork. Voir [Écrire votre propre transport](#écrire-votre-propre-transport).
 
 ### Regroupement (Coalescing)
 
@@ -152,7 +152,7 @@ La distribution aux clients locaux n'est pas de votre ressort — le service tem
 
 `pg_notify` refuse toute charge utile de 8000 octets ou plus. Les curseurs et la présence s'y intègrent largement ; un instantané de document, non. Rebase gère cela de la même manière qu'il gère les modifications d'entités volumineuses — en envoyant une adresse plutôt qu'un corps :
 
-- **Sur un canal persistant (retained)** (voir [Rétention des canaux](#channel-retention)), le message est déjà stocké avec un numéro de séquence, de sorte que la notification ne contient que `(channel, seq)` et chaque instance réceptrice relit le corps. Il n'y a alors aucune limite de taille. Cela vaut pour tout message persistant, petit ou grand : n'importe quelle connexion à la base de données peut faire `LISTEN`, si bien que le corps ne voyage jamais dans la notification. Cela coûte une lecture par clé primaire et par message, sur chaque instance ayant un membre sur le canal.
+- **Sur un canal persistant (retained)** (voir [Rétention des canaux](/docs/backend/realtime#channel-retention)), le message est déjà stocké avec un numéro de séquence, de sorte que la notification ne contient que `(channel, seq)` et chaque instance réceptrice relit le corps. Il n'y a alors aucune limite de taille. Cela vaut pour tout message persistant, petit ou grand : n'importe quelle connexion à la base de données peut faire `LISTEN`, si bien que le corps ne voyage jamais dans la notification. Cela coûte une lecture par clé primaire et par message, sur chaque instance ayant un membre sur le canal.
 - **Les diffusions éphémères et la présence** voyagent, elles, toujours dans la notification elle-même, si bien que n'importe quelle connexion à la base de données peut les lire. Placez sur un canal persistant tout ce qui ne doit pas être lisible de cette façon.
 - **Sur un canal éphémère**, il n'y a rien vers quoi pointer. La diffusion est distribuée localement, l'émetteur reçoit une erreur `CHANNEL_BUS_PAYLOAD_TOO_LARGE` sur `channel.onError()`, et un avertissement mentionne le canal — évitant ainsi que le message n'atteigne silencieusement que la moitié du cluster.
 

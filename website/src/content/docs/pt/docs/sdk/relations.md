@@ -82,7 +82,7 @@ const { data } = await client.data.posts.include({
 
 Um nome que não seja uma relação da coleção resulta em um erro **400 `UNKNOWN_RELATION`**, em todos os níveis da árvore — inclusive dentro de um `include` aninhado. Anteriormente isso era ignorado, retornando 200 com o campo simplesmente ausente, e um campo de relação ausente é indistinguível de uma linha que genuinamente não possui uma linha relacionada. Portanto, um erro de digitação parecia exatamente com dados vazios.
 
-Com um tipo `Database` gerado, isso nem chega a acontecer: as chaves de `include` são verificadas recursivamente contra as relações reais da coleção em tempo de compilação. Consulte [Includes tipados](#typed-includes).
+Com um tipo `Database` gerado, isso nem chega a acontecer: as chaves de `include` são verificadas recursivamente contra as relações reais da coleção em tempo de compilação. Consulte [Includes tipados](#includes-tipados).
 
 ### Na rede
 
@@ -156,7 +156,7 @@ data[0].authorId;       // "uuid-1234" — still there
 data[0].author?.name;   // "Jane Doe"
 ```
 
-Um `Database` gerado tipa os três com precisão: `Insert` e `Update` aceitam qualquer uma das sintaxes de escrita, `Row` possui `authorId` incondicionalmente, e `author` é opcional em `Row` — <span class="since-badge" data-since="0.24">Since 0.24</span> `RowWith<"posts", ["author"]>` é a linha com ele **obrigatório**, para uma leitura que o solicitou. Consulte [Includes tipados](#typed-includes).
+Um `Database` gerado tipa os três com precisão: `Insert` e `Update` aceitam qualquer uma das sintaxes de escrita, `Row` possui `authorId` incondicionalmente, e `author` é opcional em `Row` — <span class="since-badge" data-since="0.24">Since 0.24</span> `RowWith<"posts", ["author"]>` é a linha com ele **obrigatório**, para uma leitura que o solicitou. Consulte [Includes tipados](#includes-tipados).
 
 O único caso em que os três se sobrepõem é uma relação nomeada de forma idêntica à sua própria chave estrangeira. Nesse caso, a linha incluída é servida *sobre* a coluna, e o tipo gerado reflete isso tipando essa chave como ambos.
 

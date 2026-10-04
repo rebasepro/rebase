@@ -1,5 +1,5 @@
 ---
-sourceHash: b03a0dfd0577d1ee
+sourceHash: 67d0f85a988d0aa9
 title: Realtime su più istanze
 sidebar_label: Realtime su più istanze
 description:"\"Come i canali di broadcast e la presence sopravvivono a più di un processo server: il bus LISTEN/NOTIFY, cosa appartiene a ciascuna istanza e come scrivere un transport personalizzato.\""
@@ -9,7 +9,7 @@ description:"\"Come i canali di broadcast e la presence sopravvivono a più di u
 
 Per ambienti cluster multi-istanza (ad es. in esecuzione all'interno di container Kubernetes o Docker dietro un load balancer), Rebase si affida a PostgreSQL `LISTEN/NOTIFY` per sincronizzare le **modifiche alle righe** tra le istanze. Le sottoscrizioni a collection ed entità si estendono quindi su più istanze senza alcuna configurazione: questo è ciò che descrive questa sezione.
 
-**I canali di broadcast e la presence sono separati** e sono specifici per istanza finché non si attiva un channel bus. Vedi [Canali e presence tra istanze](#channels-and-presence-across-instances) di seguito.
+**I canali di broadcast e la presence sono separati** e sono specifici per istanza finché non si attiva un channel bus. Vedi [Canali e presence tra istanze](#canali-e-presence-tra-istanze) di seguito.
 
 ### Bypass dei pool pgBouncer
 
@@ -76,9 +76,9 @@ Il limite da monitorare non è la capacità, bensì il fatto che ogni notifica �
 
 Per ogni client, il socket accetta fino a **7.200 frame di canale al minuto** (120/s — 60 fps di broadcast del cursore più l'aggiornamento di presence veicolato da ciascuno), conteggiati separatamente dal budget condiviso tra query e sottoscrizioni. I frame che superano questo limite vengono rifiutati con un errore `RATE_LIMITED` anziché accodati.
 
-Il rifiuto arriva su `channel.onError()`, non come una `broadcast()` respinta — vedi [Quando un frame di canale viene rifiutato](#when-a-channel-frame-is-refused).
+Il rifiuto arriva su `channel.onError()`, non come una `broadcast()` respinta — vedi [Quando un frame di canale viene rifiutato](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
-Se dopo questo continui a spingere sui limiti, applica il throttling agli eventi di tipo cursore sul client (uno stato last-write-wins non necessita di 60 aggiornamenti al secondo) e prendi in considerazione l'instradamento dei collaboratori di un documento verso la stessa istanza — lo sticky routing riduce il traffico tra istanze quasi a zero, indipendentemente dal numero di utenti. Solo oltre tale soglia ha senso adottare un altro transport, e in quel caso la soluzione è un pacchetto transport, non un fork. Vedi [Scrivere un transport personalizzato](#writing-your-own-transport).
+Se dopo questo continui a spingere sui limiti, applica il throttling agli eventi di tipo cursore sul client (uno stato last-write-wins non necessita di 60 aggiornamenti al secondo) e prendi in considerazione l'instradamento dei collaboratori di un documento verso la stessa istanza — lo sticky routing riduce il traffico tra istanze quasi a zero, indipendentemente dal numero di utenti. Solo oltre tale soglia ha senso adottare un altro transport, e in quel caso la soluzione è un pacchetto transport, non un fork. Vedi [Scrivere un transport personalizzato](#scrivere-un-transport-personalizzato).
 
 ### Coalescing
 
@@ -152,7 +152,7 @@ La consegna ai client locali non è una tua responsabilità — il servizio real
 
 `pg_notify` rifiuta un payload di 8000 byte o più. I cursori e la presence ci rientrano comodamente; uno snapshot di un documento no. Rebase gestisce questo problema nello stesso modo in cui gestisce le modifiche a entità di grandi dimensioni — inviando un indirizzo anziché un corpo:
 
-- **Su un canale con retention** (vedi [Channel Retention](#channel-retention)) il messaggio è già memorizzato con un numero di sequenza, quindi la notifica trasporta solo `(channel, seq)` e ciascuna istanza ricevente rilegge il corpo. Non c'è alcun limite di dimensione. Questo vale per ogni messaggio con retention, piccolo o grande: qualsiasi login al database può eseguire `LISTEN`, quindi il corpo non viaggia mai nella notifica. Costa una lettura per chiave primaria per messaggio su ciascuna istanza con un membro sul canale.
+- **Su un canale con retention** (vedi [Channel Retention](/docs/backend/realtime#channel-retention)) il messaggio è già memorizzato con un numero di sequenza, quindi la notifica trasporta solo `(channel, seq)` e ciascuna istanza ricevente rilegge il corpo. Non c'è alcun limite di dimensione. Questo vale per ogni messaggio con retention, piccolo o grande: qualsiasi login al database può eseguire `LISTEN`, quindi il corpo non viaggia mai nella notifica. Costa una lettura per chiave primaria per messaggio su ciascuna istanza con un membro sul canale.
 - **I broadcast effimeri e la presence** viaggiano comunque nella notifica stessa, quindi qualsiasi login al database può leggerli. Metti su un canale con retention tutto ciò che non deve essere leggibile in questo modo.
 - **Su un canale effimero** non c'è nulla a cui puntare. Il broadcast viene consegnato localmente, il mittente riceve un errore `CHANNEL_BUS_PAYLOAD_TOO_LARGE` su `channel.onError()` e un avviso indica il nome del canale — evitando che il messaggio raggiunga silenziosamente solo metà del cluster.
 

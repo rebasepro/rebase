@@ -141,7 +141,7 @@ ofuscación con una excepción silenciosa, por lo que no se ofrece.
 fila y todo lo que hicieron sus callbacks se confirman (commit) juntos o no se confirma nada.
 
 - **`beforeSave`, `beforeDelete`** — si el callback lanza un error (throw), la operación se rechaza con un HTTP 400 que incluye su mensaje y el código `CALLBACK_REJECTED`, y la escritura en la base de datos nunca ocurre. Lance un `RebaseApiError` de `@rebasepro/types` para elegir el estado usted mismo — consulte [Callbacks de entidad](/docs/collections/callbacks#beforesave). Un `beforeDelete` que *devuelve* `false` es el mismo rechazo sin mensaje, y responde **403** con ese código.
-- **`afterRead`** — la fila devuelta (o la fila transformada) es lo que recibe el emisor de la llamada, y solo él: en una escritura da forma a la respuesta, mientras que `afterSave`, `beforeDelete`, `afterDelete` y el historial obtienen la fila tal como se almacenó — un valor enmascarado nunca se registra ni se revierte en la columna. Su transacción es `READ ONLY` — consulte [más abajo](#afterread-cannot-write).
+- **`afterRead`** — la fila devuelta (o la fila transformada) es lo que recibe el emisor de la llamada, y solo él: en una escritura da forma a la respuesta, mientras que `afterSave`, `beforeDelete`, `afterDelete` y el historial obtienen la fila tal como se almacenó — un valor enmascarado nunca se registra ni se revierte en la columna. Su transacción es `READ ONLY` — consulte [más abajo](#afterread-no-puede-escribir).
 - **`afterSave`, `afterDelete`** — se ejecutan *antes* del commit, con `await`. Si lanzan un error aquí, se revierte (rollback) la fila y se responde con el mismo **400 `CALLBACK_REJECTED`**, con `details.stage` indicando el hook. Mantienen la transacción abierta mientras se ejecutan, por lo que uno lento mantiene un bloqueo activo.
 - **`afterSaveError`** — se ejecuta cuando el guardado falló, en la salida. En una solicitud se ejecuta después de que la transacción de la escritura fallida se haya revertido, con un `context` en el que cada llamada es una transacción propia, de modo que un trabajo que encole para informar del fallo se conserva. Un error que lance se registra en el log; el emisor de la llamada recibe el error del propio guardado.
 
@@ -184,8 +184,7 @@ no pertenece al cuerpo del callback:
 La regla general: si el trabajo aún debe ocurrir cuando se deshace la escritura,
 no es parte de la escritura, por lo que no debe ir dentro del hook.
 
-### `afterRead` no puede escribir {#afterread-cannot-write}
-
+### `afterRead` no puede escribir
 Una lectura con alcance de solicitud abre su transacción en modo `READ ONLY`, y también lo hace la
 relectura de una suscripción en tiempo real. `afterRead` se ejecuta dentro
 de ella, por lo que **ninguna escritura desde ese callback puede tener éxito** — ni una creación con `context.data`,

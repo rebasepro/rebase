@@ -1,5 +1,5 @@
 ---
-sourceHash: 1c417068b657af16
+sourceHash: 0ac5189687d9eccf
 title: Abonnements en temps réel
 sidebar_label: Temps réel
 description: Abonnez-vous aux modifications de données en direct avec le SDK typé de Rebase à l'aide d'écouteurs en temps réel basés sur WebSocket.
@@ -210,7 +210,7 @@ Le client WebSocket gère l'authentification automatiquement :
 - Lors de la **connexion** ou du **rafraîchissement de jeton**, le nouveau jeton est envoyé à un socket déjà ouvert via un message `authenticate`. Si aucun socket n'est ouvert, rien ne se passe — se connecter n'est pas une demande d'activation du temps réel, et un socket ouvert ultérieurement s'authentifie de lui-même.
 - Lors de la **déconnexion**, la connexion WebSocket est coupée. Le client reste utilisable ; un abonnement ultérieur se reconnectera de façon anonyme.
 - Si la connexion est perdue, le client **se reconnecte automatiquement** et rétablit tous les abonnements actifs. Il n'arrête jamais d'essayer tant qu'il existe un abonnement ou un canal rejoint ; le délai entre les tentatives croît jusqu'à 30 secondes au maximum.
-- Si le serveur met fin à la session du socket — l'utilisateur s'est déconnecté partout, cette session a été révoquée, le compte a été supprimé, ou le jeton a expiré avant qu'un rafraîchissement n'atteigne le socket — il ferme le socket avec le code `4001`. Le client se reconnecte comme après toute coupure, en s'authentifiant avec la session qu'il détient alors (rafraîchie si possible), ou de façon anonyme s'il n'en détient aucune. Un rôle retiré ne ferme pas le socket : il s'applique dès la trame suivante. Voir [Authentification & RLS](/docs/backend/realtime/#authentication-rls).
+- Si le serveur met fin à la session du socket — l'utilisateur s'est déconnecté partout, cette session a été révoquée, le compte a été supprimé, ou le jeton a expiré avant qu'un rafraîchissement n'atteigne le socket — il ferme le socket avec le code `4001`. Le client se reconnecte comme après toute coupure, en s'authentifiant avec la session qu'il détient alors (rafraîchie si possible), ou de façon anonyme s'il n'en détient aucune. Un rôle retiré ne ferme pas le socket : il s'applique dès la trame suivante. Voir [Authentification & RLS](/docs/backend/realtime/#authentication--rls).
 - Si la connexion reste coupée pendant plus d'environ 15 secondes, l'`onError` de chaque abonnement (et celui de chaque canal rejoint) est appelé **une seule fois** avec une `RebaseApiError` dont le `code` est `CONNECTION_LOST`. L'abonnement n'est pas terminé : continuez à afficher ce que vous avez, marquez-le comme potentiellement obsolète, et attendez. Une fois le socket de retour, le prochain `onUpdate` de l'abonnement porte tout ce qui a été écrit pendant ce temps.
 - `client.ws.state` est l'état de la connexion — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` ou `closed` — et `client.ws.onStateChange(listener)` est informé de chaque changement. `disconnected` est l'état dans lequel `CONNECTION_LOST` a été signalé.
 - Les requêtes envoyées sur le socket sont **au plus une fois (at-most-once)**. Celle qui était en cours d'envoi au moment de la coupure échoue avec `CONNECTION_LOST` et n'est jamais renvoyée, car le serveur l'a peut-être déjà exécutée. Celle qui attend toujours un socket après 30 secondes échoue avec `REQUEST_TIMEOUT` sans avoir été envoyée.
@@ -291,7 +291,7 @@ La seule vérification appliquée par le serveur est **l'appartenance** : pour d
 Le nom d'un canal n'est donc ni un secret, ni une permission. Ne placez rien dans un canal (y compris l'historique conservé et l'état de présence) que tous les utilisateurs de votre application ne devraient pas voir, et ne dérivez pas le nom d'un canal à partir de données que vous ne divulgueriez pas. Les règles d'autorisation par canal ne sont pas encore implémentées ; si vous en avez besoin dès aujourd'hui, conservez la partie sensible des échanges sur `client.data`, où s'applique la sécurité au niveau des lignes.
 :::
 
-> **Par défaut, les diffusions ne sont pas rejouées.** Elles n'atteignent que les membres actuellement connectés. C'est ce que l'on souhaite pour des notifications qui s'auto-corrigent — un signal « quelqu'un a enregistré » est remplacé par le prochain enregistrement — et cela ne coûte rien. Pour un flux d'opérations, où une interruption silencieuse provoque des divergences, activez [l'historique des messages](#message-history-and-catch-up) sur le canal.
+> **Par défaut, les diffusions ne sont pas rejouées.** Elles n'atteignent que les membres actuellement connectés. C'est ce que l'on souhaite pour des notifications qui s'auto-corrigent — un signal « quelqu'un a enregistré » est remplacé par le prochain enregistrement — et cela ne coûte rien. Pour un flux d'opérations, où une interruption silencieuse provoque des divergences, activez [l'historique des messages](#historique-des-messages-et-rattrapage) sur le canal.
 
 ## Historique des messages et rattrapage
 

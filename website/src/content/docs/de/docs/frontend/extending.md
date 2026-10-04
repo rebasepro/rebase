@@ -1,5 +1,5 @@
 ---
-sourceHash: c63661257e39dcba
+sourceHash: 917e92f2baabde99
 title: Rebase erweitern
 sidebar_label: Rebase erweitern
 description: Ein Entscheidungsleitfaden zur Auswahl des richtigen Erweiterungsmechanismus – Plugins, Slots, Komponenten-Overrides, Entity-Views, Aktionen und mehr.
@@ -28,7 +28,7 @@ Alles hier bezieht sich auf das **Admin-Panel**. Für den Server – das Einschr
 | Eine berechnete Spalte zu einer Tabelle hinzufügen | `additionalFields` | Collection | [Zusätzliche Spalten](/docs/frontend/additional-columns) |
 | Ein benutzerdefiniertes Feld-Widget für einen Eigenschaftstyp hinzufügen | `propertyConfigs` | Eigenschaftstyp | [Benutzerdefinierte Felder](/docs/frontend/custom-fields) |
 | Einen Entity-Tab hinzufügen | `entityViews` | Entity | [Entity-Views](/docs/frontend/entity-views) |
-| Die Zeilen einer Collection auf andere Weise rendern | `admin.customViews` | Collection | [unten](#customviews) |
+| Die Zeilen einer Collection auf andere Weise rendern | `admin.customViews` | Collection | [unten](#benutzerdefinierte-view-modi) |
 | Eine Zeilen-/Kontextaktion oder einen Entity-Button hinzufügen | `entityActions` | Entity | [Entity-Aktionen](/docs/frontend/entity-actions) |
 | Eine Kennzahl auf der Startseitenkarte einer Collection platzieren | `home.card.widget`-Slot | App/Plugin | [Slots](/docs/frontend/slots) |
 | UI an einer bestimmten Chrome-Position einfügen | `slots` | App/Plugin | [Slots](/docs/frontend/slots) |
@@ -118,8 +118,7 @@ React-Komponenten auf Symbolleistenebene, die `CollectionActionsProps` erhalten 
 
 → [Entity-Aktionen – Collection-Aktionen](/docs/frontend/entity-actions#collection-actions)
 
-### Benutzerdefinierte View-Modi {#customviews}
-
+### Benutzerdefinierte View-Modi
 **Scope:** Collection (fügt einen View-Modus hinzu).
 
 Eine Karte, ein Kalender, eine Galerie, eine Zeitleiste – eine andere Darstellung *derselben Zeilen*, die im View-Umschalter der Collection neben Liste, Tabelle, Karten und Board angeboten wird.
@@ -163,8 +162,7 @@ Das Auswählen des Views aktualisiert `?__view=`, bleibt nach einem Neuladen erh
 
 **Dies ist keine Möglichkeit, einen View über mehrere Collections hinweg zu erstellen.** Ein View-Modus ist eine andere Darstellung der Abfrage einer einzelnen Collection. Wenn Ihre Komponente den `tableController` ignoriert und stattdessen vier eigene Tabellen abruft, sollte sie ein [`AppView`](/docs/frontend#custom-views) sein – die Symbolleiste darüber mit ihrem Suchfeld und der Datensatzanzahl würde sonst eine Abfrage beschreiben, die gar nicht gerendert wird.
 
-### `formView` {#formview}
-
+### `formView`
 **Scope:** Collection.
 
 Ersetzt das gesamte Standard-Entity-Formular durch eine benutzerdefinierte Komponente. Wird in der Collection-Definition festgelegt:

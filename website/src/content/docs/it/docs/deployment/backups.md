@@ -54,7 +54,7 @@ cui si basano l'ordinamento e la retention.
 | `--out`, `-o` | Un percorso locale, o un URL `s3://bucket/prefix` / `gs://bucket/prefix`. Il valore predefinito è `$BACKUP_DESTINATION`, poi `./backups`. |
 | `--exclude-schema <s>` | Esclude uno schema dal dump (ripetibile). Non escludere mai `rebase` — vedi sotto. |
 | `--no-owner` | Omette i comandi di proprietà, per ripristinare come un ruolo diverso. |
-| `--enable-row-security` | Esegue il dump come soggetto admin invece di fallire sulla row-level security. **Può produrre un dump parziale** — vedi [Row-level security](#row-level-security-and-the-dump-that-is-silently-short). |
+| `--enable-row-security` | Esegue il dump come soggetto admin invece di fallire sulla row-level security. **Può produrre un dump parziale** — vedi [Row-level security](#row-level-security-e-il-dump-silenziosamente-incompleto). |
 | `--row-security-role <r>` | Il ruolo con cui leggere con il flag sopra. Il valore predefinito è `admin`. |
 
 Un dump viene validato prima che il comando segnali il successo:

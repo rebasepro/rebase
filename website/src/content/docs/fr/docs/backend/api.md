@@ -150,7 +150,7 @@ GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 
 Les groupes peuvent être imbriqués jusqu'à 32 niveaux de profondeur ; au-delà, la requête est rejetée avec `INVALID_LOGICAL_GROUP`.
 
-Un groupe vient **restreindre** les filtres de champ plutôt que de les remplacer — voir [Comment les filtres se combinent](#how-the-filters-combine).
+Un groupe vient **restreindre** les filtres de champ plutôt que de les remplacer — voir [Comment les filtres se combinent](#comment-les-filtres-se-combinent).
 
 ### Le dialecte JSON `where`
 

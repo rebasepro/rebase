@@ -18,7 +18,7 @@ tali domande prima di mostrare il blocco di configurazione.
 
 Un backend distribuito può anche servire MCP direttamente, via HTTP, per gli utenti
 della tua applicazione. Si tratta di un meccanismo diverso con un differente modello di
-credenziali: vedi [L'endpoint remoto](#the-remote-endpoint).
+credenziali: vedi [L'endpoint remoto](#lendpoint-remoto).
 
 ## Connettere un client
 

@@ -44,7 +44,7 @@ Tous les endpoints d'authentification sont montés sur `/api/auth/` :
 | `GET` | `/api/auth/keys` | Les propres [clés API personnelles](/docs/backend/api-keys/#personal-keys) de l'appelant |
 | `POST` | `/api/auth/keys` | Créer une clé personnelle. `403 PERSONAL_KEYS_DISABLED` sauf si la collection des utilisateurs définit `auth.personalKeys` |
 | `DELETE` | `/api/auth/keys/:id` | Révoquer l'une des propres clés de l'appelant |
-| `GET` | `/.well-known/jwks.json` | Le JWKS public — monté à la racine, et non sous `basePath`, car c'est là qu'un vérificateur regarde. Présent lorsque la [signature asymétrique](#asymmetric-tokens-and-jwks) est configurée |
+| `GET` | `/.well-known/jwks.json` | Le JWKS public — monté à la racine, et non sous `basePath`, car c'est là qu'un vérificateur regarde. Présent lorsque la [signature asymétrique](#jetons-asymétriques-et-jwks) est configurée |
 | `POST` | `/api/auth/mfa/enroll` | Démarrer l'enrôlement TOTP (renvoie le secret et les codes de récupération) |
 | `POST` | `/api/auth/mfa/verify` | Confirmer un enrôlement avec un code provenant de l'application d'authentification |
 | `GET` | `/api/auth/mfa/factors` | Lister les facteurs enregistrés de l'appelant |

@@ -85,7 +85,7 @@ der es schreibt.
 
 | Regel | Typ | Beschreibung |
 |-------|-----|--------------|
-| `min` / `max` | `number` | Mindest- / Höchstanzahl von Zeichen, inklusive. Mit `columnType: "varchar"` oder `"char"` bestimmt `max` auch die Spaltengröße (`VARCHAR(max)`); eine Verringerung auf einer Tabelle, die bereits längere Zeilen enthält, ist eine Migration, die die Datenbank verweigert. Die Standardspalte ist `TEXT`, die `max` unbegrenzt lässt — die Grenze liegt dann allein in der [Anfrageprüfung](#where-validation-runs) des Servers |
+| `min` / `max` | `number` | Mindest- / Höchstanzahl von Zeichen, inklusive. Mit `columnType: "varchar"` oder `"char"` bestimmt `max` auch die Spaltengröße (`VARCHAR(max)`); eine Verringerung auf einer Tabelle, die bereits längere Zeilen enthält, ist eine Migration, die die Datenbank verweigert. Die Standardspalte ist `TEXT`, die `max` unbegrenzt lässt — die Grenze liegt dann allein in der [Anfrageprüfung](#wo-die-validierung-ausgeführt-wird) des Servers |
 | `length` | `number` | Genau diese Anzahl von Zeichen – ein Ländercode, eine Referenz mit fester Breite |
 | `matches` | `string \| RegExp` | Ein Muster, dem der gesamte Wert entsprechen muss. Ein String wird pro Anfrage kompiliert; ein nicht kompilierbarer String wird daher beim Start abgelehnt, anstatt stillschweigend ignoriert zu werden |
 | `matchesMessage` | `string` | Was das Formular anzeigt, wenn `matches` fehlschlägt |
@@ -164,7 +164,7 @@ Formular, das jemanden anleitet, und einem, das ihn abweist.
 **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** Sie laufen im
 Browser auf der bearbeiteten Entität und bestimmen, was das Panel anbietet. Eine Regel,
 die für jeden API-Aufrufer gelten muss, gehört in `validation`, was der Server bei REST-,
-Socket- und MCP-Schreibvorgängen prüft (nicht bei den [prozessinternen Schreibvorgängen](#where-validation-runs)
+Socket- und MCP-Schreibvorgängen prüft (nicht bei den [prozessinternen Schreibvorgängen](#wo-die-validierung-ausgeführt-wird)
 Ihres eigenen Servercodes), oder in eine [Sicherheitsregel](/docs/collections/security-rules/), welche die
 Datenbank für jeden erzwingt – Panel, SDK oder `curl`.
 :::

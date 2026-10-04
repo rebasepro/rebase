@@ -55,7 +55,7 @@ ist das, wonach Retention und Auflistung sortieren.
 | `--out`, `-o` | Ein lokaler Pfad, oder eine `s3://bucket/prefix`- / `gs://bucket/prefix`-URL. Standardmäßig `$BACKUP_DESTINATION`, dann `./backups`. |
 | `--exclude-schema <s>` | Ein Schema aus dem Dump auslassen (wiederholbar). Lassen Sie `rebase` niemals aus — siehe unten. |
 | `--no-owner` | Eigentumsbefehle auslassen, zum Wiederherstellen als andere Rolle. |
-| `--enable-row-security` | Als Admin-Subjekt dumpen, statt an Row-Level Security zu scheitern. **Kann einen unvollständigen Dump erzeugen** — siehe [Row-Level Security](#row-level-security-and-the-dump-that-is-silently-short). |
+| `--enable-row-security` | Als Admin-Subjekt dumpen, statt an Row-Level Security zu scheitern. **Kann einen unvollständigen Dump erzeugen** — siehe [Row-Level Security](#row-level-security-und-der-dump-der-still-und-leise-unvollständig-ist). |
 | `--row-security-role <r>` | Die Rolle, als die mit dem obigen Flag gelesen wird. Standardmäßig `admin`. |
 
 Ein Dump wird validiert, bevor der Befehl Erfolg meldet: `pg_restore --list`

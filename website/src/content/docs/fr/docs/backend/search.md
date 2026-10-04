@@ -140,7 +140,7 @@ Le comportement par défaut et le comportement sans bloc présentent des lacunes
 
 **Son coût.** La partie recherche de sous-chaîne ne peut pas utiliser l'index GIN ; un `%` initial ne le peut jamais. La partie `@@` s'exécute toujours en premier et utilise l'index, ce que le mode ajoute est donc un scan sur les lignes rejetées par l'index. Sur une grande table, c'est la différence entre un parcours d'index et un parcours séquentiel, ce qui explique pourquoi il s'agit d'un mode optionnel et non du comportement par défaut.
 
-**Le modifier sur une collection en production est sans risque** — c'est la seule option de ce bloc dans ce cas. `mode` agit côté requête : il ne modifie aucune colonne générée, aucune expression de génération et aucun index, et ne déclenche donc pas le refus décrit dans [Modifier le bloc ultérieurement](#changing-the-block-later). Son activation ne nécessite qu'un simple déploiement.
+**Le modifier sur une collection en production est sans risque** — c'est la seule option de ce bloc dans ce cas. `mode` agit côté requête : il ne modifie aucune colonne générée, aucune expression de génération et aucun index, et ne déclenche donc pas le refus décrit dans [Modifier le bloc ultérieurement](#modifier-le-bloc-ultérieurement). Son activation ne nécessite qu'un simple déploiement.
 
 Il supprime les accents sur la partie sous-chaîne, **que `unaccent` soit défini ou non**, car cette suppression s'effectue également côté requête. C'est délibéré : `unaccent` est l'option que vous ne pouvez pas activer plus tard sans réécrire la table ; ainsi, une collection qui n'en dispose pas peut quand même cesser d'ignorer `Muñoz`. Ce que `unaccent` apporte de plus, c'est la suppression des accents sur la partie `@@`, où sont stockés les lexèmes.
 

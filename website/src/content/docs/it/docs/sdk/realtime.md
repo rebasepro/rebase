@@ -1,5 +1,5 @@
 ---
-sourceHash: 1c417068b657af16
+sourceHash: 0ac5189687d9eccf
 title: Sottoscrizioni Realtime
 sidebar_label: Realtime
 description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato di Rebase utilizzando listener realtime basati su WebSocket.
@@ -9,7 +9,7 @@ description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato
 
 L'SDK tipizzato di Rebase fornisce sottoscrizioni ai dati in tempo reale tramite WebSocket. Quando i record cambiano sul server, i callback a cui ti sei iscritto vengono eseguiti immediatamente con i dati aggiornati.
 
-La connessione WebSocket viene stabilita automaticamente quando è disponibile un `websocketUrl` (derivato da `baseUrl` per impostazione predefinita). La riconnessione e l'aggiornamento del token vengono gestiti per te. Un'interruzione che dura più di circa 15 secondi viene segnalata una sola volta, all'`onError` di ciascuna sottoscrizione, come `CONNECTION_LOST` — vedi [Autenticazione e riconnessione](#authentication-and-reconnection).
+La connessione WebSocket viene stabilita automaticamente quando è disponibile un `websocketUrl` (derivato da `baseUrl` per impostazione predefinita). La riconnessione e l'aggiornamento del token vengono gestiti per te. Un'interruzione che dura più di circa 15 secondi viene segnalata una sola volta, all'`onError` di ciascuna sottoscrizione, come `CONNECTION_LOST` — vedi [Autenticazione e riconnessione](#autenticazione-e-riconnessione).
 
 ## Sottoscrizione a una collection
 
@@ -181,7 +181,7 @@ Il client WebSocket gestisce l'autenticazione automaticamente:
 - Al **login** o al **refresh del token**, il nuovo token viene inviato a un socket già aperto tramite un messaggio `authenticate`. Se non c'è alcun socket aperto, non accade nulla — l'accesso non è una richiesta per il realtime, e un socket aperto successivamente si autentica da solo.
 - Al **logout**, la connessione WebSocket viene disconnessa. Il client rimane utilizzabile; una sottoscrizione successiva si riconnette in modo anonimo.
 - Se la connessione cade, il client **si riconnette automaticamente** e ristabilisce tutte le sottoscrizioni attive. Non smette mai di tentare finché esiste una sottoscrizione o un canale cui si è aderito; il ritardo tra i tentativi cresce fino a un massimo di 30 secondi.
-- Se il server termina la sessione del socket — l'utente si è disconnesso ovunque, questa sessione è stata revocata, l'account è stato eliminato, oppure il token è scaduto prima che un refresh raggiungesse il socket — chiude il socket con il codice `4001`. Il client si riconnette come dopo qualsiasi caduta, autenticandosi con la sessione che possiede in quel momento (aggiornata se possibile), oppure in modo anonimo quando non ce n'è una. Un ruolo revocato non chiude il socket: si applica a partire dal frame successivo. Vedi [Autenticazione e RLS](/docs/backend/realtime/#authentication-rls).
+- Se il server termina la sessione del socket — l'utente si è disconnesso ovunque, questa sessione è stata revocata, l'account è stato eliminato, oppure il token è scaduto prima che un refresh raggiungesse il socket — chiude il socket con il codice `4001`. Il client si riconnette come dopo qualsiasi caduta, autenticandosi con la sessione che possiede in quel momento (aggiornata se possibile), oppure in modo anonimo quando non ce n'è una. Un ruolo revocato non chiude il socket: si applica a partire dal frame successivo. Vedi [Autenticazione e RLS](/docs/backend/realtime/#authentication--rls).
 - Se la connessione resta inattiva per più di circa 15 secondi, l'`onError` di ciascuna sottoscrizione (e l'`onError` di ciascun canale cui si è aderito) viene chiamato **una sola volta** con un `RebaseApiError` il cui `code` è `CONNECTION_LOST`. La sottoscrizione non viene terminata: continua a mostrare ciò che hai, segnalalo come potenzialmente non aggiornato, e attendi. Quando il socket torna attivo, il successivo `onUpdate` della sottoscrizione porta tutto ciò che è stato scritto nel frattempo.
 - `client.ws.state` è lo stato della connessione — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` o `closed` — e `client.ws.onStateChange(listener)` viene informato di ogni cambiamento. `disconnected` è lo stato in cui `CONNECTION_LOST` è stato segnalato.
 - Le richieste inviate tramite il socket sono **at-most-once**. Una che è stata inviata quando la connessione è caduta fallisce con `CONNECTION_LOST` e non viene mai rinviata, poiché il server potrebbe averla già eseguita. Una che attende ancora un socket dopo 30 secondi fallisce con `REQUEST_TIMEOUT` senza essere inviata.
@@ -262,7 +262,7 @@ L'unico controllo applicato dal server è l'**appartenenza**: per trasmettere in
 Pertanto, il nome di un canale non è un segreto né un permesso. Non inserire in un canale nulla (inclusi cronologia persistita e stato di presenza) che ogni utente della tua app non possa vedere, e non derivare il nome di un canale da dati che non condivideresti pubblicamente. Le regole di autorizzazione per canale non sono ancora implementate; se ne hai bisogno oggi, mantieni la parte sensibile dello scambio su `client.data`, dove si applica la sicurezza a livello di riga (RLS).
 :::
 
-> **Per impostazione predefinita, i broadcast non vengono riprodotti.** Raggiungono solo i membri attualmente connessi. Questo è il comportamento desiderato per le notifiche che si autocorregono — un avviso "qualcuno ha salvato" viene superato dal salvataggio successivo — e non ha alcun costo. Per un flusso di operazioni, in cui un'interruzione silenziosa provoca divergenze, abilita la [cronologia dei messaggi](#message-history-and-catch-up) sul canale.
+> **Per impostazione predefinita, i broadcast non vengono riprodotti.** Raggiungono solo i membri attualmente connessi. Questo è il comportamento desiderato per le notifiche che si autocorregono — un avviso "qualcuno ha salvato" viene superato dal salvataggio successivo — e non ha alcun costo. Per un flusso di operazioni, in cui un'interruzione silenziosa provoca divergenze, abilita la [cronologia dei messaggi](#cronologia-dei-messaggi-e-catch-up) sul canale.
 
 ## Cronologia dei messaggi e catch-up
 

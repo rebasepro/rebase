@@ -165,7 +165,7 @@ Gruppen können bis zu 32 Ebenen tief verschachtelt werden; darüber hinaus wird
 Anfrage mit `INVALID_LOGICAL_GROUP` abgelehnt.
 
 Eine Gruppe **grenzt** neben den Feldfiltern **ein**, anstatt sie zu ersetzen —
-siehe [Wie die Filter kombiniert werden](#how-the-filters-combine).
+siehe [Wie die Filter kombiniert werden](#wie-die-filter-kombiniert-werden).
 
 ### Der `where`-JSON-Dialekt
 
@@ -193,8 +193,7 @@ Ein fehlerhaftes `where` führt zu einem 400 `INVALID_WHERE` und wird nicht stil
 verworfen: Das Verwerfen würde den Lesevorgang ungefiltert ausführen und alles zurückgeben,
 was Row-Level Security zufällig erlaubt.
 
-### Wie die Filter kombiniert werden {#how-the-filters-combine}
-
+### Wie die Filter kombiniert werden
 `?field=op.value`, `?where=`, `?or=`/`?and=` und `?searchString=` sind unabhängig
 voneinander, und jeder vorhandene Parameter muss zutreffen:
 

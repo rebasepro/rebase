@@ -1,5 +1,5 @@
 ---
-sourceHash: c38fdefef238a009
+sourceHash: 4449046fbaa30bb3
 title: Paginazione
 sidebar_label: Paginazione
 description: Esegui la paginazione di una collezione con limit/offset, numeri di pagina o un cursore keyset — e scopri quando ciascuno smette di essere corretto.
@@ -76,7 +76,7 @@ Dalla natura del cursore derivano quattro conseguenze:
   `CURSOR_WITH_OFFSET`). Entrambi indicano dove inizia la pagina, e rispettarli
   entrambi comporterebbe il salto di alcune righe.
 - **Gli ordinamenti a più chiavi e le chiavi nullable funzionano entrambi.** Il confronto viene costruito su
-  ciascuna chiave nell'ordine specificato, con il [posizionamento di NULL](#where-nulls-sort) dichiarato
+  ciascuna chiave nell'ordine specificato, con il [posizionamento di NULL](/docs/sdk/querying#where-nulls-sort) dichiarato
   dall'ordinamento — non un singolo `>` su una colonna.
 - **La rilevanza non può essere un cursore.** Un valore `_score` viene calcolato per query e non
   viene memorizzato da nessuna parte, e due query con stringhe di ricerca diverse producono punteggi
@@ -163,7 +163,7 @@ for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ 
 
 In questo contesto, `cursor` significa "cerca invece di paginare tramite offset" e specifica la colonna in base alla quale
 ordinare quando la query non lo dichiara già. La ricerca stessa è
-[il cursore del server](#cursor-pagination): lo scorrimento restituisce `meta.nextCursor` come
+[il cursore del server](#paginazione-con-cursore): lo scorrimento restituisce `meta.nextCursor` come
 `after` e non costruisce alcun confronto autonomamente, motivo per cui funziona anche un ordinamento
 a più chiavi —
 

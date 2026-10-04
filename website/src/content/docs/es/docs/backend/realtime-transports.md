@@ -1,5 +1,5 @@
 ---
-sourceHash: b03a0dfd0577d1ee
+sourceHash: 67d0f85a988d0aa9
 title: Tiempo real entre instancias
 sidebar_label: Tiempo real entre instancias
 description:"\"Cómo los canales de difusión (broadcast) y la presencia sobreviven a más de un proceso de servidor: el bus LISTEN/NOTIFY, qué posee cada instancia y cómo escribir tu propio transporte.\""
@@ -76,7 +76,7 @@ El límite que vale la pena vigilar no es la capacidad, sino que cada notificaci
 
 Por cada cliente, el socket acepta hasta **7,200 tramas de canal por minuto** (120/s: 60 fps de difusiones de cursor más la actualización de presencia que cada una transporta), contabilizadas por separado del presupuesto que comparten las consultas y suscripciones. Las tramas que superen ese límite se rechazan con un error `RATE_LIMITED` en lugar de encolarse.
 
-El rechazo llega a `channel.onError()`, no como un `broadcast()` denegado; consulta [Cuándo se rechaza una trama de canal](#cuándo-se-rechaza-una-trama-de-canal).
+El rechazo llega a `channel.onError()`, no como un `broadcast()` denegado; consulta [Cuándo se rechaza una trama de canal](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
 Si aún necesitas más rendimiento después de eso, limita (throttle) los eventos de tipo cursor en el cliente (el estado donde la última escritura gana no necesita 60 actualizaciones por segundo) y considera enrutar a los colaboradores de un mismo documento a la misma instancia: el enrutamiento persistente (sticky routing) reduce el tráfico entre instancias a casi nada, independientemente del número de usuarios. Solo más allá de ese punto vale la pena considerar otro transporte, y entonces la solución es un paquete de transporte, no un fork. Consulta [Cómo escribir tu propio transporte](#cómo-escribir-tu-propio-transporte).
 
@@ -152,7 +152,7 @@ La entrega a los clientes locales no es tu responsabilidad: el servicio en tiemp
 
 `pg_notify` rechaza cargas útiles de 8000 bytes o más. Los cursores y la presencia caben con espacio de sobra; una instantánea (snapshot) de un documento no. Rebase gestiona esto del mismo modo que gestiona cambios grandes en entidades: enviando una dirección en lugar de un cuerpo:
 
-- **En un canal retenido** (ver [Retención de canales](#retención-de-canales)) el mensaje ya está almacenado con un número de secuencia, por lo que la notificación solo incluye `(channel, seq)` y cada instancia receptora vuelve a leer el cuerpo. No hay ningún límite de tamaño en absoluto. Esto vale para todo mensaje retenido, pequeño o grande: cualquier inicio de sesión en la base de datos puede hacer `LISTEN`, así que el cuerpo nunca viaja en la notificación. Cuesta una lectura por clave primaria por mensaje en cada instancia con un miembro en el canal.
+- **En un canal retenido** (ver [Retención de canales](/docs/backend/realtime#channel-retention)) el mensaje ya está almacenado con un número de secuencia, por lo que la notificación solo incluye `(channel, seq)` y cada instancia receptora vuelve a leer el cuerpo. No hay ningún límite de tamaño en absoluto. Esto vale para todo mensaje retenido, pequeño o grande: cualquier inicio de sesión en la base de datos puede hacer `LISTEN`, así que el cuerpo nunca viaja en la notificación. Cuesta una lectura por clave primaria por mensaje en cada instancia con un miembro en el canal.
 - **Las difusiones efímeras y la presencia** sí viajan en la propia notificación, así que cualquier inicio de sesión en la base de datos puede leerlas. Pon en un canal retenido todo lo que no deba poder leerse de ese modo.
 - **En un canal efímero** no hay nada a lo que apuntar. La difusión se entrega localmente, el remitente recibe un error `CHANNEL_BUS_PAYLOAD_TOO_LARGE` en `channel.onError()`, y una advertencia especifica el nombre del canal, en lugar de que el mensaje llegue silenciosamente solo a la mitad del clúster.
 

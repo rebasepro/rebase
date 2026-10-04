@@ -273,7 +273,7 @@ Dentro de `admin`, exceto `history`, que é um recurso de backend e permanece no
 | `history` | `boolean` | `false` | Rastrear alterações no histórico da entidade |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Aplicar valores padrão a cada salvamento |
 | `previewProperties` | `string[]` | — | Propriedades a serem exibidas em pré-visualizações de referências |
-| `display` | `EntityDisplay` | — | O que preenche cada papel de exibição — consulte [Exibição de entidade](#exibição-de-entidade-entity-display) |
+| `display` | `EntityDisplay` | — | O que preenche cada papel de exibição — consulte [Exibição de entidade](#exibição-de-entidade) |
 
 ### Avançado
 
@@ -309,8 +309,7 @@ E dentro de `admin`, porque apenas o painel os renderiza:
 
 Escrever qualquer um desses seis no nível superior resulta em um erro durante a inicialização (boot-time), com uma mensagem indicando a chave e para onde ela foi movida.
 
-## Exibição de entidade {#entity-display}
-
+## Exibição de entidade
 Cada superfície que renderiza um registro exibe algum subconjunto de seis papéis: **title**, **subtitle**, **image**, **status**, **date** e **tags**. Uma linha de lista é image + title + subtitle + status + date; um card é o mesmo com a imagem no topo; um seletor de referência é title + subtitle; e o cabeçalho de uma página é apenas o title.
 
 Cada papel é derivado das suas propriedades, e cada um pode ser declarado explicitamente — como um caminho de propriedade (property path) ou como uma função:

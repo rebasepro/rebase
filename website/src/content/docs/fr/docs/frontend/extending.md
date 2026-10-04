@@ -1,5 +1,5 @@
 ---
-sourceHash: c63661257e39dcba
+sourceHash: 917e92f2baabde99
 title: Étendre Rebase
 sidebar_label: Étendre Rebase
 description: Un guide de décision pour choisir le bon mécanisme d'extension — plugins, slots, surcharges de composants, vues d'entités, actions, et plus encore.
@@ -28,7 +28,7 @@ Tout ce qui est décrit ici concerne le **panneau d'administration**. Pour le se
 | Ajouter une colonne calculée à un tableau | `additionalFields` | collection | [Colonnes supplémentaires](/docs/frontend/additional-columns) |
 | Ajouter un widget de champ personnalisé pour un type de propriété | `propertyConfigs` | type de propriété | [Champs personnalisés](/docs/frontend/custom-fields) |
 | Ajouter un onglet d'entité | `entityViews` | entité | [Vues d'entité](/docs/frontend/entity-views) |
-| Restituer les lignes d'une collection d'une manière différente | `admin.customViews` | collection | [ci-dessous](#customviews) |
+| Restituer les lignes d'une collection d'une manière différente | `admin.customViews` | collection | [ci-dessous](#modes-de-vue-personnalisés) |
 | Ajouter une action de ligne/contexte ou un bouton d'entité | `entityActions` | entité | [Actions d'entité](/docs/frontend/entity-actions) |
 | Afficher un indicateur sur la carte de page d'accueil d'une collection | slot `home.card.widget` | application/plugin | [Slots](/docs/frontend/slots) |
 | Injecter de l'interface à un emplacement précis du chrome | `slots` | application/plugin | [Slots](/docs/frontend/slots) |
@@ -118,8 +118,7 @@ Composants React au niveau de la barre d'outils qui reçoivent `CollectionAction
 
 → [Actions d'entité — Actions de collection](/docs/frontend/entity-actions#collection-actions)
 
-### Modes de vue personnalisés {#customviews}
-
+### Modes de vue personnalisés
 **Portée :** collection (ajoute un mode de vue).
 
 Une carte, un calendrier, une galerie, une frise chronologique — une autre restitution de *ces mêmes lignes*, proposée dans le sélecteur de vue de la collection à côté de Liste, Tableau, Cartes et Tableau Kanban (Board).
@@ -163,8 +162,7 @@ Choisir la vue met à jour `?__view=`, résiste au rechargement de la page et pe
 
 **Ce n'est pas un moyen de concevoir une vue couvrant plusieurs collections.** Un mode de vue est une autre restitution de la requête d'une seule collection. Si votre composant ignore `tableController` et va chercher quatre tables de son côté, il doit être une [`AppView`](/docs/frontend#custom-views) — la barre d'outils au-dessus, avec sa zone de recherche et son décompte d'enregistrements, décrirait une requête qu'il ne rend pas.
 
-### `formView` {#formview}
-
+### `formView`
 **Portée :** collection.
 
 Remplace l'intégralité du formulaire d'entité par défaut par un composant personnalisé. Se définit sur la configuration d'une collection :

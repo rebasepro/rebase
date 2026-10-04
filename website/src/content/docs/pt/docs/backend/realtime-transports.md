@@ -1,5 +1,5 @@
 ---
-sourceHash: b03a0dfd0577d1ee
+sourceHash: 67d0f85a988d0aa9
 title: Tempo real entre instâncias
 sidebar_label: Tempo real entre instâncias
 description:"\"Como canais de broadcast e presença sobrevivem a mais de um processo de servidor: o barramento LISTEN/NOTIFY, o que pertence a cada instância e como escrever seu próprio transporte.\""
@@ -9,7 +9,7 @@ description:"\"Como canais de broadcast e presença sobrevivem a mais de um proc
 
 Para ambientes de cluster com múltiplas instâncias (por exemplo, executando dentro do Kubernetes ou contêineres Docker atrás de um balanceador de carga), o Rebase depende do `LISTEN/NOTIFY` do PostgreSQL para sincronizar **alterações de linhas** entre instâncias. Assinaturas de coleções e entidades, portanto, abrangem instâncias sem nenhuma configuração — é isso que esta seção descreve.
 
-**Canais de broadcast e presença são separados** e funcionam por instância até que você ative um barramento de canais. Consulte [Canais e presença entre instâncias](#channels-and-presence-across-instances) abaixo.
+**Canais de broadcast e presença são separados** e funcionam por instância até que você ative um barramento de canais. Consulte [Canais e presença entre instâncias](#canais-e-presença-entre-instâncias) abaixo.
 
 ### Ignorando pools do pgBouncer
 
@@ -76,9 +76,9 @@ O limite que vale a pena monitorar não é a capacidade, mas o fato de que cada 
 
 Por cliente, o socket aceita até **7.200 frames de canal por minuto** (120/s — 60 fps de transmissões de cursor mais a atualização de presença que cada uma carrega), contados separadamente do orçamento que as consultas e assinaturas compartilham. Frames que excedem esse limite são recusados com um erro `RATE_LIMITED` em vez de serem enfileirados.
 
-A recusa chega em `channel.onError()`, e não como um `broadcast()` rejeitado — consulte [Quando um frame de canal é recusado](#when-a-channel-frame-is-refused).
+A recusa chega em `channel.onError()`, e não como um `broadcast()` rejeitado — consulte [Quando um frame de canal é recusado](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
-Se ainda assim você estiver atingindo o limite, aplique throttle nos eventos do tipo cursor no cliente (o estado last-write-wins não precisa de 60 atualizações por segundo) e considere rotear os colaboradores de um documento para a mesma instância — o roteamento persistente (sticky routing) reduz o tráfego entre instâncias a quase nada, independentemente da contagem de usuários. Somente além desse ponto outro transporte passa a valer a pena, e então a resposta é um pacote de transporte, não um fork. Consulte [Escrevendo seu próprio transporte](#writing-your-own-transport).
+Se ainda assim você estiver atingindo o limite, aplique throttle nos eventos do tipo cursor no cliente (o estado last-write-wins não precisa de 60 atualizações por segundo) e considere rotear os colaboradores de um documento para a mesma instância — o roteamento persistente (sticky routing) reduz o tráfego entre instâncias a quase nada, independentemente da contagem de usuários. Somente além desse ponto outro transporte passa a valer a pena, e então a resposta é um pacote de transporte, não um fork. Consulte [Escrevendo seu próprio transporte](#escrevendo-seu-próprio-transporte).
 
 ### Coalescência
 
@@ -152,7 +152,7 @@ A entrega aos clientes locais não é sua preocupação — o serviço de tempo 
 
 O `pg_notify` recusa um payload de 8.000 bytes ou mais. Cursores e presença cabem com folga; o snapshot de um documento não. O Rebase lida com isso da mesma forma que lida com grandes alterações de entidade — enviando um endereço em vez de um corpo:
 
-- **Em um canal retido** (consulte [Retenção de canais](#channel-retention)), a mensagem já está armazenada com um número de sequência, portanto a notificação carrega apenas `(channel, seq)` e cada instância receptora lê o corpo de volta. Não há nenhum limite de tamanho. Isso vale para toda mensagem retida, pequena ou grande: qualquer login no banco de dados pode fazer `LISTEN`, então o corpo nunca trafega na notificação. Custa uma leitura por chave primária por mensagem em cada instância com um membro no canal.
+- **Em um canal retido** (consulte [Retenção de canais](/docs/backend/realtime#channel-retention)), a mensagem já está armazenada com um número de sequência, portanto a notificação carrega apenas `(channel, seq)` e cada instância receptora lê o corpo de volta. Não há nenhum limite de tamanho. Isso vale para toda mensagem retida, pequena ou grande: qualquer login no banco de dados pode fazer `LISTEN`, então o corpo nunca trafega na notificação. Custa uma leitura por chave primária por mensagem em cada instância com um membro no canal.
 - **Broadcasts efêmeros e presença** ainda trafegam na própria notificação, então qualquer login no banco de dados pode lê-los. Coloque em um canal retido tudo o que não deva ser legível dessa forma.
 - **Em um canal efêmero**, não há nada para o que apontar. O broadcast é entregue localmente, o remetente recebe um erro `CHANNEL_BUS_PAYLOAD_TOO_LARGE` em `channel.onError()`, e um aviso informa o nome do canal — em vez de a mensagem alcançar silenciosamente apenas metade do cluster.
 

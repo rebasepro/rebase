@@ -1,5 +1,5 @@
 ---
-sourceHash: 6dea8dc014a1c282
+sourceHash: 42fa2047884b640a
 title: Consulta de datos
 sidebar_label: Consulta de datos
 description: Operaciones CRUD, constructor de consultas fluido, operadores de filtro, ordenación, selección de columnas y agregaciones con el SDK tipado de Rebase.
@@ -108,13 +108,13 @@ const { data } = await client.data.products
 | Método | Descripción | Ejemplo |
 |--------|-------------|---------|
 | `.where(field, op, value)` | Añade una condición de filtro | `.where("age", ">=", 18)` |
-| `.where(path, op, value)` | Filtra en una ruta de [relación](#querying-through-a-relation) o [JSON](#filtering-inside-json) | `.where("author.name", "==", "bob")` |
-| `.where(group)` | Añade un [grupo OR/AND](#logical-conditions-or--and) | `.where(or(cond(…), cond(…)))` |
+| `.where(path, op, value)` | Filtra en una ruta de [relación](/docs/sdk/relations#querying-through-a-relation) o [JSON](/docs/sdk/aggregates-and-search#filtering-inside-json) | `.where("author.name", "==", "bob")` |
+| `.where(group)` | Añade un [grupo OR/AND](#condiciones-lógicas-or--and--not) | `.where(or(cond(…), cond(…)))` |
 | `.orderBy(field, dir, nulls?)` | Ordena los resultados | `.orderBy("name", "asc")` |
-| `.orderBy(aggregate, dir)` | Ordena por un [agregado sobre una relación](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
+| `.orderBy(aggregate, dir)` | Ordena por un [agregado sobre una relación](/docs/sdk/relations#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
 | `.limit(n)` | Limita el número de resultados | `.limit(25)` |
 | `.offset(n)` | Omite los primeros N resultados | `.offset(50)` |
-| `.after(cursor)` | Continúa a partir de un [cursor](#cursor-pagination) | `.after(meta.nextCursor)` |
+| `.after(cursor)` | Continúa a partir de un [cursor](/docs/sdk/pagination#cursor-pagination) | `.after(meta.nextCursor)` |
 | `.fields(...columns)` | Devuelve [únicamente estas columnas](#devolver-menos-columnas) | `.fields("id", "title")` |
 | `.distinct()` | Agrupa filas idénticas respecto a esas columnas | `.fields("status").distinct()` |
 | `.search(text)` | Búsqueda de texto — consulta [Search](/docs/backend/search) | `.search("laptop")` |
@@ -122,8 +122,8 @@ const { data } = await client.data.products
 | `.include(...relations)` | [Carga filas relacionadas](/docs/sdk/relations#loading-related-rows) | `.include("author", "tags")` |
 | `.find()` | Ejecuta la consulta | Devuelve `FindResult<M>` |
 | `.aggregate(params)` | [Aplica agregaciones en lugar de devolver filas](#agregaciones) | `.aggregate({ select: [{ fn: "count" }] })` |
-| `.iterate(options?)` | [Transmite en streaming cada fila coincidente](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
-| `.findAll(options?)` | [Recupera todas las filas coincidentes](#reading-everything-iterate-and-findall) | Devuelve `M[]` |
+| `.iterate(options?)` | [Transmite en streaming cada fila coincidente](/docs/sdk/pagination#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
+| `.findAll(options?)` | [Recupera todas las filas coincidentes](/docs/sdk/pagination#reading-everything-iterate-and-findall) | Devuelve `M[]` |
 | `.count()` | Cuenta las filas coincidentes | Devuelve `number` |
 | `.listen(onUpdate, onError?)` | Se suscribe a actualizaciones en tiempo real | Devuelve `unsubscribe()` |
 
@@ -248,7 +248,7 @@ Conviene conocer tres serializaciones en particular, ya que son las que suelen e
 |-----------|-------------------|------|
 | `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` busca la cadena literal de cuatro caracteres `null` |
 | `cond("id", "in", [])` | `id.in.(\)` | `in.()` representa una lista que contiene una cadena vacía, lo cual es una consulta distinta |
-| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | una [ruta de relación](#querying-through-a-relation) conserva su punto |
+| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | una [ruta de relación](/docs/sdk/relations#querying-through-a-relation) conserva su punto |
 
 Las comas, paréntesis y barras invertidas dentro de un valor se escapan con barra invertida, por lo que `cond("name", "==", "Doe, John")` se transmite como `name.eq.Doe\, John` sin dividir el grupo.
 
@@ -297,7 +297,7 @@ const { data } = await client.data.products
 
 Toda ordenación concluye siempre con el ID de la fila en orden descendente, se solicite o no. Esto garantiza que el orden sea *total*: sin ello, dos filas con el mismo valor se devolverían en el orden que determine la base de datos en ese instante, y paginar sobre un orden que varía entre dos ejecuciones de la misma consulta provocaría repeticiones u omisiones de filas.
 
-Una ordenación por múltiples columnas se pagina sin problemas mediante un [cursor](#cursor-pagination): la comparación se evalúa sobre cada clave, en orden. El único criterio de ordenación que un cursor no puede procesar es **`_score`** (consulta [Search](/docs/backend/search)). La relevancia se calcula por consulta en lugar de almacenarse, por lo que la fila del cursor no contiene un valor con el que comparar la siguiente página, y dicho listado no incluirá `nextCursor`.
+Una ordenación por múltiples columnas se pagina sin problemas mediante un [cursor](/docs/sdk/pagination#cursor-pagination): la comparación se evalúa sobre cada clave, en orden. El único criterio de ordenación que un cursor no puede procesar es **`_score`** (consulta [Search](/docs/backend/search)). La relevancia se calcula por consulta en lugar de almacenarse, por lo que la fila del cursor no contiene un valor con el que comparar la siguiente página, y dicho listado no incluirá `nextCursor`.
 
 ### Dónde se ordenan los NULL
 
@@ -320,7 +320,7 @@ const { data } = await client.data.posts
 
 En HTTP se especifica mediante un tercer segmento separado por dos puntos, `?orderBy=publishedAt:desc:last`, o mediante una clave `"nulls"` en formato de array JSON. Cualquier valor diferente a `first`/`last` devolverá un error 400 en lugar de aplicar un orden inesperado.
 
-El [cursor](#cursor-pagination) respeta la configuración definida en la ordenación, por lo que paginar sobre una clave que admita valores nulos sigue funcionando correctamente bajo cualquiera de las dos opciones.
+El [cursor](/docs/sdk/pagination#cursor-pagination) respeta la configuración definida en la ordenación, por lo que paginar sobre una clave que admita valores nulos sigue funcionando correctamente bajo cualquiera de las dos opciones.
 
 ## Devolver menos columnas
 

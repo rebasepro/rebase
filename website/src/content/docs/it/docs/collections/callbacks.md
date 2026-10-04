@@ -198,7 +198,7 @@ Importalo da `@rebasepro/types`, non da `@rebasepro/server`. Un file di collezio
 
 ### `afterSave`
 
-Chiamato dopo che la riga è stata scritta e prima del commit, all'interno della stessa transazione. Un errore lanciato annulla il salvataggio (rollback) — vedi [Semantica delle transazioni](#transaction-semantics).
+Chiamato dopo che la riga è stata scritta e prima del commit, all'interno della stessa transazione. Un errore lanciato annulla il salvataggio (rollback) — vedi [Semantica delle transazioni](#semantica-delle-transazioni).
 
 ```typescript
 afterSave: async ({
@@ -359,7 +359,7 @@ afterSave: async ({ values, context }) => {
 
 ### Creazione di Entità
 
-`.create()` e `.update()` prendono i valori da scrivere, con le firme indicate sopra. [Sincronizzazione dei dati tra collezioni](#syncing-data-between-collections) usa entrambi: una candidatura approvata crea un'offerta di lavoro pubblicata e viene ricollegata a essa.
+`.create()` e `.update()` prendono i valori da scrivere, con le firme indicate sopra. [Sincronizzazione dei dati tra collezioni](#sincronizzazione-dei-dati-tra-le-collezioni) usa entrambi: una candidatura approvata crea un'offerta di lavoro pubblicata e viene ricollegata a essa.
 
 ### Sicurezza: con quali privilegi viene eseguito `context.data`
 

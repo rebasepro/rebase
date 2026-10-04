@@ -73,7 +73,7 @@ Four things follow from what a cursor is:
   `CURSOR_WITH_OFFSET`). Both say where the page starts, and honouring both
   would skip rows.
 - **Multi-key sorts and nullable keys both work.** The comparison is built over
-  every key in order, with the [NULL placement](#where-nulls-sort) the sort
+  every key in order, with the [NULL placement](/docs/sdk/querying#where-nulls-sort) the sort
   declared — not a single `>` on one column.
 - **Relevance cannot be a cursor.** A `_score` is computed per query and stored
   nowhere, and two queries with different search strings produce scores that are

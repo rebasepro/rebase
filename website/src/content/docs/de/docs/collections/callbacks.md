@@ -198,7 +198,7 @@ Importieren Sie ihn aus `@rebasepro/types`, nicht aus `@rebasepro/server`. Eine 
 
 ### `afterSave`
 
-Wird aufgerufen, nachdem die Zeile geschrieben wurde und vor dem Commit, innerhalb derselben Transaktion. Ein Fehler (Throw) rollt den Speichervorgang zurück — siehe [Transaktionssemantik](#transaction-semantics).
+Wird aufgerufen, nachdem die Zeile geschrieben wurde und vor dem Commit, innerhalb derselben Transaktion. Ein Fehler (Throw) rollt den Speichervorgang zurück — siehe [Transaktionssemantik](#transaktionssemantik).
 
 ```typescript
 afterSave: async ({
@@ -359,7 +359,7 @@ afterSave: async ({ values, context }) => {
 
 ### Entitäten erstellen
 
-`.create()` und `.update()` erwarten die zu schreibenden Werte, mit den oben genannten Signaturen. [Daten zwischen Kollektionen synchronisieren](#syncing-data-between-collections) verwendet beide: Eine genehmigte Einreichung erstellt einen veröffentlichten Job und wird mit ihm verknüpft.
+`.create()` und `.update()` erwarten die zu schreibenden Werte, mit den oben genannten Signaturen. [Daten zwischen Kollektionen synchronisieren](#daten-zwischen-kollektionen-synchronisieren) verwendet beide: Eine genehmigte Einreichung erstellt einen veröffentlichten Job und wird mit ihm verknüpft.
 
 ### Sicherheit: Mit welchen Berechtigungen `context.data` ausgeführt wird
 

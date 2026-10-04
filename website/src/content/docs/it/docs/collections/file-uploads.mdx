@@ -61,7 +61,7 @@ Tutto ciò che si trova all'interno di `storage`.
 | `fileName` | `string \| function` | Il nome file dell'oggetto caricato, con gli stessi segnaposto. **Solo form di amministrazione — non applicato dall'API o dal database.** |
 | `storageSource` | `string` | Quale bucket registrato utilizzare, quando un progetto ne ha più di uno. Anche l'handle `bucket("media")` funziona qui |
 | `public` | `boolean` | Memorizza sotto il prefisso pubblico e distribuisce tramite un URL stabile, senza token e memorizzabile nella cache. `false` per impostazione predefinita, il che implica oggetti privati e URL firmati a breve durata |
-| `acceptedFiles` | `FileType[]` | Tipi MIME accettati da questa proprietà. È supportata la forma con asterisco — `image/*`. **Applicato dal server** per ogni caricamento nello `storagePath` della proprietà — vedi [Cosa controlla il server](#what-the-server-checks) |
+| `acceptedFiles` | `FileType[]` | Tipi MIME accettati da questa proprietà. È supportata la forma con asterisco — `image/*`. **Applicato dal server** per ogni caricamento nello `storagePath` della proprietà — vedi [Cosa controlla il server](#cosa-controlla-il-server) |
 | `maxSize` | `number` | Dimensione massima accettata del file, in byte. **Applicato dal server**, come `acceptedFiles`, sia per i percorsi di caricamento standard sia per quelli riprendibili |
 | `metadata` | `Record<string, unknown>` | Metadati dell'oggetto da archiviare insieme al file |
 | `includeBucketUrl` | `boolean` | Scrive `s3://my-bucket/path/to/file.png` nella colonna anziché `path/to/file.png`. `false` per impostazione predefinita |

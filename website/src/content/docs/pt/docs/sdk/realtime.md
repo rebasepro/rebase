@@ -1,5 +1,5 @@
 ---
-sourceHash: 1c417068b657af16
+sourceHash: 0ac5189687d9eccf
 title: Subscrições em Tempo Real
 sidebar_label: Realtime
 description: Inscreva-se em alterações de dados em tempo real com o SDK tipado do Rebase usando listeners em tempo real baseados em WebSocket.
@@ -180,7 +180,7 @@ O cliente WebSocket lida com a autenticação automaticamente:
 
 - No **login** ou **atualização de token**, o novo token é enviado para um socket já aberto via uma mensagem `authenticate`. Se nenhum estiver aberto, nada acontece — fazer login não é uma solicitação de tempo real, e um socket aberto posteriormente autentica a si mesmo.
 - No **logout**, a conexão WebSocket é desconectada. O cliente permanece utilizável; uma subscrição posterior se reconecta anonimamente.
-- Se o servidor encerrar a sessão do socket — o usuário fez logout em todos os lugares, esta sessão foi revogada, a conta foi excluída, ou o token expirou antes que uma atualização alcançasse o socket — ele fecha o socket com o código `4001`. O cliente se reconecta como após qualquer queda, autenticando-se com a sessão que ele possui naquele momento (atualizada se puder ser), ou anonimamente quando não houver nenhuma. Uma role removida não encerra o socket: ela se aplica a partir do próximo frame. Veja [Autenticação e RLS](/docs/backend/realtime/#authentication-rls).
+- Se o servidor encerrar a sessão do socket — o usuário fez logout em todos os lugares, esta sessão foi revogada, a conta foi excluída, ou o token expirou antes que uma atualização alcançasse o socket — ele fecha o socket com o código `4001`. O cliente se reconecta como após qualquer queda, autenticando-se com a sessão que ele possui naquele momento (atualizada se puder ser), ou anonimamente quando não houver nenhuma. Uma role removida não encerra o socket: ela se aplica a partir do próximo frame. Veja [Autenticação e RLS](/docs/backend/realtime/#authentication--rls).
 - Se a conexão cair, o cliente **se reconecta automaticamente** e restabelece todas as subscrições ativas. Ele nunca para de tentar enquanto existir uma subscrição ou um canal associado; o intervalo entre as tentativas cresce até, no máximo, 30 segundos.
 - Se a conexão permanecer fora do ar por mais de 15 segundos, o `onError` de cada subscrição (e o `onError` de cada canal associado) é chamado **uma vez** com um `RebaseApiError` cujo `code` é `CONNECTION_LOST`. A subscrição não é encerrada: continue mostrando o que você tem, marque-o como potencialmente obsoleto, e espere. Quando o socket voltar, o próximo `onUpdate` da subscrição traz tudo o que foi gravado nesse intervalo.
 - `client.ws.state` é o estado da conexão — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` ou `closed` — e `client.ws.onStateChange(listener)` é avisado de cada mudança. `disconnected` é o estado em que `CONNECTION_LOST` já foi reportado.
@@ -262,7 +262,7 @@ A única verificação aplicada pelo servidor é o **pertencimento**: para trans
 Portanto, o nome de um canal não é um segredo e não é uma permissão. Não coloque nada em um canal (incluindo histórico retido e estado de presença) que qualquer usuário do seu aplicativo não possa ver, e não derive o nome de um canal a partir de dados que você não divulgaria publicamente. Regras de autorização por canal não estão implementadas; se você precisar delas hoje, mantenha a parte sensível da troca em `client.data`, onde a segurança em nível de linha (row-level security) se aplica.
 :::
 
-> **Por padrão, os broadcasts não são reproduzidos.** Eles alcançam apenas os membros conectados no momento. Isso é exatamente o que você deseja para notificações que se autocorrigem — um aviso de "alguém salvou" é substituído pelo próximo salvamento — e não custa nada. Para um fluxo de operações, onde uma lacuna silenciosa causa divergência, ative o [histórico de mensagens](#message-history-and-catch-up) no canal.
+> **Por padrão, os broadcasts não são reproduzidos.** Eles alcançam apenas os membros conectados no momento. Isso é exatamente o que você deseja para notificações que se autocorrigem — um aviso de "alguém salvou" é substituído pelo próximo salvamento — e não custa nada. Para um fluxo de operações, onde uma lacuna silenciosa causa divergência, ative o [histórico de mensagens](#histórico-de-mensagens-e-recuperação-catch-up) no canal.
 
 ## Histórico de Mensagens e Recuperação (Catch-Up)
 

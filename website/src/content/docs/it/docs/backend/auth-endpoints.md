@@ -44,7 +44,7 @@ Tutti gli endpoint di autenticazione sono montati su `/api/auth/`:
 | `GET` | `/api/auth/keys` | Le [chiavi API personali](/docs/backend/api-keys/#personal-keys) del chiamante |
 | `POST` | `/api/auth/keys` | Crea una chiave personale. `403 PERSONAL_KEYS_DISABLED` a meno che la collezione users non imposti `auth.personalKeys` |
 | `DELETE` | `/api/auth/keys/:id` | Revoca una delle chiavi del chiamante |
-| `GET` | `/.well-known/jwks.json` | Il JWKS pubblico — montato alla radice, non sotto `basePath`, perché è lì che cerca un verificatore. Presente quando la [firma asimmetrica](#asymmetric-tokens-and-jwks) è configurata |
+| `GET` | `/.well-known/jwks.json` | Il JWKS pubblico — montato alla radice, non sotto `basePath`, perché è lì che cerca un verificatore. Presente quando la [firma asimmetrica](#token-asimmetrici-e-jwks) è configurata |
 | `POST` | `/api/auth/mfa/enroll` | Avvia la registrazione TOTP (restituisce il segreto e i codici di recupero) |
 | `POST` | `/api/auth/mfa/verify` | Conferma la registrazione con un codice proveniente dall'app di autenticazione |
 | `GET` | `/api/auth/mfa/factors` | Elenca i fattori registrati dal chiamante |

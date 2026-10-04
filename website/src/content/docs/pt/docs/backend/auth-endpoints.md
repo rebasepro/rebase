@@ -44,7 +44,7 @@ Todos os endpoints de autenticação são montados em `/api/auth/`:
 | `GET` | `/api/auth/keys` | As próprias [chaves de API pessoais](/docs/backend/api-keys/#personal-keys) do chamador |
 | `POST` | `/api/auth/keys` | Criar uma chave pessoal. `403 PERSONAL_KEYS_DISABLED` a menos que a coleção de usuários defina `auth.personalKeys` |
 | `DELETE` | `/api/auth/keys/:id` | Revogar uma das chaves do próprio chamador |
-| `GET` | `/.well-known/jwks.json` | O JWKS público — montado na raiz, não sob `basePath`, pois é onde um verificador procura. Presente quando o [assinamento assimétrico](#asymmetric-tokens-and-jwks) estiver configurado |
+| `GET` | `/.well-known/jwks.json` | O JWKS público — montado na raiz, não sob `basePath`, pois é onde um verificador procura. Presente quando o [assinamento assimétrico](#tokens-assimétricos-e-jwks) estiver configurado |
 | `POST` | `/api/auth/mfa/enroll` | Iniciar o cadastro no TOTP (retorna o segredo e os códigos de recuperação) |
 | `POST` | `/api/auth/mfa/verify` | Confirmar o cadastro com um código do aplicativo autenticador |
 | `GET` | `/api/auth/mfa/factors` | Listar os fatores cadastrados do chamador |
@@ -286,8 +286,7 @@ CREATE POLICY owner_access ON posts
     USING (author_id = rebase.uid() OR string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 ```
 
-## Tokens assimétricos e JWKS {#asymmetric-tokens-and-jwks}
-
+## Tokens assimétricos e JWKS
 Por padrão, os access tokens são assinados com `jwtSecret` (HS256). Isso funciona, mas
 significa que qualquer parte que precise *verificar* um token deve possuir a chave que o *emite*
 — assim, um gateway ou edge worker verificando uma sessão também pode forjar uma — e

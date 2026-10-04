@@ -75,7 +75,7 @@ The limit worth watching is not capacity, it is that every notification is a que
 
 Per client, the socket accepts up to **7,200 channel frames a minute** (120/s — 60 fps of cursor broadcasts plus the presence update each one carries), counted separately from the budget queries and subscriptions share. Frames past that are refused with a `RATE_LIMITED` error rather than queued.
 
-The refusal arrives on `channel.onError()`, not as a rejected `broadcast()` — see [When a channel frame is refused](#when-a-channel-frame-is-refused).
+The refusal arrives on `channel.onError()`, not as a rejected `broadcast()` — see [When a channel frame is refused](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
 If you are still pushing it after that, throttle cursor-grade events on the client (last-write-wins state does not need 60 updates a second), and consider routing a document's collaborators to the same instance — sticky routing drops cross-instance traffic to nearly nothing regardless of user count. Only past that is another transport worth it, and then the answer is a transport package, not a fork. See [Writing your own transport](#writing-your-own-transport).
 
@@ -151,7 +151,7 @@ Delivery to local clients is not your concern — the realtime service owns whic
 
 `pg_notify` refuses a payload of 8000 bytes or more. Cursors and presence fit with room to spare; a document snapshot does not. Rebase handles this the same way it handles large entity changes — by sending an address instead of a body:
 
-- **On a retained channel** (see [Channel Retention](#channel-retention)) the message is already stored with a sequence number, so the notification carries only `(channel, seq)` and each receiving instance reads the body back. There is no size limit at all. This holds for every retained message, small or large: any database login can `LISTEN`, so the body never travels in the notification. It costs one primary-key read per message on each instance with a member on the channel.
+- **On a retained channel** (see [Channel Retention](/docs/backend/realtime#channel-retention)) the message is already stored with a sequence number, so the notification carries only `(channel, seq)` and each receiving instance reads the body back. There is no size limit at all. This holds for every retained message, small or large: any database login can `LISTEN`, so the body never travels in the notification. It costs one primary-key read per message on each instance with a member on the channel.
 - **Ephemeral broadcasts and presence** still travel in the notification itself, so any login to the database can read them. Put anything that must not be readable that way on a retained channel.
 - **On an ephemeral channel** there is nothing to point at. The broadcast is delivered locally, the sender receives a `CHANNEL_BUS_PAYLOAD_TOO_LARGE` error on `channel.onError()`, and a warning names the channel — rather than the message silently reaching half the cluster.
 

@@ -208,7 +208,7 @@ razão pela qual isso é um modo e não o padrão.
 **Alterá-lo em uma coleção ativa é seguro** — a única opção neste bloco que é.
 O `mode` funciona no lado da consulta: não altera nenhuma coluna gerada, nenhuma
 expressão de geração e nenhum índice, portanto não dispara a recusa descrita em
-[Alterando o bloco posteriormente](#changing-the-block-later). Ativá-lo requer
+[Alterando o bloco posteriormente](#alterando-o-bloco-posteriormente). Ativá-lo requer
 apenas um deploy e nada mais.
 
 Ele remove os acentos na parte da substring **mesmo que `unaccent` não esteja

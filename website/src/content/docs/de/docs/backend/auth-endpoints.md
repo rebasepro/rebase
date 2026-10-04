@@ -44,7 +44,7 @@ Alle Auth-Endpunkte sind unter `/api/auth/` eingebunden:
 | `GET` | `/api/auth/keys` | Die eigenen [persönlichen API-Schlüssel](/docs/backend/api-keys/#personal-keys) des Aufrufers |
 | `POST` | `/api/auth/keys` | Einen persönlichen Schlüssel erstellen. `403 PERSONAL_KEYS_DISABLED`, außer die Users-Collection setzt `auth.personalKeys` |
 | `DELETE` | `/api/auth/keys/:id` | Einen der eigenen Schlüssel des Aufrufers widerrufen |
-| `GET` | `/.well-known/jwks.json` | Das öffentliche JWKS – am Root eingebunden, nicht unter `basePath`, da ein Verifizierer dort sucht. Vorhanden, wenn [asymmetrische Signierung](#asymmetric-tokens-and-jwks) konfiguriert ist |
+| `GET` | `/.well-known/jwks.json` | Das öffentliche JWKS – am Root eingebunden, nicht unter `basePath`, da ein Verifizierer dort sucht. Vorhanden, wenn [asymmetrische Signierung](#asymmetrische-tokens-und-jwks) konfiguriert ist |
 | `POST` | `/api/auth/mfa/enroll` | TOTP-Registrierung starten (gibt das Secret und Wiederherstellungscodes zurück) |
 | `POST` | `/api/auth/mfa/verify` | Registrierung mit einem Code aus dem Authentifikator bestätigen |
 | `GET` | `/api/auth/mfa/factors` | Registrierte Faktoren des Aufrufers auflisten |

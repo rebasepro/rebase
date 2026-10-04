@@ -82,7 +82,7 @@ const { data } = await client.data.posts.include({
 
 Un nome che non corrisponde a una relazione della collezione restituisce un errore **400 `UNKNOWN_RELATION`**, a ogni livello dell'albero — anche all'interno di un `include` annidato. In passato veniva ignorato, rispondendo con un 200 con il campo semplicemente mancante, ma un campo di relazione assente è indistinguibile da una riga che effettivamente non ha alcuna riga correlata. Un errore di battitura appariva quindi esattamente come dati vuoti.
 
-Con un tipo `Database` generato, non si arriva a questo punto: le chiavi di `include` vengono verificate a livello di compilazione rispetto alle relazioni reali della collezione, in modo ricorsivo. Consulta [Include tipizzati](#typed-includes).
+Con un tipo `Database` generato, non si arriva a questo punto: le chiavi di `include` vengono verificate a livello di compilazione rispetto alle relazioni reali della collezione, in modo ricorsivo. Consulta [Include tipizzati](#include-tipizzati).
 
 ### Sulla rete
 
@@ -156,7 +156,7 @@ data[0].authorId;       // "uuid-1234" — still there
 data[0].author?.name;   // "Jane Doe"
 ```
 
-Un tipo `Database` generato tipizza tutti e tre con precisione: `Insert` e `Update` accettano entrambe le sintassi di scrittura, `Row` contiene `authorId` incondizionatamente, mentre `author` è facoltativo su `Row` — <span class="since-badge" data-since="0.24">Da 0.24</span> `RowWith<"posts", ["author"]>` è la riga con quel campo resa **obbligatoria**, per una lettura che l'ha richiesto. Consulta [Include tipizzati](#typed-includes).
+Un tipo `Database` generato tipizza tutti e tre con precisione: `Insert` e `Update` accettano entrambe le sintassi di scrittura, `Row` contiene `authorId` incondizionatamente, mentre `author` è facoltativo su `Row` — <span class="since-badge" data-since="0.24">Da 0.24</span> `RowWith<"posts", ["author"]>` è la riga con quel campo resa **obbligatoria**, per una lettura che l'ha richiesto. Consulta [Include tipizzati](#include-tipizzati).
 
 L'unico caso in cui i tre collassano è una relazione con lo stesso identico nome della propria chiave esterna. In quel caso la riga inclusa viene servita *al posto della* colonna, e il tipo generato lo riflette tipizzando quella chiave per entrambi i casi.
 

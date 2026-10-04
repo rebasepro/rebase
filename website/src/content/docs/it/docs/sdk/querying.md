@@ -1,5 +1,5 @@
 ---
-sourceHash: 6dea8dc014a1c282
+sourceHash: 42fa2047884b640a
 title: Interrogare i dati
 sidebar_label: Interrogare i dati
 description: Operazioni CRUD, fluent query builder, operatori di filtro, ordinamento, selezione delle colonne e aggregazioni con l'SDK tipizzato di Rebase.
@@ -108,22 +108,22 @@ const { data } = await client.data.products
 | Metodo | Descrizione | Esempio |
 |--------|-------------|---------|
 | `.where(field, op, value)` | Aggiunge una condizione di filtro | `.where("age", ">=", 18)` |
-| `.where(path, op, value)` | Filtra su una [relazione](#querying-through-a-relation) o su un percorso [JSON](#filtering-inside-json) | `.where("author.name", "==", "bob")` |
-| `.where(group)` | Aggiunge un [gruppo OR/AND](#logical-conditions-or--and) | `.where(or(cond(…), cond(…)))` |
+| `.where(path, op, value)` | Filtra su una [relazione](/docs/sdk/relations#querying-through-a-relation) o su un percorso [JSON](/docs/sdk/aggregates-and-search#filtering-inside-json) | `.where("author.name", "==", "bob")` |
+| `.where(group)` | Aggiunge un [gruppo OR/AND](#condizioni-logiche-or--and--not) | `.where(or(cond(…), cond(…)))` |
 | `.orderBy(field, dir, nulls?)` | Ordina i risultati | `.orderBy("name", "asc")` |
-| `.orderBy(aggregate, dir)` | Ordina in base a un'[aggregazione su una relazione](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
+| `.orderBy(aggregate, dir)` | Ordina in base a un'[aggregazione su una relazione](/docs/sdk/relations#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
 | `.limit(n)` | Limita il numero di risultati | `.limit(25)` |
 | `.offset(n)` | Salta i primi N risultati | `.offset(50)` |
-| `.after(cursor)` | Continua dopo un [cursore](#cursor-pagination) | `.after(meta.nextCursor)` |
-| `.fields(...columns)` | Restituisce [solo queste colonne](#returning-fewer-columns) | `.fields("id", "title")` |
+| `.after(cursor)` | Continua dopo un [cursore](/docs/sdk/pagination#cursor-pagination) | `.after(meta.nextCursor)` |
+| `.fields(...columns)` | Restituisce [solo queste colonne](#restituire-meno-colonne) | `.fields("id", "title")` |
 | `.distinct()` | Raggruppa le righe identiche rispetto a tali colonne | `.fields("status").distinct()` |
 | `.search(text)` | Ricerca testuale — vedi [Ricerca](/docs/backend/search) | `.search("laptop")` |
 | `.vectorSearch(prop, vector, opts?)` | Ricerca dei vicini più prossimi (nearest-neighbour) su una proprietà `vector` | `.vectorSearch("embedding", vec)` |
 | `.include(...relations)` | [Carica le righe correlate](/docs/sdk/relations#loading-related-rows) | `.include("author", "tags")` |
 | `.find()` | Esegue la query | Restituisce `FindResult<M>` |
-| `.aggregate(params)` | [Esegue un'aggregazione invece di restituire le righe](#aggregates) | `.aggregate({ select: [{ fn: "count" }] })` |
-| `.iterate(options?)` | [Esegue lo streaming di ogni riga corrispondente](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
-| `.findAll(options?)` | [Raccoglie ogni riga corrispondente](#reading-everything-iterate-and-findall) | Restituisce `M[]` |
+| `.aggregate(params)` | [Esegue un'aggregazione invece di restituire le righe](#aggregazioni) | `.aggregate({ select: [{ fn: "count" }] })` |
+| `.iterate(options?)` | [Esegue lo streaming di ogni riga corrispondente](/docs/sdk/pagination#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
+| `.findAll(options?)` | [Raccoglie ogni riga corrispondente](/docs/sdk/pagination#reading-everything-iterate-and-findall) | Restituisce `M[]` |
 | `.count()` | Conta le righe corrispondenti | Restituisce `number` |
 | `.listen(onUpdate, onError?)` | Sottoscrive gli aggiornamenti in tempo reale | Restituisce `unsubscribe()` |
 
@@ -201,7 +201,7 @@ const { data } = await client.data.products
     .find();
 ```
 
-`cond` accetta l'operatore canonico — la colonna di sinistra della tabella degli [Operatori di filtro](#filter-operators). Un operatore non supportato dal dialetto genera un `TypeError` durante la serializzazione della query, invece di produrre silenziosamente una query diversa.
+`cond` accetta l'operatore canonico — la colonna di sinistra della tabella degli [Operatori di filtro](#operatori-di-filtro). Un operatore non supportato dal dialetto genera un `TypeError` durante la serializzazione della query, invece di produrre silenziosamente una query diversa.
 
 ### Negazione
 
@@ -248,7 +248,7 @@ Vale la pena conoscere tre codifiche, poiché sono quelle in cui una query strin
 |------------|--------------|------|
 | `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` cerca la stringa di quattro caratteri `null` |
 | `cond("id", "in", [])` | `id.in.(\)` | `in.()` è una lista contenente una singola stringa vuota, che corrisponde a una query diversa |
-| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | un [percorso di relazione](#querying-through-a-relation) mantiene il proprio punto |
+| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | un [percorso di relazione](/docs/sdk/relations#querying-through-a-relation) mantiene il proprio punto |
 
 Virgole, parentesi e barre rovesciate all'interno di un valore vengono precedute da un backslash di escape: di conseguenza `cond("name", "==", "Doe, John")` viaggia come `name.eq.Doe\, John` senza frammentare il gruppo.
 
@@ -297,7 +297,7 @@ const { data } = await client.data.products
 
 Ogni ordinamento termina con l'ID della riga in ordine decrescente, indipendentemente dal fatto che sia stato richiesto o meno. È questo che rende l'ordinamento *totale*: senza questo criterio, due righe che condividono lo stesso valore verrebbero restituite nell'ordine arbitrario scelto dal database, e la paginazione su un ordinamento che può variare tra due esecuzioni della stessa query comporterebbe la ripetizione di alcune righe e l'omissione di altre.
 
-Un ordinamento a più colonne funziona regolarmente con un [cursore](#cursor-pagination): il confronto viene costruito su ciascuna chiave, in ordine. L'unico ordinamento che un cursore non può descrivere è **`_score`** — vedi [Ricerca](/docs/backend/search). La rilevanza viene calcolata per ciascuna query anziché essere memorizzata, pertanto non esiste alcun valore sulla riga del cursore rispetto al quale confrontare la pagina successiva, e un tale elenco non include alcun `nextCursor`.
+Un ordinamento a più colonne funziona regolarmente con un [cursore](/docs/sdk/pagination#cursor-pagination): il confronto viene costruito su ciascuna chiave, in ordine. L'unico ordinamento che un cursore non può descrivere è **`_score`** — vedi [Ricerca](/docs/backend/search). La rilevanza viene calcolata per ciascuna query anziché essere memorizzata, pertanto non esiste alcun valore sulla riga del cursore rispetto al quale confrontare la pagina successiva, e un tale elenco non include alcun `nextCursor`.
 
 ### Posizione dei valori NULL nell'ordinamento
 
@@ -320,7 +320,7 @@ const { data } = await client.data.posts
 
 Su HTTP si utilizza un terzo segmento separato da due punti, `?orderBy=publishedAt:desc:last`, oppure una chiave `"nulls"` nel formato array JSON. Qualsiasi valore diverso da `first`/`last` restituisce un errore 400 anziché applicare un ordinamento silenziosamente diverso.
 
-Il [cursore](#cursor-pagination) rispetta qualsiasi impostazione definita per l'ordinamento, garantendo che la paginazione su una chiave nullable rimanga coerente con entrambe le collocazioni.
+Il [cursore](/docs/sdk/pagination#cursor-pagination) rispetta qualsiasi impostazione definita per l'ordinamento, garantendo che la paginazione su una chiave nullable rimanga coerente con entrambe le collocazioni.
 
 ## Restituire meno colonne
 

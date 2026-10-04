@@ -90,8 +90,8 @@ function routeOf(file) {
 
 /**
  * Close enough to github-slugger for headings this site writes: lowercase, drop
- * anything that is not a letter, number, mark, space or dash, collapse runs of
- * whitespace to single dashes. Inline code fences and the "Since" badge span
+ * anything that is not a letter, number, mark, space or dash, and turn each
+ * space into a dash. Inline code fences and the "Since" badge span
  * are stripped first, since both appear in headings here.
  *
  * The character class is Unicode-aware on purpose. `\w` is ASCII, so
@@ -107,7 +107,11 @@ function headingSlug(text) {
         .toLowerCase()
         .replace(/[^\p{L}\p{N}\p{M}_\s-]/gu, "")
         .trim()
-        .replace(/\s+/g, "-");
+        // One dash per space, as github-slugger (Starlight's) does — not one
+        // per run. "Logical Conditions (OR / AND / NOT)" is served as
+        // `#logical-conditions-or--and--not`; collapsing the runs reported the
+        // working anchor dead and accepted the broken one.
+        .replace(/\s/g, "-");
 }
 
 /**
@@ -214,6 +218,24 @@ export function checkDocsLinks(root) {
                 findings.push({
                     file, line,
                     message: `${m[1]} — ${route} has no heading "#${anchor}"`
+                });
+            }
+        }
+
+        // Same-page anchors: `[x](#heading)`. Nothing resolved these — only
+        // `/docs/…` links were read — so a section moved to another page left
+        // its in-page links pointing at nothing: six in sdk/querying.md and two
+        // in backend/realtime-transports.md, and a translated page that kept
+        // the English slug (`#aggregates` above `## Aggregationen`) broke every
+        // one of its own. A translation's own headings are what it must match.
+        for (const m of text.matchAll(/\]\(#([^)\s]+)\)/g)) {
+            links++;
+            const anchor = decodeURIComponent(m[1]).toLowerCase();
+            if (!headings.get(routeOf(file))?.has(anchor)) {
+                findings.push({
+                    file,
+                    line: text.slice(0, m.index).split("\n").length,
+                    message: `#${m[1]} — this page has no heading with that anchor`
                 });
             }
         }

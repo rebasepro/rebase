@@ -1,5 +1,5 @@
 ---
-sourceHash: c63661257e39dcba
+sourceHash: 917e92f2baabde99
 title: Estendendo o Rebase
 sidebar_label: Estendendo o Rebase
 description: Um guia de decisão para escolher o mecanismo de extensão correto — plugins, slots, substituições de componentes, visualizações de entidade, ações e muito mais.
@@ -31,7 +31,7 @@ para o backend.
 | Adicionar uma coluna computada a uma tabela | `additionalFields` | coleção | [Colunas Adicionais](/docs/frontend/additional-columns) |
 | Adicionar um widget de campo personalizado para um tipo de propriedade | `propertyConfigs` | tipo de propriedade | [Campos Personalizados](/docs/frontend/custom-fields) |
 | Adicionar uma aba à entidade | `entityViews` | entidade | [Visualizações de Entidade](/docs/frontend/entity-views) |
-| Renderizar as linhas de uma coleção de uma maneira diferente | `admin.customViews` | coleção | [abaixo](#customviews) |
+| Renderizar as linhas de uma coleção de uma maneira diferente | `admin.customViews` | coleção | [abaixo](#modos-de-visualização-personalizados) |
 | Adicionar uma ação de linha/contexto ou botão de entidade | `entityActions` | entidade | [Ações de Entidade](/docs/frontend/entity-actions) |
 | Inserir um número/indicador no card da página inicial de uma coleção | slot `home.card.widget` | app/plugin | [Slots](/docs/frontend/slots) |
 | Injetar interface em um local específico do chrome | `slots` | app/plugin | [Slots](/docs/frontend/slots) |
@@ -125,8 +125,7 @@ Componentes React em nível de barra de ferramentas que recebem `CollectionActio
 
 → [Ações de Entidade — Ações de Coleção](/docs/frontend/entity-actions#collection-actions)
 
-### Modos de visualização personalizados {#customviews}
-
+### Modos de visualização personalizados
 **Escopo:** coleção (adiciona um modo de visualização).
 
 Um mapa, um calendário, uma galeria, uma linha do tempo — outra renderização das *mesmas linhas*,
@@ -181,8 +180,7 @@ o `tableController` e busca dados de quatro tabelas próprias, ele deveria ser u
 [`AppView`](/docs/frontend#custom-views) — a barra de ferramentas acima dele, com sua caixa de busca
 e contagem de registros, estaria descrevendo uma consulta que ele não renderiza.
 
-### `formView` {#formview}
-
+### `formView`
 **Escopo:** coleção.
 
 Substitui todo o formulário de entidade padrão por um componente personalizado. Definido na configuração de uma coleção:

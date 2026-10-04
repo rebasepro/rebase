@@ -34,12 +34,11 @@ export default defineFunction((app) => {
 
 Dies wird unter **`/api/functions/hello`** eingebunden. Der Dateiname (ohne Erweiterung) wird zum Routenpräfix.
 
-`POST`, da dies standardmäßig vom SDK gesendet wird – siehe [Vom Client aufrufen](#vom-client-aufrufen-invoke-from-the-client). Eine `GET`-Route ist ebenso gültig; der Aufrufer muss dann `{ method: "GET" }` angeben.
+`POST`, da dies standardmäßig vom SDK gesendet wird – siehe [Vom Client aufrufen](#vom-client-aufrufen). Eine `GET`-Route ist ebenso gültig; der Aufrufer muss dann `{ method: "GET" }` angeben.
 
 `rebase dev` überwacht das functions-Verzeichnis. Eine Datei, die hinzugefügt wird, während es läuft, wird beim nächsten Neuladen eingebunden – kein Neustart erforderlich. (Es muss mitgeteilt werden: Das Verzeichnis wird gescannt statt importiert, sodass der Watcher dies nicht ableiten kann.)
 
-## Vom Client aufrufen {#invoke-from-the-client}
-
+## Vom Client aufrufen
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
 
@@ -76,7 +75,7 @@ Importieren Sie aus **`@rebasepro/server/functions`**, nicht aus `@rebasepro/ser
 
 Beides funktioniert. Der Subpfad ist die *portable* Autorenoberfläche: Er bindet nichts ein, was Node erfordert, sodass eine dagegen geschriebene Funktion auf jeder JavaScript-Laufzeitumgebung ausgeführt werden kann. Das Paket-Root greift auf das gesamte Framework zu – die Boot-Sequenz, die Datei-Loader, die WebSocket-Schicht –, was für einen Server-Einstiegspunkt richtig ist, aber mehr darstellt, als ein Route-Handler benötigt. Zudem bietet er Ihnen typisierte Kontext-Zugriffsmethoden (`getUser`, `getDriver`), anstatt `c.get("user")` manuell casten zu müssen.
 
-Siehe [Laufzeit-Portabilität](#laufzeit-portabilität-runtime-portability) für den vollständigen Vertrag.
+Siehe [Laufzeit-Portabilität](#laufzeit-portabilität) für den vollständigen Vertrag.
 :::
 
 ## Konfiguration
@@ -102,7 +101,7 @@ Rebase wird:
 1. Das Verzeichnis nach `.ts`- / `.js`-Dateien durchsuchen
 2. Validieren, dass jeder Standard-Export eine Hono-App ist (Duck-Typing über `.fetch()` + `.routes`)
 3. Jede App unter `/api/functions/<filename>` einbinden
-4. Die Auth-Middleware anwenden (siehe [Authentifizierung](#authentifizierung-und-kontext-weitergabe-authentication-and-context-propagation) unten)
+4. Die Auth-Middleware anwenden (siehe [Authentifizierung](#authentifizierung-und-kontext-weitergabe) unten)
 
 ## Dateibenennung und Routen-Mapping
 
@@ -187,8 +186,7 @@ const mod = await dynamicImport(fileUrl);
 
 ---
 
-## Authentifizierung und Kontext-Weitergabe {#authentication-and-context-propagation}
-
+## Authentifizierung und Kontext-Weitergabe
 Benutzerdefinierte Funktionen werden mit der **gleichen Auth-Middleware** wie die Datenrouten eingebunden, jedoch mit `requireAuth: false`. Das bedeutet:
 
 - Das JWT des Benutzers wird **geparst und in den Kontext injiziert**, sofern vorhanden
@@ -345,7 +343,7 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-Es läuft über eine TCP-Verbindung zu Ihrer Datenbank, was es zum einzigen Accessor macht, der an einen Node-Prozess gebunden ist. Das hat bei heutigen Deployments keinerlei Nachteile – es ist lediglich der eine Punkt, den man wissen muss, falls eine Funktion später migriert werden soll. Siehe [Laufzeit-Portabilität](#laufzeit-portabilität-runtime-portability).
+Es läuft über eine TCP-Verbindung zu Ihrer Datenbank, was es zum einzigen Accessor macht, der an einen Node-Prozess gebunden ist. Das hat bei heutigen Deployments keinerlei Nachteile – es ist lediglich der eine Punkt, den man wissen muss, falls eine Funktion später migriert werden soll. Siehe [Laufzeit-Portabilität](#laufzeit-portabilität).
 
 :::caution[Direkter Drizzle-Zugriff ist Node-only]
 Sie können auch Ihre eigene Drizzle-Instanz importieren und direkt abfragen (`db.execute(sql\`…\`)`). Das funktioniert und ist bei einem selbst gehosteten oder verwalteten Node-Deployment völlig in Ordnung.
@@ -353,8 +351,7 @@ Sie können auch Ihre eigene Drizzle-Instanz importieren und direkt abfragen (`d
 Es lohnt sich zu wissen, was das bedeutet: Eine Funktion, die `drizzle-orm` und einen `pg`-Pool importiert, ist dauerhaft eine Node-Funktion, sie umgeht Ihre Collection-Callbacks, die `rebase.data` ausführt (keiner von beiden prüft die `Validierung`, die für [API-Anfragen](/docs/collections/validation-and-conditions/#where-validation-runs) gilt), und bezieht ihre Verbindung nicht aus dem Anfragekontext. `rebase.sql()` bietet Ihnen dasselbe Raw SQL über die frameworkeigene Verbindung. Ziehen Sie dies vor.
 :::
 
-## Konfiguration und Secrets {#configuration-and-secrets}
-
+## Konfiguration und Secrets
 Lesen Sie Konfigurationen **innerhalb** des Handlers aus, niemals auf Modulebene:
 
 ```typescript
@@ -392,8 +389,7 @@ Ein Lesezugriff auf Modulebene wird ausgewertet, wenn die Datei importiert wird 
 
 `rebase doctor` meldet `process.env`-Lesezugriffe auf Modulebene in Ihrem functions-Verzeichnis.
 
-## Hintergrundarbeiten {#background-work}
-
+## Hintergrundarbeiten
 Aufgaben, die über die Antwort hinaus fortgeführt werden sollen, gehören in `waitUntil`:
 
 ```typescript
@@ -420,8 +416,7 @@ Ein Promise ohne `await` sieht gleichwertig aus, ist es aber nicht. `waitUntil` 
 
 Eine Zurückweisung wird protokolliert, anstatt dem Handler für unbehandelte Rejections überlassen zu werden, sodass bei einem Fehler die Route benannt wird, von der er stammt.
 
-## Laufzeit-Portabilität {#runtime-portability}
-
+## Laufzeit-Portabilität
 Eine benutzerdefinierte Funktion ist eine Hono-App, und Hono läuft auf jeder JavaScript-Server-Laufzeitumgebung. Ob *Ihre* Funktion woanders als in einem Node-Prozess ausgeführt werden kann, hängt daher davon ab, was ihre eigene Datei importiert und verwendet.
 
 Nichts davon stellt eine Einschränkung für das dar, was Sie heute schreiben können. Jedes Rebase-Deployment ist ein Node-Prozess, eine Funktion, die eine Datei liest oder einen Socket öffnet, ist vollkommen valide, und kein Build oder Deployment schlägt deswegen fehl. Dies wird hier festgehalten, damit die Antwort jetzt bereits bekannt ist und nicht später für jede Datei einzeln herausgefunden werden muss.
@@ -443,8 +438,8 @@ Nichts davon stellt eine Einschränkung für das dar, was Sie heute schreiben k�
 
 **Latente Fehler auf jeder Runtime** – diese sollten unabhängig davon behoben werden:
 
-- Lesezugriff auf `process.env` auf Modulebene (siehe [Konfiguration und Secrets](#konfiguration-und-secrets-configuration-and-secrets))
-- Fire-and-Forget-Promises anstelle von [`waitUntil`](#hintergrundarbeiten-background-work)
+- Lesezugriff auf `process.env` auf Modulebene (siehe [Konfiguration und Secrets](#konfiguration-und-secrets))
+- Fire-and-Forget-Promises anstelle von [`waitUntil`](#hintergrundarbeiten)
 - Sich darauf verlassen, dass ein Handler nach einem Timeout des Requests weiterläuft. Unter Node tut er das; dies ist eine Eigenschaft des Prozesses, kein Garantieversprechen des Frameworks
 
 ### Eigene Funktionen prüfen
@@ -570,7 +565,7 @@ Der Router wird für das **Verzeichnis** eingebunden, nicht für die darin entha
 
 Für `/api/functions/*` gelten zwei Obergrenzen:
 
-- **Request-Timeout** – standardmäßig 30 Sekunden, beantwortet mit `504` und dem Code `FUNCTION_TIMEOUT`. Konfigurierbar über `functionsTimeoutMs` (oder `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` deaktiviert es. Der Handler kann von außen nicht abgebrochen werden, übergeben Sie ausgehenden HTTP-Aufrufen daher ein `AbortSignal` – das Timeout gibt den Client und den Socket frei, bricht aber die Arbeit nicht ab. Dass der Handler nach dem 504 *weiterläuft*, ist eine Eigenschaft eines langlebigen Node-Prozesses, keine Zusage des Vertrags; alles, was zwingend abgeschlossen werden muss, gehört in [`waitUntil`](#hintergrundarbeiten-background-work).
+- **Request-Timeout** – standardmäßig 30 Sekunden, beantwortet mit `504` und dem Code `FUNCTION_TIMEOUT`. Konfigurierbar über `functionsTimeoutMs` (oder `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` deaktiviert es. Der Handler kann von außen nicht abgebrochen werden, übergeben Sie ausgehenden HTTP-Aufrufen daher ein `AbortSignal` – das Timeout gibt den Client und den Socket frei, bricht aber die Arbeit nicht ab. Dass der Handler nach dem 504 *weiterläuft*, ist eine Eigenschaft eines langlebigen Node-Prozesses, keine Zusage des Vertrags; alles, was zwingend abgeschlossen werden muss, gehört in [`waitUntil`](#hintergrundarbeiten).
 - **Rate-Limit** – API-Schlüssel und angemeldete Aufrufer teilen sich die Buckets der Daten-API. Anonyme Aufrufer erhalten ein eigenes, deutlich großzügigeres Kontingent (3000 pro Zeitfenster), da dieser Router standardmäßig für Webhook-Empfänger öffentlich ist. Überschreiben Sie dies mit `rateLimit.anonymousFunctions`; `null` schaltet es aus.
 
 Unbehandelte Promise-Rejections werden protokolliert und sind nicht fatal: Ein Fire-and-Forget-Aufruf in einer Funktion würde andernfalls den gesamten Prozess beenden. Setzen Sie `REBASE_EXIT_ON_UNHANDLED_REJECTION=1`, um das Standardverhalten von Node zu aktivieren.

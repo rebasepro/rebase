@@ -1,5 +1,5 @@
 ---
-sourceHash: 6dea8dc014a1c282
+sourceHash: 42fa2047884b640a
 title: Interroger les données
 sidebar_label: Interroger les données
 description: Opérations CRUD, constructeur de requêtes fluide, opérateurs de filtrage, tri, sélection de colonnes et agrégats avec le SDK typé de Rebase.
@@ -108,22 +108,22 @@ const { data } = await client.data.products
 | Méthode | Description | Exemple |
 |---------|-------------|---------|
 | `.where(field, op, value)` | Ajouter une condition de filtre | `.where("age", ">=", 18)` |
-| `.where(path, op, value)` | Filtrer sur le chemin d'une [relation](#querying-through-a-relation) ou d'un [JSON](#filtering-inside-json) | `.where("author.name", "==", "bob")` |
-| `.where(group)` | Ajouter un [groupe OR/AND](#logical-conditions-or--and) | `.where(or(cond(…), cond(…)))` |
+| `.where(path, op, value)` | Filtrer sur le chemin d'une [relation](/docs/sdk/relations#querying-through-a-relation) ou d'un [JSON](/docs/sdk/aggregates-and-search#filtering-inside-json) | `.where("author.name", "==", "bob")` |
+| `.where(group)` | Ajouter un [groupe OR/AND](#conditions-logiques-or--and--not) | `.where(or(cond(…), cond(…)))` |
 | `.orderBy(field, dir, nulls?)` | Trier les résultats | `.orderBy("name", "asc")` |
-| `.orderBy(aggregate, dir)` | Trier par un [agrégat sur une relation](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
+| `.orderBy(aggregate, dir)` | Trier par un [agrégat sur une relation](/docs/sdk/relations#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
 | `.limit(n)` | Limiter le nombre de résultats | `.limit(25)` |
 | `.offset(n)` | Ignorer les N premiers résultats | `.offset(50)` |
-| `.after(cursor)` | Continuer après un [curseur](#cursor-pagination) | `.after(meta.nextCursor)` |
-| `.fields(...columns)` | Renvoyer [uniquement ces colonnes](#returning-fewer-columns) | `.fields("id", "title")` |
+| `.after(cursor)` | Continuer après un [curseur](/docs/sdk/pagination#cursor-pagination) | `.after(meta.nextCursor)` |
+| `.fields(...columns)` | Renvoyer [uniquement ces colonnes](#renvoyer-moins-de-colonnes) | `.fields("id", "title")` |
 | `.distinct()` | Regrouper les lignes identiques sur ces colonnes | `.fields("status").distinct()` |
 | `.search(text)` | Recherche textuelle — voir [Recherche](/docs/backend/search) | `.search("laptop")` |
 | `.vectorSearch(prop, vector, opts?)` | Recherche des plus proches voisins sur une propriété `vector` | `.vectorSearch("embedding", vec)` |
 | `.include(...relations)` | [Charger les lignes associées](/docs/sdk/relations#loading-related-rows) | `.include("author", "tags")` |
 | `.find()` | Exécuter la requête | Renvoie `FindResult<M>` |
-| `.aggregate(params)` | [Réduire au lieu de renvoyer des lignes](#aggregates) | `.aggregate({ select: [{ fn: "count" }] })` |
-| `.iterate(options?)` | [Diffuser en continu chaque ligne correspondante](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
-| `.findAll(options?)` | [Récupérer chaque ligne correspondante](#reading-everything-iterate-and-findall) | Renvoie `M[]` |
+| `.aggregate(params)` | [Réduire au lieu de renvoyer des lignes](#agrégats) | `.aggregate({ select: [{ fn: "count" }] })` |
+| `.iterate(options?)` | [Diffuser en continu chaque ligne correspondante](/docs/sdk/pagination#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
+| `.findAll(options?)` | [Récupérer chaque ligne correspondante](/docs/sdk/pagination#reading-everything-iterate-and-findall) | Renvoie `M[]` |
 | `.count()` | Compter les lignes correspondantes | Renvoie `number` |
 | `.listen(onUpdate, onError?)` | S'abonner aux mises à jour en temps réel | Renvoie `unsubscribe()` |
 
@@ -201,7 +201,7 @@ const { data } = await client.data.products
     .find();
 ```
 
-`cond` prend l'opérateur canonique — la colonne de gauche du tableau [Opérateurs de filtrage](#filter-operators). L'utilisation d'un opérateur que le dialecte ne prend pas en charge lève une `TypeError` lors de la sérialisation de la requête, plutôt que d'exécuter silencieusement une requête différente.
+`cond` prend l'opérateur canonique — la colonne de gauche du tableau [Opérateurs de filtrage](#opérateurs-de-filtrage). L'utilisation d'un opérateur que le dialecte ne prend pas en charge lève une `TypeError` lors de la sérialisation de la requête, plutôt que d'exécuter silencieusement une requête différente.
 
 ### Négation
 
@@ -248,7 +248,7 @@ Trois encodages méritent d'être connus, car ce sont ceux sur lesquels une cha�
 |-----------|--------------|----------|
 | `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` recherche la chaîne de quatre caractères `null` |
 | `cond("id", "in", [])` | `id.in.(\)` | `in.()` est une liste contenant une seule chaîne vide, ce qui correspond à une requête différente |
-| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | un [chemin de relation](#querying-through-a-relation) conserve son point |
+| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | un [chemin de relation](/docs/sdk/relations#querying-through-a-relation) conserve son point |
 
 Les virgules, les parenthèses et les barres obliques inverses à l'intérieur d'une valeur sont échappées avec un antislash, ainsi `cond("name", "==", "Doe, John")` transite sous la forme `name.eq.Doe\, John` et ne divise pas le groupe.
 
@@ -296,7 +296,7 @@ const { data } = await client.data.products
 
 Chaque tri se termine par l'ID de la ligne, par ordre décroissant, que vous l'ayez demandé ou non. C'est ce qui rend l'ordonnancement *total* : sans cela, deux lignes partageant une même valeur seraient renvoyées dans l'ordre choisi arbitrairement par la base de données, et paginer sur un ordre susceptible de varier entre deux exécutions d'une même requête répéterait certaines lignes et en omettrait d'autres.
 
-Un tri multi-colonnes pagine parfaitement sous un [curseur](#cursor-pagination) : la comparaison s'effectue sur chaque clé, dans l'ordre. Le seul ordre qu'un curseur ne peut pas décrire est **`_score`** — voir [Recherche](/docs/backend/search). La pertinence étant calculée par requête plutôt que stockée, il n'y a aucune valeur sur la ligne du curseur à laquelle comparer la page suivante, et une telle liste ne comporte aucun `nextCursor`.
+Un tri multi-colonnes pagine parfaitement sous un [curseur](/docs/sdk/pagination#cursor-pagination) : la comparaison s'effectue sur chaque clé, dans l'ordre. Le seul ordre qu'un curseur ne peut pas décrire est **`_score`** — voir [Recherche](/docs/backend/search). La pertinence étant calculée par requête plutôt que stockée, il n'y a aucune valeur sur la ligne du curseur à laquelle comparer la page suivante, et une telle liste ne comporte aucun `nextCursor`.
 
 ### Positionnement des valeurs NULL lors du tri
 
@@ -319,7 +319,7 @@ const { data } = await client.data.posts
 
 Via HTTP, il s'agit d'un troisième segment séparé par deux-points, `?orderBy=publishedAt:desc:last`, ou d'une clé `"nulls"` dans le format de tableau JSON. Toute valeur autre que `first`/`last` renvoie une erreur 400 au lieu de produire un tri silencieusement différent.
 
-Le [curseur](#cursor-pagination) respecte ce que le tri a déclaré, de sorte que la pagination sur une clé nullable reste correcte quel que soit le placement choisi.
+Le [curseur](/docs/sdk/pagination#cursor-pagination) respecte ce que le tri a déclaré, de sorte que la pagination sur une clé nullable reste correcte quel que soit le placement choisi.
 
 ## Renvoyer moins de colonnes
 

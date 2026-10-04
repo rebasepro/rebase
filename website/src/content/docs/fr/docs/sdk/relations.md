@@ -95,7 +95,7 @@ n'a réellement aucune ligne liée. Une faute de frappe ressemblait donc exactem
 
 Avec un type `Database` généré, l'exécution ne va pas si loin : les clés de `include` sont
 vérifiées par rapport aux relations réelles de la collection au moment de la compilation, de manière récursive.
-Voir [Includes typés](#typed-includes).
+Voir [Includes typés](#includes-typés).
 
 ### Sur le réseau
 
@@ -178,7 +178,7 @@ data[0].author?.name;   // "Jane Doe"
 Un type `Database` généré type précisément les trois : `Insert` et `Update` acceptent
 l'une ou l'autre des syntaxes d'écriture, `Row` possède `authorId` sans condition, et `author` est
 facultatif sur `Row` — <span class="since-badge" data-since="0.24">Depuis 0.24</span> `RowWith<"posts", ["author"]>` est la ligne avec cette relation
-**requise**, pour une lecture qui l'a demandée. Voir [Includes typés](#typed-includes).
+**requise**, pour une lecture qui l'a demandée. Voir [Includes typés](#includes-typés).
 
 Le seul cas où les trois formes se confondent est celui d'une relation nommée de manière identique à sa propre
 clé étrangère. Dans ce cas, la ligne incluse est servie *par-dessus* la colonne, et le

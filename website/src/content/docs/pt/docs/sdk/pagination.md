@@ -1,5 +1,5 @@
 ---
-sourceHash: c38fdefef238a009
+sourceHash: 4449046fbaa30bb3
 title: Paginação
 sidebar_label: Paginação
 description: Pagine uma coleção com limit/offset, números de página ou um cursor keyset — e quando cada um deixa de ser correto.
@@ -75,7 +75,7 @@ Quatro consequências decorrem do que um cursor é:
   `CURSOR_WITH_OFFSET`). Ambos informam onde a página começa, e honrar ambos
   pularia linhas.
 - **Ordenações por múltiplas chaves e chaves que aceitam nulo funcionam.** A comparação é construída sobre
-  cada chave em ordem, com o [posicionamento de NULL](#where-nulls-sort) que a ordenação
+  cada chave em ordem, com o [posicionamento de NULL](/docs/sdk/querying#where-nulls-sort) que a ordenação
   declarou — não um único `>` em uma coluna.
 - **Relevância não pode ser um cursor.** Um `_score` é calculado por consulta e não é armazenado em
   lugar nenhum, e duas consultas com strings de busca diferentes produzem pontuações que não estão
@@ -162,7 +162,7 @@ for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ 
 
 `cursor` aqui significa "buscar em vez de paginar por offset" e define a coluna pela
 qual ordenar quando a consulta ainda não especificar. A busca em si é
-[o cursor do servidor](#cursor-pagination): a iteração repassa `meta.nextCursor` de volta
+[o cursor do servidor](#paginação-por-cursor): a iteração repassa `meta.nextCursor` de volta
 como `after` e não constrói nenhuma comparação própria, razão pela qual uma ordenação por múltiplas chaves
 funciona —
 

@@ -198,7 +198,7 @@ Importez-le depuis `@rebasepro/types`, et non depuis `@rebasepro/server`. Un fic
 
 ### `afterSave`
 
-Appelé après l'écriture de la ligne et avant le commit, au sein de la même transaction. Une exception annule l'enregistrement (rollback) — voir [Sémantique des transactions](#transaction-semantics).
+Appelé après l'écriture de la ligne et avant le commit, au sein de la même transaction. Une exception annule l'enregistrement (rollback) — voir [Sémantique des transactions](#sémantique-des-transactions).
 
 ```typescript
 afterSave: async ({

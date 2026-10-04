@@ -78,3 +78,31 @@ test("a comment line inside a fence is not a heading an anchor can land on", () 
     const found = checkDocsLinks(root).findings.filter(f => /no heading/.test(f.message));
     assert.equal(found.length, 1, `got ${JSON.stringify(found)}`);
 });
+
+test("a same-page anchor must name a heading on that page", () => {
+    // Only `/docs/…` links were read, so `[cursor](#cursor-pagination)` kept
+    // pointing at a section that had moved to another page.
+    const root = fixture({
+        "guide.md":
+            "# Guide\n\n## Filters\n\nSee [filters](#filters) and [cursors](#cursor-pagination).\n"
+    });
+    assert.deepEqual(
+        deadLinks(root).map(f => f.message),
+        ["#cursor-pagination — this page has no heading with that anchor"]
+    );
+});
+
+test("an anchor is slugged one dash per space, as Starlight serves it", () => {
+    // "Logical Conditions (OR / AND / NOT)" is `#logical-conditions-or--and--not`
+    // on the site. Collapsing runs of spaces accepted `#…-or-and-not`, which
+    // 404s, and refused the anchor that works.
+    const root = fixture({
+        "guide.md":
+            "# Guide\n\n## Logical Conditions (OR / AND / NOT)\n\n" +
+            "[works](#logical-conditions-or--and--not) [dead](#logical-conditions-or-and-not)\n"
+    });
+    assert.deepEqual(
+        deadLinks(root).map(f => f.message),
+        ["#logical-conditions-or-and-not — this page has no heading with that anchor"]
+    );
+});

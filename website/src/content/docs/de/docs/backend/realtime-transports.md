@@ -1,5 +1,5 @@
 ---
-sourceHash: b03a0dfd0577d1ee
+sourceHash: 67d0f85a988d0aa9
 title: Echtzeit über mehrere Instanzen
 sidebar_label: Echtzeit über mehrere Instanzen
 description:"\"Wie Broadcast-Channels und Presence mehr als einen Server-Prozess überstehen: der LISTEN/NOTIFY-Bus, was jede Instanz besitzt, und das Schreiben eines eigenen Transports.\""
@@ -9,7 +9,7 @@ description:"\"Wie Broadcast-Channels und Presence mehr als einen Server-Prozess
 
 Für Cluster-Umgebungen mit mehreren Instanzen (z. B. beim Betrieb in Kubernetes oder Docker-Containern hinter einem Load Balancer) stützt sich Rebase auf PostgreSQL `LISTEN/NOTIFY`, um **Zeilenänderungen** über Instanzen hinweg zu synchronisieren. Abonnements von Collections und Entitäten erstrecken sich daher ohne Konfiguration über mehrere Instanzen – genau das wird in diesem Abschnitt beschrieben.
 
-**Broadcast-Channels und Presence sind getrennt** und arbeiten instanzbezogen, bis Sie einen Channel-Bus aktivieren. Siehe [Channels und Presence über Instanzen hinweg](#channels-and-presence-across-instances) weiter unten.
+**Broadcast-Channels und Presence sind getrennt** und arbeiten instanzbezogen, bis Sie einen Channel-Bus aktivieren. Siehe [Channels und Presence über Instanzen hinweg](#channels-und-presence-über-instanzen-hinweg) weiter unten.
 
 ### Umgehung von pgBouncer-Pools
 
@@ -69,9 +69,9 @@ Die Grenze, die man im Auge behalten sollte, ist nicht die Kapazität, sondern d
 
 Pro Client akzeptiert der Socket bis zu **7.200 Channel-Frames pro Minute** (120/s – 60 fps an Cursor-Broadcasts plus das Presence-Update, das jeder Frame enthält), separat gezählt vom Budget, das sich Abfragen und Abonnements teilen. Frames, die darüber hinausgehen, werden mit einem `RATE_LIMITED`-Fehler abgelehnt und nicht in eine Warteschlange gestellt.
 
-Die Ablehnung erfolgt über `channel.onError()`, nicht als abgelehnter `broadcast()`-Aufruf – siehe [Wenn ein Channel-Frame abgelehnt wird](#when-a-channel-frame-is-refused).
+Die Ablehnung erfolgt über `channel.onError()`, nicht als abgelehnter `broadcast()`-Aufruf – siehe [Wenn ein Channel-Frame abgelehnt wird](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
-Wenn Sie danach immer noch an Grenzen stoßen, drosseln Sie Cursor-Ereignisse auf dem Client (ein Last-Write-Wins-Status benötigt keine 60 Updates pro Sekunde) und erwägen Sie, Beteiligte desselben Dokuments an dieselbe Instanz weiterzuleiten – Sticky Routing reduziert den instanzübergreifenden Datenverkehr unabhängig von der Benutzeranzahl auf nahezu null. Erst darüber hinaus lohnt sich ein anderer Transport, und die Antwort darauf ist ein Transport-Paket, kein Fork. Siehe [Einen eigenen Transport schreiben](#writing-your-own-transport).
+Wenn Sie danach immer noch an Grenzen stoßen, drosseln Sie Cursor-Ereignisse auf dem Client (ein Last-Write-Wins-Status benötigt keine 60 Updates pro Sekunde) und erwägen Sie, Beteiligte desselben Dokuments an dieselbe Instanz weiterzuleiten – Sticky Routing reduziert den instanzübergreifenden Datenverkehr unabhängig von der Benutzeranzahl auf nahezu null. Erst darüber hinaus lohnt sich ein anderer Transport, und die Antwort darauf ist ein Transport-Paket, kein Fork. Siehe [Einen eigenen Transport schreiben](#einen-eigenen-transport-schreiben).
 
 ### Coalescing
 
@@ -145,7 +145,7 @@ Die Zustellung an lokale Clients ist nicht Aufgabe des Transports – der Realti
 
 `pg_notify` lehnt Payloads ab 8000 Bytes ab. Cursors und Presence passen problemlos hinein; ein Dokument-Snapshot nicht. Rebase handhabt dies genauso wie große Entitätsänderungen – indem eine Adresse anstelle eines Bodys gesendet wird:
 
-- **Auf einem persistierten Channel** (siehe [Channel-Retention](#channel-retention)) ist die Nachricht bereits mit einer Sequenznummer gespeichert, sodass die Benachrichtigung nur `(channel, seq)` überträgt und jede empfangende Instanz den Body nachliest. Es gibt keinerlei Größenbeschränkung. Dies gilt für jede persistierte Nachricht, klein oder groß: Jeder Datenbank-Login kann `LISTEN`, sodass der Body nie in der Benachrichtigung mitreist. Es kostet einen Primärschlüssel-Read pro Nachricht auf jeder Instanz mit einem Mitglied im Channel.
+- **Auf einem persistierten Channel** (siehe [Channel-Retention](/docs/backend/realtime#channel-retention)) ist die Nachricht bereits mit einer Sequenznummer gespeichert, sodass die Benachrichtigung nur `(channel, seq)` überträgt und jede empfangende Instanz den Body nachliest. Es gibt keinerlei Größenbeschränkung. Dies gilt für jede persistierte Nachricht, klein oder groß: Jeder Datenbank-Login kann `LISTEN`, sodass der Body nie in der Benachrichtigung mitreist. Es kostet einen Primärschlüssel-Read pro Nachricht auf jeder Instanz mit einem Mitglied im Channel.
 - **Ephemere Broadcasts und Presence** reisen weiterhin in der Benachrichtigung selbst mit, sodass jeder Login an der Datenbank sie lesen kann. Legen Sie alles, was nicht auf diesem Weg lesbar sein darf, auf einen persistierten Channel.
 - **Auf einem ephemeren Channel** gibt es nichts, worauf verwiesen werden könnte. Der Broadcast wird lokal zugestellt, der Absender erhält einen `CHANNEL_BUS_PAYLOAD_TOO_LARGE`-Fehler auf `channel.onError()`, und eine Warnung benennt den Channel – anstatt dass die Nachricht stillschweigend nur die Hälfte des Clusters erreicht.
 
