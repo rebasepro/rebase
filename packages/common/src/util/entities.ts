@@ -276,12 +276,20 @@ export function sanitizeData<M extends Record<string, unknown>>
     return result;
 }
 
-export function getReferenceFrom<M extends Record<string, unknown>>(entity: Entity<M>): EntityReference {
+/**
+ * A reference to `entity`.
+ *
+ * @param path where the reference points, when that is not the path the
+ * entity is addressed by. A Firestore or MongoDB collection may declare a
+ * `path` for its store other than its slug, and a reference has to carry the
+ * stored one, where `entity.path` is the path the admin addresses it by.
+ */
+export function getReferenceFrom<M extends Record<string, unknown>>(entity: Entity<M>, path: string = entity.path): EntityReference {
     if (typeof entity.id !== "string")
         throw new Error("Only string IDs are supported in references");
     return new EntityReference({
         id: entity.id,
-        path: entity.path,
+        path,
         driver: entity.driver,
         databaseId: entity.databaseId
     });

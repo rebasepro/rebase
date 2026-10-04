@@ -5,9 +5,9 @@ import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { Entity, EntityReference } from "@rebasepro/types";
 import { ReferencePreview } from "../../../preview";
 import { Button, Checkbox, Label, Select, SelectItem } from "@rebasepro/ui";
-import { getReferenceFrom } from "@rebasepro/common";
 import { useTranslation } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../../../hooks/navigation/contexts/CollectionRegistryContext";
+import { useReferencePaths } from "../../../hooks/useReferencePaths";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { isNullFilterOperator, nullFilterOperatorFor, valueOperatorFor } from "./null_filter";
 
@@ -126,16 +126,19 @@ export function ReferenceFilterField({
     }
 
     const collectionRegistryController = useCollectionRegistryController();
+    const { toCollectionPath, referenceTo } = useReferencePaths();
+    const collectionPath = path ? toCollectionPath(path) : undefined;
     const collection: AdminCollection | undefined = useMemo(() => {
-        return path ? collectionRegistryController.getCollection(path) : undefined;
-    }, [path]);
+        return collectionPath ? collectionRegistryController.getCollection(collectionPath) : undefined;
+    }, [collectionPath]);
 
+    // The filter compares against what is stored, so it carries the stored path.
     const onSingleEntitySelected = (entity: Entity<Record<string, unknown>>) => {
-        updateFilter(operation, getReferenceFrom(entity));
+        updateFilter(operation, referenceTo(entity));
     };
 
     const onMultipleEntitiesSelected = (entities: Entity<Record<string, unknown>>[]) => {
-        updateFilter(operation, entities.map(e => getReferenceFrom(e)));
+        updateFilter(operation, entities.map(e => referenceTo(e)));
     };
 
     const multiple = multipleSelectOperations.includes(operation);
@@ -148,7 +151,7 @@ export function ReferenceFilterField({
 
     const referenceDialogController = useSelectionDialog({
         multiselect: multiple,
-        path,
+        path: collectionPath,
         collection,
         onSingleEntitySelected,
         onMultipleEntitiesSelected,

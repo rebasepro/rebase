@@ -929,7 +929,7 @@ type CollectionConfig
 type CollectionIndex
 type CollectionPatch
 type CollectionPatchOp
-type CollectionRegistryController { collections, convertIdsToPaths, getCollection, getParentCollectionSlugs, getParentEntityIds, getParentReferencesFromPath, getRawCollection, initialised }
+type CollectionRegistryController { collections, convertIdsToPaths, getCollection, getParentCollectionSlugs, getParentEntityIds, getParentReferencesFromPath, getRawCollection, initialised, resolveCollectionPath, resolveDataPath }
 type ColorHue
 type ColorKey
 type ColorScheme { color, text }
@@ -1135,7 +1135,7 @@ type UpdateValues
 type User { claims, createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, pendingEmail, photoURL, providerId, roles, uid }
 
 ## @rebasepro/common
-class CollectionRegistry { get, getCollectionByPath, getCollections, getGlobalCallbacks, getRaw, getRawCollections, normalizeCollection, register, registerMultiple, reset, resolvePathToCollections, setDataSources, setGlobalCallbacks }
+class CollectionRegistry { get, getCollectionByPath, getCollections, getGlobalCallbacks, getRaw, getRawCollections, normalizeCollection, register, registerMultiple, reset, resolveCollectionPath, resolveDataPath, resolvePathToCollections, setDataSources, setGlobalCallbacks }
 class CursorError { code }
 class CursorMismatchError { code }
 class IncludeSpecError { code }
@@ -1319,7 +1319,7 @@ interface AuthSecretCandidate { auth, properties }
 interface CheckOperationOptions { clauses, onUnknown }
 interface DataSourceResolvable { dataSource, databaseId, engine }
 interface DecodedCursor { id, orderBy, values }
-interface EntityDataOptions { resolveCollection }
+interface EntityDataOptions { resolveCollection, resolveDataPath }
 interface FieldViewer { roles }
 interface IncludeNode { children, fields, limit, logical, orderBy, where }
 interface IntrospectedCollection { name, properties, propertiesOrder, relations, securityRules, slug, table }

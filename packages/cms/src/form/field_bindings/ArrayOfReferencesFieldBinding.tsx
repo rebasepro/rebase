@@ -9,12 +9,12 @@ import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
 import { getIconForProperty } from "../../util/property_utils";
-import { getReferenceFrom } from "@rebasepro/common";
 
 import { useTranslation, ErrorView } from "@rebasepro/app";
 import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typography } from "@rebasepro/ui";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
+import { useReferencePaths } from "../../hooks/useReferencePaths";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 type ArrayOfReferencesFieldProps = FieldProps<ArrayProperty, EntityReference[]>;
@@ -58,22 +58,24 @@ export function ArrayOfReferencesFieldBinding({
     });
 
     const collectionRegistryController = useCollectionRegistryController();
+    const { toCollectionPath, referenceTo } = useReferencePaths();
+    const collectionPath = ofProperty.path ? toCollectionPath(ofProperty.path) : undefined;
     const collection: AdminCollection | undefined = useMemo(() => {
-        return ofProperty.path ? collectionRegistryController.getCollection(ofProperty.path) : undefined;
-    }, [ofProperty.path]);
+        return collectionPath ? collectionRegistryController.getCollection(collectionPath) : undefined;
+    }, [collectionPath]);
 
     if (!collection) {
         throw Error(`Couldn't find the corresponding collection for the path: ${ofProperty.path}`);
     }
 
     const onMultipleEntitiesSelected = useCallback((entities: Entity<Record<string, unknown>>[]) => {
-        const refs = entities.map(e => getReferenceFrom(e));
+        const refs = entities.map(e => referenceTo(e));
         setValue(refs);
-    }, [setValue]);
+    }, [setValue, referenceTo]);
 
     const referenceDialogController = useSelectionDialog({
         multiselect: true,
-        path: ofProperty.path,
+        path: collectionPath,
         collection,
         onMultipleEntitiesSelected,
         selectedEntityIds,

@@ -95,6 +95,20 @@ export function useBuildCollectionRegistryController(props: {
         return registry.getRaw(pathSegments.join("/")) as AdminCollection | undefined;
     }, []);
 
+    // Both hand a path back exactly as given when there is nothing to
+    // translate, slashes and all: most collections are stored under their slug.
+    const resolveDataPath = useCallback((path: string): string => {
+        const cleanedPath = removeInitialAndTrailingSlashes(path);
+        const dataPath = cleanedPath ? collectionRegistryRef.current.resolveDataPath(cleanedPath) : cleanedPath;
+        return dataPath === cleanedPath ? path : dataPath;
+    }, []);
+
+    const resolveCollectionPath = useCallback((path: string, preferredDriver?: string): string => {
+        const cleanedPath = removeInitialAndTrailingSlashes(path);
+        const collectionPath = cleanedPath ? collectionRegistryRef.current.resolveCollectionPath(cleanedPath, preferredDriver) : cleanedPath;
+        return collectionPath === cleanedPath ? path : collectionPath;
+    }, []);
+
     const getParentReferencesFromPath = useCallback((path: string): EntityReference[] => {
         const registry = collectionRegistryRef.current;
         if (!registry) {
@@ -161,6 +175,8 @@ export function useBuildCollectionRegistryController(props: {
         initialised,
         getCollection,
         getRawCollection,
+        resolveDataPath,
+        resolveCollectionPath,
         getParentReferencesFromPath,
         getParentCollectionSlugs,
         getParentEntityIds,
@@ -171,6 +187,8 @@ export function useBuildCollectionRegistryController(props: {
         initialised,
         getCollection,
         getRawCollection,
+        resolveDataPath,
+        resolveCollectionPath,
         getParentReferencesFromPath,
         getParentCollectionSlugs,
         getParentEntityIds,

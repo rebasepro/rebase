@@ -867,6 +867,20 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   such a collection keeps its whole path, and `users/abc123` is no longer
   read as the collection `user`.
 
+- **A Firestore collection that declares its own `path` is read, written and
+  referenced at that path.** A collection registered as `fs_diagnosis` with
+  `path: "diagnosis"` (beside a Postgres collection called `diagnosis`), or as
+  `medico_joints` for documents at `medico/v2.0.0/joints`, was read at its
+  slug: the list, the side panel and every subcollection under it came up
+  empty. A stored reference to `diagnosis/abc` opened the Postgres
+  collection, and a reference picked in a form stored the slug. The admin
+  still addresses the collection by its slug, and the driver is now handed
+  the declared path on every read and write, subcollections included.
+  References are stored under the declared path and read back preferring the
+  data source of the record they were read from, or the reference's own
+  `driver`. Form actions copy and delete by the slug, so a delete can no
+  longer reach the Postgres collection of the same name.
+
 #### Studio
 
 - **The source-only schema editor no longer overwrites edits made on disk

@@ -13,10 +13,10 @@ import { EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { ReferencePreview } from "../../preview";
 import { IconForView, useTranslation } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
-import { getReferenceFrom } from "@rebasepro/common";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { cls } from "@rebasepro/ui";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
+import { useReferencePaths } from "../../hooks/useReferencePaths";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
@@ -68,22 +68,24 @@ function ReferenceFieldBindingInternal({
     const validValue = refValue && typeof refValue === "object" && "isEntityReference" in refValue && refValue.isEntityReference();
 
     const collectionRegistryController = useCollectionRegistryController();
+    const { toCollectionPath, referenceTo } = useReferencePaths();
+    const collectionPath = toCollectionPath(property.path);
     const collection: AdminCollection | undefined = useMemo(() => {
-        return property.path ? collectionRegistryController.getCollection(property.path) : undefined;
-    }, [property.path]);
+        return collectionRegistryController.getCollection(collectionPath);
+    }, [collectionPath]);
 
     if (!collection) {
         throw Error(`Couldn't find the corresponding collection for the path: ${property.path}`);
     }
 
     const onSingleEntitySelected = useCallback((e: Entity<Record<string, unknown>> | null) => {
-        const ref = e ? getReferenceFrom(e) : null;
+        const ref = e ? referenceTo(e) : null;
         setValue(ref);
-    }, [setValue, propertyKey]);
+    }, [setValue, propertyKey, referenceTo]);
 
     const referenceDialogController = useSelectionDialog({
         multiselect: false,
-        path: property.path,
+        path: collectionPath,
         collection,
         onSingleEntitySelected,
         selectedEntityIds: validValue && refValue ? [refValue.id] : undefined,

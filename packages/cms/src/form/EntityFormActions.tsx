@@ -1,5 +1,4 @@
 
-import { getCollectionDataPath } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
 import type { EntityAction, AdminCollection } from "@rebasepro/cms-types";
 import React from "react";
@@ -120,7 +119,8 @@ function buildBottomActions<M extends Record<string, unknown>>({
                             action.onClick({
                                 view: "form",
                                 entity,
-                                path: path ?? getCollectionDataPath(collection),
+                                // The slug, not the stored path: see EditFormActions.
+                                path: path ?? collection.slug,
                                 collection: collection,
                                 context: undefined,
                                 sidePanelController: undefined,

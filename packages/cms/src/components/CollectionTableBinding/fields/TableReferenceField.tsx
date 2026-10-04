@@ -9,8 +9,8 @@ import { CollectionSize, AdminCollection } from "@rebasepro/cms-types";
 
 import { getPreviewSizeFrom } from "../../../preview/util";
 import { useComponentOverride, ErrorView, CollectionScopeProvider } from "@rebasepro/app";
-import { getReferenceFrom } from "@rebasepro/common";
 import { useCollectionRegistryController } from "../../../hooks/navigation/contexts/CollectionRegistryContext";
+import { useReferencePaths } from "../../../hooks/useReferencePaths";
 import { CompactEntityCellField } from "./CompactEntityCellField";
 
 type TableReferenceFieldProps = {
@@ -53,12 +53,14 @@ function TableReferenceFieldResolver(props: TableReferenceFieldProps & { collect
 
 export function TableReferenceField(props: TableReferenceFieldProps) {
     const collectionRegistryController = useCollectionRegistryController();
-    const { path } = props;
+    const { toCollectionPath } = useReferencePaths();
+    const path = toCollectionPath(props.path);
     const collection = collectionRegistryController.getCollection(path);
 
     const content = (
         <TableReferenceFieldResolver
             {...props}
+            path={path}
             collection={collection}
         />
     );
@@ -95,13 +97,15 @@ export const TableReferenceFieldInternal = React.memo(
             onOpenChange
         } = props;
 
+        const { referenceTo } = useReferencePaths();
+
         const onSingleEntitySelected = useCallback((entity: Entity<any>) => {
-            updateValue(entity ? getReferenceFrom(entity) : null);
-        }, [updateValue]);
+            updateValue(entity ? referenceTo(entity) : null);
+        }, [updateValue, referenceTo]);
 
         const onMultipleEntitiesSelected = useCallback((entities: Entity<any>[]) => {
-            updateValue(entities.map((e) => getReferenceFrom(e)));
-        }, [updateValue]);
+            updateValue(entities.map((e) => referenceTo(e)));
+        }, [updateValue, referenceTo]);
 
         const selectedEntityIds = internalValue
             ? (Array.isArray(internalValue)

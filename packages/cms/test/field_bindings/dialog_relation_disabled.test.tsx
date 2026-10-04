@@ -28,7 +28,11 @@ const authors = {
 };
 
 jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () => ({
-    useCollectionRegistryController: () => ({ getCollection: () => authors })
+    useCollectionRegistryController: () => ({
+        getCollection: () => authors,
+        resolveCollectionPath: (path: string) => path,
+        resolveDataPath: (path: string) => path
+    })
 }));
 
 import { RebaseI18nProvider } from "@rebasepro/app";
