@@ -9,6 +9,7 @@ import readline from "readline";
 import {
     buildTablesMap,
     buildEnumMap,
+    compositeKeySkipReason,
     generateCollectionFile,
     generateIndexContent,
     mergeIndexContent,
@@ -166,20 +167,23 @@ async function main() {
         const generatedFiles: string[] = [];
         const skippedFiles: string[] = [];
 
-        // A table keyed on more than one column is left out, with the reason.
-        // A collection reads and writes a row by one key column — validation
-        // refuses two `isId`s — and generating one anyway produced a file that
-        // read the table by an `id` column it does not have, and a push that
-        // planned that column as its new primary key.
-        const compositeKeyed = new Set(
+        // A table keyed on more than one column is generated with `isId` on
+        // every key column — one composite key, which the planner builds the
+        // same way — unless that cannot round-trip: a key column no `isId` can
+        // mark, or a link pointing at the table (see `compositeKeySkipReason`).
+        // Those are left out, with the reason. Generating one anyway produced a
+        // file that read the table by an `id` column it does not have, and a
+        // push that planned that column as its new primary key.
+        const compositeKeyed = new Map(
             Array.from(tablesMap.entries())
-                .filter(([tableName, meta]) => !joinTables.has(tableName) && meta.pks.length > 1)
-                .map(([tableName]) => tableName)
+                .filter(([tableName]) => !joinTables.has(tableName))
+                .map(([tableName, meta]) => [tableName, compositeKeySkipReason(meta, fks)] as const)
+                .filter((entry): entry is readonly [string, string] => entry[1] !== undefined)
         );
-        for (const tableName of compositeKeyed) {
+        for (const [tableName, reason] of compositeKeyed) {
             outWarn(chalk.yellow(
                 `⚠ Skipping table ${JSON.stringify(tableName)}: it is keyed on ` +
-                `(${tablesMap.get(tableName)?.pks.join(", ")}), and a collection reads a row by one key column. ` +
+                `(${tablesMap.get(tableName)?.pks.join(", ")}), and ${reason}. ` +
                 "`rebase db push` leaves a table that is not a collection alone."
             ));
         }
@@ -244,7 +248,7 @@ async function main() {
                     tablesMap,
                     enumMap,
                     sampleData,
-                    { metadata, classifications, checkFacts, builder, notes, skippedTables: compositeKeyed }
+                    { metadata, classifications, checkFacts, builder, notes, skippedTables: new Set(compositeKeyed.keys()) }
                 );
 
                 fs.writeFileSync(filePath, fileContent, "utf-8");

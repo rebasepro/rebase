@@ -809,6 +809,30 @@ describe("Row, Insert and Update describe different things", () => {
         expect(block(generateTypedefs([postsCol, authorsCol]), "Insert"))
             .not.toContain("string | number");
     });
+
+    it("treats every column of a composite key as part of the row's identity", () => {
+        // Several `isId` properties are one key: each is on every row, each is
+        // writable on insert like a single key the caller supplies, and none
+        // can be reassigned by an update.
+        const translations = {
+            slug: "company_translation",
+            properties: {
+                id: { type: "number", isId: true },
+                locale: { type: "string", isId: "manual" },
+                name: { type: "string" }
+            }
+        } as unknown as CollectionConfig;
+        const ts = generateTypedefs([translations]);
+        const row = block(ts, "Row", "companyTranslation");
+        expect(row).toContain("id: number;");
+        expect(row).toContain("locale: string;");
+        const insert = block(ts, "Insert", "companyTranslation");
+        expect(insert).toMatch(/^\s+id\??: number;/m);
+        expect(insert).toMatch(/^\s+locale\??: string;/m);
+        const update = block(ts, "Update", "companyTranslation");
+        expect(update).not.toMatch(/^\s+(id|locale)\??:/m);
+        expect(update).toContain("name?: string | null;");
+    });
 });
 
 /**

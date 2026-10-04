@@ -1,5 +1,5 @@
 ---
-sourceHash: 44fb75634f794993
+sourceHash: d79634002cc11c26
 title: Propriedades
 sidebar_label: Propriedades
 description: Os tipos de propriedade definem o tipo de dados, a validação e a renderização de interface do usuário para cada campo em uma coleção. O Rebase suporta os tipos string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -294,12 +294,18 @@ Não há chave estrangeira. O uid é uma string, o armazenamento de usuários po
 outro banco de dados totalmente diferente, e um usuário excluído não deve levar a trilha
 de auditoria consigo — declare uma [relação](/docs/collections/relations) se quiser o join.
 
-:::note[Uma chave primária por coleção]
-`isId` pode ser reivindicado por exatamente uma propriedade. Uma segunda é recusada no
-carregamento da configuração em vez de ser silenciosamente ignorada: chaves primárias
-compostas não são suportadas, e uma configuração declarando duas deve ser interpretada
-como uma solicitação de algo que o Rebase não pode construir. Se o que você desejava era
-uma restrição de unicidade em várias colunas, utilize um [índice](/docs/backend/indexes) único.
+:::note[Chaves primárias compostas]
+<span class="since-badge" data-since="0.24">Since 0.24</span> Marque várias propriedades com `isId` e elas formam uma chave composta: a tabela recebe
+uma única restrição `PRIMARY KEY (a, b)`, e uma linha é endereçada por todos os seus
+valores de chave na ordem de declaração, unidos por `:::` — `company_translation/1:::en_US`.
+Dê a cada coluna da chave a estratégia adequada: `isId: true` para um valor fornecido por
+quem chama, o que vale para a maioria das colunas de uma chave composta, e nunca
+`"increment"` em uma chave estrangeira ou em uma coluna de texto. Uma chave estrangeira é
+uma única coluna e não pode apontar para uma chave composta, então uma relação ou
+referência *para* uma coleção assim é recusada na geração do esquema. Se o que você
+desejava era uma restrição de unicidade em várias colunas, e não a identidade da linha,
+utilize um [índice](/docs/backend/indexes) único. Na 0.23, um segundo `isId` é recusado
+no carregamento da configuração.
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> Uma coleção em que nenhuma propriedade reivindica `isId` recebe uma coluna `id`
 própria: `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. O banco de dados a

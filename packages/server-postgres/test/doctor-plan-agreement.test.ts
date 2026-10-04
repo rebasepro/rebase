@@ -143,6 +143,45 @@ describe("the doctor against the database the planner built", () => {
         expect(key).toMatchObject({ severity: "error", table: "order_lines", expected: "id", actual: "order_id, line_no" });
     });
 
+    it("says to mark every column of a composite key with `isId`, and that the collection then reads it in sync", async () => {
+        await mockDb!.exec(`
+            CREATE TABLE "public"."order_lines" (
+                "order_id" integer NOT NULL,
+                "line_no" integer NOT NULL,
+                "qty" integer,
+                PRIMARY KEY ("order_id", "line_no")
+            );
+        `);
+        const key = (await issuesOf([orderLines])).find(i => i.category === "primary_key_mismatch");
+        expect(key?.fix).toContain('Mark only the properties for columns "order_id", "line_no" with `isId`');
+
+        // Marked, the collection reads the table by the key it has.
+        const marked = {
+            ...orderLines,
+            properties: {
+                ...orderLines.properties,
+                orderId: { type: "number", columnName: "order_id", isId: true },
+                lineNo: { type: "number", columnName: "line_no", isId: true }
+            }
+        } as unknown as CollectionConfig;
+        expect((await issuesOf([marked])).filter(i => i.category === "primary_key_mismatch")).toEqual([]);
+    });
+
+    it("finds a composite-keyed table the boot ensure created in sync", async () => {
+        const translations = {
+            slug: "translations",
+            table: "translations",
+            name: "Translations",
+            properties: {
+                id: { type: "number", isId: true, validation: { integer: true } },
+                locale: { type: "string", isId: true },
+                title: { type: "string" }
+            }
+        } as unknown as CollectionConfig;
+        await ensureCollectionTables(mockDb!, [translations]);
+        expect((await issuesOf([translations])).filter(i => i.severity !== "info")).toEqual([]);
+    });
+
     it("reports a table with no primary key at all", async () => {
         await ensureCollectionTables(mockDb!, [categories("increment")]);
         await mockDb!.exec(`ALTER TABLE "public"."categories" DROP CONSTRAINT "categories_pkey";`);

@@ -367,9 +367,8 @@ describe("enum ids and labels", () => {
 /**
  * A primary key a SQL store cannot be given.
  *
- * All three of these produced something rather than an error: a table Postgres
- * refuses (or, at boot, one silently missing a column), and a default calling a
- * function that does not exist.
+ * Each refusal here produced something rather than an error: a default calling
+ * a function that does not exist, or a column width nothing reads.
  */
 describe("primary keys a generator cannot honour", () => {
     const withIds = (properties: Record<string, unknown>) => {
@@ -377,16 +376,14 @@ describe("primary keys a generator cannot honour", () => {
         return { ...collection, properties: { ...collection.properties, ...properties } };
     };
 
-    it("errors on two `isId` properties, naming both", () => {
-        const [problem] = errors([withIds({
-            id: { name: "ID", type: "string", isId: true },
-            tenant: { name: "Tenant", type: "string", isId: true }
-        })]);
-
-        expect(problem?.path).toBe("posts.properties");
-        expect(problem?.message).toContain("composite primary keys are not supported");
-        expect(problem?.message).toContain("`id`");
-        expect(problem?.message).toContain("`tenant`");
+    it("accepts several `isId` properties as one composite key", () => {
+        // `company_translation (id integer, locale varchar, PRIMARY KEY (id,
+        // locale))`: every emitter writes one `PRIMARY KEY (id, locale)`, and
+        // rows are addressed as `1:::en_US`. A config that says so must boot.
+        expect(findCollectionConfigProblems([withIds({
+            id: { name: "ID", type: "number", isId: true },
+            locale: { name: "Locale", type: "string", isId: true }
+        })])).toEqual([]);
     });
 
     it("errors on `isId: \"cuid\"`, and says what to use instead", () => {
@@ -428,6 +425,71 @@ describe("primary keys a generator cannot honour", () => {
         expect(findCollectionConfigProblems([withIds({
             id: { name: "ID", type: "string", isId: "uuid" }
         })])).toEqual([]);
+    });
+});
+
+/**
+ * A composite key is accepted; a link *into* one is not, because a foreign key
+ * is one column and Postgres refuses `REFERENCES t (a)` when `a` alone is not
+ * unique. The schema generators refuse it too — this names it at config load,
+ * where the path says which link.
+ */
+describe("links into a composite primary key", () => {
+    const companies = {
+        slug: "companies", name: "Companies",
+        properties: { id: { name: "ID", type: "number", isId: "increment" }, name: { name: "Name", type: "string" } }
+    };
+    const translations = {
+        slug: "company_translations", name: "Translations",
+        properties: {
+            id: { name: "ID", type: "number", isId: true },
+            locale: { name: "Locale", type: "string", isId: true },
+            company: { name: "Company", type: "relation", relation: { kind: "belongsTo", target: () => companies, localKey: "id" } }
+        }
+    };
+
+    it("accepts a link out of a composite-keyed row into a single key", () => {
+        expect(errors([companies, translations])).toEqual([]);
+    });
+
+    it("refuses a belongsTo into a composite key, naming the link", () => {
+        const links = {
+            slug: "links", name: "Links",
+            properties: {
+                id: { name: "ID", type: "number", isId: "increment" },
+                translation: { name: "T", type: "relation", relation: { kind: "belongsTo", target: () => translations, localKey: "translation_id" } }
+            }
+        };
+        const [problem] = errors([companies, translations, links]);
+        expect(problem?.path).toBe("links.properties.translation");
+        expect(problem?.message).toContain("cannot reference a composite key");
+        expect(problem?.message).toContain("`company_translations`");
+    });
+
+    it("refuses a hasMany out of a composite key unless a `sourceKey` names one column", () => {
+        const notes = { slug: "notes", name: "Notes", properties: { id: { name: "ID", type: "number", isId: "increment" } } };
+        const withNotes = (relation: Record<string, unknown>) => ({
+            ...translations,
+            properties: { ...translations.properties, code: { name: "Code", type: "string", validation: { unique: true } } },
+            relations: [{ kind: "hasMany", relationName: "notes", target: () => notes, foreignKeyOnTarget: "translation_code", ...relation }]
+        });
+        const [problem] = errors([companies, notes, withNotes({})]);
+        expect(problem?.path).toBe("company_translations.relations[notes]");
+        expect(problem?.message).toContain("`sourceKey`");
+        expect(errors([companies, notes, withNotes({ sourceKey: "code" })])).toEqual([]);
+    });
+
+    it("refuses a reference into a composite key", () => {
+        const pointer = {
+            slug: "pointers", name: "Pointers",
+            properties: {
+                id: { name: "ID", type: "number", isId: "increment" },
+                translation: { name: "T", type: "reference", path: "company_translations" }
+            }
+        };
+        const [problem] = errors([companies, translations, pointer]);
+        expect(problem?.path).toBe("pointers.properties.translation");
+        expect(problem?.message).toContain("cannot reference a composite key");
     });
 });
 

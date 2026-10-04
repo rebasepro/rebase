@@ -481,3 +481,97 @@ describe("boot-ensure agrees with db push", () => {
         }, 30_000);
     });
 });
+
+/**
+ * Several `isId` properties are one composite key, and both creators have to
+ * build it as one: `db push` used to write two inline `PRIMARY KEY` clauses,
+ * which Postgres refuses, and boot-ensure created the table with the first key
+ * column alone and never added the second.
+ */
+describe("a composite primary key, applied to a live database", () => {
+    const companies = {
+        slug: "companies", table: "companies", name: "Companies",
+        properties: {
+            id: { type: "number", isId: "increment" },
+            name: { type: "string" }
+        }
+    } as unknown as CollectionConfig;
+
+    // A translation keyed by its parent's id and a locale, where the id is also
+    // the foreign key to the parent.
+    const translations = {
+        slug: "company_translations", table: "company_translations", name: "Company translations",
+        properties: {
+            id: { type: "number", isId: true },
+            locale: { type: "string", isId: true },
+            name: { type: "string" },
+            company: {
+                type: "relation",
+                relation: { kind: "belongsTo", target: () => companies, relationName: "company", localKey: "id" }
+            }
+        }
+    } as unknown as CollectionConfig;
+
+    const collections = [companies, translations];
+
+    /** The key constraint's columns in key order, and which columns are NOT NULL. */
+    const keyOf = async (db: PGlite): Promise<{ key: string[]; notNull: string[] }> => {
+        const key = await db.query<{ column_name: string }>(
+            "SELECT kcu.column_name FROM information_schema.table_constraints tc " +
+            "JOIN information_schema.key_column_usage kcu " +
+            "ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema " +
+            "WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = 'public' " +
+            "AND tc.table_name = 'company_translations' ORDER BY kcu.ordinal_position"
+        );
+        const notNull = await db.query<{ column_name: string }>(
+            "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' " +
+            "AND table_name = 'company_translations' AND is_nullable = 'NO' ORDER BY column_name"
+        );
+        return { key: key.rows.map(r => r.column_name), notNull: notNull.rows.map(r => r.column_name) };
+    };
+
+    /** Two locales of one company are two rows; the same locale twice is one. */
+    const assertKeyHolds = async (db: PGlite): Promise<void> => {
+        await db.exec(
+            "INSERT INTO public.companies (id, name) VALUES (1, 'Acme');" +
+            "INSERT INTO public.company_translations (id, locale, name) VALUES (1, 'de_DE', 'Acme GmbH');" +
+            "INSERT INTO public.company_translations (id, locale, name) VALUES (1, 'en_US', 'Acme Inc.');"
+        );
+        await expect(db.exec(
+            "INSERT INTO public.company_translations (id, locale, name) VALUES (1, 'en_US', 'again')"
+        )).rejects.toThrow(/duplicate key value violates unique constraint "company_translations_pkey"/);
+    };
+
+    const withRlsHelpers = async (db: PGlite): Promise<void> => {
+        await db.exec(
+            "CREATE SCHEMA IF NOT EXISTS rebase;" +
+            "CREATE OR REPLACE FUNCTION rebase.uid() RETURNS text LANGUAGE sql STABLE AS $$ SELECT NULL::text $$;" +
+            "CREATE OR REPLACE FUNCTION rebase.roles() RETURNS text LANGUAGE sql STABLE AS $$ SELECT ''::text $$;"
+        );
+    };
+
+    it("is one key over both columns whichever path created the table", async () => {
+        const pushed = new PGlite();
+        const booted = new PGlite();
+        try {
+            await withRlsHelpers(pushed);
+            await pushed.exec(await generatePostgresDdl(collections));
+
+            await withRlsHelpers(booted);
+            for (const statement of planCollectionSchemaEnsure(collections, emptyDb()).statements) {
+                await booted.exec(statement);
+            }
+
+            const fromPush = await keyOf(pushed);
+            const fromBoot = await keyOf(booted);
+            expect(fromPush).toEqual({ key: ["id", "locale"], notNull: ["id", "locale"] });
+            expect(fromBoot).toEqual(fromPush);
+
+            await assertKeyHolds(pushed);
+            await assertKeyHolds(booted);
+        } finally {
+            await pushed.close();
+            await booted.close();
+        }
+    }, 30_000);
+});

@@ -179,6 +179,29 @@ interface Plans {
 const collectionTableOf = (plan: SchemaPlan | undefined, collection: CollectionConfig): TablePlan | undefined =>
     plan?.tables.find(table => table.kind === "collection" && table.slug === collection.slug);
 
+const keyText = (table: TablePlan): string => `(${table.primaryKey.map(column => `"${column}"`).join(", ")})`;
+
+/**
+ * " The primary key goes from ("id") to ("id", "locale")." — or "" when the
+ * plans do not say, or say the key is unchanged.
+ *
+ * Several `isId` properties are one composite key, so marking or unmarking one
+ * of them moves the whole constraint, not one column's flag; naming the key on
+ * both sides is what tells the reader which constraint the migration replaces.
+ */
+const keyMoveText = (before: TablePlan | undefined, after: TablePlan | undefined): string =>
+    before && after && keyText(before) !== keyText(after)
+        ? ` The primary key goes from ${keyText(before)} to ${keyText(after)}.`
+        : "";
+
+/** The migration that moves a table's primary key from `before`'s to `after`'s. */
+const keyMoveRemedy = (before: TablePlan | undefined, after: TablePlan | undefined): string =>
+    "A primary key change rewrites the table and every foreign key into it. Migration only" +
+    (before && after && keyText(before) !== keyText(after)
+        ? `: ALTER TABLE "${after.schema}"."${after.table}" DROP CONSTRAINT "${after.table}_pkey", ` +
+          `ADD PRIMARY KEY ${keyText(after)} — after checking that no two rows share the new key.`
+        : ".");
+
 /** The resolved relation behind a relation property, when it resolves. */
 const relationOf = (collection: CollectionConfig, propName: string, prop: Property): ResolvedRelation | undefined => {
     if (prop.type !== "relation") return undefined;
@@ -731,13 +754,15 @@ function classifyProperty(
     }
 
     if (isIdProperty(before) !== isIdProperty(after)) {
+        const tableBefore = collectionTableOf(plans?.before, collection);
+        const tableAfter = collectionTableOf(plans?.after, collection);
         changes.push({
             kind: "change-primary-key",
             verdict: "needs-migration",
             collection: slug,
             property: name,
-            detail: `"${name}" changes whether it is the primary key.`,
-            remedy: "A primary key change rewrites the table and every foreign key into it. Migration only."
+            detail: `"${name}" changes whether it is the primary key.${keyMoveText(tableBefore, tableAfter)}`,
+            remedy: keyMoveRemedy(tableBefore, tableAfter)
         });
         return;
     }
@@ -847,6 +872,29 @@ function classifyTable(
     };
     const label = (column: ColumnPlan) => column.source.propName ?? column.column;
 
+    // The key as a whole. A composite key is one constraint over several
+    // columns, so a column joining or leaving it moves that constraint — and the
+    // ensure path declares a primary key only when it creates the table. A
+    // property newly added with `isId` reaches here only: as a new column it
+    // reads as an addition, and applied as one it would leave the key as it was.
+    // Reported once per collection; the property that changed its own `isId`
+    // has already said it.
+    if (keyText(before) !== keyText(after) && !changes.some(c => c.collection === slug && c.kind === "change-primary-key")) {
+        const moved = [
+            ...after.primaryKey.filter(column => !before.primaryKey.includes(column)),
+            ...before.primaryKey.filter(column => !after.primaryKey.includes(column))
+        ];
+        const movedColumn = after.columns.find(c => moved.includes(c.column)) ?? before.columns.find(c => moved.includes(c.column));
+        changes.push({
+            kind: "change-primary-key",
+            verdict: "needs-migration",
+            collection: slug,
+            property: movedColumn?.source.propName,
+            detail: `The primary key of "${after.table}" changes.${keyMoveText(before, after)}`,
+            remedy: keyMoveRemedy(before, after)
+        });
+    }
+
     for (const column of after.columns) {
         const was = before.columns.find(c => c.column === column.column);
         if (!was) continue;
@@ -870,13 +918,16 @@ function classifyTable(
             });
             continue;
         }
-        if (was.primaryKey !== column.primaryKey) {
+        // Membership of the key, not `primaryKey`: that flag marks a key
+        // declared inline on its one column, and a column that stays in the key
+        // as it becomes composite loses the flag without leaving the key.
+        if (before.primaryKey.includes(was.column) !== after.primaryKey.includes(column.column)) {
             push({
                 kind: "change-primary-key",
                 verdict: "needs-migration",
                 property,
-                detail: `${where} changes whether "${column.column}" is the primary key.`,
-                remedy: "A primary key change rewrites the table and every foreign key into it. Migration only."
+                detail: `${where} changes whether "${column.column}" is part of the primary key.${keyMoveText(before, after)}`,
+                remedy: keyMoveRemedy(before, after)
             });
             continue;
         }

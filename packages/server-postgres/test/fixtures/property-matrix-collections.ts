@@ -7,10 +7,10 @@
  * `generated-schema-compiles` and the boot/push parity tests do with this file.
  *
  * Grouped, so that a generator throwing on one group does not hide the others,
- * and so the configurations that are *refused* — an empty enum, a composite
- * primary key, `isId: "cuid"` — can be exercised without poisoning the set the
- * agreement tests walk. Those three are exported on their own and deliberately
- * left out of {@link everything}.
+ * and so the configurations that are *refused* — an empty enum, `isId: "cuid"`,
+ * a foreign key into a composite primary key — can be exercised without
+ * poisoning the set the agreement tests walk. Those are exported on their own
+ * and deliberately left out of {@link everything}.
  */
 import type { CollectionConfig } from "@rebasepro/types";
 
@@ -339,6 +339,8 @@ export const uuidOnly = C({ slug: "uuid_only", table: "uuid_only", name: "x", pr
 export const smallintOnly = C({ slug: "smallint_only", table: "smallint_only", name: "x", properties: { id: { type: "number", isId: "increment" }, small: { type: "number", columnType: "smallint" } } });
 
 // ───────────────────────── J. composite PK ─────────────────────────
+// Several `isId` properties are one key: one `PRIMARY KEY (tenant, code)`
+// constraint on every path, and never an inline key on either column.
 export const composite = C({
     slug: "composite", table: "composite", name: "x",
     properties: {
@@ -346,6 +348,38 @@ export const composite = C({
         code: { type: "number", isId: true },
         v: { type: "string" }
     }
+});
+// The shape composite keys were reported on: a translation keyed by its
+// parent's id and a locale, where the id is also the foreign key to the parent.
+export const companies = C({
+    slug: "companies", table: "companies", name: "x",
+    properties: {
+        id: { type: "number", isId: "increment" },
+        name: { type: "string" }
+    }
+});
+export const companyTranslations = C({
+    slug: "company_translations", table: "company_translations", name: "x",
+    properties: {
+        id: { type: "number", isId: true },
+        locale: { type: "string", isId: true },
+        name: { type: "string" },
+        company: { type: "relation", relationName: "company" }
+    },
+    relations: [
+        { kind: "belongsTo", relationName: "company", target: () => companies, localKey: "id", onDelete: "cascade" }
+    ]
+});
+// Refused: a foreign key is one column, and cannot reference a two-column key.
+export const linkIntoComposite = C({
+    slug: "link_into_composite", table: "link_into_composite", name: "x",
+    properties: {
+        id: { type: "number", isId: "increment" },
+        translation: { type: "relation", relationName: "translation" }
+    },
+    relations: [
+        { kind: "belongsTo", relationName: "translation", target: () => companyTranslations, localKey: "translation_id" }
+    ]
 });
 
 // ───────────────────────── K. custom schema + cross-schema FK ─────────────────────────
@@ -460,6 +494,8 @@ export const groups: Record<string, CollectionConfig[]> = {
     uuidOnly: [uuidOnly],
     smallintOnly: [smallintOnly],
     appSchema: [appSchema, uuidTarget],
+    composite: [composite],
+    translations: [companies, companyTranslations],
     indexed: [indexed],
     searched: [searched],
     tenanted: [tenantOrgs, claimTenanted, memberships, membershipTenanted]
@@ -470,7 +506,7 @@ export const groups: Record<string, CollectionConfig[]> = {
  *
  * The refused configurations are not here — they have no correct column for the
  * emitters to agree about. Each is exported on its own above:
- * {@link emptyEnum}, {@link emptyEnumNumber}, {@link composite}, {@link strIdCuid}.
+ * {@link emptyEnum}, {@link emptyEnumNumber}, {@link strIdCuid}, {@link linkIntoComposite}.
  */
 export const everything: CollectionConfig[] = Array.from(new Set(Object.values(groups).flat()));
 
@@ -478,6 +514,6 @@ export const everything: CollectionConfig[] = Array.from(new Set(Object.values(g
 export const refused: { collection: CollectionConfig; because: RegExp }[] = [
     { collection: emptyEnum, because: /empty `enum`/ },
     { collection: emptyEnumNumber, because: /empty `enum`/ },
-    { collection: composite, because: /Composite primary keys/ },
-    { collection: strIdCuid, because: /cuid/ }
+    { collection: strIdCuid, because: /cuid/ },
+    { collection: linkIntoComposite, because: /cannot reference a composite key/ }
 ];

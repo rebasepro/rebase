@@ -80,7 +80,7 @@ describe("what an Edit source only leaves behind", () => {
     it("is not offered for a proposal the planner refuses — the project would not start", () => {
         const changes = classifyCollectionChanges(
             [products({ code: str() })],
-            [products({ code: str({ isId: true }) })]
+            [products({ code: str({ enum: [] }) })]
         ).changes.filter(c => c.kind === "invalid-collection");
         expect(changes).toHaveLength(1);
         expect(changes[0].sourceOnly).toBeUndefined();

@@ -422,6 +422,40 @@ describe("the three emitters agree, column by column", () => {
         expect(junctionPlan.primaryKey).toEqual(["org_id", "person_id"]);
     });
 
+    it("on a composite primary key: one constraint over every `isId` column, and no inline key", () => {
+        // Two `isId` properties used to be two inline keys down every path —
+        // `.primaryKey()` twice, `PRIMARY KEY` twice in one CREATE TABLE, and a
+        // boot-ensure table created with the first column only.
+        const plan = planSchema(everything).tables.find(t => t.table === "company_translations")!;
+        expect(plan.primaryKey).toEqual(["id", "locale"]);
+
+        // db push: the constraint, and both columns NOT NULL rather than keys.
+        const createTable = ddl.match(/CREATE TABLE "public"\."company_translations" \(\n[\s\S]*?\n\);/)![0];
+        expect(createTable).toContain('  PRIMARY KEY ("id", "locale")');
+        expect(createTable.match(/PRIMARY KEY/g)).toHaveLength(1);
+        expect(ddlColumns(ddl).get("public.company_translations")!.get("id")).toMatchObject({ primaryKey: false, nullable: false });
+        expect(ddlColumns(ddl).get("public.company_translations")!.get("locale")).toMatchObject({ primaryKey: false, nullable: false });
+        // The key column is also the foreign key to the parent.
+        expect(foreignKeys(ddl).get("public.company_translations.id")).toBe("public.companies.id ON DELETE CASCADE");
+
+        // Boot-ensure: every key column arrives with the table, under the same
+        // constraint, and none of them is added a second time afterwards.
+        const create = ensure.actions.find(a => a.kind === "create-table" && a.target === "public.company_translations")!;
+        expect(create.sql).toBe(
+            'CREATE TABLE IF NOT EXISTS "public"."company_translations" ' +
+            '("id" INTEGER NOT NULL, "locale" TEXT NOT NULL, PRIMARY KEY ("id", "locale"));'
+        );
+        expect(ensure.actions.filter(a => a.kind === "add-column" && /company_translations\.(id|locale)$/.test(a.target))).toEqual([]);
+
+        // Drizzle: the table extra, keyed by field, and `.notNull()` on the columns.
+        expect(drizzle).toContain("primaryKey({ columns: [table.id, table.locale] }),");
+        const columns = drizzleColumnLines(drizzle).get(plan.varName)!;
+        expect(columns.get("id")).not.toContain(".primaryKey()");
+        expect(columns.get("id")).toContain(".notNull()");
+        expect(columns.get("locale")).not.toContain(".primaryKey()");
+        expect(columns.get("locale")).toContain(".notNull()");
+    });
+
     it("on which Postgres enum types exist", () => {
         // A `number` enum creates no type on any path: its column is NUMERIC or
         // INTEGER, so the type was referenced by nothing and only gave

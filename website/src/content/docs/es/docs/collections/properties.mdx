@@ -1,5 +1,5 @@
 ---
-sourceHash: 44fb75634f794993
+sourceHash: d79634002cc11c26
 title: Propiedades
 sidebar_label: Propiedades
 description: Los tipos de propiedades definen el tipo de dato, la validación y el renderizado de la interfaz de usuario para cada campo en una colección. Rebase admite los tipos string, number, boolean, date, array, map, reference, relation y geopoint.
@@ -270,8 +270,8 @@ Sin un usuario activo —una petición anónima, un token de servicio, un script
 
 No hay clave foránea. El uid es una cadena de texto, el almacén de usuarios puede ser una base de datos completamente distinta y un usuario eliminado no debe llevarse consigo el registro de auditoría — declare una [relación](/docs/collections/relations) si desea realizar el join.
 
-:::note[Una clave primaria por colección]
-`isId` solo puede ser reclamado por una única propiedad. Una segunda será rechazada al cargar la configuración en lugar de ignorarse silenciosamente: las claves primarias compuestas no son compatibles, y una configuración que declare dos debe interpretarse como una solicitud de algo que Rebase no puede construir. Si lo que deseaba era una restricción de unicidad en varias columnas, eso corresponde a un [índice](/docs/backend/indexes) único.
+:::note[Claves primarias compuestas]
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Si marca varias propiedades con `isId`, forman una clave compuesta: la tabla recibe una única restricción `PRIMARY KEY (a, b)`, y una fila se direcciona con todos sus valores de clave en el orden de declaración, unidos con `:::` — `company_translation/1:::en_US`. Dé a cada columna de la clave la estrategia que le corresponde: `isId: true` para un valor que aporta quien llama, que son la mayoría de las columnas de una clave compuesta, y nunca `"increment"` en una clave foránea ni en una columna de texto. Una clave foránea es una sola columna y no puede apuntar a una clave compuesta, por lo que una relación o referencia *hacia* una colección así se rechaza al generar el esquema. Si lo que deseaba era una restricción de unicidad en varias columnas y no la identidad de la fila, eso corresponde a un [índice](/docs/backend/indexes) único. En 0.23, un segundo `isId` se rechaza al cargar la configuración.
 
 <span class="since-badge" data-since="0.24">Desde 0.24</span> Una colección en la que ninguna propiedad reclama `isId` recibe una columna
 `id` propia: `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. La base de

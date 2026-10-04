@@ -126,6 +126,44 @@ export interface SchemaMetadata {
     rowCounts: Record<string, number>;
 }
 
+/**
+ * Why a table keyed on several columns is not generated as a collection, or
+ * `undefined` when it is.
+ *
+ * Several `isId` properties are one composite key, and the planner builds that
+ * table under the same `PRIMARY KEY (a, b)` — so such a table round-trips when
+ * two things hold:
+ *
+ * - **Every key column can carry `isId`,** which exists on string and number
+ *   properties only. Read from the column's SQL type, not a data sample: a
+ *   `line_no` holding only 1s is not a boolean. A key with a column of another
+ *   type — pagila's `payment` is keyed on a timestamp too — can be marked on
+ *   some of its columns only, and those would be read as the whole key.
+ * - **Nothing points at it.** A foreign key into it, or a junction, is a link
+ *   into a composite key, which the planner refuses: the relation has one
+ *   column to point with.
+ */
+export function compositeKeySkipReason(meta: TableMeta, allFks: ForeignKeyRow[]): string | undefined {
+    if (meta.pks.length < 2) return undefined;
+    const unmarkable = meta.pks.filter(pk => {
+        const column = meta.columns.find(c => c.column_name === pk);
+        const type = column ? mapPgType(column.data_type) : undefined;
+        return type !== "string" && type !== "number";
+    });
+    if (unmarkable.length > 0) {
+        return `its key column${unmarkable.length > 1 ? "s" : ""} ${unmarkable.map(c => `"${c}"`).join(", ")} ` +
+            `cannot carry \`isId\`, which a string or number property takes`;
+    }
+    const referencing = [...new Set(allFks
+        .filter(fk => fk.foreign_table_name === meta.name && fk.table_name !== meta.name)
+        .map(fk => fk.table_name))];
+    if (referencing.length > 0) {
+        return `${referencing.map(t => `"${t}"`).join(", ")} point${referencing.length > 1 ? "" : "s"} at it, ` +
+            "and a link cannot point at a composite key";
+    }
+    return undefined;
+}
+
 export interface TableMeta {
     name: string;
     columns: TableColumn[];
@@ -851,6 +889,37 @@ export function generateCollectionFile(
     // Detect composite primary keys
     const isCompositePk = meta.pks.length > 1;
 
+    /**
+     * The property type a column is generated as, with what the data sample
+     * adds to it. A column of a composite key keeps its SQL type's reading:
+     * it carries `isId`, which only a string or number property takes, and a
+     * key column holding only 1s and 0s is still a key, not a boolean.
+     */
+    const propertyTypeOf = (col: TableColumn): { propType: string; finalPropType: string; inferenceExtra: string } => {
+        const isEnumColumn = col.data_type === "USER-DEFINED" && enumMap.get(col.udt_name) !== undefined;
+        const propType = isEnumColumn ? "string" : (col.udt_name === "vector" ? "vector" : mapPgType(col.data_type));
+        if (isEnumColumn || !sampleData || sampleData.length === 0 || (isCompositePk && meta.pks.includes(col.column_name))) {
+            return { propType, finalPropType: propType, inferenceExtra: "" };
+        }
+        const values = sampleData.map(r => r[col.column_name]);
+        const inferred = inferPropertyFromData(col.column_name, col.data_type, propType, values, meta.pks.includes(col.column_name), emitAdmin);
+        return { propType, finalPropType: inferred.propType || propType, inferenceExtra: inferred.extra || "" };
+    };
+
+    // A composite key is marked on every one of its columns or on none of them:
+    // marked on some, the marked columns would be read as the whole key and
+    // address the wrong rows. `isId` exists on string and number properties
+    // only, so a key with a column of another type — pagila's `payment` is keyed
+    // on a timestamp as well — stays unmarked; `rebase schema introspect` does
+    // not generate that table at all (`compositeKeySkipReason`), since the
+    // planner would key it on an implicit `id` instead.
+    const compositeKeyMarkable = isCompositePk && meta.pks.every(pk => {
+        const keyColumn = meta.columns.find(c => c.column_name === pk);
+        if (!keyColumn) return false;
+        const { finalPropType } = propertyTypeOf(keyColumn);
+        return finalPropType === "string" || finalPropType === "number";
+    });
+
     // Map columns
     for (const col of meta.columns) {
         // A Rebase search column is the collection's `search` block, not a
@@ -886,23 +955,13 @@ export function generateCollectionFile(
         // Check if this column uses a PostgreSQL enum type
         const colEnumValues = enumMap.get(col.udt_name);
         const isEnumColumn = col.data_type === "USER-DEFINED" && colEnumValues !== undefined;
-        const isVectorColumn = col.udt_name === "vector";
 
-        const propType = isEnumColumn ? "string" : (isVectorColumn ? "vector" : mapPgType(col.data_type));
         let extra = "";
 
         const colNameLower = col.column_name.toLowerCase();
 
         // ── Data Inference Engine ────────────────────────────────────────────
-        let finalPropType = propType;
-        let inferenceExtra = "";
-
-        if (!isEnumColumn && sampleData && sampleData.length > 0) {
-            const values = sampleData.map(r => r[col.column_name]);
-            const inferred = inferPropertyFromData(col.column_name, col.data_type, propType, values, meta.pks.includes(col.column_name), emitAdmin);
-            if (inferred.propType) finalPropType = inferred.propType;
-            if (inferred.extra) inferenceExtra = inferred.extra;
-        }
+        const { propType, finalPropType, inferenceExtra } = propertyTypeOf(col);
 
         const columnChecks = tableChecks?.get(col.column_name);
 
@@ -1087,7 +1146,22 @@ export function generateCollectionFile(
         // Identify IDs (unless already inferred as UUID/CUID by inferenceEngine)
         if (meta.pks.includes(col.column_name)) {
             if (isCompositePk) {
+                // Every column of the key is marked, so the collection addresses
+                // a row by all of them (`1:::en_US`) on the server and in the
+                // admin alike, and the planner builds one `PRIMARY KEY (a, b)`.
                 extra += `\n            // Part of composite primary key (${commentText(meta.pks.join(", "))})`;
+                if (compositeKeyMarkable && !inferenceExtra.includes("isId:")) {
+                    // The same reading a single key gets — the strategy the
+                    // column has (`"manual"` for a value the caller supplies,
+                    // which is most composite keys) and the storage the planner
+                    // needs to build it as it is — so a push plans no change.
+                    const stored = primaryKeyStorage(col, finalPropType);
+                    for (const key of stored.keys) {
+                        const name = key.slice(0, key.indexOf(":"));
+                        if (!hasGeneratedKey(extra, name)) extra += `\n            ${key},`;
+                    }
+                    if (stored.note) fileNotes.push(stored.note);
+                }
             } else if (!inferenceExtra.includes("isId:")) {
                 // The strategy the column actually has. `"increment"` is an
                 // INTEGER identity and nothing else; a serial key is `SERIAL`,

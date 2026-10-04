@@ -3860,6 +3860,20 @@ yet, listed so that nobody reads a promise into them:
   OAuth. `verifyCredential` gives an app's own socket or tunnel the same
   answer for a session token or a key: who it acts as and its scopes.
 
+- **Composite primary keys.** Mark several properties `isId` and they form
+  one key: `rebase db push`, the schema check at boot and the generated
+  Drizzle file all write one `PRIMARY KEY (a, b)`, and reads, writes, nested
+  paths and `via` relations address a row by every key column
+  (`company_translation/1:::en_US`). 0.23 refused a second `isId` when the
+  config loaded. A relation or reference *into* such a collection is still
+  refused, by the schema generators and at boot, because a foreign key is one
+  column; reach those rows with a `via` relation. `rebase schema introspect`
+  now generates a table keyed on several columns, with `isId` on each key
+  column. It still skips the table when a key column cannot carry `isId` or
+  another table points at it. The live schema editor treats re-keying an
+  existing collection as a migration and names the new key. `rebase doctor`
+  and the boot warning tell you to mark every key column.
+
 ##### CI & tooling
 
 - **`pnpm check:tsconfig-entries`** fails a tsconfig `include`/`paths`/
@@ -15613,12 +15627,18 @@ There is no foreign key. The uid is a string, the user store may be another
 database entirely, and a deleted user must not take the audit trail with them —
 declare a [relation](/docs/collections/relations) if you want the join.
 
-:::note[One primary key per collection]
-`isId` may be claimed by exactly one property. A second is refused at config
-load rather than silently ignored: composite primary keys are not supported, and
-a config declaring two has to be read as asking for one Rebase cannot build. If
-what you wanted was a uniqueness constraint over several columns, that is a
-unique [index](/docs/backend/indexes).
+:::note[Composite primary keys]
+<span class="since-badge" data-since="0.24">Since 0.24</span> Mark several properties `isId` and they are one composite key: the table gets a
+single `PRIMARY KEY (a, b)` constraint, and a row is addressed by all of its key
+values in declaration order, joined with `:::` — `company_translation/1:::en_US`.
+Give each key column the strategy that fits it: `isId: true` for a value the
+caller supplies, which is every column of most composite keys, and never
+`"increment"` on a foreign key or a string column. A foreign key is one column and
+cannot point at a composite key, so a relation or reference *into* such a
+collection is refused when the schema is generated. If what you wanted was a
+uniqueness constraint over several columns rather than the row's identity, that
+is a unique [index](/docs/backend/indexes). On 0.23 a second `isId` is refused at
+config load.
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> A collection where no property claims `isId` gets an `id` column of its own:
 `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. The database fills it, so a
@@ -41131,7 +41151,7 @@ rebase schema introspect
 
 This is useful when adopting Rebase on an existing database — introspect first, then customize the generated collections.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> **Introspect, then push, changes nothing.** The generated properties say exactly what each column is — `columnType`, `precision`/`scale`, `defaultValue`, `required`, a key's `isId` (`"increment"` for an integer identity, `columnType: "serial"` for a serial, `"manual"` for a key with no default), a relation's `onDelete`, and a collection's `search` block read back from the column it built — so `rebase db push --dry-run` right after an introspection plans no changes. Where no property can state a column — a `timestamp` without time zone, an `interval`, an `inet`, an enum type not named `<table>_<column>`, a default like `CURRENT_DATE` — introspection says so, per column, on the terminal and at the top of the file, with what a push would do to it and, when there is one, the statement that makes the two agree (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). A table keyed on more than one column is left out with its reason: a collection reads a row by one key column, and `db push` leaves a table that is not a collection alone. On 0.23 the push right after an introspection can still plan type changes, dropped defaults and NOT NULLs, and a phantom `id` key.
+<span class="since-badge" data-since="0.24">Since 0.24</span> **Introspect, then push, changes nothing.** The generated properties say exactly what each column is — `columnType`, `precision`/`scale`, `defaultValue`, `required`, a key's `isId` (`"increment"` for an integer identity, `columnType: "serial"` for a serial, `"manual"` for a key with no default), a relation's `onDelete`, and a collection's `search` block read back from the column it built — so `rebase db push --dry-run` right after an introspection plans no changes. Where no property can state a column — a `timestamp` without time zone, an `interval`, an `inet`, an enum type not named `<table>_<column>`, a default like `CURRENT_DATE` — introspection says so, per column, on the terminal and at the top of the file, with what a push would do to it and, when there is one, the statement that makes the two agree (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). A table keyed on more than one column comes back as one composite key, every key column carrying its `isId`. It is left out, with the reason, when a key column cannot carry `isId` (a timestamp, say) or another table's foreign key points at it, which a single-column relation cannot do; `db push` leaves a table that is not a collection alone. On 0.23 the push right after an introspection can still plan type changes, dropped defaults and NOT NULLs, and a phantom `id` key.
 
 **What the generated files look like**
 

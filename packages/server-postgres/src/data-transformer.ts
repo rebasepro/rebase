@@ -1,13 +1,12 @@
-import { eq, SQL } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig, Properties, Property, ResolvedRelation, RelationProperty, Vector, BinaryProperty, hasForeignKeyOnTarget, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, type ResolvedVia } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { isPrototypePollutingKey } from "@rebasepro/utils";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
-import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
-import { getPrimaryKeys, buildCompositeId } from "./services/collection-helpers";
-import { applyDynamicJoin } from "./services/RelationService";
+import { getPrimaryKeys, buildCompositeId, rowIdentityCondition } from "./services/collection-helpers";
+import { applyDynamicJoin, joinStepCondition } from "./services/RelationService";
 import { ApiError, logger } from "@rebasepro/server";
 
 /**
@@ -509,53 +508,25 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                                     break;
                                 }
 
-                                // Parse the join condition - handle both string and array formats
-                                const fromColumn = Array.isArray(join.on.from) ? join.on.from[0] : join.on.from;
-                                const toColumn = Array.isArray(join.on.to) ? join.on.to[0] : join.on.to;
-
-                                const fromParts = fromColumn.split(".");
-                                const toParts = toColumn.split(".");
-
-                                const fromColName = fromParts[fromParts.length - 1];
-                                const toColName = toParts[toParts.length - 1];
-
-                                const fromCol = currentTable[fromColName as keyof typeof currentTable] as AnyPgColumn;
-                                const toCol = joinTable[toColName as keyof typeof joinTable] as AnyPgColumn;
-
-                                if (!fromCol || !toCol) {
-                                    logger.warn(`Join columns not found: ${fromColumn} -> ${toColumn}`);
+                                // Every column pair of the step, for a step that joins on a tuple.
+                                const step = joinStepCondition(currentTable, joinTable, join);
+                                if ("missing" in step) {
+                                    logger.warn(`Join columns not found: ${step.missing}`);
                                     break;
                                 }
 
-                                query = applyDynamicJoin(query, joinTable, eq(fromCol, toCol));
+                                query = applyDynamicJoin(query, joinTable, step.condition);
                                 currentTable = joinTable;
                             }
 
-                            // Add where condition for the current row
-                            if (pks.length === 1) {
-                                const sourceIdField = sourceTable[pks[0].fieldName as keyof typeof sourceTable] as AnyPgColumn;
-                                query = query.where(eq(sourceIdField, currentId)) as typeof query;
-                            } else {
-                                // For composite keys, we would need to map the split parts. For now log a warning.
-                                logger.warn(`Join path resolution for composite primary keys is not yet fully supported: ${collection.slug}`);
-                            }
-
-                            // Build additional conditions array
-                            const additionalFilters: SQL[] = [];
-
-                            // Combine parent condition with additional filters using AND
-                            let combinedWhere: SQL | undefined;
-
-                            if (pks.length === 1) {
-                                const sourceIdField = sourceTable[pks[0].fieldName as keyof typeof sourceTable] as AnyPgColumn;
-                                combinedWhere = DrizzleConditionBuilder.combineConditionsWithAnd([
-                                    eq(sourceIdField, currentId),
-                                    ...additionalFilters
-                                ].filter(Boolean) as SQL[]);
-                            }
+                            // The current row, by every key column. Without a
+                            // condition on each of them the join reads the
+                            // related rows of every row sharing the first one —
+                            // or, with none at all, of the whole table.
+                            const currentRow = rowIdentityCondition(sourceTable, pks, currentId, collection.slug);
 
                             // Execute the query
-                            const joinResults = await query.where(combinedWhere).limit(relation.cardinality === "one" ? 1 : 100);
+                            const joinResults = await query.where(currentRow).limit(relation.cardinality === "one" ? 1 : 100);
 
                             if (joinResults.length > 0) {
                                 const targetPks = getPrimaryKeys(targetCollection, registry!);

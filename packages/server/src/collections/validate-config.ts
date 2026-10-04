@@ -1,7 +1,7 @@
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS, parseEnvBoolean } from "@rebasepro/types";
 import type { AnyCollectionConfig, CollectionConfig, PolicyExpression, PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property, SecurityRule } from "@rebasepro/types";
 
-import { getEffectiveSecurityRules, getTableName, isRelationalCollection, securityRuleToConditions } from "@rebasepro/common";
+import { getEffectiveSecurityRules, getTableName, isRelationalCollection, resolveCollectionRelations, securityRuleToConditions } from "@rebasepro/common";
 import type { DataSourceResolvable } from "@rebasepro/common";
 import { suggestNearMiss } from "@rebasepro/utils";
 
@@ -1313,15 +1313,12 @@ function checkTenant(
 /**
  * The primary key, against what a SQL store can actually be given.
  *
- * Three claims a collection can make that no generator can honour, each of
- * which used to be discovered somewhere worse:
+ * Several `isId` properties are not a problem: they are one composite primary
+ * key, which every schema emitter writes as a single `PRIMARY KEY (a, b)`
+ * constraint and every read and write addresses by all of its columns (the
+ * address is `a:::b`). This checks the two strategies no generator honours as
+ * written, each of which used to be discovered somewhere worse:
  *
- * - **Two `isId` properties.** Rebase does not model a composite primary key,
- *   and the three emitters each invented a different wrong answer: two
- *   `.primaryKey()` columns in the generated Drizzle file, two inline
- *   `PRIMARY KEY` clauses in one `CREATE TABLE` (which Postgres refuses), and a
- *   boot-time ensure that created the table with the *first* id and silently
- *   never added the second column at all.
  * - **`isId: "cuid"`.** It has always emitted `DEFAULT cuid()` against a
  *   function Rebase has never created — not by a generator, not at boot, not in
  *   a migration — so the column has never had a working default on Postgres and
@@ -1347,17 +1344,6 @@ function checkPrimaryKeyStrategy(
         .filter(([, property]) => isPlainObject(property) && Boolean(property.isId))
         .map(([key, property]) => [key, property as Record<string, unknown>] as const);
 
-    if (ids.length > 1) {
-        collect.error(
-            `${at}.properties`,
-            `${ids.length} properties are marked \`isId\` (${ids.map(([key]) => `\`${key}\``).join(", ")}), ` +
-            "and composite primary keys are not supported: the generated table would carry two PRIMARY KEY " +
-            "clauses, which Postgres refuses, and the boot-time schema ensure would create the table without " +
-            "the second column. Give exactly one property `isId`, and express the second key with " +
-            "`indexes: [{ on: [...], unique: true, reason: \"…\" }]`."
-        );
-    }
-
     for (const [key, property] of ids) {
         if (property.isId === "cuid") {
             collect.error(
@@ -1376,6 +1362,97 @@ function checkPrimaryKeyStrategy(
                 "foreign key and junction column that points at a numeric primary key is INTEGER — a wider " +
                 "key would be referenced by narrower columns. Remove the `columnType`."
             );
+        }
+    }
+}
+
+/** How many properties a collection marks `isId`: more than one is a composite key. */
+function keyColumnCount(collection: unknown): number {
+    if (!isPlainObject(collection) || !isPlainObject(collection.properties)) return 0;
+    return Object.values(collection.properties).filter(property => isPlainObject(property) && Boolean(property.isId)).length;
+}
+
+/**
+ * A one-column link into a composite primary key.
+ *
+ * Several `isId` properties are one composite key, which every schema emitter
+ * builds. What none can build is a foreign key into one: a `belongsTo`'s
+ * `localKey`, a junction column and a `reference` column are each one column,
+ * and Postgres refuses `REFERENCES t (a)` when `a` alone is not unique — so the
+ * generators refuse the link, and a lookup on `a` would match every row sharing
+ * it. A `hasOne`/`hasMany` out of a composite-keyed collection points its
+ * target's foreign key at that key the same way, unless `sourceKey` names one
+ * column to point at; boot refuses those. `via` names every column it compares.
+ *
+ * Refused here too, so the config names the link before a push or a boot does.
+ */
+function checkLinksIntoCompositeKeys(collections: readonly unknown[], collect: ProblemCollector): void {
+    const relational = collections.filter((collection): collection is Record<string, unknown> =>
+        isPlainObject(collection) && isRelationalCollection(dataSourceOf(collection)));
+    const bySlugOrTable = (name: string): Record<string, unknown> | undefined =>
+        relational.find(c => c.slug === name || getTableName(asCollectionConfig(c)) === name);
+    const keyed = (collection: unknown): string =>
+        isPlainObject(collection) && typeof collection.slug === "string" ? `\`${collection.slug}\`` : "its target";
+    const refuse = (path: string, link: string, target: unknown, fix: string) => collect.error(
+        path,
+        `${link} is one column, and ${keyed(target)} is keyed on ${keyColumnCount(target)} \`isId\` properties ` +
+        `together — one column cannot reference a composite key. ${fix}`
+    );
+    const viaFix = "or express the link as `kind: \"via\"`, whose `joinPath` compares every key column.";
+
+    for (const collection of relational) {
+        const at = typeof collection.slug === "string" && collection.slug ? collection.slug : "collection";
+        const pathOf = (key: string) => isPlainObject(collection.properties) && key in collection.properties
+            ? `${at}.properties.${key}`
+            : `${at}.relations[${key}]`;
+
+        let relations: ReturnType<typeof resolveCollectionRelations>;
+        try {
+            relations = resolveCollectionRelations(asCollectionConfig(collection));
+        } catch {
+            // A relation that does not resolve has its own message elsewhere.
+            continue;
+        }
+        for (const [key, relation] of Object.entries(relations)) {
+            let target: unknown;
+            try {
+                target = relation.target();
+            } catch {
+                continue;
+            }
+            switch (relation.kind) {
+                case "belongsTo":
+                    if (keyColumnCount(target) > 1) {
+                        refuse(pathOf(key), `\`localKey: "${relation.localKey}"\``, target,
+                            `Point the relation at a collection with a single-column key, ${viaFix}`);
+                    }
+                    break;
+                case "hasOne":
+                case "hasMany":
+                    if (!relation.sourceKey && keyColumnCount(collection) > 1) {
+                        refuse(pathOf(key), `\`foreignKeyOnTarget: "${relation.foreignKeyOnTarget}"\``, collection,
+                            `Give the relation a \`sourceKey\` naming a single unique column of \`${at}\` to point at, ${viaFix}`);
+                    }
+                    break;
+                case "manyToMany":
+                    if (keyColumnCount(collection) > 1 || keyColumnCount(target) > 1) {
+                        refuse(pathOf(key), "A junction column", keyColumnCount(collection) > 1 ? collection : target,
+                            `A junction column points at a single-column key; ${viaFix}`);
+                    }
+                    break;
+                case "via":
+                    break;
+            }
+        }
+
+        if (!isPlainObject(collection.properties)) continue;
+        for (const [key, property] of Object.entries(collection.properties)) {
+            if (!isPlainObject(property) || property.type !== "reference" || typeof property.path !== "string") continue;
+            const target = bySlugOrTable(property.path);
+            if (keyColumnCount(target) > 1) {
+                refuse(`${at}.properties.${key}`, `The reference \`${key}\``, target,
+                    "Point it at a collection with a single-column key.");
+            }
         }
     }
 }
@@ -1556,6 +1633,7 @@ export function findCollectionConfigProblems(
     const collect = new ProblemCollector(options.unknownKeys ?? unknownKeyPolicyFromEnv());
     collections.forEach((collection, index) => checkCollection(collection, index, collect));
     checkCollectionsTogether(collections, options.sources, collect);
+    checkLinksIntoCompositeKeys(collections, collect);
     checkTenantMemberships(collections, collect);
     return collect.problems;
 }

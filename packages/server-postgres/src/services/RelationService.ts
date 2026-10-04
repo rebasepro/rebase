@@ -13,6 +13,8 @@ import {
     parseIdValues,
     buildCompositeId,
     joinsOnNaturalKey,
+    rowIdentityCondition,
+    primaryKeyColumns,
     sourceKeyField,
     type PrimaryKeyInfo
 } from "./collection-helpers";
@@ -73,6 +75,33 @@ function relationTargetIds(value: unknown, relationName: string, collectionSlug:
  */
 export function applyDynamicJoin<T>(query: T, joinTable: PgTable, condition: SQL): T {
     return (query as unknown as { innerJoin(t: PgTable, c: SQL): T }).innerJoin(joinTable, condition) as T;
+}
+
+/**
+ * The ON condition of one `joinPath` step: every `from` column equal to its
+ * `to` column, or `undefined` naming the first column either table lacks.
+ *
+ * `on.from`/`on.to` are a column or a tuple, and a tuple is how a step joins on
+ * a composite key. Comparing the first pair alone joined each row to every row
+ * sharing that column — every locale of a translation, not the one addressed.
+ */
+export function joinStepCondition(
+    currentTable: PgTable,
+    joinTable: PgTable,
+    step: { on: { from: string | string[]; to: string | string[] } }
+): { condition: SQL } | { missing: string } {
+    const from = Array.isArray(step.on.from) ? step.on.from : [step.on.from];
+    const to = Array.isArray(step.on.to) ? step.on.to : [step.on.to];
+    const pairs: SQL[] = [];
+    for (let i = 0; i < Math.max(from.length, to.length); i++) {
+        const fromColumn = from[i] ?? "(none)";
+        const toColumn = to[i] ?? "(none)";
+        const fromCol = currentTable[fromColumn.split(".").pop()! as keyof typeof currentTable] as AnyPgColumn | undefined;
+        const toCol = joinTable[toColumn.split(".").pop()! as keyof typeof joinTable] as AnyPgColumn | undefined;
+        if (!fromCol || !toCol) return { missing: `${fromColumn} -> ${toColumn}` };
+        pairs.push(eq(fromCol, toCol));
+    }
+    return { condition: pairs.length === 1 ? pairs[0] : and(...pairs)! };
 }
 
 /**
@@ -559,32 +588,23 @@ export class RelationService {
                     throw new Error(`Join table not found: ${join.table}`);
                 }
 
-                const fromColumn = Array.isArray(join.on.from) ? join.on.from[0] : join.on.from;
-                const toColumn = Array.isArray(join.on.to) ? join.on.to[0] : join.on.to;
-
-                const fromParts = fromColumn.split(".");
-                const toParts = toColumn.split(".");
-
-                const fromColName = fromParts[fromParts.length - 1];
-                const toColName = toParts[toParts.length - 1];
-
-                const fromCol = currentTable[fromColName as keyof typeof currentTable] as AnyPgColumn;
-                const toCol = joinTable[toColName as keyof typeof joinTable] as AnyPgColumn;
-
-                if (!fromCol || !toCol) {
-                    throw new Error(`Join columns not found: ${fromColumn} -> ${toColumn}`);
+                const step = joinStepCondition(currentTable, joinTable, join);
+                if ("missing" in step) {
+                    throw new Error(`Join columns not found: ${step.missing}`);
                 }
 
-                query = applyDynamicJoin(query, joinTable, eq(fromCol, toCol));
+                query = applyDynamicJoin(query, joinTable, step.condition);
                 currentTable = joinTable;
             }
 
-            // Add where condition for the parent row, and the target's own
-            // soft delete beside its scope — the other branch below carries
-            // both, and a join path is only another way to reach the same rows.
-            const parentIdField = parentTable[requirePrimaryKeys(parentCollection, this.registry)[0].fieldName as keyof typeof parentTable] as AnyPgColumn;
+            // The parent row by every key column — the join starts at the
+            // parent's own table, so a condition on the first column alone
+            // reads the related rows of every parent that shares it — and the
+            // target's own soft delete beside its scope: the other branch below
+            // carries both, and a join path is only another way to reach the
+            // same rows.
             query = query.where(narrowed(
-                eq(parentIdField, parsedParentId),
+                rowIdentityCondition(parentTable, parentPks, parentId, parentCollection.slug),
                 andSoftDelete(relatedNarrowing, targetCollection, targetTable)
             ));
 
@@ -775,6 +795,29 @@ export class RelationService {
         // Start count with distinct to avoid duplicates from junction tables
         let query = this.db.select({ count: sql<number>`count(distinct ${targetIdField})` }).from(targetTable).$dynamic();
 
+        // A `via` from a parent keyed on several columns is counted through
+        // the scope condition a nested listing filters by. The join-path count
+        // below joins each step on its first column pair and matches the parent
+        // on its first key column, so it counts the rows every parent sharing
+        // that column reaches — and `isRelated` would authorise a write through
+        // `1:::en_US` to a row only `1:::de_DE` reaches.
+        if (relation.kind === "via" && parentPks.length > 1) {
+            const scope = DrizzleConditionBuilder.buildRelationScopeCondition(
+                relation,
+                () => ({
+                    table: parentTable,
+                    key: primaryKeyColumns(parentTable, parentPks, parentCollection.slug)
+                        .map((column, i) => ({ column, value: parsedParentIdObj[parentPks[i].fieldName] }))
+                }),
+                parentId,
+                targetTable,
+                targetIdField,
+                this.registry
+            );
+            const result = await query.where(and(scope, ...additionalFilters));
+            return Number(result[0]?.count || 0);
+        }
+
         // Use unified count query builder from DrizzleConditionBuilder
         query = DrizzleConditionBuilder.buildRelationCountQuery(
             query,
@@ -879,23 +922,12 @@ export class RelationService {
                     throw new Error(`Join table not found: ${join.table}`);
                 }
 
-                const fromColumn = Array.isArray(join.on.from) ? join.on.from[0] : join.on.from;
-                const toColumn = Array.isArray(join.on.to) ? join.on.to[0] : join.on.to;
-
-                const fromParts = fromColumn.split(".");
-                const toParts = toColumn.split(".");
-
-                const fromColName = fromParts[fromParts.length - 1];
-                const toColName = toParts[toParts.length - 1];
-
-                const fromCol = currentTable[fromColName as keyof typeof currentTable] as AnyPgColumn;
-                const toCol = joinTable[toColName as keyof typeof joinTable] as AnyPgColumn;
-
-                if (!fromCol || !toCol) {
-                    throw new Error(`Join columns not found: ${fromColumn} -> ${toColumn}`);
+                const step = joinStepCondition(currentTable, joinTable, join);
+                if ("missing" in step) {
+                    throw new Error(`Join columns not found: ${step.missing}`);
                 }
 
-                query = applyDynamicJoin(query, joinTable, eq(fromCol, toCol));
+                query = applyDynamicJoin(query, joinTable, step.condition);
                 currentTable = joinTable;
             }
 
@@ -1116,16 +1148,10 @@ export class RelationService {
                 const joinTable = this.registry.getTable(join.table);
                 if (!joinTable) throw new Error(`Join table not found: ${join.table}`);
 
-                const fromColumn = Array.isArray(join.on.from) ? join.on.from[0] : join.on.from;
-                const toColumn = Array.isArray(join.on.to) ? join.on.to[0] : join.on.to;
-                const fromColName = fromColumn.split(".").pop()!;
-                const toColName = toColumn.split(".").pop()!;
+                const step = joinStepCondition(currentTable, joinTable, join);
+                if ("missing" in step) throw new Error(`Join columns not found: ${step.missing}`);
 
-                const fromCol = currentTable[fromColName as keyof typeof currentTable] as AnyPgColumn;
-                const toCol = joinTable[toColName as keyof typeof joinTable] as AnyPgColumn;
-                if (!fromCol || !toCol) throw new Error(`Join columns not found: ${fromColumn} -> ${toColumn}`);
-
-                query = applyDynamicJoin(query, joinTable, eq(fromCol, toCol));
+                query = applyDynamicJoin(query, joinTable, step.condition);
                 currentTable = joinTable;
             }
 

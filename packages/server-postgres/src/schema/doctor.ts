@@ -476,10 +476,13 @@ export function primaryKeyIssues(tablePlan: TablePlan, dbPk: string[], displayNa
             fix: `ALTER TABLE ${table} ADD PRIMARY KEY (${keyList});`
         }];
     }
+    // Several `isId` properties are one composite key, so a table keyed on
+    // several columns is matched by marking each of them — and only them.
+    const only = expected.some(column => !dbPk.includes(column)) ? "only " : "";
     const fix = dbPk.length === 1
-        ? `Mark the property for column "${dbPk[0]}" with \`isId\` — the table is keyed on it — or re-key the table on ${keyList}.`
-        : `A collection reads a row by one key column, and this table's key has ${dbPk.length}. `
-            + "Give it a single-column key and mark that property with `isId`, or leave the table out of your collections.";
+        ? `Mark ${only}the property for column "${dbPk[0]}" with \`isId\` — the table is keyed on it — or re-key the table on ${keyList}.`
+        : `Mark ${only}the properties for columns ${dbPk.map(c => `"${c}"`).join(", ")} with \`isId\` — together they are `
+            + `the table's composite key — or re-key the table on ${keyList}.`;
     return [{
         severity: "error",
         category: "primary_key_mismatch",

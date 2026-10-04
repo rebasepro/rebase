@@ -390,6 +390,20 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   OAuth. `verifyCredential` gives an app's own socket or tunnel the same
   answer for a session token or a key: who it acts as and its scopes.
 
+- **Composite primary keys.** Mark several properties `isId` and they form
+  one key: `rebase db push`, the schema check at boot and the generated
+  Drizzle file all write one `PRIMARY KEY (a, b)`, and reads, writes, nested
+  paths and `via` relations address a row by every key column
+  (`company_translation/1:::en_US`). 0.23 refused a second `isId` when the
+  config loaded. A relation or reference *into* such a collection is still
+  refused, by the schema generators and at boot, because a foreign key is one
+  column; reach those rows with a `via` relation. `rebase schema introspect`
+  now generates a table keyed on several columns, with `isId` on each key
+  column. It still skips the table when a key column cannot carry `isId` or
+  another table points at it. The live schema editor treats re-keying an
+  existing collection as a migration and names the new key. `rebase doctor`
+  and the boot warning tell you to mark every key column.
+
 #### CI & tooling
 
 - **`pnpm check:tsconfig-entries`** fails a tsconfig `include`/`paths`/

@@ -17,8 +17,9 @@
  *   1. a database Rebase built (`db push` of a property × relation matrix),
  *      introspected into fresh collection files, planned again — no changes;
  *   2. a hand-written legacy database of shapes a property can state,
- *      introspected and planned — no changes, and the table keyed on two
- *      columns is left out with its reason.
+ *      introspected and planned — no changes. A table keyed on two columns is
+ *      one composite key, `isId` on each column; one keyed on a column no
+ *      `isId` can mark is left out with its reason.
  *
  * Requires Docker. Spins up a throwaway Postgres container and tears it down.
  */
@@ -174,6 +175,12 @@ CREATE TABLE order_lines (
   qty integer NOT NULL DEFAULT 1,
   PRIMARY KEY (order_id, line_no)
 );
+CREATE TABLE readings (
+  sensor_id integer NOT NULL,
+  taken_at timestamptz NOT NULL,
+  value numeric(8,2),
+  PRIMARY KEY (sensor_id, taken_at)
+);
 CREATE TABLE "UserAccounts" (
   "UserId" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "DisplayName" text
@@ -261,7 +268,11 @@ describe("introspect, then push: adopting a database changes nothing", () => {
         }
 
         const { introspected, planned } = await introspectAndPlan("legacy");
-        expect(introspected.all).toMatch(/Skipping table "order_lines": it is keyed on \(order_id, line_no\)/);
+        // Generated, with `isId` on both key columns: one composite key.
+        expect(introspected.all).not.toMatch(/Skipping table "order_lines"/);
+        expect(introspected.all).toMatch(/✓ .*order_lines\.ts/);
+        // A timestamp cannot carry `isId`, so this key cannot be stated.
+        expect(introspected.all).toMatch(/Skipping table "readings": it is keyed on \(sensor_id, taken_at\), and its key column "taken_at" cannot carry `isId`/);
         expect(introspected.all).not.toMatch(/will not round-trip/);
         expect(planned.exitCode, planned.all).toBe(0);
         expect(planned.all).toMatch(/No changes: the database already matches these collections/);

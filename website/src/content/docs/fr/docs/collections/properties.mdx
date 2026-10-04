@@ -1,5 +1,5 @@
 ---
-sourceHash: 44fb75634f794993
+sourceHash: d79634002cc11c26
 title: Propriétés
 sidebar_label: Propriétés
 description: Les types de propriétés définissent le type de données, la validation et le rendu de l'interface utilisateur pour chaque champ d'une collection. Rebase prend en charge les types string, number, boolean, date, array, map, reference, relation et geopoint.
@@ -293,12 +293,19 @@ Il n'y a pas de clé étrangère. L'uid est une chaîne de caractères, le magas
 base de données totalement différente, et un utilisateur supprimé ne doit pas emporter la piste d'audit avec lui —
 déclarez une [relation](/docs/collections/relations) si vous souhaitez une jointure.
 
-:::note[Une seule clé primaire par collection]
-`isId` ne peut être revendiqué que par une seule propriété. Une seconde sera refusée au
-chargement de la configuration plutôt qu'ignorée silencieusement : les clés primaires composites ne sont pas prises en charge, et
-une configuration en déclarant deux doit être interprétée comme une demande que Rebase ne peut pas satisfaire. Si
-vous souhaitiez définir une contrainte d'unicité sur plusieurs colonnes, il s'agit d'un
-[index](/docs/backend/indexes) unique.
+:::note[Clés primaires composites]
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Marquez plusieurs propriétés avec `isId` et elles forment une clé composite : la table
+reçoit une unique contrainte `PRIMARY KEY (a, b)`, et une ligne est adressée par toutes
+ses valeurs de clé dans l'ordre de déclaration, jointes par `:::` —
+`company_translation/1:::en_US`. Donnez à chaque colonne de la clé la stratégie qui lui
+convient : `isId: true` pour une valeur fournie par l'appelant, ce qui vaut pour la
+plupart des colonnes d'une clé composite, et jamais `"increment"` sur une clé étrangère
+ou une colonne de texte. Une clé étrangère est une seule colonne et ne peut pas pointer
+vers une clé composite ; une relation ou une référence *vers* une telle collection est
+donc refusée lors de la génération du schéma. Si vous souhaitiez une contrainte
+d'unicité sur plusieurs colonnes plutôt que l'identité de la ligne, il s'agit d'un
+[index](/docs/backend/indexes) unique. Sur la 0.23, un second `isId` est refusé au
+chargement de la configuration.
 
 <span class="since-badge" data-since="0.24">Depuis 0.24</span> Une collection dont aucune propriété ne revendique `isId` reçoit sa propre colonne `id` : `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. La base de données la remplit, si bien qu'une ligne créée depuis le panneau d'administration, l'API REST ou le SDK n'a besoin d'aucune clé, et une clé que vous envoyez vous-même est utilisée telle quelle. Une table créée avant l'existence de cette valeur par défaut la reçoit au démarrage suivant. Sur la 0.23 la colonne n'a aucune valeur par défaut, et une création qui n'envoie aucune clé échoue.
 :::

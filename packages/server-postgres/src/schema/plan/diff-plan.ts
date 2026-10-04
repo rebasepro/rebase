@@ -28,7 +28,7 @@
  * already has*, and which of the planned constraints are safe to apply to it.
  */
 import type { ColumnPlan, SchemaPlan, TablePlan } from "./types";
-import { renderColumnDefinition, renderPgType } from "./render-ddl";
+import { renderColumnDefinition, renderPgType, renderPrimaryKeyConstraint } from "./render-ddl";
 import { quoteSqlLiteral } from "./plan-schema";
 import { SET_UPDATED_AT_FN, triggerStatements } from "./updated-at-trigger";
 import {
@@ -247,9 +247,23 @@ export interface EnsurePlan {
     orphanedRequiredColumns: OrphanedRequiredColumn[];
 }
 
+/**
+ * Whether a column is part of the table's primary key.
+ *
+ * Those are created with the table, in step 2, and never added afterwards: a
+ * key column missing from a table that already exists cannot be made part of
+ * its key by an additive change, so there is nothing safe to plan for one.
+ *
+ * A relation's entry for a column a declared property owns is not the column —
+ * it carries only the constraint — so it is not a key column either, or the
+ * key would be created twice.
+ */
+const isKeyColumn = (table: TablePlan, column: ColumnPlan): boolean =>
+    !column.columnOwnedByProperty && table.primaryKey.includes(column.column);
+
 /** Which pass a column belongs to. The order below is the order they run in. */
-const isScalarProperty = (column: ColumnPlan): boolean =>
-    (column.source.kind === "property" || column.source.kind === "implicit-id") && !column.primaryKey;
+const isScalarProperty = (table: TablePlan, column: ColumnPlan): boolean =>
+    (column.source.kind === "property" || column.source.kind === "implicit-id") && !isKeyColumn(table, column);
 
 export function diffPlanAgainstCatalogue(
     plan: SchemaPlan,
@@ -321,24 +335,30 @@ export function diffPlanAgainstCatalogue(
         actions.push({ kind: "create-function", target: functionTarget(statement), sql: statement });
     }
 
-    // 2. Missing tables. Only the identity column is created here; every other
+    // 2. Missing tables. Only the key columns are created here; every other
     //    column is added by step 3, so a new table and an existing table that
     //    gained a field travel the exact same code path. One way to build a
     //    column means one way for it to be wrong.
+    //
+    //    A composite key's columns all arrive here, with the one `PRIMARY KEY`
+    //    constraint naming them: a primary key can only be declared when the
+    //    table is created, and a table created with the first key column alone
+    //    would never gain the rest as part of its key.
     const created = new Set<string>();
     for (const table of collectionTables) {
         if (existing.tables.has(table.qualified) || created.has(table.qualified)) continue;
         created.add(table.qualified);
         const schema = assertSafeIdentifier(table.schema, "schema name");
         const name = assertSafeIdentifier(table.table, "table name");
-        const id = table.columns.find(c => c.primaryKey);
-        const definition = id
-            ? `"${assertSafeIdentifier(id.column, "column name")}" ${renderColumnDefinition(id)}`
-            : '"id" TEXT PRIMARY KEY';
+        const keyColumns = table.columns.filter(c => isKeyColumn(table, c));
+        const definitions = keyColumns.length > 0
+            ? keyColumns.map(c => `"${assertSafeIdentifier(c.column, "column name")}" ${renderColumnDefinition(c)}`)
+            : ['"id" TEXT PRIMARY KEY'];
+        if (keyColumns.length > 1) definitions.push(renderPrimaryKeyConstraint(table));
         actions.push({
             kind: "create-table",
             target: table.qualified,
-            sql: `CREATE TABLE IF NOT EXISTS "${schema}"."${name}" (${definition});`
+            sql: `CREATE TABLE IF NOT EXISTS "${schema}"."${name}" (${definitions.join(", ")});`
         });
     }
 
@@ -357,7 +377,7 @@ export function diffPlanAgainstCatalogue(
             kind: "create-table",
             target: table.qualified,
             sql: `CREATE TABLE IF NOT EXISTS "${table.schema}"."${table.table}" (${columns}` +
-                `, PRIMARY KEY (${table.primaryKey.map(c => `"${c}"`).join(", ")}));`
+                `, ${renderPrimaryKeyConstraint(table)});`
         });
     }
 
@@ -586,7 +606,7 @@ export function diffPlanAgainstCatalogue(
         assertSafeIdentifier(table.schema, "schema name");
         assertSafeIdentifier(table.table, "table name");
         for (const column of table.columns) {
-            if (!isScalarProperty(column)) continue;
+            if (!isScalarProperty(table, column)) continue;
             planColumn(table, column);
         }
         // The implicit key of a collection that declares none. It is created
@@ -692,6 +712,9 @@ export function diffPlanAgainstCatalogue(
             // `postId` beside the `belongsTo` that uses it); the relation
             // contributes only the constraint, below.
             if (column.columnOwnedByProperty) continue;
+            // A reference that is part of a composite key was created with
+            // the table, in step 2.
+            if (isKeyColumn(table, column)) continue;
             if (renameLegacyColumn(table, column)) continue;
             planColumn(table, column);
         }

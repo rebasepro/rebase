@@ -9,6 +9,8 @@ import {
     getCollectionByPath,
     getTableForCollection,
     getPrimaryKeys,
+    requirePrimaryKeys,
+    rowIdentityCondition,
     parseIdValues,
     buildCompositeId
 } from "./collection-helpers";
@@ -191,18 +193,9 @@ export class PersistService {
 
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = getPrimaryKeys(collection, this.registry);
-
-        const parsedIdObj = parseIdValues(id, idInfoArray);
-
-        const conditions: SQL[] = [];
-        for (const info of idInfoArray) {
-            const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
-            if (!field) {
-                throw new Error(`ID field '${info.fieldName}' not found in table for collection '${collectionPath}'`);
-            }
-            conditions.push(eq(field, parsedIdObj[info.fieldName]));
-        }
+        // `requirePrimaryKeys`: with no key there is no condition, and a DELETE
+        // without one empties the table.
+        const condition = rowIdentityCondition(table, requirePrimaryKeys(collection, this.registry), id, collectionPath);
 
         // In a transaction of its own, as `save` is: inside a write's
         // transaction that is a SAVEPOINT, so a delete the database refuses (a
@@ -215,13 +208,13 @@ export class PersistService {
         try {
             result = await this.db.transaction(tx => tx
                 .delete(table)
-                .where(and(...conditions)));
+                .where(condition));
         } catch (error: unknown) {
             throw this.toUserFriendlyError(error, collection.slug, collection, "delete");
         }
 
         if ((result.rowCount ?? 0) === 0) {
-            throw await this.explainZeroRowWrite(this.db, table, conditions, collectionPath, id, "delete");
+            throw await this.explainZeroRowWrite(this.db, table, [condition], collectionPath, id, "delete");
         }
     }
 
@@ -466,7 +459,6 @@ export class PersistService {
                 if (id && !options?.upsert) {
                     // Update existing row
                     currentId = id; // `id` is already the formatted composite or singular string
-                    const idValues = parseIdValues(id, idInfoArray);
 
                     // Apply joinPath one-to-one relation updates BEFORE the main UPDATE.
                     // This ensures parentSourceCol reads the pre-update FK value, preventing
@@ -500,21 +492,16 @@ export class PersistService {
                             ...(entityData as Record<string, unknown>),
                             ...(compiledOps ?? {})
                         });
-                        const conditions = [];
-                        for (const info of idInfoArray) {
-                            const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
-                            conditions.push(eq(field, idValues[info.fieldName]));
-                        }
-
-                        const updateResult = await updateQuery.where(and(...conditions, ...bounds.map(bound => bound.holds)));
+                        const condition = rowIdentityCondition(table, idInfoArray, id, effectiveCollectionPath);
+                        const updateResult = await updateQuery.where(and(condition, ...bounds.map(bound => bound.holds)));
 
                         // Throwing rolls the transaction back, so relation writes
                         // already applied above do not survive a rejected update.
                         if ((updateResult.rowCount ?? 0) === 0) {
-                            const broken = await brokenFieldOpBounds(tx, table, conditions, bounds);
+                            const broken = await brokenFieldOpBounds(tx, table, [condition], bounds);
                             if (broken.length > 0) throw fieldOpBoundsError(collection.slug, broken);
                             throw await this.explainZeroRowWrite(
-                                tx, table, conditions, effectiveCollectionPath, currentId, "update"
+                                tx, table, [condition], effectiveCollectionPath, currentId, "update"
                             );
                         }
                     }

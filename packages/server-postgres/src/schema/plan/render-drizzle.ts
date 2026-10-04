@@ -308,9 +308,16 @@ export function renderDrizzleSchema(plan: SchemaPlan, options: DrizzleRenderOpti
             : `${lines.join(",\n")}\n`;
 
         const extras: string[] = [];
-        if (table.kind === "junction") {
-            extras.push(`    ${needs(uses, "primaryKey")}({ columns: [${table.primaryKey.map(c => member("table", c)).join(", ")}] }),`);
-        } else {
+        // A key over several columns is one `primaryKey({ columns })` extra —
+        // `.primaryKey()` on each column would declare several primary keys.
+        // The plan lists COLUMN names and the table is keyed by field name
+        // (`authorId` for `author_id`), so each is looked up.
+        if (table.primaryKey.length > 1) {
+            const keyMember = (name: string): string =>
+                member("table", table.columns.find(c => c.column === name && !c.columnOwnedByProperty)?.key ?? name);
+            extras.push(`    ${needs(uses, "primaryKey")}({ columns: [${table.primaryKey.map(keyMember).join(", ")}] }),`);
+        }
+        if (table.kind === "collection") {
             extras.push(...indexExtras(table, uses));
         }
         if (withPolicies) {

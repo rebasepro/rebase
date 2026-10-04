@@ -285,10 +285,47 @@ describe("needs-migration — the ensure path cannot express it at all", () => {
     it("a proposal the planner refuses is refused with the planner's reason", () => {
         const result = classifyCollectionChanges(
             [collection("posts", { code: str() })],
-            [collection("posts", { code: str({ isId: true }) })]
+            [collection("posts", { code: str({ enum: [] }) })]
         );
         expect(result.applicable).toBe(false);
         expect(result.changes.some(c => c.kind === "invalid-collection")).toBe(true);
+    });
+
+    /**
+     * Several `isId` properties are one composite key, which the planner
+     * builds — so marking a second one is no longer a proposal it refuses. It
+     * is a change to the table's one key constraint, which the ensure path
+     * declares only when it creates a table.
+     */
+    it("marking a second property `isId` moves the whole key, and says to which columns", () => {
+        const change = only(
+            [collection("posts", { code: str() })],
+            [collection("posts", { code: str({ isId: true }) })]
+        );
+        expect(change).toMatchObject({ kind: "change-primary-key", verdict: "needs-migration", property: "code" });
+        expect(change.detail).toContain('from ("id") to ("id", "code")');
+        expect(change.remedy).toContain('ADD PRIMARY KEY ("id", "code")');
+    });
+
+    it("a property added with `isId` joins the key, and is not applied as a plain new column", () => {
+        const result = classifyCollectionChanges(
+            [collection("posts", { title: str() })],
+            [collection("posts", { title: str(), locale: str({ isId: true }) })],
+            database({ columns: ["id", "title"] })
+        );
+        expect(result.applicable).toBe(false);
+        const key = result.changes.filter(c => c.kind === "change-primary-key");
+        expect(key).toHaveLength(1);
+        expect(key[0]).toMatchObject({ verdict: "needs-migration", property: "locale" });
+        expect(key[0].detail).toContain('from ("id") to ("id", "locale")');
+    });
+
+    it("a new collection with a composite key is safe: its table is created with the key", () => {
+        const change = only(
+            [],
+            [collection("translations", { locale: str({ isId: true }), title: str() })]
+        );
+        expect(change).toMatchObject({ kind: "add-collection", verdict: "safe" });
     });
 
     it("removing an enum value, which Postgres cannot do at all", () => {

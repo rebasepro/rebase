@@ -14,6 +14,7 @@ import {
     parseIdValues,
     idCanAddressTable,
     rowIdentityCondition,
+    primaryKeyColumns,
     buildCompositeId,
     COMPOSITE_ID_SEPARATOR,
     type PrimaryKeyInfo
@@ -1008,9 +1009,10 @@ target });
      * Extract cursor pagination conditions from startAfter options.
      *
      * "Every row that sorts after this one", written out as a comparison over
-     * the same keys the `ORDER BY` uses and ending on the same `id DESC`. With
-     * one key that is the familiar `k > v OR (k = v AND id < cursorId)`; with
-     * several it nests, each key's tie handing the decision to the next.
+     * the same keys the `ORDER BY` uses and ending on the same primary key,
+     * descending. With one sort key that is the familiar
+     * `k > v OR (k = v AND id < cursorId)`; with several it nests, each key's
+     * tie handing the decision to the next.
      */
     private buildCursorConditions(
         table: PgTable<any>,
@@ -1181,7 +1183,7 @@ target });
     }
 
     /**
-     * "Sorts strictly after the cursor row", over `keys` and then the id.
+     * "Sorts strictly after the cursor row", over `keys` and then the primary key.
      *
      * Built by recursion rather than as a row-value comparison — `(a, b) > (x, y)`
      * would be shorter, but it is only correct when every key runs the same
@@ -1289,17 +1291,19 @@ target });
      */
     private buildRelationScope(hop: NestedPathHop): SQL {
         const parentPks = requirePrimaryKeys(hop.parentCollection, this.registry);
-        const parentIdInfo = parentPks[0];
-        const parsedParentId = parseIdValues(hop.parentId, parentPks)[parentIdInfo.fieldName];
+        const parsedParent = parseIdValues(hop.parentId, parentPks);
+        // What a single-column link compares against. A link from a composite
+        // key has no such value, and `findRelationDefects` refuses one at boot.
+        const parsedParentId = parsedParent[parentPks[0].fieldName];
 
+        // The parent row by every key column, for the shapes that read it.
         const parent = () => {
             const table = getTableForCollection(hop.parentCollection, this.registry);
-            const idColumn = table[parentIdInfo.fieldName as keyof typeof table] as AnyPgColumn;
-            if (!idColumn) {
-                throw new Error(`ID field '${parentIdInfo.fieldName}' not found in table for collection '${hop.parentCollection.slug}'`);
-            }
-            return { table,
-idColumn };
+            const columns = primaryKeyColumns(table, parentPks, hop.parentCollection.slug);
+            return {
+                table,
+                key: columns.map((column, i) => ({ column, value: parsedParent[parentPks[i].fieldName] }))
+            };
         };
 
         const targetTable = getTableForCollection(hop.targetCollection, this.registry);

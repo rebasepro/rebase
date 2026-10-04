@@ -1,5 +1,5 @@
 import {
-    generateCollectionFile, buildTablesMap, buildEnumMap,
+    generateCollectionFile, buildTablesMap, buildEnumMap, compositeKeySkipReason,
     identifyJoinTables, TableRow, TableColumn, PrimaryKeyRow,
     ForeignKeyRow, EnumValue, TableMeta, CollectionBuilder
 } from "../src/schema/introspect-db-logic";
@@ -183,6 +183,102 @@ udt_name: "int4" })
             const result = generateCollectionFile("scores", meta, [], new Set(), new Map([["scores", meta]]), new Map());
             expect(result).toContain("composite primary key");
             expect(result).toContain("user_id, game_id");
+        });
+
+        it("marks every column of a composite key with the strategy it has, a number and a string alike", () => {
+            // Unmarked, the admin resolves no address for the rows and the
+            // server warns at boot; marked with a generating strategy, the
+            // admin withholds the fields on create and the insert has no key.
+            // Neither column has a default, so each is `"manual"` — a value the
+            // caller supplies — with the storage the planner needs to build it.
+            const meta = makeSimpleTable("company_translation", [
+                mkCol("company_translation", "id", { data_type: "integer",
+udt_name: "int4",
+is_nullable: "NO" }),
+                mkCol("company_translation", "locale", { data_type: "character varying",
+udt_name: "varchar",
+is_nullable: "NO" }),
+                mkCol("company_translation", "name", { data_type: "text",
+udt_name: "text" })
+            ], ["id", "locale"]);
+            const result = generateCollectionFile(
+                "company_translation", meta, [], new Set(), new Map([["company_translation", meta]]), new Map()
+            );
+            expect(result.match(/isId: "manual",/g)).toHaveLength(2);
+            expect(result).toContain("columnType: \"integer\"");
+            expect(result).toContain("columnType: \"varchar\"");
+            expect(result).not.toContain("isId: \"increment\"");
+            expect(result).not.toContain("isId: \"uuid\"");
+        });
+
+        it("keeps a composite key column a number when its sample holds only 1s and 0s", () => {
+            const meta = makeSimpleTable("order_lines", [
+                mkCol("order_lines", "order_id", { data_type: "integer",
+udt_name: "int4",
+is_nullable: "NO" }),
+                mkCol("order_lines", "line_no", { data_type: "integer",
+udt_name: "int4",
+is_nullable: "NO" })
+            ], ["order_id", "line_no"]);
+            const result = generateCollectionFile(
+                "order_lines", meta, [], new Set(), new Map([["order_lines", meta]]), new Map(),
+                [{ order_id: 7, line_no: 1 }, { order_id: 8, line_no: 0 }]
+            );
+            expect(result).not.toContain("type: \"boolean\"");
+            expect(result.match(/isId: "manual",/g)).toHaveLength(2);
+        });
+
+        describe("which composite-keyed tables introspection generates", () => {
+            const orderLines = makeSimpleTable("order_lines", [
+                mkCol("order_lines", "order_id", { data_type: "bigint",
+udt_name: "int8",
+is_nullable: "NO" }),
+                mkCol("order_lines", "line_no", { data_type: "integer",
+udt_name: "int4",
+is_nullable: "NO" })
+            ], ["order_id", "line_no"], [mkFk("order_lines", "order_id", "order")]);
+
+            it("generates one whose key columns are numbers or strings and that nothing points at", () => {
+                expect(compositeKeySkipReason(orderLines, orderLines.fks)).toBeUndefined();
+            });
+
+            it("leaves out one with a key column no `isId` can mark, naming it", () => {
+                const payment = makeSimpleTable("payment", [
+                    mkCol("payment", "payment_id", { data_type: "integer",
+udt_name: "int4" }),
+                    mkCol("payment", "payment_date", { data_type: "timestamp with time zone",
+udt_name: "timestamptz" })
+                ], ["payment_id", "payment_date"]);
+                expect(compositeKeySkipReason(payment, [])).toMatch(/"payment_date" cannot carry `isId`/);
+            });
+
+            it("leaves out one a foreign key points at: a link cannot point at a composite key", () => {
+                const notes = mkFk("line_notes", "order_id", "order_lines", "order_id");
+                expect(compositeKeySkipReason(orderLines, [...orderLines.fks, notes]))
+                    .toMatch(/"line_notes" points at it/);
+            });
+
+            it("says nothing about a table keyed on one column", () => {
+                const products = makeSimpleTable("products", [mkCol("products", "id")]);
+                expect(compositeKeySkipReason(products, [mkFk("orders", "product_id", "products")])).toBeUndefined();
+            });
+        });
+
+        it("marks none of a composite key's columns when one of them cannot carry `isId`", () => {
+            // pagila's `payment` is keyed on `(payment_id, payment_date)`. A date
+            // property has no `isId`, and marking `payment_id` alone would make
+            // it the whole key — so the key is left to the table's constraint.
+            const meta = makeSimpleTable("payment", [
+                mkCol("payment", "payment_id", { data_type: "integer",
+udt_name: "int4",
+is_nullable: "NO" }),
+                mkCol("payment", "payment_date", { data_type: "timestamp with time zone",
+udt_name: "timestamptz",
+is_nullable: "NO" })
+            ], ["payment_id", "payment_date"]);
+            const result = generateCollectionFile("payment", meta, [], new Set(), new Map([["payment", meta]]), new Map());
+            expect(result).toContain("composite primary key");
+            expect(result).not.toContain("isId");
         });
     });
 
