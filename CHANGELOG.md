@@ -270,11 +270,6 @@
   in words what the key will be able to do. A *My keys* tab manages your
   personal keys when the backend enables them.
 
-- **Two-step verification is set up in the CMS.** Account settings has a
-  Two-step verification tab: add an authenticator app (its key, and a link
-  that opens it in the app), list and remove factors, and replace the recovery
-  codes, with a code asked for first whenever the change needs `aal2`.
-
 - **The users table resets two-step verification.** *Reset two-step
   verification* calls `DELETE /admin/users/:uid/mfa`, and is offered only to
   whoever holds `users:write`, as the route is. The auth controller now reads
@@ -937,6 +932,11 @@
   and the SDK would drop N.
 
 #### Client SDK
+
+- **A generated SDK lints clean.** A collection with no relations was emitted
+  as `Relations: {}`, which typescript-eslint's recommended
+  `no-empty-object-type` refuses in any project that lints its generated
+  types; it is now `Record<never, never>`, the same type for `include`.
 
 - **`upsert()` without `onConflict` updates the row already at that key,**
   instead of answering `409`, as documented; it now matches what it already

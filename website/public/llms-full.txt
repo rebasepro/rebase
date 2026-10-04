@@ -3749,11 +3749,6 @@ yet, listed so that nobody reads a promise into them:
   in words what the key will be able to do. A *My keys* tab manages your
   personal keys when the backend enables them.
 
-- **Two-step verification is set up in the CMS.** Account settings has a
-  Two-step verification tab: add an authenticator app (its key, and a link
-  that opens it in the app), list and remove factors, and replace the recovery
-  codes, with a code asked for first whenever the change needs `aal2`.
-
 - **The users table resets two-step verification.** *Reset two-step
   verification* calls `DELETE /admin/users/:uid/mfa`, and is offered only to
   whoever holds `users:write`, as the route is. The auth controller now reads
@@ -4416,6 +4411,11 @@ yet, listed so that nobody reads a promise into them:
   and the SDK would drop N.
 
 ##### Client SDK
+
+- **A generated SDK lints clean.** A collection with no relations was emitted
+  as `Relations: {}`, which typescript-eslint's recommended
+  `no-empty-object-type` refuses in any project that lints its generated
+  types; it is now `Record<never, never>`, the same type for `include`.
 
 - **`upsert()` without `onConflict` updates the row already at that key,**
   instead of answering `409`, as documented; it now matches what it already
@@ -22157,12 +22157,7 @@ guesses, each account is limited to ten verification attempts per 15 minutes
 recorded against the factor so it cannot be replayed for the rest of its
 ±1-step window.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> In the CMS, **Account settings → Two-step verification** enrols an
-authenticator app (its key, and a link that opens it in the app, then the code
-it shows), lists the account's factors, removes one and replaces the recovery
-codes. When a change needs `aal2` it asks for a code first and steps the session
-up with it. The recovery codes are shown once, after the first factor is
-confirmed. In the users table, **Reset two-step verification**
+<span class="since-badge" data-since="0.24">Since 0.24</span> In the CMS users table, **Reset two-step verification**
 (`DELETE /api/admin/users/:uid/mfa`) and **Disable or enable account**
 (`PUT /api/admin/users/:uid { disabled }`) are offered to whoever holds
 `users:write`, as the routes are; the switch is never offered on your own

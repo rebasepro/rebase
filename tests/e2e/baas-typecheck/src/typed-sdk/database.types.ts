@@ -43,8 +43,7 @@ export interface Database {
     Update: {
       body?: string | null;
     };
-    Relations: {
-    };
+    Relations: Record<never, never>;
     Slug: "my-notes";
   };
   orderItems: {
@@ -62,8 +61,7 @@ export interface Database {
       sku?: string;
       quantity?: number | null;
     };
-    Relations: {
-    };
+    Relations: Record<never, never>;
     Slug: "order_items";
   };
   posts: {
@@ -123,8 +121,7 @@ export interface Database {
     Update: {
       label?: string;
     };
-    Relations: {
-    };
+    Relations: Record<never, never>;
     Slug: "tags";
   };
 }

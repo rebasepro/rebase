@@ -570,7 +570,15 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         // Emitted as the accessor NAME rather than the target's `Row`, so a
         // self-referencing or mutually-referencing relation is a finite string
         // instead of a type that expands forever.
-        lines.push("    Relations: {");
+        // A collection with no relations gets `Record<never, never>`, not `{}`:
+        // the same type for `keyof` (never), but `{}` is what typescript-eslint's
+        // recommended `no-empty-object-type` refuses, in every project that
+        // lints its generated SDK.
+        if (Object.keys(resolvedRelations).length === 0) {
+            lines.push("    Relations: Record<never, never>;");
+        } else {
+            lines.push("    Relations: {");
+        }
         for (const [key, relation] of Object.entries(resolvedRelations)) {
             const target = resolveTargetCollection(relation);
             const slug = target?.slug ?? relation.targetSlug;
@@ -580,7 +588,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
             // something that does not exist.
             lines.push(`      ${emitKey(key)}: ${accessor ? emitString(accessor) : "never"};`);
         }
-        lines.push("    };");
+        if (Object.keys(resolvedRelations).length > 0) lines.push("    };");
 
         // ── Slug ──
         //
