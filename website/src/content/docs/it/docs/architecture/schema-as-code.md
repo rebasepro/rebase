@@ -35,47 +35,48 @@ Questo approccio "UI come Generatore di Codice" significa che le modifiche visua
 
 ## Pipeline di Generazione dello Schema
 
-Your collections are read once and emitted twice — as a Drizzle schema the
-running server queries through, and as SQL that describes the database you meant
-to have. It is the SQL that the database is brought into line with, by
-[Atlas](https://atlasgo.io), which diffs your desired schema against the live one
-and plans the change:
+Le tue collezioni vengono lette una volta ed emesse due volte — come uno schema
+Drizzle attraverso cui il server in esecuzione esegue le sue query, e come SQL
+che descrive il database che volevi avere. È a questo SQL che il database viene
+allineato, da [Atlas](https://atlasgo.io), che confronta lo schema desiderato
+con quello reale e pianifica la modifica:
 
 ```
-                        Collections (TypeScript)
+                        Collezioni (TypeScript)
                                   │
             ┌─────────────────────┴─────────────────────┐
             ▼                                           ▼
-   rebase schema generate                   (db push and db generate write
-            │                               the SQL below on every run, into
-            ▼                               .rebase/sql/, which is not committed)
+   rebase schema generate                   (db push e db generate scrivono
+            │                               i file SQL qui sotto a ogni esecuzione,
+            ▼                               in .rebase/sql/, che non va nel commit)
   backend/src/schema.generated.ts                       │
-  the Drizzle schema the runtime                        ▼
-  reads and writes rows through             schema.sql              ← Atlas's desired state
-                                            policies.sql            ← RLS, applied separately
-                                            search.sql, vector.sql, ← Atlas cannot manage these
+  lo schema Drizzle attraverso cui                      ▼
+  il runtime legge e scrive le righe        schema.sql              ← stato desiderato di Atlas
+                                            policies.sql            ← RLS, si applica a parte
+                                            search.sql, vector.sql, ← Atlas non può gestirli
                                             triggers.sql
                                                         │
                                           ┌─────────────┴─────────────┐
                                           ▼                           ▼
                                    rebase db push              rebase db generate
-                                   Atlas plans the diff        Atlas writes the diff
-                                   and applies it now          to drizzle/migrations/
+                                   Atlas pianifica il diff     Atlas scrive il diff
+                                   e lo applica subito         in drizzle/migrations/
                                           │                           │
                                           │                           ▼
                                           │                    rebase db migrate
-                                          │                    applies them in order
+                                          │                    le applica in ordine
                                           └─────────────┬─────────────┘
                                                         ▼
                                                   PostgreSQL
 ```
 
-`db push` is the development loop; `db generate` + `db migrate` is the
-reviewable one, and the one to use in production. Both go through the same
-generated SQL, so they cannot disagree about what your collections mean, and
-both write it afresh from the collections before reading it, so there is no copy
-in your repository to fall behind. The migrations are what you commit. See
-[Schema Generation](/docs/cli/schema) for every flag.
+`db push` è il ciclo di sviluppo; `db generate` + `db migrate` è quello
+revisionabile, e quello da usare in produzione. Entrambi passano per lo stesso
+SQL generato, quindi non possono essere in disaccordo su cosa significhino le
+tue collezioni, ed entrambi lo riscrivono da zero a partire dalle collezioni
+prima di leggerlo, quindi nel tuo repository non c'è nessuna copia che possa
+diventare obsoleta. Ciò che va nel commit sono le migrazioni. Consulta
+[Generazione dello Schema](/docs/cli/schema) per tutti i flag.
 
 ### Esempio
 

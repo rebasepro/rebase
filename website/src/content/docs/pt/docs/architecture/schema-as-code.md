@@ -35,47 +35,47 @@ Essa abordagem de "UI como Gerador de Código" significa que as edições visuai
 
 ## Pipeline de Geração de Schema
 
-Your collections are read once and emitted twice — as a Drizzle schema the
-running server queries through, and as SQL that describes the database you meant
-to have. It is the SQL that the database is brought into line with, by
-[Atlas](https://atlasgo.io), which diffs your desired schema against the live one
-and plans the change:
+Suas coleções são lidas uma vez e emitidas duas — como um schema Drizzle por meio
+do qual o servidor em execução faz suas consultas, e como SQL que descreve o
+banco de dados que você queria ter. É a esse SQL que o banco de dados é ajustado,
+pelo [Atlas](https://atlasgo.io), que compara o schema desejado com o real e
+planeja a mudança:
 
 ```
-                        Collections (TypeScript)
+                          Coleções (TypeScript)
                                   │
             ┌─────────────────────┴─────────────────────┐
             ▼                                           ▼
-   rebase schema generate                   (db push and db generate write
-            │                               the SQL below on every run, into
-            ▼                               .rebase/sql/, which is not committed)
+   rebase schema generate                   (db push e db generate gravam
+            │                               o SQL abaixo a cada execução,
+            ▼                               em .rebase/sql/, que não é versionado)
   backend/src/schema.generated.ts                       │
-  the Drizzle schema the runtime                        ▼
-  reads and writes rows through             schema.sql              ← Atlas's desired state
-                                            policies.sql            ← RLS, applied separately
-                                            search.sql, vector.sql, ← Atlas cannot manage these
+  o schema Drizzle pelo qual o                          ▼
+  runtime lê e grava linhas                 schema.sql              ← estado desejado do Atlas
+                                            policies.sql            ← RLS, aplicado à parte
+                                            search.sql, vector.sql, ← o Atlas não consegue gerenciá-los
                                             triggers.sql
                                                         │
                                           ┌─────────────┴─────────────┐
                                           ▼                           ▼
                                    rebase db push              rebase db generate
-                                   Atlas plans the diff        Atlas writes the diff
-                                   and applies it now          to drizzle/migrations/
+                                   o Atlas planeja o diff      o Atlas grava o diff
+                                   e o aplica na hora          em drizzle/migrations/
                                           │                           │
                                           │                           ▼
                                           │                    rebase db migrate
-                                          │                    applies them in order
+                                          │                    as aplica em ordem
                                           └─────────────┬─────────────┘
                                                         ▼
                                                   PostgreSQL
 ```
 
-`db push` is the development loop; `db generate` + `db migrate` is the
-reviewable one, and the one to use in production. Both go through the same
-generated SQL, so they cannot disagree about what your collections mean, and
-both write it afresh from the collections before reading it, so there is no copy
-in your repository to fall behind. The migrations are what you commit. See
-[Schema Generation](/docs/cli/schema) for every flag.
+`db push` é o ciclo de desenvolvimento; `db generate` + `db migrate` é o
+revisável, e o que deve ser usado em produção. Os dois passam pelo mesmo SQL
+gerado, então não podem divergir sobre o que suas coleções significam, e os dois
+o geram de novo a partir das coleções antes de lê-lo, então não há nenhuma cópia
+no seu repositório que possa ficar desatualizada. O que você versiona são as
+migrações. Veja [Geração de Esquema](/docs/cli/schema) para todas as flags.
 
 ### Exemplo
 
