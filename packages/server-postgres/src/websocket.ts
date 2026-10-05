@@ -6,6 +6,7 @@ import { isNestedPath, resolveNestedPath } from "./services/nested-path";
 import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketOptions, WebSocketMessage } from "@rebasepro/types";
 import type { SqlScriptResult } from "@rebasepro/types";
 import { redactSqlLiterals } from "./utils/sql-redaction";
+import { reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
 import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AdminScope } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
@@ -645,6 +646,9 @@ channelWindowStart: Date.now() });
 
         // Route all messages through RealtimeService for unified handling
         ws.on("message", async (message: RawData) => {
+            // Every frame is answered, so one from a client that has not read
+            // its earlier answers would only add to a backlog it is not draining.
+            if (terminateIfBacklogged(ws, clientId)) return;
             let requestId: string | undefined;
             try {
                 if (!clientSessions.get(clientId)?.authenticated && frameBytes(message) > MAX_UNAUTHENTICATED_FRAME_BYTES) {
@@ -1570,4 +1574,11 @@ code: "BRANCHING_UNSUPPORTED" } }
             }
         });
     });
+
+    // A peer that vanished without a close — lost signal, sleep, a forgotten
+    // NAT mapping — is let go of once it stops answering pings. Stopped with
+    // whichever goes first, like the identity sweep.
+    const stopReaping = reapSilentSockets(wss);
+    wss.on("close", stopReaping);
+    if (typeof server.on === "function") server.on("close", stopReaping);
 }

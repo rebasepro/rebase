@@ -1,5 +1,5 @@
 ---
-sourceHash: 67d0f85a988d0aa9
+sourceHash: cba58e3dbe87b090
 title: Realtime su più istanze
 sidebar_label: Realtime su più istanze
 description:"\"Come i canali di broadcast e la presence sopravvivono a più di un processo server: il bus LISTEN/NOTIFY, cosa appartiene a ciascuna istanza e come scrivere un transport personalizzato.\""
@@ -32,7 +32,8 @@ Quando un record viene modificato sull'Istanza A, trasmette una notifica sul can
 
 - **Auto-filtraggio**: Alla ricezione di un messaggio, ciascuna istanza legge il `sid`. Se corrisponde al proprio ID istanza, il server scarta la notifica per evitare loop infiniti di routing.
 - **Relay e Fan-out**: Se la notifica proviene da un'altra istanza, il server pianifica un refetch con debounce e trasmette l'aggiornamento ai suoi sottoscrittori WebSocket connessi localmente.
-- **Ciclo di riconnessione del supervisore**: Se la connessione al database si interrompe, un supervisore della connessione in background monitora lo stato e attiva una sequenza di riconnessione automatica dopo un ritardo fisso di **3 secondi**, ripristinando il loop di `LISTEN` senza influire sul ciclo di vita dell'applicazione Hono principale.
+- **Ciclo di riconnessione del supervisore**: Se la connessione al database si interrompe, un supervisore della connessione in background monitora lo stato e attiva una sequenza di riconnessione automatica dopo un ritardo fisso di **3 secondi**, ripristinando il loop di `LISTEN` senza influire sul ciclo di vita dell'applicazione Hono principale. Poi ogni sottoscrizione attiva dell'istanza viene riletta, perché ciò che è stato pubblicato mentre la connessione era caduta non ha raggiunto nessuno. Se il database non è raggiungibile all'avvio, la connessione viene ritentata nello stesso modo.
+- **Heartbeat**: Una connessione `LISTEN` è inattiva per natura, e il timeout di inattività di un load balancer o di un NAT può interromperla senza errori da nessuna delle due parti (una connessione semiaperta). Per questo funziona con il keepalive TCP e deve rispondere a un `SELECT 1` ogni 30 secondi, entro 10 secondi. Una connessione che non risponde viene sostituita come sopra. Finché la connessione è caduta, `/health` la elenca come `cross-instance`, e dopo 60 secondi di interruzione il controllo fallisce.
 
 ## Canali e presence tra istanze
 

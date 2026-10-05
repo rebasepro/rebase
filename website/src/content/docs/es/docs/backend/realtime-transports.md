@@ -1,5 +1,5 @@
 ---
-sourceHash: 67d0f85a988d0aa9
+sourceHash: cba58e3dbe87b090
 title: Tiempo real entre instancias
 sidebar_label: Tiempo real entre instancias
 description:"\"Cómo los canales de difusión (broadcast) y la presencia sobreviven a más de un proceso de servidor: el bus LISTEN/NOTIFY, qué posee cada instancia y cómo escribir tu propio transporte.\""
@@ -32,7 +32,8 @@ Cuando se modifica un registro en la Instancia A, esta transmite una notificaci�
 
 - **Autofiltrado**: Al recibir un mensaje, cada instancia lee el `sid`. Si coincide con su propio ID de instancia, el servidor descarta la notificación para evitar bucles infinitos de enrutamiento.
 - **Retransmisión y distribución (Fan-out)**: Si la notificación proviene de otra instancia, el servidor programa una nueva consulta con debounce y retransmite la actualización a sus suscriptores WebSocket conectados localmente.
-- **Bucle de reconexión del supervisor**: Si la conexión con la base de datos se interrumpe, un supervisor de conexión en segundo plano monitorea el estado y activa una secuencia de reconexión automática tras un retraso fijo de **3 segundos**, restaurando el bucle `LISTEN` sin afectar el ciclo de vida de la aplicación Hono principal.
+- **Bucle de reconexión del supervisor**: Si la conexión con la base de datos se interrumpe, un supervisor de conexión en segundo plano monitorea el estado y activa una secuencia de reconexión automática tras un retraso fijo de **3 segundos**, restaurando el bucle `LISTEN` sin afectar el ciclo de vida de la aplicación Hono principal. Después se vuelve a consultar cada suscripción activa de la instancia, porque lo que se publicó mientras la conexión estaba caída no llegó a nadie. Si la base de datos no está disponible al arrancar, la conexión se reintenta de la misma forma.
+- **Latido (heartbeat)**: Una conexión `LISTEN` está inactiva por naturaleza, y el tiempo de espera por inactividad de un balanceador de carga o de un NAT puede cortarla sin error en ninguno de los dos extremos (una conexión semiabierta). Por eso funciona con TCP keepalive y debe responder a un `SELECT 1` cada 30 segundos en menos de 10 segundos. La que no responde se reemplaza como se describe arriba. Mientras la conexión está caída, `/health` la incluye como `cross-instance`, y cuando lleva 60 segundos caída la comprobación falla.
 
 ## Canales y presencia entre instancias
 

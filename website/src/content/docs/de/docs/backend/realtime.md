@@ -1,5 +1,5 @@
 ---
-sourceHash: 419a1d3fedba3c2d
+sourceHash: 4b2acc8e12bf440c
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Echtzeit-Datensynchronisierung, Broadcast-Kanäle und Presence-Tracking über WebSocket.
@@ -198,6 +198,14 @@ Auf einem Laptop gegen ein lokales PostgreSQL mit einem Verbindungspool von 20 V
 <span class="since-badge" data-since="0.24">Seit 0.24</span> **Ein Socket darf höchstens 1.000 Abonnements halten.** Das nächste wird mit einem Fehler-Frame mit dem Code `TOO_MANY_SUBSCRIPTIONS` abgelehnt; das erneute Abonnieren unter einer ID, die der Socket bereits hält, ersetzt dieses Abonnement und zählt nicht erneut. Das SDK teilt sich identische Abonnements auf einem Socket, sodass dies die unterschiedlichen Listen und Datensätze zählt, die eine Seite offen hat. Ändern Sie dies mit `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` oder `realtime.maxSubscriptionsPerSocket` auf dem Postgres-Adapter (die Umgebungsvariable gewinnt); ein Wert, der keine positive ganze Zahl ist, stoppt den Server beim Start. Auf 0.23 sind die Abonnements eines Sockets nicht begrenzt.
 
 Eine Abonnement-ID gehört dem jeweiligen Socket: Zwei Clients, die beide ein Abonnement `"sub-1"` nennen, behalten jeweils ihr eigenes, und ein `unsubscribe` beendet nur das des Absenders.
+
+### Sockets, die nicht mehr antworten
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Ein Client kann verschwinden, ohne seinen Socket zu schließen: Ein Handy verliert den Empfang, ein Laptop geht in den Ruhezustand, ein NAT vergisst die Verbindung. Es kommt kein Close-Frame an, also sagt dem Server niemand etwas. Deshalb sendet der Server jedem Socket alle 30 Sekunden einen Ping und beendet einen Socket, der bis zum nächsten Ping nicht geantwortet hat. Ein verschwundener Client wird so innerhalb einer Minute freigegeben. Browser und das SDK beantworten Pings von selbst; ein Client, der das Protokoll direkt spricht, muss sie ebenfalls beantworten, wie es die meisten WebSocket-Bibliotheken tun.
+
+Ein Socket wird außerdem beendet, wenn mehr als 16&nbsp;MiB an Frames, die an ihn gesendet wurden, noch ungelesen sind. Das ist ein Client, der nicht liest, was ihm gesendet wird, oder einer, der so weit zurückliegt, dass das, was er lesen würde, veraltet ist.
+
+Ein beendeter Socket wird wie ein geschlossener aufgeräumt. Seine Abonnements enden, er verlässt seine Kanäle, und seine Presence wird entfernt, wobei der Abgang den anderen Mitgliedern angekündigt wird. Ein Client, der noch da ist, sieht die Verbindung abbrechen, und das SDK [verbindet sich neu](#automatische-wiederverbindung-auto-reconnect) und abonniert erneut. Auf 0.23 bleibt ein solcher Socket offen, bis das Betriebssystem die Verbindung aufgibt (unter Linux etwa zwei Stunden), und jeder Schreibvorgang in eine Collection, die er abonniert hat, kostet für ihn weiterhin einen Refetch.
 
 ## Broadcast-Kanäle
 

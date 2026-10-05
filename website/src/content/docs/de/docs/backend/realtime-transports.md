@@ -1,5 +1,5 @@
 ---
-sourceHash: 67d0f85a988d0aa9
+sourceHash: cba58e3dbe87b090
 title: Echtzeit über mehrere Instanzen
 sidebar_label: Echtzeit über mehrere Instanzen
 description:"\"Wie Broadcast-Channels und Presence mehr als einen Server-Prozess überstehen: der LISTEN/NOTIFY-Bus, was jede Instanz besitzt, und das Schreiben eines eigenen Transports.\""
@@ -32,7 +32,8 @@ Wenn ein Datensatz auf Instanz A geändert wird, sendet sie eine Benachrichtigun
 
 - **Selbstfilterung**: Beim Empfang einer Nachricht liest jede Instanz die `sid`. Entspricht diese der eigenen Instanz-ID, verwirft der Server die Benachrichtigung, um Endlosschleifen beim Routing zu verhindern.
 - **Relay und Fan-out**: Stammt die Benachrichtigung von einer anderen Instanz, plant der Server ein debounctes Refetch und leitet das Update an seine lokal verbundenen WebSocket-Abonnenten weiter.
-- **Supervisor-Wiederverbindungsschleife**: Bricht die Datenbankverbindung ab, überwacht ein Hintergrund-Verbindungs-Supervisor den Status und löst nach einer festen Verzögerung von **3 Sekunden** eine automatische Wiederverbindungssequenz aus. Dadurch wird die `LISTEN`-Schleife wiederhergestellt, ohne den Lebenszyklus der Hono-Hauptanwendung zu beeinträchtigen.
+- **Supervisor-Wiederverbindungsschleife**: Bricht die Datenbankverbindung ab, überwacht ein Hintergrund-Verbindungs-Supervisor den Status und löst nach einer festen Verzögerung von **3 Sekunden** eine automatische Wiederverbindungssequenz aus. Dadurch wird die `LISTEN`-Schleife wiederhergestellt, ohne den Lebenszyklus der Hono-Hauptanwendung zu beeinträchtigen. Danach wird jedes aktive Abonnement der Instanz neu abgefragt, denn was veröffentlicht wurde, während die Verbindung unterbrochen war, hat niemanden erreicht. Ist die Datenbank beim Start nicht erreichbar, wird die Verbindung auf dieselbe Weise erneut versucht.
+- **Heartbeat**: Eine `LISTEN`-Verbindung ist naturgemäß untätig, und ein Leerlauf-Timeout eines Load Balancers oder eines NAT kann sie trennen, ohne dass eine der beiden Seiten einen Fehler sieht (eine halboffene Verbindung). Deshalb läuft sie mit TCP-Keepalive und muss alle 30 Sekunden ein `SELECT 1` innerhalb von 10 Sekunden beantworten. Eine Verbindung, die das versäumt, wird wie oben ersetzt. Solange die Verbindung unterbrochen ist, führt `/health` sie als `cross-instance` auf, und nach 60 Sekunden Ausfall schlägt die Prüfung fehl.
 
 ## Channels und Presence über Instanzen hinweg
 

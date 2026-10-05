@@ -1,5 +1,5 @@
 ---
-sourceHash: 67d0f85a988d0aa9
+sourceHash: cba58e3dbe87b090
 title: Temps réel entre plusieurs instances
 sidebar_label: Temps réel entre plusieurs instances
 description:"\"Comment les canaux de diffusion et la présence fonctionnent sur plusieurs processus serveur : le bus LISTEN/NOTIFY, la gestion par instance et l'écriture de votre propre transport.\""
@@ -32,7 +32,8 @@ Lorsqu'un enregistrement est modifié sur l'instance A, celle-ci diffuse une not
 
 - **Auto-filtrage (Self-Filtering)** : À la réception d'un message, chaque instance lit le `sid`. S'il correspond à son propre identifiant d'instance, le serveur ignore la notification afin d'éviter les boucles infinies de routage.
 - **Relais et diffusion (Fan-out)** : Si la notification provient d'une autre instance, le serveur planifie une nouvelle récupération temporisée (debounced) et relaie la mise à jour à ses abonnés WebSocket connectés localement.
-- **Boucle de reconnexion du superviseur** : En cas d'interruption de la connexion à la base de données, un superviseur de connexion en arrière-plan surveille l'état et déclenche une séquence de reconnexion automatique après un délai fixe de **3 secondes**, rétablissant la boucle `LISTEN` sans affecter le cycle de vie principal de l'application Hono.
+- **Boucle de reconnexion du superviseur** : En cas d'interruption de la connexion à la base de données, un superviseur de connexion en arrière-plan surveille l'état et déclenche une séquence de reconnexion automatique après un délai fixe de **3 secondes**, rétablissant la boucle `LISTEN` sans affecter le cycle de vie principal de l'application Hono. Chaque abonnement actif de l'instance est ensuite relu, car ce qui a été publié pendant la coupure n'a atteint personne. Si la base de données est injoignable au démarrage, la connexion est retentée de la même façon.
+- **Battement de cœur (heartbeat)** : Une connexion `LISTEN` est inactive par nature, et le délai d'inactivité d'un répartiteur de charge ou d'un NAT peut la couper sans erreur d'un côté comme de l'autre (une connexion semi-ouverte). Elle fonctionne donc avec le keepalive TCP et doit répondre à un `SELECT 1` toutes les 30 secondes, en moins de 10 secondes. Une connexion qui n'y répond pas est remplacée comme ci-dessus. Tant que la connexion est coupée, `/health` la signale sous le nom `cross-instance`, et la vérification échoue après 60 secondes de coupure.
 
 ## Canaux et présence entre plusieurs instances
 

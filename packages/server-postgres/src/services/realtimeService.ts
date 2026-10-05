@@ -1,6 +1,5 @@
 import { WebSocket } from "ws";
 import { EventEmitter } from "events";
-import { Client as PgClient } from "pg";
 import { randomUUID } from "crypto";
 import { DataService } from "./dataService";
 
@@ -18,6 +17,8 @@ import { ApiError, logger, rawQueryLoggingEnabled } from "@rebasepro/server";
 import { assertReadRequestReadable } from "./read-field-access";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
+import { PgNotifyListener } from "./pg-notify-listener";
+import { terminateIfBacklogged } from "./socket-liveness";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
 import { isNestedPath } from "./nested-path";
 import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
@@ -478,14 +479,10 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     // ── Cross-instance LISTEN/NOTIFY ──
     /** Unique identifier for this process instance, used to skip own notifications. */
     private readonly instanceId = `inst_${randomUUID().slice(0, 8)}`;
-    /** Dedicated pg.Client for LISTEN (outside the Drizzle pool). */
-    private listenClient?: PgClient;
-    /** Connection string used for reconnecting the LISTEN client. */
-    private listenConnectionString?: string;
+    /** The LISTEN connection on {@link PG_NOTIFY_CHANNEL}, outside the Drizzle pool. */
+    private crossInstanceListener?: PgNotifyListener;
     /** Whether cross-instance broadcasting is active. */
     private broadcasting = false;
-    /** Reconnection timer handle. */
-    private reconnectTimer?: ReturnType<typeof setTimeout>;
     /** Debounce window (ms) for coalescing rapid row updates into a single correctness refetch. */
     private static readonly REFETCH_DEBOUNCE_MS = 300;
 
@@ -1997,12 +1994,19 @@ roles: ["anon"] };
         this.sendRaw(clientId, JSON.stringify(message));
     }
 
-    /** Send an already-serialised frame to a client, if it is still connected. */
+    /**
+     * Send an already-serialised frame to a client, if it is still connected.
+     *
+     * Every frame to a socket goes through here, so this is where a client
+     * that does not read what it is sent is let go of — see
+     * {@link terminateIfBacklogged}. Terminated, it closes like any other
+     * socket, and {@link removeClient} drops what it held.
+     */
     private sendRaw(clientId: string, frame: string) {
         const client = this.clients.get(clientId);
-        if (client && client.readyState === WebSocket.OPEN) {
-            client.send(frame);
-        }
+        if (!client || client.readyState !== WebSocket.OPEN) return;
+        if (terminateIfBacklogged(client, clientId)) return;
+        client.send(frame);
     }
 
     /**
@@ -2389,10 +2393,7 @@ roles: ["anon"] };
 
         for (const memberId of members) {
             if (memberId === clientId) continue; // Don't echo back to sender
-            const ws = this.clients.get(memberId);
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(message);
-            }
+            this.sendRaw(memberId, message);
         }
     }
 
@@ -2665,16 +2666,13 @@ roles: ["anon"] };
         retained: boolean,
         latestSeq?: number
     ): void {
-        const ws = this.clients.get(clientId);
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                type: "channel_history",
-                channel,
-                messages,
-                retained,
-                ...(latestSeq !== undefined ? { latestSeq } : {})
-            }));
-        }
+        this.sendRaw(clientId, JSON.stringify({
+            type: "channel_history",
+            channel,
+            messages,
+            retained,
+            ...(latestSeq !== undefined ? { latestSeq } : {})
+        }));
     }
 
     // =============================================================================
@@ -2785,14 +2783,11 @@ lastSeen: Date.now() });
         channel: string,
         presences: Record<string, Record<string, unknown>>
     ): void {
-        const ws = this.clients.get(clientId);
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                type: "presence_state",
-                channel,
-                presences
-            }));
-        }
+        this.sendRaw(clientId, JSON.stringify({
+            type: "presence_state",
+            channel,
+            presences
+        }));
     }
 
     /** Deliver a presence diff to this instance's members of the channel. */
@@ -2812,10 +2807,7 @@ lastSeen: Date.now() });
         });
 
         for (const memberId of members) {
-            const ws = this.clients.get(memberId);
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(message);
-            }
+            this.sendRaw(memberId, message);
         }
     }
 
@@ -2997,6 +2989,10 @@ lastSeen: Date.now() });
         if (this.cdcActive && this.cdcListener) {
             const { connected, downSince } = this.cdcListener.status();
             listeners.push({ name: "cdc", connected, ...(downSince !== undefined ? { downSince } : {}) });
+        }
+        if (this.crossInstanceListener) {
+            const { connected, downSince } = this.crossInstanceListener.status();
+            listeners.push({ name: "cross-instance", connected, ...(downSince !== undefined ? { downSince } : {}) });
         }
         const bus = this.bus instanceof PostgresChannelBus ? this.bus.status() : undefined;
         if (bus) {
@@ -3247,8 +3243,15 @@ lastSeen: Date.now() });
 
     /**
      * Enable cross-instance realtime broadcasting via Postgres LISTEN/NOTIFY.
-     * Creates a dedicated pg.Client (outside the Drizzle pool) that stays
-     * connected and listens for change notifications from other instances.
+     * Listens on a dedicated connection (outside the Drizzle pool) for the
+     * changes other instances publish, through a {@link PgNotifyListener}: it
+     * proves itself with a heartbeat, is replaced when it drops or stops
+     * answering, and every subscription is refetched once it is back, since
+     * whatever was published meanwhile reached nobody here.
+     *
+     * A database that cannot be reached at boot does not fail this call: the
+     * listener reports itself down (see {@link health}) and keeps dialling.
+     * There is no other cross-instance path to fall back to.
      *
      * This is an **optional** feature — if never called, the backend operates
      * in single-instance mode (the default, perfectly fine for most setups).
@@ -3261,11 +3264,16 @@ lastSeen: Date.now() });
             return;
         }
 
-        this.listenConnectionString = connectionString;
-        // Set broadcasting BEFORE connecting so that scheduleReconnect()
-        // works correctly if the initial connection attempt fails.
         this.broadcasting = true;
-        await this.connectListenClient();
+        this.crossInstanceListener = new PgNotifyListener({
+            connectionString,
+            channel: PG_NOTIFY_CHANNEL,
+            logLabel: "[RealtimeService]",
+            onPayload: (payload) => this.handleCrossInstanceNotification(payload),
+            onReconnect: () => this.resyncSubscriptions(),
+            retryInitialConnect: true
+        });
+        await this.crossInstanceListener.start();
         logger.info(`📡 [RealtimeService] Cross-instance realtime enabled (instanceId: ${this.instanceId})`);
     }
 
@@ -3274,16 +3282,10 @@ lastSeen: Date.now() });
      */
     async stopListening(): Promise<void> {
         this.broadcasting = false;
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = undefined;
-        }
-        if (this.listenClient) {
-            try {
-                await this.listenClient.end();
-            } catch { /* ignore close errors */ }
-            this.listenClient = undefined;
-        }
+        const listener = this.crossInstanceListener;
+        if (!listener) return;
+        this.crossInstanceListener = undefined;
+        await listener.stop();
         logger.info("📡 [RealtimeService] Cross-instance realtime disabled.");
     }
 
@@ -3301,130 +3303,55 @@ lastSeen: Date.now() });
         await this.db.execute(drizzleSql`SELECT pg_notify(${PG_NOTIFY_CHANNEL}, ${payload})`);
     }
 
-    /**
-     * Create and connect the dedicated LISTEN client with auto-reconnect.
-     *
-     * @param reconnect Set when the client is coming back from a drop: every
-     *        notification published in the gap is gone, so the subscriptions
-     *        are refetched once it is listening again.
-     */
-    private async connectListenClient({ reconnect = false }: { reconnect?: boolean } = {}): Promise<void> {
-        if (!this.listenConnectionString) return;
-
-        let pending: PgClient | undefined;
+    /** One change another instance published on {@link PG_NOTIFY_CHANNEL}. */
+    private async handleCrossInstanceNotification(payload: string): Promise<void> {
         try {
-            // See `PgNotifyListener.connect` — same shape, same reason. Until
-            // `this.listenClient` is assigned, nothing else in this class knows
-            // the connection exists, so a throw between `connect()` and that
-            // assignment leaks a live backend and `scheduleReconnect` opens
-            // another one three seconds later.
-            const client = new PgClient({ connectionString: this.listenConnectionString });
-            pending = client;
+            const { sid, p, eid, db } = JSON.parse(payload) as {
+                sid: string;
+                p: string;
+                eid: string;
+                db: string | null;
+            };
 
-            client.on("error", (err) => {
-                logger.error("❌ [RealtimeService] LISTEN client error", { detail: err.message });
-                this.scheduleReconnect();
-            });
+            // Skip our own notifications — already processed locally
+            if (sid === this.instanceId) return;
 
-            client.on("end", () => {
-                if (this.broadcasting) {
-                    logger.warn("⚠️ [RealtimeService] LISTEN client disconnected unexpectedly.");
-                    this.scheduleReconnect();
+            // A foreign sid is proof of a second process. Nothing here
+            // needs that fact, but the channel path does — see
+            // `warnIfMemoryBusOnMultiplePods`.
+            this.foreignInstanceSeen = true;
+
+            this.debugLog(`📡 [RealtimeService] Received cross-instance notification: path=${p}, id=${eid}, from=${sid}`);
+
+            // Refetch the row from the DB so row subscriptions
+            // receive the actual data instead of null (which the client
+            // would interpret as "deleted").
+            let refetchedRow: Record<string, unknown> | null = null;
+            try {
+                if (this.driver) {
+                    const collection = this.registry.getCollectionByPath(p);
+                    const fetched = await this.driver.fetchOne({
+                        path: p,
+                        id: eid,
+                        collection: collection
+                    });
+                    refetchedRow = fetched ?? null;
+                } else {
+                    const fetched = await this.dataService.fetchOne(
+                        p, eid, db ?? undefined
+                    );
+                    refetchedRow = fetched ?? null;
                 }
-            });
-
-            client.on("notification", async (msg) => {
-                if (!msg.payload) return;
-                try {
-                    const { sid, p, eid, db } = JSON.parse(msg.payload) as {
-                        sid: string;
-                        p: string;
-                        eid: string;
-                        db: string | null;
-                    };
-
-                    // Skip our own notifications — already processed locally
-                    if (sid === this.instanceId) return;
-
-                    // A foreign sid is proof of a second process. Nothing here
-                    // needs that fact, but the channel path does — see
-                    // `warnIfMemoryBusOnMultiplePods`.
-                    this.foreignInstanceSeen = true;
-
-                    this.debugLog(`📡 [RealtimeService] Received cross-instance notification: path=${p}, id=${eid}, from=${sid}`);
-
-                    // Refetch the row from the DB so row subscriptions
-                    // receive the actual data instead of null (which the client
-                    // would interpret as "deleted").
-                    let refetchedRow: Record<string, unknown> | null = null;
-                    try {
-                        if (this.driver) {
-                            const collection = this.registry.getCollectionByPath(p);
-                            const fetched = await this.driver.fetchOne({
-                                path: p,
-                                id: eid,
-                                collection: collection
-                            });
-                            refetchedRow = fetched ?? null;
-                        } else {
-                            const fetched = await this.dataService.fetchOne(
-                                p, eid, db ?? undefined
-                            );
-                            refetchedRow = fetched ?? null;
-                        }
-                    } catch (fetchErr) {
-                        // If the fetch fails (e.g. row was deleted), refetchedRow stays null
-                        this.debugLog(`📡 [RealtimeService] Could not refetch row ${eid} from ${p} — treating as deleted`, fetchErr);
-                    }
-
-                    // Trigger local fan-out with broadcast=false to avoid re-broadcasting
-                    await this.notifyUpdate(p, eid, refetchedRow, db ?? undefined, false);
-                } catch (err) {
-                    logger.error("❌ [RealtimeService] Error processing cross-instance notification", { error: err });
-                }
-            });
-
-            await client.connect();
-            await client.query(`LISTEN ${PG_NOTIFY_CHANNEL}`);
-            this.listenClient = client;
-            // Adopted: `destroy()` and `scheduleReconnect` close it now.
-            pending = undefined;
-
-            this.debugLog(`📡 [RealtimeService] LISTEN client connected on channel "${PG_NOTIFY_CHANNEL}"`);
-            if (reconnect) {
-                logger.warn("⚠️ [RealtimeService] LISTEN client reconnected; refetching every subscription for what it missed.");
-                this.resyncSubscriptions();
+            } catch (fetchErr) {
+                // If the fetch fails (e.g. row was deleted), refetchedRow stays null
+                this.debugLog(`📡 [RealtimeService] Could not refetch row ${eid} from ${p} — treating as deleted`, fetchErr);
             }
+
+            // Trigger local fan-out with broadcast=false to avoid re-broadcasting
+            await this.notifyUpdate(p, eid, refetchedRow, db ?? undefined, false);
         } catch (err) {
-            if (pending) {
-                try { await pending.end(); } catch { /* already dead */ }
-            }
-            logger.error("❌ [RealtimeService] Failed to connect LISTEN client", { error: err });
-            this.scheduleReconnect();
+            logger.error("❌ [RealtimeService] Error processing cross-instance notification", { error: err });
         }
-    }
-
-    /**
-     * Schedule a reconnection attempt with a fixed 3s delay.
-     */
-    private scheduleReconnect(): void {
-        if (!this.broadcasting || this.reconnectTimer) return;
-
-        const delay = 3000; // Fixed 3s delay; simple and predictable
-        this.debugLog(`📡 [RealtimeService] Scheduling LISTEN reconnect in ${delay}ms...`);
-
-        this.reconnectTimer = setTimeout(async () => {
-            this.reconnectTimer = undefined;
-            if (!this.broadcasting) return;
-
-            // Clean up old client
-            if (this.listenClient) {
-                try { await this.listenClient.end(); } catch { /* ignore */ }
-                this.listenClient = undefined;
-            }
-
-            await this.connectListenClient({ reconnect: true });
-        }, delay);
     }
 }
 
