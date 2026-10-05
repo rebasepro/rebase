@@ -2412,7 +2412,8 @@ as a wider one.
 | `GET /file/*` — the shared-cache decision (`Cache-Control: public`) | **BUG** — `isPublicStoragePath(key)` read the key `default/public/x` (a folder called `default`) as public; fixed with the key predicate |
 | `GET /metadata/*` — `public: true` vs. minting a token | clean before (it prefixed the bucket first); now on the key predicate too |
 | `fileTokenAuth` — the path a token is compared with | clean — its own copy of the route's derivation, identical; now the shared function |
-| `DELETE /file/*`, `POST /upload`, `GET /list`, `POST /folder`, TUS | clean — each canonicalizes once and hands the same string to the hook and the controller |
+| `DELETE /file/*`, `POST /upload`, `GET /list`, `POST /folder`, TUS | clean on the key — each canonicalizes once and hands the same string to the hook and the controller |
+| the storage *source* the hook is told, on every door | **BUG** — the hook got `storageId` as spelled while the registry served `canonicalStorageId` of it, so a hook guarding `"private"` by name approved `?storageId=%20private` and the private source served, deleted or took the write; it now gets the canonical id, and nothing for the default source |
 | transforms and durable renditions | clean — cache and rendition keys are built from the served key; `isRenditionKey` reads a folded copy, but folded *wider* (case, `\`, NFKC), so it can only refuse more |
 | client SDK, `useBackendStorageSource` | clean by direction — they only choose whether to skip the `/metadata` round trip; a wrong "public" builds a token-less URL the server refuses |
 | the scaffolded `storageAuthorize` hooks | **BUG** — `isPublicStoragePath(key)` read `default/public/x` as public; templates use `isPublicStorageKey` |

@@ -458,6 +458,12 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         bucket: string,
         storageId?: string | null
     ): Promise<void> => {
+        // The source the request is served from — the registry resolves the
+        // controller through this same function — rather than the id as it was
+        // spelled. ` private` and `private` reach one controller, and a check
+        // that compared the spelling approved the one while the other served.
+        const source = canonicalStorageId(storageId);
+
         // A narrowed credential — an API key, a token — needs the storage
         // scope for this operation on this source. Here, because only here is
         // the source known: it may arrive in the query, a form field or the
@@ -465,7 +471,6 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const narrowed = c.get("scopes");
         if (narrowed) {
             const scope = `storage:${operation === "list" ? "read" : operation}`;
-            const source = canonicalStorageId(storageId);
             if (!scopeGrants(narrowed, scope, source)) {
                 throw new ApiError(403, "SCOPE_MISSING",
                     `This credential does not hold "${scope}" for storage source "${source}".`,
@@ -493,7 +498,10 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 bucket,
                 operation,
                 user,
-                storageId: storageId ?? undefined,
+                // Absent for the default source however it was asked for (no
+                // parameter, empty, `(default)`), as the context type promises
+                // and as the SDK sends it.
+                storageId: source === DEFAULT_STORAGE_SOURCE_KEY ? undefined : source,
                 data: authorizeData?.()
             });
         } catch {

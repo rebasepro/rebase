@@ -496,7 +496,7 @@ await initializeRebaseBackend({
 | `bucket` | Resolved bucket (`"default"` when unspecified) |
 | `operation` | `"read"`, `"write"`, `"delete"` or `"list"` |
 | `user` | `{ uid, email?, roles? }`, or `null` where the route allows anonymous access |
-| `storageId` | The named backend, when the request targeted one |
+| `storageId` | The named backend, when the request targeted one — its canonical key (`?storageId=%20media` is `"media"`). Absent for the default source, however the request named it (no parameter, empty, or `(default)`) |
 | `data` | Trusted, **RLS-bypassing** read access — `data.collection(slug).find(query)` / `.findById(id)`. Ownership lives in a row, not in a key prefix, so the hook needs a reader to answer "who owns this object?". It bypasses row-level security deliberately: this hook *is* the authorization decision, and making it through a reader already narrowed by the caller's own permissions would be circular. Read-only by design. |
 
 Return `false` to deny with a **403**. Throwing also denies — an ownership lookup that fails does not fall open.

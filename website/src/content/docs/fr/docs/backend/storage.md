@@ -1,5 +1,5 @@
 ---
-sourceHash: 1fb2c48c53650df2
+sourceHash: 79207c5462071a3a
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez des backends de stockage sur système de fichiers local, compatibles S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -497,7 +497,7 @@ await initializeRebaseBackend({
 | `bucket` | Bucket résolu (`"default"` s'il n'est pas spécifié) |
 | `operation` | `"read"`, `"write"`, `"delete"` ou `"list"` |
 | `user` | `{ uid, email?, roles? }`, ou `null` lorsque la route autorise l'accès anonyme |
-| `storageId` | Le backend nommé, lorsque la requête en ciblait un |
+| `storageId` | Le backend nommé, lorsque la requête en ciblait un — sa clé canonique (`?storageId=%20media` vaut `"media"`). Absent pour la source par défaut, quelle que soit la façon dont la requête la nomme (pas de paramètre, vide ou `(default)`) |
 | `data` | Accès en lecture de confiance, **contournant la RLS** — `data.collection(slug).find(query)` / `.findById(id)`. La propriété d'un objet réside dans une ligne de base de données, et non dans le préfixe d'une clé ; le hook a donc besoin d'un lecteur pour déterminer "qui possède cet objet ?". Il contourne délibérément la sécurité au niveau des lignes : ce hook *est* la décision d'autorisation, et l'exécuter via un lecteur déjà restreint par les permissions de l'appelant créerait une circularité. Conçu en lecture seule par définition. |
 
 Renvoyez `false` pour refuser avec un code **403**. Lever une exception refuse également l'accès — une vérification de propriété qui échoue ne laisse pas l'accès ouvert par défaut.

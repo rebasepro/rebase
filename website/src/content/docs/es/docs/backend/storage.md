@@ -1,5 +1,5 @@
 ---
-sourceHash: 1fb2c48c53650df2
+sourceHash: 79207c5462071a3a
 title: Configuración de almacenamiento
 sidebar_label: Configuración de almacenamiento
 description: Configure backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para la subida de archivos, imágenes y contenido multimedia.
@@ -502,7 +502,7 @@ await initializeRebaseBackend({
 | `bucket` | Bucket resuelto (`"default"` cuando no se especifica) |
 | `operation` | `"read"`, `"write"`, `"delete"` o `"list"` |
 | `user` | `{ uid, email?, roles? }`, o `null` donde la ruta permite acceso anónimo |
-| `storageId` | El backend con nombre, cuando la solicitud apuntaba a uno |
+| `storageId` | El backend con nombre, cuando la solicitud apuntaba a uno: su clave canónica (`?storageId=%20media` es `"media"`). Ausente para el origen predeterminado, lo nombre como lo nombre la solicitud (sin parámetro, vacío o `(default)`) |
 | `data` | Acceso de lectura de confianza que **omite RLS** — `data.collection(slug).find(query)` / `.findById(id)`. La propiedad reside en una fila, no en el prefijo de una clave, por lo que el hook necesita un mecanismo de lectura para responder "¿a quién pertenece este objeto?". Omite la seguridad a nivel de fila deliberadamente: este hook *es* la decisión de autorización, y tomarla a través de un lector ya restringido por los permisos del propio solicitante sería circular. De solo lectura por diseño. |
 
 Devuelva `false` para denegar con un **403**. Lanzar una excepción también deniega el acceso — una búsqueda de propiedad que falla no queda abierta por defecto.
