@@ -357,7 +357,14 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         // non-cookie mode meant an anonymous visitor (who sends no body) got a
         // 400 INVALID_INPUT logged at warn on every page load, when the honest
         // answer is simply "not signed in".
-        refreshToken: z.string().min(1).optional()
+        //
+        // And no `.min(1)`: an empty string is how this server's own cookie-mode
+        // responses spell "the cookie has it", so a client echoing `""` back is
+        // presenting no body token, not a malformed one. Refusing it here
+        // answered 400 before `readRefreshToken` could read the cookie, which
+        // broke every in-tab refresh under cookieAuth; it now treats `""` as
+        // absent, wherever it comes from.
+        refreshToken: z.string().optional()
     });
     // `logoutSchema` and `updateProfileSchema` were declared here and used by
     // nothing: `/auth/logout` and `PATCH /auth/me` live in `session-routes.ts`,

@@ -314,6 +314,37 @@ expiresAt: Date.now() + 100000 }));
 
             expect(auth.getSession()).toBeNull();
         });
+
+        it("reports a refresh refused as malformed (400) and does not retry it", async () => {
+            // The identical request is refused identically: a backoff only
+            // buried the server's message under five more copies of it.
+            const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+            try {
+                const storage = createMemoryStorage();
+                storage.setItem("rebase_auth", JSON.stringify(mockSessionObj(Date.now() + 60000)));
+                mockFetch.mockResolvedValue({
+                    ok: false,
+                    status: 400,
+                    statusText: "Bad Request",
+                    json: async () => ({
+                        error: { message: "refreshToken: Too small: expected string to have >=1 characters", code: "INVALID_INPUT" }
+                    })
+                });
+
+                const auth = createAuth(transport, { storage });
+                await settle(() => consoleError.mock.calls.length > 0);
+                await jest.advanceTimersByTimeAsync(5 * 60_000);
+
+                expect(mockFetch).toHaveBeenCalledTimes(1);
+                expect(consoleError).toHaveBeenCalledTimes(1);
+                expect(String(consoleError.mock.calls[0][0])).toContain("400 INVALID_INPUT");
+                expect(String(consoleError.mock.calls[0][0])).toContain("Too small");
+                // The token was never refused, so the session is not thrown away.
+                expect(auth.getSession()).not.toBeNull();
+            } finally {
+                consoleError.mockRestore();
+            }
+        });
     });
 
     // -----------------------------------------------------------------------
@@ -606,6 +637,26 @@ json: async () => ({}) });
             await auth.signOut();
             expect(auth.getSession()).toBeNull();
         });
+
+        it("presents no refresh token in the body in cookie mode", async () => {
+            // Cold start: nothing in the jar, so the session is opened by a sign-in.
+            mockFetch.mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({ error: { code: "NO_SESSION" } }) });
+            const auth = createAuth(transport, { storage: createMemoryStorage(), authFlowMode: "cookie" });
+            await auth.isInitialized();
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ tokens: { ...mockTokens(), refreshToken: "" }, user: mockUser })
+            });
+            await auth.signInWithEmail("test@example.com", "password123");
+
+            mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+            await auth.signOut();
+
+            expect(mockFetch).toHaveBeenLastCalledWith("http://localhost/api/v1/auth/logout", expect.objectContaining({
+                body: "{}",
+                credentials: "include"
+            }));
+        });
     });
 
     // -----------------------------------------------------------------------
@@ -631,6 +682,33 @@ json: async () => ({}) });
             const result = await auth.refreshSession();
             expect(result.accessToken).toEqual("new-jwt");
             expect(transport.setToken).toHaveBeenCalledWith("new-jwt");
+        });
+
+        it("presents no refresh token in the body from a live cookie-mode session", async () => {
+            // The server answers `refreshToken: ""` in cookie mode. Echoing it
+            // back was a 400 on every in-tab refresh, so a tab that outlived
+            // its access token — every laptop that slept — could not renew it.
+            mockFetch.mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({ error: { code: "NO_SESSION" } }) });
+            const auth = createAuth(transport, { storage: createMemoryStorage(), authFlowMode: "cookie" });
+            await auth.isInitialized();
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ tokens: { ...mockTokens(), refreshToken: "" }, user: mockUser })
+            });
+            await auth.signInWithEmail("test@example.com", "password123");
+
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ tokens: { ...mockTokens(), accessToken: "renewed", refreshToken: "" }, user: mockUser })
+            });
+            const renewed = await auth.refreshSession();
+
+            expect(renewed.accessToken).toBe("renewed");
+            expect(renewed.refreshToken).toBe("");
+            expect(mockFetch).toHaveBeenLastCalledWith("http://localhost/api/v1/auth/refresh", expect.objectContaining({
+                body: "{}",
+                credentials: "include"
+            }));
         });
 
         it("throws when no active session to refresh", async () => {

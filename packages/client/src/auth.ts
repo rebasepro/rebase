@@ -148,8 +148,53 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         return transport.fetchFn || globalThis.fetch;
     }
 
-    function throwApiError(status: number, body: { error?: { message?: string; code?: string; details?: unknown }; message?: string; code?: string; details?: unknown } | undefined, statusText: string): never {
-        throw new RebaseApiError(
+    /**
+     * The body of a request that presents the refresh token — `/refresh` and
+     * `/logout`.
+     *
+     * Empty in cookie mode. The token is in an HttpOnly cookie the browser
+     * attaches, and this client never holds it: what it holds is the `""` the
+     * server answers in its place. Sending that back was sending a blank token
+     * beside the cookie, and a server that refused the blank (0.10.0 through
+     * 0.23, with 400 INVALID_INPUT) never read the cookie — so no tab that outlived
+     * its access token could renew it, while a reload, which had no session in
+     * memory and so sent no field, could.
+     */
+    function refreshTokenBody(): string {
+        return JSON.stringify(authFlowMode === "cookie" ? {} : { refreshToken: currentSession?.refreshToken });
+    }
+
+    /**
+     * The refresh token a new session keeps, given the one an answer carried.
+     *
+     * In cookie mode, none: the server answers `refreshToken: ""` because the
+     * cookie holds it, and that `""` is "not held here", not a token to carry
+     * forward or present. Otherwise the answer's token, or — from a server
+     * that omits it on a rotation it did not make — the one already held.
+     */
+    function heldRefreshToken(received: string | undefined): string {
+        if (authFlowMode === "cookie") return "";
+        return received || currentSession?.refreshToken || "";
+    }
+
+    /**
+     * Whether the server refused a refresh as malformed: a 400, which says the
+     * request this client built is not one that server accepts.
+     *
+     * That is a client/server contract mismatch, not a blip. The identical
+     * request is refused identically however often it is sent, so retrying it
+     * on a backoff only hides the error behind six identical ones — which is
+     * how a cookie-mode tab, refused this way after every wake from sleep,
+     * quietly ended on its login screen.
+     */
+    function isMalformedRefreshError(err: unknown): boolean {
+        return err instanceof RebaseApiError && err.status === 400;
+    }
+
+    type ErrorBody = { error?: { message?: string; code?: string; details?: unknown }; message?: string; code?: string; details?: unknown } | undefined;
+
+    function apiError(status: number, body: ErrorBody, statusText: string): RebaseApiError {
+        return new RebaseApiError(
             body?.error?.message || body?.message || statusText,
             {
                 status,
@@ -157,6 +202,10 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
                 details: body?.error?.details || body?.details
             }
         );
+    }
+
+    function throwApiError(status: number, body: ErrorBody, statusText: string): never {
+        throw apiError(status, body, statusText);
     }
 
     function emit(event: AuthChangeEvent, session: RebaseSession | null) {
@@ -306,6 +355,10 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
                 abandonSessionLocally();
                 return;
             }
+            // Refused as malformed, and already reported by `requestRefresh`.
+            // Sending it again gets the same answer. The token was never
+            // refused, so the session stays, as it does when retries run out.
+            if (isMalformedRefreshError(err)) return;
             if (attempt >= MAX_REFRESH_RETRIES) {
                 // Out of retries. A token the server kept refusing — as
                 // already used, the one refusal retried at all — is as dead as
@@ -386,7 +439,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         const user: User = mapRawUser(data.user);
         const session: RebaseSession = {
             accessToken: data.tokens.accessToken,
-            refreshToken: data.tokens.refreshToken || (currentSession?.refreshToken) || "",
+            refreshToken: heldRefreshToken(data.tokens.refreshToken),
             expiresAt: data.tokens.accessTokenExpiresAt,
             user
         };
@@ -570,7 +623,7 @@ redirectUri });
                 await fetchFn(authUrl("/logout"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ refreshToken: currentSession?.refreshToken }),
+                    body: refreshTokenBody(),
                     credentials: authFlowMode === "cookie" ? "include" : undefined
                 } as RequestInit);
             }
@@ -733,12 +786,28 @@ redirectUri });
         const res = await fetchFn(authUrl("/refresh"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refreshToken: currentSession?.refreshToken }),
+            body: refreshTokenBody(),
             credentials: authFlowMode === "cookie" ? "include" : undefined
         } as RequestInit);
         const body = await res.json().catch(() => ({}));
         if (epoch !== sessionEpoch) return supersededRefresh();
-        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        if (!res.ok) {
+            const err = apiError(res.status, body, res.statusText);
+            if (isMalformedRefreshError(err)) {
+                // Said out loud, once per refusal, because nothing else will:
+                // the session cannot be renewed, and every caller of a refresh
+                // treats a non-auth failure as something to wait out.
+                console.error(
+                    `[rebase] POST ${authPath}/refresh was refused as malformed ` +
+                    `(${res.status}${err.code ? ` ${err.code}` : ""}): ${err.message}. ` +
+                    "The client and server disagree on the refresh request, so this session " +
+                    "cannot be renewed and retrying will not help. Check that @rebasepro/client " +
+                    "and @rebasepro/server are on compatible versions, and that `authFlowMode` " +
+                    "matches the server's `cookieAuth`."
+                );
+            }
+            throw err;
+        }
 
         const accessToken = body.tokens.accessToken;
         transport.setToken(accessToken);
@@ -763,7 +832,7 @@ redirectUri });
 
         const session: RebaseSession = {
             accessToken,
-            refreshToken: body.tokens.refreshToken || currentSession?.refreshToken || "",
+            refreshToken: heldRefreshToken(body.tokens.refreshToken),
             expiresAt: body.tokens.accessTokenExpiresAt,
             user: user ?? EMPTY_USER
         };
@@ -1330,8 +1399,10 @@ refreshToken: session.refreshToken };
                             // without a connection — while a running app, on
                             // the very same error, keeps its session. Keep it
                             // here too, and try again on the backoff schedule.
+                            // A refusal as malformed is neither: it is not
+                            // retried, since it would be refused again.
                             transport.setToken(currentSession.accessToken);
-                            if (autoRefresh) scheduleRetry(0);
+                            if (autoRefresh && !isMalformedRefreshError(err)) scheduleRetry(0);
                         }
                     }
                     resolveInitialized!();

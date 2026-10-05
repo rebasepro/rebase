@@ -77,6 +77,13 @@ export function clearRefreshCookie(c: Context<HonoEnv>, config: CookieAuthConfig
 
 /**
  * Read the refresh token from the request — cookie first, then body fallback.
+ *
+ * An empty string is no token, wherever it comes from. In cookie mode every
+ * response this server sends carries `refreshToken: ""` (see
+ * `redactRefreshToken`), and a client that echoes it back — `@rebasepro/client`
+ * did, on every refresh from a live tab — is presenting nothing. Taking the
+ * body's `""` as the token, or refusing it at the schema, kept the cookie
+ * beside it from ever being read.
  */
 export function readRefreshToken(c: Context<HonoEnv>, body: { refreshToken?: string }, config: CookieAuthConfig | undefined): string | undefined {
     if (config) {
@@ -87,11 +94,12 @@ export function readRefreshToken(c: Context<HonoEnv>, body: { refreshToken?: str
         for (const part of cookies) {
             const trimmed = part.trim();
             if (trimmed.startsWith(prefix)) {
-                return decodeURIComponent(trimmed.slice(prefix.length));
+                const fromCookie = decodeURIComponent(trimmed.slice(prefix.length));
+                if (fromCookie) return fromCookie;
             }
         }
     }
-    return body.refreshToken;
+    return body.refreshToken || undefined;
 }
 
 /**

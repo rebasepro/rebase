@@ -23,6 +23,10 @@ export type AuthChangeEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED" | "
  */
 export interface RebaseSession {
     accessToken: string;
+    /**
+     * `""` under `authFlowMode: "cookie"`: the refresh token is in an HttpOnly
+     * cookie that no script can read, so the session does not hold it.
+     */
     refreshToken: string;
     expiresAt: number;
     user: User;

@@ -1127,6 +1127,17 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 #### Client SDK
 
+- **With `authFlowMode: "cookie"`, the client no longer sends a refresh token
+  in the body of `/auth/refresh` or `/auth/logout`.** The cookie carries it.
+  The client used to send back the `""` the server returns in cookie mode,
+  and servers since 0.10.0 refused that with a 400, so an open tab could not
+  renew an expired session. In cookie mode `session.refreshToken` is `""`,
+  and the client never sends it as a token. A refresh refused with `400` is
+  now logged with `console.error`, including the server's message, and is
+  not retried, because the same request gets the same answer. It used to be
+  retried silently six times. The session is kept, as it is when retries run
+  out.
+
 - **A generated SDK lints clean.** A collection with no relations was emitted
   as `Relations: {}`, which typescript-eslint's recommended
   `no-empty-object-type` refuses in any project that lints its generated
@@ -1190,6 +1201,18 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   the now signed-out client.
 
 #### Auth
+
+- **Under `cookieAuth`, a tab whose access token has expired can renew it
+  again.** `/auth/refresh` answered `{"refreshToken": ""}` with
+  `400 INVALID_INPUT` before reading the cookie, and `@rebasepro/client`
+  sends exactly that from any open tab, because `""` is what cookie mode
+  returns in the token's place. Any tab left open past the access token's
+  lifetime (one hour by default, so every laptop that slept) showed its
+  login screen, and a reload signed the user back in. An empty
+  `refreshToken` now counts as no token on `/auth/refresh` and
+  `/auth/logout`, so the server reads the cookie. This also fixes apps
+  already deployed with the older client, with no rebuild: a managed
+  runtime serves them its own copy of `@rebasepro/server`.
 
 - **A wrong password or MFA code is no longer answered with a token refresh
   and a resend.** A mistyped step-up code used to spend two of the
