@@ -1,5 +1,5 @@
 ---
-sourceHash: 419a1d3fedba3c2d
+sourceHash: 4b2acc8e12bf440c
 title: Tempo Real & WebSocket
 sidebar_label: Tempo Real
 description: Sincronização de dados em tempo real, canais de broadcast e rastreamento de presença via WebSocket.
@@ -224,6 +224,29 @@ não têm limite.
 Um id de assinatura é próprio do socket: dois clientes que ambos nomeiam uma
 assinatura `"sub-1"` mantêm cada um a sua, e um `unsubscribe` encerra apenas a
 do remetente.
+
+### Sockets que param de responder
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Um cliente pode sumir sem fechar seu socket: um celular perde o
+sinal, um notebook entra em suspensão, um NAT esquece a conexão. Nenhum frame de
+fechamento chega, então nada avisa o servidor. Por isso o servidor envia um ping
+a cada socket a cada 30 segundos e encerra o que não respondeu até o ping
+seguinte, de modo que um cliente que sumiu é liberado em menos de um minuto.
+Navegadores e o SDK respondem aos pings sozinhos; um cliente que fala o
+protocolo diretamente também precisa respondê-los, como faz a maioria das
+bibliotecas de WebSocket.
+
+Um socket também é encerrado quando mais de 16&nbsp;MiB de frames enviados a ele
+continuam sem ser lidos. É um cliente que não lê o que recebe, ou um tão
+atrasado que o que ele leria já está desatualizado.
+
+Um socket encerrado é limpo como um fechado. Suas assinaturas terminam, ele sai
+dos seus canais e sua presença é removida, com a saída anunciada aos outros
+membros. Um cliente que ainda está lá vê a conexão cair, e o SDK
+[se reconecta](#reconexão-automática) e assina de novo. Na 0.23 um socket assim
+continua aberto até o sistema operacional desistir da conexão (cerca de duas
+horas no Linux), e cada gravação em uma coleção que ele assina continua custando
+um refetch para ele.
 
 ## Canais de Broadcast
 

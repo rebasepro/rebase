@@ -1,5 +1,5 @@
 ---
-sourceHash: 419a1d3fedba3c2d
+sourceHash: 4b2acc8e12bf440c
 title: Tiempo real y WebSocket
 sidebar_label: Tiempo real
 description: Sincronización de datos en tiempo real, canales de difusión y seguimiento de presencia mediante WebSocket.
@@ -229,6 +229,29 @@ suscripciones de un socket no tienen límite.
 Un id de suscripción es propio del socket: dos clientes que nombran ambos una
 suscripción `"sub-1"` conservan cada uno la suya, y un `unsubscribe` termina
 solo la del emisor.
+
+### Sockets que dejan de responder
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Un cliente puede desaparecer sin cerrar su socket: un móvil
+pierde la cobertura, un portátil entra en reposo, un NAT olvida la conexión. No
+llega ningún frame de cierre, así que nada se lo dice al servidor. Por eso el
+servidor envía un ping a cada socket cada 30 segundos y termina el que no ha
+respondido antes del siguiente ping, de modo que un cliente desaparecido se
+libera en menos de un minuto. Los navegadores y el SDK responden a los pings por
+sí solos; un cliente que habla el protocolo directamente también tiene que
+responderlos, como hacen la mayoría de las bibliotecas de WebSocket.
+
+Un socket también se termina cuando más de 16&nbsp;MiB de frames enviados a él
+siguen sin leerse. Es un cliente que no lee lo que se le envía, o uno tan
+retrasado que lo que leería ya está desfasado.
+
+Un socket terminado se limpia como uno cerrado. Sus suscripciones terminan, sale
+de sus canales y se elimina su presencia, y la salida se anuncia a los demás
+miembros. Un cliente que sigue ahí ve caer la conexión, y el SDK
+[se reconecta](#reconexión-automática) y vuelve a suscribirse. En 0.23 un socket
+así sigue abierto hasta que el sistema operativo da por perdida la conexión
+(unas dos horas en Linux), y cada escritura en una colección a la que está
+suscrito sigue costando un refetch para él.
 
 ## Canales de difusión (Broadcast Channels)
 

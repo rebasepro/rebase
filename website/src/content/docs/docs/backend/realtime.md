@@ -256,6 +256,28 @@ A subscription id is the socket's own: two clients that both name a
 subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the
 sender's.
 
+### Sockets that stop answering
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A client can vanish without closing its socket: a phone loses
+signal, a laptop goes to sleep, a NAT forgets the connection. No close frame
+arrives, so nothing tells the server. The server therefore pings every socket
+every 30 seconds and terminates one that has not answered by the next ping, so
+a vanished client is let go of within a minute. Browsers and the SDK answer
+pings on their own; a client that speaks the protocol directly has to answer
+them too, as most WebSocket libraries do.
+
+A socket is also terminated when more than 16&nbsp;MiB of frames sent to it are
+still unread. That is a client that does not read what it is sent, or one so far
+behind that what it would read is stale.
+
+A terminated socket is cleaned up like a closed one. Its subscriptions end, it
+leaves its channels, and its presence is removed, with the departure announced
+to the other members. A client that is still there sees the connection drop,
+and the SDK [reconnects](#auto-reconnect) and subscribes again. On 0.23 such a
+socket stays open until the operating system gives up on the connection (about
+two hours on Linux), and every write to a collection it subscribes to still
+costs a refetch for it.
+
 ## Broadcast Channels
 
 Broadcast channels let clients send arbitrary messages to each other in real time — useful for features like typing indicators, cursor positions, or custom notifications.

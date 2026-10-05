@@ -1,5 +1,5 @@
 ---
-sourceHash: 419a1d3fedba3c2d
+sourceHash: 4b2acc8e12bf440c
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Sincronizzazione dei dati in tempo reale, canali di broadcast e tracciamento della presenza tramite WebSocket.
@@ -232,6 +232,29 @@ limitate.
 Un id di sottoscrizione è proprio del socket: due client che nominano
 entrambi una sottoscrizione `"sub-1"` mantengono ciascuno la propria, e un
 `unsubscribe` termina solo quella del mittente.
+
+### Socket che smettono di rispondere
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> Un client può sparire senza chiudere il proprio socket: un
+telefono perde il segnale, un portatile va in sospensione, un NAT dimentica la
+connessione. Non arriva alcun frame di chiusura, quindi nessuno lo dice al
+server. Per questo il server invia un ping a ogni socket ogni 30 secondi e
+termina quello che non ha risposto entro il ping successivo, così un client
+sparito viene rilasciato entro un minuto. I browser e l'SDK rispondono ai ping
+da soli; un client che parla direttamente il protocollo deve rispondere anche
+lui, come fa la maggior parte delle librerie WebSocket.
+
+Un socket viene terminato anche quando più di 16&nbsp;MiB di frame inviati a lui
+sono ancora da leggere. È un client che non legge ciò che gli viene inviato, o
+uno così indietro che ciò che leggerebbe è ormai superato.
+
+Un socket terminato viene ripulito come uno chiuso. Le sue sottoscrizioni
+terminano, lascia i suoi canali e la sua presenza viene rimossa, con l'uscita
+annunciata agli altri membri. Un client ancora presente vede cadere la
+connessione, e l'SDK [si riconnette](#riconnessione-automatica) e sottoscrive di
+nuovo. Nella 0.23 un socket del genere resta aperto finché il sistema operativo
+non rinuncia alla connessione (circa due ore su Linux), e ogni scrittura in una
+collezione a cui è sottoscritto continua a costare un refetch per lui.
 
 ## Canali di broadcast
 

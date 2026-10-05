@@ -1,5 +1,5 @@
 ---
-sourceHash: 419a1d3fedba3c2d
+sourceHash: 4b2acc8e12bf440c
 title: Temps réel & WebSocket
 sidebar_label: Temps réel
 description: Synchronisation des données en temps réel, canaux de diffusion et suivi de présence via WebSocket.
@@ -224,6 +224,14 @@ l'emporte) ; une valeur qui n'est pas un entier positif arrête le serveur au d�
 
 Un id d'abonnement est propre au socket : deux clients qui nomment tous deux un abonnement
 `"sub-1"` conservent chacun le leur, et un `unsubscribe` ne met fin qu'à celui de l'émetteur.
+
+### Les sockets qui ne répondent plus
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Un client peut disparaître sans fermer son socket : un téléphone perd le réseau, un ordinateur portable se met en veille, un NAT oublie la connexion. Aucune trame de fermeture n'arrive, donc rien ne prévient le serveur. Le serveur envoie donc un ping à chaque socket toutes les 30 secondes et met fin à celui qui n'a pas répondu avant le ping suivant : un client disparu est ainsi libéré en moins d'une minute. Les navigateurs et le SDK répondent seuls aux pings ; un client qui parle directement le protocole doit y répondre aussi, comme le font la plupart des bibliothèques WebSocket.
+
+Un socket est aussi fermé de force quand plus de 16&nbsp;Mio de trames qui lui ont été envoyées restent non lues. C'est un client qui ne lit pas ce qu'on lui envoie, ou un client si en retard que ce qu'il lirait est déjà périmé.
+
+Un socket fermé de force est nettoyé comme un socket fermé. Ses abonnements prennent fin, il quitte ses canaux et sa présence est retirée, son départ étant annoncé aux autres membres. Un client encore présent voit la connexion tomber, et le SDK [se reconnecte](#reconnexion-automatique) et se réabonne. Sur 0.23, un tel socket reste ouvert jusqu'à ce que le système d'exploitation abandonne la connexion (environ deux heures sous Linux), et chaque écriture dans une collection à laquelle il est abonné coûte toujours une nouvelle requête pour lui.
 
 ## Canaux de diffusion (Broadcast Channels)
 

@@ -18,6 +18,7 @@ import { assertReadRequestReadable } from "./read-field-access";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
 import { PgNotifyListener } from "./pg-notify-listener";
+import { terminateIfBacklogged } from "./socket-liveness";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
 import { isNestedPath } from "./nested-path";
 import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
@@ -1993,12 +1994,19 @@ roles: ["anon"] };
         this.sendRaw(clientId, JSON.stringify(message));
     }
 
-    /** Send an already-serialised frame to a client, if it is still connected. */
+    /**
+     * Send an already-serialised frame to a client, if it is still connected.
+     *
+     * Every frame to a socket goes through here, so this is where a client
+     * that does not read what it is sent is let go of — see
+     * {@link terminateIfBacklogged}. Terminated, it closes like any other
+     * socket, and {@link removeClient} drops what it held.
+     */
     private sendRaw(clientId: string, frame: string) {
         const client = this.clients.get(clientId);
-        if (client && client.readyState === WebSocket.OPEN) {
-            client.send(frame);
-        }
+        if (!client || client.readyState !== WebSocket.OPEN) return;
+        if (terminateIfBacklogged(client, clientId)) return;
+        client.send(frame);
     }
 
     /**
@@ -2385,10 +2393,7 @@ roles: ["anon"] };
 
         for (const memberId of members) {
             if (memberId === clientId) continue; // Don't echo back to sender
-            const ws = this.clients.get(memberId);
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(message);
-            }
+            this.sendRaw(memberId, message);
         }
     }
 
@@ -2661,16 +2666,13 @@ roles: ["anon"] };
         retained: boolean,
         latestSeq?: number
     ): void {
-        const ws = this.clients.get(clientId);
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                type: "channel_history",
-                channel,
-                messages,
-                retained,
-                ...(latestSeq !== undefined ? { latestSeq } : {})
-            }));
-        }
+        this.sendRaw(clientId, JSON.stringify({
+            type: "channel_history",
+            channel,
+            messages,
+            retained,
+            ...(latestSeq !== undefined ? { latestSeq } : {})
+        }));
     }
 
     // =============================================================================
@@ -2781,14 +2783,11 @@ lastSeen: Date.now() });
         channel: string,
         presences: Record<string, Record<string, unknown>>
     ): void {
-        const ws = this.clients.get(clientId);
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                type: "presence_state",
-                channel,
-                presences
-            }));
-        }
+        this.sendRaw(clientId, JSON.stringify({
+            type: "presence_state",
+            channel,
+            presences
+        }));
     }
 
     /** Deliver a presence diff to this instance's members of the channel. */
@@ -2808,10 +2807,7 @@ lastSeen: Date.now() });
         });
 
         for (const memberId of members) {
-            const ws = this.clients.get(memberId);
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(message);
-            }
+            this.sendRaw(memberId, message);
         }
     }
 
