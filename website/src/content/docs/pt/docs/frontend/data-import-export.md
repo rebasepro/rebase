@@ -1,5 +1,5 @@
 ---
-sourceHash: a0b64d909e3d8229
+sourceHash: d8dc261c256b2bc3
 title: Importação e Exportação de Dados
 sidebar_label: Importação e Exportação de Dados
 description: Importe dados de arquivos CSV, JSON e Excel para suas coleções e exporte dados de coleções para CSV ou JSON com campos computados opcionais.
@@ -47,10 +47,15 @@ Uma célula só é convertida quando o tipo da propriedade consegue conter exata
 | Número | `12`, `-3.5`, `10.00`, `1e3` | `02134` (um zero à esquerda seria perdido), números com mais de 15 dígitos significativos, `1,234`, `$5.00`, `12%`, `N/A` |
 | Booleano | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, em qualquer caixa | qualquer outra coisa |
 | Data | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), datas escritas por extenso (`5 Jan 2024`), `05/01/2024`, segundos ou milissegundos epoch | texto que não nomeia uma data |
+| Geopoint | o objeto que a exportação escreve, `{"latitude": 41.9, "longitude": 12.5}`, ou o seu JSON numa célula CSV | qualquer outra coisa, ou uma coordenada fora do intervalo |
+| Mapa sem campos declarados | um objeto, ou o seu JSON numa célula CSV | qualquer outra coisa |
+| Vetor | uma lista de números (`[0.1, 0.2]`, `0.1, 0.2`), ou o `{"value": [0.1, 0.2]}` da exportação | uma lista que contém algo que não é um número |
 
 Uma data sem horário é esse dia em UTC. Para datas escritas como `05/01/2024`, a coluna decide a ordem: um primeiro número acima de 12 torna a coluna dia-primeiro, um segundo número acima de 12 torna-a mês-primeiro. Quando uma coluna nunca o indica, o locale do navegador decide, e quando ela contém as duas ordens, uma data que qualquer uma das ordens poderia ler não é convertida.
 
 Uma célula em branco não é um valor: ela não define nada, e o padrão que você escolheu para essa propriedade se aplica.
+
+Um arquivo exportado de uma coleção é importado de volta com os mesmos valores, seja CSV ou JSON. Um mapa com campos declarados é lido com uma coluna por campo (`address.street`), como a exportação o escreve; qualquer outro valor, incluindo um geopoint ou um mapa chave-valor, é uma única coluna. Um número epoch entre -100,000,000,000 e 100,000,000,000 é lido como segundos, então uma data entre 31 de outubro de 1966 e 3 de março de 1973 exportada como timestamp não volta igual: exporte essas datas como texto. Um campo de hora do dia lê um número abaixo de um dia (86,400,000) como os milissegundos desde a meia-noite que a exportação escreve.
 
 ### Valores que não podem ser importados
 

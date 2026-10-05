@@ -56,7 +56,8 @@ function valueAt(obj: unknown, path: string): unknown {
  * Whether an imported value is the file's value: the same, the text a CSV
  * cell was written as (a canonical `10.5` cell arrives as a number and a text
  * property gives back `"10.5"`), or the number a text spells when the number
- * keeps all of it (`10.00` → 10, but never `02134` → 2134 or a SKU rounded).
+ * keeps all of it (`10.00` → 10, but never `02134` → 2134 or a SKU rounded) —
+ * item by item in a list, and field by field in a map.
  */
 function sameValue(out: unknown, original: unknown): boolean {
     if (JSON.stringify(out) === JSON.stringify(original)) return true;
@@ -71,7 +72,16 @@ function sameValue(out: unknown, original: unknown): boolean {
     if (Array.isArray(out) && Array.isArray(original)) {
         return out.length === original.length && out.every((item, i) => sameValue(item, original[i]));
     }
+    // An item of a list of maps has its fields converted to their types too.
+    if (isRecord(out) && isRecord(original)) {
+        const keys = new Set([...Object.keys(out), ...Object.keys(original)]);
+        return [...keys].every(key => sameValue(out[key], original[key]));
+    }
     return false;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**

@@ -1,5 +1,5 @@
 ---
-sourceHash: a0b64d909e3d8229
+sourceHash: d8dc261c256b2bc3
 title: Importazione ed esportazione dati
 sidebar_label: Importazione ed esportazione dati
 description: Importa dati da file CSV, JSON ed Excel nelle tue collezioni ed esporta i dati delle collezioni in CSV o JSON con campi calcolati opzionali.
@@ -47,10 +47,15 @@ Una cella viene convertita solo quando il tipo della proprietà può contenere e
 | Numero | `12`, `-3.5`, `10.00`, `1e3` | `02134` (uno zero iniziale andrebbe perso), numeri con più di 15 cifre significative, `1,234`, `$5.00`, `12%`, `N/A` |
 | Booleano | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, in qualsiasi maiuscola/minuscola | qualsiasi altra cosa |
 | Data | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), date scritte per intero (`5 Jan 2024`), `05/01/2024`, secondi o millisecondi epoch | testo che non indica alcuna data |
+| Geopoint | l'oggetto che scrive l'esportazione, `{"latitude": 41.9, "longitude": 12.5}`, o il suo JSON in una cella CSV | qualsiasi altra cosa, o una coordinata fuori intervallo |
+| Mappa senza campi dichiarati | un oggetto, o il suo JSON in una cella CSV | qualsiasi altra cosa |
+| Vettore | una lista di numeri (`[0.1, 0.2]`, `0.1, 0.2`), o il `{"value": [0.1, 0.2]}` dell'esportazione | una lista che contiene qualcosa che non è un numero |
 
 Una data senza orario è quel giorno in UTC. Per le date scritte come `05/01/2024`, è la colonna a decidere l'ordine: un primo numero superiore a 12 rende la colonna giorno-prima, un secondo numero superiore a 12 la rende mese-prima. Quando una colonna non lo indica mai, decide la locale del browser, e quando contiene entrambi gli ordini, una data che entrambi gli ordini potrebbero leggere non viene convertita.
 
 Una cella vuota non è un valore: non imposta nulla, e si applica il default scelto per quella proprietà.
+
+Un file esportato da una collezione si reimporta con gli stessi valori, in CSV come in JSON. Una mappa con campi dichiarati si legge con una colonna per campo (`address.street`), come la scrive l'esportazione; qualsiasi altro valore, compresi un geopoint o una mappa chiave-valore, è una sola colonna. Un numero epoch compreso tra -100,000,000,000 e 100,000,000,000 viene letto come secondi, quindi una data tra il 31 ottobre 1966 e il 3 marzo 1973 esportata come timestamp non torna uguale: esporta quelle date come testo. Un campo ora del giorno legge un numero inferiore a un giorno (86,400,000) come i millisecondi dalla mezzanotte che scrive l'esportazione.
 
 ### Valori che non possono essere importati
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: a0b64d909e3d8229
+sourceHash: d8dc261c256b2bc3
 title: Import et export de données
 sidebar_label: Import et export de données
 description: Importez des données depuis des fichiers CSV, JSON et Excel dans vos collections, et exportez les données de vos collections au format CSV ou JSON avec des champs calculés optionnels.
@@ -47,10 +47,15 @@ Une cellule n'est convertie que lorsque le type de la propriété peut contenir 
 | Nombre | `12`, `-3.5`, `10.00`, `1e3` | `02134` (un zéro initial serait perdu), les nombres de plus de 15 chiffres significatifs, `1,234`, `$5.00`, `12%`, `N/A` |
 | Booléen | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, quelle que soit la casse | tout le reste |
 | Date | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), dates en toutes lettres (`5 Jan 2024`), `05/01/2024`, secondes ou millisecondes epoch | un texte qui ne désigne aucune date |
+| Géopoint | l'objet que l'exportation écrit, `{"latitude": 41.9, "longitude": 12.5}`, ou son JSON dans une cellule CSV | tout le reste, ou une coordonnée hors limites |
+| Map sans champs déclarés | un objet, ou son JSON dans une cellule CSV | tout le reste |
+| Vecteur | une liste de nombres (`[0.1, 0.2]`, `0.1, 0.2`), ou le `{"value": [0.1, 0.2]}` de l'exportation | une liste contenant autre chose qu'un nombre |
 
 Une date sans heure correspond à ce jour-là en UTC. Pour les dates écrites `05/01/2024`, c'est la colonne qui décide de l'ordre : un premier nombre supérieur à 12 fait de la colonne un format jour-mois, un second nombre supérieur à 12 en fait un format mois-jour. Quand une colonne ne le précise jamais, c'est la locale du navigateur qui décide, et quand elle contient les deux ordres, une date que l'un ou l'autre ordre pourrait lire n'est pas convertie.
 
 Une cellule vide n'est pas une valeur : elle ne définit rien, et la valeur par défaut choisie pour cette propriété s'applique.
+
+Un fichier exporté depuis une collection se réimporte avec les mêmes valeurs, en CSV comme en JSON. Une map avec des champs déclarés se lit avec une colonne par champ (`address.street`), comme l'exportation l'écrit ; toute autre valeur, y compris un géopoint ou une map clé-valeur, tient en une colonne. Un nombre epoch compris entre -100,000,000,000 et 100,000,000,000 est lu comme des secondes : une date comprise entre le 31 octobre 1966 et le 3 mars 1973 exportée en timestamp ne revient donc pas à l'identique, exportez ces dates en texte. Un champ d'heure du jour lit un nombre inférieur à un jour (86,400,000) comme les millisecondes depuis minuit que l'exportation écrit.
 
 ### Valeurs qui ne peuvent pas être importées
 
