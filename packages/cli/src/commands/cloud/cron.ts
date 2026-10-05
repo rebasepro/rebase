@@ -375,22 +375,7 @@ async function logsCommand(rawArgs: string[]): Promise<void> {
 
 const CRON_ACTIONS = ["list", "logs"] as const;
 
-/**
- * Dispatch `rebase cloud cron [list|logs]`.
- *
- * The action is re-read here rather than taken from the dispatcher, which
- * picks the first word that is not a flag and cannot know which flags take a
- * value: `rebase cloud cron --host staging.example.com` named the host as the
- * action and was refused as an unknown command.
- */
-export async function cronCommand(_dispatched: string | undefined, rawArgs: string[]): Promise<void> {
-    const { positionals } = parseCloudArgs({
-        spec: { ...CRON_LIST_FLAGS, ...CRON_LOGS_FLAGS },
-        rawArgs,
-        commandWords: 2,
-        command: "cloud cron"
-    });
-    const action = positionals[0];
+export async function cronCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
     requireKnownAction("cron", action, CRON_ACTIONS);
     if (action === "logs") {
         await logsCommand(rawArgs);

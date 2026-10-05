@@ -93,6 +93,40 @@ function knownSubcommands(command: string): readonly string[] {
 }
 
 /**
+ * The subcommand in the words after a command, read against the subcommands the
+ * group dispatches.
+ *
+ * The first word that is not a flag is not always the subcommand: after a flag
+ * that takes a value it is that value. `rebase db --collections ./c push` was
+ * refused as an unknown db command `./c`, `rebase api-keys --name ci create` as
+ * one called `ci`, and `rebase skills --agent claude install` as `claude` —
+ * lines every one of those commands parses happily once it is reached.
+ *
+ * Which flags take a value is not known at this level, so the vocabulary decides
+ * instead: a word the group dispatches is the subcommand; a word straight after
+ * a flag (and not glued to it with `=`) may be that flag's value and is passed
+ * over. When no word is a known subcommand, the first word is returned as
+ * before, so a typo — `rebase db psuh`, `rebase db --dry-run psuh` — still
+ * reaches the group and is refused by name. A command with no vocabulary keeps
+ * the first word.
+ *
+ * Exported for its tests.
+ */
+export function resolveSubcommand(after: readonly string[], known: readonly string[]): string | undefined {
+    const words = after.filter(token => !token.startsWith("-"));
+    if (known.length === 0) return words[0];
+    for (let i = 0; i < after.length; i++) {
+        const token = after[i];
+        if (token.startsWith("-")) continue;
+        if (known.includes(token)) return token;
+        const previous = after[i - 1];
+        const mayBeAValue = previous !== undefined && previous.startsWith("-") && !previous.includes("=");
+        if (!mayBeAValue) return token;
+    }
+    return words[0];
+}
+
+/**
  * The command and subcommand words as `cli.error` may send them: each one is a
  * word this CLI dispatches, `"none"` when nothing was typed, or `"other"`.
  *
@@ -143,14 +177,17 @@ export async function entry(args: string[]) {
     // `_` is ["cloud", "--json", "storage", "create"] and the subcommand read as
     // "--json". Skip the flags when naming the command and its subcommand.
     //
-    // This cannot be complete at this level: a flag that takes a value leaves
-    // the value behind as a bare token, and which flags take values is a fact
-    // only the individual command knows. So a command whose dispatch has to be
-    // exact resolves its own positionals against its own spec — see
-    // `positionals()` in commands/cloud/index.ts — and this is the coarse pass.
-    const words = parsedArgs._.filter(a => !a.startsWith("-"));
-    const command = words[0];
-    const subcommand = words[1];
+    // A flag that takes a value leaves the value behind as a bare token, and
+    // which flags take values is a fact only the individual command knows — for
+    // `db` and `schema`, only the database driver's own CLI. So the subcommand
+    // is named against the group's vocabulary instead: see `resolveSubcommand`.
+    // `cloud` resolves its own group and action against the family's flag
+    // specs — `positionals()` in commands/cloud/index.ts.
+    const commandAt = parsedArgs._.findIndex(a => !a.startsWith("-"));
+    const command = commandAt === -1 ? undefined : parsedArgs._[commandAt];
+    const subcommand = command === undefined
+        ? undefined
+        : resolveSubcommand(parsedArgs._.slice(commandAt + 1), knownSubcommands(command));
 
     // Show global help only when no command given, or --help with no recognized command
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {

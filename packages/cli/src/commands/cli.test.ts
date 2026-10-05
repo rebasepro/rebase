@@ -16,10 +16,12 @@ vi.mock("./init", () => ({
 vi.mock("./generate_sdk", () => ({
     generateSdkCommand: vi.fn()
 }));
-vi.mock("./schema", () => ({
+vi.mock("./schema", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("./schema")>()),
     schemaCommand: vi.fn()
 }));
-vi.mock("./db", () => ({
+vi.mock("./db", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("./db")>()),
     dbCommand: vi.fn()
 }));
 vi.mock("./dev", () => ({
@@ -31,17 +33,20 @@ vi.mock("./build", () => ({
 vi.mock("./start", () => ({
     startCommand: vi.fn()
 }));
-vi.mock("./auth", () => ({
+vi.mock("./auth", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("./auth")>()),
     authCommand: vi.fn()
 }));
 vi.mock("./doctor", () => ({
     doctorCommand: vi.fn()
 }));
-vi.mock("./cloud", () => ({
+vi.mock("./cloud", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("./cloud")>()),
     cloudCommand: vi.fn()
 }));
 // Spread the real module rather than listing the two exports this file cares
-// about. A hand-listed mock fails the whole suite the day a command imports a
+// about. (`schema`, `db`, `auth` and `cloud` above are spread for the same
+// reason: `entry` reads each group's subcommand list on every line.) A hand-listed mock fails the whole suite the day a command imports a
 // third helper — which is what happened when `readEnvFile` was added — and the
 // failure names the mock, not the import, so it reads as a broken test.
 vi.mock("../utils/project", async (importOriginal) => ({
@@ -160,7 +165,10 @@ describe("CLI routing", () => {
     it("hands cloud the whole argv, since only cloud can parse cloud's flags", async () => {
         const args = ["node", "rebase", "cloud", "--project", "acme", "storage", "create"];
         await entry(args);
-        expect(cloudCommand).toHaveBeenCalledWith("acme", args);
+        // The group, now that the coarse pass reads the vocabulary — it used to
+        // be "acme", the project's slug. Cloud resolves its own group from the
+        // argv either way; the argv is the point.
+        expect(cloudCommand).toHaveBeenCalledWith("storage", args);
     });
 
     it("routes 'build' to buildCommand", async () => {

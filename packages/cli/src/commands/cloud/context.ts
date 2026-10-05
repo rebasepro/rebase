@@ -688,8 +688,10 @@ export function removeLink(cwd: string = process.cwd()): boolean {
  * positional.
  *
  * Only genuinely global flags belong here. Group-specific ones (`--bucket`,
- * `--region`, …) are declared by the handler that owns them and always follow
- * the group, so they cannot shift the group or action.
+ * `--region`, …) are declared by the handler that owns them. They can still
+ * precede the action — or stand in for it, on a group with a default — so the
+ * dispatcher also declares every one that takes a value: `CLOUD_VALUE_FLAGS`
+ * in `index.ts`.
  *
  * `-p` is `--project` in eighteen places and `--password` in `login`. That
  * ambiguity does not matter to the one caller that reads this spec: it resolves

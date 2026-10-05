@@ -99,8 +99,6 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     stop: {},
     restart: {},
     metrics: null,
-    // Parsed at the group only to find the action — the flags belong to
-    // `cron list` and `cron logs`, whose pages document them.
     cron: null,
     "cron list": CRON_LIST_FLAGS,
     "cron logs": CRON_LOGS_FLAGS,

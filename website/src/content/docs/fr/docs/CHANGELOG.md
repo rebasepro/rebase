@@ -754,6 +754,18 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 #### CLI
 
+- **A flag written before an action is no longer read as the action.** The
+  CLI named the action as the first word after the group that was not a flag,
+  and a flag's value is such a word. So `rebase cloud deployments --limit 5`
+  was refused as an unknown command `5`, `rebase cloud debug --host
+  staging.example.com` as `staging.example.com`, and `rebase cloud projects
+  --name shop create` as `shop`. The same happened at the top level:
+  `rebase db --collections ./config/collections push`, `rebase api-keys --name
+  ci create` and `rebase skills --agent claude install` were each refused as
+  an unknown subcommand. All of these lines now run the action they name.
+  `--help` on such a `rebase cloud` line now prints the named action's page.
+  A mistyped action is still refused by name.
+
 - **`rebase cloud debug logs`, `errors`, `requests` and `boot` say what
   window their lines cover, and say when a limit cut it.** The control
   plane returns at most 2000 lines per pod and lowered a larger `--tail`

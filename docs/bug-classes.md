@@ -4209,3 +4209,44 @@ schema-wide grant after a per-table revoke — and make it honour the exception.
 | `db push`, between Atlas's COMMIT and the lock | **OPEN** — milliseconds in which only a killed process or a lost connection leaves a new table open. Closing it (suspend the default privilege around the apply, or run the plan in Rebase's own transaction) is a decision. |
 | processes that do not provision, `REBASE_MIGRATE_ON_BOOT=none`, every boot's `initializeDriver`, the role steps of `db migrate` and `db pull` | **OPEN** — each grants schema-wide without knowing which collection tables could not be locked, so a table the provisioning boot withdrew is granted again by them. A decision: have `ensureAppRole` withhold every declared table whose RLS is off — fail-closed for deployments serving RLS-off collection tables today. |
 | `db generate`, a failure while finishing the migration | **OPEN** (low) — reported as a warning; a failure before the policies are appended leaves a migration that creates tables without RLS. No deterministic trigger found. |
+
+## 71. A word's role decided by a reader that does not hold the spec
+
+A dispatcher names the subcommand before the command parses its line, and
+names it as "the first word that is not a flag". But a flag's value is a word
+that is not a flag. Which flags take a value is in each command's own spec, and
+the dispatcher reads none of them, so a value written before the subcommand, or
+standing where a group's default action would be, becomes the subcommand. The
+command's own parse would have got it right. It never runs, because the
+dispatcher has already refused the line as an unknown command or sent it to the
+wrong handler.
+
+The instances: `rebase cloud deployments --limit 5` ran an action called "5",
+`rebase cloud debug --host staging.example.com` one called
+"staging.example.com", `rebase cloud projects --name shop create` one called
+"shop" (and `--help` on that line printed the group's page, not `create`'s).
+At the top level, `rebase db --collections ./c push`, `rebase api-keys --name ci
+create` and `rebase skills --agent claude install` were each refused as an
+unknown subcommand. Every one is a line its command's help offers.
+`rebase cloud cron` first shipped with its own re-parse to work around it, and
+that is how the class was found.
+
+**Sweep:** for every place that names a command, group or action from the
+line, ask what it believes about the flags in front of it. A reader that knows
+none of them must either be given the specs (the `cloud` family:
+`CLOUD_VALUE_FLAGS`, held to the commands' specs by `value-flags.test.ts`), or
+decide from something it does hold, such as the group's vocabulary (`cli.ts`:
+`resolveSubcommand`). Then drive the real dispatcher with a value flag *before*
+the action, and with the action omitted on a group that has a default.
+
+**Sweep (2026-10-05, the CLI's dispatchers):**
+
+| checked | result |
+|---|---|
+| `rebase cloud` group and action (`positionals()` in `commands/cloud/index.ts`) | **BUG**. It declares every value flag of the family now. The list is checked against every spec in the directory in both directions, and no flag may be a boolean in one command and take a value in another. `value-flags.test.ts`. |
+| `rebase <group> <subcommand>` (`cli.ts`) for `db`, `schema`, `auth`, `apps`, `skills`, `api-keys` | **BUG**. The subcommand is read against the group's vocabulary: a known word wins, a word straight after a flag may be its value, and when no word is known the first word is the subcommand, as before, so a typo is still refused by name. `subcommand-resolution.test.ts`. |
+| `rebase cloud cron`'s own action re-parse | removed — the dispatcher is right now. |
+| each cloud handler's operands (`parseCloudArgs` with `commandWords`) | clean — a strict parse of the whole line consumes every declared flag with its value (`cloud-args.test.ts`). |
+| `rebase telemetry` | clean — resolves its own subcommand with `parseCommandArgs`. |
+| a value equal to a subcommand word (`rebase api-keys --name list create` reads `list`) | **OPEN** (low) — unchanged from before. Only the command's spec could tell, and at the top level that spec can live in the database driver's CLI. |
+| a value flag before the command itself (`rebase --x y db push`) | **OPEN** (low) — the root parse knows only the root flags. No command documents a flag before its own name. |

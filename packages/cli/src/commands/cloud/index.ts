@@ -45,20 +45,98 @@ import {
 import { ACTION_HELP, printActionHelp } from "./action-help";
 
 /**
+ * Every flag in the `rebase cloud` family that takes a value, and the short
+ * spellings of them — the globals aside, which `GLOBAL_CLOUD_FLAGS` declares.
+ *
+ * {@link positionals} needs them for one reason: `arg` only consumes a flag's
+ * value when the flag is declared, and an undeclared one leaves its value
+ * behind as a bare word in the action's position. `rebase cloud deployments
+ * --limit 5` dispatched to an action called "5", `rebase cloud debug --host
+ * staging.example.com` to one called "staging.example.com", and `rebase cloud
+ * projects --name shop create` to one called "shop" — each refused as an unknown
+ * command, for a line the command's own help offers.
+ *
+ * Every value is `String` whatever the command reads it as: only consumption
+ * matters here, and the command parses the value itself. One list for the whole
+ * family works because no flag takes a value in one command and none in
+ * another; `value-flags.test.ts` holds that, and holds this list to the specs
+ * the commands declare in both directions, so a new value flag fails a test
+ * until it is added here.
+ */
+export const CLOUD_VALUE_FLAGS = {
+    "--access-key-id": String,
+    "--autoscale-cpu-target": String,
+    "--autoscale-max": String,
+    "--backup-access-key-id": String,
+    "--backup-bucket": String,
+    "--backup-endpoint": String,
+    "--backup-secret-access-key": String,
+    "--base-domain": String,
+    "--branch": String,
+    "--bucket": String,
+    "--bundle-dir": String,
+    "--can": String,
+    "--collection": String,
+    "--connection-string": String,
+    "--cpu": String,
+    "--db": String,
+    "--db-cpu": String,
+    "--db-instances": String,
+    "--db-memory": String,
+    "--email": String,
+    "--endpoint": String,
+    "--events": String,
+    "--expires-in": String,
+    "--function": String,
+    "--host": String,
+    "--ingress-address": String,
+    "--kubeconfig": String,
+    "--limit": String,
+    "--memory": String,
+    "--message": String,
+    "--name": String,
+    "--org": String,
+    "--output": String,
+    "--password": String,
+    "--platform-rebuilds": String,
+    "--port": String,
+    "--provider": String,
+    "--region": String,
+    "--replicas": String,
+    "--repo": String,
+    "--scale-to-zero": String,
+    "--secret-access-key": String,
+    "--since": String,
+    "--slug": String,
+    "--source": String,
+    "--spot": String,
+    "--storage": String,
+    "--subdomain": String,
+    "--table": String,
+    "--tail": String,
+    "--target": String,
+    "--timeout": String,
+    "--type": String,
+    "--out": "--output",
+    "-e": "--email",
+    "-m": "--message",
+    "-n": "--name"
+} as const;
+
+/**
  * Positional tokens after `rebase cloud` (group, action, …).
  *
- * Two things stop a flag being mistaken for the group. `GLOBAL_CLOUD_FLAGS` is
- * declared so `arg` *consumes* the flags that may precede it — critically
- * together with their values, which is the half that filtering cannot do. The
- * leading-`-` skip then covers a flag nobody declared, so an unrecognised
- * boolean shifts nothing.
+ * Two things stop a flag being mistaken for the group or the action.
+ * `GLOBAL_CLOUD_FLAGS` and {@link CLOUD_VALUE_FLAGS} are declared so `arg`
+ * *consumes* every flag of the family that takes a value — critically together
+ * with its value, which is the half that filtering cannot do. The leading-`-`
+ * skip then covers a flag nobody declared, so an unrecognised boolean shifts
+ * nothing.
  *
- * Only leading tokens are skipped: past the group and action, an undeclared
- * flag and its value are somebody else's positionals and none of our business.
- * A flag this file has never heard of, that takes a value, placed before the
- * group, is the one shape still unresolvable here — there is no way to know
- * whether the token after it is its value or the group, and guessing either way
- * is worse than the handler reporting an unknown group.
+ * A flag this family has never heard of, that takes a value, is the one shape
+ * still unresolvable here — there is no way to know whether the token after it
+ * is its value or the action. The command's own strict parse refuses that flag
+ * anyway, so the only cost is which refusal the caller reads.
  *
  * Exported so its tests can drive the real thing. The dispatch test used to
  * re-implement it locally as `slice(3).filter(a => !a.startsWith("-"))` — which
@@ -67,8 +145,15 @@ import { ACTION_HELP, printActionHelp } from "./action-help";
  * as the real dispatcher was broken.
  */
 export function positionals(rawArgs: string[]): string[] {
-    const rest = arg(GLOBAL_CLOUD_FLAGS, { argv: rawArgs.slice(3),
-permissive: true })._;
+    let rest: string[];
+    try {
+        rest = arg({ ...CLOUD_VALUE_FLAGS, ...GLOBAL_CLOUD_FLAGS }, { argv: rawArgs.slice(3), permissive: true })._;
+    } catch {
+        // A value flag at the end of the line with no value. The command's own
+        // parse names that problem in the family's refusal envelope; here it is
+        // enough to find the words as the globals alone see them.
+        rest = arg(GLOBAL_CLOUD_FLAGS, { argv: rawArgs.slice(3), permissive: true })._;
+    }
     let i = 0;
     while (i < rest.length && rest[i].startsWith("-")) i++;
     return rest.slice(i);
