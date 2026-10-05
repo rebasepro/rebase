@@ -1,5 +1,5 @@
 ---
-sourceHash: 79207c5462071a3a
+sourceHash: 4d4f9bdaabf6ff8e
 title: Configurazione dello Storage
 sidebar_label: Configurazione dello Storage
 description: Configura backend di storage su filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
@@ -509,7 +509,7 @@ await initializeRebaseBackend({
 | `bucket` | Bucket risolto (`"default"` se non specificato) |
 | `operation` | `"read"`, `"write"`, `"delete"` o `"list"` |
 | `user` | `{ uid, email?, roles? }`, oppure `null` dove la rotta consente l'accesso anonimo |
-| `storageId` | Il backend con nome, quando la richiesta ne ha preso di mira uno — la sua chiave canonica (`?storageId=%20media` è `"media"`). Assente per la sorgente predefinita, comunque la richiesta la indichi (nessun parametro, vuoto o `(default)`) |
+| `storageId` | Il backend con nome, quando la richiesta ne ha preso di mira uno — la sua chiave canonica (`storageId=%20media` è `"media"`). Assente per la sorgente predefinita, comunque la richiesta la indichi (nessun parametro, vuoto o `(default)`) |
 | `data` | Accesso in lettura affidabile che **ignora l'RLS** — `data.collection(slug).find(query)` / `.findById(id)`. La proprietà risiede in una riga, non nel prefisso di una chiave, quindi l'hook necessita di un lettore per rispondere a "chi possiede questo oggetto?". Ignora deliberatamente la row-level security: questo hook *è* la decisione di autorizzazione, e prenderla attraverso un lettore già limitato dai permessi del chiamante stesso risulterebbe circolare. In sola lettura per progettazione. |
 
 Restituisci `false` per negare l'accesso con un **403**. Anche il sollevamento di un'eccezione

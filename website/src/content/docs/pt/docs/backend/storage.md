@@ -1,5 +1,5 @@
 ---
-sourceHash: 79207c5462071a3a
+sourceHash: 4d4f9bdaabf6ff8e
 title: Configuração de Armazenamento
 sidebar_label: Configuração de Armazenamento
 description: Configure backends de armazenamento em sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -495,7 +495,7 @@ await initializeRebaseBackend({
 | `bucket` | Bucket resolvido (`"default"` quando não especificado) |
 | `operation` | `"read"`, `"write"`, `"delete"` ou `"list"` |
 | `user` | `{ uid, email?, roles? }`, ou `null` quando a rota permite acesso anônimo |
-| `storageId` | O backend nomeado, quando a requisição teve um como destino — sua chave canônica (`?storageId=%20media` é `"media"`). Ausente para a fonte padrão, seja como for que a requisição a nomeie (sem parâmetro, vazio ou `(default)`) |
+| `storageId` | O backend nomeado, quando a requisição teve um como destino — sua chave canônica (`storageId=%20media` é `"media"`). Ausente para a fonte padrão, seja como for que a requisição a nomeie (sem parâmetro, vazio ou `(default)`) |
 | `data` | Acesso de leitura confiável que **ignora RLS** — `data.collection(slug).find(query)` / `.findById(id)`. A propriedade do recurso reside em uma linha, e não no prefixo de uma chave, portanto o hook precisa de um leitor para responder "quem é o dono deste objeto?". Ele ignora a segurança em nível de linha deliberadamente: este hook *é* a decisão de autorização, e fazê-la por meio de um leitor já limitado pelas permissões do próprio chamador criaria uma dependência circular. Somente leitura por concepção. |
 
 Retorne `false` para negar o acesso com um erro **403**. Lançar um erro também nega o acesso — uma consulta de propriedade que falha não concede acesso acidentalmente.
