@@ -10,7 +10,7 @@ import { hostname } from "node:os";
 import { randomUUID } from "node:crypto";
 import type { LoadedCronJob } from "./cron-loader";
 import type { CronJobRunSummary, CronStore } from "./cron-store";
-import { logger, redactSensitiveText } from "../utils/logger.js";
+import { logger, redactSensitiveText, stringifyForLog } from "../utils/logger.js";
 import { buildScaleToZeroWarning } from "./scale-to-zero.js";
 
 // ─── Cron expression parser (minimal, no external dependency) ────────
@@ -1325,6 +1325,17 @@ export class CronScheduler {
                     typeof a === "string" ? a : JSON.stringify(a)
                 ).join(" ");
                 capturedLogs.push(line);
+                // Also to the process log. `cron_logs` is behind the admin
+                // API, so a line that went only there was missing from the
+                // platform's logs, which is where an operator looks when a
+                // run goes wrong. The values are redacted on the way: a
+                // stringified object reaches the logger as text, and the
+                // logger's own pass over the message only removes `Failed
+                // query:` spans from it.
+                logger.info(
+                    args.map((a) => typeof a === "string" ? a : stringifyForLog(a)).join(" "),
+                    { cron: job.id }
+                );
             },
             // `rebase`, and only `rebase`: it matches the singleton import and
             // `defineFunction`'s context. The old `client` alias re-exposed

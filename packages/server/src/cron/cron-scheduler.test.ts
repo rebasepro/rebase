@@ -4,6 +4,7 @@ import { createCronStore } from "./cron-store";
 import type { CronJobPersistedState, CronJobRunSummary, CronRunLease, CronStore } from "./cron-store";
 import type { CronJobDefinition, CronJobLogEntry, DataDriver } from "@rebasepro/types";
 import type { LoadedCronJob } from "./cron-loader";
+import { DrizzleQueryError } from "drizzle-orm/errors";
 import { logger } from "../utils/logger";
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -315,6 +316,109 @@ schedule: "30 2 * * 1" })]);
             expect(log!.error).toBe("Failed query: [redacted — set REBASE_LOG_RAW_QUERIES=true in development to see it]");
             expect(scheduler.getJob("leaky")!.lastError).not.toContain("alice@acme.com");
             expect(scheduler.getJob("leaky")!.lastError).not.toContain("$2b$12$");
+        });
+
+        describe("ctx.log in the process log", () => {
+            // Asserted on what reaches stdout, not on a spy over `logger.info`:
+            // the redaction happens inside the logger, so a spy would only
+            // ever show its input. Production mode, because the JSON envelope
+            // is what `rebase cloud debug logs` reads off the pod.
+            const originalEnv = {
+                NODE_ENV: process.env.NODE_ENV,
+                LOG_LEVEL: process.env.LOG_LEVEL
+            };
+            let stdout: string[];
+
+            beforeEach(() => {
+                process.env.NODE_ENV = "production";
+                stdout = [];
+                jest.spyOn(process.stdout, "write").mockImplementation(((chunk: string) => { stdout.push(String(chunk)); return true; }) as never);
+                jest.spyOn(process.stderr, "write").mockImplementation((() => true) as never);
+            });
+
+            afterEach(() => {
+                jest.restoreAllMocks();
+                for (const [key, value] of Object.entries(originalEnv)) {
+                    if (value === undefined) delete process.env[key];
+                    else process.env[key] = value;
+                }
+            });
+
+            /** The JSON lines a job's `ctx.log` wrote, in order. */
+            const linesOf = (jobId: string): Array<Record<string, unknown>> => stdout
+                .flatMap((chunk) => chunk.split("\n").filter(Boolean))
+                .map((line) => JSON.parse(line) as Record<string, unknown>)
+                .filter((entry) => entry.cron === jobId);
+
+            it("writes each line at info, with the job it came from", async () => {
+                // A run's own explanation of itself — why a step fell back —
+                // used to exist only in `cron_logs`, behind the admin API.
+                scheduler.registerJobs([makeJob("enrich", {
+                    handler: async (ctx) => {
+                        ctx.log("model unavailable (quota_exhausted)");
+                        ctx.log("scored", { leads: 3 });
+                    }
+                })]);
+
+                const log = await scheduler.triggerJob("enrich");
+
+                expect(linesOf("enrich").map((entry) => [entry.severity, entry.message])).toEqual([
+                    ["INFO", "model unavailable (quota_exhausted)"],
+                    ["INFO", 'scored {"leads":3}']
+                ]);
+                // And the run's log entry is what it always was.
+                expect(log!.logs).toEqual(["model unavailable (quota_exhausted)", 'scored {"leads":3}']);
+            });
+
+            it("redacts what it logs on the way to stdout, and persists the line as before", async () => {
+                // A logged query failure carries the statement and its bound
+                // values as own-properties beside the message, which
+                // `JSON.stringify` copies; the logger's pass over the message
+                // text cannot see them once they are a string.
+                const queryFailure = new DrizzleQueryError(
+                    'insert into "users" ("email", "password_hash") values ($1, $2)',
+                    ["alice@acme.com", "$2b$12$abcdefghijklmnop"],
+                    new Error("duplicate key value violates unique constraint")
+                );
+                const provider = {
+                    endpoint: "https://api.example.com",
+                    apiKey: "sk-live-123"
+                };
+                scheduler.registerJobs([makeJob("leaky-log", {
+                    handler: async (ctx) => {
+                        ctx.log("insert failed", queryFailure);
+                        ctx.log("calling provider", provider);
+                        ctx.log(`retrying after: ${queryFailure.message}`);
+                    }
+                })]);
+
+                const log = await scheduler.triggerJob("leaky-log");
+
+                const written = JSON.stringify(linesOf("leaky-log"));
+                expect(linesOf("leaky-log")).toHaveLength(3);
+                for (const secret of ["alice@acme.com", "$2b$12$", "password_hash", "sk-live-123"]) {
+                    expect(written).not.toContain(secret);
+                }
+                // Still says what happened.
+                expect(written).toContain("duplicate key value violates unique constraint");
+                expect(written).toContain("https://api.example.com");
+                // `cron_logs` gets exactly the lines it got before.
+                expect(log!.logs).toEqual([
+                    `insert failed ${JSON.stringify(queryFailure)}`,
+                    `calling provider ${JSON.stringify(provider)}`,
+                    `retrying after: ${queryFailure.message}`
+                ]);
+            });
+
+            it("keeps the line out of stdout below the configured level, but not out of the run", async () => {
+                process.env.LOG_LEVEL = "warn";
+                scheduler.registerJobs([makeJob("quiet", { handler: async (ctx) => { ctx.log("tick"); } })]);
+
+                const log = await scheduler.triggerJob("quiet");
+
+                expect(linesOf("quiet")).toEqual([]);
+                expect(log!.logs).toEqual(["tick"]);
+            });
         });
 
         it("handles non-Error thrown values", async () => {

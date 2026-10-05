@@ -168,7 +168,7 @@ interface CronJobContext {
     // The scheduled tick timestamp
     scheduledAt: Date;
 
-    // Logger — captured lines appear in Studio and the logs API
+    // Logger — lines appear in Studio, the logs API and the server log
     log: (...args: unknown[]) => void;
 
     // Aborted when the run exceeds `timeoutSeconds`, or when a shutdown's
@@ -182,7 +182,7 @@ interface CronJobContext {
 }
 ```
 
-Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API.
+Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API. Each line is also written to the server log at `info` level with a `cron` field holding the job ID, so it shows up wherever your container's output is collected, including Rebase Cloud's debug logs. That copy is redacted the way the server's own log lines are: the values of keys such as `password` or `apiKey`, and the SQL and parameters of a failed query, are replaced. The execution log stores the line without that redaction.
 
 ### `ctx.signal` — stop the work when the run stops
 

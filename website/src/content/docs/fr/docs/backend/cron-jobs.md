@@ -1,5 +1,5 @@
 ---
-sourceHash: 250ff63e7148cd0e
+sourceHash: ddd8f6798208c0d8
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -165,7 +165,7 @@ interface CronJobContext {
     // The scheduled tick timestamp
     scheduledAt: Date;
 
-    // Logger — captured lines appear in Studio and the logs API
+    // Logger — lines appear in Studio, the logs API and the server log
     log: (...args: unknown[]) => void;
 
     // Aborted when the run exceeds `timeoutSeconds`, or when a shutdown's
@@ -179,7 +179,7 @@ interface CronJobContext {
 }
 ```
 
-Utilisez `ctx.log()` pour émettre une sortie structurée. Ces lignes sont capturées dans le journal d'exécution et visibles dans Studio ainsi que via l'API REST.
+Utilisez `ctx.log()` pour émettre une sortie structurée. Ces lignes sont capturées dans le journal d'exécution et visibles dans Studio ainsi que via l'API REST. Chaque ligne est aussi écrite dans le journal du serveur au niveau `info`, avec un champ `cron` contenant l'ID du job : elle apparaît donc partout où la sortie de votre conteneur est collectée, y compris dans les journaux de débogage de Rebase Cloud. Cette copie est masquée comme les lignes de journal du serveur lui-même : les valeurs de clés comme `password` ou `apiKey`, ainsi que le SQL et les paramètres d'une requête en échec, sont remplacés. Le journal d'exécution conserve la ligne sans ce masquage.
 
 ### `ctx.signal` — interrompre le travail lorsque l'exécution s'arrête
 

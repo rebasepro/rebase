@@ -325,6 +325,30 @@ function formatData(data?: Record<string, unknown>): Record<string, unknown> | u
 }
 
 /**
+ * `JSON.stringify`, with the redaction a structured field gets.
+ *
+ * For a value that has to go *into the message*. Once an object is a string,
+ * `emit` can only strip `Failed query:` spans out of it: a sensitive key would
+ * pass, and so would the `query` and `params` own-properties `DrizzleQueryError`
+ * carries beside its message, which `JSON.stringify` copies and the message
+ * redaction never sees. Unlike the structured walk this honours `toJSON`, since
+ * the result is read as text. Never throws: a value that cannot be stringified
+ * is a marker, not a failed log line.
+ */
+export function stringifyForLog(value: unknown): string | undefined {
+    try {
+        return JSON.stringify(value, (key, val: unknown) => {
+            if (isSensitiveKey(key)) return REDACTED_VALUE;
+            if (val instanceof Error) return serialiseError(val);
+            if (typeof val === "string") return redactSensitiveText(val);
+            return val;
+        });
+    } catch {
+        return "[unserialisable]";
+    }
+}
+
+/**
  * Something that wants a copy of every line this logger writes.
  *
  * Receives the message and fields *after* redaction, never before: a sink is

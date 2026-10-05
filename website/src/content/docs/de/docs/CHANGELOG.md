@@ -654,6 +654,20 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 - **A static-only bundle refuses a non-numeric `PORT` and honours
   `PORT=0`,** as the backend does.
 
+- **What a cron job logs reaches the server log.** Lines a handler wrote with
+  `ctx.log()` were kept only with the run, in `rebase.cron_logs` and the
+  in-memory history,
+  which only the admin-gated `/api/admin/cron/:id/logs` reads. The process
+  log got one line per run, `✅ [cron] "<id>" completed in Nms`, so nothing
+  a job said about itself showed up in `rebase cloud debug logs`. A managed
+  app's AI step that fell back with `model unavailable (quota_exhausted)`
+  left no trace there, and the app wrapped `log` in all ten of its crons to
+  copy each line to stdout itself; that wrapper can go once the app upgrades.
+  Each line is now also logged at `info` with a `cron` field holding the job
+  ID. That copy is redacted like any other log line: the values of keys such
+  as `password` or `apiKey`, and the SQL and bound parameters of a logged
+  query error, are replaced. The lines stored with the run are unchanged.
+
 #### Postgres
 
 - **Queues and topics declared in `config/resources.ts` now run.** The

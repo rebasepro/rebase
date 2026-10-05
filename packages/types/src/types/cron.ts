@@ -112,7 +112,11 @@ export interface CronJobContext {
     /** The current scheduled tick timestamp. */
     scheduledAt: Date;
 
-    /** A simple logger scoped to this job run. */
+    /**
+     * A simple logger scoped to this job run. Each line is kept with the
+     * run's log entry and also written to the server log at `info`, with a
+     * `cron` field holding the job ID.
+     */
     log: (...args: unknown[]) => void;
 
     /**

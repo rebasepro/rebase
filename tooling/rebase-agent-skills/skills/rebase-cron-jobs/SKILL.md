@@ -225,7 +225,7 @@ interface CronJobContext {
     /** The current scheduled tick timestamp. */
     scheduledAt: Date;
 
-    /** A simple logger scoped to this job run — output captured in the execution log. */
+    /** A simple logger scoped to this job run — output captured in the execution log and written to the server log. */
     log: (...args: unknown[]) => void;
 
     /** Aborted when the run exceeds `timeoutSeconds`. Pass it to `fetch` and friends. */

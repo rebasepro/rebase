@@ -1,5 +1,5 @@
 ---
-sourceHash: 250ff63e7148cd0e
+sourceHash: ddd8f6798208c0d8
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Programa tareas recurrentes en segundo plano con el sistema integrado de cron jobs de Rebase. Define tareas como archivos TypeScript, monitorízalas en Studio y gestiónalas a través de la API REST.
@@ -162,7 +162,7 @@ interface CronJobContext {
     // The scheduled tick timestamp
     scheduledAt: Date;
 
-    // Logger — captured lines appear in Studio and the logs API
+    // Logger — lines appear in Studio, the logs API and the server log
     log: (...args: unknown[]) => void;
 
     // Aborted when the run exceeds `timeoutSeconds`, or when a shutdown's
@@ -176,7 +176,7 @@ interface CronJobContext {
 }
 ```
 
-Usa `ctx.log()` para emitir salida estructurada. Estas líneas se capturan en el registro de ejecución y son visibles en Studio y a través de la API REST.
+Usa `ctx.log()` para emitir salida estructurada. Estas líneas se capturan en el registro de ejecución y son visibles en Studio y a través de la API REST. Cada línea también se escribe en el registro del servidor con nivel `info` y un campo `cron` que contiene el ID del job, así que aparece en cualquier sistema que recoja la salida de tu contenedor, incluidos los registros de depuración de Rebase Cloud. En esa copia se ocultan los mismos datos que en las líneas de registro del propio servidor: se sustituyen los valores de claves como `password` o `apiKey`, y el SQL y los parámetros de una consulta fallida. El registro de ejecución guarda la línea sin ocultar nada.
 
 ### `ctx.signal` — detén el trabajo cuando la ejecución se detenga
 
