@@ -709,6 +709,35 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 #### CLI
 
+- **`rebase cloud debug logs`, `errors`, `requests` and `boot` say what
+  window their lines cover, and say when a limit cut it.** The control
+  plane returns at most 2000 lines per pod and lowered a larger `--tail`
+  without saying so, and its `truncated` flag covers only its byte
+  budgets. So `--since 30d --tail 200000` returned 35 minutes of lines
+  marked `"truncated": false`. Each view now ends with the start of the
+  window asked for and the first and last timestamps returned, per pod
+  and overall (`window`, `pods[].firstTimestamp`/`lastTimestamp` under
+  `--json`). A pod that returned the full line limit and whose earliest
+  line is later than the start of the window is marked `truncated`, with
+  a `truncatedReason` saying how much of the window was not read. A pod
+  that started recently returns fewer lines than the limit and is not
+  marked. A `--tail` above 2000 is lowered to 2000 before the request, and
+  the output says so (`tail.note`). A `--tail` that is not a positive
+  whole number is refused.
+
+- **`rebase cloud debug boot` reads each pod's log from its start**, with no
+  time window and 2000 lines per pod instead of the newest 500 from the last
+  7 days, which missed the startup lines of any pod that had served traffic
+  since. When a pod has logged more than 2000 lines since it started, its
+  startup lines are out of the control plane's reach. The command then
+  names the pod (`reachedStart: false`, `unreachedPods`) instead of reporting
+  that nothing matched.
+
+- **`rebase cloud debug --help` lists `--since`, `--tail` and `--previous`
+  under the actions that take them, with each action's own default.** The
+  help said "Default: 500" for every action, but `requests` reads 1000
+  lines, and it offered `--previous` to `requests`, which rejects it.
+
 - **`rebase db push` stops before a column type change that can lose
   values** — `numeric(5,2)` to `numeric(4,1)`, `bigint` to `integer`,
   `jsonb` to `text` — as documented. It never fired on the plan Atlas

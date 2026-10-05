@@ -25,6 +25,16 @@ import {
     isBootLine,
     parseRequestLine,
     functionNames,
+    resolveTail,
+    assessCoverage,
+    bootReach,
+    formatSpan,
+    printDebugHelp,
+    SERVER_MAX_TAIL_LINES,
+    LOG_VIEW_FLAGS,
+    REQUESTS_FLAGS,
+    HEALTH_FLAGS,
+    type RuntimeLogsResponse,
     type ProbeResult,
     type Verdict
 } from "./debug";
@@ -384,6 +394,252 @@ describe("parseSince", () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════
+   Coverage: the window asked for against the window returned
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * `count` lines from one pod, as runtime-logs renders them, one every `stepMs`
+ * ending at `lastMs`.
+ */
+function podLog(pod: string, count: number, lastMs: number, stepMs = 1000, text = "tick"): string[] {
+    return Array.from({ length: count }, (_, i) => {
+        const ts = new Date(lastMs - (count - 1 - i) * stepMs).toISOString();
+        return `${ts} [${pod}] ${text} ${i}`;
+    });
+}
+
+function answer(lines: string[], pods: RuntimeLogsResponse["pods"], truncated = false): RuntimeLogsResponse {
+    return { logs: lines.join("\n"),
+pods,
+ordering: "timestamp",
+truncated,
+state: "ok",
+message: null };
+}
+
+function okPod(pod: string, lines: number, truncated = false) {
+    return { pod,
+state: "ok",
+lines,
+message: null,
+hint: null,
+truncated };
+}
+
+const NOW = Date.parse("2026-10-05T10:37:00.000Z");
+const DAY = 86400;
+
+describe("resolveTail", () => {
+    it("lowers an ask above the control plane's ceiling, and says so", () => {
+        const tail = resolveTail(200000, true);
+        expect(tail.applied).toBe(SERVER_MAX_TAIL_LINES);
+        expect(tail.note).toMatch(/--tail 200000 was lowered to 2000/);
+    });
+
+    it("sends an ask within the ceiling unchanged, with nothing to say", () => {
+        expect(resolveTail(500, false)).toEqual({ requested: 500,
+applied: 500,
+explicit: false,
+note: null });
+    });
+});
+
+describe("assessCoverage", () => {
+    /**
+     * The prospector report, 2026-10-05: `--since 30d --tail 200000` came back
+     * with 35 minutes of lines from one pod, and the server's answer said
+     * `truncated: false` for the pod and for the whole. The pod returned the
+     * full 2000 lines the control plane allows, which is the tell.
+     */
+    it("marks a pod that filled the line limit short of the window as truncated, and says by how much", () => {
+        const lines = podLog("rebase-backend-a", 2000, NOW - 20_000, 1050);
+        const tail = resolveTail(200000, true);
+        const cov = assessCoverage({
+            res: answer(lines, [okPod("rebase-backend-a", 2000)]),
+            lines: lines.map(parseLogLine),
+            sinceSeconds: 30 * DAY,
+            tail,
+            now: NOW
+        });
+
+        expect(cov.truncated).toBe(true);
+        expect(cov.requestedFrom).toBe("2026-09-05T10:37:00.000Z");
+        expect(cov.firstTimestamp).toBe(parseLogLine(lines[0]).ts);
+        expect(cov.lastTimestamp).toBe(parseLogLine(lines[1999]).ts);
+        const pod = cov.pods[0];
+        expect(pod.truncated).toBe(true);
+        expect(pod.truncatedBy).toBe("tail");
+        expect(pod.complete).toBe(false);
+        expect(pod.firstTimestamp).toBe(cov.firstTimestamp);
+        expect(pod.truncatedReason).toContain("returned 2000 lines, the control plane's ceiling of 2000 lines per pod");
+        expect(pod.truncatedReason).toContain(`earliest is ${cov.firstTimestamp}`);
+        expect(pod.truncatedReason).toMatch(/29d 23h after the 30d window begins/);
+        expect(cov.truncatedReasons).toEqual([pod.truncatedReason]);
+    });
+
+    it("does not call a young pod truncated: fewer lines than the limit is its whole log", () => {
+        // Started an hour ago, asked for 30 days. Nothing older exists, and
+        // nothing was cut.
+        const lines = podLog("rebase-backend-a", 120, NOW - 1000, 30_000);
+        const cov = assessCoverage({
+            res: answer(lines, [okPod("rebase-backend-a", 120)]),
+            lines: lines.map(parseLogLine),
+            sinceSeconds: 30 * DAY,
+            tail: resolveTail(500, false),
+            now: NOW
+        });
+        expect(cov.truncated).toBe(false);
+        expect(cov.truncatedReasons).toEqual([]);
+        expect(cov.pods[0]).toMatchObject({ truncated: false,
+truncatedBy: null,
+complete: true });
+        expect(cov.firstTimestamp).toBe(parseLogLine(lines[0]).ts);
+    });
+
+    it("tells a reader under the default limit that --tail reads further back", () => {
+        const lines = podLog("p", 500, NOW - 1000);
+        const cov = assessCoverage({
+            res: answer(lines, [okPod("p", 500)]),
+            lines: lines.map(parseLogLine),
+            sinceSeconds: 3600,
+            tail: resolveTail(500, false),
+            now: NOW
+        });
+        expect(cov.pods[0].truncatedReason).toContain("the default of 500 lines per pod");
+        expect(cov.pods[0].truncatedReason).toMatch(/Raise --tail \(at most 2000\)/);
+    });
+
+    it("tells a reader at the ceiling that older lines cannot be read from here", () => {
+        const lines = podLog("p", 2000, NOW - 1000);
+        const cov = assessCoverage({
+            res: answer(lines, [okPod("p", 2000)]),
+            lines: lines.map(parseLogLine),
+            sinceSeconds: DAY,
+            tail: resolveTail(2000, true),
+            now: NOW
+        });
+        expect(cov.pods[0].truncatedReason).toContain("the --tail 2000 limit");
+        expect(cov.pods[0].truncatedReason).toMatch(/older lines cannot be read from here/);
+    });
+
+    it("reports each pod's own range, and the overall range across them", () => {
+        const a = podLog("a", 10, NOW - 60_000);
+        const b = podLog("b", 10, NOW - 1000);
+        const lines = [...a, ...b];
+        const cov = assessCoverage({
+            res: answer(lines, [okPod("a", 10), okPod("b", 10)]),
+            lines: lines.map(parseLogLine),
+            sinceSeconds: 3600,
+            tail: resolveTail(500, false),
+            now: NOW
+        });
+        expect(cov.pods[0].lastTimestamp).toBe(parseLogLine(a[9]).ts);
+        expect(cov.pods[1].firstTimestamp).toBe(parseLogLine(b[0]).ts);
+        expect(cov.firstTimestamp).toBe(parseLogLine(a[0]).ts);
+        expect(cov.lastTimestamp).toBe(parseLogLine(b[9]).ts);
+    });
+
+    it("names the server's byte budget when that is what cut a pod", () => {
+        const lines = podLog("p", 40, NOW - 1000);
+        const cov = assessCoverage({
+            res: answer(lines, [okPod("p", 40, true)], true),
+            lines: lines.map(parseLogLine),
+            sinceSeconds: 3600,
+            tail: resolveTail(500, false),
+            now: NOW
+        });
+        expect(cov.pods[0]).toMatchObject({ truncated: true,
+truncatedBy: "bytes",
+complete: false });
+        expect(cov.pods[0].truncatedReason).toMatch(/per-pod byte budget/);
+        // One reason for one cut: the server's overall flag is this pod's.
+        expect(cov.truncatedReasons).toHaveLength(1);
+    });
+
+    it("explains a server-side cut that no single pod owns", () => {
+        const lines = podLog("p", 40, NOW - 1000);
+        const cov = assessCoverage({
+            res: answer(lines, [okPod("p", 40)], true),
+            lines: lines.map(parseLogLine),
+            sinceSeconds: 3600,
+            tail: resolveTail(500, false),
+            now: NOW
+        });
+        expect(cov.truncated).toBe(true);
+        expect(cov.pods[0].truncated).toBe(false);
+        expect(cov.truncatedReasons[0]).toMatch(/trimmed the combined result/);
+    });
+
+    it("with no window, a pod that filled the limit was not read back to its start", () => {
+        const lines = podLog("p", 2000, NOW - 1000);
+        const cov = assessCoverage({
+            res: answer(lines, [okPod("p", 2000)]),
+            lines: lines.map(parseLogLine),
+            sinceSeconds: null,
+            tail: resolveTail(2000, false),
+            now: NOW
+        });
+        expect(cov.requestedFrom).toBeNull();
+        expect(cov.pods[0].truncatedReason).toContain(`its log before ${cov.firstTimestamp} was not read`);
+    });
+
+    it("leaves a pod that could not be read out of the cut, and not complete", () => {
+        const cov = assessCoverage({
+            res: answer([], [{ pod: "p",
+state: "not_ready",
+lines: 0,
+message: "waiting",
+hint: "retry" }]),
+            lines: [],
+            sinceSeconds: 3600,
+            tail: resolveTail(500, false),
+            now: NOW
+        });
+        expect(cov.truncated).toBe(false);
+        expect(cov.pods[0]).toMatchObject({ truncated: false,
+complete: false,
+firstTimestamp: null });
+    });
+});
+
+describe("bootReach", () => {
+    function pods(...entries: Array<[string, number]>) {
+        const lines = entries.flatMap(([pod, n]) => podLog(pod, n, NOW - 1000));
+        return assessCoverage({
+            res: answer(lines, entries.map(([pod, n]) => okPod(pod, n))),
+            lines: lines.map(parseLogLine),
+            sinceSeconds: null,
+            tail: resolveTail(2000, false),
+            now: NOW
+        }).pods;
+    }
+
+    it("reaches a pod's start when its whole log came back", () => {
+        expect(bootReach(pods(["a", 300]), null)).toEqual({ reachedStart: true,
+unreached: [] });
+    });
+
+    it("names the pod whose log was cut before its start", () => {
+        expect(bootReach(pods(["a", 300], ["b", 2000]), null)).toEqual({ reachedStart: false,
+unreached: ["b"] });
+    });
+
+    it("never claims the start under --since, which only reads a recent window", () => {
+        expect(bootReach(pods(["a", 300]), 3600).reachedStart).toBe(false);
+    });
+});
+
+describe("formatSpan", () => {
+    it("renders the two largest units", () => {
+        expect(formatSpan(40_000)).toBe("40s");
+        expect(formatSpan(35 * 60_000)).toBe("35m");
+        expect(formatSpan(125 * 60_000)).toBe("2h 5m");
+        expect(formatSpan((30 * 86400 - 3600) * 1000)).toBe("29d 23h");
+        expect(formatSpan(86400_000)).toBe("1d");
+    });
+});
+
+/* ═══════════════════════════════════════════════════════════════
    Command behaviour
    ═══════════════════════════════════════════════════════════════ */
 
@@ -661,6 +917,147 @@ desired: 1 }
         expect(update).not.toHaveBeenCalled();
         const parsed = JSON.parse(cap.output().trim());
         expect(parsed.placement.replicas.available).toBe(1);
+    });
+});
+
+/* ── log views: what was asked, what came back ──────────────────── */
+
+describe("debug logs / boot --json report the window they covered", () => {
+    /** Answer runtime-logs with `body`, recording the query each call sent. */
+    function useLogsClient(body: (query: URLSearchParams) => RuntimeLogsResponse) {
+        const queries: URLSearchParams[] = [];
+        const invoke = vi.fn(async (name: string, _b: unknown, opts?: { path?: string }) => {
+            expect(name).toBe("runtime-logs");
+            const query = new URLSearchParams((opts?.path ?? "").split("?")[1] ?? "");
+            queries.push(query);
+            return body(query);
+        });
+        useClient(fakeClient({ invoke }));
+        return queries;
+    }
+
+    async function run(action: string, ...flags: string[]) {
+        const cap = captureStdout();
+        await debugCommand(action, ["node", "rebase", "cloud", "debug", action, ...flags, "--json"]);
+        cap.restore();
+        return JSON.parse(cap.output().trim());
+    }
+
+    it("clamps --tail to the server's ceiling out loud, and marks a cut window truncated", async () => {
+        const now = Date.now();
+        const lines = podLog("rebase-backend-a", 2000, now - 60_000, 1050);
+        const queries = useLogsClient((q) => {
+            const n = Number(q.get("tailLines"));
+            return answer(lines.slice(-n), [okPod("rebase-backend-a", Math.min(n, 2000))]);
+        });
+
+        const out = await run("logs", "--since", "30d", "--tail", "200000");
+
+        // The request carries the clamped number: the server no longer
+        // lowers anything out of sight.
+        expect(queries[0].get("tailLines")).toBe("2000");
+        expect(queries[0].get("sinceSeconds")).toBe(String(30 * DAY));
+        expect(out.tail).toMatchObject({ requested: 200000,
+applied: 2000,
+serverMax: 2000 });
+        expect(out.tail.note).toMatch(/lowered to 2000/);
+        expect(out.truncated).toBe(true);
+        expect(out.truncatedReasons[0]).toMatch(/rebase-backend-a: returned 2000 lines/);
+        expect(out.window.firstTimestamp).toBe(parseLogLine(lines[0]).ts);
+        expect(out.window.lastTimestamp).toBe(parseLogLine(lines[1999]).ts);
+        expect(Date.parse(out.window.requestedFrom)).toBeLessThan(Date.parse(out.window.firstTimestamp));
+        expect(out.pods[0]).toMatchObject({ truncated: true,
+truncatedBy: "tail" });
+    });
+
+    it("refuses a --tail that is not a positive whole number", async () => {
+        useLogsClient(() => answer([], []));
+        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+            throw new Error("__exit__");
+        }) as never);
+        const cap = captureStdout();
+        await expect(
+            debugCommand("logs", ["node", "rebase", "cloud", "debug", "logs", "--tail", "0", "--json"])
+        ).rejects.toThrow("__exit__");
+        cap.restore();
+        exit.mockRestore();
+        expect(JSON.parse(cap.output().trim()).error.message).toMatch(/--tail must be a positive whole number/);
+    });
+
+    it("boot reads each pod from its start, with the most lines the server returns", async () => {
+        const now = Date.now();
+        const lines = [
+            ...podLog("rebase-backend-a", 1, now - 600_000, 1000, "Server running on port 8080"),
+            ...podLog("rebase-backend-a", 99, now - 1000)
+        ];
+        const queries = useLogsClient(() => answer(lines, [okPod("rebase-backend-a", 100)]));
+
+        const out = await run("boot");
+
+        // No window: a 7-day one cut the startup off any older pod.
+        expect(queries[0].has("sinceSeconds")).toBe(false);
+        expect(queries[0].get("tailLines")).toBe(String(SERVER_MAX_TAIL_LINES));
+        expect(out.sinceSeconds).toBeNull();
+        expect(out.window.requestedFrom).toBeNull();
+        expect(out.reachedStart).toBe(true);
+        expect(out.lines.map((l: { text: string }) => l.text)).toEqual(["Server running on port 8080 0"]);
+    });
+
+    it("boot says so when a pod's start was out of reach, instead of reporting nothing found", async () => {
+        const now = Date.now();
+        const lines = podLog("rebase-backend-a", 2000, now - 1000);
+        useLogsClient(() => answer(lines, [okPod("rebase-backend-a", 2000)]));
+
+        const out = await run("boot");
+
+        expect(out.state).toBe("ok"); // the fetch worked…
+        expect(out.reachedStart).toBe(false); // …and did not get to the startup
+        expect(out.unreachedPods).toEqual(["rebase-backend-a"]);
+        expect(out.truncated).toBe(true);
+        expect(out.matched).toBe(0);
+    });
+});
+
+describe("debug help and the flags each action parses agree", () => {
+    /**
+     * `--tail`, `--since` and `--previous` were one group-wide list saying
+     * "Default: 500": wrong for `requests` (1000) and `boot`, and `requests`
+     * rejects `--previous`. Each action now lists its own, from the specs.
+     */
+    function helpFlags(): Record<string, string[]> {
+        const cap = captureStdout();
+        printDebugHelp();
+        cap.restore();
+        const page = JSON.parse(cap.output().trim()) as {
+            actions: Array<{ action: string; flags: Array<{ flag: string }> }>;
+        };
+        return Object.fromEntries(page.actions.map((a) => [a.action, a.flags.map((f) => f.flag.split(" ")[0]).sort()]));
+    }
+
+    it.each([
+        ["health", HEALTH_FLAGS],
+        ["logs", LOG_VIEW_FLAGS],
+        ["errors", LOG_VIEW_FLAGS],
+        ["boot", LOG_VIEW_FLAGS],
+        ["requests", REQUESTS_FLAGS],
+        ["pod", {}],
+        ["db", {}]
+    ])("%s documents exactly the flags it parses", (action, spec) => {
+        expect(helpFlags()[action]).toEqual(Object.keys(spec).sort());
+    });
+
+    it("states each action's real --tail default", () => {
+        const cap = captureStdout();
+        printDebugHelp();
+        cap.restore();
+        const page = JSON.parse(cap.output().trim()) as {
+            actions: Array<{ action: string; flags: Array<{ flag: string; description: string }> }>;
+        };
+        const tailOf = (action: string) =>
+            page.actions.find((a) => a.action === action)?.flags.find((f) => f.flag.startsWith("--tail"))?.description;
+        expect(tailOf("logs")).toMatch(/Default: 500$/);
+        expect(tailOf("requests")).toMatch(/Default: 1000$/);
+        expect(tailOf("boot")).toMatch(/Default: 2000$/);
     });
 });
 

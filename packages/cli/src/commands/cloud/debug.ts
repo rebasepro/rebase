@@ -522,13 +522,237 @@ export function parseSince(input: string | undefined): number | null {
    Shared fetches
    ═══════════════════════════════════════════════════════════════ */
 
-interface RuntimeLogsResponse {
+/** One pod's entry in a `runtime-logs` answer. */
+export interface RuntimeLogsPod {
+    pod: string;
+    state: string;
+    /** Lines this pod returned. */
+    lines: number;
+    message: string | null;
+    hint: string | null;
+    /** The server's per-pod BYTE budget cut this pod's output. Says nothing about the line limit. */
+    truncated?: boolean;
+}
+
+export interface RuntimeLogsResponse {
     logs?: string;
-    pods?: Array<{ pod: string; state: string; lines: number; message: string | null; hint: string | null }>;
+    pods?: RuntimeLogsPod[];
     ordering?: string;
+    /** A byte budget or the pod-count ceiling cut the result. Says nothing about the line limit. */
     truncated?: boolean;
     state?: string;
     message?: string | null;
+}
+
+/**
+ * The most lines `runtime-logs` returns per pod.
+ *
+ * The control plane enforces this (`MAX_TAIL_LINES` in
+ * `saas/backend/functions/runtime-logs.ts`) by clamping a larger `tailLines`
+ * without saying so: its answer names neither the limit nor the value it used.
+ * `--tail 200000` therefore came back as 2000 lines reported as untruncated.
+ * The CLI clamps first, with the same number, so the lowering is something it
+ * can print rather than something that happened out of sight.
+ */
+export const SERVER_MAX_TAIL_LINES = 2000;
+
+/** How many lines per pod a read asks for, and why that may be less than requested. */
+export interface TailLimit {
+    /** What `--tail` asked for, or the view's default. */
+    requested: number;
+    /** What is sent: `requested`, lowered to {@link SERVER_MAX_TAIL_LINES}. */
+    applied: number;
+    /** Whether `--tail` was given, so a message can name the flag or the default. */
+    explicit: boolean;
+    /** Set when `applied < requested`: the sentence that says so. */
+    note: string | null;
+}
+
+export function resolveTail(requested: number, explicit: boolean): TailLimit {
+    const applied = Math.min(requested, SERVER_MAX_TAIL_LINES);
+    return {
+        requested,
+        applied,
+        explicit,
+        note:
+            applied < requested
+                ? `--tail ${requested} was lowered to ${applied}: the control plane returns at most ` +
+                  `${SERVER_MAX_TAIL_LINES} lines per pod.`
+                : null
+    };
+}
+
+/** Read `--tail`, refusing anything that is not a positive whole number. */
+function tailFromFlag(value: number | undefined, fallback: number): TailLimit {
+    if (value === undefined) return resolveTail(fallback, false);
+    if (!Number.isInteger(value) || value <= 0) {
+        fail(`--tail must be a positive whole number of lines; received "${value}".`, undefined, "usage");
+    }
+    return resolveTail(value, true);
+}
+
+/** What one pod's lines actually cover. */
+export interface PodCoverage extends RuntimeLogsPod {
+    /** Earliest and latest timestamps among the lines this pod returned. */
+    firstTimestamp: string | null;
+    lastTimestamp: string | null;
+    /** A limit cut what this pod would otherwise have returned for the window. */
+    truncated: boolean;
+    /** Which limit: the per-pod line limit, or the server's byte budget. */
+    truncatedBy: "tail" | "bytes" | null;
+    /** The plain explanation, when truncated. */
+    truncatedReason: string | null;
+    /**
+     * Every line this pod holds in the window came back. With no window (read
+     * from the start), its first line is the start of its log.
+     */
+    complete: boolean;
+}
+
+/** The window asked for against the window delivered. */
+export interface LogCoverage {
+    /** Start of the window asked for, ISO. Null when reading each pod from its start. */
+    requestedFrom: string | null;
+    /** Earliest and latest timestamps across every line returned. */
+    firstTimestamp: string | null;
+    lastTimestamp: string | null;
+    pods: PodCoverage[];
+    truncated: boolean;
+    truncatedReasons: string[];
+}
+
+/** A span of milliseconds as `29d 23h`, `2h 5m`, `35m`, `40s`. */
+export function formatSpan(ms: number): string {
+    const s = Math.max(0, Math.round(ms / 1000));
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`;
+    if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    if (m > 0) return `${m}m`;
+    return `${s}s`;
+}
+
+function timestampRange(lines: ParsedLogLine[]): { first: string | null; last: string | null } {
+    let first: { text: string; ms: number } | null = null;
+    let last: { text: string; ms: number } | null = null;
+    for (const l of lines) {
+        if (!l.ts) continue;
+        const ms = Date.parse(l.ts);
+        if (Number.isNaN(ms)) continue;
+        if (!first || ms < first.ms) first = { text: l.ts,
+ms };
+        if (!last || ms > last.ms) last = { text: l.ts,
+ms };
+    }
+    return { first: first?.text ?? null,
+last: last?.text ?? null };
+}
+
+/**
+ * Compare what a read covered with what it asked for.
+ *
+ * The server's `truncated` describes only its byte budgets and pod ceiling, so
+ * a pod that filled the line limit came back marked complete however much of
+ * the window it left unread. The line limit is the cut that matters most, and
+ * it is detected here: a pod that returned as many lines as the limit, whose
+ * earliest line is later than the start of the window, was cut by it.
+ *
+ * Filling the limit is the half that separates a cut from a young pod. A pod
+ * that started an hour ago also has no line older than an hour; it returned
+ * fewer lines than the limit, so what came back is its whole log, and nothing
+ * was cut.
+ */
+export function assessCoverage(opts: {
+    res: RuntimeLogsResponse;
+    lines: ParsedLogLine[];
+    /** The window asked for. Null reads each pod from its start. */
+    sinceSeconds: number | null;
+    tail: TailLimit;
+    now: number;
+}): LogCoverage {
+    const { res, lines, sinceSeconds, tail, now } = opts;
+    const windowStartMs = sinceSeconds === null ? null : now - sinceSeconds * 1000;
+    const requestedFrom = windowStartMs === null ? null : new Date(windowStartMs).toISOString();
+    const limitName = tail.note
+        ? `the control plane's ceiling of ${tail.applied} lines per pod`
+        : tail.explicit
+          ? `the --tail ${tail.applied} limit`
+          : `the default of ${tail.applied} lines per pod`;
+    // Only worth saying when raising it would read further back.
+    const raise = tail.applied < SERVER_MAX_TAIL_LINES
+        ? ` Raise --tail (at most ${SERVER_MAX_TAIL_LINES}) to read further back.`
+        : ` The control plane returns only each pod's newest ${SERVER_MAX_TAIL_LINES}, so older lines cannot be read from here.`;
+
+    const pods: PodCoverage[] = (res.pods ?? []).map((p) => {
+        const range = timestampRange(lines.filter((l) => l.pod === p.pod));
+        const base = { ...p,
+firstTimestamp: range.first,
+lastTimestamp: range.last };
+        if (p.state !== "ok") {
+            return { ...base,
+truncated: false,
+truncatedBy: null,
+truncatedReason: null,
+complete: false };
+        }
+        if (p.truncated) {
+            return {
+                ...base,
+                truncated: true,
+                truncatedBy: "bytes" as const,
+                truncatedReason:
+                    `${p.pod}: the control plane's per-pod byte budget cut this pod's output short` +
+                    (range.first ? ` — what fit runs ${range.first} to ${range.last}.` : "."),
+                complete: false
+            };
+        }
+        const firstMs = range.first ? Date.parse(range.first) : null;
+        const startsLate = windowStartMs === null || firstMs === null || firstMs > windowStartMs;
+        if (p.lines >= tail.applied && startsLate) {
+            let reason: string;
+            if (firstMs === null) {
+                reason = `${p.pod}: returned ${p.lines} lines, ${limitName}; they carry no timestamps, so how far back they reach is unknown.`;
+            } else if (sinceSeconds !== null && windowStartMs !== null) {
+                reason =
+                    `${p.pod}: returned ${p.lines} lines, ${limitName}, and the earliest is ${range.first} — ` +
+                    `${formatSpan(firstMs - windowStartMs)} after the ${formatDuration(sinceSeconds)} ` +
+                    `window begins (${requestedFrom}). Lines in between were not read.${raise}`;
+            } else {
+                reason =
+                    `${p.pod}: returned ${p.lines} lines, ${limitName}, so its log before ${range.first} ` +
+                    `was not read.${raise}`;
+            }
+            return { ...base,
+truncated: true,
+truncatedBy: "tail" as const,
+truncatedReason: reason,
+complete: false };
+        }
+        return { ...base,
+truncated: false,
+truncatedBy: null,
+truncatedReason: null,
+complete: true };
+    });
+
+    const truncatedReasons = pods.flatMap((p) => (p.truncatedReason ? [p.truncatedReason] : []));
+    // The server's flag also covers cuts no single pod owns: its total byte
+    // budget across pods, and the cap on how many pods it reads.
+    if (res.truncated && !pods.some((p) => p.truncatedBy === "bytes")) {
+        truncatedReasons.push(
+            "The control plane trimmed the combined result (its total byte budget, or the most pods it reads at once); the oldest lines were dropped."
+        );
+    }
+    const overall = timestampRange(lines);
+    return {
+        requestedFrom,
+        firstTimestamp: overall.first,
+        lastTimestamp: overall.last,
+        pods,
+        truncated: Boolean(res.truncated) || pods.some((p) => p.truncated),
+        truncatedReasons
+    };
 }
 
 async function fetchRuntimeLogs(
@@ -563,11 +787,35 @@ function printPodStates(res: RuntimeLogsResponse): void {
         // is in its PREVIOUS instance, and that is only discoverable if we say so.
         if (p.hint) console.log(chalk.cyan(`    → ${p.hint}`));
     }
-    if (res.truncated) console.log(chalk.gray("  (output truncated — narrow the window with --since)"));
 }
 
-/** Resolve the public origin a project is served at. */
-async function resolveOrigin(
+/**
+ * The window asked for, the window delivered, and every cut between them.
+ * Printed after the lines, where a reader's eye is when the output ends.
+ */
+function printCoverage(coverage: LogCoverage, tail: TailLimit): void {
+    const asked = coverage.requestedFrom ? `from ${coverage.requestedFrom}` : "from each pod's start";
+    const got = coverage.firstTimestamp && coverage.lastTimestamp
+        ? `${coverage.firstTimestamp} → ${coverage.lastTimestamp} ` +
+          `(${formatSpan(Date.parse(coverage.lastTimestamp) - Date.parse(coverage.firstTimestamp))})`
+        : "no timestamped lines";
+    console.log(chalk.gray(`  Asked for:  ${asked}`));
+    console.log(chalk.gray(`  Returned:   ${got}`));
+    if (tail.note) console.log(chalk.yellow(`  ! ${tail.note}`));
+    if (coverage.truncated) {
+        console.log(chalk.yellow("  ! Truncated — the lines above do not cover the window asked for:"));
+        for (const reason of coverage.truncatedReasons) console.log(chalk.yellow(`    ${reason}`));
+    }
+    console.log("");
+}
+
+/**
+ * Resolve the public origin a project is served at — or `--host`, when given.
+ *
+ * Shared with `rebase cloud cron`, which reads the runtime at the same address
+ * `debug health` probes.
+ */
+export async function resolveOrigin(
     rawArgs: string[],
     client: CloudClient,
     url: string,
@@ -606,12 +854,7 @@ async function healthCommand(rawArgs: string[]): Promise<void> {
     // Strict: `--collecton users` used to be dropped and the probe then ran
     // against the default collection while reporting on the one asked for.
     const { flags: parsed } = parseCloudArgs({
-        // `--host` is read again inside `resolveOrigin`, which needs it before
-        // the client exists; declared here because THIS is the parse that
-        // decides whether the line is accepted at all.
-        spec: { "--collection": String,
-"--function": String,
-"--host": String },
+        spec: HEALTH_FLAGS,
         rawArgs,
         commandWords: 3, // cloud debug health
         command: "cloud debug",
@@ -681,32 +924,117 @@ probes: results }
    Subcommand: logs / errors / requests / boot
    ═══════════════════════════════════════════════════════════════ */
 
+/** What `debug logs`, `errors` and `boot` parse. Their help pairs against this. */
+export const LOG_VIEW_FLAGS = {
+    "--since": String,
+    "--tail": Number,
+    "--previous": Boolean
+} as const;
+
+/** What `debug requests` parses. */
+export const REQUESTS_FLAGS = {
+    "--since": String,
+    "--tail": Number
+} as const;
+
+/** What `debug health` parses. */
+export const HEALTH_FLAGS = {
+    "--collection": String,
+    "--function": String,
+    // `--host` is read again inside `resolveOrigin`, which needs it before
+    // the client exists; declared here because THIS is the parse that
+    // decides whether the line is accepted at all.
+    "--host": String
+} as const;
+
 interface LogViewOptions {
     /** Keep only lines matching this. Omit to keep everything. */
     filter?: (text: string) => boolean;
-    /** Default lookback when --since is not given. */
-    defaultSinceSeconds: number;
+    /** Default lookback when --since is not given. Null reads each pod from its start. */
+    defaultSinceSeconds: number | null;
+    /** Lines read per pod when --tail is not given. */
+    defaultTail: number;
     /** Max lines rendered. */
     limit: number;
     title: string;
+    /**
+     * The lines wanted are the first a pod wrote, so a read that did not reach
+     * a pod's start has not looked where they are — see {@link bootReach}.
+     */
+    needsStart?: boolean;
+}
+
+const LOG_VIEWS = {
+    logs: { defaultSinceSeconds: 900,
+defaultTail: 500,
+limit: 200,
+title: "📄 Logs" },
+    errors: { filter: isErrorLine,
+defaultSinceSeconds: 3600,
+defaultTail: 500,
+limit: 40,
+title: "🔥 Errors" },
+    boot: {
+        filter: isBootLine,
+        // No window, and the most lines the control plane returns. Startup
+        // happened when the pod started, which may have been days ago: a
+        // 7-day window and the newest 500 lines missed it on any pod that had
+        // served traffic since.
+        defaultSinceSeconds: null,
+        defaultTail: SERVER_MAX_TAIL_LINES,
+        limit: 25,
+        title: "🚀 Boot",
+        needsStart: true
+    }
+} satisfies Record<string, LogViewOptions>;
+
+const REQUESTS_DEFAULTS = { sinceSeconds: 900,
+tail: 1000 };
+
+/** Read `--since`, refusing anything that is not a duration. Undefined when it was not given. */
+function sinceFromFlag(sinceArg: string | undefined): number | undefined {
+    if (sinceArg === undefined) return undefined;
+    const seconds = parseSince(sinceArg);
+    if (seconds === null) fail(`--since must be a duration like 15m, 2h or 90s; received "${sinceArg}".`);
+    return seconds;
+}
+
+function windowLabel(sinceSeconds: number | null): string {
+    return sinceSeconds === null ? "since each pod started" : `last ${formatDuration(sinceSeconds)}`;
+}
+
+/**
+ * Whether a boot read reached each pod's start, which is where its startup
+ * lines are. A pod whose read was cut has not been looked at there, so finding
+ * no startup lines in it means nothing — and a line from later in its life
+ * that happens to mention `storage` is not its startup.
+ *
+ * Under `--since` a pod is never counted as reached: a complete read of the
+ * window starts at the pod's first line only if the pod started inside it, and
+ * nothing in the answer says whether it did.
+ */
+export function bootReach(pods: PodCoverage[], sinceSeconds: number | null): {
+    reachedStart: boolean;
+    unreached: string[];
+} {
+    const unreached = pods
+        .filter((p) => p.state === "ok" && (!p.complete || sinceSeconds !== null))
+        .map((p) => p.pod);
+    return { reachedStart: unreached.length === 0,
+unreached };
 }
 
 async function logView(rawArgs: string[], view: LogViewOptions): Promise<void> {
     const { flags: parsed } = parseCloudArgs({
-        spec: { "--since": String,
-"--tail": Number,
-"--previous": Boolean },
+        spec: LOG_VIEW_FLAGS,
         rawArgs,
         commandWords: 3, // cloud debug logs|errors|boot
         command: "cloud debug",
         maxPositionals: 0
     });
 
-    const sinceArg = parsed["--since"];
-    if (sinceArg !== undefined && parseSince(sinceArg) === null) {
-        fail(`--since must be a duration like 15m, 2h or 90s; received "${sinceArg}".`);
-    }
-    const sinceSeconds = parseSince(sinceArg) ?? view.defaultSinceSeconds;
+    const sinceSeconds = sinceFromFlag(parsed["--since"]) ?? view.defaultSinceSeconds;
+    const tail = tailFromFlag(parsed["--tail"], view.defaultTail);
 
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
@@ -714,8 +1042,8 @@ async function logView(rawArgs: string[], view: LogViewOptions): Promise<void> {
     let res: RuntimeLogsResponse;
     try {
         res = await fetchRuntimeLogs(client, projectId, {
-            sinceSeconds,
-            tailLines: parsed["--tail"] ?? 500,
+            sinceSeconds: sinceSeconds ?? undefined,
+            tailLines: tail.applied,
             previous: Boolean(parsed["--previous"])
         });
     } catch (e) {
@@ -726,33 +1054,63 @@ async function logView(rawArgs: string[], view: LogViewOptions): Promise<void> {
     const parsedLines = all.map(parseLogLine);
     const kept = view.filter ? parsedLines.filter((l) => view.filter!(l.text)) : parsedLines;
     const shown = kept.slice(-view.limit);
+    const coverage = assessCoverage({ res,
+lines: parsedLines,
+sinceSeconds,
+tail,
+now: Date.now() });
+    const reach = view.needsStart ? bootReach(coverage.pods, sinceSeconds) : null;
 
     emit(
         () => {
             console.log("");
             console.log(
-                chalk.bold(`  ${view.title} — ${displayProjectRef(rawArgs)}`) +
-                    chalk.gray(`  last ${formatDuration(sinceSeconds)}`)
+                chalk.bold(`  ${view.title} — ${displayProjectRef(rawArgs)}`) + chalk.gray(`  ${windowLabel(sinceSeconds)}`)
             );
             console.log("");
             printPodStates(res);
             if (shown.length === 0) {
-                console.log(chalk.gray("  (nothing matched in this window)"));
+                console.log(chalk.gray("  (nothing matched in what was read)"));
                 console.log("");
-                return;
+            } else {
+                for (const l of shown) console.log(`  ${l.pod ? chalk.gray(`[${l.pod}] `) : ""}${l.text}`);
+                console.log("");
+                if (kept.length > shown.length) {
+                    console.log(chalk.gray(`  (showing the last ${shown.length} of ${kept.length} matching lines)`));
+                    console.log("");
+                }
             }
-            for (const l of shown) console.log(`  ${l.pod ? chalk.gray(`[${l.pod}] `) : ""}${l.text}`);
-            console.log("");
-            if (kept.length > shown.length) {
-                console.log(chalk.gray(`  (showing the last ${shown.length} of ${kept.length} matching lines)`));
+            printCoverage(coverage, tail);
+            if (reach && !reach.reachedStart) {
+                const which = reach.unreached.join(", ");
+                console.log(
+                    chalk.yellow(
+                        sinceSeconds === null
+                            ? `  ! The start of ${which} was not read, so its startup lines are not among the lines above.`
+                            : `  ! The start of ${which} may not have been read: --since limits the read to a recent window. ` +
+                              "Drop it to read each pod from its start."
+                    )
+                );
                 console.log("");
             }
         },
         {
             sinceSeconds,
+            tail: { requested: tail.requested,
+applied: tail.applied,
+serverMax: SERVER_MAX_TAIL_LINES,
+note: tail.note },
+            window: {
+                requestedFrom: coverage.requestedFrom,
+                firstTimestamp: coverage.firstTimestamp,
+                lastTimestamp: coverage.lastTimestamp
+            },
             state: res.state ?? null,
-            pods: res.pods ?? [],
-            truncated: Boolean(res.truncated),
+            pods: coverage.pods,
+            truncated: coverage.truncated,
+            truncatedReasons: coverage.truncatedReasons,
+            ...(reach ? { reachedStart: reach.reachedStart,
+unreachedPods: reach.unreached } : {}),
             matched: kept.length,
             lines: shown
         }
@@ -761,18 +1119,14 @@ async function logView(rawArgs: string[], view: LogViewOptions): Promise<void> {
 
 async function requestsCommand(rawArgs: string[]): Promise<void> {
     const { flags: parsed } = parseCloudArgs({
-        spec: { "--since": String,
-"--tail": Number },
+        spec: REQUESTS_FLAGS,
         rawArgs,
         commandWords: 3, // cloud debug requests
         command: "cloud debug",
         maxPositionals: 0
     });
-    const sinceArg = parsed["--since"];
-    if (sinceArg !== undefined && parseSince(sinceArg) === null) {
-        fail(`--since must be a duration like 15m, 2h or 90s; received "${sinceArg}".`);
-    }
-    const sinceSeconds = parseSince(sinceArg) ?? 900;
+    const sinceSeconds = sinceFromFlag(parsed["--since"]) ?? REQUESTS_DEFAULTS.sinceSeconds;
+    const tail = tailFromFlag(parsed["--tail"], REQUESTS_DEFAULTS.tail);
 
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
@@ -780,31 +1134,39 @@ async function requestsCommand(rawArgs: string[]): Promise<void> {
     let res: RuntimeLogsResponse;
     try {
         res = await fetchRuntimeLogs(client, projectId, { sinceSeconds,
-tailLines: parsed["--tail"] ?? 1000 });
+tailLines: tail.applied });
     } catch (e) {
         reportError(e, "Failed to fetch runtime logs");
     }
 
-    const entries = (res.logs ?? "")
+    const parsedLines = (res.logs ?? "")
         .split("\n")
         .filter((l) => l !== "")
-        .map((l) => parseRequestLine(parseLogLine(l).text))
+        .map(parseLogLine);
+    const entries = parsedLines
+        .map((l) => parseRequestLine(l.text))
         .filter((e): e is RequestLogEntry => e !== null);
     const shown = entries.slice(-40);
+    const coverage = assessCoverage({ res,
+lines: parsedLines,
+sinceSeconds,
+tail,
+now: Date.now() });
 
     emit(
         () => {
             console.log("");
             console.log(
                 chalk.bold(`  🌐 Requests — ${displayProjectRef(rawArgs)}`) +
-                    chalk.gray(`  last ${formatDuration(sinceSeconds)}`)
+                    chalk.gray(`  ${windowLabel(sinceSeconds)}`)
             );
             console.log("");
             printPodStates(res);
             if (shown.length === 0) {
-                console.log(chalk.gray("  No structured request lines in this window."));
+                console.log(chalk.gray("  No structured request lines in what was read."));
                 console.log(chalk.gray("  (this view needs the server's request logging; try `debug logs`)"));
                 console.log("");
+                printCoverage(coverage, tail);
                 return;
             }
             for (const e of shown) {
@@ -817,9 +1179,24 @@ tailLines: parsed["--tail"] ?? 1000 });
                 );
             }
             console.log("");
+            printCoverage(coverage, tail);
         },
-        { sinceSeconds,
-requests: shown }
+        {
+            sinceSeconds,
+            tail: { requested: tail.requested,
+applied: tail.applied,
+serverMax: SERVER_MAX_TAIL_LINES,
+note: tail.note },
+            window: {
+                requestedFrom: coverage.requestedFrom,
+                firstTimestamp: coverage.firstTimestamp,
+                lastTimestamp: coverage.lastTimestamp
+            },
+            pods: coverage.pods,
+            truncated: coverage.truncated,
+            truncatedReasons: coverage.truncatedReasons,
+            requests: shown
+        }
     );
 }
 
@@ -1027,27 +1404,9 @@ export async function debugCommand(action: string | undefined, rawArgs: string[]
             await healthCommand(rawArgs);
             break;
         case "logs":
-            await logView(rawArgs, { defaultSinceSeconds: 900,
-limit: 200,
-title: "📄 Logs" });
-            break;
         case "errors":
-            await logView(rawArgs, {
-                filter: isErrorLine,
-                defaultSinceSeconds: 3600,
-                limit: 40,
-                title: "🔥 Errors"
-            });
-            break;
         case "boot":
-            await logView(rawArgs, {
-                filter: isBootLine,
-                // The whole log, not a window: startup happened when the pod
-                // started, which may have been days ago.
-                defaultSinceSeconds: 7 * 24 * 3600,
-                limit: 25,
-                title: "🚀 Boot"
-            });
+            await logView(rawArgs, LOG_VIEWS[action]);
             break;
         case "requests":
             await requestsCommand(rawArgs);
@@ -1076,6 +1435,30 @@ title: "📄 Logs" });
     }
 }
 
+/**
+ * The log flags as one action's help lists them, with THAT action's defaults.
+ * They were one group-wide list saying "Default: 500", which was true of two of
+ * the four actions, and offered `--previous` to `requests`, which rejects it.
+ */
+function logFlagHelp(defaults: { sinceSeconds: number | null; tail: number }, previous: boolean): Array<[string, string]> {
+    const flags: Array<[string, string]> = [
+        [
+            "--since <dur>",
+            defaults.sinceSeconds === null
+                ? "Only lines this recent: 90s, 15m, 2h, 1d. Default: from each pod's start"
+                : `Lookback window: 90s, 15m, 2h, 1d. Default: ${formatDuration(defaults.sinceSeconds)}`
+        ],
+        ["--tail <n>", `Newest lines to read per pod, at most ${SERVER_MAX_TAIL_LINES}. Default: ${defaults.tail}`]
+    ];
+    if (previous) flags.push(["--previous", "Read the CRASHED container instance, where the reason lives"]);
+    return flags;
+}
+
+function logViewFlagHelp(view: LogViewOptions): Array<[string, string]> {
+    return logFlagHelp({ sinceSeconds: view.defaultSinceSeconds,
+tail: view.defaultTail }, true);
+}
+
 export function printDebugHelp(): void {
     printGroupHelp({
         command: "cloud debug",
@@ -1093,16 +1476,20 @@ export function printDebugHelp(): void {
             },
             { action: "logs",
 section: "Runtime",
-description: "Recent application logs" },
+description: "Recent application logs",
+flags: logViewFlagHelp(LOG_VIEWS.logs) },
             { action: "errors",
 section: "Runtime",
-description: "Error and warning lines only" },
+description: "Error and warning lines only",
+flags: logViewFlagHelp(LOG_VIEWS.errors) },
             { action: "requests",
 section: "Runtime",
-description: "HTTP requests the server logged: status, path, latency" },
+description: "HTTP requests the server logged: status, path, latency",
+flags: logFlagHelp(REQUESTS_DEFAULTS, false) },
             { action: "boot",
 section: "Runtime",
-description: "What the server decided at startup: storage, functions, auth" },
+description: "What the server decided at startup: storage, functions, auth",
+flags: logViewFlagHelp(LOG_VIEWS.boot) },
             { action: "pod",
 section: "Runtime",
 description: "Replicas, image, namespace, cluster placement" },
@@ -1110,14 +1497,11 @@ description: "Replicas, image, namespace, cluster placement" },
 section: "Data",
 description: "Connection shape and the port-forward recipe. Never the password" }
         ],
-        options: [
-            ["--since <dur>", "Lookback window: 90s, 15m, 2h, 1d"],
-            ["--tail <n>", "Lines to read per pod. Default: 500"],
-            ["--previous", "Read the CRASHED container instance, where the reason lives"]
-        ],
         notes: [
             "Everything here is read-only. `health` exits non-zero when a check fails, so it works in a",
-            "deploy script. To restart a workload, use `rebase cloud restart`."
+            "deploy script. To restart a workload, use `rebase cloud restart`.",
+            "The log views end with the window asked for, the window returned, and anything that cut",
+            `between them. The control plane returns at most ${SERVER_MAX_TAIL_LINES} lines per pod.`
         ]
     });
 }
