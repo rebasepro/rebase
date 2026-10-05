@@ -259,4 +259,67 @@ describe("db push destructive-change gate E2E", () => {
         expect(rows.find(r => r.attname === "nickname")?.type).toBe("character varying(100)");
         expect(rows.some(r => r.generated)).toBe(true);
     }, 150_000);
+
+    /**
+     * A primary key is a row's address. Moving `translations` from `(id)` to
+     * `(id, locale)` makes Atlas plan `DROP CONSTRAINT "translations_pkey", ADD
+     * PRIMARY KEY ("id", "locale")` — no DROP of data in sight — and push
+     * applied it unasked, off a TTY, changing the id of every row.
+     */
+    it("refuses to re-key a table non-interactively, then re-keys it with --allow-destructive", async () => {
+        const translationsJs = (localeIsKey: boolean) => `
+const translationsCollection = {
+    name: "Translations",
+    slug: "translations",
+    table: "translations",
+    properties: {
+        id:     { name: "ID",     type: "number", isId: true },
+        locale: { name: "Locale", type: "string", ${localeIsKey ? "isId: true" : "validation: { required: true }"} },
+        title:  { name: "Title",  type: "string" }
+    }
+};
+export default translationsCollection;
+`;
+        const primaryKey = async (): Promise<string[]> => {
+            const res = await dbClient.query<{ cols: string[] }>(`
+                SELECT array_agg(a.attname::text ORDER BY k.ord) AS cols
+                  FROM pg_constraint c
+                 CROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord)
+                  JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum
+                 WHERE c.conrelid = 'public.translations'::regclass AND c.contype = 'p'`);
+            return res.rows[0]?.cols ?? [];
+        };
+
+        // The directory is the collection set, whatever `index.js` lists: the
+        // earlier tests' tables leave it, and are left alone as unmanaged.
+        for (const file of fs.readdirSync(collectionsDir)) {
+            if (file.endsWith(".js")) fs.rmSync(path.join(collectionsDir, file));
+        }
+        fs.writeFileSync(path.join(collectionsDir, "index.js"),
+            `import translationsCollection from "./translations.js";\nexport default [translationsCollection];\n`);
+        fs.writeFileSync(path.join(collectionsDir, "translations.js"), translationsJs(false));
+        const created = await runPush();
+        expect(created.all ?? "").toMatch(/completed successfully/);
+        expect(created.exitCode).toBe(0);
+        await dbClient.query(`INSERT INTO translations (id, locale, title) VALUES (1, 'en', 'Hello'), (2, 'en', 'Bye')`);
+        expect(await primaryKey()).toEqual(["id"]);
+
+        fs.writeFileSync(path.join(collectionsDir, "translations.js"), translationsJs(true));
+        const refused = await runPush();
+        expect(refused.exitCode).not.toBe(0);
+        expect(refused.all ?? "").toMatch(/This push includes 1 destructive change/);
+        expect(refused.all ?? "").toMatch(
+            /PRIMARY KEY CHANGE \("public"\."translations" is re-keyed on \("id", "locale"\): every row's id changes/
+        );
+        expect(await primaryKey()).toEqual(["id"]);
+
+        const allowed = await runPush(["--allow-destructive"]);
+        expect(allowed.exitCode).toBe(0);
+        expect(await primaryKey()).toEqual(["id", "locale"]);
+        const rows = await dbClient.query(`SELECT id, locale, title FROM translations ORDER BY id`);
+        expect(rows.rows).toEqual([
+            { id: 1, locale: "en", title: "Hello" },
+            { id: 2, locale: "en", title: "Bye" }
+        ]);
+    }, 150_000);
 });

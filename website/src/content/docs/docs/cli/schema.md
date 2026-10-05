@@ -104,7 +104,9 @@ rebase db push
 - Applies changes directly to the database (CREATE, ALTER, DROP)
 - Dry-runs the plan first and stops before anything that destroys data: a
   dropped table, column, schema, view or type, a `TRUNCATE`, or a column type
-  change that can lose values (`timestamptz` → `date`, `numeric` → `integer`).
+  change that can lose values (`timestamptz` → `date`, `numeric` → `integer`),
+  or a primary key change — `(id)` → `(id, locale)` gives every row a new id, so
+  links, foreign keys and ids stored elsewhere stop finding their row.
   It asks on a terminal and refuses otherwise; `--allow-destructive` (or
   `--yes`) applies it anyway
 - Switches row-level security on for every collection table, junctions included, right after the

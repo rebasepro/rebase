@@ -1,0 +1,24 @@
+Planning migration statements (1 in total):
+
+  -- modify "translations" table:
+    -> ALTER TABLE "public"."translations" DROP CONSTRAINT "translations_pkey", ADD COLUMN "locale" text NOT NULL, ADD PRIMARY KEY ("id", "locale");
+
+-------------------------------------------
+
+Analyzing planned statements (1 in total):
+
+  -- Potential issues detected in planned migration (1 in total)
+    -- Run `atlas login` and re-run the command to view diagnostics
+
+-------------------------------------------
+
+Running dry-run migration (1 statement in total):
+
+  -- modify "translations" table
+    -> ALTER TABLE "public"."translations" DROP CONSTRAINT "translations_pkey", ADD COLUMN "locale" text NOT NULL, ADD PRIMARY KEY ("id", "locale");
+  -- ok (17.708µs)
+
+  -------------------------
+  -- 53.375µs
+  -- 1 migration
+  -- 1 sql statement

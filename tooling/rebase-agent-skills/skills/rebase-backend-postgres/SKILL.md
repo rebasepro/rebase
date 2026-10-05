@@ -83,8 +83,8 @@ rebase db migrate
 > In particular there is no `rebase db studio`.
 >
 > `rebase db push` refuses a destructive change on a non-TTY (dropped column, dropped
-> table, or a column type change that can lose values, such as `timestamptz` → `date` or
-> `numeric` → `integer`). In CI or from an agent, pass `--allow-destructive` (or `--yes`)
+> table, a column type change that can lose values, such as `timestamptz` → `date` or
+> `numeric` → `integer`, or a primary key change, which gives every row a new id). In CI or from an agent, pass `--allow-destructive` (or `--yes`)
 > once you have confirmed the data loss is intended.
 
 ## Key Backend Packages

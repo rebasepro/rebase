@@ -9,12 +9,16 @@
  * here, and refuse to auto-approve anything destructive without an explicit
  * opt-in.
  *
- * A type change is the one destructive plan that names no DROP. `ALTER COLUMN
+ * A type change is a destructive plan that names no DROP. `ALTER COLUMN
  * "price" TYPE integer` rounds every 19.99 to 20, and `TYPE date` throws away
  * every timestamp's time of day, in a statement that reads like a routine
  * alter. So a type change is gated too, unless it is a widening every value
  * survives unchanged — which needs the column's current type, read from the
  * catalogue by the caller.
+ *
+ * A primary key change names no DROP of data either: `DROP CONSTRAINT
+ * "<table>_pkey", ADD PRIMARY KEY ("id", "locale")` keeps every value and
+ * gives every row a new address. It is gated like a drop.
  *
  * Everything in this file is side-effect free so it can be unit-tested
  * without Atlas or a database.
@@ -229,23 +233,21 @@ export function detectDestructiveStatements(
         });
     }
     for (const statement of statements) {
+        // One finding per statement, under the label that says the most, with
+        // everything else it does in the detail: Atlas folds a key change, a
+        // retype and a drop into one `ALTER TABLE`, and a reader shown only
+        // the first would approve the rest unread.
         const dropped = DESTRUCTIVE_PATTERNS.find(({ re }) => re.test(statement));
-        if (dropped) {
-            found.push({ statement, kind: dropped.label });
-            continue; // one label per statement is enough to flag it
-        }
+        const rekeyed = describePrimaryKeyChange(statement);
         const lossy = parseColumnTypeChanges(statement)
             .map(change => ({ change, from: currentTypeOf(change, columnTypes) }))
-            .filter(({ change, from }) => from === undefined || !isLosslessTypeChange(from, change.to));
-        if (lossy.length > 0) {
-            found.push({
-                statement,
-                kind: "ALTER COLUMN TYPE",
-                detail: lossy
-                    .map(({ change, from }) => `"${change.column}" ${from ?? "(current type unknown)"} → ${change.to}`)
-                    .join("; ")
-            });
-        }
+            .filter(({ change, from }) => from === undefined || !isLosslessTypeChange(from, change.to))
+            .map(({ change, from }) => `"${change.column}" ${from ?? "(current type unknown)"} → ${change.to}`)
+            .join("; ");
+        const kind = dropped?.label ?? (rekeyed ? "PRIMARY KEY CHANGE" : lossy ? "ALTER COLUMN TYPE" : undefined);
+        if (!kind) continue;
+        const detail = [rekeyed, lossy].filter(Boolean).join("; ");
+        found.push(detail ? { statement, kind, detail } : { statement, kind });
     }
     return found;
 }
@@ -331,6 +333,58 @@ function parseColumnTypeChanges(statement: string): ColumnTypeChange[] {
         changes.push({ schema, table: name, column: unquote(match[1]), to });
     }
     return changes;
+}
+
+/** `ADD [CONSTRAINT "x"] PRIMARY KEY ("a", "b")`, one clause of an `ALTER TABLE`. */
+const ADD_PRIMARY_KEY_RE = new RegExp(
+    String.raw`^ADD\s+(?:CONSTRAINT\s+${IDENT}\s+)?PRIMARY\s+KEY\b\s*(?:\(([^)]*)\))?`, "i"
+);
+/** `DROP CONSTRAINT [IF EXISTS] "x"`, one clause of an `ALTER TABLE`. */
+const DROP_CONSTRAINT_RE = new RegExp(
+    String.raw`^DROP\s+CONSTRAINT\s+(?:IF\s+EXISTS\s+)?(${IDENT})`, "i"
+);
+
+/** What a row loses when the columns that address it change. */
+const ROW_ADDRESS_LOST = "every row's id changes, so anything that refers to a row by its id — a URL, " +
+    "a foreign key, an id stored elsewhere — stops finding it";
+
+/**
+ * What an `ALTER TABLE` does to the table's primary key, in a sentence — or
+ * `undefined` when it leaves the key alone.
+ *
+ * The key is a row's address: Rebase reads, links and routes every row by it.
+ * Atlas plans a key change as `DROP CONSTRAINT "<table>_pkey", ADD PRIMARY KEY
+ * (…)` — one routine-looking statement that names no DROP of data — so moving
+ * a collection from `(id)` to `(id, locale)` re-keyed a populated table with
+ * no prompt. A `CREATE TABLE`'s own `PRIMARY KEY` is not a change and is never
+ * read here: only an `ALTER TABLE`'s clauses are. A dropped constraint counts
+ * as the key when it carries Postgres's default name for one, `<table>_pkey`;
+ * a key under another name is caught by the `ADD PRIMARY KEY` that replaces it.
+ */
+function describePrimaryKeyChange(statement: string): string | undefined {
+    const alter = ALTER_TABLE_RE.exec(fromAlterTable(statement));
+    if (!alter) return undefined;
+    const table = alter[2] ? `${alter[1]}.${alter[2]}` : alter[1];
+
+    let added: string | undefined;
+    let dropped: string | undefined;
+    for (const clause of splitClauses(alter[3])) {
+        const add = ADD_PRIMARY_KEY_RE.exec(clause);
+        if (add) {
+            added = add[1] === undefined ? "a new key" : `(${add[1].split(",").map(c => c.trim()).join(", ")})`;
+            continue;
+        }
+        const drop = DROP_CONSTRAINT_RE.exec(clause);
+        if (drop && unquote(drop[1]).endsWith("_pkey")) dropped = drop[1];
+    }
+
+    if (added && dropped) return `${table} is re-keyed on ${added}: ${ROW_ADDRESS_LOST}`;
+    if (added) {
+        return `${table} gets the primary key ${added}: rows are addressed by it from now on, ` +
+            "and the push fails if two rows share a value";
+    }
+    if (dropped) return `${table} loses its primary key ${dropped}: ${ROW_ADDRESS_LOST}`;
+    return undefined;
 }
 
 /**

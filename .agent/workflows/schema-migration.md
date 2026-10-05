@@ -228,7 +228,10 @@ for a drop. Three layers stop that from reaching a table Rebase does not own:
    the same type with a modifier at least as wide (`varchar(100)` →
    `varchar(255)`, `numeric(10,2)` → `numeric`), `smallint` → `integer` →
    `bigint` (or a `numeric` with room for their digits), and `varchar(n)` →
-   `text`. A column push cannot find in the database is gated too.
+   `text`. A column push cannot find in the database is gated too. So is a
+   **primary key change** — `(id)` → `(id, locale)` plans as `DROP CONSTRAINT
+   "<table>_pkey", ADD PRIMARY KEY (…)`, which gives every row a new id; a new
+   table's own `PRIMARY KEY` is not a change and passes.
 
 So you can safely keep additional tables in the same database (other
 applications, legacy systems, manual SQL) and Rebase will not modify or drop

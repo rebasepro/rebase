@@ -1,0 +1,27 @@
+Planning migration statements (1 in total):
+
+  -- modify "translations" table:
+    -> ALTER TABLE "public"."translations" ADD PRIMARY KEY ("id");
+
+-------------------------------------------
+
+Analyzing planned statements (1 in total):
+
+  -- no diagnostics found
+
+  -------------------------
+  -- 20.459959ms
+  -- 1 schema change
+
+-------------------------------------------
+
+Running dry-run migration (1 statement in total):
+
+  -- modify "translations" table
+    -> ALTER TABLE "public"."translations" ADD PRIMARY KEY ("id");
+  -- ok (22.042µs)
+
+  -------------------------
+  -- 51.5µs
+  -- 1 migration
+  -- 1 sql statement

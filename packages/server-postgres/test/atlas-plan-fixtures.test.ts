@@ -111,6 +111,61 @@ describe("the destructive gate on a real plan", () => {
     });
 });
 
+/**
+ * `translations` as each pk capture's database held it: keyed on `id`, with
+ * `locale` an ordinary column (absent in the add-column capture, where the
+ * key change brings it).
+ */
+const TRANSLATIONS: ExistingColumnType[] = [
+    ["id", "integer"],
+    ["locale", "text"],
+    ["title", "text"]
+].map(([column, type]) => ({ schema: "public", table: "translations", column, type }));
+
+/**
+ * A primary key is a row's address: Rebase reads, links and routes every row
+ * by it. Changing which columns it covers changes every row's id at once, so
+ * each record's URL, every foreign key into the table and any id stored
+ * outside it stop finding the row. Atlas plans that as one routine-looking
+ * `ALTER TABLE` naming no DROP of data, and `db push` applied it unprompted.
+ */
+describe("a primary key change on a real plan", () => {
+    it.each([
+        ["v1.2.3-pk-widen.txt", "(\"id\", \"locale\")"],
+        ["v1.2.3-pk-add-column.txt", "(\"id\", \"locale\")"],
+        ["v1.2.3-pk-narrow.txt", "(\"id\")"],
+        ["v1.2.3-pk-move.txt", "(\"locale\")"]
+    ])("%s: is destructive, and says every row's id changes", (name, key) => {
+        const found = detectDestructiveStatements(fixture(name), TRANSLATIONS);
+        expect(found).toHaveLength(1);
+        expect(found[0].kind).toBe("PRIMARY KEY CHANGE");
+        expect(found[0].detail).toBe(
+            `"public"."translations" is re-keyed on ${key}: every row's id changes, so anything that ` +
+            "refers to a row by its id — a URL, a foreign key, an id stored elsewhere — stops finding it"
+        );
+    });
+
+    it("flags a key added to a table that had none", () => {
+        const found = detectDestructiveStatements(fixture("v1.2.3-pk-keyless.txt"), TRANSLATIONS);
+        expect(found).toHaveLength(1);
+        expect(found[0].kind).toBe("PRIMARY KEY CHANGE");
+        expect(found[0].detail).toBe(
+            "\"public\".\"translations\" gets the primary key (\"id\"): rows are addressed by it from now on, " +
+            "and the push fails if two rows share a value"
+        );
+    });
+
+    it("does not take a foreign key rebuilt in place for a key change", () => {
+        expect(detectDestructiveStatements(fixture("v1.2.3-fk-on-delete.txt"), TRANSLATIONS)).toEqual([]);
+    });
+
+    it("does not flag the PRIMARY KEY a new table declares", () => {
+        expect(detectDestructiveStatements(fixture("v1.2.3-create.txt"), [])).toEqual([]);
+        expect(detectDestructiveStatements(fixture("v1.2.3-mixed.txt"), PEOPLE).map(d => d.kind))
+            .toEqual(["DROP COLUMN", "DROP TABLE"]);
+    });
+});
+
 describe("the generated-column rebuild on a real plan", () => {
     it("sees the retyped column a search vector reads", () => {
         const mutations = parseColumnMutations(fixture("v1.2.3-modify-searched-column.txt"));
