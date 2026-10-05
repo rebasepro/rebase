@@ -52,6 +52,14 @@ class Exited extends Error {
 const PROJECT_ID = "proj_1";
 
 /**
+ * The project's own app. `rebase cloud cron` reads it directly, with a token
+ * the control plane mints — so those requests are not control-plane traffic,
+ * need no scope of the CLI's token, and must not carry it.
+ */
+const APP = "https://shop.rebase.website";
+const RUNTIME_TOKEN = "rpt_minted.for.cron";
+
+/**
  * Requests a command makes that a token is not given, each with why the
  * command does not need it. Anything else uncovered is a gap in the map.
  */
@@ -80,6 +88,7 @@ let said: string[];
 /** The scope the control plane checks a request against. */
 function requiredScope(method: string, url: URL): string {
     const [api, plane, name] = url.pathname.split("/").filter(Boolean);
+    if (url.origin === APP) return `app:${method} ${url.pathname}`;
     if (url.origin !== cp) return `elsewhere:${method} ${url.href}`;
     if (api === "api" && plane === "data") {
         const verb = method === "GET" ? "read" : method === "DELETE" ? "delete" : "write";
@@ -153,6 +162,7 @@ function answer(method: string, url: URL): unknown {
         [p === "/api/functions/deploy", () => ({ success: true, deployment: { id: "d1" }, managed: true })],
         [p === `/api/functions/runtime-logs/${PROJECT_ID}`, () => ({ logs: "listening on :3000\n" })],
         [p === `/api/functions/metrics/${PROJECT_ID}`, () => ({ status: "running", cpu: "12m", memory: "120Mi", memoryPercent: "23%" })],
+        [p === `/api/functions/runtime-token/${PROJECT_ID}`, () => ({ token: RUNTIME_TOKEN, scopes: ["cron:read"] })],
         [p === `/api/functions/env-vars/${PROJECT_ID}` && method === "GET", () => ENV_LIST],
         [p === `/api/functions/env-vars/${PROJECT_ID}`, () => ({ success: true, var: ENV_LIST.vars[0], pendingRedeploy: true })],
         [p === `/api/functions/env-vars/${PROJECT_ID}/FOO`, () => ({ success: true, pendingRedeploy: true })],
@@ -171,11 +181,20 @@ function answer(method: string, url: URL): unknown {
 const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
+/** The app's cron surface, which answers only the token minted for it. */
+function app(method: string, url: URL, init?: RequestInit): Response {
+    expect(new Headers(init?.headers).get("Authorization")).toBe(`Bearer ${RUNTIME_TOKEN}`);
+    if (url.pathname === "/api/admin/cron") return json(200, { jobs: [] });
+    if (url.pathname === "/api/admin/cron/nightly/logs") return json(200, { logs: [] });
+    return json(404, { error: { code: "NOT_FOUND", message: `no route ${method} ${url.pathname}` } });
+}
+
 function controlPlane(input: RequestInfo | URL, init?: RequestInit): Response {
     const url = new URL(String(input));
     const method = init?.method ?? "GET";
     const scope = requiredScope(method, url);
     sent.push({ method, url, scope });
+    if (url.origin === APP) return app(method, url, init);
     // A token, so the bearer is the one the line was given — never a session.
     expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer rk_live_token");
     if (enforce && !grants(held, scope)) {
@@ -301,7 +320,9 @@ const COMMANDS: Record<TokenCapability, string[][]> = {
         ["logs"],
         ["logs", "--runtime"],
         ["logs", "--follow"],
-        ["metrics"]
+        ["metrics"],
+        ["cron", "list"],
+        ["cron", "logs", "nightly"]
     ],
     env: [
         ["env", "list"],
@@ -342,9 +363,10 @@ describe("each capability covers its commands", () => {
 
         expect(requests.length, "the command made no request, so this proves nothing").toBeGreaterThan(0);
         for (const request of requests) {
-            expect(request.scope, `${request.method} ${request.url.href}`).toMatch(/^(data|functions):/);
+            expect(request.scope, `${request.method} ${request.url.href}`).toMatch(/^(data|functions|app):/);
         }
         const gaps = requests
+            .filter(request => !request.scope.startsWith("app:"))
             .filter(request => !grants(held, request.scope) && !BEST_EFFORT[request.scope])
             .map(request => `${request.method} ${request.url.pathname} needs ${request.scope}`);
         expect(gaps, `--can ${capability} does not cover what the command calls`).toEqual([]);
@@ -354,7 +376,9 @@ describe("each capability covers its commands", () => {
         // The enforced run: what the token does not hold is refused, and the
         // command still finishes — `process.exit` would have thrown here.
         const requests = await run(prepare(line), capability, true);
-        const refused = requests.filter(request => !grants(held, request.scope)).map(request => request.scope);
+        const refused = requests
+            .filter(request => !request.scope.startsWith("app:") && !grants(held, request.scope))
+            .map(request => request.scope);
         expect(refused.every(scope => BEST_EFFORT[scope])).toBe(true);
         expect(said.join("\n")).not.toMatch(/SCOPE_MISSING|does not hold/);
     });

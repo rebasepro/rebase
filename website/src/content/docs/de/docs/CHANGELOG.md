@@ -250,6 +250,22 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   of them can restore over a live database, which stays with a signed-in owner
   or admin.
 
+- **`rebase cloud cron list` and `rebase cloud cron logs <job> [--limit N]`
+  read a deployed app's cron jobs and their recorded runs with your `rebase
+  cloud` login.** The run history is in the app's own `rebase.cron_logs`,
+  behind the app's admin gate, which accepts an admin of the app, an `rk_`
+  key or the service key, and a project owner signed in to Rebase Cloud
+  often holds none of them. `rebase cloud debug logs` covers only the pod's
+  last half hour or so. Each command asks the control plane for a token that
+  reads cron and nothing else, is bound to the one project and expires within
+  minutes, then reads the app at its public address with it (`--host` reads
+  another address). `--json` returns the jobs or the runs as the app reports
+  them. It needs a control plane that serves `runtime-token` and an app on a
+  runtime that accepts platform tokens (below); against either one that does
+  not, the command says which one and exits non-zero. A `rebase cloud tokens`
+  key needs `--can logs`, and one created before this release must be created
+  again to cover it.
+
 #### Admin (CMS & app)
 
 - **A data-import preview lists every value that will not be imported, per
@@ -455,6 +471,21 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   `email_change_token` and `email_change_sent_at`, added at boot and planned
   by `db push`. An X account can now replace its placeholder address, which
   also no longer receives the welcome mail.
+
+- **Platform tokens on the admin gate.** A server with
+  `REBASE_PLATFORM_TOKEN_KEY` (one or more PEM EC P-256 public keys) and
+  `REBASE_PLATFORM_TOKEN_AUDIENCE` (the project's id) set accepts an `rpt_`
+  bearer token signed by the hosting platform: ES256, `iss: "rebase-cloud"`,
+  `aud` equal to the audience, a `sub`, and at most ten minutes between
+  `iat` and `exp`. The caller acts as `platform:<sub>` with no roles, and
+  holds only the scopes in the token's `scope` claim that the server allows
+  a platform to hold. Today that is `cron:read` alone, whatever the token
+  asks for, so it reads `/api/admin/cron` and its logs and gets `403` from
+  every other admin route. Each accepted request logs `Platform token
+  accepted` with the `sub` and `jti`. With neither variable set the feature
+  is off, which is every self-hosted server. With only one set, or a key that
+  is not a P-256 public key, the server logs a warning, boots, and refuses
+  every `rpt_` token with `401 PLATFORM_TOKENS_OFF`.
 
 #### Client SDK
 

@@ -135,6 +135,7 @@ import { createApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRoutes, createPersonalKeyRoutes } from "./auth/api-keys/api-key-routes";
 import { createApiKeyPreAuth, createFunctionScopeGuard, createTusScopeGuard, resolveApiKey } from "./auth/api-keys/api-key-middleware";
 import type { KeyTargets } from "./auth/api-keys/key-grant";
+import { createPlatformTokenPreAuth, platformTokensFromEnv } from "./auth/platform-token";
 import { createRequireAuth } from "./auth/middleware";
 import { accessModelFromCollections, callerScopes, configureAccess, requireScope, requireScopeByMethod } from "./auth/access";
 import { createScopeRoutes } from "./auth/scope-routes";
@@ -1778,6 +1779,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         config.app.use(`${basePath}/admin/*`, apiKeyPreAuth);
     }
 
+    // `rpt_` tokens the hosting platform mints for a project member — read-only
+    // admin scopes, minutes long, bound to this project. Off unless the platform
+    // set its public key and this project's audience; see `auth/platform-token`.
+    // Mounted where the `rk_` pre-auth is and for the same reason: the auth
+    // adapter's own admin router sits on `/admin` and authenticates everything
+    // under it, ahead of each surface's gate. What a token then reaches is the
+    // surfaces' scope checks to decide, exactly as for a key.
+    const platformTokenPreAuth = createPlatformTokenPreAuth(await platformTokensFromEnv(process.env));
+    if (surfaces.admin) {
+        config.app.use(`${basePath}/admin/*`, platformTokenPreAuth);
+    }
+
     if (apiKeyStore && surfaces.admin) {
         const apiKeyRoutes = createApiKeyRoutes({
             store: apiKeyStore,
@@ -2181,10 +2194,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         isAuthAdapter(config.auth!) || !!(config.auth as RebaseAuthConfig).jwtSecret
     );
     /**
-     * The admin gate itself: an `rk_` key, the service key, or a person's
-     * token — roles and revocation read from the database, never off the
-     * token — and then the surface's scope. One scope for a surface whose
-     * every route needs the same thing; a `read`/`write` pair for one whose
+     * The admin gate itself: an `rk_` key, an `rpt_` platform token, the
+     * service key, or a person's token — roles and revocation read from the
+     * database, never off the token — and then the surface's scope. One scope
+     * for a surface whose every route needs the same thing; a `read`/`write` pair for one whose
      * reads and writes split along the HTTP method. {@link applyAdminGate} puts
      * it on a router; a surface mounted on a single path (the contract, the
      * private docs) takes the same list.
@@ -2192,6 +2205,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     type SurfaceScopes = AdminScope | { read: AdminScope; write: AdminScope };
     const adminGate = (scopes: SurfaceScopes): MiddlewareHandler<HonoEnv>[] => [
         ...(apiKeyPreAuth ? [apiKeyPreAuth] : []),
+        platformTokenPreAuth,
         createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity }),
         typeof scopes === "string" ? requireScope(scopes) : requireScopeByMethod(scopes)
     ];

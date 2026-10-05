@@ -26,6 +26,7 @@ import { ENV_SET_FLAGS } from "./env";
 import { COMPUTE_SET_FLAGS, BILLING_ACTIONS } from "./resources";
 import { LOGIN_FLAGS } from "./auth";
 import { CREATE_TOKEN_FLAGS } from "./tokens";
+import { CRON_LIST_FLAGS, CRON_LOGS_FLAGS } from "./cron";
 
 /**
  * Which spec backs which page.
@@ -98,6 +99,11 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     stop: {},
     restart: {},
     metrics: null,
+    // Parsed at the group only to find the action — the flags belong to
+    // `cron list` and `cron logs`, whose pages document them.
+    cron: null,
+    "cron list": CRON_LIST_FLAGS,
+    "cron logs": CRON_LOGS_FLAGS,
     "clusters add": {
         "--name": String,
         "--provider": String,
@@ -226,7 +232,9 @@ flag: flag[1] });
         ["deploy.ts", DEPLOY_FLAGS],
         ["projects.ts", CREATE_PROJECT_FLAGS],
         ["env.ts", ENV_SET_FLAGS],
-        ["tokens.ts", CREATE_TOKEN_FLAGS]
+        ["tokens.ts", CREATE_TOKEN_FLAGS],
+        ["cron.ts", CRON_LIST_FLAGS],
+        ["cron.ts", CRON_LOGS_FLAGS]
     ] as const) {
         for (const flag of Object.keys(spec)) found.push({ file: name,
 flag });

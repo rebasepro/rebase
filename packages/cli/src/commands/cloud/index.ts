@@ -22,6 +22,7 @@ import { settingsCommand, printSettingsHelp } from "./settings";
 import { deploymentsListCommand, rollbackCommand, cancelCommand } from "./deployments";
 import { powerCommand } from "./power";
 import { debugCommand, printDebugHelp } from "./debug";
+import { cronCommand } from "./cron";
 import {
     statusCommand,
     metricsCommand,
@@ -251,6 +252,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "debug":
             await debugCommand(action, rawArgs);
             break;
+        case "cron":
+            await cronCommand(action, rawArgs);
+            break;
 
         /* env / domains / extensions / settings */
         case "env":
@@ -407,6 +411,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "status", section: "Deploy & observe", description: "One glance: URL, last deploy, and what it is waiting on" },
     { action: "metrics", section: "Deploy & observe", description: "Live CPU, memory and disk" },
     { action: "debug", section: "Deploy & observe", description: "Diagnose a misbehaving deployment. Read-only" },
+    { action: "cron", section: "Deploy & observe", description: "The app's cron jobs and their run history. Read-only" },
 
     { action: "env", section: "Config", description: "Environment variables" },
     { action: "domains", section: "Config", description: "Custom domains, their DNS records, and verification" },

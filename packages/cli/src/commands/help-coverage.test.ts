@@ -484,6 +484,7 @@ describe("every command the dispatch answers parses its flags strictly", () => {
             "index.ts:projectsGroup": "the same, one level down",
             "index.ts:deploymentsGroup": "the same, one level down",
             "debug.ts:resolveOrigin": "a helper of `debug health`, which declares --host and parses it",
+            "cron.ts:connect": "a helper of `cron list` and `cron logs`, which declare --host and parse first",
             "link.ts:linkDirect": "the self-hosted branch of `linkCommand`, which parsed before choosing it",
             "projects.ts:projectInfo": "its line is parsed by `resolveProjectArg` at the dispatch site",
             "resources.ts:buildDialPatch": "reads the dials' VALUES; `computeCommand` is what accepts the line"

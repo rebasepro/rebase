@@ -851,6 +851,48 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         examples: ["rebase cloud restart --yes"]
     },
 
+    cron: {
+        command: "cloud cron",
+        usage: "cloud cron [list|logs] [options]",
+        summary:
+            "The deployed app's cron jobs and their recorded runs, read from the app itself with your "
+            + "`rebase cloud` login. Read-only: the login is exchanged for a token that reads cron and "
+            + "nothing else, is bound to this project and expires within minutes. `list` is the default.",
+        flags: [],
+        examples: [
+            "rebase cloud cron",
+            "rebase cloud cron logs nightly-digest",
+            "rebase cloud cron logs nightly-digest --limit 5 --json"
+        ],
+        notes: [
+            "To change, disable or trigger a job, use the app's own admin panel.",
+            "`rebase cloud debug logs` shows what jobs printed to the pod's output; this shows every recorded run."
+        ]
+    },
+
+    "cron list": {
+        command: "cloud cron list",
+        usage: "cloud cron list [--host <hostname>]",
+        summary:
+            "Every job the app schedules: its schedule, its state, when it last ran and how long it took, "
+            + "when it runs next, and the last error of a job that failed.",
+        flags: [["--host <hostname>", "Read this address instead of the project's own"]],
+        examples: ["rebase cloud cron list", "rebase cloud cron list --json"]
+    },
+
+    "cron logs": {
+        command: "cloud cron logs",
+        usage: "cloud cron logs <job> [--limit <n>] [--host <hostname>]",
+        summary:
+            "One job's recorded runs, newest first: when each started, how long it took, whether it failed "
+            + "and why, and every line it logged with `ctx.log`.",
+        flags: [
+            ["--limit <n>", "How many runs. Default: 50"],
+            ["--host <hostname>", "Read this address instead of the project's own"]
+        ],
+        examples: ["rebase cloud cron logs nightly-digest", "rebase cloud cron logs nightly-digest --limit 5 --json"]
+    },
+
     metrics: {
         command: "cloud metrics",
         usage: "cloud metrics",
