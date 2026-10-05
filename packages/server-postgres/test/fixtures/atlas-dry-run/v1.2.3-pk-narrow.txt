@@ -1,0 +1,27 @@
+Planning migration statements (1 in total):
+
+  -- modify "translations" table:
+    -> ALTER TABLE "public"."translations" DROP CONSTRAINT "translations_pkey", ADD PRIMARY KEY ("id");
+
+-------------------------------------------
+
+Analyzing planned statements (1 in total):
+
+  -- no diagnostics found
+
+  -------------------------
+  -- 13.315833ms
+  -- 1 schema change
+
+-------------------------------------------
+
+Running dry-run migration (1 statement in total):
+
+  -- modify "translations" table
+    -> ALTER TABLE "public"."translations" DROP CONSTRAINT "translations_pkey", ADD PRIMARY KEY ("id");
+  -- ok (17.167µs)
+
+  -------------------------
+  -- 44.625µs
+  -- 1 migration
+  -- 1 sql statement

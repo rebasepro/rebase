@@ -136,6 +136,15 @@ const quoteIdent = (name: string): string => `"${name.replace(/"/g, "\"\"")}"`;
 const USER_TABLE_PRIVILEGES = "SELECT, INSERT, UPDATE, DELETE";
 
 /**
+ * Take every privilege the user role holds on one table back — what a table
+ * gets when RLS cannot be switched on for it, so it is unreachable rather than
+ * unprotected. Quoted exactly: a mixed-case adopted table (`"User"`) folded to
+ * lower case names a table that does not exist.
+ */
+export const revokeUserRoleSql = (schema: string, table: string): string =>
+    `REVOKE ALL PRIVILEGES ON ${quoteIdent(schema)}.${quoteIdent(table)} FROM ${quoteIdent(REBASE_USER_ROLE)}`;
+
+/**
  * Warn when the connection role shares its name with an existing schema.
  *
  * Postgres resolves unqualified names through `search_path`, which defaults to

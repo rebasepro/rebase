@@ -42,7 +42,7 @@ import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./s
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
-import { detectConnectionPosture, ensureAppRole, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
+import { detectConnectionPosture, ensureAppRole, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, refreshInstalledCdcFunction, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { collectionKeyColumns } from "./services/cdc/identity-columns";
@@ -452,6 +452,35 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 await tx.execute(sql.raw(statement));
             }
         });
+    };
+
+    /**
+     * Tables the policies step could not lock, whose user-role privileges it
+     * took back instead — `schema.table` → its parts.
+     *
+     * Kept because the boot grants again after that step: the final posture
+     * check runs `ensureAppRole`, whose `GRANT … ON ALL TABLES IN SCHEMA`
+     * covers these tables too. It handed every withdrawn privilege straight
+     * back — RLS off, DML granted, every authenticated request reading every
+     * row — while the log said the table was closed. So whatever grants
+     * schema-wide after the policies step withholds these again.
+     */
+    const withheldTables = new Map<string, { schema: string; table: string }>();
+
+    const withholdAgain = async (runSql: RawSqlRunner): Promise<void> => {
+        for (const [qualified, { schema, table }] of withheldTables) {
+            try {
+                await runSql(revokeUserRoleSql(schema, table));
+            } catch (err) {
+                throw new Error(
+                    `Refusing to start: row-level security could not be enabled on "${qualified}", and the ` +
+                    `privileges the schema-wide grant just gave ${REBASE_USER_ROLE} on it could not be taken ` +
+                    "back. The table would be served with no row filtering. Fix the database permissions " +
+                    "(the connection role must own the table, or be able to ALTER it) and boot again: " +
+                    (err instanceof Error ? err.message : String(err))
+                );
+            }
+        }
     };
 
     return {
@@ -1402,6 +1431,13 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 collections as CollectionConfig[],
                 log
             );
+            // This run covers every collection on the source, so what it could
+            // not lock is the whole set — a table locked since is dropped from it.
+            withheldTables.clear();
+            for (const u of outcome.unsecured.filter(u => u.grantWithdrawn)) {
+                const dot = u.table.indexOf(".");
+                withheldTables.set(u.table, { schema: u.table.slice(0, dot), table: u.table.slice(dot + 1) });
+            }
 
             for (const skip of outcome.skipped) {
                 logger.warn(`🔐 [rls] Policies not applied to "${skip.table}": ${skip.reason}`);
@@ -1543,6 +1579,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                         `"permission denied for schema …" until a boot can: ${err instanceof Error ? err.message : String(err)}`
                     );
                 }
+                await withholdAgain(runSql);
                 return;
             }
 
@@ -1562,6 +1599,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                     `policy applied at all. Refusing to serve.\n\n${err instanceof Error ? err.message : String(err)}`
                 );
             }
+            await withholdAgain(runSql);
 
             driver.rlsUserRole = REBASE_USER_ROLE;
             realtimeService.rlsUserRole = REBASE_USER_ROLE;

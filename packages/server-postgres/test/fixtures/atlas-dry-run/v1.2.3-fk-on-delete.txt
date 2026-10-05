@@ -1,0 +1,27 @@
+Planning migration statements (1 in total):
+
+  -- modify "translations" table:
+    -> ALTER TABLE "public"."translations" DROP CONSTRAINT "translations_author_id_fkey", ADD CONSTRAINT "translations_author_id_fkey" FOREIGN KEY ("author_id") REFERENCES "public"."authors" ("id") ON UPDATE NO ACTION ON DELETE CASCADE;
+
+-------------------------------------------
+
+Analyzing planned statements (1 in total):
+
+  -- no diagnostics found
+
+  -------------------------
+  -- 14.827959ms
+  -- 1 schema change
+
+-------------------------------------------
+
+Running dry-run migration (1 statement in total):
+
+  -- modify "translations" table
+    -> ALTER TABLE "public"."translations" DROP CONSTRAINT "translations_author_id_fkey", ADD CONSTRAINT "translations_author_id_fkey" FOREIGN KEY ("author_id") REFERENCES "public"."authors" ("id") ON UPDATE NO ACTION ON DELETE CASCADE;
+  -- ok (18.25µs)
+
+  -------------------------
+  -- 57.375µs
+  -- 1 migration
+  -- 1 sql statement

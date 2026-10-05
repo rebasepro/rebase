@@ -166,6 +166,44 @@ describe("an ALTER COLUMN … TYPE in the plan", () => {
     });
 });
 
+/**
+ * The shapes of a primary key change Atlas has not been seen to print but
+ * Postgres accepts. The ones it does print are pinned against real captures in
+ * `atlas-plan-fixtures.test.ts`.
+ */
+describe("a primary key change", () => {
+    it("is read through a named ADD CONSTRAINT … PRIMARY KEY", () => {
+        const found = detectDestructiveStatements(
+            'ALTER TABLE "public"."t" DROP CONSTRAINT IF EXISTS "t_pkey", ADD CONSTRAINT "t_pkey" PRIMARY KEY ("a", "b");'
+        );
+        expect(found.map(d => d.kind)).toEqual(["PRIMARY KEY CHANGE"]);
+        expect(found[0].detail).toMatch(/^"public"\."t" is re-keyed on \("a", "b"\): every row's id changes/);
+    });
+
+    it("is read from the key's drop alone", () => {
+        const found = detectDestructiveStatements('ALTER TABLE "t" DROP CONSTRAINT "t_pkey";');
+        expect(found.map(d => d.kind)).toEqual(["PRIMARY KEY CHANGE"]);
+        expect(found[0].detail).toMatch(/^"t" loses its primary key "t_pkey": every row's id changes/);
+    });
+
+    it("is named beside a DROP in the same statement", () => {
+        const found = detectDestructiveStatements(
+            'ALTER TABLE "public"."t" DROP CONSTRAINT "t_pkey", DROP COLUMN "id", ADD PRIMARY KEY ("code");'
+        );
+        expect(found.map(d => d.kind)).toEqual(["DROP COLUMN"]);
+        expect(found[0].detail).toMatch(/is re-keyed on \("code"\)/);
+    });
+
+    it("is not read into another constraint's drop, or into a new table's key", () => {
+        const plan = [
+            'ALTER TABLE "public"."t" DROP CONSTRAINT "t_email_key";',
+            'ALTER TABLE "public"."t" DROP CONSTRAINT "t_owner_id_fkey", ADD CONSTRAINT "t_owner_id_fkey" FOREIGN KEY ("owner_id") REFERENCES "public"."users" ("id");',
+            'CREATE TABLE "public"."j" ("a" integer NOT NULL, "b" integer NOT NULL, PRIMARY KEY ("a", "b"));'
+        ].join("\n");
+        expect(detectDestructiveStatements(plan)).toEqual([]);
+    });
+});
+
 describe("isLosslessTypeChange", () => {
     it.each([
         ["character varying(255)", "text"],

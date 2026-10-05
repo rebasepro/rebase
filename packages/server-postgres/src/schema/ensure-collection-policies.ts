@@ -35,7 +35,7 @@ import { type CollectionConfig } from "@rebasepro/types";
 import { planCollectionPolicies, type CollectionPolicyPlan } from "./generate-postgres-ddl-logic";
 import { isGeneratedPolicyName } from "../security/policy-drift";
 import { describeDriverError, readExistingSchema, type Queryable } from "./ensure-collection-tables";
-import { REBASE_USER_ROLE } from "../security/rls-enforcement";
+import { revokeUserRoleSql } from "../security/rls-enforcement";
 
 export interface PolicyEnsureResult {
     /** `CREATE POLICY` statements that ran successfully. */
@@ -120,6 +120,91 @@ async function dropOrphanedPoliciesOn(client: Queryable, plan: CollectionPolicyP
     return dropped;
 }
 
+/** What one table's `ENABLE ROW LEVEL SECURITY` came to. */
+type TableLock =
+    | { locked: true }
+    | { locked: false; error: string; grantWithdrawn: boolean };
+
+/**
+ * Switch RLS on for one table, or — when Postgres refuses — take the user
+ * role's privileges on it back, so the table is unreachable rather than
+ * unprotected.
+ */
+async function lockTable(client: Queryable, plan: CollectionPolicyPlan): Promise<TableLock> {
+    try {
+        await client.query(plan.enableRls);
+        return { locked: true };
+    } catch (err) {
+        // The database's own answer, not the ORM's wrapper — see
+        // `describeDriverError`. This is the most consequential message in
+        // the file: it is what the operator reads about a table that is now
+        // denying every request, and `Failed query: <the statement>` told
+        // them nothing they did not already have.
+        const error = describeDriverError(err);
+        // Take the privilege back rather than serve an unprotected table.
+        // This is the fail-closed step the old code assumed it already had:
+        // per-table, so one collection cannot take the rest of the
+        // deployment down, but leaving nothing readable without RLS.
+        //
+        // Quoted, like every other statement here: unquoted, Postgres folds
+        // the name to lower case, so a mixed-case adopted table (`"User"`)
+        // was revoked as `public.user` — which fails, and a table that could
+        // have been closed refused the boot instead.
+        try {
+            await client.query(revokeUserRoleSql(plan.schema, plan.table));
+            return { locked: false, error, grantWithdrawn: true };
+        } catch {
+            // Reported with `grantWithdrawn: false`, which the caller
+            // escalates. There is nothing else this can do to make the table
+            // safe.
+            return { locked: false, error, grantWithdrawn: false };
+        }
+    }
+}
+
+export interface TableLockResult {
+    /** Tables RLS is now on for. */
+    locked: number;
+    /** Tables it could not be switched on for. See {@link PolicyEnsureResult.unsecured}. */
+    unsecured: PolicyEnsureResult["unsecured"];
+}
+
+/**
+ * Switch RLS on for every table the collections declare — each collection's
+ * and each junction's — and do nothing else.
+ *
+ * The first thing `rebase db push` does once Atlas has committed. Atlas cannot
+ * carry `ENABLE ROW LEVEL SECURITY` (its free tier neither plans nor reads it),
+ * so a table it creates arrives with RLS off — while the user role already
+ * holds DML on it through the schema's default privileges. Everything push runs
+ * after Atlas can refuse: the vector, search and trigger DDL, the policies
+ * themselves. Locking first means none of those failures can leave a table
+ * open: RLS with no policy denies, which is a state a failed push may leave.
+ *
+ * A declared table that is not in the database is skipped — nothing can reach
+ * a table that does not exist, and the step that creates it locks it.
+ */
+export async function lockCollectionTables(
+    client: Queryable,
+    collections: CollectionConfig[]
+): Promise<TableLockResult> {
+    const result: TableLockResult = { locked: 0, unsecured: [] };
+    const plans = planCollectionPolicies(collections);
+    if (plans.length === 0) return result;
+
+    const existing = await readExistingSchema(client, Array.from(new Set(plans.map(p => p.schema))));
+    for (const plan of plans) {
+        if (!existing.tables.has(plan.qualified)) continue;
+        const lock = await lockTable(client, plan);
+        if (lock.locked) {
+            result.locked++;
+        } else {
+            result.unsecured.push({ table: plan.qualified, error: lock.error, grantWithdrawn: lock.grantWithdrawn });
+        }
+    }
+    return result;
+}
+
 export async function ensureCollectionPolicies(
     client: Queryable,
     collections: CollectionConfig[],
@@ -147,39 +232,12 @@ export async function ensureCollectionPolicies(
         // afterwards leaves the table denying; while it is off, the grant made
         // earlier in boot leaves the table wide open. Sharing one `try` meant
         // the dangerous case was reported in the safe case's words.
-        try {
-            await client.query(plan.enableRls);
-            result.tablesSecured++;
-        } catch (err) {
-            // The database's own answer, not the ORM's wrapper — see
-            // `describeDriverError`. This is the most consequential message in
-            // the file: it is what the operator reads about a table that is now
-            // denying every request, and `Failed query: <the statement>` told
-            // them nothing they did not already have.
-            const error = describeDriverError(err);
-            // Take the privilege back rather than serve an unprotected table.
-            // This is the fail-closed step the old code assumed it already had:
-            // per-table, so one collection cannot take the rest of the
-            // deployment down, but leaving nothing readable without RLS.
-            //
-            // Quoted, like every other statement here: unquoted, Postgres folds
-            // the name to lower case, so a mixed-case adopted table (`"User"`)
-            // was revoked as `public.user` — which fails, and a table that could
-            // have been closed refused the boot instead.
-            let grantWithdrawn = false;
-            try {
-                await client.query(`REVOKE ALL PRIVILEGES ON "${plan.schema}"."${plan.table}" FROM "${REBASE_USER_ROLE}"`);
-                grantWithdrawn = true;
-            } catch {
-                // Fall through: reported below with `grantWithdrawn: false`,
-                // which the caller escalates. There is nothing else this
-                // function can do to make the table safe.
-            }
-            result.unsecured.push({ table: plan.qualified,
-error,
-grantWithdrawn });
+        const lock = await lockTable(client, plan);
+        if (!lock.locked) {
+            result.unsecured.push({ table: plan.qualified, error: lock.error, grantWithdrawn: lock.grantWithdrawn });
             continue;
         }
+        result.tablesSecured++;
 
         try {
             let created = 0;
