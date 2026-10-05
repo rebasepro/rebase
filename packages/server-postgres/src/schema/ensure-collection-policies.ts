@@ -35,7 +35,7 @@ import { type CollectionConfig } from "@rebasepro/types";
 import { planCollectionPolicies, type CollectionPolicyPlan } from "./generate-postgres-ddl-logic";
 import { isGeneratedPolicyName } from "../security/policy-drift";
 import { describeDriverError, readExistingSchema, type Queryable } from "./ensure-collection-tables";
-import { REBASE_USER_ROLE } from "../security/rls-enforcement";
+import { revokeUserRoleSql } from "../security/rls-enforcement";
 
 export interface PolicyEnsureResult {
     /** `CREATE POLICY` statements that ran successfully. */
@@ -151,7 +151,7 @@ async function lockTable(client: Queryable, plan: CollectionPolicyPlan): Promise
         // was revoked as `public.user` — which fails, and a table that could
         // have been closed refused the boot instead.
         try {
-            await client.query(`REVOKE ALL PRIVILEGES ON "${plan.schema}"."${plan.table}" FROM "${REBASE_USER_ROLE}"`);
+            await client.query(revokeUserRoleSql(plan.schema, plan.table));
             return { locked: false, error, grantWithdrawn: true };
         } catch {
             // Reported with `grantWithdrawn: false`, which the caller
