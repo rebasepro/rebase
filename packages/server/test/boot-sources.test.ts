@@ -140,8 +140,15 @@ describe("resolveDataSources", () => {
 });
 
 describe("resolveStorageBackend", () => {
-    it("defaults to local when nothing is configured", () => {
+    it("defaults to local when nothing is configured, marked as nobody's choice", () => {
         const config = resolveStorageBackend({}, "(default)", undefined, "/var/uploads");
+        expect(config).toEqual({ type: "local", basePath: "/var/uploads", implicit: true });
+    });
+
+    it("does not mark local storage the environment asked for", () => {
+        // Production drops both. Only this one is somebody's mistake, so only
+        // this one is reported as an error.
+        const config = resolveStorageBackend({ STORAGE_TYPE: "local" }, "(default)", undefined, "/var/uploads");
         expect(config).toEqual({ type: "local", basePath: "/var/uploads" });
     });
 
@@ -317,7 +324,7 @@ describe("a key whose uppercase is not letter-for-letter", () => {
 
         // The directory names files already on disk: derived once, not re-derived.
         expect(resolveStorageBackend({}, "straße", undefined, "/var/uploads"))
-            .toEqual({ type: "local", basePath: "/var/uploads__stra_e" });
+            .toEqual({ type: "local", basePath: "/var/uploads__stra_e", implicit: true });
     });
 
     it("refuses two keys that share a spelling in either form", () => {

@@ -10,6 +10,7 @@ import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { createCustomAuthAdapter } from "../src/auth/custom-auth-adapter";
 import { logger } from "../src/utils/logger";
+import { resolveStorageSources } from "../src/boot/sources";
 
 /**
  * What a deployment with no bucket does with an upload.
@@ -136,6 +137,33 @@ describe("storage routes with no backend configured", () => {
         const config = await (await app.request("/api/auth/config")).json() as Record<string, unknown>;
 
         expect(config.storage).toBe(true);
+    });
+
+    it("reports a project that configures no storage at INFO, not ERROR, on boot", async () => {
+        // What a project with no bucket boots with: the resolver's default
+        // source, which nothing chose. Storage being off is then the project's
+        // choice, and an ERROR on every boot buried the real errors.
+        process.env.NODE_ENV = "production";
+        const errors = jest.spyOn(logger, "error");
+        const infos = jest.spyOn(logger, "info");
+
+        const app = await boot(resolveStorageSources({}, undefined, "/tmp/rebase-storage-disabled-test"));
+
+        expect(errors.mock.calls.map(([message]) => message).filter(m => /storage/i.test(String(m)))).toEqual([]);
+        expect(infos.mock.calls.some(([message]) => String(message).startsWith("File storage is off"))).toBe(true);
+        expect((await app.request("/api/storage/upload", { method: "POST" })).status).toBe(501);
+        errors.mockRestore();
+        infos.mockRestore();
+    });
+
+    it("still reports local storage somebody asked for in production as an error", async () => {
+        process.env.NODE_ENV = "production";
+        const errors = jest.spyOn(logger, "error");
+
+        await boot(resolveStorageSources({ STORAGE_TYPE: "local" }, undefined, "/tmp/rebase-storage-disabled-test"));
+
+        expect(errors.mock.calls.some(([message]) => String(message).includes("is set to \"local\" in production"))).toBe(true);
+        errors.mockRestore();
     });
 
     it("still serves storage in development, where local disk is the point", async () => {

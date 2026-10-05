@@ -1347,6 +1347,14 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   now includes `storage`, which says whether the backend serves file
   storage, so a client can know before it asks.
 
+- **A production deployment that configures no storage logs
+  "File storage is off" once at INFO on boot, instead of an ERROR.** With
+  no `STORAGE_TYPE` and no declared bucket engine, the default source falls
+  back to local disk. Production drops local disk, and that was reported as
+  a misconfiguration on every boot, though the project simply uses no
+  storage. Local storage asked for with `STORAGE_TYPE=local`, or passed in
+  code, is still an ERROR in production.
+
 - A storage path with a `%` that begins no escape
   (`/api/storage/metadata/100%-done.txt`) answers `400 INVALID_STORAGE_KEY`
   instead of 500.

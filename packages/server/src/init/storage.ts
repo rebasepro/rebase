@@ -55,6 +55,17 @@ export async function initializeStorage(
         // backend rather than throwing keeps the rest of the app — data, auth,
         // realtime — serving, which a crash-looping rollout would not.
         if (isProduction && conf.type === "local" && !localStorageForced()) {
+            // Nothing asked for storage, so there is none, and that is a
+            // choice, not a fault. Reported once at INFO: an ERROR on every
+            // boot of every project without a bucket hid the real errors.
+            if (conf.implicit) {
+                logger.info(
+                    `File storage is off: storage source "${label}" has no backend configured, so ` +
+                    "uploads answer 501 STORAGE_NOT_CONFIGURED. To turn it on, set S3-compatible " +
+                    "storage (STORAGE_TYPE=s3) or GCS (STORAGE_TYPE=gcs)."
+                );
+                return undefined;
+            }
             logger.error(
                 `Storage backend "${label}" is set to "local" in production — DISABLED. Local ` +
                 "storage is the container filesystem, so uploaded files would be destroyed on the " +

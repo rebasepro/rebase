@@ -524,8 +524,11 @@ export function resolveStorageBackend(
         });
     }
 
-    if (type === "local" || type === "") {
+    if (type === "local") {
         return withLimit({ type: "local", basePath: localBasePath });
+    }
+    if (type === "") {
+        return withLimit({ type: "local", basePath: localBasePath, implicit: true });
     }
 
     throw new BundleError(

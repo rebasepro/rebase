@@ -25,6 +25,14 @@ export interface LocalStorageConfig {
      * production, where an unbound object store stays unbound.
      */
     standsInFor?: string;
+    /**
+     * Set when nothing chose this backend: no `STORAGE_TYPE` and no declared
+     * engine, so local disk is only the default a source falls back to.
+     * Production drops a local backend either way. This only decides how that
+     * is reported: an implicit default being dropped means the project uses no
+     * storage, which is not a misconfiguration.
+     */
+    implicit?: boolean;
 }
 
 /**
