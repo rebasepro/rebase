@@ -1,5 +1,5 @@
 ---
-sourceHash: eb3d7dba66d373fb
+sourceHash: e8335b630b5757ca
 title: Endpoints de autenticação e tokens
 sidebar_label: Endpoints de autenticação
 description: As rotas de autenticação que o backend do Rebase disponibiliza, seus formatos de resposta, autenticação multifator, o contexto de banco de dados que uma política visualiza, JWKS e chaves de serviço.
@@ -27,7 +27,7 @@ Todos os endpoints de autenticação são montados em `/api/auth/`:
 | `PATCH` | `/api/auth/me` | Atualizar o próprio perfil do chamador |
 | `POST` | `/api/auth/change-email` | `{ newEmail }`: move a própria conta do chamador para outro endereço. Envia um link para o novo endereço e um aviso para o antigo; nada muda até que o link seja seguido. Requer `aal2` em uma conta com um segundo fator. `409 EMAIL_EXISTS` ou `UNDELIVERABLE_ADDRESS`, `400 EMAIL_UNCHANGED`, `403 ANONYMOUS_USER` para um convidado — veja [Alterando um endereço de e-mail](#alterando-um-endereço-de-e-mail) |
 | `POST` | `/api/auth/confirm-email-change` | `{ token }` do link. Nenhuma sessão é necessária. Move a conta para o novo endereço, verificado; `400 INVALID_TOKEN` para um link usado, substituído ou expirado, `409 EMAIL_EXISTS` quando o endereço foi tomado enquanto ele esperava |
-| `GET` | `/api/auth/config` | O que este backend oferece a uma tela de login — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Não autenticado e calculado a partir dos mesmos predicados que as rotas impõem, de forma que o anunciado pela tela não divirja do que ela pode fazer |
+| `GET` | `/api/auth/config` | O que este backend oferece a uma tela de login — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`, e `storage`, que indica se o backend serve armazenamento de arquivos. Não autenticado e calculado a partir dos mesmos predicados que as rotas impõem, de forma que o anunciado pela tela não divirja do que ela pode fazer |
 | `POST` | `/api/auth/send-verification` | Enviar ao chamador um link de verificação de e-mail |
 | `GET` | `/api/auth/verify-email` | Consumir um link de verificação (a URL contida nesse e-mail). Mantém o que uma sessão ativa da conta prova e remove o que ninguém provou — veja [Verificação de e-mail](/docs/backend/email-verification/) |
 | `POST` | `/api/auth/verify-email` | O mesmo com `{ token, password?, removeUnproven? }`: a senha a mantém e faz login; sem nenhuma das duas provas, uma conta que já possui uma responde `409 PROOF_REQUIRED` |

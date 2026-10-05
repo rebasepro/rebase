@@ -886,6 +886,19 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 #### Admin (CMS & app)
 
+- **The admin panel no longer sends requests on page load that it knows
+  will be refused.** For a user without the `schema:read` scope, every load
+  called `GET /api/admin/schema/status` and `GET /api/schema-editor/status`,
+  and both answered 403. On a deployment without storage, every load also
+  called `GET /api/storage/sources`, which answered 501 and was logged at
+  ERROR. These failures filled `rebase cloud debug errors` and hid the real
+  ones. The panel now asks for the schema status only when
+  `GET /auth/scopes` says the user holds `schema:read`. It asks for the
+  storage sources only when `GET /auth/config` does not report
+  `storage: false`. A custom `AuthController` takes part by reporting
+  `heldScopes` and `storageEnabled`. One that reports neither keeps asking,
+  as before.
+
 - **The list view keeps its scroll position when you come back from a
   record opened full screen.** Full screen replaces the collection view, and
   the list view, unlike the table and card views, never saved or restored
@@ -1324,6 +1337,15 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   pins.
 
 #### Storage & email
+
+- **`GET /api/storage/sources` on a deployment without storage answers
+  `200 {"data": [], "configured": false}` instead of
+  `501 STORAGE_NOT_CONFIGURED`.** Storage being off is a configuration
+  choice, not a server error, so the request is no longer logged at ERROR.
+  Uploads and every other storage route still answer 501. With storage
+  configured, the answer carries `configured: true`. `GET /api/auth/config`
+  now includes `storage`, which says whether the backend serves file
+  storage, so a client can know before it asks.
 
 - A storage path with a `%` that begins no escape
   (`/api/storage/metadata/100%-done.txt`) answers `400 INVALID_STORAGE_KEY`

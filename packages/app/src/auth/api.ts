@@ -10,7 +10,7 @@
  */
 
 import { RebaseApiError } from "@rebasepro/types";
-import type { AuthAdapterCapabilities } from "@rebasepro/types";
+import type { AuthConfigDocument } from "@rebasepro/types";
 import { DEFAULT_API_PATH } from "../hooks/ApiConfigContext";
 
 async function handleResponse<T>(response: Response): Promise<T> {
@@ -67,7 +67,7 @@ async function fetchWithHandling(input: RequestInfo | URL, init?: RequestInit): 
  * this one listed an `emailServiceEnabled` flag no backend sends, and marked as
  * optional fields every backend always returns.
  */
-export type AuthConfigResponse = AuthAdapterCapabilities;
+export type AuthConfigResponse = AuthConfigDocument;
 
 /**
  * Cache container for `fetchAuthConfig` — holds both the inflight promise

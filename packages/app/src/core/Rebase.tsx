@@ -236,8 +236,13 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
     const [remoteStorageSources, setRemoteStorageSources] = useState<StorageSourceDefinition[]>([]);
     const authUser = authController.user;
     const loginSkipped = authController.loginSkipped;
+    // Not asked when `GET /auth/config` says the backend has no storage: the
+    // answer is already known, and asking would cost a request on every page
+    // load. While that config is still in flight (`null`), wait for it.
+    const storageEnabled = authController.storageEnabled;
     useEffect(() => {
         if (!client?.fetchStorageSources) return;
+        if (storageEnabled === false || storageEnabled === null) return;
         let cancelled = false;
         client.fetchStorageSources()
             .then((defs) => { if (!cancelled) setRemoteStorageSources(defs); })
@@ -256,7 +261,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
                 if (!cancelled) console.debug("[Rebase] Could not load storage sources", e);
             });
         return () => { cancelled = true; };
-    }, [client, authUser, loginSkipped]);
+    }, [client, authUser, loginSkipped, storageEnabled]);
 
     // Normalize the prop + discovered definitions into a registry + sources map.
     const storageSourcesRef = useRef<{

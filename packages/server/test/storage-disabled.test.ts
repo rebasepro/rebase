@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
+import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import type { BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
 
@@ -8,6 +8,8 @@ import * as path from "path";
 import { initializeRebaseBackend } from "../src/init";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
+import { createCustomAuthAdapter } from "../src/auth/custom-auth-adapter";
+import { logger } from "../src/utils/logger";
 
 /**
  * What a deployment with no bucket does with an upload.
@@ -95,6 +97,45 @@ describe("storage routes with no backend configured", () => {
         const res = await app.request("/api/storage/upload", { method: "POST" });
 
         expect(res.status).toBe(501);
+    });
+
+    it("lists no sources with a 200, because an unconfigured feature is not a server error", async () => {
+        // The admin panel asked this on every page load. As a 501 it was logged
+        // at ERROR each time, which buried the real failures in the logs.
+        process.env.NODE_ENV = "production";
+        const app = await boot(undefined);
+        const errors = jest.spyOn(logger, "error");
+
+        const res = await app.request("/api/storage/sources");
+
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({ data: [], configured: false });
+        expect(errors.mock.calls.filter(([, data]) =>
+            (data as { path?: string } | undefined)?.path === "/api/storage/sources")).toEqual([]);
+        errors.mockRestore();
+    });
+
+    it("says in GET /auth/config that storage is off, so the panel need not ask", async () => {
+        process.env.NODE_ENV = "production";
+        const app = await boot(undefined, {
+            auth: createCustomAuthAdapter({ verifyRequest: async () => null })
+        });
+
+        const config = await (await app.request("/api/auth/config")).json() as Record<string, unknown>;
+
+        expect(config.storage).toBe(false);
+    });
+
+    it("says in GET /auth/config that storage is on when a backend serves it", async () => {
+        process.env.NODE_ENV = "development";
+        const app = await boot({ type: "local", basePath: "/tmp/rebase-storage-disabled-test" }, {
+            auth: createCustomAuthAdapter({ verifyRequest: async () => null }),
+            storageInsecureAllowAnyAuthenticated: true
+        });
+
+        const config = await (await app.request("/api/auth/config")).json() as Record<string, unknown>;
+
+        expect(config.storage).toBe(true);
     });
 
     it("still serves storage in development, where local disk is the point", async () => {

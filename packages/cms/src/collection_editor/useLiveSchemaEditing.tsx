@@ -57,9 +57,19 @@ export interface UseLiveSchemaEditingOptions {
      * survive a sign-in.
      */
     authKey?: string | null;
+    /**
+     * Whether to ask the backend at all. `false` when the caller cannot be told
+     * anything (`/status` needs `schema:read`) or the editor is read-only: the
+     * answer is then "not available" without a request that could only be
+     * refused. Defaults to `true`.
+     */
+    enabled?: boolean;
     /** Swappable for the tests, which have no server. */
     client?: LiveSchemaClient;
 }
+
+/** The answer when nobody asked. */
+const NOT_ASKED: LiveSchemaStatus = { enabled: false, canPlan: false, canApply: false };
 
 interface PendingChange {
     change: ProposedCollectionChange;
@@ -99,6 +109,7 @@ export interface LiveSchemaEditing {
 
 export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): LiveSchemaEditing {
     const { baseUrl, authKey } = options;
+    const asking = options.enabled !== false;
 
     const optionsRef = useRef(options);
     optionsRef.current = options;
@@ -134,13 +145,14 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
     const reviewToken = useRef(0);
 
     const ready = useCallback((): Promise<LiveSchemaStatus> => {
+        if (!asking) return Promise.resolve(NOT_ASKED);
         const key = [client, authKey];
         const current = probe.current;
         if (!current || current.key[0] !== key[0] || current.key[1] !== key[1]) {
             probe.current = { key, promise: client.status() };
         }
         return probe.current!.promise;
-    }, [client, authKey]);
+    }, [client, authKey, asking]);
 
     useEffect(() => {
         let cancelled = false;

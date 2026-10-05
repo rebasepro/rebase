@@ -1,5 +1,5 @@
 ---
-sourceHash: 4d4f9bdaabf6ff8e
+sourceHash: 123256f487ac8a71
 title: Configurazione dello Storage
 sidebar_label: Configurazione dello Storage
 description: Configura backend di storage su filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
@@ -126,7 +126,7 @@ fa eccezione, poiché il suo payload è il file stesso — restituisce i byte, c
 `POST /api/storage/upload` risponde con `201` contenente `{ key, bucket, storageUrl }`
 dell'oggetto archiviato sotto `data`; `GET /api/storage/metadata/*` con i metadati dell'oggetto
 e, per un oggetto privato, il `token` di breve durata;
-`GET /api/storage/sources` con l'array delle sorgenti configurate.
+`GET /api/storage/sources` con l'array delle sorgenti configurate e `configured: true`. Su un deployment senza alcuno storage risponde `200 {"data": [], "configured": false}`, mentre ogni altra route risponde `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` riporta lo stesso dato come `storage: false`, così un client può evitare di chiedere.
 `DELETE /api/storage/file/*` e `POST /api/storage/folder` contengono solo un
 `message`, poiché non c'è nulla da restituire.
 

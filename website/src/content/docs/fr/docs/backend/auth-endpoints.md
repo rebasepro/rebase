@@ -1,5 +1,5 @@
 ---
-sourceHash: eb3d7dba66d373fb
+sourceHash: e8335b630b5757ca
 title: Endpoints d'authentification et jetons
 sidebar_label: Endpoints d'authentification
 description: Les routes d'authentification montées par le backend Rebase, le format de leurs réponses, l'authentification multifacteur, le contexte de base de données vu par une politique, JWKS et clés de service.
@@ -27,7 +27,7 @@ Tous les endpoints d'authentification sont montés sur `/api/auth/` :
 | `PATCH` | `/api/auth/me` | Mettre à jour le profil de l'appelant |
 | `POST` | `/api/auth/change-email` | `{ newEmail }` : déplacer le propre compte de l'appelant vers une autre adresse. Envoie un lien à la nouvelle adresse et un avis à l'ancienne ; rien ne change avant que le lien ne soit suivi. Exige `aal2` sur un compte avec un second facteur. `409 EMAIL_EXISTS` ou `UNDELIVERABLE_ADDRESS`, `400 EMAIL_UNCHANGED`, `403 ANONYMOUS_USER` pour un invité — voir [Changer d'adresse e-mail](#changer-dadresse-e-mail) |
 | `POST` | `/api/auth/confirm-email-change` | `{ token }` provenant du lien. Aucune session requise. Déplace le compte vers la nouvelle adresse, vérifiée ; `400 INVALID_TOKEN` pour un lien consommé, remplacé ou expiré, `409 EMAIL_EXISTS` quand l'adresse a été prise pendant l'attente |
-| `GET` | `/api/auth/config` | Ce que ce backend propose à un écran de connexion — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Non authentifié et calculé à partir des mêmes prédicats que ceux appliqués par les routes, de sorte que ce que l'écran affiche ne peut pas dévier de ce qu'il peut faire |
+| `GET` | `/api/auth/config` | Ce que ce backend propose à un écran de connexion — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`, et `storage`, qui indique si le backend sert le stockage de fichiers. Non authentifié et calculé à partir des mêmes prédicats que ceux appliqués par les routes, de sorte que ce que l'écran affiche ne peut pas dévier de ce qu'il peut faire |
 | `POST` | `/api/auth/send-verification` | Envoyer à l'appelant un lien de vérification d'e-mail |
 | `GET` | `/api/auth/verify-email` | Valider un lien de vérification (l'URL présente dans cet e-mail). Conserve ce qu'une session active du compte prouve et retire ce que personne n'a prouvé — voir [Vérification de l'e-mail](/docs/backend/email-verification/) |
 | `POST` | `/api/auth/verify-email` | La même chose avec `{ token, password?, removeUnproven? }` : le mot de passe le conserve et connecte ; sans aucune des deux preuves, un compte qui en détient une répond `409 PROOF_REQUIRED` |

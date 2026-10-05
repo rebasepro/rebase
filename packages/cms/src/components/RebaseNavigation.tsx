@@ -39,6 +39,7 @@ import { SidePanelProvider } from "./SidePanelProvider";
 import { useLocalCollectionsConfigController } from "../collection_editor/useLocalCollectionsConfigController";
 import { ConfigControllerProvider } from "../collection_editor/ConfigControllerProvider";
 import { useCollectionsConfigController } from "../collection_editor/useCollectionsConfigController";
+import { callerHoldsScope, reportsScopes } from "../util/caller_scopes";
 
 // Lazy-load the schema view — only fetched when studio schema tool is active
 const CollectionsStudioView = lazyChunk(() =>
@@ -181,13 +182,21 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     // — the *frontend bundle's* build mode — is what made the editor offer
     // itself against production backends, `baas` projects and servers without
     // `ts-morph`, and turned every save into a bare 404.
+    //
+    // Both of its status routes require `schema:read`. Asked by someone
+    // without it, each answers 403 on every page load. So when the controller
+    // reports scopes, it is not asked until they include that one. A
+    // controller that does not report them leaves the backend to answer.
     const internalConfigController = useLocalCollectionsConfigController(
         rebaseClient,
         resolvedCollections,
         collectionEditorEnabled ? {
             readOnly: collectionEditorOptions?.readOnly,
             getAuthToken: collectionEditorOptions?.getAuthToken ?? authController?.getAuthToken,
-            authKey: authController?.user?.uid ?? null
+            authKey: authController?.user?.uid ?? null,
+            mayReadSchema: reportsScopes(authController)
+                ? callerHoldsScope(authController, "schema:read")
+                : undefined
         } : { readOnly: true }
     );
 

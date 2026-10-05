@@ -1,5 +1,5 @@
 ---
-sourceHash: 4d4f9bdaabf6ff8e
+sourceHash: 123256f487ac8a71
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez des backends de stockage sur système de fichiers local, compatibles S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -126,7 +126,7 @@ fait exception, car sa charge utile est le fichier lui-même — elle répond av
 `POST /api/storage/upload` répond `201` avec les informations `{ key, bucket, storageUrl }`
 de l'objet stocké sous `data` ; `GET /api/storage/metadata/*` renvoie les métadonnées
 de l'objet et, pour un objet privé, le `token` à courte durée de vie ;
-`GET /api/storage/sources` renvoie le tableau des sources configurées.
+`GET /api/storage/sources` renvoie le tableau des sources configurées, avec `configured: true`. Sur un déploiement sans aucun stockage, il répond `200 {"data": [], "configured": false}`, tandis que toutes les autres routes répondent `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` signale la même chose avec `storage: false`, si bien qu'un client peut se dispenser de demander.
 `DELETE /api/storage/file/*` et `POST /api/storage/folder` ne transportent qu'un
 `message`, puisqu'il n'y a rien à retourner.
 

@@ -192,6 +192,27 @@ export interface AuthAdapterCapabilities {
     needsSetup?: boolean;
 }
 
+/**
+ * What `GET /api/auth/config` answers: the auth adapter's capabilities, plus
+ * the optional features of the backend around it.
+ *
+ * The admin panel reads this document before anything else, so it is where
+ * the panel learns that a feature is off, without first asking for that
+ * feature and getting a refusal.
+ *
+ * @group Auth
+ */
+export interface AuthConfigDocument extends AuthAdapterCapabilities {
+    /**
+     * Whether this backend serves file storage. When it is `false`, no storage
+     * backend is configured: `GET /storage/sources` lists nothing and every
+     * other `/storage` route answers 501 `STORAGE_NOT_CONFIGURED`. Absent from
+     * a backend that predates the field, so a client must ask
+     * `GET /storage/sources` there.
+     */
+    storage?: boolean;
+}
+
 // ─── User Management ────────────────────────────────────────────────────────
 
 /**

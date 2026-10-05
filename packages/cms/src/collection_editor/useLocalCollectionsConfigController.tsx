@@ -47,6 +47,13 @@ export function useLocalCollectionsConfigController(
          * anonymous probe does not survive a sign-in.
          */
         authKey?: string | null;
+        /**
+         * Whether the signed-in user holds `schema:read`, which both
+         * status routes require. `false` asks neither and leaves the editor
+         * read-only, because a 403 is the only answer such a user can get.
+         * Absent means ask.
+         */
+        mayReadSchema?: boolean;
     }
 ): CollectionsConfigController {
 
@@ -114,7 +121,8 @@ export function useLocalCollectionsConfigController(
     };
 
     // ── Ask the backend whether it will accept an edit ────────────────
-    const forcedReadOnly = options?.readOnly;
+    const noSchemaAccess = options?.mayReadSchema === false;
+    const forcedReadOnly = noSchemaAccess ? true : options?.readOnly;
     const authKey = options?.authKey ?? null;
     const [availability, setAvailability] = useState<SchemaEditorAvailability>({ state: "unknown" });
 
@@ -181,7 +189,9 @@ export function useLocalCollectionsConfigController(
     const liveSchema = useLiveSchemaEditing({
         baseUrl: `${String(clientBaseUrl).replace(/\/$/, "")}${clientApiPath}/admin/schema`,
         getAuthToken: resolveToken,
-        authKey
+        authKey,
+        // A read-only editor writes nothing, so there is nothing to ask.
+        enabled: forcedReadOnly !== true
     });
 
     /**
@@ -217,9 +227,14 @@ export function useLocalCollectionsConfigController(
     const readOnly = forcedReadOnly
         ?? (availability.state === "known" ? !availability.enabled : buildModeGuess());
 
-    const readOnlyReason = availability.state === "known" && availability.reason
-        ? availability.reason
-        : "Collections can only be edited against a backend running the schema editor, which is off in production.";
+    // No reason of our own for a user without schema access. Each surface
+    // has a generic "editing is disabled" for that, and the user's scopes may
+    // still be loading, so a specific reason could be wrong.
+    const readOnlyReason = noSchemaAccess
+        ? undefined
+        : availability.state === "known" && availability.reason
+            ? availability.reason
+            : "Collections can only be edited against a backend running the schema editor, which is off in production.";
 
     const findCollection = (id: string): AdminCollection | undefined =>
         parsedCollections.find(c => (c as AdminCollection & { id?: string }).id === id || c.slug === id);

@@ -4356,6 +4356,19 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Admin (CMS & app)
 
+- **The admin panel no longer sends requests on page load that it knows
+  will be refused.** For a user without the `schema:read` scope, every load
+  called `GET /api/admin/schema/status` and `GET /api/schema-editor/status`,
+  and both answered 403. On a deployment without storage, every load also
+  called `GET /api/storage/sources`, which answered 501 and was logged at
+  ERROR. These failures filled `rebase cloud debug errors` and hid the real
+  ones. The panel now asks for the schema status only when
+  `GET /auth/scopes` says the user holds `schema:read`. It asks for the
+  storage sources only when `GET /auth/config` does not report
+  `storage: false`. A custom `AuthController` takes part by reporting
+  `heldScopes` and `storageEnabled`. One that reports neither keeps asking,
+  as before.
+
 - **The list view keeps its scroll position when you come back from a
   record opened full screen.** Full screen replaces the collection view, and
   the list view, unlike the table and card views, never saved or restored
@@ -4794,6 +4807,15 @@ yet, listed so that nobody reads a promise into them:
   pins.
 
 ##### Storage & email
+
+- **`GET /api/storage/sources` on a deployment without storage answers
+  `200 {"data": [], "configured": false}` instead of
+  `501 STORAGE_NOT_CONFIGURED`.** Storage being off is a configuration
+  choice, not a server error, so the request is no longer logged at ERROR.
+  Uploads and every other storage route still answer 501. With storage
+  configured, the answer carries `configured: true`. `GET /api/auth/config`
+  now includes `storage`, which says whether the backend serves file
+  storage, so a client can know before it asks.
 
 - A storage path with a `%` that begins no escape
   (`/api/storage/metadata/100%-done.txt`) answers `400 INVALID_STORAGE_KEY`
@@ -22262,7 +22284,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `PATCH` | `/api/auth/me` | Update the caller's own profile |
 | `POST` | `/api/auth/change-email` | `{ newEmail }`: move the caller's own account to another address. Mails a link to the new address and a notice to the old one; nothing changes until the link is followed. Needs `aal2` on an account with a second factor. `409 EMAIL_EXISTS` or `UNDELIVERABLE_ADDRESS`, `400 EMAIL_UNCHANGED`, `403 ANONYMOUS_USER` for a guest — see [Changing an email address](#changing-an-email-address) |
 | `POST` | `/api/auth/confirm-email-change` | `{ token }` from the link. No session needed. Moves the account onto the new address, verified; `400 INVALID_TOKEN` for a spent, replaced or expired link, `409 EMAIL_EXISTS` when the address was taken while it waited |
-| `GET` | `/api/auth/config` | What this backend offers a sign-in screen — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Unauthenticated, and computed from the same predicates the routes enforce, so what the screen advertises cannot drift from what it can do |
+| `GET` | `/api/auth/config` | What this backend offers a sign-in screen — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`, and `storage`, which says whether the backend serves file storage. Unauthenticated, and computed from the same predicates the routes enforce, so what the screen advertises cannot drift from what it can do |
 | `POST` | `/api/auth/send-verification` | Send the caller an email-verification link |
 | `GET` | `/api/auth/verify-email` | Consume a verification link (the URL in that email). Keeps what a live session of the account proves and removes what nobody proved — see [Email verification](/docs/backend/email-verification/) |
 | `POST` | `/api/auth/verify-email` | The same with `{ token, password?, removeUnproven? }`: the password keeps it and signs in; with neither proof an account holding one answers `409 PROOF_REQUIRED` |
@@ -22993,7 +23015,11 @@ is the exception, because its payload is the file — it answers the bytes, with
 `POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }`
 of the stored object under `data`; `GET /api/storage/metadata/*` the object's
 metadata and, for a private object, the short-lived `token`;
-`GET /api/storage/sources` the array of configured sources.
+`GET /api/storage/sources` the array of configured sources, with
+`configured: true`. On a deployment with no storage at all, it answers
+`200 {"data": [], "configured": false}`, while every other route answers
+`501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` reports the same
+fact as `storage: false`, so a client can skip asking.
 `DELETE /api/storage/file/*` and `POST /api/storage/folder` carry only a
 `message`, since there is nothing to return.
 

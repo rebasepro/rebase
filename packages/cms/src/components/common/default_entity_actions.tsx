@@ -23,7 +23,6 @@ import {
     Typography
 } from "@rebasepro/ui";
 import type { User } from "@rebasepro/types";
-import { scopeGrants } from "@rebasepro/types";
 import type { EntityAction, UserCreationResult } from "@rebasepro/cms-types";
 import {
     apiBaseOf,
@@ -35,6 +34,7 @@ import {
 import { DeleteEntityDialog } from "../DeleteEntityDialog";
 import { addRecentId } from "../CollectionViewBinding/utils";
 import { navigateToEntity } from "../../util/navigation_utils";
+import { callerHoldsScope } from "../../util/caller_scopes";
 import { resolveDefaultSelectedView } from "@rebasepro/app";
 import { CreationResultDialog } from "../admin/CreationResultDialog";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -447,17 +447,6 @@ export const resetPasswordAction: EntityAction = {
     }
 };
 
-
-/**
- * Does the signed-in caller hold `scope`? Read off the controller's
- * `heldScopes` — `GET /auth/scopes` — so an action is offered to exactly those
- * its route admits. Not known yet is no.
- */
-function callerHoldsScope(authController: unknown, scope: string): boolean {
-    if (typeof authController !== "object" || authController === null || !("heldScopes" in authController)) return false;
-    const held = authController.heldScopes;
-    return Array.isArray(held) && scopeGrants(held.filter((entry): entry is string => typeof entry === "string"), scope);
-}
 
 /** The signed-in caller's uid, if the context names one. */
 function callerUid(authController: unknown): string | undefined {

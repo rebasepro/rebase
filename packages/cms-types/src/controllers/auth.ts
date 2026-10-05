@@ -92,6 +92,19 @@ export type AuthController<USER extends User = User, ExtraData = unknown> = {
      */
     capabilities?: AuthCapabilities;
 
+    /**
+     * Whether the backend serves file storage, as `GET /auth/config` reports
+     * it. The panel asks for the backend's storage sources only when this is
+     * not `false`.
+     *
+     * `null` while the controller is still reading the config: the panel
+     * waits, rather than asking a question the config is about to answer.
+     * `undefined` (or absent) means unknown: a controller that does not read
+     * the config, a backend that predates the field, or a read that failed.
+     * The panel then asks the backend directly.
+     */
+    storageEnabled?: boolean | null;
+
 };
 
 /**

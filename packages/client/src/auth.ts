@@ -1,6 +1,6 @@
 import { RebaseApiError, Transport } from "./transport";
 import { RebaseClientError } from "@rebasepro/types";
-import type { AuthAdapterCapabilities, AuthChangeEvent, RebaseSession, AuthTokens, DeviceSession, User } from "@rebasepro/types";
+import type { AuthConfigDocument, AuthChangeEvent, RebaseSession, AuthTokens, DeviceSession, User } from "@rebasepro/types";
 
 // Re-export canonical types so `import { RebaseSession } from "@rebasepro/client"` keeps working
 export type { RebaseSession, AuthTokens, AuthChangeEvent, DeviceSession } from "@rebasepro/types";
@@ -33,14 +33,15 @@ const EMPTY_USER: User = { uid: "", email: null, displayName: null, photoURL: nu
 
 
 /**
- * What `GET /auth/config` answers: the backend's auth capability document.
+ * What `GET /auth/config` answers: the backend's auth capability document, and
+ * whether it serves storage.
  *
  * Declared once, in `@rebasepro/types`, and re-exported here under the name the
  * endpoint uses. The SDK used to carry its own near-copy of it, which listed an
  * `emailServiceEnabled` flag no backend has ever sent and omitted half of what
  * every backend does send.
  */
-export type AuthConfig = AuthAdapterCapabilities;
+export type AuthConfig = AuthConfigDocument;
 
 export interface AuthStorage {
     getItem: (key: string) => string | null;

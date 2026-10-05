@@ -29,6 +29,7 @@ export function useRebaseAuthController(
     const [loginSkipped, setLoginSkipped] = useState(false);
     const [extra, setExtra] = useState<unknown>(null);
     const [authConfig, setAuthConfig] = useState<AuthConfigResponse | null>(null);
+    const [authConfigFailed, setAuthConfigFailed] = useState(false);
     const [heldScopes, setHeldScopes] = useState<string[] | undefined>(undefined);
 
     const isMountedRef = useRef(true);
@@ -104,6 +105,7 @@ export function useRebaseAuthController(
                 // user is unaffected by this failing.
                 console.warn("[Rebase] Could not load the backend auth configuration; " +
                     "the login view will fall back to defaults.", e);
+                if (isMountedRef.current && request === latestConfigRequest) setAuthConfigFailed(true);
             });
         }
 
@@ -457,6 +459,12 @@ export function useRebaseAuthController(
         startMfaChallenge: auth?.mfa ? startMfaChallenge : undefined,
         verifyMfaChallenge: auth?.mfa ? verifyMfaChallenge : undefined,
         heldScopes,
+        // `null` until the config has been read, so the panel waits for it
+        // rather than asking for storage sources the backend may not have.
+        // `undefined` when it cannot be read, or says nothing: ask then.
+        storageEnabled: authConfig
+            ? authConfig.storage
+            : (auth && !authConfigFailed ? null : undefined),
         extra,
         setExtra,
         // `authConfig` is null until `GET /auth/config` lands, so each fallback

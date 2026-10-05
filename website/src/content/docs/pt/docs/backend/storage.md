@@ -1,5 +1,5 @@
 ---
-sourceHash: 4d4f9bdaabf6ff8e
+sourceHash: 123256f487ac8a71
 title: Configuração de Armazenamento
 sidebar_label: Configuração de Armazenamento
 description: Configure backends de armazenamento em sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -126,7 +126,7 @@ com os códigos na [referência de erros](/docs/backend/errors/). O `/api/storag
 O `POST /api/storage/upload` responde com `201` contendo `{ key, bucket, storageUrl }`
 do objeto armazenado sob `data`; o `GET /api/storage/metadata/*` retorna os metadados
 do objeto e, para um objeto privado, o `token` de curta duração;
-o `GET /api/storage/sources` retorna o array de fontes configuradas.
+o `GET /api/storage/sources` retorna o array de fontes configuradas, com `configured: true`. Em uma implantação sem nenhum armazenamento, ele responde `200 {"data": [], "configured": false}`, enquanto todas as outras rotas respondem `501 STORAGE_NOT_CONFIGURED`. O `GET /api/auth/config` informa o mesmo como `storage: false`, para que um cliente não precise perguntar.
 O `DELETE /api/storage/file/*` e o `POST /api/storage/folder` trazem apenas uma
 `message`, já que não há nada a retornar.
 

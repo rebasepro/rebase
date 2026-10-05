@@ -1252,7 +1252,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             });
         }
 
-        return c.json({ data: Array.from(byKey.values()) });
+        return c.json({ data: Array.from(byKey.values()), configured: true });
     });
 
     return router;

@@ -1,5 +1,5 @@
 ---
-sourceHash: eb3d7dba66d373fb
+sourceHash: e8335b630b5757ca
 title: Endpoint e token di autenticazione
 sidebar_label: Endpoint di autenticazione
 description: Le route di autenticazione montate dal backend Rebase, la struttura delle loro risposte, l'autenticazione a più fattori, il contesto del database visibile a una policy, JWKS e chiavi di servizio.
@@ -27,7 +27,7 @@ Tutti gli endpoint di autenticazione sono montati su `/api/auth/`:
 | `PATCH` | `/api/auth/me` | Aggiorna il profilo del chiamante |
 | `POST` | `/api/auth/change-email` | `{ newEmail }`: sposta l'account del chiamante su un altro indirizzo. Invia via email un link al nuovo indirizzo e un avviso a quello vecchio; nulla cambia finché il link non viene seguito. Richiede `aal2` su un account con un secondo fattore. `409 EMAIL_EXISTS` oppure `UNDELIVERABLE_ADDRESS`, `400 EMAIL_UNCHANGED`, `403 ANONYMOUS_USER` per un guest — vedi [Cambiare un indirizzo email](#cambiare-un-indirizzo-email) |
 | `POST` | `/api/auth/confirm-email-change` | `{ token }` dal link. Non richiede alcuna sessione. Sposta l'account sul nuovo indirizzo, verificato; `400 INVALID_TOKEN` per un link consumato, sostituito o scaduto, `409 EMAIL_EXISTS` quando l'indirizzo è stato preso mentre era in attesa |
-| `GET` | `/api/auth/config` | Ciò che questo backend offre a una schermata di accesso — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Non autenticato e calcolato a partire dagli stessi predicati applicati dalle route, garantendo che ciò che la schermata mostra corrisponda esattamente a ciò che può fare |
+| `GET` | `/api/auth/config` | Ciò che questo backend offre a una schermata di accesso — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`, e `storage`, che indica se il backend serve lo storage dei file. Non autenticato e calcolato a partire dagli stessi predicati applicati dalle route, garantendo che ciò che la schermata mostra corrisponda esattamente a ciò che può fare |
 | `POST` | `/api/auth/send-verification` | Invia al chiamante un link di verifica dell'email |
 | `GET` | `/api/auth/verify-email` | Consuma un link di verifica (l'URL contenuto nell'email). Mantiene ciò che una sessione attiva dell'account dimostra e rimuove ciò che nessuno ha dimostrato — vedi [Verifica email](/docs/backend/email-verification/) |
 | `POST` | `/api/auth/verify-email` | Lo stesso con `{ token, password?, removeUnproven? }`: la password lo mantiene e accede; senza nessuna delle due prove un account che ne possiede una risponde `409 PROOF_REQUIRED` |

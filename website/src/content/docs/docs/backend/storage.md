@@ -125,7 +125,11 @@ is the exception, because its payload is the file — it answers the bytes, with
 `POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }`
 of the stored object under `data`; `GET /api/storage/metadata/*` the object's
 metadata and, for a private object, the short-lived `token`;
-`GET /api/storage/sources` the array of configured sources.
+`GET /api/storage/sources` the array of configured sources, with
+`configured: true`. On a deployment with no storage at all, it answers
+`200 {"data": [], "configured": false}`, while every other route answers
+`501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` reports the same
+fact as `storage: false`, so a client can skip asking.
 `DELETE /api/storage/file/*` and `POST /api/storage/folder` carry only a
 `message`, since there is nothing to return.
 

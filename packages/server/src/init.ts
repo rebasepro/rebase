@@ -21,7 +21,8 @@ import {
     parseEnvBoolean,
     resourceKeyOf,
     DEFAULT_STORAGE_SOURCE_KEY,
-    type AdminScope
+    type AdminScope,
+    type AuthConfigDocument
 } from "@rebasepro/types";
 import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, getEffectiveSecurityRules, assertBeforeQueryIsPostgresOnly } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
@@ -1874,9 +1875,16 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // This is the *only* handler for the path — the auth router used to
         // carry a second copy that this registration shadowed, returning a
         // different shape.
+        //
+        // It also says whether storage is configured. The admin panel reads
+        // this document on every load, so the flag spares it asking
+        // `/storage/sources` on a deployment with no bucket.
         config.app.get(`${basePath}/auth/config`, defaultAuthLimiter, async (c) => {
             const capabilities = await authAdapter!.getCapabilities();
-            return c.json(capabilities);
+            return c.json({
+                ...capabilities,
+                storage: Boolean(storageRegistry || storageController)
+            } satisfies AuthConfigDocument);
         });
 
         if (!isAuthAdapter(config.auth)) {
@@ -2765,6 +2773,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // RETRYABLE_STATUSES in @rebasepro/client), which would silently pile
         // up uploads that can never land.
         const storageStub = new Hono<HonoEnv>();
+        // Listing the sources is a question, not a use of storage: the answer is
+        // "none", and it is a 200, so a client that asks on every page load
+        // does not put an ERROR in the logs each time.
+        storageStub.get("/sources", (c) => c.json({ data: [], configured: false }));
         storageStub.all("/*", (c) => c.json({
             error: {
                 message: "File storage is not configured on this deployment, so uploads and " +
@@ -2775,7 +2787,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }, 501));
         if (surfaces.storage) {
             config.app.route(`${basePath}/storage`, storageStub);
-            logger.info("Storage not configured — /storage returns 501 STORAGE_NOT_CONFIGURED");
+            logger.info("Storage not configured — /storage/sources lists none, every other /storage route returns 501 STORAGE_NOT_CONFIGURED");
         }
     }
 
