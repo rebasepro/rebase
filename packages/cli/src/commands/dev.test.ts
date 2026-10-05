@@ -13,6 +13,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
+import { createRequire } from "module";
 import net from "net";
 import os from "os";
 import path from "path";
@@ -113,7 +114,11 @@ describe("devWatchArgs", () => {
         // with them — that `--exclude` beats its own dependency tracking — so
         // run it.
         const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-dev-watch-")));
-        const tsx = path.join(__dirname, "..", "..", "node_modules", ".bin", "tsx");
+        // Resolved the way `dev-crash-marker.test.ts` does it. tsx is the
+        // root's devDependency, not this package's, so a clean install has no
+        // `packages/cli/node_modules/.bin/tsx`: spawning that path failed, and
+        // `reject: false` turned the failure into "no boot".
+        const tsxCli = createRequire(import.meta.url).resolve("tsx/cli");
         try {
             fs.mkdirSync(path.join(root, "config", "collections"), { recursive: true });
             fs.mkdirSync(path.join(root, "backend"));
@@ -138,9 +143,9 @@ describe("devWatchArgs", () => {
             };
 
             const { execa } = await import("execa");
-            const child = execa(tsx, devWatchArgs(root, {}, "entry.mjs", trigger), { cwd: path.join(root, "backend"), reject: false });
+            const child = execa(process.execPath, [tsxCli, ...devWatchArgs(root, {}, "entry.mjs", trigger)], { cwd: path.join(root, "backend"), reject: false });
             try {
-                expect(await waitFor(1)).toBe(1);
+                expect(await waitFor(1), "tsx never ran the entry").toBe(1);
                 await new Promise(r => setTimeout(r, 500));
                 fs.appendFileSync(collection, "export const touched = true;\n");
                 await new Promise(r => setTimeout(r, 1500));
