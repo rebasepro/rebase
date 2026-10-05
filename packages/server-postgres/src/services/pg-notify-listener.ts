@@ -3,11 +3,11 @@
  *
  * Every cross-instance feature in the backend needs the same thing: one
  * connection *outside* the Drizzle pool that stays open, holds a `LISTEN`, and
- * comes back on its own after the database or the network drops it. CDC needed
- * it first; the channel bus needs it too. This is that connection, with the one
- * behaviour that matters to callers preserved: the **first** connect is
- * validated and rethrown, so a caller can fall back to a different strategy,
- * while every later drop is repaired quietly in the background.
+ * comes back on its own after the database or the network drops it. CDC, the
+ * channel bus and the cross-instance broadcast all use this one. By default the
+ * **first** connect is validated and rethrown, so a caller can fall back to a
+ * different strategy, while every later drop is repaired quietly in the
+ * background; `retryInitialConnect` repairs the first one the same way.
  *
  * `LISTEN` is session state, so this connection must not go through a
  * transaction-mode pooler (PgBouncer): give it the direct database URL.
@@ -42,6 +42,15 @@ export interface PgNotifyListenerOptions {
     heartbeatIntervalMs?: number;
     /** How long a heartbeat may take before the connection is declared dead. */
     heartbeatTimeoutMs?: number;
+    /**
+     * Treat a failed first connect like any later drop: `start()` resolves,
+     * the listener reports itself down, and it keeps dialling in the
+     * background. For a caller with nothing to fall back to, for whom a
+     * database that is unreachable at boot is an outage to wait out rather
+     * than a reason to run without the channel. Off by default: `start()`
+     * rejects, so a caller with a fallback can take it.
+     */
+    retryInitialConnect?: boolean;
 }
 
 /**
@@ -125,13 +134,15 @@ export class PgNotifyListener {
      *
      * Rejects if the *initial* connection or `LISTEN` fails, leaving the
      * listener stopped — callers use that to degrade deliberately instead of
-     * running blind against a channel nothing is delivering.
+     * running blind against a channel nothing is delivering. With
+     * `retryInitialConnect` it resolves instead, reports itself down, and
+     * keeps dialling.
      */
     async start(): Promise<void> {
         if (this.running) return;
         this.running = true;
         try {
-            await this.connect({ initial: true });
+            await this.connect({ first: true });
         } catch (err) {
             this.running = false;
             throw err;
@@ -154,7 +165,12 @@ export class PgNotifyListener {
         }
     }
 
-    private async connect({ initial = false }: { initial?: boolean } = {}): Promise<void> {
+    /**
+     * @param first The connect `start()` makes: never a reconnect, so it owes
+     *        no resync, and — unless `retryInitialConnect` — a failure is
+     *        thrown to the caller rather than retried.
+     */
+    private async connect({ first = false }: { first?: boolean } = {}): Promise<void> {
         const { connectionString, channel, onPayload, logLabel } = this.options;
         // Held here rather than only inside the `try` so the failure path can
         // still reach it: everything below `connect()` can throw, and until
@@ -211,14 +227,14 @@ export class PgNotifyListener {
             }
             // Surface the initial failure so callers can choose to fall back;
             // for reconnects, keep retrying quietly in the background.
-            if (initial) throw err;
+            if (first && !this.options.retryInitialConnect) throw err;
             logger.error(`❌ ${logLabel} Failed to connect LISTEN client`, { error: err });
             this.scheduleReconnect();
             return;
         }
         // Outside the `try`: a throwing handler is not a failed connection,
         // and must not tear down the one that just came back.
-        if (!initial && this.options.onReconnect) {
+        if (!first && this.options.onReconnect) {
             logger.warn(`⚠️ ${logLabel} LISTEN client reconnected; anything published while it was down was missed.`);
             try {
                 this.options.onReconnect();
