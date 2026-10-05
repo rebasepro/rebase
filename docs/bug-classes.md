@@ -4007,6 +4007,7 @@ Found in one sweep:
 | CSV cell text | `JSON.parse` before the target type is known | `1.10`, twenty-digit ids, Excel's `TRUE` |
 | MCP gate's `.env` regex (first match) | the CLI's dotenv (last match, `export`) | the gate cleared localhost while the CLI connected to production |
 | CDC payload keyed by SQL column | address derived by property key | single-row subscriptions on a `columnName` key |
+| collection export, CSV and JSON (`export.ts`) | import: file reader, mapping step, `processValueMapping` | JSON: every geopoint, key-value map and vector, split into `location.latitude` columns no property holds; CSV: every vector, a block list written one cell per item, the dates inside an array of maps or a fixed list, a time of day exported as a timestamp. **2026-10-05:** guarded by `packages/cms/test/data_import/export_import_round_trip.test.ts`, which exports a record holding every admin field (checked against `DEFAULT_FIELD_CONFIGS` and every `DataType`) under all six export settings and imports it back with the real reader, mapping and conversion |
 
 **Sweep:** list every serialise/parse pair and write *one* test per pair that
 round-trips `false`, `0`, `""`, `null`, a value containing the format's own

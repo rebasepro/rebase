@@ -32,12 +32,12 @@ import { buildEntityPropertiesFromData } from "@rebasepro/inference";
 import { useImportConfig } from "../hooks";
 import { convertImportData, getInferenceType, ImportConversionProblem } from "../utils";
 import { guessIdColumn } from "../utils/id_column";
+import { buildHeadersMappingFromData, takesObjectWhole } from "../utils/import_columns";
 import { DataNewPropertiesMapping } from "../components/DataNewPropertiesMapping";
 import { ImportFileUpload } from "../components/ImportFileUpload";
 import { ImportSaveInProgress } from "../components/ImportSaveInProgress";
 import { ImportConversionProblems } from "../components/ImportConversionProblems";
 import { ImportConfig } from "../types";
-import { isPrototypePollutingKey, slugify } from "@rebasepro/utils";
 
 type ImportState = "initial" | "mapping" | "preview" | "import_data_saving";
 
@@ -289,9 +289,11 @@ function PropertyTreeSelect({
             level,
             propertyKey
         }) => {
+            // A map with fields is filled from a column per field; a
+            // key-value map, like a geopoint, takes a column whole.
             return <SelectItem value={propertyKey}
                 key={propertyKey}
-                disabled={property.type === "map"}>
+                disabled={property.type === "map" && !takesObjectWhole(property)}>
                 <PropertySelectEntry propertyKey={propertyKey}
                     property={property}
                     level={level}/>
@@ -429,39 +431,4 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
         </div>
     </div>;
 
-}
-
-function buildHeadersMappingFromData(objArr: object[], properties?: Properties) {
-    const headersMapping: Record<string, string> = {};
-    objArr.filter(Boolean).forEach((obj) => {
-        Object.keys(obj).forEach((key) => {
-            // The keys are the uploaded file's header row; `headersMapping[key] = …`
-            // is the same setter the import pipeline refuses elsewhere.
-            if (isPrototypePollutingKey(key)) return;
-            const child = (obj as Record<string, unknown>)[key];
-            if (child != null && typeof child === "object" && !Array.isArray(child)) {
-                const childProperty = properties?.[key];
-                const childProperties = childProperty && "properties" in childProperty ? childProperty.properties : undefined;
-                const childHeadersMapping = buildHeadersMappingFromData([child as object], childProperties);
-                Object.entries(childHeadersMapping).forEach(([subKey, mapping]) => {
-                    headersMapping[`${key}.${subKey}`] = `${key}.${mapping}`;
-                });
-            }
-
-            if (!properties) {
-                headersMapping[key] = key;
-            } else if (key in properties) {
-                headersMapping[key] = key;
-            } else {
-                const slug = slugify(key);
-                if (slug in properties) {
-                    headersMapping[key] = slug;
-                } else {
-                    headersMapping[key] = key;
-                }
-            }
-
-        });
-    });
-    return headersMapping;
 }

@@ -1,5 +1,5 @@
 ---
-sourceHash: a0b64d909e3d8229
+sourceHash: d8dc261c256b2bc3
 title: Datenimport & -export
 sidebar_label: Datenimport & -export
 description: Importieren Sie Daten aus CSV-, JSON- und Excel-Dateien in Ihre Collections und exportieren Sie Collection-Daten nach CSV oder JSON mit optionalen berechneten Feldern.
@@ -47,6 +47,9 @@ Eine Zelle wird nur umgewandelt, wenn der Typ der Eigenschaft exakt das aufnehme
 | Number | `12`, `-3.5`, `10.00`, `1e3` | `02134` (eine führende Null würde verloren gehen), Zahlen mit mehr als 15 signifikanten Stellen, `1,234`, `$5.00`, `12%`, `N/A` |
 | Boolean | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, in beliebiger Schreibweise | alles andere |
 | Date | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), ausgeschriebene Daten (`5 Jan 2024`), `05/01/2024`, Epoch-Sekunden oder -Millisekunden | Text, der kein Datum benennt |
+| Geopoint | das Objekt, das der Export schreibt, `{"latitude": 41.9, "longitude": 12.5}`, oder sein JSON in einer CSV-Zelle | alles andere, oder eine Koordinate außerhalb des Wertebereichs |
+| Map ohne deklarierte Felder | ein Objekt, oder sein JSON in einer CSV-Zelle | alles andere |
+| Vector | eine Liste von Zahlen (`[0.1, 0.2]`, `0.1, 0.2`), oder das `{"value": [0.1, 0.2]}` des Exports | eine Liste, die etwas enthält, das keine Zahl ist |
 
 Ein Datum ohne Uhrzeit ist dieser Tag in UTC. Bei Daten in der Form `05/01/2024` entscheidet die
 Spalte über die Reihenfolge: Eine erste Zahl über 12 macht die Spalte tagzuerst, eine zweite Zahl
@@ -56,6 +59,14 @@ nicht umgewandelt.
 
 Eine leere Zelle ist kein Wert: Sie setzt nichts, und der Default, den Sie für diese Eigenschaft
 gewählt haben, greift.
+
+Eine aus einer Collection exportierte Datei wird mit denselben Werten wieder importiert, ob CSV oder JSON.
+Eine Map mit deklarierten Feldern wird mit einer Spalte pro Feld gelesen (`address.street`), so wie der
+Export sie schreibt; jeder andere Wert, auch ein Geopoint oder eine Key-Value-Map, ist eine Spalte. Eine
+Epoch-Zahl zwischen -100,000,000,000 und 100,000,000,000 wird als Sekunden gelesen, daher kommt ein Datum
+zwischen dem 31. Oktober 1966 und dem 3. März 1973, das als Timestamp exportiert wurde, nicht unverändert
+zurück: Exportieren Sie solche Daten als Text. Ein Uhrzeit-Feld liest eine Zahl unter einem Tag
+(86,400,000) als die Millisekunden seit Mitternacht, die der Export schreibt.
 
 ### Werte, die nicht importiert werden können
 

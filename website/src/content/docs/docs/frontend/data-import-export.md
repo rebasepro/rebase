@@ -46,10 +46,15 @@ A cell is converted only when the property's type can hold exactly what it says:
 | Number | `12`, `-3.5`, `10.00`, `1e3` | `02134` (a leading zero would be lost), numbers with more than 15 significant digits, `1,234`, `$5.00`, `12%`, `N/A` |
 | Boolean | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, in any case | anything else |
 | Date | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), written-out dates (`5 Jan 2024`), `05/01/2024`, epoch seconds or milliseconds | text that names no date |
+| Geopoint | the object the export writes, `{"latitude": 41.9, "longitude": 12.5}`, or its JSON in a CSV cell | anything else, or a coordinate out of range |
+| Map without declared fields | an object, or its JSON in a CSV cell | anything else |
+| Vector | a list of numbers (`[0.1, 0.2]`, `0.1, 0.2`), or the export's `{"value": [0.1, 0.2]}` | a list holding anything that is not a number |
 
 A date without a time is that day in UTC. For dates written as `05/01/2024`, the column decides the order: a first number above 12 makes the column day-first, a second number above 12 makes it month-first. When a column never says, the browser's locale decides, and when it holds both orders, a date that either order could read is not converted.
 
 A blank cell is no value: it sets nothing, and the default you chose for that property applies.
+
+A file exported from a collection imports back into the same values, CSV or JSON. A map with declared fields is read one column per field (`address.street`), as the export writes it; any other value, a geopoint or a key-value map included, is one column. An epoch number between -100,000,000,000 and 100,000,000,000 is read as seconds, so a date between 31 October 1966 and 3 March 1973 exported as a timestamp does not come back: export those dates as text. A time-of-day field reads a number below one day (86,400,000) as the milliseconds since midnight the export writes.
 
 ### Values that cannot be imported
 
