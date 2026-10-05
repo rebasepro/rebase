@@ -2,11 +2,11 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import type { Server } from "http";
 import type { AuthAdapter } from "@rebasepro/types";
 
-let mockWssInstance: { on: jest.Mock } | null = null;
+let mockWssInstance: { on: jest.Mock; clients: Set<unknown> } | null = null;
 
 jest.mock("ws", () => ({
     WebSocketServer: jest.fn().mockImplementation(() => {
-        mockWssInstance = { on: jest.fn() };
+        mockWssInstance = { on: jest.fn(), clients: new Set() };
         return mockWssInstance;
     }),
     WebSocket: jest.fn()

@@ -7,7 +7,10 @@ jest.mock("ws", () => {
     return {
         WebSocketServer: jest.fn().mockImplementation(() => {
             const instance = {
-                on: jest.fn()
+                on: jest.fn(),
+                // What a real server tracks. The socket's liveness check reads
+                // it, and refuses a server without it.
+                clients: new Set()
             };
             mockWssInstance = instance;
             return instance;

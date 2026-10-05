@@ -5,7 +5,7 @@ let mockWssInstance: any = null;
 
 jest.mock("ws", () => ({
     WebSocketServer: jest.fn().mockImplementation(() => {
-        const instance = { on: jest.fn() };
+        const instance = { on: jest.fn(), clients: new Set() };
         mockWssInstance = instance;
         return instance;
     }),

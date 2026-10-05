@@ -44,12 +44,22 @@ export const MAX_SOCKET_BUFFERED_BYTES = 16 * 1024 * 1024;
  * not answer the previous ping. Returns the function that stops it.
  */
 export function reapSilentSockets(wss: WebSocketServer, intervalMs: number = SOCKET_PING_INTERVAL_MS): () => void {
+    // Read here rather than on the first tick. A server made with
+    // `clientTracking: false` has no `clients`, and finding that out inside the
+    // timer throws from a callback nothing catches, which ends the process
+    // `intervalMs` later — whatever it is doing by then. That is how a test
+    // double without `clients` took down the jest worker that ran it, along with
+    // every suite the worker had moved on to.
+    const clients: Set<WebSocket> | undefined = wss.clients;
+    if (!clients) {
+        throw new Error("reapSilentSockets needs a WebSocketServer that tracks its clients; this one was created with clientTracking: false.");
+    }
     const awaitingPong = new WeakSet<WebSocket>();
     wss.on("connection", (ws: WebSocket) => {
         ws.on("pong", () => awaitingPong.delete(ws));
     });
     const timer = setInterval(() => {
-        for (const ws of wss.clients) {
+        for (const ws of clients) {
             if (awaitingPong.has(ws)) {
                 logger.debug(`[WebSocket Server] Terminated a socket that did not answer a ping within ${intervalMs}ms.`);
                 ws.terminate();

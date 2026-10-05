@@ -29,13 +29,13 @@ jest.mock("../src/services/dataService", () => ({
 }));
 
 import http from "http";
-import WebSocket from "ws";
+import WebSocket, { WebSocketServer } from "ws";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { MAX_SOCKET_BUFFERED_BYTES } from "../src/services/socket-liveness";
+import { MAX_SOCKET_BUFFERED_BYTES, reapSilentSockets } from "../src/services/socket-liveness";
 import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 
 const posts = {
@@ -283,5 +283,22 @@ describe("shutting the server down", () => {
         expect(jest.getTimerCount()).toBe(0);
         // afterEach closes it again; a second listen keeps that harmless.
         await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    });
+});
+
+describe("a socket server that does not track its clients", () => {
+    it("is refused when the ping clock is set up, not on its first tick", () => {
+        // The tick walks `clients`. Without them it threw from inside the
+        // timer, which nothing catches: the process ended 30 seconds later,
+        // whatever it was running by then. Under jest that was a worker, and
+        // every suite it had moved on to failed with an empty message.
+        const wss = new WebSocketServer({ noServer: true, clientTracking: false });
+        const timers = jest.getTimerCount();
+        try {
+            expect(() => reapSilentSockets(wss)).toThrow(/clientTracking: false/);
+            expect(jest.getTimerCount()).toBe(timers);
+        } finally {
+            wss.close();
+        }
     });
 });

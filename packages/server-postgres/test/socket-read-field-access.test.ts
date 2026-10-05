@@ -25,7 +25,7 @@ let mockWssInstance: { on: jest.Mock } | null = null;
 jest.mock("ws", () => ({
     ...jest.requireActual<typeof import("ws")>("ws"),
     WebSocketServer: jest.fn().mockImplementation(() => {
-        const instance = { on: jest.fn() };
+        const instance = { on: jest.fn(), clients: new Set() };
         mockWssInstance = instance;
         return instance;
     })
