@@ -1,5 +1,5 @@
 ---
-sourceHash: 5072db38fc5777e0
+sourceHash: 481cd30b8a1a6e64
 title: Offline e Sincronização Local-First
 sidebar_label: Offline
 description: Ative o motor de sincronização local-first do SDK tipado do Rebase — um banco de dados local de linhas, escritas offline instantâneas com reversão e consultas ao vivo reativas.
@@ -126,9 +126,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Conectividade atual, tamanho da fila, atividade de sincronização, último erro |
 | `onStatusChange(fn)` | Assinar o item acima |
 | `onQueueChange(fn)` | Apenas o número de escritas não enviadas, para um badge |
-| `pending()` | As próprias mutações enfileiradas, da mais antiga para a mais recente |
+| `pending()` | As próprias mutações enfileiradas, da mais antiga para a mais recente. <span class="since-badge" data-since="0.24">Desde 0.24</span> `pending({ orphaned: true })`: as que foram enfileiradas sem sessão iniciada — veja [Usuários](#usuários) |
 | `sync()` | Reexecutar agora — resolve com `{ flushed, remaining }` |
-| `clear()` | Descartar as escritas enfileiradas **e** as linhas locais do usuário atual |
+| `clear()` | Descartar as escritas enfileiradas **e** as linhas locais do usuário atual. <span class="since-badge" data-since="0.24">Desde 0.24</span> `clear({ orphaned: true })`: em vez disso, as que foram enfileiradas sem sessão iniciada |
 
 A reexecução acontece por conta própria: quando o navegador dispara `online`, quando o usuário faz login e em um backoff exponencial (um segundo, dobrando até um minuto) enquanto houver algo na fila. `sync()` serve para um botão de "tentar novamente".
 
@@ -160,6 +160,31 @@ As abas do mesmo app compartilham um único banco de dados IndexedDB, portanto c
 ## Usuários
 
 O banco de dados local e a fila de saída são particionados por usuário autenticado. As linhas em cache são o que a segurança em nível de linha permitiu que aquele usuário visse, e uma escrita enfileirada tem de ser reexecutada como seu autor — de modo que sair e entrar novamente como outra pessoa nunca mistura os dois. Sair da sessão não exige limpar nada.
+
+### Enquanto a sessão é restaurada
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Até o cliente saber quem está com a sessão iniciada, ele não sabe qual banco de dados local nem qual fila de saída usar, então as leituras e escritas offline esperam. É o tempo que `auth.isInitialized()` leva: nenhum para uma sessão armazenada que ainda é válida, e uma requisição de refresh quando a sessão precisa voltar do servidor — no modo cookie, em que nada é armazenado no dispositivo, isso acontece a cada carregamento de página. Uma escrita feita nesse intervalo é enfileirada em nome de quem a sessão se revelar ser, e uma leitura responde a partir do banco de dados local dessa pessoa. Um evento de tempo real que chegue nesse meio-tempo é passado ao seu callback tal como o servidor o enviou, e não é guardado em lugar nenhum.
+
+Se a sessão não puder ser restaurada — o refresh é recusado ou, no modo cookie, não alcança o servidor —, o cliente fica sem sessão, e as leituras e escritas offline são as do usuário sem sessão. Na 0.23, o modo cookie tratava todo esse intervalo como sem sessão, de modo que uma escrita feita nele era enfileirada como do usuário sem sessão.
+
+### Escritas feitas sem sessão iniciada
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Escritas enfileiradas enquanto ninguém estava com a sessão iniciada não são reexecutadas quando alguém faz login. Esse usuário não as fez, e reexecutá-las com as credenciais dele colocaria as alterações de uma pessoa em nome de outra — em um dispositivo compartilhado, as escritas de um visitante na conta do próximo usuário. Elas também não são movidas para a fila de saída do usuário que fez login. São mantidas e listadas à parte, para que o app decida o que fazer com elas:
+
+```typescript
+client.auth.onAuthStateChange(async (event) => {
+    if (event !== "SIGNED_IN") return;
+    const orphaned = await client.offline!.pending({ orphaned: true });
+    if (orphaned.length === 0) return;
+    if (await askToKeep(orphaned.length)) {
+        // Re-issue each one yourself, now as the signed-in user.
+        for (const write of orphaned) await reissue(write);
+    }
+    await client.offline!.clear({ orphaned: true });
+});
+```
+
+`clear({ orphaned: true })` as descarta, junto com as linhas locais às quais foram aplicadas; a fila de saída do próprio usuário com sessão iniciada não é tocada. Se ninguém mexer nelas, são reexecutadas na próxima vez que ninguém estiver com a sessão iniciada. Enquanto ninguém está com a sessão iniciada, elas são simplesmente a fila de saída atual, e `pending({ orphaned: true })` não lista nada.
 
 ## Configuração
 
