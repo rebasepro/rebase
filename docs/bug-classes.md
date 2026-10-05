@@ -4129,3 +4129,44 @@ test agreed with the code and neither met the thing it stood in for. The new
 guards run the real thing: real Atlas output, two copies of `@rebasepro/types`,
 a LISTEN as a role with no grants, one contract suite over all three storage
 controllers, and the door-parity kit over six doors on real Postgres.
+
+## 70. A multi-step apply whose protective step runs last
+
+An operation changes state in several steps, and the step that makes the new
+state safe comes last, after steps that can fail. Every step is right on its
+own and every success path ends safe; a failure ends wherever it stopped — with
+the dangerous half applied and the protection never reached. Nothing about it
+is silent (that is class 57): the command exits 1 and says why. What nobody
+asked is what the database looks like at the moment it stops.
+
+The instance: `rebase db push` ran Atlas — which commits a new table with RLS
+off, while `rebase_user` already holds DML on it through the schema's default
+privileges — then the vector, search and trigger DDL, then the policies, which
+were what switched RLS on. A refused search step left a new `secrets` table
+readable and writable by every authenticated request, with no policy, until a
+later push or boot; with `REBASE_MIGRATE_ON_BOOT=none`, for good (SCHEMA-11).
+The boot door had the same order, and a mirror image of it: a table the
+policies step could not lock was closed by revoking the user role — and the
+boot's final schema-wide `GRANT … ON ALL TABLES` then handed the privileges
+back. The protection ran; a later, broader step that did not know about it
+undid it, and the log still said "unreachable rather than unprotected".
+
+**Sweep:** for every multi-step apply, list the steps in order and, for each one
+that can fail, write down the state it leaves behind. Any state in which
+something is reachable that was not before is the bug: move the protection to
+the front, or make it atomic with the change it protects. Then look for a later
+broad step that redoes what an earlier narrow one undid on purpose — a
+schema-wide grant after a per-table revoke — and make it honour the exception.
+
+**Sweep (2026-10-05, the schema doors):**
+
+| checked | result |
+|---|---|
+| `db push`: Atlas → vector, search, triggers → policies | **BUG** (SCHEMA-11). Every collection and junction table is locked right after the apply, before anything that can fail; one that cannot be locked is revoked and the push stops before the role step. `db-push-rls-on-failure-e2e.test.ts`. |
+| boot and the live schema editor: `CREATE TABLE`, policies only after driver and auth init | **BUG**. The ensure plan emits `ENABLE ROW LEVEL SECURITY` right after each `CREATE TABLE`, junctions included. `ensure-tables-born-locked.test.ts`. |
+| boot: a table the policies step revoked, then the final `ensureAppRole` | **BUG**. The bootstrapper keeps what it withdrew and withholds it again after the final grant, and refuses to start if it cannot. `boot-withheld-table-stays-withheld.test.ts`. |
+| `db push`'s role step after a table it could not lock | clean — the push exits before it. |
+| `db migrate` | clean for the order: `db generate` appends `policies.sql`, every `ENABLE` included, to the migration that creates the tables, and Atlas applies each file in one transaction. |
+| `db push`, between Atlas's COMMIT and the lock | **OPEN** — milliseconds in which only a killed process or a lost connection leaves a new table open. Closing it (suspend the default privilege around the apply, or run the plan in Rebase's own transaction) is a decision. |
+| processes that do not provision, `REBASE_MIGRATE_ON_BOOT=none`, every boot's `initializeDriver`, the role steps of `db migrate` and `db pull` | **OPEN** — each grants schema-wide without knowing which collection tables could not be locked, so a table the provisioning boot withdrew is granted again by them. A decision: have `ensureAppRole` withhold every declared table whose RLS is off — fail-closed for deployments serving RLS-off collection tables today. |
+| `db generate`, a failure while finishing the migration | **OPEN** (low) — reported as a warning; a failure before the policies are appended leaves a migration that creates tables without RLS. No deterministic trigger found. |
