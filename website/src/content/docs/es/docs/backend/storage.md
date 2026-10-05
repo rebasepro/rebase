@@ -1,5 +1,5 @@
 ---
-sourceHash: 7be09a8935390362
+sourceHash: 79207c5462071a3a
 title: Configuración de almacenamiento
 sidebar_label: Configuración de almacenamiento
 description: Configure backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para la subida de archivos, imágenes y contenido multimedia.
@@ -502,7 +502,7 @@ await initializeRebaseBackend({
 | `bucket` | Bucket resuelto (`"default"` cuando no se especifica) |
 | `operation` | `"read"`, `"write"`, `"delete"` o `"list"` |
 | `user` | `{ uid, email?, roles? }`, o `null` donde la ruta permite acceso anónimo |
-| `storageId` | El backend con nombre, cuando la solicitud apuntaba a uno |
+| `storageId` | El backend con nombre, cuando la solicitud apuntaba a uno: su clave canónica (`?storageId=%20media` es `"media"`). Ausente para el origen predeterminado, lo nombre como lo nombre la solicitud (sin parámetro, vacío o `(default)`) |
 | `data` | Acceso de lectura de confianza que **omite RLS** — `data.collection(slug).find(query)` / `.findById(id)`. La propiedad reside en una fila, no en el prefijo de una clave, por lo que el hook necesita un mecanismo de lectura para responder "¿a quién pertenece este objeto?". Omite la seguridad a nivel de fila deliberadamente: este hook *es* la decisión de autorización, y tomarla a través de un lector ya restringido por los permisos del propio solicitante sería circular. De solo lectura por diseño. |
 
 Devuelva `false` para denegar con un **403**. Lanzar una excepción también deniega el acceso — una búsqueda de propiedad que falla no queda abierta por defecto.
@@ -510,6 +510,7 @@ Devuelva `false` para denegar con un **403**. Lanzar una excepción también den
 Conviene saber:
 
 - **La ruta de metadatos es donde realmente se decide el acceso de lectura.** Esta emite el token de descarga de corta duración y delimitado a la ruta en el que confía la ruta del archivo, por lo que el hook lo restringe allí. Las solicitudes que ya llevan dicho token, o que acceden a una ruta declarada pública, omiten el hook: el token se emitió bajo su control y solo es válido para su propia ruta.
+- **Una ruta es pública cuando lo es la clave que nombra.** El prefijo `public/` se comprueba sobre la clave canónica que sirve la ruta —después de leer un segmento de bucket `default/` inicial y de plegar `//`, `./` y una `/` inicial—, nunca sobre la URL tal como se escribió. `/api/storage/file/notes://public/x.txt` nombra la clave privada `notes:/public/x.txt`, y la clave `default/public/x.txt` (a la que se llega como `/api/storage/file/default/default/public/x.txt`) está en una carpeta llamada `default`; ninguna de las dos es pública. En un hook, compruebe la `key` que recibe con `isPublicStorageKey` de `@rebasepro/types`: `isPublicStoragePath` lee una ruta o URL del lado del cliente, y considera públicas a ambas.
 - **`list` se restringe en función del prefijo.** Listar es la forma de descubrir claves de las que nadie le informó.
 - **Las subidas reanudables (TUS) se restringen en el momento de la creación**, de modo que una subida denegada no deja ningún archivo temporal atrás.
 - Omitir el hook conserva el comportamiento anterior, por lo que las aplicaciones de inquilino único no se ven afectadas.

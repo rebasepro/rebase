@@ -140,10 +140,15 @@ property failure reads like flakiness and is nearly always the opposite: a
 property is deterministic given its input, so an intermittent failure means the
 input space contains a counterexample that sampling reaches sometimes. The
 correct response is to capture the counterexample, never to retry until green.
-The first counterexample found this way turned out to be a mistake in the
+The first counterexample found this way was put down to a mistake in the
 property itself (`isPublicStoragePath` accepts full URLs while the canonicalizer
 does not — different domains, both correct); the second, at the same assertion,
-was the real defect above.
+was the real defect above. The first was a defect too: `publicObjectAuth` fed the
+public check the URL path while the route served the canonical key, so
+`/file/x://public/y` served the private `x:/public/y` to anyone (fixed
+2026-10-05; the server now decides on the served key with `isPublicStorageKey`).
+A counterexample explained away as "different domains" is worth one more
+question — does anything hand one function's domain to the other?
 
 The pattern worth noticing: every one is a case a reasonable person would not
 have put in a fixture. Nobody writes `O'Brien` into a policy test by accident,
@@ -433,7 +438,11 @@ it, or depend on the library and delete the copy.
 `isPublicStoragePath("./public/x")` is false while `canonicalStorageKey("./public/x")`
 is `public/x`. Nothing is bypassed — the object really is under the public prefix
 — but a caller reasoning about the raw key understates the exposure. The existing
-rule applies: decide on the canonical key, never on the one that arrived.
+rule applies: decide on the canonical key, never on the one that arrived. The
+server now does, in both directions: `publicObjectAuth` derives the served key
+with the route's own `requestedStorageObject` and tests it with
+`isPublicStorageKey` (2026-10-05), and
+`storage-public-decision.property.test.ts` holds the door to it.
 
 ## If you want to go further
 

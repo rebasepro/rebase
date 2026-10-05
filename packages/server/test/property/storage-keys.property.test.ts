@@ -15,7 +15,7 @@
 
 import fc from "fast-check";
 import path from "node:path";
-import { isPublicStoragePath, PUBLIC_STORAGE_PREFIX } from "@rebasepro/types";
+import { isPublicStorageKey, isPublicStoragePath, PUBLIC_STORAGE_PREFIX } from "@rebasepro/types";
 import {
     canonicalStorageKey,
     tryCanonicalStorageKey,
@@ -65,7 +65,8 @@ const hostileKey = fc.oneof(
  *
  * `://` is excluded because it is the one sequence on which this domain and
  * `isPublicStoragePath`'s differ; see the pinned test at the bottom of the file
- * for what that difference is and why it is not a defect.
+ * for what that difference is, and what it cost when a request path was handed
+ * to the path check.
  */
 const bucketRelativeKey = hostileKey.filter(k => !k.includes("://"));
 
@@ -247,16 +248,25 @@ describe("public prefix agreement", () => {
      * canonicalizes to `x:/public/y`, which does not.
      *
      * This was found by the property above failing intermittently — the
-     * generator produced a `://` roughly one run in three. Nothing is broken:
-     * no caller feeds a URL to the canonicalizer, because the routes derive the
-     * key from the URL path, which is already bucket-relative. It is pinned
-     * because "these two agree" is the kind of thing that gets assumed later,
-     * and the assumption is false outside a domain nobody has written down.
+     * generator produced a `://` roughly one run in three, and it was recorded
+     * here as harmless on the belief that nothing fed a request path to the
+     * public check. `publicObjectAuth` did: it judged the raw URL path with
+     * `isPublicStoragePath` while the route served the canonical key, so
+     * `GET /file/x://public/y` let an anonymous caller read the private
+     * `x:/public/y`. The server now decides on the served key with
+     * `isPublicStorageKey`, which parses nothing out of it
+     * (`storage-public-decision.property.test.ts` holds the door to that).
+     * `isPublicStoragePath` keeps reading client paths, and this pins why it
+     * must never be handed a request path again.
      */
-    it("PINNED: the public check accepts URLs, the canonicalizer does not", () => {
+    it("PINNED: the path check accepts URLs, the canonicalizer and the key check do not", () => {
         expect(isPublicStoragePath("x://public/y")).toBe(true);
         expect(canonicalStorageKey("x://public/y")).toBe("x:/public/y");
         expect(isPublicStoragePath(canonicalStorageKey("x://public/y"))).toBe(false);
+        expect(isPublicStorageKey(canonicalStorageKey("x://public/y"))).toBe(false);
+        // A leading `default/` is a bucket to the path check and a folder in a key.
+        expect(isPublicStoragePath("default/public/y")).toBe(true);
+        expect(isPublicStorageKey("default/public/y")).toBe(false);
 
         // …and on the shared domain — a key within a bucket — they agree.
         for (const key of ["public/x", "public//x", "public/./x", "//public/x", "default/public/x"]) {

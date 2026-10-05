@@ -1,4 +1,4 @@
-import { isPublicStoragePath, type StorageAuthorize } from "@rebasepro/types";
+import { isPublicStorageKey, type StorageAuthorize } from "@rebasepro/types";
 
 /**
  * Who may do what to files in storage.
@@ -37,7 +37,7 @@ import { isPublicStoragePath, type StorageAuthorize } from "@rebasepro/types";
  *
  * ```ts
  * export const storageAuthorize: StorageAuthorize = async ({ key, user, operation, data }) => {
- *     if (operation === "read" && isPublicStoragePath(key)) return true;
+ *     if (operation === "read" && isPublicStorageKey(key)) return true;
  *     if (!user) return false;
  *
  *     // Writes land under the caller's own prefix.
@@ -66,7 +66,7 @@ import { isPublicStoragePath, type StorageAuthorize } from "@rebasepro/types";
 export const storageAuthorize: StorageAuthorize = ({ key, user, operation }) => {
     // The `public/` prefix is the framework's convention for world-readable
     // objects, and it is what signed download URLs for public assets rely on.
-    if (operation === "read" && isPublicStoragePath(key)) {
+    if (operation === "read" && isPublicStorageKey(key)) {
         return true;
     }
 

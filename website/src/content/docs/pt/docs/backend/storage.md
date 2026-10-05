@@ -1,5 +1,5 @@
 ---
-sourceHash: 7be09a8935390362
+sourceHash: 79207c5462071a3a
 title: Configuração de Armazenamento
 sidebar_label: Configuração de Armazenamento
 description: Configure backends de armazenamento em sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -495,7 +495,7 @@ await initializeRebaseBackend({
 | `bucket` | Bucket resolvido (`"default"` quando não especificado) |
 | `operation` | `"read"`, `"write"`, `"delete"` ou `"list"` |
 | `user` | `{ uid, email?, roles? }`, ou `null` quando a rota permite acesso anônimo |
-| `storageId` | O backend nomeado, quando a requisição teve um como destino |
+| `storageId` | O backend nomeado, quando a requisição teve um como destino — sua chave canônica (`?storageId=%20media` é `"media"`). Ausente para a fonte padrão, seja como for que a requisição a nomeie (sem parâmetro, vazio ou `(default)`) |
 | `data` | Acesso de leitura confiável que **ignora RLS** — `data.collection(slug).find(query)` / `.findById(id)`. A propriedade do recurso reside em uma linha, e não no prefixo de uma chave, portanto o hook precisa de um leitor para responder "quem é o dono deste objeto?". Ele ignora a segurança em nível de linha deliberadamente: este hook *é* a decisão de autorização, e fazê-la por meio de um leitor já limitado pelas permissões do próprio chamador criaria uma dependência circular. Somente leitura por concepção. |
 
 Retorne `false` para negar o acesso com um erro **403**. Lançar um erro também nega o acesso — uma consulta de propriedade que falha não concede acesso acidentalmente.
@@ -503,6 +503,7 @@ Retorne `false` para negar o acesso com um erro **403**. Lançar um erro também
 Vale a pena saber:
 
 - **A rota de metadados é onde o acesso de leitura é realmente decidido.** Ela emite o token de download de curta duração e com escopo de caminho que a rota de arquivos valida, logo o hook atua nela. Requisições que já carregam tal token, ou que atingem um caminho público declarado, ignoram o hook — o token já foi emitido sob suas regras e é válido apenas para o seu próprio caminho.
+- **Um caminho é público quando a chave que ele nomeia é.** O prefixo `public/` é testado na chave canônica que a rota serve — depois de ler um segmento de bucket `default/` inicial e de recolher `//`, `./` e uma `/` inicial —, nunca na URL como foi escrita. `/api/storage/file/notes://public/x.txt` nomeia a chave privada `notes:/public/x.txt`, e a chave `default/public/x.txt` (alcançada como `/api/storage/file/default/default/public/x.txt`) fica numa pasta chamada `default`; nenhuma das duas é pública. Num hook, teste a `key` que você recebe com `isPublicStorageKey` de `@rebasepro/types` — `isPublicStoragePath` lê um caminho ou URL do lado do cliente, e considera ambos públicos.
 - **O `list` é controlado no prefixo.** Listar é a forma de descobrir chaves que ninguém informou a você.
 - **Uploads retomáveis (TUS) são controlados no momento da criação**, de forma que um upload negado não deixa nenhum arquivo temporário para trás.
 - Omitir o hook preserva o comportamento anterior, de modo que aplicativos single-tenant não são afetados.

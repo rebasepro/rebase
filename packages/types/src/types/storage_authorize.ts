@@ -25,7 +25,11 @@ export interface StorageAuthorizeContext {
     operation: StorageOperation;
     /** Null when the route allows unauthenticated access. */
     user: StorageAuthorizeUser | null;
-    /** Named backend the request targeted, when one was given. */
+    /**
+     * Named backend the request targeted, when one was given — as its canonical
+     * key, the one the request is served from (`" media "` arrives as
+     * `"media"`). Absent for the default source, however the request named it.
+     */
     storageId?: string;
     /**
      * Trusted, RLS-bypassing data access, so the hook can answer the question it

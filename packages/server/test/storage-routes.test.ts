@@ -14,16 +14,17 @@ import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { DefaultStorageRegistry } from "../src/storage/storage-registry";
-import { createStorageRoutes, extractWildcardPath } from "../src/storage/routes";
+import { createStorageRoutes } from "../src/storage/routes";
+import { storageRequestWildcard } from "../src/storage/requested-object";
 import { configureJwt, generateDownloadToken } from "../src/auth/jwt";
 
 // ──────────────────────────────────────────────────────────────────────
-// Unit tests for extractWildcardPath
+// Unit tests for storageRequestWildcard
 // ──────────────────────────────────────────────────────────────────────
 
-describe("extractWildcardPath", () => {
+describe("storageRequestWildcard", () => {
     it("should extract path after the route prefix", () => {
-        const result = extractWildcardPath({
+        const result = storageRequestWildcard({
             req: {
                 path: "/api/storage/metadata/default/author_pictures/photo.jpg",
                 routePath: "/api/storage/metadata/*"
@@ -33,7 +34,7 @@ describe("extractWildcardPath", () => {
     });
 
     it("should extract simple file path", () => {
-        const result = extractWildcardPath({
+        const result = storageRequestWildcard({
             req: {
                 path: "/api/storage/file/testfile.jpg",
                 routePath: "/api/storage/file/*"
@@ -43,7 +44,7 @@ describe("extractWildcardPath", () => {
     });
 
     it("should return empty string for trailing-slash-only path", () => {
-        const result = extractWildcardPath({
+        const result = storageRequestWildcard({
             req: {
                 path: "/api/storage/metadata/",
                 routePath: "/api/storage/metadata/*"
@@ -53,7 +54,7 @@ describe("extractWildcardPath", () => {
     });
 
     it("should return empty string when path equals prefix (no trailing slash)", () => {
-        const result = extractWildcardPath({
+        const result = storageRequestWildcard({
             req: {
                 path: "/api/storage/metadata",
                 routePath: "/api/storage/metadata/*"
@@ -63,7 +64,7 @@ describe("extractWildcardPath", () => {
     });
 
     it("should handle deeply nested paths", () => {
-        const result = extractWildcardPath({
+        const result = storageRequestWildcard({
             req: {
                 path: "/api/storage/file/bucket/a/b/c/d/file.png",
                 routePath: "/api/storage/file/*"
@@ -73,7 +74,7 @@ describe("extractWildcardPath", () => {
     });
 
     it("should handle paths with spaces and special chars", () => {
-        const result = extractWildcardPath({
+        const result = storageRequestWildcard({
             req: {
                 path: "/api/storage/file/default/photos/my%20file%20(1).png",
                 routePath: "/api/storage/file/*"

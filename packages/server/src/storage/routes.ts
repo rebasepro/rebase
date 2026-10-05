@@ -14,7 +14,7 @@ import type { Stats } from "node:fs";
 import { StorageController, type StorageAuthorize, type StorageAuthorizeData, type StorageOperation } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
-import { DEFAULT_STORAGE_SOURCE_KEY, isAnonymousUid, isPublicStoragePath, scopeGrants, type DownloadConfig, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
+import { DEFAULT_STORAGE_SOURCE_KEY, isAnonymousUid, isPublicStorageKey, scopeGrants, type DownloadConfig, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
 import {
     assertUploadWithinPathLimits,
     assertUploadWithinPropertyLimits,
@@ -30,9 +30,12 @@ import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
 import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
+import { storageRequestWildcard } from "./requested-object";
 import { canonicalStorageId, InvalidListOptionsError } from "./keys";
 import {
     canonicalKeyOrBadRequest,
+    requestedObjectOrBadRequest,
+    objectOfPathOrBadRequest,
     canonicalBucketOrBadRequest,
     servedBucketOrRefuse,
     writableBucketOrRefuse,
@@ -326,28 +329,6 @@ function downloadTokenTtlOrThrow(value: number | undefined): number {
 }
 
 /**
- * Extract the wildcard portion of a route path from the full request path.
- *
- * Hono's `c.req.param('*')` does not work reliably in sub-routers mounted
- * via `app.route(prefix, subRouter)`. Instead we derive the wildcard value
- * from the fully-resolved `c.req.path` and `c.req.routePath`.
- *
- * For a route `/metadata/*` mounted at `/api/storage`, a request to
- * `/api/storage/metadata/default/file.jpg` yields routePath
- * `/api/storage/metadata/*`.  We strip the prefix (everything before `/*`)
- * plus one character for the trailing `/` to obtain `default/file.jpg`.
- */
-export function extractWildcardPath(c: { req: { path: string; routePath: string } }): string {
-    const routePath = c.req.routePath; // e.g. "/api/storage/metadata/*"
-    const prefix = routePath.replace("/*", ""); // e.g. "/api/storage/metadata"
-    const fullPath = c.req.path; // e.g. "/api/storage/metadata/default/file.jpg"
-    const idx = fullPath.indexOf(prefix);
-    if (idx < 0) return "";
-    // +1 to skip the '/' after the prefix
-    return fullPath.substring(idx + prefix.length + 1);
-}
-
-/**
  * Parse a listing's `maxResults`, answering 400 unless it is a whole number of
  * at least 1.
  *
@@ -477,6 +458,12 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         bucket: string,
         storageId?: string | null
     ): Promise<void> => {
+        // The source the request is served from — the registry resolves the
+        // controller through this same function — rather than the id as it was
+        // spelled. ` private` and `private` reach one controller, and a check
+        // that compared the spelling approved the one while the other served.
+        const source = canonicalStorageId(storageId);
+
         // A narrowed credential — an API key, a token — needs the storage
         // scope for this operation on this source. Here, because only here is
         // the source known: it may arrive in the query, a form field or the
@@ -484,7 +471,6 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const narrowed = c.get("scopes");
         if (narrowed) {
             const scope = `storage:${operation === "list" ? "read" : operation}`;
-            const source = canonicalStorageId(storageId);
             if (!scopeGrants(narrowed, scope, source)) {
                 throw new ApiError(403, "SCOPE_MISSING",
                     `This credential does not hold "${scope}" for storage source "${source}".`,
@@ -512,7 +498,10 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 bucket,
                 operation,
                 user,
-                storageId: storageId ?? undefined,
+                // Absent for the default source however it was asked for (no
+                // parameter, empty, `(default)`), as the context type promises
+                // and as the SDK sends it.
+                storageId: source === DEFAULT_STORAGE_SOURCE_KEY ? undefined : source,
                 data: authorizeData?.()
             });
         } catch {
@@ -624,38 +613,6 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         };
 
     /**
-     * Parse bucket and path from a combined file path.
-     *
-     * The resolved path is canonicalized here — by the same function the upload
-     * route applies to incoming keys — so read, delete, metadata and folder
-     * routes agree with the write side about what a key means before it reaches
-     * the controller, the authorize hook, or the download token it mints.
-     *
-     * A key that cannot be canonicalized (a real `..` segment, a null byte) is
-     * a 400, not a repaired key. The `LocalStorageController` traversal guard
-     * (`getFullPath`) is the load-bearing defence for the *storage root*, and
-     * `canonicalStorageBucket` for the bucket the caller names; this is what
-     * defends the boundary the hook drew inside them.
-     */
-    const parseBucketAndPath = (filePath: string): { bucket: string; resolvedPath: string } => {
-        const parts = filePath.split("/");
-
-        // Only recognize 'default' as an explicit bucket prefix
-        if (parts.length > 1 && parts[0].toLowerCase() === "default") {
-            return {
-                bucket: "default",
-                resolvedPath: canonicalKeyOrBadRequest(parts.slice(1).join("/"))
-            };
-        }
-
-        // All other paths use 'default' bucket with the full path
-        return {
-            bucket: "default",
-            resolvedPath: canonicalKeyOrBadRequest(filePath)
-        };
-    };
-
-    /**
      * POST /upload - Upload a file
      * Body: multipart/form-data with 'file' field
      * Request body can also contain metadata keys 'metadata_*'
@@ -755,16 +712,15 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // ports (dev) or domains (CDN) can render images via <img>.
         c.header("Cross-Origin-Resource-Policy", "cross-origin");
 
-        const rawPath = extractWildcardPath(c);
+        const rawPath = storageRequestWildcard(c);
         if (!rawPath) {
             throw ApiError.notFound("File not found");
         }
 
-        const filePath = decodeURIComponent(rawPath);
         const storageId = c.req.query("storageId");
         const resolved = resolveController(storageId);
 
-        const { bucket, resolvedPath } = parseBucketAndPath(filePath);
+        const { bucket, key: resolvedPath } = requestedObjectOrBadRequest(rawPath);
         await checkAuthorized(c, "read", resolvedPath, bucket, storageId);
 
         // The stored content type is the uploader's claim; never sniff past
@@ -788,7 +744,10 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // prefix needs no credentials, so a CDN holding it is the point; any
         // other object required this caller's credentials, and `public` would
         // be permission to serve it to the next caller instead.
-        const sharedCacheable = publicRead === true || isPublicStoragePath(resolvedPath);
+        // Judged on the key, by the key's predicate: `isPublicStoragePath` reads a
+        // leading `default/` as a bucket, and here it is a folder in the key — so
+        // the private `default/public/x` went out marked `public`.
+        const sharedCacheable = publicRead === true || isPublicStorageKey(resolvedPath);
         const cachePolicy = (maxAgeSeconds: number) => ({
             isPublic: sharedCacheable,
             maxAgeSeconds,
@@ -983,15 +942,14 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * GET /metadata/* - Get file metadata
      */
     router.get("/metadata/*", fileTokenAuth, publicObjectAuth, readAuthMiddleware, async (c) => {
-        const rawPath = extractWildcardPath(c);
+        const rawPath = storageRequestWildcard(c);
         if (!rawPath) {
             return c.json({ data: null, fileNotFound: true }, 404);
         }
 
-        const filePath = decodeURIComponent(rawPath);
         const storageId = c.req.query("storageId");
         const resolved = resolveController(storageId);
-        const { bucket, resolvedPath } = parseBucketAndPath(filePath);
+        const { bucket, key: resolvedPath } = requestedObjectOrBadRequest(rawPath);
 
         // A download token cannot buy another download token.
         //
@@ -1036,8 +994,9 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         }
 
         if (downloadConfig.metadata) {
-            const scopedPath = `${bucket}/${resolvedPath}`;
-            if (isPublicStoragePath(scopedPath)) {
+            // The same predicate on the same key as `publicObjectAuth`, which let
+            // an anonymous caller this far only if it holds.
+            if (isPublicStorageKey(resolvedPath)) {
                 // Public object: served token-less via a permanent URL.
                 downloadConfig.metadata.public = true;
             } else {
@@ -1050,7 +1009,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 // their rate-limit allowance and not to the reader's address.
                 const minter = principal?.uid;
                 downloadConfig.metadata.token = await generateDownloadToken(
-                    scopedPath,
+                    `${bucket}/${resolvedPath}`,
                     downloadTokenTtl,
                     storageId,
                     minter && minter !== "public" && !isAnonymousUid(minter) ? minter : undefined
@@ -1066,15 +1025,14 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * DELETE /file/* - Delete a file
      */
     router.delete("/file/*", writeAuthMiddleware, async (c) => {
-        const rawPath = extractWildcardPath(c);
+        const rawPath = storageRequestWildcard(c);
         if (!rawPath) {
             return c.json({ message: "No file to delete" });
         }
 
-        const filePath = decodeURIComponent(rawPath);
         const storageId = c.req.query("storageId");
         const resolved = resolveController(storageId);
-        const { bucket, resolvedPath } = parseBucketAndPath(filePath);
+        const { bucket, key: resolvedPath } = requestedObjectOrBadRequest(rawPath);
 
         await checkAuthorized(c, "delete", resolvedPath, bucket, storageId);
 
@@ -1148,12 +1106,12 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         }
 
         const resolved = resolveController(storageId);
-        const { resolvedPath } = parseBucketAndPath(folderPath);
+        const { key: resolvedPath } = objectOfPathOrBadRequest(folderPath);
 
         // The documented `bucket` body field, read for the first time.
         //
         // The docblock above has always said `Body: { path, bucket? }`, and the
-        // handler never looked at it: it took whatever `parseBucketAndPath`
+        // handler never looked at it: it took whatever the path parser
         // returned, which is `"default"` for every input that is not literally
         // prefixed `default/`. So `POST /folder { path: "reports", bucket:
         // "media" }` answered 201 and created the folder in the default bucket

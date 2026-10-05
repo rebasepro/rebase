@@ -13,6 +13,7 @@
 import { ApiError } from "../api/errors";
 import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError } from "./keys";
 import { isRenditionKey, RENDITION_PREFIX } from "./rendition-cache";
+import { requestedStorageObject, storageObjectOfPath, type RequestedStorageObject } from "./requested-object";
 import type { StorageController } from "./types";
 
 /**
@@ -26,14 +27,42 @@ import type { StorageController } from "./types";
  * See `keys.ts` for why an unacceptable key is refused rather than repaired.
  */
 export function canonicalKeyOrBadRequest(key: string): string {
+    return addressableOrBadRequest(() => canonicalStorageKey(key));
+}
+
+/**
+ * The object a `/file/*`, `/metadata/*` or `DELETE /file/*` request's wildcard
+ * path names, answering 400 when it names none.
+ *
+ * Derived by {@link requestedStorageObject}, the function `publicObjectAuth`
+ * and `fileTokenAuth` derive it with, so the key the route acts on is the key
+ * they decided about.
+ */
+export function requestedObjectOrBadRequest(wildcard: string): RequestedStorageObject {
+    return addressableOrBadRequest(() => requestedStorageObject(wildcard));
+}
+
+/**
+ * {@link requestedObjectOrBadRequest} for a path that is already text rather
+ * than a URL path — the folder route's JSON body.
+ */
+export function objectOfPathOrBadRequest(path: string): RequestedStorageObject {
+    return addressableOrBadRequest(() => storageObjectOfPath(path));
+}
+
+/**
+ * Run a canonicalization, refuse what it yields when that is the reserved
+ * rendition space, and turn either refusal into a 400.
+ */
+function addressableOrBadRequest<T extends string | RequestedStorageObject>(canonicalize: () => T): T {
     try {
-        const canonical = canonicalStorageKey(key);
+        const canonical = canonicalize();
         // The rendition space is not addressable by callers, in either
         // direction. Reading one would serve a derivative of a source object
         // without the source's key ever reaching `storageAuthorize` or the
         // declarative policies — both of which reason about that key — and
         // writing one would let a caller choose what a later transform serves.
-        if (isRenditionKey(canonical)) {
+        if (isRenditionKey(typeof canonical === "string" ? canonical : canonical.key)) {
             throw new InvalidStorageKeyError(
                 `"${RENDITION_PREFIX}" is reserved for derived image renditions and cannot be ` +
                 "read or written directly."

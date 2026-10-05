@@ -1,6 +1,6 @@
 import { MiddlewareHandler, Context } from "hono";
 import { judgeAccessToken, type AccessJudgeRepository } from "./token-revocation";
-import { ANONYMOUS_USER_ID, DataDriver, hasAdminRole, isPublicStoragePath } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, DataDriver, hasAdminRole, isPublicStorageKey } from "@rebasepro/types";
 import { verifyAccessToken, AccessTokenPayload, isJwtConfigured, verifyDownloadToken, type DownloadTokenPayload } from "./jwt";
 import type { HonoEnv } from "../api/types";
 import { ApiError, errorHandler } from "../api/errors";
@@ -10,11 +10,12 @@ import { isApiKeyToken, validateApiKey } from "./api-keys/api-key-middleware";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
 import { logger } from "../utils/logger";
 import { extractBearerToken } from "./bearer-token";
-// A leaf module (node:path and `@rebasepro/types` only), so this does not close
-// an import cycle with `storage/routes.ts` — which is the point: both sides of
-// the token comparison must derive the key, and the source it belongs to, with
-// the same functions, not with two copies of one rule.
-import { canonicalStorageId, tryCanonicalStorageKey } from "../storage/keys";
+// Leaf modules (`@rebasepro/types` only), so these do not close an import cycle
+// with `storage/routes.ts` — which is the point: the route, the public check and
+// both sides of the token comparison derive the object, and the source it
+// belongs to, with the same functions, not with copies of one rule.
+import { canonicalStorageId } from "../storage/keys";
+import { storageRequestWildcard, tryRequestedStorageObject } from "../storage/requested-object";
 
 // Re-exported from here because this is where callers look for it; the separate
 // module exists only so `api-key-middleware` can use it without closing an
@@ -546,18 +547,21 @@ export const queryTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
  * requested object path is public, it sets a minimal "public" principal so the
  * downstream `requireAuth` gate lets the read through. Private paths are left
  * untouched, so they still require a valid token.
+ *
+ * Public means the object the route will serve is public, so the decision is
+ * made on that object's canonical key, derived by the route's own function
+ * (`requestedStorageObject`). It used to be made on the raw path, through a
+ * check that strips a `scheme://`: `notes://public/secret.txt` read as
+ * `public/secret.txt` here while the route served the private
+ * `notes:/public/secret.txt`, and the authorize hook — not asked about this
+ * principal — never saw it.
  */
 export const publicObjectAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
     // Already authenticated (Bearer / scoped token) — nothing to authorize.
     if (c.get("user")) return next();
 
-    const routePath = c.req.routePath;          // e.g. "/api/storage/file/*"
-    const prefix = routePath.replace("/*", "");
-    const fullPath = c.req.path;
-    const idx = fullPath.indexOf(prefix);
-    const rawPath = idx < 0 ? "" : fullPath.substring(idx + prefix.length + 1);
-
-    if (rawPath && isPublicStoragePath(decodeURIComponent(rawPath))) {
+    const requested = tryRequestedStorageObject(storageRequestWildcard(c));
+    if (requested && isPublicStorageKey(requested.key)) {
         c.set("user", { uid: "public", roles: ["public"] });
     }
 
@@ -582,7 +586,7 @@ export const publicObjectAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
  * Hono routes the request, so this comparison already runs on a resolved path.
  * But that is a guarantee of the runtime rather than of this code, and it is
  * one line to not depend on it. The same rule already guards the public-object
- * path — see `isPublicStoragePath`.
+ * path — see `isPublicStorageKey`.
  */
 export function isPathMatch(requested: string, allowed: string): boolean {
     if (requested.split("/").some((seg) => seg === "..")) return false;
@@ -604,40 +608,6 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
     const authHeader = c.req.header("authorization");
     const queryToken = c.req.query("token");
 
-    // Local copy of helper to avoid circular imports with routes.ts
-    const extractWildcard = (ctx: import("hono").Context): string => {
-        const routePath = ctx.req.routePath;
-        const prefix = routePath.replace("/*", "");
-        const fullPath = ctx.req.path;
-        const idx = fullPath.indexOf(prefix);
-        if (idx < 0) return "";
-        return fullPath.substring(idx + prefix.length + 1);
-    };
-
-    /**
-     * Must agree with `parseBucketAndPath` in `storage/routes.ts`, because the
-     * path a token GRANTS is minted there and the path a request ASKS FOR is
-     * derived here. `/metadata` canonicalizes before signing, so a raw
-     * comparison here would 403 an otherwise-valid request for any key whose
-     * URL form is not already canonical (`a//b.txt`, `a/./b.txt`).
-     *
-     * A key that cannot be canonicalized yields null, which matches no grant —
-     * the same fail-closed answer `isPathMatch` gives a `..` segment.
-     */
-    const parseBucketPath = (filePath: string): { bucket: string; resolvedPath: string | null } => {
-        const parts = filePath.split("/");
-        if (parts.length > 1 && parts[0].toLowerCase() === "default") {
-            return {
-                bucket: "default",
-                resolvedPath: tryCanonicalStorageKey(parts.slice(1).join("/"))
-            };
-        }
-        return {
-            bucket: "default",
-            resolvedPath: tryCanonicalStorageKey(filePath)
-        };
-    };
-
     /**
      * Decide what a valid download token entitles this request to.
      *
@@ -656,14 +626,19 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
         // it holds even for a path the token genuinely covers.
         if (canonicalStorageId(c.req.query("storageId")) !== payload.storageId) return "deny-storage";
 
-        const rawPath = extractWildcard(c);
+        const rawPath = storageRequestWildcard(c);
         if (!rawPath) return "no-path";
 
-        const filePath = decodeURIComponent(rawPath);
-        const { bucket, resolvedPath } = parseBucketPath(filePath);
-        if (resolvedPath === null) return "deny-path";
+        // The path a token GRANTS is minted by `/metadata` from the object the
+        // route derives, and the path a request ASKS FOR is derived here — by
+        // the same function, so a key whose URL form is not already canonical
+        // (`a//b.txt`, `a/./b.txt`) matches the grant it was minted with. A
+        // path that names no object matches no grant, the same fail-closed
+        // answer `isPathMatch` gives a `..` segment.
+        const requested = tryRequestedStorageObject(rawPath);
+        if (requested === null) return "deny-path";
 
-        return isPathMatch(`${bucket}/${resolvedPath}`, payload.path) ? "grant" : "deny-path";
+        return isPathMatch(`${requested.bucket}/${requested.key}`, payload.path) ? "grant" : "deny-path";
     };
 
     /**
