@@ -62,6 +62,7 @@ import { assertKnownFlags, collectionsPathIn, parseDriverLine } from "./cli-flag
 import { assertCollectionsPathExists } from "./cli-collections-path";
 import { DESIRED_STATE_URL, GENERATED_SQL_DIR, generatedSqlDir, prepareGeneratedSqlDir } from "./generated-sql";
 import { backupActionOf } from "./backup-argv";
+import type { TableLockResult } from "./schema/ensure-collection-policies";
 
 import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
 
@@ -681,8 +682,12 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 throw err;
             }
             out("");
-            
+
             if (databaseUrl) {
+                // First, before anything below can fail. Atlas has just
+                // committed any new table with RLS off and the user role
+                // already holding DML on it; every later step may refuse.
+                await lockManagedTables(databaseUrl, collectionsPath);
                 await ensureAuthTables(databaseUrl, collectionsPath);
                 // After the tables exist and before the policies: the vector and
                 // search columns are `ALTER TABLE ... ADD COLUMN`, and a policy
@@ -746,6 +751,72 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
     } catch (err) {
         outWarn(chalk.yellow(`  ⚠️  Failed to bootstrap the RLS helper functions: ${err instanceof Error ? err.message : String(err)}`));
     }
+}
+
+/**
+ * Switch row-level security on for every table the collections declare, right
+ * after Atlas has applied the schema.
+ *
+ * Atlas cannot carry `ENABLE ROW LEVEL SECURITY` in `schema.sql`: its free tier
+ * neither plans it nor reads it back, so a table it creates is born with RLS
+ * off — and `rebase_user`, the role every authenticated request runs as, holds
+ * DML on it from that moment through the schema's default privileges. RLS used
+ * to arrive with the policies, the last step of the push; a refusal from the
+ * vector, search or trigger step in between left the new table readable and
+ * writable by every caller, with no policy, until a later push or boot fixed
+ * it — and a deployment with `REBASE_MIGRATE_ON_BOOT=none` never did. Locked
+ * first, a failure later leaves a table that denies, not one that is open.
+ *
+ * Fatal when a table cannot be locked, and before the steps that follow: the
+ * role provisioning at the end re-grants on every table in the schema, which
+ * would undo the revoke that is the fallback here.
+ */
+async function lockManagedTables(databaseUrl: string, collectionsPath: string): Promise<void> {
+    let unsecured: TableLockResult["unsecured"];
+    let userRole: string;
+    try {
+        const { lockCollectionTables } = await import("./schema/ensure-collection-policies");
+        const { loadCollections } = await import("./schema/doctor");
+        userRole = (await import("./security/rls-enforcement")).REBASE_USER_ROLE;
+        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const { Client } = await import("pg");
+        const client = new Client({ connectionString: databaseUrl });
+        await client.connect();
+        try {
+            ({ unsecured } = await lockCollectionTables(
+                { query: async (text) => ({ rows: (await client.query(text)).rows }) },
+                collections
+            ));
+        } finally {
+            await client.end();
+        }
+    } catch (err) {
+        outError(chalk.red(
+            `\n  ✗ The schema was applied, but row-level security could not be switched on for its tables: ` +
+            `${err instanceof Error ? err.message : String(err)}`
+        ));
+        outError(chalk.gray(
+            "    A table this push created may be readable and writable by every authenticated request\n" +
+            "    until it is. Re-run `rebase db push` — it locks every collection table before anything else."
+        ));
+        process.exit(1);
+    }
+    if (unsecured.length === 0) return;
+
+    outError(chalk.red("\n  ✗ The schema was applied, but row-level security could not be switched on for:"));
+    for (const u of unsecured) {
+        outError(chalk.red(`      ${u.table}: ${u.error}`));
+        outError(chalk.gray(u.grantWithdrawn
+            ? `        Its privileges were taken back from ${userRole}, so it is unreachable rather than unprotected.`
+            : `        ${userRole} still holds its privileges: every authenticated request can read and write every row.`));
+    }
+    outError(chalk.gray("    Nothing after the schema apply ran. Fix the cause — the connection role must own these\n" +
+        "    tables, or be able to ALTER them — and run `rebase db push` again, or as their owner:"));
+    for (const u of unsecured) {
+        const [schema, ...table] = u.table.split(".");
+        outError(chalk.bold(`      ALTER TABLE "${schema}"."${table.join(".")}" ENABLE ROW LEVEL SECURITY;`));
+    }
+    process.exit(1);
 }
 
 /**

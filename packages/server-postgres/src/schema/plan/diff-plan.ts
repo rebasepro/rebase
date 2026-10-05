@@ -28,7 +28,7 @@
  * already has*, and which of the planned constraints are safe to apply to it.
  */
 import type { ColumnPlan, SchemaPlan, TablePlan } from "./types";
-import { renderColumnDefinition, renderPgType, renderPrimaryKeyConstraint } from "./render-ddl";
+import { renderColumnDefinition, renderEnableRls, renderPgType, renderPrimaryKeyConstraint } from "./render-ddl";
 import { quoteSqlLiteral } from "./plan-schema";
 import { SET_UPDATED_AT_FN, triggerStatements } from "./updated-at-trigger";
 import {
@@ -126,7 +126,7 @@ export interface DiffOptions {
 }
 
 export interface EnsureAction {
-    kind: "create-enum" | "create-table" | "add-column" | "add-constraint" | "rename-column"
+    kind: "create-enum" | "create-table" | "enable-rls" | "add-column" | "add-constraint" | "rename-column"
         | "create-extension" | "create-function" | "create-index" | "comment-column"
         | "add-enum-value" | "set-not-null" | "drop-not-null" | "set-default" | "create-trigger";
     /** Qualified target, for logging: `public.posts` or `public.posts.title`. */
@@ -265,6 +265,26 @@ const isKeyColumn = (table: TablePlan, column: ColumnPlan): boolean =>
 const isScalarProperty = (table: TablePlan, column: ColumnPlan): boolean =>
     (column.source.kind === "property" || column.source.kind === "implicit-id") && !isKeyColumn(table, column);
 
+/**
+ * `ENABLE ROW LEVEL SECURITY` on a table this plan has just created — the
+ * statement immediately after its `CREATE TABLE`, never later.
+ *
+ * The user role every authenticated request runs as holds DML on a new table
+ * the moment it exists: the schema's default privileges grant it, and boot's
+ * `ensureAppRole` grants it on every table before the policies run. The
+ * policies — which also switch RLS on — come after the driver and auth have
+ * initialised, so any failure in between left a table with full DML and no row
+ * filtering, served by every process in the deployment that does not
+ * provision. Born locked, a table denies until its policies arrive, which is
+ * the state a failure is allowed to leave behind. Idempotent, so a table a
+ * concurrent boot created gets the same statement and nothing changes.
+ */
+const lockAction = (table: TablePlan): EnsureAction => ({
+    kind: "enable-rls",
+    target: table.qualified,
+    sql: renderEnableRls(table)
+});
+
 export function diffPlanAgainstCatalogue(
     plan: SchemaPlan,
     existing: ExistingSchema,
@@ -360,6 +380,7 @@ export function diffPlanAgainstCatalogue(
             target: table.qualified,
             sql: `CREATE TABLE IF NOT EXISTS "${schema}"."${name}" (${definitions.join(", ")});`
         });
+        actions.push(lockAction(table));
     }
 
     // 2b. Junction tables behind many-to-many relations. No collection declares
@@ -379,6 +400,7 @@ export function diffPlanAgainstCatalogue(
             sql: `CREATE TABLE IF NOT EXISTS "${table.schema}"."${table.table}" (${columns}` +
                 `, ${renderPrimaryKeyConstraint(table)});`
         });
+        actions.push(lockAction(table));
     }
 
     const addColumn = (table: TablePlan, column: string, definition: string): void => {

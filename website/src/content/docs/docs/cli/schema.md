@@ -107,6 +107,9 @@ rebase db push
   change that can lose values (`timestamptz` → `date`, `numeric` → `integer`).
   It asks on a terminal and refuses otherwise; `--allow-destructive` (or
   `--yes`) applies it anyway
+- Switches row-level security on for every collection table, junctions included, right after the
+  schema change and before any step that can fail, so a push that stops part-way leaves a new table
+  denying every request rather than open to it
 - Applies your collections' RLS policies, and **removes policies an earlier push superseded**
 - Does **not** create migration files
 
