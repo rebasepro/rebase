@@ -535,6 +535,7 @@ function isLazyComponentRef
 function isManyToMany
 function isMongoDBCollectionConfig
 function isPostgresCollectionConfig
+function isPublicStorageKey
 function isPublicStoragePath
 function isRelationAggregateSort
 function isRelationalCollectionConfig
@@ -1102,6 +1103,7 @@ interface OfflineApi { clear, onQueueChange, onStatusChange, pending, status, sy
 interface OfflineCacheEntry { cachedAt, value }
 interface OfflineCacheRecord { cachedAt, key, value }
 interface OfflineConfig { crossTab, maxCachedQueriesPerCollection, maxCachedRowsPerCollection, maxRetries, onSyncError, store, syncIntervalMs }
+interface OfflineQueueOptions { orphaned }
 interface OfflineStatus { lastError, lastSyncedAt, online, pending, syncing }
 interface OfflineStore { clear, deleteCache, dequeue, enqueue, getCache, listCache, listCacheEntries, listQueue, setCache, setCacheMany }
 interface PageWalkOptions { cursor, maxPages, pageSize }

@@ -3926,6 +3926,13 @@ yet, listed so that nobody reads a promise into them:
   by `db push`. An X account can now replace its placeholder address, which
   also no longer receives the welcome mail.
 
+##### Client SDK
+
+- `client.offline.pending({ orphaned: true })` and
+  `client.offline.clear({ orphaned: true })` (`OfflineQueueOptions`). Writes
+  queued while nobody was signed in are never replayed as whoever signs in;
+  these list them so the app can re-issue or discard them.
+
 #### Changed
 
 ##### Studio
@@ -3964,6 +3971,13 @@ yet, listed so that nobody reads a promise into them:
 - **A boot-provisioned database whose bundle listed a two-sided
   many-to-many's "later" collection first gets one junction primary-key
   rebuild on its next `rebase db push`, then none.**
+
+- **`rebase db push` treats a primary key change as destructive.** Changing a
+  collection's key, such as `(id)` → `(id, locale)` or moving it to another
+  column, gives every row a new id, and push applied it without asking, even
+  in CI. It now asks on a terminal, refuses elsewhere unless you pass
+  `--allow-destructive`, and says what changes: URLs, foreign keys and ids
+  stored elsewhere stop finding their row.
 
 ##### Client SDK
 
@@ -4365,6 +4379,18 @@ yet, listed so that nobody reads a promise into them:
   `driver`. Form actions copy and delete by the slug, so a delete can no
   longer reach the Postgres collection of the same name.
 
+- A JSON file exported from a collection imports its geopoints, key-value maps
+  and vectors back; before, they were dropped without a word. A nested key in a
+  JSON file is mapped under the map its parent matched, such as
+  `Home Address` → `home_address.street_name`.
+
+- A CSV exported from a collection imports back its vectors, its block lists
+  written one cell per item, the dates inside arrays of maps and fixed lists,
+  and times of day exported as timestamps.
+
+- In the import's mapping step, a key-value map can be chosen as a column's
+  target.
+
 ##### Studio
 
 - **The source-only schema editor no longer overwrites edits made on disk
@@ -4467,6 +4493,22 @@ yet, listed so that nobody reads a promise into them:
   across instances.** Readers could previously see message N+1 before N,
   and the SDK would drop N.
 
+- Without change capture (`REALTIME_CDC=off`, or a database role that cannot
+  create triggers), the cross-instance LISTEN connection is checked by a
+  heartbeat. A connection that goes half-open — an idle-flow timeout on a load
+  balancer or a NAT — is replaced within about 45 s and every subscription is
+  refetched; a database that cannot be reached at startup is retried. `/health`
+  lists the connection as `cross-instance` while it is down and fails after
+  60 s down. Before, writes made on other instances silently stopped arriving.
+
+- The server pings every realtime socket every 30 s and drops one that has
+  not answered by the next ping, and drops a socket with more than 16 MiB of
+  unread frames queued. A dropped socket's subscriptions, channels and presence
+  are cleaned up as on a normal close. Before, a client that vanished without
+  closing (lost signal, sleep) kept its subscriptions refetched on every write
+  for about two hours. Clients that speak the protocol directly must answer
+  pings, which every standard WebSocket library does.
+
 ##### Client SDK
 
 - **A generated SDK lints clean.** A collection with no relations was emitted
@@ -4519,6 +4561,17 @@ yet, listed so that nobody reads a promise into them:
 
 - **One refused field in a merged offline edit no longer rolls back the
   user's other edits in that write.**
+
+- With `offline` on, a write made while the session is still being restored on
+  load is queued for the user the session turns out to be. In cookie mode every
+  page load has this window, and a write made in it was queued as the
+  signed-out user's, where no sign-in ever replayed it; reads in that window
+  showed the signed-out local database instead of the user's. Offline reads and
+  writes now wait for `auth.isInitialized()`.
+
+- With `offline` on, a stored session whose refresh is refused on load no
+  longer leaves that user's cached rows readable, or their outbox writable, by
+  the now signed-out client.
 
 ##### Auth
 
@@ -4631,6 +4684,16 @@ yet, listed so that nobody reads a promise into them:
   server. The image now installs `ts-morph` 28.0.0, the version the server
   pins.
 
+##### Storage & email
+
+- A storage path with a `%` that begins no escape
+  (`/api/storage/metadata/100%-done.txt`) answers `400 INVALID_STORAGE_KEY`
+  instead of 500.
+
+- `/api/storage/file/DEFAULT/public/x`, `public//x` and `.%2Fpublic/x` are
+  served anonymously like `public/x`. The route already served that object;
+  the public check refused it.
+
 #### Security
 
 ##### Realtime
@@ -4675,6 +4738,26 @@ yet, listed so that nobody reads a promise into them:
   allowance;** the server's own `rebase.storage` calls are never
   rate-limited; and a refused bearer token is no longer partly written to
   the error log.
+
+- **A private file whose key contains `<word>:/public/` can no longer be read
+  anonymously as `GET /api/storage/file/<word>://public/…`.** The "is this
+  public?" check read the URL path and stripped what it took for a scheme,
+  while the route served the canonical key, which is private: a hook that
+  denied every read was never asked, and `/metadata` minted a download token
+  for it. The check now runs on the key the route serves. `storageAuthorize`
+  hooks should test `key` with the new `isPublicStorageKey` from
+  `@rebasepro/types`; `isPublicStoragePath` stays for client-side paths and
+  URLs.
+
+- **A private file under a folder named `default` (key `default/public/x`) is
+  no longer served with `Cache-Control: public`,** and new projects'
+  `config/storage.ts` hook no longer treats it as world-readable.
+
+- **`storageAuthorize` and policy predicates receive the storage source the
+  request is served from.** `?storageId=%20private` reached the hook as
+  `" private"` while the `private` source served, deleted or took the write.
+  The default source is now always `undefined`, including for `?storageId=`
+  and `?storageId=(default)`.
 
 ##### MCP
 
@@ -4744,6 +4827,26 @@ yet, listed so that nobody reads a promise into them:
   attacker's refresh token minting access tokens. It now deletes the refresh
   tokens and outstanding reset links and stamps `tokens_valid_after` in the
   same transaction, as the API reset does.
+
+##### Postgres
+
+- **A `rebase db push` that fails part-way no longer leaves the tables it just
+  created open to every caller.** Row-level security was switched on by the
+  policies step, last, while `rebase_user` already held read and write on a
+  new table through the schema's default privileges; a push stopped by a
+  refused `search` block change, a vector or trigger error, or a policy that
+  would not compile left the table readable and writable by every
+  authenticated request — for good with `REBASE_MIGRATE_ON_BOOT=none`. Push now
+  turns RLS on for every collection and junction table straight after the
+  schema change, before any step that can fail, so a failed push leaves new
+  tables refusing requests until their policies arrive. Tables created at boot
+  and by the live schema editor have RLS on from the moment they are created.
+
+- **A collection table boot could not switch row-level security on for stays
+  closed.** Boot revoked the role's access to such a table and reported it as
+  closed, then its last step granted every authenticated request read and
+  write on every table again, with no row filtering. The table now stays
+  closed, and boot refuses to start if it cannot keep it closed.
 
 ### [0.23.0] - 2026-09-27
 
@@ -23151,7 +23254,7 @@ await initializeRebaseBackend({
 | `bucket` | Resolved bucket (`"default"` when unspecified) |
 | `operation` | `"read"`, `"write"`, `"delete"` or `"list"` |
 | `user` | `{ uid, email?, roles? }`, or `null` where the route allows anonymous access |
-| `storageId` | The named backend, when the request targeted one |
+| `storageId` | The named backend, when the request targeted one — its canonical key (`storageId=%20media` is `"media"`). Absent for the default source, however the request named it (no parameter, empty, or `(default)`) |
 | `data` | Trusted, **RLS-bypassing** read access — `data.collection(slug).find(query)` / `.findById(id)`. Ownership lives in a row, not in a key prefix, so the hook needs a reader to answer "who owns this object?". It bypasses row-level security deliberately: this hook *is* the authorization decision, and making it through a reader already narrowed by the caller's own permissions would be circular. Read-only by design. |
 
 Return `false` to deny with a **403**. Throwing also denies — an ownership lookup that fails does not fall open.
@@ -23159,6 +23262,7 @@ Return `false` to deny with a **403**. Throwing also denies — an ownership loo
 Worth knowing:
 
 - **The metadata route is where read access is really decided.** It mints the short-lived path-scoped download token that the file route trusts, so the hook gates it there. Requests already carrying such a token, or hitting a declared public path, skip the hook — the token was minted under it and is valid only for its own path.
+- **A path is public when the key it names is.** The `public/` prefix is tested on the canonical key the route serves — after a leading `default/` bucket segment is read off and `//`, `./` and a leading `/` are folded away — never on the URL as written. `/api/storage/file/notes://public/x.txt` names the private key `notes:/public/x.txt`, and the key `default/public/x.txt` (reached as `/api/storage/file/default/default/public/x.txt`) lies in a folder called `default`; neither is public. In a hook, test the `key` you are handed with `isPublicStorageKey` from `@rebasepro/types` — `isPublicStoragePath` reads a client-side path or URL, and reads both of those as public.
 - **`list` is gated on the prefix.** Listing is how you discover keys nobody told you about.
 - **Resumable (TUS) uploads are gated at create time**, so a denied upload leaves no temp file behind.
 - Omitting the hook preserves the previous behaviour, so single-tenant apps are unaffected.
@@ -24013,6 +24117,28 @@ A subscription id is the socket's own: two clients that both name a
 subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the
 sender's.
 
+#### Sockets that stop answering
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A client can vanish without closing its socket: a phone loses
+signal, a laptop goes to sleep, a NAT forgets the connection. No close frame
+arrives, so nothing tells the server. The server therefore pings every socket
+every 30 seconds and terminates one that has not answered by the next ping, so
+a vanished client is let go of within a minute. Browsers and the SDK answer
+pings on their own; a client that speaks the protocol directly has to answer
+them too, as most WebSocket libraries do.
+
+A socket is also terminated when more than 16&nbsp;MiB of frames sent to it are
+still unread. That is a client that does not read what it is sent, or one so far
+behind that what it would read is stale.
+
+A terminated socket is cleaned up like a closed one. Its subscriptions end, it
+leaves its channels, and its presence is removed, with the departure announced
+to the other members. A client that is still there sees the connection drop,
+and the SDK [reconnects](#auto-reconnect) and subscribes again. On 0.23 such a
+socket stays open until the operating system gives up on the connection (about
+two hours on Linux), and every write to a collection it subscribes to still
+costs a refetch for it.
+
 ### Broadcast Channels
 
 Broadcast channels let clients send arbitrary messages to each other in real time — useful for features like typing indicators, cursor positions, or custom notifications.
@@ -24347,7 +24473,8 @@ When a record is modified on Instance A, it broadcasts a notification on the `re
 
 - **Self-Filtering**: Upon receiving a message, each instance reads the `sid`. If it matches its own instance ID, the server discards the notification to prevent infinite routing loops.
 - **Relay and Fan-out**: If the notification came from another instance, the server schedules a debounced refetch and relays the update to its locally connected WebSocket subscribers.
-- **Supervisor Reconnection Loop**: If the database connection drops, a background connection supervisor monitors the state and triggers an auto-reconnect sequence after a fixed **3-second** delay, restoring the `LISTEN` loop without affecting the main Hono application lifecycle.
+- **Supervisor Reconnection Loop**: If the database connection drops, a background connection supervisor monitors the state and triggers an auto-reconnect sequence after a fixed **3-second** delay, restoring the `LISTEN` loop without affecting the main Hono application lifecycle. Every live subscription on the instance is then refetched, because whatever was published while the connection was down reached nobody. If the database cannot be reached at startup, the connection is retried the same way.
+- **Heartbeat**: A `LISTEN` connection is idle by nature, and an idle-flow timeout on a load balancer or a NAT can drop it with no error on either side (a half-open connection). So it runs with TCP keepalive and must answer a `SELECT 1` every 30 seconds within 10 seconds. One that misses it is replaced as above. While the connection is down, `/health` lists it as `cross-instance`, and once it has been down for 60 seconds the check fails.
 
 ### Channels and presence across instances
 
@@ -29794,10 +29921,15 @@ A cell is converted only when the property's type can hold exactly what it says:
 | Number | `12`, `-3.5`, `10.00`, `1e3` | `02134` (a leading zero would be lost), numbers with more than 15 significant digits, `1,234`, `$5.00`, `12%`, `N/A` |
 | Boolean | `true`/`false`, `yes`/`no`, `y`/`n`, `1`/`0`, in any case | anything else |
 | Date | ISO 8601 (`2024-01-05`, `2024-01-05T10:00:00Z`), written-out dates (`5 Jan 2024`), `05/01/2024`, epoch seconds or milliseconds | text that names no date |
+| Geopoint | the object the export writes, `{"latitude": 41.9, "longitude": 12.5}`, or its JSON in a CSV cell | anything else, or a coordinate out of range |
+| Map without declared fields | an object, or its JSON in a CSV cell | anything else |
+| Vector | a list of numbers (`[0.1, 0.2]`, `0.1, 0.2`), or the export's `{"value": [0.1, 0.2]}` | a list holding anything that is not a number |
 
 A date without a time is that day in UTC. For dates written as `05/01/2024`, the column decides the order: a first number above 12 makes the column day-first, a second number above 12 makes it month-first. When a column never says, the browser's locale decides, and when it holds both orders, a date that either order could read is not converted.
 
 A blank cell is no value: it sets nothing, and the default you chose for that property applies.
+
+A file exported from a collection imports back into the same values, CSV or JSON. A map with declared fields is read one column per field (`address.street`), as the export writes it; any other value, a geopoint or a key-value map included, is one column. An epoch number between -100,000,000,000 and 100,000,000,000 is read as seconds, so a date between 31 October 1966 and 3 March 1973 exported as a timestamp does not come back: export those dates as text. A time-of-day field reads a number below one day (86,400,000) as the milliseconds since midnight the export writes.
 
 #### Values that cannot be imported
 
@@ -39151,9 +39283,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Current connectivity, queue depth, sync activity, last error |
 | `onStatusChange(fn)` | Subscribe to the above |
 | `onQueueChange(fn)` | Just the number of unsent writes, for a badge |
-| `pending()` | The queued mutations themselves, oldest first |
+| `pending()` | The queued mutations themselves, oldest first. <span class="since-badge" data-since="0.24">Since 0.24</span> `pending({ orphaned: true })`: the ones queued while signed out — see [Users](#users) |
 | `sync()` | Replay now — resolves with `{ flushed, remaining }` |
-| `clear()` | Discard the current user's queued writes **and** local rows |
+| `clear()` | Discard the current user's queued writes **and** local rows. <span class="since-badge" data-since="0.24">Since 0.24</span> `clear({ orphaned: true })`: the ones queued while signed out instead |
 
 Replay happens on its own: when the browser fires `online`, when the user signs in, and on an exponential backoff (one second, doubling to a minute) while anything is queued. `sync()` is for a "retry now" button.
 
@@ -39185,6 +39317,31 @@ Tabs of the same app share one IndexedDB database, so they share the local rows 
 ### Users
 
 The local database and the outbox are partitioned per signed-in user. Cached rows are whatever row-level security let that user see, and a queued write has to replay as its author — so signing out and back in as someone else never mixes the two. Signing out does not need to clear anything.
+
+#### While the session is being restored
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> Until the client knows who is signed in, it does not know whose local database and outbox to use, so offline reads and writes wait. That is the time `auth.isInitialized()` takes: none for a stored session that is still valid, and one refresh request when the session has to come back from the server — in cookie mode, where nothing is stored on the device, that is every page load. A write made in that window is queued as whoever the session turns out to be, and a read answers from their local database. A realtime frame that arrives meanwhile is passed to your callback as the server sent it, and kept nowhere.
+
+If the session cannot be restored — the refresh is refused, or in cookie mode cannot reach the server — the client is signed out, and offline reads and writes are the signed-out user's. On 0.23, cookie mode treated the whole window as signed out, so a write made in it was queued as the signed-out user's.
+
+#### Writes made while signed out
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> Writes queued while nobody was signed in are not replayed when someone signs in. That user did not make them, and replaying them with their credentials would put one person's changes in another's name — on a shared device, a visitor's writes in the next user's account. They are not moved into the signed-in user's outbox either. They are kept and listed separately, so the app can decide what to do with them:
+
+```typescript
+client.auth.onAuthStateChange(async (event) => {
+    if (event !== "SIGNED_IN") return;
+    const orphaned = await client.offline!.pending({ orphaned: true });
+    if (orphaned.length === 0) return;
+    if (await askToKeep(orphaned.length)) {
+        // Re-issue each one yourself, now as the signed-in user.
+        for (const write of orphaned) await reissue(write);
+    }
+    await client.offline!.clear({ orphaned: true });
+});
+```
+
+`clear({ orphaned: true })` discards them, with the local rows they were applied to; the signed-in user's own outbox is left alone. If the app does nothing with them, they replay the next time nobody is signed in. While nobody is signed in they are simply the current outbox, and `pending({ orphaned: true })` lists nothing.
 
 ### Configuration
 
@@ -41176,9 +41333,14 @@ rebase db push
 - Applies changes directly to the database (CREATE, ALTER, DROP)
 - Dry-runs the plan first and stops before anything that destroys data: a
   dropped table, column, schema, view or type, a `TRUNCATE`, or a column type
-  change that can lose values (`timestamptz` → `date`, `numeric` → `integer`).
+  change that can lose values (`timestamptz` → `date`, `numeric` → `integer`),
+  or a primary key change — `(id)` → `(id, locale)` gives every row a new id, so
+  links, foreign keys and ids stored elsewhere stop finding their row.
   It asks on a terminal and refuses otherwise; `--allow-destructive` (or
   `--yes`) applies it anyway
+- Switches row-level security on for every collection table, junctions included, right after the
+  schema change and before any step that can fail, so a push that stops part-way leaves a new table
+  denying every request rather than open to it
 - Applies your collections' RLS policies, and **removes policies an earlier push superseded**
 - Does **not** create migration files
 
