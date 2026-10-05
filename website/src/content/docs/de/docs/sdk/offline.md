@@ -1,5 +1,5 @@
 ---
-sourceHash: 5072db38fc5777e0
+sourceHash: 481cd30b8a1a6e64
 title: Offline & Local-First-Sync
 sidebar_label: Offline
 description: Aktivieren Sie die Local-First-Sync-Engine des typisierten SDK von Rebase — eine lokale Zeilendatenbank, sofortige Offline-Schreibvorgänge mit Rollback und reaktive Live-Abfragen.
@@ -126,9 +126,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Aktuelle Verbindung, Warteschlangentiefe, Sync-Aktivität, letzter Fehler |
 | `onStatusChange(fn)` | Das Obige abonnieren |
 | `onQueueChange(fn)` | Nur die Anzahl der nicht gesendeten Schreibvorgänge, für ein Badge |
-| `pending()` | Die eingereihten Mutationen selbst, älteste zuerst |
+| `pending()` | Die eingereihten Mutationen selbst, älteste zuerst. <span class="since-badge" data-since="0.24">Seit 0.24</span> `pending({ orphaned: true })`: die, die ohne Anmeldung eingereiht wurden — siehe [Benutzer](#benutzer) |
 | `sync()` | Jetzt wiederholen — löst mit `{ flushed, remaining }` auf |
-| `clear()` | Die eingereihten Schreibvorgänge **und** lokalen Zeilen des aktuellen Benutzers verwerfen |
+| `clear()` | Die eingereihten Schreibvorgänge **und** lokalen Zeilen des aktuellen Benutzers verwerfen. <span class="since-badge" data-since="0.24">Seit 0.24</span> `clear({ orphaned: true })`: stattdessen die, die ohne Anmeldung eingereiht wurden |
 
 Das Wiederholen geschieht von selbst: wenn der Browser `online` auslöst, wenn sich der Benutzer anmeldet, und mit exponentiellem Backoff (eine Sekunde, verdoppelnd bis zu einer Minute), solange etwas in der Warteschlange steht. `sync()` ist für einen «Jetzt erneut versuchen»-Button gedacht.
 
@@ -160,6 +160,31 @@ Tabs derselben App teilen sich eine IndexedDB-Datenbank und damit die lokalen Ze
 ## Benutzer
 
 Die lokale Datenbank und die Outbox sind pro angemeldetem Benutzer partitioniert. Zwischengespeicherte Zeilen sind das, was Row-Level Security diesen Benutzer sehen ließ, und ein eingereihter Schreibvorgang muss als sein Urheber wiederholt werden — sich abzumelden und als jemand anders wieder anzumelden vermischt die beiden also nie. Beim Abmelden muss nichts geleert werden.
+
+### Während die Sitzung wiederhergestellt wird
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Solange der Client nicht weiß, wer angemeldet ist, weiß er nicht, welche lokale Datenbank und welche Outbox er verwenden soll — Offline-Lese- und -Schreibvorgänge warten daher. Das ist die Zeit, die `auth.isInitialized()` braucht: keine für eine gespeicherte Sitzung, die noch gültig ist, und eine Refresh-Anfrage, wenn die Sitzung vom Server zurückkommen muss — im Cookie-Modus, in dem nichts auf dem Gerät gespeichert wird, ist das bei jedem Seitenaufruf der Fall. Ein in diesem Zeitraum gemachter Schreibvorgang wird für den Benutzer eingereiht, der sich als Inhaber der Sitzung herausstellt, und ein Lesevorgang antwortet aus dessen lokaler Datenbank. Ein Realtime-Ereignis, das in der Zwischenzeit eintrifft, wird so an Ihren Callback übergeben, wie der Server es gesendet hat, und nirgends gespeichert.
+
+Lässt sich die Sitzung nicht wiederherstellen — der Refresh wird abgelehnt oder erreicht im Cookie-Modus den Server nicht —, ist der Client abgemeldet, und Offline-Lese- und -Schreibvorgänge gehören dem abgemeldeten Benutzer. Unter 0.23 behandelte der Cookie-Modus den ganzen Zeitraum als abgemeldet, sodass ein darin gemachter Schreibvorgang für den abgemeldeten Benutzer eingereiht wurde.
+
+### Schreibvorgänge ohne Anmeldung
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Schreibvorgänge, die eingereiht wurden, während niemand angemeldet war, werden nicht wiederholt, wenn sich jemand anmeldet. Dieser Benutzer hat sie nicht gemacht, und sie mit seinen Anmeldedaten zu wiederholen, würde die Änderungen einer Person unter dem Namen einer anderen ablegen — auf einem gemeinsam genutzten Gerät die Schreibvorgänge eines Besuchers im Konto des nächsten Benutzers. Sie werden auch nicht in die Outbox des angemeldeten Benutzers verschoben. Sie bleiben erhalten und werden getrennt aufgelistet, damit die App entscheiden kann, was mit ihnen geschieht:
+
+```typescript
+client.auth.onAuthStateChange(async (event) => {
+    if (event !== "SIGNED_IN") return;
+    const orphaned = await client.offline!.pending({ orphaned: true });
+    if (orphaned.length === 0) return;
+    if (await askToKeep(orphaned.length)) {
+        // Re-issue each one yourself, now as the signed-in user.
+        for (const write of orphaned) await reissue(write);
+    }
+    await client.offline!.clear({ orphaned: true });
+});
+```
+
+`clear({ orphaned: true })` verwirft sie, zusammen mit den lokalen Zeilen, auf die sie angewendet wurden; die eigene Outbox des angemeldeten Benutzers bleibt unberührt. Lässt man sie liegen, werden sie wiederholt, sobald wieder niemand angemeldet ist. Solange niemand angemeldet ist, sind sie einfach die aktuelle Outbox, und `pending({ orphaned: true })` listet nichts.
 
 ## Konfiguration
 

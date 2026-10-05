@@ -125,9 +125,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Current connectivity, queue depth, sync activity, last error |
 | `onStatusChange(fn)` | Subscribe to the above |
 | `onQueueChange(fn)` | Just the number of unsent writes, for a badge |
-| `pending()` | The queued mutations themselves, oldest first |
+| `pending()` | The queued mutations themselves, oldest first. <span class="since-badge" data-since="0.24">Since 0.24</span> `pending({ orphaned: true })`: the ones queued while signed out — see [Users](#users) |
 | `sync()` | Replay now — resolves with `{ flushed, remaining }` |
-| `clear()` | Discard the current user's queued writes **and** local rows |
+| `clear()` | Discard the current user's queued writes **and** local rows. <span class="since-badge" data-since="0.24">Since 0.24</span> `clear({ orphaned: true })`: the ones queued while signed out instead |
 
 Replay happens on its own: when the browser fires `online`, when the user signs in, and on an exponential backoff (one second, doubling to a minute) while anything is queued. `sync()` is for a "retry now" button.
 
@@ -159,6 +159,31 @@ Tabs of the same app share one IndexedDB database, so they share the local rows 
 ## Users
 
 The local database and the outbox are partitioned per signed-in user. Cached rows are whatever row-level security let that user see, and a queued write has to replay as its author — so signing out and back in as someone else never mixes the two. Signing out does not need to clear anything.
+
+### While the session is being restored
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> Until the client knows who is signed in, it does not know whose local database and outbox to use, so offline reads and writes wait. That is the time `auth.isInitialized()` takes: none for a stored session that is still valid, and one refresh request when the session has to come back from the server — in cookie mode, where nothing is stored on the device, that is every page load. A write made in that window is queued as whoever the session turns out to be, and a read answers from their local database. A realtime frame that arrives meanwhile is passed to your callback as the server sent it, and kept nowhere.
+
+If the session cannot be restored — the refresh is refused, or in cookie mode cannot reach the server — the client is signed out, and offline reads and writes are the signed-out user's. On 0.23, cookie mode treated the whole window as signed out, so a write made in it was queued as the signed-out user's.
+
+### Writes made while signed out
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> Writes queued while nobody was signed in are not replayed when someone signs in. That user did not make them, and replaying them with their credentials would put one person's changes in another's name — on a shared device, a visitor's writes in the next user's account. They are not moved into the signed-in user's outbox either. They are kept and listed separately, so the app can decide what to do with them:
+
+```typescript
+client.auth.onAuthStateChange(async (event) => {
+    if (event !== "SIGNED_IN") return;
+    const orphaned = await client.offline!.pending({ orphaned: true });
+    if (orphaned.length === 0) return;
+    if (await askToKeep(orphaned.length)) {
+        // Re-issue each one yourself, now as the signed-in user.
+        for (const write of orphaned) await reissue(write);
+    }
+    await client.offline!.clear({ orphaned: true });
+});
+```
+
+`clear({ orphaned: true })` discards them, with the local rows they were applied to; the signed-in user's own outbox is left alone. If the app does nothing with them, they replay the next time nobody is signed in. While nobody is signed in they are simply the current outbox, and `pending({ orphaned: true })` lists nothing.
 
 ## Configuration
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5072db38fc5777e0
+sourceHash: 481cd30b8a1a6e64
 title: Hors ligne et synchronisation local-first
 sidebar_label: Hors ligne
 description: Activez le moteur de synchronisation local-first du SDK typé de Rebase — une base de données locale de lignes, des écritures hors ligne instantanées avec annulation, et des requêtes en direct réactives.
@@ -126,9 +126,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Connectivité actuelle, profondeur de la file d'attente, activité de synchronisation, dernière erreur |
 | `onStatusChange(fn)` | S'abonner à ce qui précède |
 | `onQueueChange(fn)` | Uniquement le nombre d'écritures non envoyées, pour un badge |
-| `pending()` | Les mutations en file d'attente elles-mêmes, les plus anciennes d'abord |
+| `pending()` | Les mutations en file d'attente elles-mêmes, les plus anciennes d'abord. <span class="since-badge" data-since="0.24">Depuis 0.24</span> `pending({ orphaned: true })` : celles mises en file d'attente sans session ouverte — voir [Utilisateurs](#utilisateurs) |
 | `sync()` | Rejouer maintenant — résout avec `{ flushed, remaining }` |
-| `clear()` | Écarter les écritures en file d'attente **et** les lignes locales de l'utilisateur courant |
+| `clear()` | Écarter les écritures en file d'attente **et** les lignes locales de l'utilisateur courant. <span class="since-badge" data-since="0.24">Depuis 0.24</span> `clear({ orphaned: true })` : celles mises en file d'attente sans session ouverte, à la place |
 
 Le rejeu se déclenche de lui-même : quand le navigateur émet `online`, quand l'utilisateur se connecte, et selon un backoff exponentiel (une seconde, doublant jusqu'à une minute) tant que quelque chose reste en file d'attente. `sync()` sert à un bouton « réessayer maintenant ».
 
@@ -160,6 +160,31 @@ Les onglets d'une même application partagent une seule base IndexedDB : ils par
 ## Utilisateurs
 
 La base de données locale et la file d'attente d'envoi sont cloisonnées par utilisateur connecté. Les lignes en cache sont celles que la sécurité au niveau des lignes a laissé voir à cet utilisateur, et une écriture en file d'attente doit être rejouée en tant que son auteur — se déconnecter puis se reconnecter sous une autre identité ne mélange donc jamais les deux. La déconnexion n'a besoin de rien effacer.
+
+### Pendant la restauration de la session
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Tant que le client ne sait pas qui est connecté, il ne sait pas quelle base de données locale ni quelle file d'attente d'envoi utiliser : les lectures et écritures hors ligne attendent donc. C'est le temps que prend `auth.isInitialized()` : aucun pour une session stockée encore valide, et une requête de rafraîchissement quand la session doit revenir du serveur — en mode cookie, où rien n'est stocké sur l'appareil, c'est le cas à chaque chargement de page. Une écriture faite pendant cet intervalle est mise en file d'attente au nom de l'utilisateur que la session se révèle être, et une lecture répond depuis sa base de données locale. Un événement temps réel qui arrive entre-temps est transmis à votre callback tel que le serveur l'a envoyé, et n'est conservé nulle part.
+
+Si la session ne peut pas être restaurée — le rafraîchissement est refusé ou, en mode cookie, n'atteint pas le serveur —, le client est déconnecté, et les lectures et écritures hors ligne sont celles de l'utilisateur déconnecté. Sur la 0.23, le mode cookie traitait tout cet intervalle comme déconnecté, si bien qu'une écriture faite pendant celui-ci était mise en file d'attente au nom de l'utilisateur déconnecté.
+
+### Écritures faites sans session ouverte
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Les écritures mises en file d'attente alors que personne n'était connecté ne sont pas rejouées quand quelqu'un se connecte. Cet utilisateur ne les a pas faites, et les rejouer avec ses identifiants placerait les modifications d'une personne au nom d'une autre — sur un appareil partagé, les écritures d'un visiteur dans le compte de l'utilisateur suivant. Elles ne sont pas non plus déplacées dans la file d'attente d'envoi de l'utilisateur connecté. Elles sont conservées et listées à part, pour que l'application décide quoi en faire :
+
+```typescript
+client.auth.onAuthStateChange(async (event) => {
+    if (event !== "SIGNED_IN") return;
+    const orphaned = await client.offline!.pending({ orphaned: true });
+    if (orphaned.length === 0) return;
+    if (await askToKeep(orphaned.length)) {
+        // Re-issue each one yourself, now as the signed-in user.
+        for (const write of orphaned) await reissue(write);
+    }
+    await client.offline!.clear({ orphaned: true });
+});
+```
+
+`clear({ orphaned: true })` les écarte, avec les lignes locales auxquelles elles ont été appliquées ; la propre file d'attente d'envoi de l'utilisateur connecté n'est pas touchée. Si on les laisse, elles sont rejouées la prochaine fois que personne n'est connecté. Tant que personne n'est connecté, elles sont simplement la file d'attente d'envoi courante, et `pending({ orphaned: true })` ne liste rien.
 
 ## Configuration
 

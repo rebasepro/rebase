@@ -120,7 +120,7 @@ export type {
 // `MemoryOfflineStore` is exported for tests and as the reference
 // implementation, while the IndexedDB store is wired automatically in the
 // browser and needs no direct construction.
-export type { OfflineApi, OfflineConfig, OfflineStatus } from "./offline";
+export type { OfflineApi, OfflineConfig, OfflineQueueOptions, OfflineStatus } from "./offline";
 export { isOfflineError } from "./offline";
 export type { LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 // The reader for a fetched row's version. A function rather than a field so the
@@ -617,10 +617,21 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         // Cache and queue are partitioned per user: cached rows are RLS-scoped
         // to whoever fetched them, and queued writes must replay as the user
         // who made them — a shared browser must never mix the two.
-        offlineManager.setScope(auth.getSession()?.user?.uid);
+        //
+        // Who that is, is not known until auth has restored the session or
+        // found there is none. In cookie mode nothing is stored on the device,
+        // so that takes the refresh request made on load; an expired stored
+        // token takes one too, and may turn out to be refused. Until then the
+        // manager has no scope, and everything offline waits. Reading the
+        // missing session as "signed out" would queue the user's own writes
+        // as the signed-out user's, which no sign-in replays; reading the
+        // stored one as the answer would keep a refused session's user in
+        // scope for a client that is signed out.
+        offlineManager.holdScope();
         auth.onAuthStateChange((event, session) => {
             offlineManager.setScope(event === "SIGNED_OUT" ? undefined : session?.user?.uid);
         });
+        void auth.isInitialized().then(() => offlineManager.setScope(auth.getSession()?.user?.uid));
     }
 
     const collectionClients = new Map<string, CollectionClient<Record<string, unknown>>>();

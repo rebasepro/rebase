@@ -698,7 +698,8 @@ With it on, the data layer keeps a **normalized local database of rows** (Indexe
 | Local writes join their lists | An offline create shows up in every filtered query it matches, and disappears from one an offline edit moves it out of |
 | Rejections roll back | A write the server refuses (400/403/404) is undone locally and reported via `onSyncError` |
 | Retries are automatic | Network failures and 429/503 replay on an exponential backoff; the `online` event and a sign-in also trigger one |
-| Per-user and per-tab-safe | Local rows and the outbox are partitioned by signed-in uid, shared across tabs, and replayed by one tab at a time |
+| Per-user and per-tab-safe | Local rows and the outbox are partitioned by signed-in uid, shared across tabs, and replayed by one tab at a time. Until auth has restored the session (`auth.isInitialized()`), offline reads and writes wait for it |
+| Signed-out writes stay signed out | Writes queued while nobody was signed in are never replayed as whoever signs in. `pending({ orphaned: true })` lists them; the app re-issues or `clear({ orphaned: true })`s them |
 
 ### Live queries — prefer these in a UI
 
@@ -732,6 +733,7 @@ rebase.offline!.onStatusChange(({ online, syncing, pending, lastSyncedAt, lastEr
 await rebase.offline!.sync();      // "retry now" — resolves { flushed, remaining }
 await rebase.offline!.pending();   // the queued mutations themselves
 await rebase.offline!.clear();     // DESTRUCTIVE: drops queued writes and local rows
+await rebase.offline!.pending({ orphaned: true });  // writes queued while signed out, held back from the signed-in user
 ```
 
 `isOfflineError(error)` distinguishes "offline with nothing local to answer with" from a request that genuinely failed:

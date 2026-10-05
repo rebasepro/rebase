@@ -1,5 +1,5 @@
 ---
-sourceHash: 5072db38fc5777e0
+sourceHash: 481cd30b8a1a6e64
 title: Sincronización Offline y Local-First
 sidebar_label: Offline
 description: Active el motor de sincronización local-first del SDK tipado de Rebase — una base de datos local de filas, escrituras offline instantáneas con reversión y consultas en vivo reactivas.
@@ -126,9 +126,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Conectividad actual, profundidad de la cola, actividad de sincronización, último error |
 | `onStatusChange(fn)` | Suscribirse a lo anterior |
 | `onQueueChange(fn)` | Solo el número de escrituras sin enviar, para un indicador |
-| `pending()` | Las mutaciones en cola en sí, de la más antigua a la más reciente |
+| `pending()` | Las mutaciones en cola en sí, de la más antigua a la más reciente. <span class="since-badge" data-since="0.24">Desde 0.24</span> `pending({ orphaned: true })`: las que se pusieron en cola sin sesión iniciada — véase [Usuarios](#usuarios) |
 | `sync()` | Reproducir ahora — se resuelve con `{ flushed, remaining }` |
-| `clear()` | Descartar las escrituras en cola **y** las filas locales del usuario actual |
+| `clear()` | Descartar las escrituras en cola **y** las filas locales del usuario actual. <span class="since-badge" data-since="0.24">Desde 0.24</span> `clear({ orphaned: true })`: en su lugar, las que se pusieron en cola sin sesión iniciada |
 
 La reproducción ocurre por su cuenta: cuando el navegador dispara `online`, cuando el usuario inicia sesión y con un backoff exponencial (un segundo, duplicándose hasta un minuto) mientras haya algo en cola. `sync()` es para un botón de «reintentar ahora».
 
@@ -160,6 +160,31 @@ Las pestañas de la misma aplicación comparten una única base de datos Indexed
 ## Usuarios
 
 La base de datos local y la cola de salida están particionadas por usuario autenticado. Las filas en caché son lo que la seguridad a nivel de fila dejó ver a ese usuario, y una escritura en cola tiene que reproducirse como su autor — así que cerrar sesión y volver a entrar como otra persona nunca mezcla las dos. Cerrar sesión no necesita limpiar nada.
+
+### Mientras se restaura la sesión
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Hasta que el cliente sabe quién ha iniciado sesión, no sabe qué base de datos local ni qué cola de salida usar, así que las lecturas y escrituras offline esperan. Es el tiempo que tarda `auth.isInitialized()`: ninguno para una sesión almacenada que sigue siendo válida, y una petición de refresco cuando la sesión tiene que volver del servidor — en modo cookie, donde no se guarda nada en el dispositivo, eso ocurre en cada carga de página. Una escritura hecha en ese intervalo se pone en cola a nombre de quien resulte ser el usuario de la sesión, y una lectura responde desde su base de datos local. Un evento de tiempo real que llegue mientras tanto se pasa a tu callback tal como lo envió el servidor, y no se guarda en ningún sitio.
+
+Si la sesión no se puede restaurar — el refresco es rechazado o, en modo cookie, no llega al servidor — el cliente queda sin sesión, y las lecturas y escrituras offline son las del usuario sin sesión. En 0.23, el modo cookie trataba todo ese intervalo como sin sesión, así que una escritura hecha en él se ponía en cola como del usuario sin sesión.
+
+### Escrituras hechas sin sesión iniciada
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Las escrituras puestas en cola mientras nadie había iniciado sesión no se reproducen cuando alguien inicia sesión. Ese usuario no las hizo, y reproducirlas con sus credenciales pondría los cambios de una persona a nombre de otra — en un dispositivo compartido, las escrituras de un visitante en la cuenta del siguiente usuario. Tampoco se mueven a la cola de salida del usuario que inició sesión. Se conservan y se listan aparte, para que la app decida qué hacer con ellas:
+
+```typescript
+client.auth.onAuthStateChange(async (event) => {
+    if (event !== "SIGNED_IN") return;
+    const orphaned = await client.offline!.pending({ orphaned: true });
+    if (orphaned.length === 0) return;
+    if (await askToKeep(orphaned.length)) {
+        // Re-issue each one yourself, now as the signed-in user.
+        for (const write of orphaned) await reissue(write);
+    }
+    await client.offline!.clear({ orphaned: true });
+});
+```
+
+`clear({ orphaned: true })` las descarta, junto con las filas locales a las que se aplicaron; la cola de salida propia del usuario con sesión iniciada no se toca. Si nadie las toca, se reproducen la próxima vez que nadie haya iniciado sesión. Mientras nadie ha iniciado sesión son simplemente la cola de salida actual, y `pending({ orphaned: true })` no lista nada.
 
 ## Configuración
 

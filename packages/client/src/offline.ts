@@ -129,12 +129,35 @@ export interface OfflineStatus {
 
 export type { LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 
+/** Which queue {@link OfflineApi.pending} and {@link OfflineApi.clear} act on. */
+export interface OfflineQueueOptions {
+    /**
+     * The writes queued while nobody was signed in, instead of the current
+     * user's.
+     *
+     * While someone is signed in these are held back: they were not made by
+     * that user, so they are never replayed under their credentials, and never
+     * moved into their queue. `pending({ orphaned: true })` lists them so the
+     * app can decide — re-issue them as the signed-in user, or discard them
+     * with `clear({ orphaned: true })`. Left alone, they replay the next time
+     * nobody is signed in.
+     *
+     * With nobody signed in they are the current queue, and are not orphaned:
+     * `pending({ orphaned: true })` lists nothing.
+     */
+    orphaned?: boolean;
+}
+
 /** What `client.offline` exposes to the app. */
 export interface OfflineApi {
     /** Replay the queue now. Resolves with what was flushed and what remains. */
     sync(): Promise<{ flushed: number; remaining: number }>;
-    /** The queued mutations for the current user, oldest first. */
-    pending(): Promise<PendingMutation[]>;
+    /**
+     * The queued mutations for the current user, oldest first — or, with
+     * `{ orphaned: true }`, the ones queued while nobody was signed in (see
+     * {@link OfflineQueueOptions.orphaned}).
+     */
+    pending(options?: OfflineQueueOptions): Promise<PendingMutation[]>;
     /** The current engine state — connectivity, queue depth, last sync. */
     status(): OfflineStatus;
     /** Subscribe to {@link OfflineStatus} changes (for a sync indicator). */
@@ -144,8 +167,12 @@ export interface OfflineApi {
      * Destructive: queued writes are lost, not replayed. For "discard my
      * offline changes" flows, not for sign-out (scoping already isolates
      * users).
+     *
+     * With `{ orphaned: true }`, drop the writes queued while nobody was
+     * signed in, and the local rows they were applied to, instead — the
+     * current user's are left alone.
      */
-    clear(): Promise<void>;
+    clear(options?: OfflineQueueOptions): Promise<void>;
     /** Subscribe to queue-size changes (for a "pending changes" badge). */
     onQueueChange(listener: (count: number) => void): () => void;
 }
@@ -365,6 +392,9 @@ const MISSING = "\u0000missing";
  */
 const IN_PROGRESS_MIN_RETRIES = 12;
 
+/** The scope of whatever is cached and queued while nobody is signed in. */
+const SIGNED_OUT_SCOPE = "anon";
+
 export class OfflineManager {
     private readonly store: OfflineStore;
     private readonly maxCachedQueries: number;
@@ -375,7 +405,14 @@ export class OfflineManager {
     private readonly inners = new Map<string, SDKCollectionClient<AnyRow>>();
     private readonly connectivity: ConnectivityMonitor;
 
-    private scope = "anon";
+    private scope = SIGNED_OUT_SCOPE;
+    /**
+     * Set while the manager does not know whose data it holds: from
+     * {@link holdScope} until the next {@link setScope}. `scope` is not
+     * consulted meanwhile — no operation gets a {@link ScopeTicket}, and
+     * nothing reads or writes the store.
+     */
+    private scopeHold?: { known: Promise<void>; release: () => void };
     /**
      * Bumped by every change of user, and by `clear()`.
      *
@@ -477,7 +514,14 @@ export class OfflineManager {
 
         this.api = {
             sync: () => this.sync(),
-            pending: async () => {
+            pending: async (options) => {
+                if (options?.orphaned) {
+                    await this.scopeKnown();
+                    if (this.scope === SIGNED_OUT_SCOPE) return [];
+                    // Read off the store, never loaded into `queue`: nothing
+                    // here may replay under the signed-in user's credentials.
+                    return await this.store.listQueue(`${SIGNED_OUT_SCOPE}|`);
+                }
                 await this.ensureQueueLoaded();
                 // Deep-copied: these are live queue entries (tail coalescing
                 // mutates them in place), and a caller must not be able to
@@ -489,7 +533,15 @@ export class OfflineManager {
                 this.statusListeners.add(listener);
                 return () => this.statusListeners.delete(listener);
             },
-            clear: async () => {
+            clear: async (options) => {
+                await this.scopeKnown();
+                if (options?.orphaned) {
+                    if (this.scope === SIGNED_OUT_SCOPE) return;
+                    await this.store.clear(`${SIGNED_OUT_SCOPE}|`);
+                    // A tab still signed out holds that queue in memory.
+                    this.broadcast({ type: "queue" }, SIGNED_OUT_SCOPE);
+                    return;
+                }
                 // Anything in flight was read for the rows being thrown away.
                 this.scopeEpoch++;
                 await this.store.clear(`${this.scope}|`);
@@ -513,9 +565,43 @@ export class OfflineManager {
      * across a sign-out/sign-in on a shared browser.
      */
     setScope(uid: string | undefined): void {
-        const next = uid || "anon";
-        if (next === this.scope) return;
+        const next = uid || SIGNED_OUT_SCOPE;
+        const hold = this.scopeHold;
+        if (!hold && next === this.scope) return;
         this.scope = next;
+        this.scopeHold = undefined;
+        this.leaveScope();
+        // What was waiting for a user runs for this one.
+        hold?.release();
+        this.revalidateAll();
+        // The returning user's queue may hold writes from a previous session.
+        void this.sync().catch(() => undefined);
+    }
+
+    /**
+     * Forget whose data this is until the next {@link setScope}.
+     *
+     * For the time before the client knows who is signed in — a session being
+     * restored on load. Taking that time for "signed out" would put the user's
+     * own writes in the signed-out queue, which no sign-in replays, and show
+     * them the signed-out local database instead of theirs.
+     *
+     * Meanwhile the manager has no scope at all. Every operation — a read, a
+     * write, a replay, `pending()`, `clear()` — waits for one and then runs
+     * for whoever it turns out to be, and nothing reads or writes the store.
+     * A realtime frame arriving in between is handed on as the server sent it
+     * and kept nowhere.
+     */
+    holdScope(): void {
+        if (this.scopeHold) return;
+        let release!: () => void;
+        const known = new Promise<void>((resolve) => { release = resolve; });
+        this.scopeHold = { known, release };
+        this.leaveScope();
+    }
+
+    /** Let go of the current user's rows and queue: in memory, and on screen. */
+    private leaveScope(): void {
         this.scopeEpoch++;
         this.queueLoad = undefined;
         this.queue = [];
@@ -524,13 +610,26 @@ export class OfflineManager {
         this.notifyQueue();
         // Everything on screen belongs to the previous user.
         for (const slug of this.observers.keys()) this.notifyCollection(slug, false);
-        this.revalidateAll();
-        // The returning user's queue may hold writes from a previous session.
-        void this.sync().catch(() => undefined);
     }
 
-    /** The user an operation is running for — see {@link scopeEpoch}. */
-    private ticket(): ScopeTicket {
+    /** Settles once the manager knows whose data it holds — see {@link holdScope}. */
+    private async scopeKnown(): Promise<void> {
+        while (this.scopeHold) await this.scopeHold.known;
+    }
+
+    /**
+     * The user an operation is running for — see {@link scopeEpoch} — or
+     * nothing while that is not known ({@link holdScope}). An operation takes
+     * it as `this.ticket() ?? await this.nextTicket()`, before its first await.
+     */
+    private ticket(): ScopeTicket | undefined {
+        if (this.scopeHold) return undefined;
+        return { scope: this.scope, epoch: this.scopeEpoch };
+    }
+
+    /** The ticket of whoever the held scope turns out to be. */
+    private async nextTicket(): Promise<ScopeTicket> {
+        await this.scopeKnown();
         return { scope: this.scope, epoch: this.scopeEpoch };
     }
 
@@ -584,7 +683,7 @@ export class OfflineManager {
 
         const wrapped: CollectionClient<M> = {
             find: async (params?: FindParams<M>): Promise<FindResult<M>> => {
-                const ticket = this.ticket();
+                const ticket = this.ticket() ?? await this.nextTicket();
                 const state = await this.ensureCollection(slug);
                 if (this.connectivity.shouldAttempt()) {
                     try {
@@ -628,7 +727,7 @@ export class OfflineManager {
             findAll: (params?: FindAllParams<M>) => collectAllPages<M>((p) => wrapped.find(p), params, slug),
 
             findById: async (id: string | number) => {
-                const ticket = this.ticket();
+                const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 if (this.connectivity.shouldAttempt()) {
                     try {
@@ -674,7 +773,7 @@ export class OfflineManager {
             },
 
             create: async (data: Partial<M>, id?: string | number, options?: WriteOptions) => {
-                const ticket = this.ticket();
+                const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 // Named before it is sent: if the answer is lost, the queued
                 // replay presents the same key on the same request, and the
@@ -716,12 +815,12 @@ export class OfflineManager {
                 data: Partial<M>[],
                 options?: { upsert?: boolean; onConflict?: readonly string[] } & WriteOptions
             ) => {
+                const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 if (!Array.isArray(data)) {
                     throw new TypeError("createMany expects an array of records.");
                 }
                 if (data.length === 0) return [];
-                const ticket = this.ticket();
                 // As in `create`: the key the batch is sent under is the key
                 // its replay is sent under.
                 const idempotencyKey = options?.idempotencyKey ?? createMutationId();
@@ -792,7 +891,7 @@ export class OfflineManager {
              * queue drains — the exact outcome upsert exists to prevent.
              */
             upsert: async (data: Partial<M>, options?: UpsertOptions) => {
-                const ticket = this.ticket();
+                const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 if (this.connectivity.shouldAttempt()) {
                     try {
@@ -833,12 +932,12 @@ export class OfflineManager {
                 updates: { id: string | number; data: Partial<M> | UpdateValues<Partial<M>> }[],
                 options?: WriteOptions
             ) => {
+                const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 if (!Array.isArray(updates)) {
                     throw new TypeError("updateMany expects an array of { id, data } entries.");
                 }
                 if (updates.length === 0) return [];
-                const ticket = this.ticket();
                 // Any row in the batch with a write already queued sends the
                 // whole batch to the queue. Splitting it — some rows now, some
                 // later — would break the one guarantee a batch makes, that its
@@ -877,12 +976,12 @@ data: u.data as AnyRow })),
             },
 
             deleteMany: async (ids: (string | number)[], options?: WriteOptions) => {
+                const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 if (!Array.isArray(ids)) {
                     throw new TypeError("deleteMany expects an array of ids.");
                 }
                 if (ids.length === 0) return;
-                const ticket = this.ticket();
                 const anyPending = ids.some((id) => this.hasPending(slug, id));
                 if (this.connectivity.shouldAttempt() && !anyPending) {
                     try {
@@ -916,7 +1015,7 @@ data: u.data as AnyRow })),
                 data: Partial<M> | UpdateValues<Partial<M>>,
                 options?: WriteOptions
             ) => {
-                const ticket = this.ticket();
+                const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 // As in `create`: the key the edit is sent under is the key
                 // its replay is sent under, so a replay of an edit that already
@@ -987,7 +1086,7 @@ data: u.data as AnyRow })),
             },
 
             delete: async (id: string | number, options?: WriteOptions) => {
-                const ticket = this.ticket();
+                const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 // Keyed from the first attempt, because a delete is the write
                 // a lost answer hurts most: its replay finds the row gone and
@@ -1024,7 +1123,7 @@ data: u.data as AnyRow })),
             },
 
             count: async (params?: FindParams<M>): Promise<number> => {
-                const ticket = this.ticket();
+                const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
                 if (this.connectivity.shouldAttempt()) {
                     try {
@@ -1103,12 +1202,17 @@ data: u.data as AnyRow })),
         // `findById` beside it still returned the edit.
         //
         // The socket re-authenticates as whoever is signed in, so a frame is
-        // the current user's.
+        // the current user's — once it is known who that is. Before then a
+        // frame is handed on as the server sent it, and kept nowhere.
         if (!isUnsupported(inner.listen)) {
             wrapped.listen = (params, onUpdate, onError) => inner.listen(
                 params,
                 (response) => {
                     const ticket = this.ticket();
+                    if (!ticket) {
+                        onUpdate(response);
+                        return;
+                    }
                     void this.ingest(slug, response.data ?? [], ticket, isProjection(params)).then(() => {
                         if (!this.isCurrent(ticket)) return;
                         const snapshot = this.recordSnapshot(slug, params, response, ticket);
@@ -1125,6 +1229,10 @@ data: u.data as AnyRow })),
                 id,
                 (row) => {
                     const ticket = this.ticket();
+                    if (!ticket) {
+                        onUpdate(row);
+                        return;
+                    }
                     if (!row) {
                         // Deleted elsewhere. `observeById` always handled this;
                         // here the row stayed in the local database and was
@@ -1207,7 +1315,10 @@ data: u.data as AnyRow })),
 
         if (options?.realtime !== false && !isUnsupported(inner.listen)) {
             unlisten = inner.listen(params, (response) => {
+                // Whose rows these are is not known yet. The observer reads
+                // the query itself once it is.
                 const ticket = this.ticket();
+                if (!ticket) return;
                 void this.ingest(slug, response.data ?? [], ticket, isProjection(params)).then(() => {
                     this.recordSnapshot(slug, params, response, ticket);
                     this.notifyCollection(slug, false);
@@ -1272,12 +1383,16 @@ data: u.data as AnyRow })),
 
         if (options?.realtime !== false && !isUnsupported(inner.listenById)) {
             unlisten = inner.listenById(id, (row) => {
+                // As in `observe`: before the scope is known, the observer's
+                // own read is what fills it in.
+                const ticket = this.ticket();
+                if (!ticket) return;
                 if (!row) {
-                    if (!this.hasPending(slug, id)) this.removeLocalRow(slug, id, this.ticket(), true);
+                    if (!this.hasPending(slug, id)) this.removeLocalRow(slug, id, ticket, true);
                     this.notifyCollection(slug, false);
                     return;
                 }
-                void this.ingest(slug, [row], this.ticket()).then(() => this.notifyCollection(slug, false));
+                void this.ingest(slug, [row], ticket).then(() => this.notifyCollection(slug, false));
             }, onError);
         }
 
@@ -1344,6 +1459,8 @@ data: u.data as AnyRow })),
     }
 
     private ensureCollection(slug: string): Promise<CollectionState> {
+        // Whose rows to load is not known yet.
+        if (this.scopeHold) return this.scopeKnown().then(() => this.ensureCollection(slug));
         const state = this.collectionState(slug);
         if (!state.loaded) {
             const scope = this.scope;
@@ -1832,6 +1949,7 @@ data: u.data as AnyRow })),
     // ─── Queue ───────────────────────────────────────────────────────────────
 
     private ensureQueueLoaded(): Promise<void> {
+        if (this.scopeHold) return this.scopeKnown().then(() => this.ensureQueueLoaded());
         if (!this.queueLoad) {
             const scope = this.scope;
             this.queueLoad = this.store.listQueue(`${scope}|`).then((queue) => {
@@ -1987,13 +2105,15 @@ data: u.data as AnyRow })),
 
     sync(): Promise<{ flushed: number; remaining: number }> {
         if (this.flushPromise) return this.flushPromise;
-        this.flushPromise = this.withLock(() => this.flush())
+        // The lock is per user, so it is taken once the user is known.
+        const run = () => this.withLock(() => this.flush());
+        this.flushPromise = (this.scopeHold ? this.scopeKnown().then(run) : run())
             .finally(() => { this.flushPromise = undefined; });
         return this.flushPromise;
     }
 
     private async flush(): Promise<{ flushed: number; remaining: number }> {
-        const ticket = this.ticket();
+        const ticket = this.ticket() ?? await this.nextTicket();
         await this.ensureQueueLoaded();
         // Another tab may have queued or drained work since we last looked.
         await this.reloadQueue();
@@ -2443,10 +2563,10 @@ data: u.data as AnyRow })),
 
     // ─── Cross-tab ───────────────────────────────────────────────────────────
 
-    private broadcast(message: { type: "rows"; slugs: string[] } | { type: "queue" }): void {
+    private broadcast(message: { type: "rows"; slugs: string[] } | { type: "queue" }, scope = this.scope): void {
         if (!this.channel) return;
         try {
-            this.channel.postMessage({ ...message, scope: this.scope, sender: this.tabId });
+            this.channel.postMessage({ ...message, scope, sender: this.tabId });
         } catch {
             // Structured-clone failures here would only cost cross-tab freshness.
         }
@@ -2455,7 +2575,8 @@ data: u.data as AnyRow })),
     private onBroadcast(message: unknown): void {
         if (this.disposed || !message || typeof message !== "object") return;
         const msg = message as { type?: string; scope?: string; sender?: string; slugs?: string[] };
-        if (msg.sender === this.tabId || msg.scope !== this.scope) return;
+        // Held, this tab is nobody's yet: there is nothing in memory to keep fresh.
+        if (this.scopeHold || msg.sender === this.tabId || msg.scope !== this.scope) return;
         if (msg.type === "rows") {
             for (const slug of msg.slugs ?? []) void this.reloadCollection(slug);
         } else if (msg.type === "queue") {
@@ -2466,7 +2587,7 @@ data: u.data as AnyRow })),
     /** Re-read one collection from the store, replacing what is in memory. */
     private async reloadCollection(slug: string): Promise<void> {
         const state = this.collections.get(slug);
-        if (!state?.loaded) return; // never loaded here — nothing to keep fresh
+        if (!state?.loaded || this.scopeHold) return; // never loaded here — nothing to keep fresh
         await this.reloadQueue();
         const scope = this.scope;
         const [rows, snapshots, absent] = await Promise.all([
@@ -2502,6 +2623,7 @@ data: u.data as AnyRow })),
     }
 
     private async reloadQueue(): Promise<void> {
+        if (this.scopeHold) return;
         const scope = this.scope;
         const queue = await this.store.listQueue(`${scope}|`).catch(() => undefined);
         if (!queue || this.scope !== scope) return;
