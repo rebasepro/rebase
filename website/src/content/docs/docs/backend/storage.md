@@ -504,6 +504,7 @@ Return `false` to deny with a **403**. Throwing also denies — an ownership loo
 Worth knowing:
 
 - **The metadata route is where read access is really decided.** It mints the short-lived path-scoped download token that the file route trusts, so the hook gates it there. Requests already carrying such a token, or hitting a declared public path, skip the hook — the token was minted under it and is valid only for its own path.
+- **A path is public when the key it names is.** The `public/` prefix is tested on the canonical key the route serves — after a leading `default/` bucket segment is read off and `//`, `./` and a leading `/` are folded away — never on the URL as written. `/api/storage/file/notes://public/x.txt` names the private key `notes:/public/x.txt`, and the key `default/public/x.txt` (reached as `/api/storage/file/default/default/public/x.txt`) lies in a folder called `default`; neither is public. In a hook, test the `key` you are handed with `isPublicStorageKey` from `@rebasepro/types` — `isPublicStoragePath` reads a client-side path or URL, and reads both of those as public.
 - **`list` is gated on the prefix.** Listing is how you discover keys nobody told you about.
 - **Resumable (TUS) uploads are gated at create time**, so a denied upload leaves no temp file behind.
 - Omitting the hook preserves the previous behaviour, so single-tenant apps are unaffected.

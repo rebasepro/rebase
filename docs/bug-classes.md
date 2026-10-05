@@ -2382,6 +2382,43 @@ recorded *why* it was clean rather than just that it was — so when a sweep cle
 something on a premise rather than on a check, write the premise into the row,
 and treat the premise, not the file, as the thing to re-test.
 
+### The public check read the URL, the route served the key — 2026-10-05
+
+Storage audit STORAGE-4. `publicObjectAuth` decides whether an anonymous read
+is public, and when it says yes the authorize hook is not asked. It tested
+`isPublicStoragePath(decodeURIComponent(rawPath))` — a predicate written for
+client-side paths, which strips everything up to a `://` and a leading
+`default/` bucket — while the route served `canonicalStorageKey` of the same
+path, which folds `//` to `/`. `GET /file/notes://public/secret.txt` was
+`public/secret.txt` to the check and the private `notes:/public/secret.txt` to
+the route: served to anyone, past a hook that denied every read, and
+`/metadata` minted a download token for it. The property test in
+`storage-keys.property.test.ts` had found exactly this difference in August and
+pinned it as harmless "because the routes derive the key from the URL path" —
+the premise, not the check, was what nobody re-tested.
+
+The derivation is one function now (`storage/requested-object.ts`:
+wildcard → decode → `default/` bucket → canonical key), used by the route,
+`publicObjectAuth` and `fileTokenAuth`; and the server decides on the key with
+`isPublicStorageKey`, which parses nothing out of it.
+`storage-public-decision.property.test.ts` is the guard: over generated paths,
+through the real door, an anonymous read is let through exactly when the key the
+route serves is public — both directions, so a narrower decision fails as well
+as a wider one.
+
+| checked | result |
+|---|---|
+| `GET /file/*`, `GET /metadata/*` — the anonymous "public" decision | **BUG** — fixed; it also refused public keys spelled `DEFAULT/public/x`, `public//x`, `./public/x` (fail-closed half) |
+| `GET /file/*` — the shared-cache decision (`Cache-Control: public`) | **BUG** — `isPublicStoragePath(key)` read the key `default/public/x` (a folder called `default`) as public; fixed with the key predicate |
+| `GET /metadata/*` — `public: true` vs. minting a token | clean before (it prefixed the bucket first); now on the key predicate too |
+| `fileTokenAuth` — the path a token is compared with | clean — its own copy of the route's derivation, identical; now the shared function |
+| `DELETE /file/*`, `POST /upload`, `GET /list`, `POST /folder`, TUS | clean — each canonicalizes once and hands the same string to the hook and the controller |
+| transforms and durable renditions | clean — cache and rendition keys are built from the served key; `isRenditionKey` reads a folded copy, but folded *wider* (case, `\`, NFKC), so it can only refuse more |
+| client SDK, `useBackendStorageSource` | clean by direction — they only choose whether to skip the `/metadata` round trip; a wrong "public" builds a token-less URL the server refuses |
+| the scaffolded `storageAuthorize` hooks | **BUG** — `isPublicStoragePath(key)` read `default/public/x` as public; templates use `isPublicStorageKey` |
+| a raw `%` in a request path | was a 500 (`URIError`); the shared function refuses it as a 400 |
+| local storage on a case-insensitive filesystem (macOS default) | **not fixed** — `PUBLIC/x` and `public/x` are one file there while the decision is on the key's text; development only, Linux and object stores are case-sensitive |
+
 ---
 
 ## 39. A refusal the database expresses as a number

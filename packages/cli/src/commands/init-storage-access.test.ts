@@ -145,6 +145,9 @@ roles }
     it("is not fooled by a public/ lookalike", () => {
         expect(ask("read", "publicity/secret.png")).toBe(false);
         expect(ask("read", "notpublic/secret.png")).toBe(false);
+        // The hook is handed a key, in which `default/` is a folder, not the
+        // bucket a client-side path would name with it.
+        expect(ask("read", "default/public/secret.png")).toBe(false);
     });
 });
 
@@ -191,6 +194,7 @@ describe("the scaffolded BaaS project declares a storage access model", () => {
     it("lets anyone read a public/ object and nothing else", () => {
         expect(ask("read", "public/logo.png")).toBe(true);
         expect(ask("read", "users/u1/a.png")).toBe(false);
+        expect(ask("read", "default/public/secret.png")).toBe(false);
         expect(ask("list", "")).toBe(false);
     });
 

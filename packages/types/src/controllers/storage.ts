@@ -10,9 +10,36 @@ import { DEFAULT_STORAGE_SOURCE_KEY } from "../types/storage_source";
 export const PUBLIC_STORAGE_PREFIX = "public/";
 
 /**
- * True when a storage key/path points at a public object (lives under
- * {@link PUBLIC_STORAGE_PREFIX}). The check is applied to the key *within the
- * bucket* — strip any `bucket/` and `scheme://` prefixes first.
+ * True when a storage **key** is public: it lies under
+ * {@link PUBLIC_STORAGE_PREFIX}.
+ *
+ * The key is read exactly as it is — the canonical key within its bucket, the
+ * one the server stores, serves, and hands a `storageAuthorize` hook as
+ * `key` — and nothing is parsed out of it. That is the difference from
+ * {@link isPublicStoragePath}, which reads a client-side *path* and so strips
+ * a `scheme://` and a leading `default/` bucket segment first. On a key both are
+ * wrong: `default/public/x` is a key in a folder called `default`, and a
+ * request path `notes://public/x` names the key `notes:/public/x`. Neither is
+ * public, and the server decides on this function so that it never says they
+ * are.
+ *
+ * @group Models
+ */
+export function isPublicStorageKey(key: string | null | undefined): boolean {
+    if (!key || !key.startsWith(PUBLIC_STORAGE_PREFIX)) return false;
+    // A canonical key never carries a `..` segment; one that does is not a key
+    // the server would serve, and is never public.
+    return !key.split(/[\\/]/).includes("..");
+}
+
+/**
+ * True when a storage key or client-side path points at a public object
+ * (lives under {@link PUBLIC_STORAGE_PREFIX}).
+ *
+ * For a path as a client holds it: a `scheme://` prefix and a single leading
+ * `default/` bucket segment are stripped first. The server and a
+ * `storageAuthorize` hook, which hold the canonical key, use
+ * {@link isPublicStorageKey}.
  *
  * @group Models
  */

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7be09a8935390362
+sourceHash: 1fb2c48c53650df2
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez des backends de stockage sur système de fichiers local, compatibles S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -505,6 +505,7 @@ Renvoyez `false` pour refuser avec un code **403**. Lever une exception refuse �
 Bon à savoir :
 
 - **La route de métadonnées est l'endroit où l'accès en lecture est réellement validé.** Elle génère le jeton de téléchargement temporaire restreint au chemin, auquel la route de fichier fait confiance ; le hook effectue donc le filtrage à ce niveau. Les requêtes présentant déjà un tel jeton, ou ciblant un chemin déclaré public, ignorent le hook — le jeton a été délivré sous son contrôle et n'est valide que pour son propre chemin.
+- **Un chemin est public quand la clé qu'il désigne l'est.** Le préfixe `public/` est testé sur la clé canonique que sert la route — après lecture d'un segment de bucket `default/` initial et repli de `//`, `./` et d'un `/` initial —, jamais sur l'URL telle qu'elle est écrite. `/api/storage/file/notes://public/x.txt` désigne la clé privée `notes:/public/x.txt`, et la clé `default/public/x.txt` (atteinte via `/api/storage/file/default/default/public/x.txt`) se trouve dans un dossier nommé `default` ; aucune des deux n'est publique. Dans un hook, testez la `key` qui vous est transmise avec `isPublicStorageKey` de `@rebasepro/types` — `isPublicStoragePath` lit un chemin ou une URL côté client, et considère ces deux cas comme publics.
 - **`list` est filtré selon le préfixe.** L'opération de listage permet de découvrir des clés dont personne ne vous a communiqué l'existence.
 - **Les téléversements avec reprise (TUS) sont filtrés dès la création**, ainsi un téléversement refusé ne laisse aucun fichier temporaire derrière lui.
 - Omettre le hook préserve le comportement antérieur, de sorte que les applications mono-tenant ne sont pas impactées.

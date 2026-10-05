@@ -201,10 +201,6 @@ the reason.
   included, because a `StorageController` has no ranged read and the S3
   controller collects the body stream into one `Buffer`. A large file costs its
   size in memory per concurrent download.
-- **A raw `%` in a key is a 500.** The download, metadata and delete routes run
-  `decodeURIComponent` over the path with no `URIError` guard. The SDK encodes
-  every key segment (`encodeStorageKey`), so this reaches only a caller that
-  builds the URL itself and leaves a `%` unencoded — which should get a 400.
 
 ## Where the code lives
 

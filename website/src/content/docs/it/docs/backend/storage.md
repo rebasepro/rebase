@@ -1,5 +1,5 @@
 ---
-sourceHash: 7be09a8935390362
+sourceHash: 1fb2c48c53650df2
 title: Configurazione dello Storage
 sidebar_label: Configurazione dello Storage
 description: Configura backend di storage su filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
@@ -518,6 +518,7 @@ Restituisci `false` per negare l'accesso con un **403**. Anche il sollevamento d
 Da sapere:
 
 - **La rotta dei metadati è il punto in cui viene realmente decisa l'autorizzazione di lettura.** È qui che viene generato il token di download temporaneo associato al percorso di cui la rotta del file si fida, perciò l'hook ne regola l'accesso in questo punto. Le richieste che dispongono già di tale token o che raggiungono un percorso pubblico dichiarato ignorano l'hook — il token è stato emesso sotto di esso ed è valido esclusivamente per il proprio percorso.
+- **Un percorso è pubblico quando lo è la chiave che indica.** Il prefisso `public/` viene verificato sulla chiave canonica servita dalla rotta — dopo aver letto un eventuale segmento di bucket `default/` iniziale e aver compresso `//`, `./` e una `/` iniziale —, mai sull'URL così come è scritto. `/api/storage/file/notes://public/x.txt` indica la chiave privata `notes:/public/x.txt`, e la chiave `default/public/x.txt` (raggiunta come `/api/storage/file/default/default/public/x.txt`) si trova in una cartella chiamata `default`; nessuna delle due è pubblica. In un hook, verifica la `key` che ricevi con `isPublicStorageKey` di `@rebasepro/types` — `isPublicStoragePath` legge un percorso o un URL lato client, e considera pubblici entrambi i casi.
 - **`list` è regolato in base al prefisso.** L'elenco è il modo in cui si scoprono chiavi di cui nessuno ti ha parlato.
 - **I caricamenti ripristinabili (TUS) vengono regolati al momento della creazione**, evitando che un caricamento negato lasci file temporanei residui.
 - L'omissione dell'hook mantiene il comportamento precedente, non impattando le app single-tenant.

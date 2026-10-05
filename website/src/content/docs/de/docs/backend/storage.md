@@ -1,5 +1,5 @@
 ---
-sourceHash: 7be09a8935390362
+sourceHash: 1fb2c48c53650df2
 title: Storage-Konfiguration
 sidebar_label: Storage-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible oder GCS/Firebase Storage-Backends für Datei-Uploads, Bilder und Medien.
@@ -405,6 +405,7 @@ Geben Sie `false` zurück, um mit einem **403** abzuweisen. Das Werfen einer Exc
 Wissenswertes:
 
 - **Die Metadaten-Route entscheidet maßgeblich über den Lesezugriff.** Sie generiert das kurzlebige, pfadgebundene Download-Token, dem die Datei-Route vertraut; daher schützt der Hook den Zugriff bereits hier. Anfragen, die bereits ein solches Token mitführen oder einen deklarierten öffentlichen Pfad aufrufen, überspringen den Hook — das Token wurde unter seiner Kontrolle ausgestellt und ist ausschließlich für den eigenen Pfad gültig.
+- **Ein Pfad ist öffentlich, wenn der Schlüssel, den er benennt, es ist.** Das Präfix `public/` wird am kanonischen Schlüssel geprüft, den die Route ausliefert — nachdem ein führendes `default/`-Bucket-Segment abgelesen und `//`, `./` sowie ein führendes `/` zusammengefaltet wurden —, niemals an der URL, wie sie geschrieben wurde. `/api/storage/file/notes://public/x.txt` benennt den privaten Schlüssel `notes:/public/x.txt`, und der Schlüssel `default/public/x.txt` (erreichbar als `/api/storage/file/default/default/public/x.txt`) liegt in einem Ordner namens `default`; keiner von beiden ist öffentlich. Prüfen Sie in einem Hook den übergebenen `key` mit `isPublicStorageKey` aus `@rebasepro/types` — `isPublicStoragePath` liest einen clientseitigen Pfad oder eine URL und hält beide für öffentlich.
 - **`list` wird anhand des Präfixes geprüft.** Über das Auflisten lassen sich Schlüssel ermitteln, die einem zuvor nicht bekannt waren.
 - **Fortsetzbare (TUS) Uploads werden bereits bei der Erstellung geprüft**, sodass ein abgelehnter Upload keine temporären Dateien hinterlässt.
 - Das Weglassen des Hooks behält das bisherige Verhalten bei, sodass Single-Tenant-Anwendungen davon unberührt bleiben.
