@@ -447,6 +447,13 @@
   by `db push`. An X account can now replace its placeholder address, which
   also no longer receives the welcome mail.
 
+#### Client SDK
+
+- `client.offline.pending({ orphaned: true })` and
+  `client.offline.clear({ orphaned: true })` (`OfflineQueueOptions`). Writes
+  queued while nobody was signed in are never replayed as whoever signs in;
+  these list them so the app can re-issue or discard them.
+
 ### Changed
 
 #### Studio
@@ -485,6 +492,13 @@
 - **A boot-provisioned database whose bundle listed a two-sided
   many-to-many's "later" collection first gets one junction primary-key
   rebuild on its next `rebase db push`, then none.**
+
+- **`rebase db push` treats a primary key change as destructive.** Changing a
+  collection's key, such as `(id)` → `(id, locale)` or moving it to another
+  column, gives every row a new id, and push applied it without asking, even
+  in CI. It now asks on a terminal, refuses elsewhere unless you pass
+  `--allow-destructive`, and says what changes: URLs, foreign keys and ids
+  stored elsewhere stop finding their row.
 
 #### Client SDK
 
@@ -886,6 +900,18 @@
   `driver`. Form actions copy and delete by the slug, so a delete can no
   longer reach the Postgres collection of the same name.
 
+- A JSON file exported from a collection imports its geopoints, key-value maps
+  and vectors back; before, they were dropped without a word. A nested key in a
+  JSON file is mapped under the map its parent matched, such as
+  `Home Address` → `home_address.street_name`.
+
+- A CSV exported from a collection imports back its vectors, its block lists
+  written one cell per item, the dates inside arrays of maps and fixed lists,
+  and times of day exported as timestamps.
+
+- In the import's mapping step, a key-value map can be chosen as a column's
+  target.
+
 #### Studio
 
 - **The source-only schema editor no longer overwrites edits made on disk
@@ -988,6 +1014,22 @@
   across instances.** Readers could previously see message N+1 before N,
   and the SDK would drop N.
 
+- Without change capture (`REALTIME_CDC=off`, or a database role that cannot
+  create triggers), the cross-instance LISTEN connection is checked by a
+  heartbeat. A connection that goes half-open — an idle-flow timeout on a load
+  balancer or a NAT — is replaced within about 45 s and every subscription is
+  refetched; a database that cannot be reached at startup is retried. `/health`
+  lists the connection as `cross-instance` while it is down and fails after
+  60 s down. Before, writes made on other instances silently stopped arriving.
+
+- The server pings every realtime socket every 30 s and drops one that has
+  not answered by the next ping, and drops a socket with more than 16 MiB of
+  unread frames queued. A dropped socket's subscriptions, channels and presence
+  are cleaned up as on a normal close. Before, a client that vanished without
+  closing (lost signal, sleep) kept its subscriptions refetched on every write
+  for about two hours. Clients that speak the protocol directly must answer
+  pings, which every standard WebSocket library does.
+
 #### Client SDK
 
 - **A generated SDK lints clean.** A collection with no relations was emitted
@@ -1040,6 +1082,17 @@
 
 - **One refused field in a merged offline edit no longer rolls back the
   user's other edits in that write.**
+
+- With `offline` on, a write made while the session is still being restored on
+  load is queued for the user the session turns out to be. In cookie mode every
+  page load has this window, and a write made in it was queued as the
+  signed-out user's, where no sign-in ever replayed it; reads in that window
+  showed the signed-out local database instead of the user's. Offline reads and
+  writes now wait for `auth.isInitialized()`.
+
+- With `offline` on, a stored session whose refresh is refused on load no
+  longer leaves that user's cached rows readable, or their outbox writable, by
+  the now signed-out client.
 
 #### Auth
 
@@ -1152,6 +1205,16 @@
   server. The image now installs `ts-morph` 28.0.0, the version the server
   pins.
 
+#### Storage & email
+
+- A storage path with a `%` that begins no escape
+  (`/api/storage/metadata/100%-done.txt`) answers `400 INVALID_STORAGE_KEY`
+  instead of 500.
+
+- `/api/storage/file/DEFAULT/public/x`, `public//x` and `.%2Fpublic/x` are
+  served anonymously like `public/x`. The route already served that object;
+  the public check refused it.
+
 ### Security
 
 #### Realtime
@@ -1196,6 +1259,26 @@
   allowance;** the server's own `rebase.storage` calls are never
   rate-limited; and a refused bearer token is no longer partly written to
   the error log.
+
+- **A private file whose key contains `<word>:/public/` can no longer be read
+  anonymously as `GET /api/storage/file/<word>://public/…`.** The "is this
+  public?" check read the URL path and stripped what it took for a scheme,
+  while the route served the canonical key, which is private: a hook that
+  denied every read was never asked, and `/metadata` minted a download token
+  for it. The check now runs on the key the route serves. `storageAuthorize`
+  hooks should test `key` with the new `isPublicStorageKey` from
+  `@rebasepro/types`; `isPublicStoragePath` stays for client-side paths and
+  URLs.
+
+- **A private file under a folder named `default` (key `default/public/x`) is
+  no longer served with `Cache-Control: public`,** and new projects'
+  `config/storage.ts` hook no longer treats it as world-readable.
+
+- **`storageAuthorize` and policy predicates receive the storage source the
+  request is served from.** `?storageId=%20private` reached the hook as
+  `" private"` while the `private` source served, deleted or took the write.
+  The default source is now always `undefined`, including for `?storageId=`
+  and `?storageId=(default)`.
 
 #### MCP
 
@@ -1265,6 +1348,26 @@
   attacker's refresh token minting access tokens. It now deletes the refresh
   tokens and outstanding reset links and stamps `tokens_valid_after` in the
   same transaction, as the API reset does.
+
+#### Postgres
+
+- **A `rebase db push` that fails part-way no longer leaves the tables it just
+  created open to every caller.** Row-level security was switched on by the
+  policies step, last, while `rebase_user` already held read and write on a
+  new table through the schema's default privileges; a push stopped by a
+  refused `search` block change, a vector or trigger error, or a policy that
+  would not compile left the table readable and writable by every
+  authenticated request — for good with `REBASE_MIGRATE_ON_BOOT=none`. Push now
+  turns RLS on for every collection and junction table straight after the
+  schema change, before any step that can fail, so a failed push leaves new
+  tables refusing requests until their policies arrive. Tables created at boot
+  and by the live schema editor have RLS on from the moment they are created.
+
+- **A collection table boot could not switch row-level security on for stays
+  closed.** Boot revoked the role's access to such a table and reported it as
+  closed, then its last step granted every authenticated request read and
+  write on every table again, with no row filtering. The table now stays
+  closed, and boot refuses to start if it cannot keep it closed.
 
 ## [0.23.0] - 2026-09-27
 
