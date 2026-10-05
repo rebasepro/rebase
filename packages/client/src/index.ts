@@ -497,9 +497,10 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         });
 
         // The account the socket's server-side state belongs to. The server
-        // keeps each subscription's principal from when it was made and never
-        // revisits it, so re-authenticating a socket as somebody else leaves
-        // every subscription reading as the previous account.
+        // re-scopes a socket's subscriptions and channel memberships when it
+        // authenticates again (`rescopeClient`), but a change of account still
+        // rebuilds the socket here: a fresh socket carries nothing the previous
+        // account's socket held, so this does not depend on the server alone.
         let realtimeUid: string | null = auth.getSession()?.user?.uid ?? null;
 
         auth.onAuthStateChange((event, session) => {
