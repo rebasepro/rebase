@@ -94,12 +94,20 @@ const companies = {
     }
 } as unknown as CollectionConfig;
 
-const authors = {
+const authors: CollectionConfig = {
     name: "Authors", slug: "authors", table: "authors",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" },
-        company: { name: "Company", type: "relation", relation: { kind: "belongsTo", target: () => companies, localKey: "company_id" } }
+        company: { name: "Company", type: "relation", relation: { kind: "belongsTo", target: () => companies, localKey: "company_id" } },
+        // A one-step `via` whose last `to` is a foreign key, not the target's key.
+        writings: {
+            name: "Writings", type: "relation",
+            relation: {
+                kind: "via", target: () => posts, cardinality: "many",
+                joinPath: [{ table: "posts", on: { from: "id", to: "author_id" } }]
+            }
+        }
     }
 } as unknown as CollectionConfig;
 
@@ -289,6 +297,60 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
         await admin?.end().catch(() => {});
         if (container) await stopPgContainer(container.containerName);
     }, 60_000);
+
+    // ── `via` on a booted schema ───────────────────────────────────────────
+
+    describe("a `via` relation, written in column terms", () => {
+        /** Each post's company, by the join the relation describes. */
+        async function companyOfPost(): Promise<Map<number, number>> {
+            const { rows } = await admin.query<{ post: number; company: number }>(`
+                SELECT p.id AS post, c.id AS company
+                FROM posts p JOIN authors a ON a.id = p.author_id JOIN companies c ON c.id = a.company_id
+            `);
+            return new Map(rows.map(r => [Number(r.post), Number(r.company)]));
+        }
+
+        it("loads the related row through `include`", async () => {
+            const expected = await companyOfPost();
+            const { json } = await measure("/posts?limit=25&orderBy=id:asc&include=company");
+            const rows = json.data ?? [];
+            expect(rows).toHaveLength(25);
+            for (const post of rows) {
+                expect(post.company).toMatchObject({ id: expected.get(Number(post.id)) });
+            }
+        });
+
+        it("loads it on the get-by-id route", async () => {
+            const expected = await companyOfPost();
+            const { json } = await measure("/posts/7?include=company");
+            expect(json.company).toMatchObject({ id: expected.get(7) });
+        });
+
+        it("loads a to-many `via`, and its per-parent limit, through `include`", async () => {
+            const { json } = await measure(`/authors?limit=5&orderBy=id:asc&include=${encodeURIComponent(JSON.stringify({ writings: { limit: 2, orderBy: "id:desc" } }))}`);
+            const { rows } = await admin.query<{ author: number; ids: number[] }>(`
+                SELECT author_id AS author, (array_agg(id ORDER BY id DESC))[1:2] AS ids FROM posts GROUP BY author_id
+            `);
+            const expected = new Map(rows.map(r => [Number(r.author), r.ids.map(Number)]));
+            for (const author of json.data ?? []) {
+                expect((author.writings as Row[]).map(p => Number(p.id))).toEqual(expected.get(Number(author.id)));
+            }
+        });
+
+        it("lists a to-many `via` under the parent's nested path", async () => {
+            const { rows } = await admin.query<{ id: number }>("SELECT id FROM posts WHERE author_id = 3 ORDER BY id");
+            const { json } = await measure("/authors/3/writings?limit=100&orderBy=id:asc");
+            expect((json.data ?? []).map(row => Number(row.id))).toEqual(rows.map(r => Number(r.id)));
+            expect(json.meta?.total).toBe(rows.length);
+        });
+
+        it("lists it under the parent's nested path, with a count that agrees", async () => {
+            const expected = await companyOfPost();
+            const { json } = await measure("/posts/7/company");
+            expect((json.data ?? []).map(row => Number(row.id))).toEqual([expected.get(7)]);
+            expect(json.meta?.total).toBe(1);
+        });
+    });
 
     // ── a per-relation `limit` is applied by Postgres ──────────────────────
 

@@ -16,6 +16,7 @@ import {
     rowIdentityCondition,
     primaryKeyColumns,
     sourceKeyField,
+    columnNamed,
     type PrimaryKeyInfo
 } from "./collection-helpers";
 import { parseDataFromServer } from "../data-transformer";
@@ -96,8 +97,10 @@ export function joinStepCondition(
     for (let i = 0; i < Math.max(from.length, to.length); i++) {
         const fromColumn = from[i] ?? "(none)";
         const toColumn = to[i] ?? "(none)";
-        const fromCol = currentTable[fromColumn.split(".").pop()! as keyof typeof currentTable] as AnyPgColumn | undefined;
-        const toCol = joinTable[toColumn.split(".").pop()! as keyof typeof joinTable] as AnyPgColumn | undefined;
+        // Written in column terms, and a booted table is keyed by wire name —
+        // see `columnNamed`.
+        const fromCol = columnNamed(currentTable, fromColumn.split(".").pop()!);
+        const toCol = columnNamed(joinTable, toColumn.split(".").pop()!);
         if (!fromCol || !toCol) return { missing: `${fromColumn} -> ${toColumn}` };
         pairs.push(eq(fromCol, toCol));
     }

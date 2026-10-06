@@ -32,7 +32,7 @@ import { buildSearchColumnSpec, SEARCH_UNACCENT_FN, type SearchColumnSpec } from
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
 import { ApiError, logger } from "@rebasepro/server";
-import { getColumnMeta } from "../services/collection-helpers";
+import { columnNamed, getColumnMeta } from "../services/collection-helpers";
 
 /**
  * What to do with a filter field that resolves to no column at all.
@@ -560,7 +560,9 @@ export class DrizzleConditionBuilder {
         // column rather than a bare name also keeps it qualified, so it binds
         // to the outer target and not to a table joined inside the EXISTS.
         const targetColumn = (name: string): AnyPgColumn => {
-            const column = targetTable[getColumnName(name) as keyof typeof targetTable] as AnyPgColumn;
+            // By its SQL name as well as its key: the step is written in
+            // column terms, and a booted table is keyed by wire name.
+            const column = columnNamed(targetTable, getColumnName(name));
             if (!column) {
                 throw new Error(`Join step column '${name}' not found in the target table of this joinPath`);
             }
