@@ -1,8 +1,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import { deepEqual as equal } from "fast-equals";
 import { Entity } from "@rebasepro/types";
 import { CollectionSize, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
-import { EntityCardBinding } from "./EntityCardBinding";
+import { EntityCardBinding, EntityCardBindingProps } from "./EntityCardBinding";
 import {
     cls,
     CircularProgress,
@@ -95,6 +96,13 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
 
     const ResolvedEntityCard = useComponentOverride("Collection.Card", EntityCardBinding) as typeof EntityCardBinding;
 
+    // Memoised, so a page, a push or a tick draws the cards that changed. The
+    // grid draws every loaded card, and drew every one again on each update:
+    // the 41st page of 50 cards cost 4,050 card renders.
+    const MemoisedCard = useMemo(
+        () => React.memo(ResolvedEntityCard, areCardPropsEqual) as unknown as typeof EntityCardBinding,
+        [ResolvedEntityCard]);
+
     const {
         data,
         dataLoading,
@@ -110,9 +118,32 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
         onEntityClick?.(entity);
     }, [onEntityClick]);
 
+    // The handlers every card gets are the same two functions for the life of
+    // the grid, reading what they need when they are called. One per card per
+    // render — what `CardView` hands `renderCard` — would draw every card on
+    // every update. The selection controller is a new object with each
+    // selection, so it is read through the ref as well.
+    const latest = useRef({ onEntityClick, selectionController, selectionEnabled });
+    latest.current = { onEntityClick, selectionController, selectionEnabled };
+
     const handleSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {
-        selectionController?.toggleEntitySelection(entity, selected);
-    }, [selectionController]);
+        latest.current.selectionController?.toggleEntitySelection(entity, selected);
+    }, []);
+
+    /**
+     * A card was clicked: a modifier click ticks it, any other opens it — what
+     * the grid's own per-card handler does, for a `Collection.Card` override
+     * that does not handle the modifier itself.
+     */
+    const handleCardClick = useCallback((entity: Entity<M>, event?: React.MouseEvent) => {
+        const { onEntityClick, selectionController, selectionEnabled } = latest.current;
+        if (event && (event.metaKey || event.ctrlKey) && selectionEnabled) {
+            event.preventDefault();
+            selectionController?.toggleEntitySelection(entity, !selectionController.isEntitySelected(entity));
+            return;
+        }
+        onEntityClick?.(entity);
+    }, []);
 
     // Built from the rows on screen rather than from a list of the selected:
     // in query mode there is no such list, and this Set only ever describes
@@ -146,20 +177,41 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
             initialScroll={initialScroll}
             size={size}
             emptyComponent={emptyComponent}
-            renderCard={useCallback((entity, { selected, highlighted, onClick }) => (
-                <ResolvedEntityCard
+            renderCard={useCallback((entity, { selected, highlighted }) => (
+                <MemoisedCard
                     key={`${entity.path}_${entity.id}`}
                     entity={entity}
                     collection={collection}
                     searchString={tableController.searchString}
-                    onClick={(_entity, event) => onClick(event)}
+                    onClick={handleCardClick}
                     selected={selected}
                     highlighted={highlighted}
                     onSelectionChange={handleRowSelectionChange}
                     selectionEnabled={selectionEnabled}
                     size={size}
                 />
-            ), [collection, selectionEnabled, size, handleRowSelectionChange, ResolvedEntityCard, tableController.searchString])}
+            ), [collection, selectionEnabled, size, handleRowSelectionChange, handleCardClick, MemoisedCard, tableController.searchString])}
         />
+    );
+}
+
+/**
+ * Every prop by reference, except the row: a realtime frame decodes into new
+ * row objects whether or not anything in them changed, so the row is compared
+ * by value — the same row (id and path) with equal values draws the same card.
+ */
+function areCardPropsEqual<M extends Record<string, unknown>>(
+    a: EntityCardBindingProps<M>,
+    b: EntityCardBindingProps<M>
+): boolean {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof EntityCardBindingProps<M>>;
+    for (const key of keys) {
+        if (key === "entity") continue;
+        if (a[key] !== b[key]) return false;
+    }
+    return a.entity === b.entity || (
+        a.entity.id === b.entity.id &&
+        a.entity.path === b.entity.path &&
+        equal(a.entity.values, b.entity.values)
     );
 }
