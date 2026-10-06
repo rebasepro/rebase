@@ -5,6 +5,7 @@ import { DataService } from "./dataService";
 
 import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, CollectionUpdateMeta, IncludeSpec, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, OrderByTuple, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig, DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
@@ -287,6 +288,26 @@ type SubscriptionGroup = {
     timer?: ReturnType<typeof setTimeout>;
 };
 
+/**
+ * How many group refetches may run at once: a quarter of the connection pool
+ * the service shares with every REST request, and never fewer than two.
+ *
+ * One write to a list watched by many different principals arms a refetch
+ * per principal, and they all came due in the same tick. Started together,
+ * 200 of them were 200 transactions queued on a 20-connection pool, and an
+ * unrelated request arriving meanwhile waited behind every one (measured: a
+ * `SELECT 1` took 521 ms). Capped, the refetches queue here instead, and
+ * three quarters of the pool stays free for the requests. A pool this cannot
+ * read (a test double, a client that is not a `pg` pool) is taken to be the
+ * default 20-connection one.
+ */
+export function refetchConcurrencyFor(db: object): number {
+    const pool = "$client" in db && db.$client instanceof Pool ? db.$client : undefined;
+    // `pg`'s own default when a pool is built without a `max`.
+    const poolMax = pool ? (pool.options.max ?? 10) : 20;
+    return Math.max(2, Math.floor(poolMax / 4));
+}
+
 /** `JSON.stringify` with object keys sorted, so equal requests have one spelling. */
 function canonicalJson(value: unknown): string {
     return JSON.stringify(value, (_key, nested: unknown) => {
@@ -461,6 +482,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     /** Subscriptions one refetch answers — see {@link SubscriptionGroup}. */
     private groups = new Map<string, SubscriptionGroup>();
     /**
+     * Groups whose refetch is due and waiting for a slot, in the order they
+     * came due. A group is in it at most once; changes that arrive while it
+     * waits join the read it is waiting for, which starts after them.
+     */
+    private refetchQueue = new Set<SubscriptionGroup>();
+    /** Group refetches running now — at most {@link maxConcurrentRefetches}. */
+    private refetchesRunning = 0;
+    /** See {@link refetchConcurrencyFor}. */
+    public maxConcurrentRefetches: number;
+    /**
      * The collection groups on each path, and the single-row groups at each
      * `path` + id: what a change looks up, instead of walking every
      * subscription on the server once per changed row.
@@ -537,6 +568,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
     constructor(private db: NodePgDatabase<any>, private registry: PostgresCollectionRegistry) {
         super();
+        this.maxConcurrentRefetches = refetchConcurrencyFor(db);
         // No call-context provider, deliberately. This service is the
         // *no-driver* fallback — the branches below that cannot apply a database
         // auth context either — and without a driver there is no context to
@@ -683,6 +715,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         if (group.pending !== "all") group.pending.delete(key);
         if (group.members.size > 0) return;
         if (group.timer) clearTimeout(group.timer);
+        this.refetchQueue.delete(group);
         this.groups.delete(group.key);
         const [index, address] = group.type === "collection"
             ? [this.collectionGroupsByPath, group.path]
@@ -709,7 +742,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         const now = Date.now();
         group.lastChangeAt = now;
         group.firstPendingAt ??= now;
-        if (!group.timer) this.armGroupTimer(group, RealtimeService.REFETCH_DEBOUNCE_MS);
+        // A group already waiting for a slot needs no timer: its read starts
+        // after this change, and answers it.
+        if (!group.timer && !this.refetchQueue.has(group)) this.armGroupTimer(group, RealtimeService.REFETCH_DEBOUNCE_MS);
     }
 
     private armGroupTimer(group: SubscriptionGroup, delayMs: number): void {
@@ -726,8 +761,30 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 ));
                 return;
             }
-            void this.refetchGroup(group);
+            this.refetchQueue.add(group);
+            this.drainRefetchQueue();
         }, delayMs);
+    }
+
+    /**
+     * Start queued group refetches while fewer than
+     * {@link maxConcurrentRefetches} are running. Each one that settles starts
+     * the next, so the fan-out of one write waits its turn here rather than
+     * in the pool, ahead of every REST request.
+     */
+    private drainRefetchQueue(): void {
+        while (this.refetchesRunning < this.maxConcurrentRefetches) {
+            const next = this.refetchQueue.values().next();
+            if (next.done) return;
+            const group = next.value;
+            this.refetchQueue.delete(group);
+            if (this.groups.get(group.key) !== group) continue;
+            this.refetchesRunning++;
+            void this.refetchGroup(group).finally(() => {
+                this.refetchesRunning--;
+                this.drainRefetchQueue();
+            });
+        }
     }
 
     /**
@@ -2938,6 +2995,7 @@ lastSeen: Date.now() });
         }
 
         // 2. Clear subscriptions, callbacks and the groups and indexes over them
+        this.refetchQueue.clear();
         this._subscriptions.clear();
         this.subscriptionCallbacks.clear();
         this.subscriptionsByClient.clear();

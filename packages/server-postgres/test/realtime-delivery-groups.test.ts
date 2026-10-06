@@ -317,3 +317,44 @@ describe("a steady stream of writes", () => {
         expect(Math.max(...gaps, 3000 - deliveredAt[deliveredAt.length - 1])).toBeLessThanOrEqual(1100);
     });
 });
+
+describe("one write to a list many different principals watch", () => {
+    it("refetches a few groups at a time, so the fan-out cannot take the whole pool", async () => {
+        // Every group armed by one change used to start its refetch in the
+        // same tick: 200 principals on a list were 200 transactions queued on
+        // the 20-connection pool every REST request shares (measured: an
+        // unrelated `SELECT 1` waited 521 ms behind one write's fan-out).
+        const users = Array.from({ length: 40 }, (_, i): SubscriptionAuthContext => ({ uid: `user${i}`, roles: ["editor"] }));
+        const sockets = users.map((_, i) => connect(`c${i}`));
+        for (let i = 0; i < users.length; i++) await subscribeList(`c${i}`, "s", users[i]);
+        await flush();
+        for (const ws of sockets) ws.send.mockClear();
+
+        let inFlight = 0;
+        let peak = 0;
+        const held: Array<() => void> = [];
+        fetchCollectionForRest.mockClear();
+        fetchCollectionForRest.mockImplementation(async () => {
+            peak = Math.max(peak, ++inFlight);
+            await new Promise<void>((release) => held.push(release));
+            inFlight--;
+            return [{ id: 1, title: "Row" }];
+        });
+        try {
+            await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
+            jest.advanceTimersByTime(350);
+            await flush();
+            for (let round = 0; held.length > 0 && round < 100; round++) {
+                for (const release of held.splice(0)) release();
+                await flush();
+            }
+        } finally {
+            fetchCollectionForRest.mockImplementation(async () => [{ id: 1, title: "Row" }]);
+        }
+
+        // A quarter of the default 20-connection pool, and every group still served.
+        expect(peak).toBeLessThanOrEqual(5);
+        expect(fetchCollectionForRest).toHaveBeenCalledTimes(40);
+        for (const ws of sockets) expect(frames(ws).filter(f => f.type === "collection_update")).toHaveLength(1);
+    });
+});

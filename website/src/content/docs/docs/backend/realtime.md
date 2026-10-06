@@ -237,13 +237,15 @@ write to a list:
 | 1,000, one principal | 4 | ~350 ms |
 | 1,000, each a different principal | ~2,000 | ~700 ms |
 
-300 ms of each is the debounce. The second row is the ceiling to plan for: the
-refetches queue on the same pool as your REST traffic, so a collection written
-several times a second while **hundreds of different users** watch the same
-list is where realtime starts to compete with requests. Beyond that, prefer
-narrower subscriptions (a page, a filter on the user's own rows) or a
-[broadcast channel](#broadcast-channels) carrying the change for clients to
-re-fetch on their own schedule.
+300 ms of each is the debounce. The second row is the ceiling to plan for. The
+refetches run on the same pool as your REST traffic, but at most a quarter of
+its connections at a time (5 of the default 20, never fewer than 2); the rest
+wait their turn in the server, so a write's fan-out delays its own frames
+rather than your requests. A collection written several times a second while
+**hundreds of different users** watch the same list is where those frames
+start to lag. Beyond that, prefer narrower subscriptions (a page, a filter on
+the user's own rows) or a [broadcast channel](#broadcast-channels) carrying the
+change for clients to re-fetch on their own schedule.
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> **One socket may hold at most 1,000 subscriptions.** The next is refused with
 an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the
