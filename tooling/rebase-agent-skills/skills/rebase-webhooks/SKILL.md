@@ -616,7 +616,7 @@ Checks all registered webhooks for matching `table` + `event`, and dispatches to
 
 ### `enqueueEntityChange(table, event, id, entity, previousEntity?): void`
 
-Same matching and same payload, queued instead of awaited. Returns `void` immediately. Called inside a write (from a callback), the deliveries are held until that write commits and dropped if it rolls back; then they run on an in-process drain loop, so a collection callback does not hold its transaction open on HTTP and a receiver's outage cannot roll a write back. Results are reported through the `onDelivery` option.
+Same matching and same payload, queued instead of awaited. Returns `void` immediately. Called inside a write (from a callback), the deliveries are held until that write commits and dropped if it rolls back; then they run on an in-process drain loop — one per webhook, so a receiver that is down delays only its own deliveries — so a collection callback does not hold its transaction open on HTTP and a receiver's outage cannot roll a write back. Results are reported through the `onDelivery` option.
 
 By default the queue is **in memory**: a crash or a deploy between the commit and the delivery drops the event.
 
@@ -637,9 +637,9 @@ jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx
 
 Only the webhook's **id** goes on the job, never the webhook itself: its signing secret would otherwise sit in `rebase.jobs` in cleartext for as long as retention keeps the row, and a webhook edited between the enqueue and the delivery should go out as it is now.
 
-### `flush(): Promise<void>`
+### `flush(timeoutMs?): Promise<boolean>`
 
-Resolves when every queued delivery has finished. Call it on graceful shutdown so a deploy does not drop what is in flight, and in tests that need to observe what `enqueueEntityChange` sent.
+Resolves `true` when every queued delivery has finished. Call it on graceful shutdown so a deploy does not drop what is in flight, and in tests that need to observe what `enqueueEntityChange` sent. With `timeoutMs`, it resolves `false` once that budget runs out with deliveries still pending (they carry on in the background) — a receiver that is down can hold each of its deliveries for ~36 seconds of retries, so a shutdown should pass one.
 
 ## Event Types
 
@@ -715,7 +715,8 @@ afterSave: async ({ id, values, collection }) => {
 | **`previousEntity` not passed for UPDATE** | `old_record` is `undefined` (omitted from JSON). |
 | **`onEntityChange` is async** | The entire retry sequence is awaited: up to 10s per attempt plus 1s and 5s of backoff, so **~36s** worst case per matching webhook — not the ~6s the backoffs alone suggest. Inside a collection callback that is transaction time; use `enqueueEntityChange`. |
 | **`enqueueEntityChange` returns `void`** | Deliveries run after the caller returns. Nothing awaits them but `flush()`, and results arrive only through `onDelivery`. |
-| **Process exits with deliveries queued** | They are lost. `await dispatcher.flush()` on shutdown. |
+| **Process exits with deliveries queued** | They are lost. `await dispatcher.flush(10_000)` on shutdown. |
+| **One receiver is down** | Each webhook has its own in-process queue: its deliveries wait out their retries, every other webhook's go out as usual. Order is kept per webhook. |
 
 ## References
 

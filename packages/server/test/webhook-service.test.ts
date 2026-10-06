@@ -517,7 +517,66 @@ url: "https://b.com/hook" })
             dispatcher.setWebhooks([makeWebhook({ url: "http://127.0.0.1/hook" })]);
 
             dispatcher.enqueueEntityChange("users", "INSERT", "id_1", { id: "id_1" });
-            await expect(dispatcher.flush()).resolves.toBeUndefined();
+            await expect(dispatcher.flush()).resolves.toBe(true);
+        });
+
+        describe("with a receiver that is down", () => {
+            /**
+             * Two webhooks on one table. `dead.example.com` holds every POST
+             * open until `release()`; `ok.example.com` answers at once.
+             */
+            function twoReceivers() {
+                const delivered: string[] = [];
+                const dispatcher = makeDispatcher({
+                    onDelivery: r => delivered.push(`${r.webhookId}:${(r.payload.record as { id: string }).id}`)
+                });
+                dispatcher.setWebhooks([
+                    makeWebhook({ id: "wh_dead", url: "https://dead.example.com/hook" }),
+                    makeWebhook({ id: "wh_ok", url: "https://ok.example.com/hook" })
+                ]);
+                let release: () => void = () => undefined;
+                const outage = new Promise<void>(resolve => {
+                    release = resolve;
+                });
+                mockFetch.mockImplementation(async (url: string) => {
+                    if (url.includes("dead.example.com")) await outage;
+                    return respond(200);
+                });
+                return { dispatcher, delivered, release: () => release() };
+            }
+
+            async function until(check: () => boolean): Promise<void> {
+                for (let i = 0; i < 200 && !check(); i++) await new Promise(r => setTimeout(r, 5));
+            }
+
+            it("still delivers to the healthy one, in order", async () => {
+                // One serial queue for every webhook: a receiver that refused
+                // connections cost every other receiver six seconds per queued
+                // event (three attempts, 1s and 5s apart), and one that timed
+                // out cost thirty-six. Here the dead one never answers at all,
+                // and the healthy one heard nothing.
+                const { dispatcher, delivered, release } = twoReceivers();
+                for (const id of ["1", "2", "3"]) dispatcher.enqueueEntityChange("users", "INSERT", id, { id });
+
+                await until(() => delivered.length >= 3);
+                expect(delivered).toEqual(["wh_ok:1", "wh_ok:2", "wh_ok:3"]);
+
+                release();
+                await dispatcher.flush();
+                expect(delivered.filter(d => d.startsWith("wh_dead"))).toEqual(["wh_dead:1", "wh_dead:2", "wh_dead:3"]);
+            });
+
+            it("lets flush give up after its budget, and finish once the receiver answers", async () => {
+                const { dispatcher, delivered, release } = twoReceivers();
+                dispatcher.enqueueEntityChange("users", "INSERT", "1", { id: "1" });
+
+                await expect(dispatcher.flush(20)).resolves.toBe(false);
+                expect(delivered).toEqual(["wh_ok:1"]);
+
+                release();
+                await expect(dispatcher.flush(5_000)).resolves.toBe(true);
+                expect(delivered).toEqual(["wh_ok:1", "wh_dead:1"]);
+            });
         });
     });
 });

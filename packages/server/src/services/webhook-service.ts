@@ -87,6 +87,17 @@ interface QueuedDelivery {
     payload: Record<string, unknown>;
 }
 
+/**
+ * One webhook's in-process deliveries, in the order they were queued, and the
+ * loop working through them. Each webhook has its own, so a receiver that is
+ * down — six seconds of backoff per delivery when it refuses, thirty-six when
+ * it times out — only ever delays itself.
+ */
+interface DeliveryLane {
+    queue: QueuedDelivery[];
+    running: Promise<void>;
+}
+
 /** Read at most this much of a response before cancelling the rest. */
 const MAX_RESPONSE_BYTES = 64 * 1024;
 
@@ -96,8 +107,8 @@ export class WebhookDispatcher {
     private retryDelays = [1000, 5000, 15000]; // Exponential backoff
     private readonly options: WebhookDispatcherOptions;
     private readonly timeoutMs: number;
-    private queue: QueuedDelivery[] = [];
-    private draining: Promise<void> | null = null;
+    /** In-process deliveries, one lane per webhook id. A lane is removed when it empties. */
+    private lanes = new Map<string, DeliveryLane>();
 
     constructor(options: WebhookDispatcherOptions = {}) {
         this.options = options;
@@ -201,15 +212,34 @@ export class WebhookDispatcher {
                         // memory one, so it does not fail silently — and the
                         // delivery still goes out rather than being lost.
                         logger.error("[webhooks] Could not queue a delivery; falling back to in-process", { error });
-                        this.queue.push(job);
-                        this.startDraining();
+                        this.enqueueInProcess([job]);
                     });
             }
             return;
         }
 
-        this.queue.push(...jobs);
-        this.startDraining();
+        this.enqueueInProcess(jobs);
+    }
+
+    /**
+     * Append each delivery to its webhook's lane, starting the lane if it is
+     * idle. Deliveries to one webhook keep their order; deliveries to
+     * different webhooks no longer wait for each other — one serial queue for
+     * every webhook meant a receiver that refused connections held every
+     * other receiver six seconds per queued event.
+     */
+    private enqueueInProcess(jobs: QueuedDelivery[]): void {
+        for (const job of jobs) {
+            const id = job.webhook.id;
+            const lane = this.lanes.get(id);
+            if (lane) {
+                lane.queue.push(job);
+                continue;
+            }
+            const started: DeliveryLane = { queue: [job], running: Promise.resolve() };
+            this.lanes.set(id, started);
+            started.running = this.drainLane(id, started);
+        }
     }
 
     /**
@@ -256,33 +286,55 @@ export class WebhookDispatcher {
      * Wait for every queued delivery to finish. For graceful shutdown, and for
      * tests that need to observe what {@link enqueueEntityChange} sent.
      *
+     * `timeoutMs` bounds the wait: a receiver that is down costs each of its
+     * queued deliveries up to ~36 seconds of retries, which a shutdown cannot
+     * always afford. Resolves `true` when everything finished, `false` when
+     * the budget ran out first — those deliveries carry on in the background
+     * for as long as the process does. Without it, waits however long the
+     * deliveries take.
+     *
      * In-process deliveries only — with a `jobQueue` configured there is
      * nothing here to wait for, because the deliveries are rows.
      */
-    async flush(): Promise<void> {
-        while (this.draining) {
-            await this.draining;
-        }
-    }
-
-    private startDraining(): void {
-        if (this.draining) return;
-        const run = this.drainQueue().finally(() => {
-            if (this.draining === run) this.draining = null;
-        });
-        this.draining = run;
-    }
-
-    private async drainQueue(): Promise<void> {
-        while (this.queue.length > 0) {
-            const job = this.queue.shift() as QueuedDelivery;
-            try {
-                const result = await this.deliverWithRetry(job.webhook, job.event, job.payload);
-                this.options.onDelivery?.(result);
-            } catch {
-                // `deliverWithRetry` converts everything to a result, but a
-                // throw from `onDelivery` must not take the queue down with it.
+    async flush(timeoutMs?: number): Promise<boolean> {
+        const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
+        // A loop, not one wait: a delivery can queue another (a fallback from
+        // the job queue, an `onDelivery` that enqueues) while this waits.
+        while (this.lanes.size > 0) {
+            const lanes = Promise.all([...this.lanes.values()].map(lane => lane.running));
+            if (deadline === undefined) {
+                await lanes;
+                continue;
             }
+            const remaining = deadline - Date.now();
+            if (remaining <= 0) return false;
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const expired = new Promise<true>(resolve => {
+                timer = setTimeout(() => resolve(true), remaining);
+            });
+            const ranOut = await Promise.race([lanes.then(() => false), expired]);
+            clearTimeout(timer);
+            if (ranOut) return false;
+        }
+        return true;
+    }
+
+    private async drainLane(id: string, lane: DeliveryLane): Promise<void> {
+        try {
+            while (lane.queue.length > 0) {
+                const job = lane.queue.shift() as QueuedDelivery;
+                try {
+                    const result = await this.deliverWithRetry(job.webhook, job.event, job.payload);
+                    this.options.onDelivery?.(result);
+                } catch {
+                    // `deliverWithRetry` converts everything to a result, but a
+                    // throw from `onDelivery` must not take the lane down with it.
+                }
+            }
+        } finally {
+            // Same tick as the empty check above, so nothing can be appended
+            // to a lane that is about to be dropped.
+            if (this.lanes.get(id) === lane) this.lanes.delete(id);
         }
     }
 

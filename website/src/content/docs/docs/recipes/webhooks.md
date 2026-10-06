@@ -72,8 +72,11 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
 ```
 
 The queue is in-process and in-memory: a crash or a deploy between the commit and the delivery
-drops the event. Call `await dispatcher.flush()` on shutdown. If you need deliveries to survive a
-restart, write an outbox row in the same transaction and drain it from a job instead.
+drops the event. Each webhook has its own queue, so a receiver that is down delays only its own
+deliveries, never another webhook's. Call `await dispatcher.flush(10_000)` on shutdown: it waits
+for what is queued and resolves `false` if the budget runs out first, because a receiver that is
+down can hold each of its deliveries for up to ~36 seconds of retries. If you need deliveries to
+survive a restart, write an outbox row in the same transaction and drain it from a job instead.
 
 ### Calling an endpoint directly
 
