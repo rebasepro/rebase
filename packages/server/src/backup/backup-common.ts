@@ -153,7 +153,10 @@ export async function listBackupObjects(
             .sort(byNewest);
     }
 
-    if (!storage) return [];
+    // An empty list is a claim about the bucket. Without a controller for it
+    // nothing was read, and the panel said "No backups yet." about a bucket
+    // full of them.
+    if (!storage) throw new Error(noControllerFor(dest));
     const keys = await listAllObjectKeys(storage, dest.prefix ? `${dest.prefix}/` : "", dest.bucket);
     const present = new Set(keys);
     return keys
@@ -170,6 +173,11 @@ export async function listBackupObjects(
             };
         })
         .sort(byNewest);
+}
+
+function noControllerFor(dest: { kind: "s3" | "gcs"; bucket: string; prefix: string }): string {
+    const scheme = dest.kind === "s3" ? "s3" : "gs";
+    return `No storage controller for ${scheme}://${dest.bucket}${dest.prefix ? `/${dest.prefix}` : ""}, so its backups cannot be read.`;
 }
 
 function byNewest(a: BackupInfo, b: BackupInfo): number {
@@ -207,7 +215,7 @@ export async function readBackupBytes(
         return { bytes: new Uint8Array(fs.readFileSync(resolved)), name: path.basename(resolved) };
     }
 
-    if (!storage) return null;
+    if (!storage) throw new Error(noControllerFor(dest));
     if (!isObjectBackupKey(dest, key)) return null;
     const file = await storage.getObject(key, dest.bucket);
     if (!file) return null;
@@ -240,7 +248,7 @@ export async function openBackupStream(
         return { stream: fileStream(resolved), size, name: path.basename(resolved) };
     }
 
-    if (!storage) return null;
+    if (!storage) throw new Error(noControllerFor(dest));
     if (!isObjectBackupKey(dest, key)) return null;
     const file = await storage.getObject(key, dest.bucket);
     if (!file) return null;

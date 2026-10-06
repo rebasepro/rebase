@@ -1178,6 +1178,7 @@ export const fr: RebaseTranslations = {
     studio_backups_manual_run_failed: "La dernière exécution manuelle a échoué ({{when}})",
     studio_backups_history_unreadable: "Impossible de lire l'historique d'exécution de la sauvegarde planifiée : on ne sait donc pas si elle s'est exécutée. La raison figure dans le journal du serveur.",
     studio_backups_job_refused: "Les sauvegardes planifiées ne s'exécutent jamais : le planificateur a refusé la tâche {{job}}. Corrigez-la dans son fichier cron.",
+    studio_backups_local_disk_of_this_process: "Voici les sauvegardes présentes sur le disque de ce processus serveur. Les sauvegardes planifiées s'exécutent dans un autre processus et écrivent sur son disque : elles n'apparaissent ici que si les deux partagent ce répertoire. Une destination s3:// ou gs:// se lit de la même façon depuis chaque processus.",
     studio_backups_unavailable_title: "Sauvegardes indisponibles",
     studio_backups_unavailable_body: "Ce backend n'expose pas l'API des sauvegardes.",
     studio_cron_denied_title: "Vous ne pouvez pas lister les tâches cron de ce projet",

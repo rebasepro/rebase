@@ -1178,6 +1178,7 @@ export const it: RebaseTranslations = {
     studio_backups_manual_run_failed: "L'ultima esecuzione manuale non è riuscita ({{when}})",
     studio_backups_history_unreadable: "Non è stato possibile leggere la cronologia delle esecuzioni del backup pianificato, quindi non si sa se è stato eseguito. Il motivo è nel log del server.",
     studio_backups_job_refused: "I backup pianificati non vengono mai eseguiti: lo scheduler ha rifiutato il processo {{job}}. Correggilo nel suo file cron.",
+    studio_backups_local_disk_of_this_process: "Questi sono i backup sul disco di questo processo del server. I backup pianificati vengono eseguiti in un altro processo e scrivono sul suo disco, quindi compaiono qui solo se i due condividono questa directory. Una destinazione s3:// o gs:// si legge allo stesso modo da ogni processo.",
     studio_backups_unavailable_title: "Backup non disponibili",
     studio_backups_unavailable_body: "Questo backend non espone l'API dei backup.",
     studio_cron_denied_title: "Non puoi elencare i processi cron di questo progetto",

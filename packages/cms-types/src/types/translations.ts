@@ -1289,6 +1289,7 @@ export interface RebaseTranslations {
     studio_backups_manual_run_failed?: string;
     studio_backups_history_unreadable?: string;
     studio_backups_job_refused?: string;
+    studio_backups_local_disk_of_this_process?: string;
     studio_backups_unavailable_title?: string;
     studio_backups_unavailable_body?: string;
     studio_cron_denied_title?: string;

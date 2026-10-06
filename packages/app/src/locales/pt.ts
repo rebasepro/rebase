@@ -1183,6 +1183,7 @@ export const pt: RebaseTranslations = {
     studio_backups_manual_run_failed: "A última execução manual falhou ({{when}})",
     studio_backups_history_unreadable: "Não foi possível ler o histórico de execuções da cópia de segurança agendada, por isso não se sabe se foi executada. O motivo está no registo do servidor.",
     studio_backups_job_refused: "As cópias de segurança agendadas nunca são executadas: o agendador recusou a tarefa {{job}}. Corrija-a no respetivo ficheiro cron.",
+    studio_backups_local_disk_of_this_process: "Estas são as cópias de segurança no disco deste processo do servidor. As cópias agendadas são executadas noutro processo e escrevem no disco dele, por isso só aparecem aqui se ambos partilharem este diretório. Um destino s3:// ou gs:// lê-se da mesma forma a partir de qualquer processo.",
     studio_backups_unavailable_title: "Cópias de segurança indisponíveis",
     studio_backups_unavailable_body: "Este backend não expõe a API de cópias de segurança.",
     studio_cron_denied_title: "Não pode listar as tarefas cron deste projeto",

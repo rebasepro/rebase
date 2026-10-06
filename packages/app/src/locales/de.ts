@@ -1178,6 +1178,7 @@ export const de: RebaseTranslations = {
     studio_backups_manual_run_failed: "Der letzte manuelle Lauf ist fehlgeschlagen ({{when}})",
     studio_backups_history_unreadable: "Der Ausführungsverlauf der geplanten Sicherung konnte nicht gelesen werden, daher ist unbekannt, ob sie gelaufen ist. Der Grund steht im Server-Log.",
     studio_backups_job_refused: "Geplante Sicherungen laufen nie: Der Scheduler hat den Job {{job}} abgelehnt. Korrigiere ihn in seiner Cron-Datei.",
+    studio_backups_local_disk_of_this_process: "Dies sind die Sicherungen auf der Festplatte dieses Serverprozesses. Geplante Sicherungen laufen in einem anderen Prozess und schreiben auf dessen Festplatte; sie erscheinen hier nur, wenn beide dieses Verzeichnis teilen. Ein Ziel s3:// oder gs:// liest sich von jedem Prozess aus gleich.",
     studio_backups_unavailable_title: "Sicherungen nicht verfügbar",
     studio_backups_unavailable_body: "Dieses Backend stellt die Sicherungs-API nicht bereit.",
     studio_cron_denied_title: "Du darfst die Cron-Jobs dieses Projekts nicht auflisten",

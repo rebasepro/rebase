@@ -34,7 +34,10 @@ describe("GET /download", () => {
     afterEach(() => jest.restoreAllMocks());
 
     function download(key: string, storage?: StorageController, destination = dir) {
-        const router = createBackupRoutes({ getDestination: () => parseBackupDestination(destination), storage });
+        const router = createBackupRoutes({
+            getDestination: () => parseBackupDestination(destination),
+            ...(storage ? { storageFor: () => storage } : {})
+        });
         return router.request(`/download?key=${encodeURIComponent(key)}`);
     }
 

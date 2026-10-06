@@ -196,6 +196,21 @@ describe("Backups panel and the scheduled run", () => {
         await waitFor(() => expect(screen.getByText(/^Scheduled backups are paused\. Resume the nightly job/)).toBeTruthy());
     });
 
+    it("says a local listing is this process's disk when the schedule runs in another", async () => {
+        // The api role of a split deployment lists its own disk; the worker
+        // writes the scheduled dumps to its own.
+        list.mockResolvedValue({
+            backups: [],
+            destinationKind: "local",
+            configured: true,
+            localDiskOfThisProcess: true,
+            schedule: { jobId: "backup", name: "Backup", schedule: "0 3 * * *", enabled: true }
+        });
+        render(<BackupsView/>);
+
+        await waitFor(() => expect(screen.getByText(en.studio_backups_local_disk_of_this_process!)).toBeTruthy());
+    });
+
     it("with no schedule, says how to take or schedule a backup — in the reader's language", async () => {
         // An older server sends no `schedule` at all.
         list.mockResolvedValue({ backups: [], destinationKind: "local", configured: true });

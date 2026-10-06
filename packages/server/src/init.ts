@@ -3542,7 +3542,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     // 6b. Mount Backup admin routes (for the Studio Backups panel).
     // Read the destination lazily from env so config changes don't need a
-    // rebuild. Only enabled when BACKUP_DESTINATION is set.
+    // rebuild. Only enabled when BACKUP_DESTINATION is set. An object-storage
+    // destination is read through a controller for its own bucket, built from
+    // the S3_* environment as the backup cron builds its own — not through the
+    // app's file storage, which is another bucket, a local directory, or none.
     if (surfaces.admin) {
         const { createBackupRoutes, parseBackupDestination, readBackupSchedule } = await import("./backup");
         const backupRouter = new Hono<HonoEnv>();
@@ -3558,8 +3561,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 const out = process.env.BACKUP_DESTINATION?.trim();
                 return out ? parseBackupDestination(out) : null;
             },
-            storage: storageController,
-            getSchedule: scheduler ? () => readBackupSchedule(scheduler) : undefined
+            getSchedule: scheduler ? () => readBackupSchedule(scheduler) : undefined,
+            scheduledElsewhere: !ownership.cronScheduler
         }));
         config.app.route(`${basePath}/admin/backups`, backupRouter);
         logger.debug("Backup admin routes mounted", { path: `${basePath}/admin/backups` });

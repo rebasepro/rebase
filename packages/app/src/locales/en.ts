@@ -1186,6 +1186,7 @@ export const en: RebaseTranslations = {
     studio_backups_manual_run_failed: "The last run by hand failed ({{when}})",
     studio_backups_history_unreadable: "Could not read the scheduled backup's run history, so whether it ran is not known. The server log has the reason.",
     studio_backups_job_refused: "Scheduled backups never run: the scheduler refused the {{job}} job. Fix it in its cron file.",
+    studio_backups_local_disk_of_this_process: "These are the backups on this server process's disk. Scheduled backups run in another process and write to its disk, so they are listed here only if both share this directory. An s3:// or gs:// destination reads the same from every process.",
     studio_backups_unavailable_title: "Backups not available",
     studio_backups_unavailable_body: "This backend does not expose the backups API.",
     studio_cron_denied_title: "You cannot list this project's cron jobs",

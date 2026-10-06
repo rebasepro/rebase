@@ -207,7 +207,9 @@ describe("server backup-common", () => {
         });
     });
 
-    it("returns empty for object storage without a controller", async () => {
-        expect(await listBackupObjects(parseBackupDestination("s3://b/p"))).toEqual([]);
+    it("refuses object storage without a controller, rather than answering empty", async () => {
+        // Empty is a claim about the bucket. Nothing was read, and the
+        // Backups panel said "No backups yet." about a bucket full of them.
+        await expect(listBackupObjects(parseBackupDestination("s3://b/p"))).rejects.toThrow("s3://b/p");
     });
 });

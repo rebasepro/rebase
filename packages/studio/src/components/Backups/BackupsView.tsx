@@ -161,6 +161,7 @@ export function BackupsView() {
     const [backups, setBackups] = useState<BackupInfo[]>([]);
     const [destinationKind, setDestinationKind] = useState<string>("local");
     const [configured, setConfigured] = useState(true);
+    const [localDiskOfThisProcess, setLocalDiskOfThisProcess] = useState(false);
     const [schedule, setSchedule] = useState<BackupScheduleStatus | null>(null);
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState<string | null>(null);
@@ -185,6 +186,7 @@ export function BackupsView() {
             setBackups(res.backups);
             setDestinationKind(res.destinationKind);
             setConfigured(res.configured);
+            setLocalDiskOfThisProcess(res.localDiskOfThisProcess === true);
             // Absent from a server that predates the field.
             setSchedule(res.schedule ?? null);
         } catch (e: unknown) {
@@ -276,6 +278,16 @@ export function BackupsView() {
                         {schedule && (
                             <div className="max-w-3xl">
                                 <BackupScheduleSummary schedule={schedule}/>
+                            </div>
+                        )}
+                        {/* The api process of a split deployment lists its own disk; the worker writes elsewhere. */}
+                        {configured && localDiskOfThisProcess && (
+                            <div className="max-w-3xl">
+                                <Alert color="info">
+                                    <Typography variant="body2" className="text-[13px]">
+                                        {t("studio_backups_local_disk_of_this_process")}
+                                    </Typography>
+                                </Alert>
                             </div>
                         )}
                         {!configured ? (

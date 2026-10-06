@@ -126,4 +126,12 @@ export interface BackupListing {
      * Absent from a server that predates the field.
      */
     schedule?: BackupScheduleStatus | null;
+
+    /**
+     * True when the destination is a local path and the scheduled backup runs
+     * in another process (the worker of a split deployment). The backups
+     * listed are the ones on this process's disk; the scheduled runs write to
+     * theirs, which is the same directory only when both mount it.
+     */
+    localDiskOfThisProcess?: boolean;
 }

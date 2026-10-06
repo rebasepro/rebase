@@ -1186,6 +1186,7 @@ export const es: RebaseTranslations = {
     studio_backups_manual_run_failed: "La última ejecución manual falló ({{when}})",
     studio_backups_history_unreadable: "No se ha podido leer el historial de ejecuciones de la copia de seguridad programada, así que no se sabe si se ha ejecutado. El motivo está en el registro del servidor.",
     studio_backups_job_refused: "Las copias de seguridad programadas nunca se ejecutan: el planificador rechazó la tarea {{job}}. Corrígela en su archivo cron.",
+    studio_backups_local_disk_of_this_process: "Estas son las copias de seguridad del disco de este proceso del servidor. Las copias programadas se ejecutan en otro proceso y escriben en su disco, así que solo aparecen aquí si ambos comparten este directorio. Un destino s3:// o gs:// se lee igual desde cualquier proceso.",
     studio_backups_unavailable_title: "Copias de seguridad no disponibles",
     studio_backups_unavailable_body: "Este backend no expone la API de copias de seguridad.",
     studio_cron_denied_title: "No puedes listar las tareas cron de este proyecto",
