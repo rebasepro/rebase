@@ -331,6 +331,28 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
         });
     });
 
+    // ── a belongsTo include reads no key twice ──────────────────────────────
+
+    describe("a belongsTo include", () => {
+        /** The reads of `table` that fetched rows, not a COUNT. */
+        const rowReads = (sent: Statement[], table: string) =>
+            reading(sent, table).filter(s => !/count\(/i.test(s.text));
+
+        it("takes each foreign key off the rows it already read", async () => {
+            const { json, statements: sent } = await measure("/posts?limit=25&orderBy=id:asc&include=author.company");
+            for (const post of json.data ?? []) expect((post.author as Row).company).toMatchObject({ id: expect.anything() });
+            // The page, and the authors: neither table is read again for its keys.
+            expect(rowReads(sent, "posts")).toHaveLength(1);
+            expect(rowReads(sent, "authors")).toHaveLength(1);
+        });
+
+        it("still loads it when a projection left the key out of the row", async () => {
+            const { rows } = await admin.query<{ id: number; author_id: number }>("SELECT id, author_id FROM posts WHERE id <= 5 ORDER BY id");
+            const { json } = await measure("/posts?limit=5&orderBy=id:asc&fields=id,title&include=author");
+            expect((json.data ?? []).map(post => (post.author as Row).id)).toEqual(rows.map(r => r.author_id));
+        });
+    });
+
     // ── `via` on a booted schema ───────────────────────────────────────────
 
     describe("a `via` relation, written in column terms", () => {

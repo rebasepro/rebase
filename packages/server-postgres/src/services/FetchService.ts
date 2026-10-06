@@ -740,8 +740,10 @@ target });
                     // level and a `{ __type: "date" }` envelope one level down,
                     // in one response — and how the target's own to-one
                     // relations arrived as `{ __type: "relation" }` refs.
+                    // The rows go along so a `belongsTo` takes each foreign
+                    // key from the row rather than selecting it again.
                     const results = await this.relationService.batchFetchRelatedEntities(
-                        collectionPath, rowIds, key, relation, narrow, { style: "rest" }
+                        collectionPath, rowIds, key, relation, narrow, { style: "rest", parentRows: addressable }
                     );
                     for (const row of addressable) {
                         const related = results.get(String(addressOf(row)));
@@ -942,7 +944,9 @@ target });
         row: Record<string, unknown>,
         address: string,
         collection: CollectionConfig,
-        collectionPath: string
+        collectionPath: string,
+        /** The row as read, so a `belongsTo` takes its foreign key from it. */
+        sourceRow: Record<string, unknown>
     ): Promise<void> {
         if (!address) return;
         const toRef = (related: { id: string | number; path: string; values: Record<string, unknown> }) =>
@@ -956,7 +960,7 @@ target });
             try {
                 if (relation.cardinality === "one") {
                     const related = (await this.relationService.batchFetchRelatedEntities(
-                        collectionPath, [address], key, relation
+                        collectionPath, [address], key, relation, undefined, { parentRows: [sourceRow] }
                     )).get(address);
                     if (related) row[key] = toRef(related);
                 } else {
@@ -1365,7 +1369,7 @@ target });
             if (row === undefined) return undefined;
             if (row !== null) {
                 const flatRow = toFlatRow(row, collection, this.registry);
-                await this.loadRelationRefs(flatRow, buildCompositeId(row, idInfoArray), collection, collectionPath);
+                await this.loadRelationRefs(flatRow, buildCompositeId(row, idInfoArray), collection, collectionPath, row);
 
                 // Again, now the relations are on the row: a relation property
                 // the caller may not read is withheld like any other field.
@@ -1388,7 +1392,7 @@ target });
         // owned foreign key into a ref. Given them, it queried each inverse
         // relation itself, with neither the target's scope nor its soft delete.
         const values = await parseDataFromServer(raw, collection) as Record<string, unknown>;
-        await this.loadRelationRefs(values, buildCompositeId(raw, idInfoArray), collection, collectionPath);
+        await this.loadRelationRefs(values, buildCompositeId(raw, idInfoArray), collection, collectionPath, raw);
 
         // The primary path strips inside `toFlatRow`; this one parses the row
         // itself, so it strips itself. Without it a fetch that fell back served

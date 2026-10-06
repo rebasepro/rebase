@@ -994,8 +994,16 @@ export class RelationService {
         _relationKey: string,
         relation: ResolvedRelation,
         narrow?: SQL,
-        /** `style` — how each target row is rendered; see {@link RelatedRowStyle}. */
-        options?: { style?: RelatedRowStyle }
+        options?: {
+            /** How each target row is rendered; see {@link RelatedRowStyle}. */
+            style?: RelatedRowStyle;
+            /**
+             * The parent rows themselves, in `parentIds` order, when the caller
+             * holds them. A `belongsTo` reads each one's foreign key off its
+             * row rather than selecting it again.
+             */
+            parentRows?: Record<string, unknown>[];
+        }
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>>> {
         if (parentIds.length === 0) return new Map();
 
@@ -1093,27 +1101,46 @@ export class RelationService {
                 throw new Error(`Local key column '${relation.localKey}' not found in parent table`);
             }
 
-            // Step 1: Fetch all FK values from parent table in ONE query
-            const fkRows = await this.db
-                .select({
-                    parentId: parentIdCol,
-                    fkValue: localKeyCol
-                })
-                .from(parentTable)
-                .where(inArray(parentIdCol, parsedParentIds));
-
-            // Build parentId → fkValue mapping and collect unique FK values
-            const parentToFk = new Map<string, string | number>();
-            const uniqueFkValues: (string | number)[] = [];
+            // Step 1: the foreign key of every parent. A parent row the caller
+            // already holds carries it under `localKeyField`, and is read from
+            // there; only the parents whose row does not — a `fields`
+            // projection that left it out, a key withheld by field access —
+            // cost a query, the ONE query this step always used to be. It
+            // re-read keys the page had just selected: a statement per
+            // belongsTo per include level, for nothing.
+            const parentToFk = new Map<string, unknown>();
+            const uniqueFkValues: unknown[] = [];
             const seenFks = new Set<string>();
-
-            for (const row of fkRows as Array<{ parentId: string | number; fkValue: string | number | null }>) {
-                if (row.fkValue == null) continue;
-                parentToFk.set(String(row.parentId), row.fkValue);
-                const fkStr = String(row.fkValue);
+            const remember = (parentId: string, fkValue: unknown) => {
+                if (fkValue === null || fkValue === undefined) return;
+                parentToFk.set(parentId, fkValue);
+                const fkStr = String(fkValue);
                 if (!seenFks.has(fkStr)) {
                     seenFks.add(fkStr);
-                    uniqueFkValues.push(row.fkValue);
+                    uniqueFkValues.push(fkValue);
+                }
+            };
+
+            const toRead: (string | number)[] = [];
+            parentIds.forEach((parentId, i) => {
+                const row = options?.parentRows?.[i];
+                if (row && Object.prototype.hasOwnProperty.call(row, localKeyField)) {
+                    remember(String(parentId), row[localKeyField]);
+                } else {
+                    toRead.push(parsedParentIds[i]);
+                }
+            });
+
+            if (toRead.length > 0) {
+                const fkRows = await this.db
+                    .select({
+                        parentId: parentIdCol,
+                        fkValue: localKeyCol
+                    })
+                    .from(parentTable)
+                    .where(inArray(parentIdCol, toRead));
+                for (const row of fkRows) {
+                    remember(String(row.parentId), row.fkValue);
                 }
             }
 
