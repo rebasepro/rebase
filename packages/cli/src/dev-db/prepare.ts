@@ -25,7 +25,7 @@ import path from "path";
 import { composeDatabaseUrl } from "../utils/dev-preflight";
 import { findProjectRoot, readEnvFile } from "../utils/project";
 import { resourceEnvSuffix } from "@rebasepro/types";
-import { branchUrl, readActiveBranch } from "./branch-pointer";
+import { branchUrl, databaseNameOf, readActiveBranch } from "./branch-pointer";
 import { MANAGED_LIMITATIONS, MANAGED_POOL_MAX } from "./constraints";
 import { ensureManagedDatabase } from "./daemon";
 import { type DevDatabase, describeDevDatabase, resolveDevDatabase } from "./resolve";
@@ -159,6 +159,17 @@ export function devDatabaseKind(projectRoot?: string | null): DevDatabase["kind"
 export const DEV_DATABASE_KIND_ENV = "REBASE_DEV_DATABASE_KIND";
 
 /**
+ * The variable that tells a server started on a branch which database it was
+ * branched from.
+ *
+ * The branch registry lives in that database, and a branch database holds
+ * only a snapshot of it taken when it was copied — so a server on a branch
+ * keeps its branches, and copies new ones from, the database named here. A
+ * branch URL does not say which that is; only this checkout's `.env` does.
+ */
+export const BRANCH_PARENT_DATABASE_ENV = "REBASE_BRANCH_PARENT_DATABASE";
+
+/**
  * Resolve, start if needed, and describe the database for this command.
  *
  * `projectRoot` is where the managed database's data lives, so two projects on
@@ -192,7 +203,14 @@ export async function prepareDatabaseEnv(
         //
         // Safe to set: `dotenv` does not overwrite a variable that is already
         // in the environment, so the child's own `.env` load cannot undo it.
-        return { database, env: { DATABASE_URL: database.url }, description };
+        // On a branch, the database it was branched from too: the one
+        // `resolveActiveBranch` swapped the name on.
+        const parent = database.source === "branch" ? databaseNameOf(envFile.DATABASE_URL?.trim() ?? "") : null;
+        return {
+            database,
+            env: { DATABASE_URL: database.url, ...(parent ? { [BRANCH_PARENT_DATABASE_ENV]: parent } : {}) },
+            description
+        };
     }
 
     if (database.kind === "docker") {

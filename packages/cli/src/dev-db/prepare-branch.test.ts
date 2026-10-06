@@ -13,7 +13,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { prepareDatabaseEnv, resolveActiveBranch } from "./prepare";
+import { BRANCH_PARENT_DATABASE_ENV, prepareDatabaseEnv, resolveActiveBranch } from "./prepare";
 import { writeActiveBranch } from "./branch-pointer";
 
 describe("prepareDatabaseEnv with a branch active", () => {
@@ -34,6 +34,18 @@ describe("prepareDatabaseEnv with a branch active", () => {
 
         expect(prepared.env.DATABASE_URL)
             .toBe("postgresql://rebase:s3cret@localhost:5434/rb_feat_x?sslmode=disable");
+    });
+
+    it("names the main database the branch was taken from, where the server keeps its branches", async () => {
+        // A branch database holds only a snapshot of the branch registry,
+        // taken when it was copied; the registry itself lives in the main
+        // database. The server cannot tell which that is from a branch URL.
+        writeActiveBranch(root, { name: "feat_x", database: "rb_feat_x" });
+
+        const prepared = await prepareDatabaseEnv(root);
+
+        expect(prepared.env[BRANCH_PARENT_DATABASE_ENV]).toBe("leadgen");
+        expect(BRANCH_PARENT_DATABASE_ENV).toBe("REBASE_BRANCH_PARENT_DATABASE");
     });
 
     it("names the branch in the line commands print", async () => {

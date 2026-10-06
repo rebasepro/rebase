@@ -78,6 +78,19 @@ export function isRoleSwitchingOptedOut(): boolean {
 }
 
 /**
+ * The main database, when this process serves a branch of it.
+ *
+ * `rebase dev` on a checkout switched to a branch connects to the branch, and
+ * names the database it was branched from in `REBASE_BRANCH_PARENT_DATABASE`.
+ * Branches are kept there — the registry, and the default source of a new
+ * one — as they are when the main database itself is served: a branch's own
+ * `rebase.branches` is a snapshot, taken before its row was written.
+ */
+export function branchParentDatabase(): string | undefined {
+    return process.env.REBASE_BRANCH_PARENT_DATABASE?.trim() || undefined;
+}
+
+/**
  * The role a statement will actually have run as, given the role it asked for.
  *
  * For the audit log, which recorded `options.role` — the *requested* role — and
@@ -413,8 +426,11 @@ export class PostgresBackendDriver implements DataDriver {
         // Initialize BranchService when adminConnectionString is configured
         if (poolManager) {
             this.branchService = new BranchService(db, poolManager, {
-                database: () => this.appDatabaseName(),
-                registry: async () => this.db
+                database: async () => branchParentDatabase() ?? await this.appDatabaseName(),
+                registry: async () => {
+                    const parent = branchParentDatabase();
+                    return parent && parent !== await this.appDatabaseName() ? poolManager.getDrizzle(parent) : this.db;
+                }
             });
         }
 
