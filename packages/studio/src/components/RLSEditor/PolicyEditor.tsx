@@ -20,6 +20,7 @@ import {
 } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
 import { RLS_JWT_SQL, RLS_ROLES_SQL, RLS_UID_SQL } from "@rebasepro/types";
+import { REBASE_USER_ROLE } from "@rebasepro/common";
 import {
     COMMAND_OPTIONS,
     POLICY_PRESETS,
@@ -318,11 +319,17 @@ export const PolicyEditor = ({
                             <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark mb-1">
                                 {t("studio_policy_help_step2_desc")}
                             </Typography>
+                            {/* Database roles, which is all a `TO` list can name. Every
+                                API request runs as REBASE_USER_ROLE, so "signed-in users"
+                                and "anonymous visitors" are not roles a policy can target
+                                — they are conditions, and the templates write them as such. */}
                             <ul className="list-disc pl-5 space-y-1 text-sm text-text-secondary dark:text-text-secondary-dark">
                                 <li><strong>public</strong>: {t("studio_policy_help_role_public")}</li>
-                                <li><strong>authenticated</strong>: {t("studio_policy_help_role_authenticated")}</li>
-                                <li><strong>anon</strong>: {t("studio_policy_help_role_anon")}</li>
+                                <li><strong>{REBASE_USER_ROLE}</strong>: {t("studio_policy_help_role_rebase_user")}</li>
                             </ul>
+                            <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark mt-1">
+                                {t("studio_policy_help_roles_not_users")}
+                            </Typography>
                         </Paper>
 
                         <Paper className={cls("p-4 sm:p-5 flex flex-col gap-1", defaultBorderMixin)}>

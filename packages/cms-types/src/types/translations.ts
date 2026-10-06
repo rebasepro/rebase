@@ -1101,8 +1101,8 @@ export interface RebaseTranslations {
     studio_policy_help_step2_title: string;
     studio_policy_help_step2_desc: string;
     studio_policy_help_role_public?: string;
-    studio_policy_help_role_authenticated?: string;
-    studio_policy_help_role_anon?: string;
+    studio_policy_help_role_rebase_user?: string;
+    studio_policy_help_roles_not_users?: string;
     studio_policy_help_step3_title: string;
     studio_policy_help_step3_desc: string;
     studio_policy_help_step3_example: string;
