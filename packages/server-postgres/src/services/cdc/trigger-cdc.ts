@@ -68,6 +68,16 @@ const quoteLiteral = (value: string): string => `'${value.replace(/'/g, "''")}'`
  *    maps any more;
  *  - otherwise `id`, if the table has one, and else nothing: a change the
  *    consumer can only treat as collection-wide.
+ *
+ * A trigger attached by `id` alone — what provisioning gives every collection
+ * keyed by `id` — reads that one column straight off the row. Reaching any
+ * other key goes through `to_jsonb` of the whole row, which fetches every
+ * TOASTed column and serialises it: on a table with a rich-text or JSON
+ * document per row, a write that only flipped `status` cost the trigger
+ * 150–260 µs per row instead of ~5, to read a key. The payload is the same
+ * text either way. A column renamed since the trigger was attached raises
+ * `undefined_column` on that read, which falls through to the general path
+ * rather than failing the write.
  */
 export function buildCdcFunctionSql(): string {
     return `
@@ -81,30 +91,45 @@ DECLARE
     col     text;
     payload text;
 BEGIN
-    -- The tuple is read here and never leaves this function: only the
-    -- identity below is put on the channel.
-    IF (TG_OP = 'DELETE') THEN
-        rec := to_jsonb(OLD);
-    ELSE
-        rec := to_jsonb(NEW);
+    -- The common key, read on its own: no other column is fetched.
+    IF TG_NARGS = 1 AND TG_ARGV[0] = 'id' THEN
+        BEGIN
+            IF (TG_OP = 'DELETE') THEN
+                ident := jsonb_build_object('id', OLD.id);
+            ELSE
+                ident := jsonb_build_object('id', NEW.id);
+            END IF;
+        EXCEPTION WHEN undefined_column THEN
+            ident := '{}'::jsonb;
+        END;
     END IF;
-
-    FOR n IN 0 .. TG_NARGS - 1 LOOP
-        col := TG_ARGV[n];
-        IF rec ? col THEN
-            ident := ident || jsonb_build_object(col, rec -> col);
-        END IF;
-    END LOOP;
 
     IF ident = '{}'::jsonb THEN
-        SELECT coalesce(jsonb_object_agg(a.attname, rec -> a.attname), '{}'::jsonb) INTO ident
-        FROM pg_index i
-        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
-        WHERE i.indrelid = TG_RELID AND i.indisprimary;
-    END IF;
+        -- The tuple is read here and never leaves this function: only the
+        -- identity below is put on the channel.
+        IF (TG_OP = 'DELETE') THEN
+            rec := to_jsonb(OLD);
+        ELSE
+            rec := to_jsonb(NEW);
+        END IF;
 
-    IF ident = '{}'::jsonb AND rec ? 'id' THEN
-        ident := jsonb_build_object('id', rec -> 'id');
+        FOR n IN 0 .. TG_NARGS - 1 LOOP
+            col := TG_ARGV[n];
+            IF rec ? col THEN
+                ident := ident || jsonb_build_object(col, rec -> col);
+            END IF;
+        END LOOP;
+
+        IF ident = '{}'::jsonb THEN
+            SELECT coalesce(jsonb_object_agg(a.attname, rec -> a.attname), '{}'::jsonb) INTO ident
+            FROM pg_index i
+            JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+            WHERE i.indrelid = TG_RELID AND i.indisprimary;
+        END IF;
+
+        IF ident = '{}'::jsonb AND rec ? 'id' THEN
+            ident := jsonb_build_object('id', rec -> 'id');
+        END IF;
     END IF;
 
     payload := json_build_object(
