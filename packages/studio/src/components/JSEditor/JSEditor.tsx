@@ -59,6 +59,14 @@ interface ExecutionResult {
     duration: number;
     error?: string;
     timestamp: number;
+    /** The code that ran: the tab's, or the selection. */
+    code: string;
+    /**
+     * Whether the run read as the signed-in user — not as someone picked in
+     * "Run as", and not under "No Auth". A row it returned is then one the
+     * entity editor, which works as the signed-in user, opens as the same row.
+     */
+    ranAsSignedInUser: boolean;
 }
 
 interface EditorTab {
@@ -148,18 +156,27 @@ interface MatchedJSCollection {
     pkColumn: string;
 }
 
+/** The script without its comments: a collection named in one is not where rows came from. */
+function withoutComments(code: string): string {
+    return code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+}
+
 /**
- * Given the raw SDK result, try to detect which collections are present.
+ * Given the raw SDK result, try to detect which collection its rows belong to.
  * JS SDK results typically come back as `{ data: [{ id, values }] }` or plain arrays.
- * The heuristic: if the executed code contains `collection("<slug>")` or `client.data.<slug>`,
- * and the result has rows with an "id" column, we match those slugs.
+ * The heuristic: the executed code, outside its comments, names exactly one
+ * collection — `collection("<slug>")` or `client.data.<slug>` — and the result has
+ * rows with an "id" column. A script naming two could have returned either's
+ * rows, and an action on a row would open the other collection's row with the
+ * same id, so it gets none.
  */
 function detectCollectionsInResult(
-    code: string,
+    executedCode: string,
     resultValue: unknown,
     collections: AdminCollection[]
 ): MatchedJSCollection[] {
     if (!resultValue || !collections?.length) return [];
+    const code = withoutComments(executedCode);
 
     // Extract collection slugs mentioned in the code
     const mentionedSlugs = new Set<string>();
@@ -179,7 +196,7 @@ function detectCollectionsInResult(
         }
     }
 
-    if (mentionedSlugs.size === 0) return [];
+    if (mentionedSlugs.size !== 1) return [];
 
     // Check if result has rows with an "id" field
     let rows: Record<string, unknown>[] = [];
@@ -422,6 +439,9 @@ release: () => client.close() };
         const consoleEntries: ConsoleEntry[] = [];
         const startTime = performance.now();
         let release: (() => void) | undefined;
+        // The same choice `buildClient` makes: the app's own client, as the
+        // signed-in user, unless "No Auth" or someone else is picked.
+        const ranAsSignedInUser = authMode !== "none" && (!selectedUser || selectedUser.uid === currentUser?.uid);
 
         // Capture console methods
         const originalConsole = {
@@ -475,7 +495,9 @@ timestamp: Date.now() });
                 value,
                 console: consoleEntries,
                 duration,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                code,
+                ranAsSignedInUser
             });
 
             // Auto-detect best view
@@ -494,7 +516,9 @@ timestamp: Date.now() });
                 console: consoleEntries,
                 duration,
                 error: err instanceof Error ? err.message : String(err),
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                code,
+                ranAsSignedInUser
             });
             setResultView("json");
         } finally {
@@ -584,14 +608,16 @@ data: rows };
 
     // ─── Matched collections for entity actions ──────────────────
 
+    // Rows read as someone else are not offered to the entity editor, which
+    // opens and saves them as the signed-in user.
     const matchedCollections = useMemo(() => {
-        if (!result?.value || result.error) return [];
+        if (!result?.value || result.error || !result.ranAsSignedInUser) return [];
         return detectCollectionsInResult(
-            activeTab?.code ?? "",
+            result.code,
             result.value,
             collectionRegistry?.collections ?? []
         );
-    }, [result, activeTab?.code, collectionRegistry?.collections]);
+    }, [result, collectionRegistry?.collections]);
 
     const getRowEntityActions = useCallback((rowData: Record<string, unknown>): { collection: MatchedJSCollection; entityId: string | number }[] => {
         if (!rowData || matchedCollections.length === 0) return [];
