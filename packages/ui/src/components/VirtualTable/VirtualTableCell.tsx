@@ -45,15 +45,34 @@ export const VirtualTableCell = React.memo<VirtualTableCellProps<unknown>>(
             } as CellRendererParams<T>
         ) : null;
     },
-    (a, b) => {
-        return equal(a.rowData, b.rowData) &&
-            equal(a.column, b.column) &&
-            equal(a.cellData, b.cellData) &&
-            a.rowIndex === b.rowIndex &&
-            a.columnIndex === b.columnIndex &&
-            a.isDragging === b.isDragging &&
-            a.isDraggable === b.isDraggable &&
-            a.frozen === b.frozen &&
-            equal(a.extraData, b.extraData)
-    }
+    areCellPropsEqual
 );
+
+/**
+ * Every prop the cell hands `cellRenderer` is compared, and so is
+ * `cellRenderer` itself: a cell that kept the renderer it was first given kept
+ * every value that renderer closed over — inline editing switched off, a
+ * permission revoked, a new row-actions builder — until its row changed.
+ *
+ * Values that a parent rebuilds on each render (the row, its cell value, the
+ * column, `extraData`) are compared by value; `deepEqual` returns at once for
+ * the same reference. Functions and `columns` are compared by reference —
+ * `VirtualTable` holds `columns` by value already.
+ */
+function areCellPropsEqual(a: VirtualTableCellProps<unknown>, b: VirtualTableCellProps<unknown>): boolean {
+    return a.cellRenderer === b.cellRenderer &&
+        a.columns === b.columns &&
+        a.dataKey === b.dataKey &&
+        a.rowIndex === b.rowIndex &&
+        a.columnIndex === b.columnIndex &&
+        a.isDragging === b.isDragging &&
+        a.isDraggable === b.isDraggable &&
+        a.frozen === b.frozen &&
+        a.sortableNodeRef === b.sortableNodeRef &&
+        a.sortableStyle === b.sortableStyle &&
+        a.sortableAttributes === b.sortableAttributes &&
+        equal(a.column, b.column) &&
+        equal(a.cellData, b.cellData) &&
+        equal(a.extraData, b.extraData) &&
+        equal(a.rowData, b.rowData);
+}
