@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { createCollectionClient } from "../src/collection";
-import { Transport } from "../src/transport";
+import { RebaseApiError, Transport } from "../src/transport";
 import { RebasePaginationError } from "@rebasepro/common";
 
 /**
@@ -132,8 +132,8 @@ describe("CollectionClient.iterate", () => {
 
         for await (const _row of client.iterate({ pageSize: 3 })) { /* drain */ }
 
-        expect(mockRequest).toHaveBeenNthCalledWith(1, "/data/jobs?limit=3&offset=0", { method: "GET" });
-        expect(mockRequest).toHaveBeenNthCalledWith(2, "/data/jobs?limit=3&offset=3", { method: "GET" });
+        expect(mockRequest).toHaveBeenNthCalledWith(1, "/data/jobs?limit=3&offset=0&count=none", { method: "GET" });
+        expect(mockRequest).toHaveBeenNthCalledWith(2, "/data/jobs?limit=3&offset=3&count=none", { method: "GET" });
     });
 
     it("defaults to a page size of 200", async () => {
@@ -142,7 +142,7 @@ describe("CollectionClient.iterate", () => {
 
         for await (const _row of client.iterate()) { /* drain */ }
 
-        expect(mockRequest).toHaveBeenCalledWith("/data/jobs?limit=200&offset=0", { method: "GET" });
+        expect(mockRequest).toHaveBeenCalledWith("/data/jobs?limit=200&offset=0&count=none", { method: "GET" });
     });
 
     it("carries the caller's filters onto every page", async () => {
@@ -415,5 +415,110 @@ describe("CollectionClient.findAll", () => {
 
         await expect(client.findAll({ pageSize: 1000 })).rejects.toMatchObject({ code: "max-rows" });
         expect(mockRequest).toHaveBeenCalledTimes(11);
+    });
+});
+
+/**
+ * `count: "none"` on the wire.
+ *
+ * The server has taken `?count=none` since the list page and its `COUNT(*)`
+ * were split apart, but this transport never sent it: `find({ count: "none" })`
+ * still paid for the count over HTTP, and so did every page of every walk —
+ * on a 100k-row table the count is most of what a list request costs, and a
+ * walk never reports a total to anyone.
+ */
+describe("count on the wire", () => {
+    let transport: Transport;
+    let mockRequest: jest.Mock<Transport["request"]>;
+    const urls = () => mockRequest.mock.calls.map((c) => String(c[0]));
+
+    beforeEach(() => {
+        ({ transport, mockRequest } = createMockTransport());
+    });
+
+    it("find({ count: \"none\" }) sends ?count=none", async () => {
+        const client = createCollectionClient<JobModel>(transport, "jobs");
+        mockRequest.mockResolvedValueOnce(page(rows(1, 1), { total: 1, limit: 10, offset: 0, hasMore: false }));
+
+        await client.find({ limit: 10, count: "none" });
+
+        expect(urls()).toEqual(["/data/jobs?limit=10&count=none"]);
+    });
+
+    it("a plain find sends no count parameter (exact is the server's default)", async () => {
+        const client = createCollectionClient<JobModel>(transport, "jobs");
+        mockRequest.mockResolvedValue(page(rows(1, 1), { total: 1, limit: 10, offset: 0, hasMore: false }) as never);
+
+        await client.find({ limit: 10 });
+        await client.find({ limit: 10, count: "exact" });
+
+        expect(urls()).toEqual(["/data/jobs?limit=10", "/data/jobs?limit=10"]);
+    });
+
+    it("every page of iterate() and findAll() skips the count", async () => {
+        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const serve = () => {
+            mockRequest
+                .mockResolvedValueOnce(page(rows(1, 2), { total: 3, limit: 2, offset: 0, hasMore: true, nextCursor: "C2" }))
+                .mockResolvedValueOnce(page(rows(3, 1), { total: 3, limit: 2, offset: 0, hasMore: false }));
+        };
+
+        serve();
+        for await (const _row of client.iterate({ pageSize: 2 })) { /* drain */ }
+        serve();
+        await client.findAll({ pageSize: 2 });
+        // A caller's own `count` cannot turn it back on: nothing reads a total
+        // off a walk.
+        serve();
+        await client.findAll({ pageSize: 2, count: "exact" });
+
+        expect(urls()).toHaveLength(6);
+        for (const url of urls()) expect(url).toContain("count=none");
+    });
+
+    it("count() never forwards a count parameter to /count", async () => {
+        const client = createCollectionClient<JobModel>(transport, "jobs");
+        mockRequest.mockResolvedValueOnce({ count: 7 } as never);
+
+        await expect(client.count({ count: "none", where: { status: ["==", "queued"] } })).resolves.toBe(7);
+
+        expect(urls()).toEqual(["/data/jobs/count?status=eq.queued"]);
+    });
+
+    it("a server that reads ?count= as a filter is asked again without it, once per client", async () => {
+        // Every server released before the parameter treats `count` as a
+        // column name and answers 400 UNKNOWN_FILTER_FIELD.
+        const client = createCollectionClient<JobModel>(transport, "jobs");
+        mockRequest
+            .mockRejectedValueOnce(new RebaseApiError("Unknown filter field 'count' on collection 'jobs'", {
+                status: 400,
+                code: "UNKNOWN_FILTER_FIELD",
+                details: { field: "count", collection: "jobs" }
+            }))
+            .mockResolvedValue(page(rows(1, 1), { total: 1, limit: 10, offset: 0, hasMore: false }) as never);
+
+        const first = await client.find({ limit: 10, count: "none" });
+        expect(first.data).toEqual([{ id: 1 }]);
+        // Later reads through the same client do not send it again.
+        await createCollectionClient<JobModel>(transport, "other").find({ limit: 5, count: "none" });
+
+        expect(urls()).toEqual([
+            "/data/jobs?limit=10&count=none",
+            "/data/jobs?limit=10",
+            "/data/other?limit=5"
+        ]);
+    });
+
+    it("any other unknown-field 400 is the caller's, not retried", async () => {
+        const client = createCollectionClient<JobModel>(transport, "jobs");
+        mockRequest.mockRejectedValueOnce(new RebaseApiError("Unknown filter field 'nope'", {
+            status: 400,
+            code: "UNKNOWN_FILTER_FIELD",
+            details: { field: "nope", collection: "jobs" }
+        }));
+
+        await expect(client.find({ limit: 10, count: "none", where: { nope: ["==", 1] } }))
+            .rejects.toMatchObject({ code: "UNKNOWN_FILTER_FIELD" });
+        expect(mockRequest).toHaveBeenCalledTimes(1);
     });
 });

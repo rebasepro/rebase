@@ -111,6 +111,28 @@ function inflightCountsFor(transport: Transport): Map<string, Promise<number>> {
 }
 
 /**
+ * Transports whose server reads `?count=none` as a filter on a column named
+ * `count`.
+ *
+ * Every server released before the parameter existed does, and answers a 400
+ * `UNKNOWN_FILTER_FIELD` naming `count`. Skipping the count only ever saves
+ * the server work, so a read refused for it is sent again without it, and
+ * later reads through the same transport (one per client, so one server) stop
+ * sending it. Membership is never cleared: a server does not lose the
+ * parameter, and one that gains it in an upgrade gets it again on the next
+ * page load.
+ */
+const serversWithoutCountParam = new WeakSet<Transport>();
+
+function isCountReadAsFilter(error: unknown): boolean {
+    if (!(error instanceof RebaseApiError) || error.status !== 400 || error.code !== "UNKNOWN_FILTER_FIELD") {
+        return false;
+    }
+    const details = error.details;
+    return typeof details === "object" && details !== null && "field" in details && details.field === "count";
+}
+
+/**
  * Where a fetched row's version is kept.
  *
  * Non-enumerable, so it does not appear in `Object.keys`, in `JSON.stringify`,
@@ -269,11 +291,25 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
 
     const client: CollectionClient<M> = {
         async find(params?: FindParams<M>): Promise<FindResult<M>> {
-            const qs = buildQueryString(params);
-            const raw = await transport.request<{
+            const read = (p: FindParams<M> | undefined) => transport.request<{
                 data: Record<string, unknown>[];
                 meta: FindResult<M>["meta"]
-            }>(basePath + qs, { method: "GET" });
+            }>(basePath + buildQueryString(p), { method: "GET" });
+            const counted = { ...params, count: undefined };
+            let raw: Awaited<ReturnType<typeof read>>;
+            if (params?.count !== "none") {
+                raw = await read(params);
+            } else if (serversWithoutCountParam.has(transport)) {
+                raw = await read(counted);
+            } else {
+                try {
+                    raw = await read(params);
+                } catch (error) {
+                    if (!isCountReadAsFilter(error)) throw error;
+                    serversWithoutCountParam.add(transport);
+                    raw = await read(counted);
+                }
+            }
             return {
                 data: (raw.data || []) as M[],
                 meta: raw.meta
@@ -476,7 +512,9 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 // would make the total disagree with the `find()` it describes.
                 // Same reasoning as limit/offset: parameters that cannot affect
                 // the answer are not forwarded.
-                include: undefined
+                include: undefined,
+                // Whether a *page* is counted beside it; this is the count.
+                count: undefined
             };
             const qs = buildQueryString(countParams);
 

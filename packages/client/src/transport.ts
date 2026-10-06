@@ -225,6 +225,10 @@ export function buildQueryString(params?: FindParams): string {
     // reads it: the encoding is the server's, and a client that parsed it would
     // be depending on something that exists to be changed.
     if (params.after) parts.push(`after=${encodeURIComponent(params.after)}`);
+    // Only `none`: `exact` is the server's default, so sending it says
+    // nothing — and a server older than the parameter reads any `?count=` as
+    // a filter on a column named `count` (see `find` in collection.ts).
+    if (params.count === "none") parts.push("count=none");
 
     if (params.orderBy) {
         const wire = serializeOrderBy(params.orderBy);

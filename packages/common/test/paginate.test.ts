@@ -96,16 +96,18 @@ describe("in-process accessor pagination", () => {
 
         for await (const _row of jobsOf(data).iterate({ pageSize: 2 })) { /* drain */ }
 
-        expect(calls.map((c) => [c.limit, c.offset])).toEqual([[2, 0], [2, 2], [2, 4]]);
+        // One row past each page: the walk does not count, so that row is
+        // what says whether another page follows.
+        expect(calls.map((c) => [c.limit, c.offset])).toEqual([[3, 0], [3, 2], [3, 4]]);
     });
 
     it("terminates on an empty page even when the driver claims there is more", async () => {
-        // `count` lies about the total, so `hasMore` never goes false; the
-        // empty page has to be what stops the walk.
+        // The first read fills its probe row, so `hasMore` says there is
+        // another page; the empty page has to be what stops the walk.
         const driver = {
             fetchCollection: jest.fn(async (props: FetchCollectionProps) => {
                 const offset = props.offset ?? 0;
-                return offset === 0 ? rows(1, 2) : [];
+                return offset === 0 ? rows(1, props.limit ?? 20) : [];
             }),
             fetchOne: jest.fn(),
             save: jest.fn(),
@@ -122,8 +124,9 @@ describe("in-process accessor pagination", () => {
     });
 
     it("gives up loudly on a driver that never reaches the end", async () => {
+        // Always one row more than asked for, so every page says "more".
         const driver = {
-            fetchCollection: jest.fn(async () => rows(1, 2)),
+            fetchCollection: jest.fn(async (props: FetchCollectionProps) => rows(1, props.limit ?? 20)),
             fetchOne: jest.fn(),
             save: jest.fn(),
             delete: jest.fn(),
@@ -142,6 +145,14 @@ describe("in-process accessor pagination", () => {
         const data = buildSdkData(createPagedDriver(5));
         const all = await jobsOf(data).findAll({ pageSize: 2 });
         expect(all.map((r) => r.id)).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    it("never counts: hasMore comes from one row past the page", async () => {
+        const driver = createPagedDriver(5);
+        const all = await jobsOf(buildSdkData(driver)).findAll({ pageSize: 2 });
+
+        expect(all.map((r) => r.id)).toEqual([1, 2, 3, 4, 5]);
+        expect(driver.count).not.toHaveBeenCalled();
     });
 
     it("findAll throws rather than truncating when the cap is hit", async () => {
@@ -437,5 +448,21 @@ describe("the default walk seeks with the server's cursor", () => {
     it("an explicit cursor walk still refuses a stalled cursor", async () => {
         const server = createServer(9, { stallAt: 1 });
         await expect(drain(server.find, { pageSize: 3, cursor: "id" })).rejects.toMatchObject({ code: "cursor-stalled" });
+    });
+
+    /**
+     * Nothing a walk returns carries a total — `iterate()` yields rows and
+     * `findAll()` an array — so the `COUNT(*)` each page used to run beside
+     * itself was read by no one. Over 100k rows that count was most of the
+     * walk's SQL (1.8 s of it, against 26 ms without).
+     */
+    it("asks for no count on any page, whatever the caller passed", async () => {
+        const server = createServer(10);
+        await drain(server.find, { pageSize: 3 });
+        await drain(server.find, { pageSize: 3, count: "exact" });
+        await drain(server.find, { pageSize: 3, cursor: "id" });
+
+        expect(server.calls.length).toBeGreaterThan(9);
+        for (const call of server.calls) expect(call.count).toBe("none");
     });
 });

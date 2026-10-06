@@ -153,7 +153,13 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
         ...rest
     } = (params ?? {}) as IterateParams<M> & Pick<FindParams<M>, "offset" | "page">;
 
-    const findParams = { ...rest } as FindParams<M>;
+    // No page of a walk is counted. Nothing it returns carries a total —
+    // `iterate()` yields rows, `findAll()` an array — and `hasMore`, the one
+    // thing it reads off `meta`, does not need one: without a count the read
+    // asks for one row past the page. The count is most of what a list read
+    // costs on a large table (1.8 s of a 100k-row walk's SQL, 26 ms without).
+    // A caller's own `count` is overridden for the same reason.
+    const findParams = { ...rest, count: "none" } as FindParams<M>;
     const size = normalizePageSize(pageSize);
     const pageCap = normalizeMaxPages(maxPages);
 

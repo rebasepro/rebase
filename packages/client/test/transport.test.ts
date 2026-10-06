@@ -49,8 +49,15 @@ offset: 20 })).toBe("?limit=10&offset=20");
 
     it("serializes PostgREST-style where clauses directly as query parameters", () => {
         expect(buildQueryString({ where: { status: "eq.published",
-count: "gt.5" } }))
-            .toBe("?status=eq.published&count=gt.5");
+views: "gt.5" } }))
+            .toBe("?status=eq.published&views=gt.5");
+    });
+
+    it("sends a filter on a column named `count` inside ?where=, since ?count= is the count switch", () => {
+        expect(buildQueryString({ where: { status: "eq.published", count: "gt.5" } }))
+            .toBe("?status=eq.published&where=%7B%22count%22%3A%22gt.5%22%7D");
+        expect(buildQueryString({ count: "none", where: { count: "gt.5" } }))
+            .toBe("?count=none&where=%7B%22count%22%3A%22gt.5%22%7D");
     });
 
     it("URL encodes values correctly", () => {

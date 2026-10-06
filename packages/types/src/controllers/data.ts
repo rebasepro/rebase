@@ -837,6 +837,9 @@ export interface PageWalkOptions<M extends Record<string, unknown> = Record<stri
  * `find()` takes except the window itself (`limit`, `offset`, `page`), which
  * the iterator owns, plus the walk options.
  *
+ * `count` is accepted and ignored: no page of a walk is counted, since nothing
+ * a walk returns carries a total (see {@link FindParams.count}).
+ *
  * @group Data
  */
 export type IterateParams<M extends Record<string, unknown> = Record<string, unknown>, Inc = IncludeSpec> =

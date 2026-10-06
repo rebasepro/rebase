@@ -107,7 +107,8 @@ meta.hasMore; // exact
 Without a count there is no total to report: over HTTP `meta.total` is absent,
 and in-process it is the rows up to the end of the page (`offset` plus the
 page). Over HTTP it is `?count=none`; `?count=exact` is the default, and any
-other value is a 400 `INVALID_COUNT`.
+other value is a 400 `INVALID_COUNT`. `iterate()` and `findAll()` send it on
+every page by themselves, since a walk reports no total.
 
 #### Which reads are wrapped, and which are not
 

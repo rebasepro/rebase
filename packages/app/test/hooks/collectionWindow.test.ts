@@ -20,6 +20,8 @@ function rowsOf(n: number, prefix = "r"): Entity<Row>[] {
 class FakeCollection {
     rows: Entity<Row>[];
     reads: { limit: number; offset: number }[] = [];
+    /** What each one-shot read asked of the count: `undefined` is a `COUNT(*)`. */
+    countModes: (FindParams<Row>["count"])[] = [];
     push: ((response: FindResponse<Row>) => void) | undefined;
     liveError: ((error: Error) => void) | undefined;
     gate: Promise<void> | undefined;
@@ -41,6 +43,7 @@ class FakeCollection {
     find = async (params?: FindParams<Row>): Promise<FindResponse<Row>> => {
         const limit = resolveClientListLimit(params?.limit);
         this.reads.push({ limit, offset: params?.offset ?? 0 });
+        this.countModes.push(params?.count);
         if (this.gate) await this.gate;
         if (this.failWith) throw this.failWith;
         return this.answer(params);
@@ -287,6 +290,34 @@ describe("CollectionWindow", () => {
         } finally {
             jest.useRealTimers();
         }
+    });
+
+    /**
+     * Nothing in the window reads `meta.total` — a page ends the window by
+     * coming back short — so every read it makes skips the count. Scrolling a
+     * table to 10,000 rows used to run 199 `COUNT(*)`s over the whole
+     * collection, each thrown away, and a re-read under a stream of writes
+     * ran one more per 1,000 rows held.
+     */
+    it("asks for no count on any read it makes", async () => {
+        const collection = new FakeCollection(rowsOf(40));
+        const { window, last } = open(collection);
+        collection.push!(collection.answer({ limit: 10 }));
+        await until(() => last()?.rows?.length === 10);
+        window.setTarget(30);
+        await until(() => last()?.rows?.length === 30);
+        collection.push!(collection.answer({ limit: 10 }));
+        await until(() => collection.reads.length === 2);
+
+        // The rows past the first page, then the re-read the push started.
+        expect(collection.reads).toEqual([{ limit: 20, offset: 10 }, { limit: 20, offset: 10 }]);
+        expect(collection.countModes).toEqual(["none", "none"]);
+
+        // The first page read once, when there is no subscription, too.
+        const once = new FakeCollection(rowsOf(5));
+        const opened = open(once, { live: false });
+        await until(() => opened.last()?.rows?.length === 5);
+        expect(once.countModes).toEqual(["none"]);
     });
 
     it("says nothing after it is disposed", async () => {

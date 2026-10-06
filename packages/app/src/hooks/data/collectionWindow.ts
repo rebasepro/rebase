@@ -213,7 +213,7 @@ export class CollectionWindow<M extends Record<string, unknown>> {
     private readHeadOnce(reportFailure: boolean, liveError?: Error): void {
         let request: Promise<{ data: Entity<M>[] }>;
         try {
-            request = Promise.resolve(this.accessor.find({ ...this.query, limit: this.pageSize }));
+            request = Promise.resolve(this.accessor.find(this.oneShot(this.pageSize)));
         } catch (error) {
             request = Promise.reject(error);
         }
@@ -339,7 +339,7 @@ export class CollectionWindow<M extends Record<string, unknown>> {
         this.loadingMore = true;
         this.emit();
         try {
-            const response = await this.accessor.find({ ...this.query, limit, offset });
+            const response = await this.accessor.find(this.oneShot(limit, offset));
             if (this.disposed) return;
             const raw = response.data ?? [];
             const processed = await this.process(raw);
@@ -365,7 +365,7 @@ export class CollectionWindow<M extends Record<string, unknown>> {
         try {
             while (fresh.length < span) {
                 const limit = Math.min(MAX_LIST_LIMIT, span - fresh.length);
-                const response = await this.accessor.find({ ...this.query, limit, offset });
+                const response = await this.accessor.find(this.oneShot(limit, offset));
                 if (this.disposed) return;
                 const raw = response.data ?? [];
                 fresh.push(...await this.process(raw));
@@ -387,6 +387,19 @@ export class CollectionWindow<M extends Record<string, unknown>> {
         this.tail = fresh.length > keep ? fresh.slice(0, keep) : fresh;
         this.tailEnded = ended && fresh.length <= keep;
         this.emit();
+    }
+
+    /**
+     * Every one-shot read the window makes: its query, never counted.
+     *
+     * Nothing here reads `meta.total` — a page ends the window by coming back
+     * short — and the `COUNT(*)` beside each page read every matching row to
+     * report a number that was thrown away: scrolling a table to 10,000 rows
+     * ran 199 of them. The first page's subscription is the accessor's and is
+     * left as it is.
+     */
+    private oneShot(limit: number, offset?: number): FindParams<M> {
+        return { ...this.query, limit, ...(offset !== undefined && { offset }), count: "none" };
     }
 
     private async process(rows: Entity<M>[]): Promise<Entity<M>[]> {
