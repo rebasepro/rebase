@@ -1,7 +1,7 @@
 import type { Property } from "@rebasepro/types";
 import type { PropertyConfig, AdminCollection } from "@rebasepro/cms-types";
 import { AuthController } from "@rebasepro/cms-types";
-import { isPropertyBuilder } from "@rebasepro/common";
+import { isPropertyBuilder, resolveCollectionRelations } from "@rebasepro/common";
 import { getTitlePropertyKey } from "@rebasepro/app";
 import { SUMMARY_RANK, isStorageProperty, rankSummaryProperty } from "../collections/summary-property";
 
@@ -101,19 +101,66 @@ export function getEntityPreviewKeys(
 const INCLUDE_ALL_RELATIONS: string[] = ["*"];
 
 /**
- * The `include` params that eager-load a collection's relations in the same
- * request as its rows, so previews never fetch once per relation cell.
+ * Include lists handed out, interned by content.
  *
- * Only the REST transport reads `include`; the realtime transport embeds
- * relation data unconditionally and ignores it. Passing it either way keeps a
- * realtime-less deployment rendering the same cells as a realtime one.
+ * Key: the relation names, joined. A list is a pure function of its names, so
+ * nothing ever invalidates an entry; the map holds one per distinct set of
+ * names a session reads — one per collection shape, a handful in all. It is
+ * what keeps the result referentially stable when a caller builds its
+ * collection object afresh on every render: `useRelationSelector` lists the
+ * include as an effect dependency, and a new array per render was a new read
+ * per render.
+ */
+const INTERNED_INCLUDES = new Map<string, string[]>();
+
+/**
+ * The `include` a collection view's read sends, so a relation cell renders from
+ * the row it arrived with instead of fetching once per cell.
+ *
+ * It names the relations a **property** of the collection declares — the ones
+ * a table column, a list or card chip, a picker option or a board card can
+ * render, because the view model only maps relation data onto property keys
+ * (`toViewModelValues`). It used to be `["*"]`, which the server reads as
+ * every relation the collection declares, one hop. That included the
+ * relations declared only in `relations: []` for a record's tabs: no property
+ * names them and no list surface shows them, yet every read embedded all of
+ * their rows for every parent on the page — a `companies` table with one
+ * `owner` column and a `hasMany activities` tab read 50 × 2,000 activity rows a
+ * page, and again on every realtime re-read of the rows held.
+ *
+ * What a property renders is unchanged: each name here is exactly what `*`
+ * loaded for that property, uncapped. Both transports read `include` — the
+ * REST list and the realtime subscription run the same include loader on the
+ * server.
+ *
+ * Only names the collection resolves as relations are sent: the server answers
+ * an unknown one with a 400 `UNKNOWN_RELATION`. A collection whose relations
+ * cannot be resolved here (a target that does not load in the browser) falls
+ * back to `*` and lets the server decide, as before.
  */
 export function getRelationIncludeParams(collection: AdminCollection<any>): string[] | undefined {
-    if (!collection.properties) return undefined;
-    const hasRelations = Object.values(collection.properties).some(property =>
-        property && !isPropertyBuilder(property) &&
-        (isRelationProperty(property as Property) || isReferenceProperty(property as Property)));
-    return hasRelations ? INCLUDE_ALL_RELATIONS : undefined;
+    const properties = collection.properties;
+    if (!properties) return undefined;
+
+    let relationNames: string[];
+    try {
+        relationNames = Object.keys(resolveCollectionRelations(collection));
+    } catch (_e) {
+        const hasRelations = Object.values(properties).some(property =>
+            property && !isPropertyBuilder(property) &&
+            (isRelationProperty(property as Property) || isReferenceProperty(property as Property)));
+        return hasRelations ? INCLUDE_ALL_RELATIONS : undefined;
+    }
+
+    const names = relationNames.filter(name =>
+        Object.prototype.hasOwnProperty.call(properties, name) && Boolean(properties[name]));
+    if (names.length === 0) return undefined;
+
+    const key = names.join("\u0000");
+    const interned = INTERNED_INCLUDES.get(key);
+    if (interned) return interned;
+    INTERNED_INCLUDES.set(key, names);
+    return names;
 }
 
 /**
