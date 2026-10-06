@@ -170,8 +170,10 @@ A result's `content[0].text` is fenced in `untrustedEnvelope`
 (`@rebasepro/common`), the marking the local MCP server puts on every data
 result: a row was written by somebody, and it reaches the model on the channel
 the model takes its instructions from. `structuredContent` stays the plain
-result. The `initialize` instructions and each row-returning tool's description
-say so.
+result, except on `list_collections`: its listing is for the model alone and is
+sent once, in the text (`structuredContent: false` on the tool). The text is
+compact JSON — indentation was half of it. The `initialize` instructions and
+each row-returning tool's description say so.
 
 ## The consent screen
 

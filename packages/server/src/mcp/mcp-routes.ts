@@ -424,13 +424,16 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
             // The text is the one a model reads, so it is fenced: a row was
             // written by somebody, and arrives on the channel the model takes
             // its instructions from. `structuredContent` is data by type and
-            // stays the plain result.
+            // stays the plain result — for the tools a program reads; a tool
+            // only a model reads sends the result once (`structuredContent:
+            // false`). The JSON is compact: indentation is ~half the text,
+            // and every character of it is a token the model pays for.
             const source = typeof args.collection === "string"
                 ? `${name} on collection ${JSON.stringify(args.collection)}`
                 : name;
             return rpcResult(id, {
-                content: [{ type: "text", text: untrustedEnvelope(source, JSON.stringify(result, null, 2)) }],
-                structuredContent: result
+                content: [{ type: "text", text: untrustedEnvelope(source, JSON.stringify(result)) }],
+                ...(tool.structuredContent !== false && { structuredContent: result })
             });
         } catch (error) {
             // A tool failure is a RESULT with `isError`, not a JSON-RPC error.

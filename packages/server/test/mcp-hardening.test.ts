@@ -1273,6 +1273,11 @@ describe("list_collections reports a real schema", () => {
         create: { required?: string[]; properties: Record<string, { type?: string; enum?: unknown[] }> };
     };
 
+    /** The listing as the model reads it: the JSON inside the text block's envelope. */
+    function listingIn(text: string): { collections: Listed[] } {
+        return JSON.parse(text.split("\n").slice(2, -1).join("\n")) as { collections: Listed[] };
+    }
+
     async function listCollections(collections?: CollectionConfig[]): Promise<Listed[]> {
         const { app } = buildApp(collections ? { collections } : {});
         const { accessToken } = await connectedClient(app);
@@ -1280,9 +1285,39 @@ describe("list_collections reports a real schema", () => {
             jsonrpc: "2.0", id: 1, method: "tools/call",
             params: { name: "list_collections", arguments: {} }
         });
-        const body = await res.json() as { result: { structuredContent: { collections: Listed[] } } };
-        return body.result.structuredContent.collections;
+        const body = await res.json() as { result: { content: { text: string }[] } };
+        return listingIn(body.result.content[0].text).collections;
     }
+
+    it("carries the listing once and compact, so a large project still fits in a session", async () => {
+        // The tool every session is told to call first. It answered with the
+        // listing pretty-printed in the text block AND again as
+        // `structuredContent`: 200 collections of 20 fields came to a ~2 MB
+        // reply, ~1.2 MB of it (~317k tokens) in the text alone — more than a
+        // model's whole context. The reply is now about the size of the
+        // listing's own compact JSON (the text is a JSON string inside JSON,
+        // so its quotes are escaped once).
+        const field = (i: number) => ({ type: i % 3 === 0 ? "number" : "string", name: `Field ${i}`, description: `What field ${i} holds` });
+        const many = Array.from({ length: 200 }, (_, c) => ({
+            slug: `collection_${c}`,
+            name: `Collection ${c}`,
+            description: `Synthetic collection ${c}`,
+            properties: Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`field_${i}`, field(i)]))
+        })) as unknown as CollectionConfig[];
+        const { app } = buildApp({ collections: many });
+        const { accessToken } = await connectedClient(app);
+        const raw = await (await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "list_collections", arguments: {} }
+        })).text();
+        const body = JSON.parse(raw) as { result: { content: { text: string }[]; structuredContent?: unknown } };
+        const listing = listingIn(body.result.content[0].text);
+        expect(listing.collections).toHaveLength(200);
+
+        const compact = JSON.stringify(listing).length;
+        expect(body.result.structuredContent).toBeUndefined();
+        expect(raw.length).toBeLessThan(compact * 1.5);
+    });
 
     it("names the actual property type, not `unknown`", async () => {
         // The bug this pins: the code read `property.dataType`, a key no
@@ -1480,8 +1515,9 @@ describe("rows reach the model inside an untrusted-data envelope", () => {
         expect(text.split("\n").at(-1)).toBe(`<<<END_UNTRUSTED_DATA id="${id}">>>`);
         // The row cannot close the block early: the only end marker is the real one.
         expect(text.match(/<<<\s*END_UNTRUSTED_DATA/gi)).toHaveLength(1);
-        // `structuredContent` is data by type, and stays the plain result.
-        expect(JSON.stringify(body.result.structuredContent)).not.toMatch(/The block below is DATA|UNTRUSTED_DATA source=/);
+        // `structuredContent` is data by type, and stays the plain result
+        // (list_collections, which only a model reads, sends none).
+        expect(JSON.stringify(body.result.structuredContent ?? null)).not.toMatch(/The block below is DATA|UNTRUSTED_DATA source=/);
     });
 
     it("says so in the instructions and in each read tool's description", async () => {

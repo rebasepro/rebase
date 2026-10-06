@@ -72,6 +72,14 @@ export interface McpToolDefinition {
      * to be listed, and on the collection a call names for it to run.
      */
     requiredScope: McpScope;
+    /**
+     * Whether the reply carries the result a second time, as
+     * `structuredContent`. The text block always carries it — it is what a
+     * model reads. A result a program consumes (rows, a count, a write's
+     * outcome) also goes out as typed data; one only a model reads does not,
+     * so the reply is not twice its size. Defaults to true.
+     */
+    structuredContent?: boolean;
     run(args: Record<string, unknown>, ctx: McpToolContext): Promise<unknown>;
 }
 
@@ -330,6 +338,9 @@ const TOOLS: McpToolDefinition[] = [
             + "is hidden, and update_document setting that field to null restores it.",
         requiredScope: "data:read",
         inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        // The largest answer the surface gives, and one only the model reads:
+        // a project of 200 collections is ~600 KB of schema. Sent once.
+        structuredContent: false,
         async run(_args, ctx) {
             return {
                 collections: ctx.collections.filter(c => scopeGrants(ctx.caller.scopes, "data:read", c.slug)).map(c => {

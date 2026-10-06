@@ -1715,8 +1715,12 @@ function textResult(text: string) {
 text }] };
 }
 
+/**
+ * JSON as a tool's text. Compact: indentation is about half of a pretty-printed
+ * answer, and every character of it is a token the model pays for.
+ */
 function jsonResult(data: unknown) {
-    return textResult(JSON.stringify(data, null, 2));
+    return textResult(JSON.stringify(data));
 }
 
 /** A `<<<` that opens something shaped like either envelope marker, in any case. */
@@ -1764,7 +1768,7 @@ export function untrustedEnvelope(source: string, body: string): string {
 
 /** JSON from the target environment, marked as untrusted. */
 function untrustedJsonResult(source: string, data: unknown) {
-    return textResult(untrustedEnvelope(source, JSON.stringify(data, null, 2)));
+    return textResult(untrustedEnvelope(source, JSON.stringify(data)));
 }
 
 /**

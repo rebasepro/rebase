@@ -362,7 +362,9 @@ shaped like a marker is broken with a zero-width space, so a row that prints
 outside.
 
 The [remote endpoint](#the-remote-endpoint) fences its tool results the same
-way and says so to the client; its `structuredContent` carries the plain result.
+way and says so to the client; its `structuredContent` carries the plain result,
+except for `list_collections`, whose listing only a model reads and which is sent
+once, in the text.
 
 It is a marker, not a sandbox. An assistant holding these tools is only as safe
 as the content you let it read.
