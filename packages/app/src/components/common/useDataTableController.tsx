@@ -44,6 +44,15 @@ export type DataTableControllerProps<M extends Record<string, any> = any> = {
      */
     updateUrl?: boolean;
 
+    /**
+     * Read rows at all. Defaults to `true`. `false` closes the subscription and
+     * reads nothing — for a view that keeps the controller for its search and
+     * filters but draws its rows some other way, like the board, whose columns
+     * each read their own. The rows already held stay until it is enabled
+     * again, which reads afresh.
+     */
+    enabled?: boolean;
+
 }
 
 /**
@@ -69,7 +78,8 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         entitiesDisplayedFirst,
         lastDeleteTimestamp,
         fixedFilter: fixedFilterFromProps,
-        updateUrl
+        updateUrl,
+        enabled = true
     }: DataTableControllerProps<M>)
     : EntityTableController<M> {
 
@@ -294,6 +304,11 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
     useEffect(() => {
 
+        if (!enabled) {
+            setDataLoading(false);
+            return;
+        }
+
         // Cleared by this run's cleanup. A one-shot read has nothing to
         // unsubscribe from, so without it an answer for a superseded query
         // (the "ch" typed before "chair") landed on top of the newer one.
@@ -371,7 +386,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
             collectionWindow.dispose();
             if (windowRef.current === collectionWindow) windowRef.current = undefined;
         };
-    }, [dataClient, path, pageSize, sortKey, filterValues, searchString, oneShotReadKey]);
+    }, [dataClient, path, pageSize, sortKey, filterValues, searchString, oneShotReadKey, enabled]);
 
     // Scrolling asks for more rows of the same query: only the rows past the
     // ones held are read.

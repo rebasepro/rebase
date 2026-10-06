@@ -425,7 +425,11 @@ const CollectionViewBindingInner = React.memo(
             collection,
             lastDeleteTimestamp,
             scrollRestoration,
-            updateUrl
+            updateUrl,
+            // The board reads only the search and filters from it; each of its
+            // columns runs its own window. A live first page here would be one
+            // more subscription nothing draws.
+            enabled: viewMode !== "kanban"
         });
 
         const tableKey = React.useRef<string>(Math.random().toString(36));
