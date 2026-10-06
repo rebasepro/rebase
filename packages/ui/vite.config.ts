@@ -24,7 +24,10 @@ export default defineConfig(() => ({
             entry: path.resolve(__dirname, "src/index.ts"),
             name: "Rebase UI",
             formats: ["es"],
-            fileName: (format) => `index.${format}.js`
+            // One file per source module (`preserveModules` below), so the
+            // entry is `index.es.js` — the path package.json's `exports` names
+            // — and `components/Button.tsx` becomes `components/Button.es.js`.
+            fileName: (format, entryName) => `${entryName}.${format}.js`
         },
         target: "ESNEXT",
         minify: false,
@@ -35,6 +38,18 @@ export default defineConfig(() => ({
                 if (warning.code === "MISSING_GLOBAL_NAME") return;
                 warn(warning);
             },
+            output: {
+                // A consumer's bundler can drop a whole MODULE it does not use,
+                // but inside one module it can only drop statements it can
+                // prove pure — and a kit's top level is ~100 un-annotated
+                // `React.memo(...)`/`forwardRef(...)` calls. Shipped as a
+                // single file, `import { cls }` pulled in the whole kit
+                // (925 kB minified). One module per file lets `sideEffects`
+                // in package.json do its job. Guarded by
+                // tooling/scripts/check-ui-dist-tree-shakes.mjs.
+                preserveModules: true,
+                preserveModulesRoot: path.resolve(__dirname, "src")
+            }
         }
     },
 

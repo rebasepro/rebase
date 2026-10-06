@@ -1,3 +1,10 @@
+"use client";
+// The whole kit is one client boundary for React Server Components, as it was
+// when `dist` was a single file that inherited the directive from any module
+// carrying it. `dist` is one file per module now, and only 44 of them say
+// "use client" themselves; on the entry it keeps every export a client
+// reference, exactly as before.
+
 // =============================================================================
 // Components
 // =============================================================================
