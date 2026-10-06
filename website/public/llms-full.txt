@@ -26180,7 +26180,7 @@ Three things to know:
 
 In the ordinary case — a restart minutes after a slot ran normally — the most recent slot is already claimed, so catch-up costs one claim check per job per boot and does nothing.
 
-Boot deletes claims older than seven days, but always keeps each job's latest one, whatever its age. That claim is the record that the slot already ran, so a monthly job with a month-wide catch-up window is not re-run by a deploy on the 10th.
+The scheduler deletes claims older than seven days when it starts and then every hour, but always keeps each job's latest one, whatever its age. That claim is the record that the slot already ran, so a monthly job with a month-wide catch-up window is not re-run by a deploy on the 10th.
 
 A recovered run is a normal entry in `cron_logs` (`manual` is `false`), with a first log line recording the slot it recovered and how late it was:
 
@@ -26368,7 +26368,9 @@ FROM rebase.jobs WHERE status = 'failed'
 ORDER BY updated_at DESC;
 ```
 
-Failed rows are kept 30 days; successful ones 3.
+Failed rows are kept 30 days; successful ones 3. Each worker deletes the
+expired rows when it starts and then every hour, in batches, off the request
+path.
 
 ### What happens when a worker dies
 

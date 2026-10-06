@@ -57,7 +57,8 @@ function makeStateStore(options: { leaseHolder?: string; overrides?: Record<stri
             ? { acquired: false, holder: options.leaseHolder }
             : { acquired: true },
         releaseRunLease: async () => {},
-        fetchRunSummaries: async () => new Map()
+        fetchRunSummaries: async () => new Map(),
+        sweepClaims: async () => 0
     } satisfies Required<CronStore> & { overrides: Map<string, boolean | null> };
 }
 

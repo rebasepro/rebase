@@ -521,3 +521,50 @@ describe("backoff", () => {
         expect(defaultBackoff(50)).toBe(60 * 60_000);
     });
 });
+
+describe("the retention sweep", () => {
+    it("runs on the worker every hour, not only at boot", async () => {
+        // It used to run once, inside `ensureTable`, awaited in the boot path:
+        // a worker that lived for weeks never pruned, and the next boot paid
+        // for all of it — six seconds of sequential scan over two million rows
+        // before the server would serve.
+        jest.useFakeTimers();
+        const store = fakeStore();
+        const sweepExpired = jest.fn(async () => 0);
+        const queue = createJobQueue({ ...store, sweepExpired }, {
+            pollIntervalMs: 60 * 60_000,
+            visibilityTimeoutMs: 60 * 60_000
+        });
+        try {
+            queue.start();
+            await jest.advanceTimersByTimeAsync(0);
+            expect(sweepExpired).toHaveBeenCalledTimes(1);
+
+            await jest.advanceTimersByTimeAsync(3 * 60 * 60_000);
+            expect(sweepExpired).toHaveBeenCalledTimes(4);
+
+            await queue.stop();
+            await jest.advanceTimersByTimeAsync(3 * 60 * 60_000);
+            expect(sweepExpired).toHaveBeenCalledTimes(4);
+        } finally {
+            await queue.stop();
+            jest.useRealTimers();
+        }
+    });
+
+    it("keeps the worker running when a sweep fails", async () => {
+        jest.useFakeTimers();
+        const store = fakeStore();
+        const sweepExpired = jest.fn(async () => { throw new Error("statement timeout"); });
+        const queue = createJobQueue({ ...store, sweepExpired }, { pollIntervalMs: 60 * 60_000 });
+        try {
+            queue.start();
+            await jest.advanceTimersByTimeAsync(60 * 60_000);
+            expect(sweepExpired).toHaveBeenCalledTimes(2);
+            expect(queue.isRunning()).toBe(true);
+        } finally {
+            await queue.stop();
+            jest.useRealTimers();
+        }
+    });
+});

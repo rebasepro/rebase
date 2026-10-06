@@ -69,6 +69,18 @@ describe("createCronStore", () => {
             expect(all).toContain("DELETE FROM rebase.cron_claims");
         });
 
+        it("leaves the claim retention sweep out of booting", async () => {
+            // Only the future-slot release runs here — it is about the slots
+            // this boot is about to fire. Retention is `sweepClaims`, on the
+            // scheduler's timer.
+            const { driver, statements } = recordingDriver();
+            await createCronStore(driver)!.ensureTable();
+            const deletes = statements.filter(s => s.includes("DELETE FROM rebase.cron_claims"));
+            expect(deletes).toHaveLength(1);
+            expect(deletes[0]).toContain("slot > now()");
+            expect(statements.some(s => s.includes("claimed_at < now()"))).toBe(false);
+        });
+
         it("releases claims on slots that have not happened yet", async () => {
             const statements: string[] = [];
             const params: unknown[][] = [];

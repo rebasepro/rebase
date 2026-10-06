@@ -114,6 +114,13 @@ export interface CronStore {
      * hold only the ones it made.
      */
     fetchRunSummaries?(jobIds: readonly string[]): Promise<Map<string, CronJobRunSummary>>;
+
+    /**
+     * Delete slot claims past retention — all but each job's most recent one —
+     * in batches. Resolves with how many went. The scheduler runs it on a
+     * timer while it is started; a store without it keeps every claim.
+     */
+    sweepClaims?(): Promise<number>;
 }
 
 /** One job's row in `rebase.cron_job_state`, as the scheduler reads it. */
@@ -151,11 +158,13 @@ function placeholders(count: number, first = 1): string {
 }
 
 /**
- * Claims older than this are garbage-collected on startup — all but each
- * job's most recent one, which is kept however old it is; see the sweep in
- * `ensureTable`.
+ * Claims older than this are garbage-collected — all but each job's most
+ * recent one, which is kept however old it is; see `sweepClaims`.
  */
 const CLAIM_RETENTION_DAYS = 7;
+
+/** Claims one retention statement deletes; a sweep repeats it until a batch comes back short. */
+const CLAIM_SWEEP_BATCH = 5_000;
 
 /**
  * How far ahead a claim may legitimately sit. Slots are claimed as they fire,
@@ -298,29 +307,11 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
                     }
                 });
 
-                // Garbage-collect old claims — except each job's most recent
-                // one. A claim is also the record that a slot already ran, and
-                // the catch-up at boot asks exactly that about the job's latest
-                // slot, as far back as its `catchUpWindowSeconds` reaches —
-                // which can be a month. Sweeping that claim after seven days
-                // would make the boot that swept it re-run the slot. A claim
-                // behind the latest answers for a slot no catch-up looks at,
-                // since a catch-up considers only the most recent one.
-                //
-                // After the future-slot sweep, not before: a stranded future
-                // claim would otherwise count as the job's latest, and the real
-                // one behind it would be swept here and then released there.
-                await ddl.step("Claim retention sweep", async () => {
-                    await exec(
-                        `DELETE FROM ${CLAIMS_TABLE} AS c
-                         WHERE c.claimed_at < now() - make_interval(days => $1)
-                           AND c.slot < (
-                               SELECT max(latest.slot) FROM ${CLAIMS_TABLE} AS latest
-                               WHERE latest.job_id = c.job_id
-                           )`,
-                        { params: [CLAIM_RETENTION_DAYS] }
-                    );
-                });
+                // The retention sweep is not here any more: it ran at boot
+                // and only at boot, so a scheduler that lived for months kept
+                // every claim it made — 525,000 a year for one per-minute job
+                // — until the next deploy deleted them in the boot path. The
+                // scheduler runs `sweepClaims` on a timer instead.
             }
 
             // Neither table is a collection, so neither carries RLS, while the
@@ -367,6 +358,50 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
                     "that served the request, and jobs run as their code declares on every other one. " +
                     "A manual trigger is not kept off a run another process is making."
                 );
+            }
+        },
+
+        async sweepClaims(): Promise<number> {
+            // Garbage-collect old claims — except each job's most recent one.
+            // A claim is also the record that a slot already ran, and the
+            // catch-up at boot asks exactly that about the job's latest slot,
+            // as far back as its `catchUpWindowSeconds` reaches — which can be
+            // a month. Sweeping that claim after seven days would make the
+            // next boot re-run the slot. A claim behind the latest answers for
+            // a slot no catch-up looks at, since a catch-up considers only the
+            // most recent one.
+            //
+            // "Most recent" counts only slots that have happened (give or take
+            // the skew margin). A stranded future claim — the boot's
+            // future-slot sweep releases those — would otherwise count as the
+            // job's latest, and the real one behind it would be swept here and
+            // the future one released there, leaving the job with neither.
+            // That used to be guarded by running this after that sweep; it
+            // now runs on a timer, so the query guards itself.
+            let total = 0;
+            for (;;) {
+                const rows = await exec(
+                    `WITH swept AS (
+                         DELETE FROM ${CLAIMS_TABLE}
+                         WHERE (job_id, slot) IN (
+                             SELECT c.job_id, c.slot FROM ${CLAIMS_TABLE} AS c
+                             WHERE c.claimed_at < now() - make_interval(days => $1)
+                               AND c.slot < (
+                                   SELECT max(latest.slot) FROM ${CLAIMS_TABLE} AS latest
+                                   WHERE latest.job_id = c.job_id
+                                     AND latest.slot <= now() + make_interval(mins => $2)
+                               )
+                             LIMIT $3
+                             FOR UPDATE SKIP LOCKED
+                         )
+                         RETURNING 1
+                     )
+                     SELECT count(*)::int AS deleted FROM swept`,
+                    { params: [CLAIM_RETENTION_DAYS, FUTURE_CLAIM_SKEW_MINUTES, CLAIM_SWEEP_BATCH] }
+                );
+                const deleted = Number((rows?.[0] as { deleted?: number } | undefined)?.deleted ?? 0);
+                total += deleted;
+                if (deleted < CLAIM_SWEEP_BATCH) return total;
             }
         },
 

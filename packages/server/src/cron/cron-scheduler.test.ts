@@ -75,7 +75,8 @@ function makeFleetStore() {
         releaseRunLease: jest.fn(async (jobId: string, holder: string) => {
             if (leases.get(jobId)?.holder === holder) leases.delete(jobId);
         }),
-        fetchRunSummaries: jest.fn(async (_jobIds: readonly string[]) => new Map<string, CronJobRunSummary>())
+        fetchRunSummaries: jest.fn(async (_jobIds: readonly string[]) => new Map<string, CronJobRunSummary>()),
+        sweepClaims: jest.fn(async () => 0)
     } satisfies Required<CronStore>;
     return { store, overrides, leases, claims, logs };
 }
@@ -902,6 +903,40 @@ reason: "already_executing" });
             expect(s2.getJob("restart")?.nextRunAt).toBeDefined();
             s2.stop();
         });
+
+        it("sweeps old claims while it runs, every hour, until it stops", async () => {
+            // The claim retention sweep ran only inside `ensureTable`, in the
+            // boot path: a scheduler that lived for months kept every claim it
+            // made — 525,000 a year for one per-minute job.
+            const fleet = makeFleetStore();
+            scheduler.setStore(fleet.store);
+            scheduler.registerJobs([makeJob("hourly", { schedule: "0 0 1 1 *" })]);
+
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(0);
+            expect(fleet.store.sweepClaims).toHaveBeenCalledTimes(1);
+
+            await jest.advanceTimersByTimeAsync(3 * 60 * 60 * 1000);
+            expect(fleet.store.sweepClaims).toHaveBeenCalledTimes(4);
+
+            await scheduler.stop();
+            await jest.advanceTimersByTimeAsync(3 * 60 * 60 * 1000);
+            expect(fleet.store.sweepClaims).toHaveBeenCalledTimes(4);
+        });
+
+        it("keeps running when a claim sweep fails", async () => {
+            const fleet = makeFleetStore();
+            fleet.store.sweepClaims.mockRejectedValue(new Error("statement timeout"));
+            jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+            scheduler.setStore(fleet.store);
+            scheduler.registerJobs([makeJob("yearly", { schedule: "0 0 1 1 *" })]);
+
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(60 * 60 * 1000);
+
+            expect(fleet.store.sweepClaims).toHaveBeenCalledTimes(2);
+            expect(scheduler.getJob("yearly")?.nextRunAt).toBeDefined();
+        });
     });
 
     // ── Schedule-driven execution ───────────────────────────────────
@@ -1419,7 +1454,9 @@ catchUpWindowSeconds: 3600,
                 admin: {
                     executeSql: async (sql: string) => {
                         if (sql.includes("cron_claims")) {
-                            claimAttempts.push(sql);
+                            // The claim, not the hourly retention sweep that
+                            // also starts with the scheduler (and fails too).
+                            if (sql.includes("INSERT INTO rebase.cron_claims")) claimAttempts.push(sql);
                             throw new Error("Failed query", {
                                 cause: Object.assign(new Error('relation "rebase.cron_claims" does not exist'), { code: "42P01" })
                             });

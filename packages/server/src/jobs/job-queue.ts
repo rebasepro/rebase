@@ -31,6 +31,13 @@ export function defaultBackoff(attempt: number): number {
 const REAP_INTERVAL_FACTOR = 0.25;
 
 /**
+ * How often a worker deletes finished jobs past retention. Hourly keeps the
+ * table near its retention size on a pod that is never redeployed; each sweep
+ * reads only the finished rows, through `idx_jobs_finished`.
+ */
+const RETENTION_SWEEP_INTERVAL_MS = 60 * 60_000;
+
+/**
  * Thrown by a handler for a failure no retry can change — a destination that
  * is refused, a receiver that redirects. The job is dead-lettered on this
  * attempt, with the message as its `last_error`, instead of spending its
@@ -82,6 +89,8 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
 
     let timer: NodeJS.Timeout | null = null;
     let reapTimer: NodeJS.Timeout | null = null;
+    let sweepTimer: NodeJS.Timeout | null = null;
+    let sweeping = false;
     let running = false;
     /**
      * Every job this worker is running, tracked one by one rather than per
@@ -196,6 +205,25 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         }
     }
 
+    /**
+     * Delete finished jobs past retention. On the worker, on its own timer:
+     * the sweep used to run only in the boot path, awaited before the server
+     * served, so a pod that lived for weeks never pruned and the next boot
+     * paid for all of it at once.
+     */
+    async function sweep(): Promise<void> {
+        if (sweeping || !store.sweepExpired) return;
+        sweeping = true;
+        try {
+            const deleted = await store.sweepExpired();
+            if (deleted > 0) logger.info(`[jobs] Removed ${deleted} finished job(s) past retention`);
+        } catch (error) {
+            logger.warn("[jobs] The retention sweep failed; it runs again within the hour", { error });
+        } finally {
+            sweeping = false;
+        }
+    }
+
     /** Claim as many jobs as there are free slots and start each one on its own. */
     async function claimAndStart(): Promise<Promise<void>[]> {
         const free = concurrency - active.size;
@@ -271,6 +299,9 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
             void reap();
             reapTimer = setInterval(() => { void reap(); }, visibilityTimeoutMs * REAP_INTERVAL_FACTOR);
             reapTimer.unref?.();
+            void sweep();
+            sweepTimer = setInterval(() => { void sweep(); }, RETENTION_SWEEP_INTERVAL_MS);
+            sweepTimer.unref?.();
             schedule(0);
         },
 
@@ -283,6 +314,10 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
             if (reapTimer) {
                 clearInterval(reapTimer);
                 reapTimer = null;
+            }
+            if (sweepTimer) {
+                clearInterval(sweepTimer);
+                sweepTimer = null;
             }
             // Jobs in flight keep their claim until they finish or the
             // visibility timeout expires, so waiting here is what turns a

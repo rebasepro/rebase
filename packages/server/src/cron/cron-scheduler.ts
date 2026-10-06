@@ -447,6 +447,13 @@ function setLongTimeout(callback: () => void, delayMs: number): () => void {
 const DEFAULT_TIMEOUT_SECONDS = 300;
 
 /**
+ * How often a started scheduler deletes slot claims past retention. Claims
+ * accrue one per job per fire, so a scheduler that lives for months needs to
+ * prune while it runs, not only when it next boots.
+ */
+const CLAIM_SWEEP_INTERVAL_MS = 60 * 60_000;
+
+/**
  * How long a run lease outlasts the run's own timeout.
  *
  * The lease is timed on the database's clock from the moment it is taken, the
@@ -573,6 +580,9 @@ export class CronScheduler {
      * ever clear the lease that run took.
      */
     private readonly instanceLabel = `${hostname()}:${process.pid}`;
+    /** The hourly claim-retention sweep, while the scheduler is started with a store. */
+    private claimSweepTimer?: ReturnType<typeof setInterval>;
+    private sweepingClaims = false;
 
     /**
      * Set the server singleton to make it available to cron job handlers.
@@ -710,7 +720,29 @@ export class CronScheduler {
         // boot must not wait on either. Its own errors are contained inside.
         void this.catchUpMissedSlots();
 
+        // Off the boot path too, and then hourly. It cannot take a claim the
+        // catch-up is asking about: a job's latest claim is never swept.
+        if (this.store?.sweepClaims) {
+            void this.sweepClaims();
+            this.claimSweepTimer = setInterval(() => { void this.sweepClaims(); }, CLAIM_SWEEP_INTERVAL_MS);
+            this.claimSweepTimer.unref?.();
+        }
+
         logger.info(`⏰ Cron scheduler started with ${this.jobs.size} job(s)`);
+    }
+
+    /** Delete slot claims past retention. Failures are logged; the next hour tries again. */
+    private async sweepClaims(): Promise<void> {
+        const store = this.store;
+        if (!store?.sweepClaims || this.sweepingClaims) return;
+        this.sweepingClaims = true;
+        try {
+            await store.sweepClaims();
+        } catch (err) {
+            logger.warn("[cron] The claim retention sweep failed; it runs again within the hour", { error: err });
+        } finally {
+            this.sweepingClaims = false;
+        }
     }
 
     /**
@@ -729,6 +761,10 @@ export class CronScheduler {
         this.started = false;
         for (const [id] of this.jobs) {
             this.stopJob(id);
+        }
+        if (this.claimSweepTimer) {
+            clearInterval(this.claimSweepTimer);
+            this.claimSweepTimer = undefined;
         }
         if (this.inFlight.size === 0) return;
 

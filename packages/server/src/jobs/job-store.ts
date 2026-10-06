@@ -17,7 +17,7 @@ import type { JobRecord } from "./types.js";
 
 const TABLE = "rebase.jobs";
 
-/** How long finished jobs are kept before the boot sweep removes them. */
+/** How long finished jobs are kept before the retention sweep removes them. */
 const SUCCEEDED_RETENTION_DAYS = 3;
 /**
  * Failures outlive successes by a lot. A dead-lettered job is evidence, and the
@@ -25,6 +25,14 @@ const SUCCEEDED_RETENTION_DAYS = 3;
  * on Friday night.
  */
 const FAILED_RETENTION_DAYS = 30;
+
+/**
+ * Rows one retention statement deletes. A sweep repeats it until a batch
+ * comes back short, so a backlog — the first sweep on a table a long-lived
+ * pod let grow to millions of rows — is many short transactions rather than
+ * one that holds locks and writes a burst of WAL for seconds.
+ */
+const RETENTION_BATCH = 5_000;
 
 /** A row as Postgres returns it. */
 interface JobRow {
@@ -135,6 +143,13 @@ export interface JobStore {
     heartbeat?(id: string, claim: JobClaim): Promise<boolean>;
     /** Return jobs stranded by a worker that died holding them. Resolves with how many. */
     reapExpired(visibilityTimeoutMs: number): Promise<number>;
+    /**
+     * Delete finished jobs past retention — succeeded ones after
+     * {@link SUCCEEDED_RETENTION_DAYS} days, failed ones after
+     * {@link FAILED_RETENTION_DAYS} — in batches. Resolves with how many went.
+     * The worker runs it on a timer; a store without it keeps every row.
+     */
+    sweepExpired?(): Promise<number>;
     fetch(id: string): Promise<JobRecord | null>;
 }
 
@@ -225,17 +240,25 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
                 WHERE idempotency_key IS NOT NULL AND status IN ('pending', 'running')
             `);
 
+            // The retention sweep's index. Partial on the finished rows — the
+            // only ones it deletes — so a sweep reads what it removes instead
+            // of the whole table; without it every sweep was a sequential scan,
+            // six seconds over two million rows.
+            await ddl.ensureObject("Creating idx_jobs_finished", `
+                CREATE INDEX IF NOT EXISTS idx_jobs_finished
+                ON ${TABLE}(status, updated_at)
+                WHERE status IN ('succeeded', 'failed')
+            `);
+
             const ready = await ddl.isReadable(TABLE);
 
             if (ready) {
-                await ddl.step("Job retention sweep", async () => {
-                    await exec(
-                        `DELETE FROM ${TABLE}
-                         WHERE (status = 'succeeded' AND updated_at < now() - make_interval(days => $1))
-                            OR (status = 'failed'    AND updated_at < now() - make_interval(days => $2))`,
-                        [SUCCEEDED_RETENTION_DAYS, FAILED_RETENTION_DAYS]
-                    );
-                });
+                // No retention sweep here. It used to run at boot and only at
+                // boot: awaited before the server served, a sequential scan of
+                // the whole table, and never again for as long as the pod lived
+                // — a worker up for three weeks held seven times the rows
+                // retention meant to keep. The worker runs `sweepExpired` on a
+                // timer instead.
 
                 // Payloads are arbitrary application data — a webhook body, a
                 // user id, whatever was passed — and a writable queue lets any
@@ -442,6 +465,33 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
                 );
             }
             return count;
+        },
+
+        async sweepExpired(): Promise<number> {
+            // `SKIP LOCKED`, so replicas sweeping at once divide the rows
+            // rather than queue behind each other's batch. The count comes back
+            // as one row, not one id per deleted job.
+            let total = 0;
+            for (;;) {
+                const rows = await exec(
+                    `WITH swept AS (
+                         DELETE FROM ${TABLE}
+                         WHERE id IN (
+                             SELECT id FROM ${TABLE}
+                             WHERE (status = 'succeeded' AND updated_at < now() - make_interval(days => $1))
+                                OR (status = 'failed'    AND updated_at < now() - make_interval(days => $2))
+                             LIMIT $3
+                             FOR UPDATE SKIP LOCKED
+                         )
+                         RETURNING 1
+                     )
+                     SELECT count(*)::int AS deleted FROM swept`,
+                    [SUCCEEDED_RETENTION_DAYS, FAILED_RETENTION_DAYS, RETENTION_BATCH]
+                );
+                const deleted = Number(firstSqlRow<{ deleted: number }>(rows)?.deleted ?? 0);
+                total += deleted;
+                if (deleted < RETENTION_BATCH) return total;
+            }
         },
 
         async fetch(id: string): Promise<JobRecord | null> {

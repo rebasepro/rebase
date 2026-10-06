@@ -99,7 +99,9 @@ FROM rebase.jobs WHERE status = 'failed'
 ORDER BY updated_at DESC;
 ```
 
-Failed rows are kept 30 days; successful ones 3.
+Failed rows are kept 30 days; successful ones 3. Each worker deletes the
+expired rows when it starts and then every hour, in batches, off the request
+path.
 
 ## What happens when a worker dies
 
