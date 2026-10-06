@@ -184,6 +184,8 @@ interface CronJobContext {
 
 Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API. Each line is also written to the server log at `info` level with a `cron` field holding the job ID, so it shows up wherever your container's output is collected, including Rebase Cloud's debug logs. That copy is redacted the way the server's own log lines are: the values of keys such as `password` or `apiKey`, and the SQL and parameters of a failed query, are replaced. The execution log stores the line without that redaction.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> The execution log keeps a run's first 500 lines or 64 KB of them, whichever comes first, and then one line saying how many more there were: `… 9500 more lines not kept — see the server log`. The server log gets every line. A job that logs one line per item it processes should expect its history to show the start of the run.
+
 ### `ctx.signal` — stop the work when the run stops
 
 The timeout ends the *run*: the scheduler stops waiting and records a failure.

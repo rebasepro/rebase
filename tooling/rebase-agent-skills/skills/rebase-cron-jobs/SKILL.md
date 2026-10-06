@@ -623,7 +623,7 @@ interface CronJobLogEntry {
     success: boolean;         // Whether this run succeeded
     error?: string;           // Error message if the run failed
     result?: unknown;         // Arbitrary data returned by the handler
-    logs: string[];           // Captured log lines from ctx.log()
+    logs: string[];           // Captured log lines from ctx.log() — the first 500 or 64 KB, then a line counting the rest
     manual?: boolean;         // Whether this was a manual trigger
 }
 ```

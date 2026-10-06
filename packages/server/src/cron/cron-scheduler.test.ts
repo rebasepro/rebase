@@ -288,6 +288,58 @@ schedule: "30 2 * * 1" })]);
             expect(log!.logs).toEqual(["line 1", 'line 2 {"nested":true}', "42"]);
         });
 
+        describe("the ctx.log capture's cap", () => {
+            // A job logging one line per processed item kept every line — in
+            // the 50-run ring, in its `cron_logs` row, in every history read.
+            afterEach(() => jest.restoreAllMocks());
+
+            it("keeps the first 500 lines and says how many more there were", async () => {
+                const info = jest.spyOn(logger, "info").mockImplementation(() => undefined);
+                const store = makeFleetStore();
+                scheduler.setStore(store.store);
+                scheduler.registerJobs([makeJob("chatty", {
+                    handler: async (ctx) => { for (let i = 0; i < 10_000; i++) ctx.log(`item ${i} done`); }
+                })]);
+
+                const log = await scheduler.triggerJob("chatty");
+
+                expect(log!.logs).toHaveLength(501);
+                expect(log!.logs[0]).toBe("item 0 done");
+                expect(log!.logs[499]).toBe("item 499 done");
+                expect(log!.logs[500]).toBe("… 9500 more lines not kept — see the server log");
+                // What is persisted and what the ring holds is the capped run.
+                expect(store.logs[0].logs).toHaveLength(501);
+                expect(scheduler.getJobLogs("chatty")[0].logs).toHaveLength(501);
+                // Every line still reaches the server log.
+                expect(info.mock.calls.filter(([, meta]) => (meta as { cron?: string } | undefined)?.cron === "chatty"))
+                    .toHaveLength(10_000);
+            });
+
+            it("stops at 64 KB when the lines are long", async () => {
+                jest.spyOn(logger, "info").mockImplementation(() => undefined);
+                const line = "x".repeat(1000);
+                scheduler.registerJobs([makeJob("wide", {
+                    handler: async (ctx) => { for (let i = 0; i < 200; i++) ctx.log(line); }
+                })]);
+
+                const log = await scheduler.triggerJob("wide");
+
+                const kept = log!.logs.slice(0, -1);
+                expect(kept).toHaveLength(65);
+                expect(kept.join("").length).toBeLessThanOrEqual(64 * 1024);
+                expect(log!.logs.at(-1)).toBe("… 135 more lines not kept — see the server log");
+            });
+
+            it("adds nothing to a run under the cap", async () => {
+                scheduler.registerJobs([makeJob("quiet", {
+                    handler: async (ctx) => { for (let i = 0; i < 500; i++) ctx.log("ok"); }
+                })]);
+                const log = await scheduler.triggerJob("quiet");
+                expect(log!.logs).toHaveLength(500);
+                expect(log!.logs.every(l => l === "ok")).toBe(true);
+            });
+        });
+
         it("sets lastRunAt after execution", async () => {
             scheduler.registerJobs([makeJob("timed")]);
             const before = new Date();

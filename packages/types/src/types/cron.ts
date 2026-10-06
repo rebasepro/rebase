@@ -113,9 +113,10 @@ export interface CronJobContext {
     scheduledAt: Date;
 
     /**
-     * A simple logger scoped to this job run. Each line is kept with the
-     * run's log entry and also written to the server log at `info`, with a
-     * `cron` field holding the job ID.
+     * A simple logger scoped to this job run. Each line is written to the
+     * server log at `info`, with a `cron` field holding the job ID, and kept
+     * with the run's log entry — the first 500 lines or 64 KB of them,
+     * whichever comes first, then one line saying how many more there were.
      */
     log: (...args: unknown[]) => void;
 

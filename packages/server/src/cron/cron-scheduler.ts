@@ -413,6 +413,53 @@ export function findMostRecentSlot(expression: string, from: Date, to: Date, tim
 const MAX_LOGS_PER_JOB = 50;
 
 /**
+ * What one run keeps of its `ctx.log` lines: up to 500 lines or 64 KB,
+ * whichever comes first. The lines past that are counted, and one line at the
+ * end says how many there were; every line still reaches the server log.
+ *
+ * Uncapped, a job logging one line per item kept them all — in the 50-run ring
+ * per job, in a `cron_logs` row, and in every history read: a per-minute sync
+ * of 1,000 items held 4 MB per job in memory and wrote 115 MB a day.
+ */
+export const MAX_CAPTURED_LOG_LINES = 500;
+export const MAX_CAPTURED_LOG_BYTES = 64 * 1024;
+
+/**
+ * A run's `ctx.log` capture, capped at {@link MAX_CAPTURED_LOG_LINES} and
+ * {@link MAX_CAPTURED_LOG_BYTES}. The kept lines are the first ones: once one
+ * line is dropped, every later one is too, so the history reads as a prefix of
+ * the run's output and never as lines with gaps between them.
+ */
+function createLogCapture(firstLine?: string) {
+    const lines: string[] = [];
+    let bytes = 0;
+    let dropped = 0;
+    let closed = false;
+    const capture = {
+        add(line: string): void {
+            if (closed) return;
+            const size = Buffer.byteLength(line, "utf8");
+            if (dropped === 0 && lines.length < MAX_CAPTURED_LOG_LINES && bytes + size <= MAX_CAPTURED_LOG_BYTES) {
+                lines.push(line);
+                bytes += size;
+                return;
+            }
+            dropped++;
+        },
+        /** The lines kept, and the line that says what was not. Later `add`s are ignored. */
+        close(): string[] {
+            if (!closed && dropped > 0) {
+                lines.push(`… ${dropped} more line${dropped === 1 ? "" : "s"} not kept — see the server log`);
+            }
+            closed = true;
+            return lines;
+        }
+    };
+    if (firstLine !== undefined) capture.add(firstLine);
+    return capture;
+}
+
+/**
  * Minimum milliseconds between scheduled executions of the same job.
  * Prevents tight re-execution loops caused by jitter or clock drift.
  */
@@ -1550,7 +1597,7 @@ export class CronScheduler {
         // catch-up uses it to say so in the persisted log, where an operator
         // reading `cron_logs` will actually see it — `manual` is the only other
         // provenance the entry carries, and a catch-up is not manual.
-        const capturedLogs: string[] = seedLog ? [seedLog] : [];
+        const capturedLogs = createLogCapture(seedLog || undefined);
 
         const ctx: CronJobContext = {
             jobId: job.id,
@@ -1560,7 +1607,9 @@ export class CronScheduler {
                 const line = args.map((a) =>
                     typeof a === "string" ? a : JSON.stringify(a)
                 ).join(" ");
-                capturedLogs.push(line);
+                // Capped — see `MAX_CAPTURED_LOG_LINES`. The process log below
+                // is not: it gets every line.
+                capturedLogs.add(line);
                 // Also to the process log. `cron_logs` is behind the admin
                 // API, so a line that went only there was missing from the
                 // platform's logs, which is where an operator looks when a
@@ -1650,7 +1699,7 @@ export class CronScheduler {
             success,
             error,
             result: result !== undefined ? result : undefined,
-            logs: capturedLogs,
+            logs: capturedLogs.close(),
             manual
         };
 
