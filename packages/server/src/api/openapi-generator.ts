@@ -1,5 +1,6 @@
 import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, isToMany, ResolvedRelation, VectorProperty, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { effectiveAccess, fieldKeyForColumn, findRelation, getTenantConfig, isRelationRequired, resolveCollectionRelations } from "@rebasepro/common";
+import { effectiveAccess, fieldKeyForColumn, findRelation, getTenantConfig, isRelationRequired, resolveCollectionRelations, softDeleteFieldOf } from "@rebasepro/common";
+import { DELETED_QUERY_PARAM, HARD_DELETE_QUERY_PARAM } from "./rest/soft-delete-params";
 
 /**
  * OpenAPI 3.0.3 specification generator.
@@ -293,7 +294,59 @@ description: "Whether more records exist beyond this page" },
     // two parameters with the same (`name`, `in`) pair on one operation, which
     // is invalid OpenAPI: Swagger UI renders a duplicate and several generators
     // abort. Taken from the parameter list itself so the two cannot drift.
-    const reservedParameterNames = new Set(listQueryParameters().map(p => p.name));
+    //
+    // `deleted` too: the parser reads it as the soft-delete parameter on every
+    // collection (a value other than `include`/`only` is a 400), so a filter
+    // on a column of that name never runs either.
+    const reservedParameterNames = new Set([...listQueryParameters().map(p => p.name), DELETED_QUERY_PARAM]);
+
+    /**
+     * `?deleted=` on the reads of a `softDelete` collection. A delete there
+     * moves the row to the trash, and every read hides trashed rows unless it
+     * asks for them; the list, the single row, the count and the aggregate all
+     * honour this. Empty for any other collection.
+     */
+    const deletedParameters = (collection: CollectionConfig) => {
+        const field = softDeleteFieldOf(collection);
+        if (!field) return [];
+        return [{
+            name: DELETED_QUERY_PARAM,
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["include", "only"] },
+            description:
+                `Rows a delete moved to the trash (\`${field}\` set) are left out unless this asks for them: ` +
+                "`include` reads them with the live rows, `only` reads them alone. Any other value is a " +
+                "400 INVALID_DELETED_PARAM."
+        }];
+    };
+
+    /**
+     * `?hard=` on the deletes of a `softDelete` collection: delete for good
+     * rather than move to the trash. Empty for any other collection.
+     */
+    const hardDeleteParameters = (collection: CollectionConfig) => {
+        if (!softDeleteFieldOf(collection)) return [];
+        return [{
+            name: HARD_DELETE_QUERY_PARAM,
+            in: "query",
+            required: false,
+            schema: { type: "boolean", default: false },
+            description:
+                "`true` deletes for good instead of moving to the trash — a row already in the trash " +
+                "included, which is how the trash is emptied. Only `true`/`1` and `false`/`0` are " +
+                "accepted; anything else is a 400 INVALID_HARD_PARAM."
+        }];
+    };
+
+    /** What a delete does to a `softDelete` collection's row, for the delete operations' descriptions. */
+    const softDeleteBehaviour = (collection: CollectionConfig): string | undefined => {
+        const field = softDeleteFieldOf(collection);
+        if (!field) return undefined;
+        return `This collection soft-deletes: a delete moves the row to the trash by stamping \`${field}\`, ` +
+            "and every read leaves it out unless it passes `?deleted=include` or `?deleted=only`. A PATCH " +
+            `setting \`${field}\` back to \`null\` restores it. Pass \`?hard=true\` to delete for good.`;
+    };
 
     // Every component name this document will carry, known before the first
     // schema is built: a relation may point at a collection that appears later
@@ -514,6 +567,7 @@ description: "Whether more records exist beyond this page" },
         schemas[`${schemaName}Update`] = buildCollectionUpdateSchema(collection);
 
         const dataPath = `/data/${slug}`;
+        const softDeleteNote = softDeleteBehaviour(collection);
 
         // ── GET /data/{slug}/count — How many rows match ──────────────
         //
@@ -536,6 +590,7 @@ description: "Whether more records exist beyond this page" },
                 operationId: `count${schemaName}`,
                 parameters: [
                     ...listQueryParameters().filter(p => p.name === "searchString"),
+                    ...deletedParameters(collection),
                     ...buildFilterParameters(collection, reservedParameterNames)
                 ],
                 responses: {
@@ -607,6 +662,7 @@ description: "Whether more records exist beyond this page" },
                         schema: { type: "string" },
                         example: "count:desc"
                     },
+                    ...deletedParameters(collection),
                     ...buildFilterParameters(collection, reservedParameterNames)
                 ],
                 responses: {
@@ -650,6 +706,7 @@ description: "Whether more records exist beyond this page" },
                 operationId: `list${schemaName}`,
                 parameters: [
                     ...listQueryParameters(),
+                    ...deletedParameters(collection),
                     ...buildFilterParameters(collection, reservedParameterNames)
                 ],
                 responses: {
@@ -875,9 +932,10 @@ description: "Whether more records exist beyond this page" },
                     "`requestBody` on a DELETE operation — a generated client would send the " +
                     "request with no ids at all. Takes ids rather than a filter: a mistyped " +
                     "condition that empties a table cannot be reviewed at the call site the way " +
-                    "an explicit list can. `beforeDelete`/`afterDelete` fire per row.",
+                    "an explicit list can. `beforeDelete`/`afterDelete` fire per row." +
+                    (softDeleteNote ? `\n\n${softDeleteNote}` : ""),
                 operationId: `deleteMany${schemaName}`,
-                parameters: [idempotencyHeader],
+                parameters: [idempotencyHeader, ...hardDeleteParameters(collection)],
                 requestBody: {
                     required: true,
                     content: {
@@ -897,7 +955,9 @@ description: "Whether more records exist beyond this page" },
                 },
                 responses: {
                     200: {
-                        description: "How many rows were deleted",
+                        description: softDeleteNote
+                            ? "How many rows were moved to the trash, or deleted for good with `?hard=true`"
+                            : "How many rows were deleted",
                         content: {
                             "application/json": {
                                 schema: {
@@ -954,7 +1014,8 @@ description: "Entity ID" },
                             "Comma-separated columns to return, as a SELECT projection. The primary key "
                             + "always survives and `excludeFromApi` columns stay hidden.",
                         example: "id,title"
-                    }
+                    },
+                    ...deletedParameters(collection)
                 ],
                 responses: {
                     200: {
@@ -987,6 +1048,7 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
             delete: {
                 tags: [collection.name],
                 summary: `Delete ${collection.singularName || collection.name}`,
+                ...(softDeleteNote ? { description: softDeleteNote } : {}),
                 operationId: `delete${schemaName}`,
                 parameters: [
                     { name: "id",
@@ -1004,10 +1066,15 @@ description: "Entity ID" },
                             "Names this delete so a retry replays its answer. A delete replayed after " +
                             "the first attempt committed would otherwise answer 404 — which an offline " +
                             "queue reads as a permanent failure for a delete that in fact succeeded."
-                    }
+                    },
+                    ...hardDeleteParameters(collection)
                 ],
                 responses: {
-                    204: { description: "Deleted successfully" },
+                    204: {
+                        description: softDeleteNote
+                            ? "Moved to the trash: the row still exists and can be restored. With `?hard=true`, deleted for good"
+                            : "Deleted successfully"
+                    },
                     404: { description: "Entity not found",
 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
                     409: {
