@@ -40,6 +40,15 @@ import { describeDriverError, type Queryable } from "./ensure-collection-tables"
 import { assertSafeIdentifier } from "./plan/diff-plan";
 import { quoteSqlLiteral } from "./generate-postgres-ddl-logic";
 import { revokeUserRoleSql } from "../security/rls-enforcement";
+import {
+    atomicBatch,
+    isLockTimeout,
+    isMultiStatementRefusal,
+    resolveBootLockOptions,
+    sleep,
+    type BootLockOptions,
+    type ResolvedBootLockOptions
+} from "./boot-ddl";
 
 export interface PolicyEnsureResult {
     /** `CREATE POLICY` statements that ran successfully. */
@@ -78,50 +87,68 @@ export interface PolicyEnsureResult {
      * database — which is the reason this module exists. So boot has to do it.
      */
     orphansDropped: number;
+    /**
+     * Tables whose policies were not re-applied because another session held
+     * the table's lock for every attempt — a long transaction, a report, a
+     * dump. Each table's policy statements run in one transaction, so a table
+     * here was left exactly as it was: RLS on, its existing policies in force.
+     * `rulesChanged` says whether those differ from the declared ones by name
+     * (a rule whose policy is missing, or an orphan still granting), in which
+     * case the new rules are not in force on this table until a later boot.
+     */
+    deferred: { table: string; error: string; rulesChanged: boolean }[];
 }
 
 const isCreatePolicy = (statement: string): boolean => /^\s*CREATE POLICY/i.test(statement);
 
-/**
- * Bring the declared collections' RLS policies up to date. Returns what it did.
- *
- * Only tables that already exist are touched: the boot-time table creator runs
- * first, so anything still missing is a table this additive path is not allowed
- * to create (a junction, or a relation left to a migration). Enabling RLS on a
- * non-existent table would error, so those are recorded as skipped, not failed.
- */
-
-/**
- * Remove generated policies on this table that the current plan does not
- * produce.
- *
- * Scoped hard, because dropping a policy is destructive: only this one table,
- * only names matching the generated `<table>_<op>_<sha1>` shape, and only names
- * absent from the statements just applied. A hand-written policy, or one
- * belonging to another table, is never touched — `isGeneratedPolicyName` is the
- * same predicate `db push` uses to draw that line.
- */
-async function dropOrphanedPoliciesOn(client: Queryable, plan: CollectionPolicyPlan): Promise<number> {
+/** The policy names a plan creates. */
+const plannedPolicyNames = (plan: CollectionPolicyPlan): Set<string> => {
     const expected = new Set<string>();
     for (const statement of plan.policyStatements) {
         const match = /^\s*CREATE POLICY\s+"([^"]+)"/i.exec(statement);
         if (match) expected.add(match[1]);
     }
+    return expected;
+};
 
-    const existing = await client.query<{ policyname: string }>(
-        `SELECT policyname FROM pg_policies WHERE schemaname = '${plan.schema.replace(/'/g, "''")}' ` +
-        `AND tablename = '${plan.table.replace(/'/g, "''")}'`
+/**
+ * Generated policies on this table that the current plan does not produce.
+ *
+ * Scoped hard, because dropping a policy is destructive: only this one table,
+ * only names matching the generated `<table>_<op>_<sha1>` shape, and only names
+ * absent from the plan. A hand-written policy, or one belonging to another
+ * table, is never touched — `isGeneratedPolicyName` is the same predicate `db
+ * push` uses to draw that line.
+ *
+ * Computed from the names read before anything is applied. The plan only ever
+ * drops and re-creates its own names, so "present before, not planned" is the
+ * same set the old read-after-apply found.
+ */
+const orphansOf = (plan: CollectionPolicyPlan, present: readonly string[]): string[] => {
+    const expected = plannedPolicyNames(plan);
+    return present.filter(name => !expected.has(name) && isGeneratedPolicyName(name, plan.table));
+};
+
+const dropPolicySql = (plan: CollectionPolicyPlan, name: string): string =>
+    `DROP POLICY IF EXISTS "${name}" ON "${plan.schema}"."${plan.table}"`;
+
+/**
+ * Every policy name on every table in the declared schemas, in one read — it
+ * replaced a `pg_policies` query per table.
+ */
+async function readPolicyNames(client: Queryable, schemas: string[]): Promise<Map<string, string[]>> {
+    const names = new Map<string, string[]>();
+    if (schemas.length === 0) return names;
+    const inList = schemas.map(schema => `'${assertSafeIdentifier(schema, "schema name")}'`).join(", ");
+    const { rows } = await client.query<{ schemaname: string; tablename: string; policyname: string }>(
+        `SELECT schemaname, tablename, policyname FROM pg_policies WHERE schemaname IN (${inList})`
     );
-
-    let dropped = 0;
-    for (const row of existing.rows) {
-        const name = row.policyname;
-        if (expected.has(name)) continue;
-        if (!isGeneratedPolicyName(name, plan.table)) continue;
-        await client.query(`DROP POLICY IF EXISTS "${name}" ON "${plan.schema}"."${plan.table}"`);
-        dropped++;
+    for (const row of rows) {
+        const key = `${row.schemaname}.${row.tablename}`;
+        if (!names.has(key)) names.set(key, []);
+        names.get(key)!.push(row.policyname);
     }
-    return dropped;
+    return names;
 }
 
 /**
@@ -185,10 +212,15 @@ type TableLock =
  * replica shares the grants, so one boot during a `pg_dump` closed the
  * collection for the whole deployment until the next clean boot.
  */
-async function lockTable(client: Queryable, plan: CollectionPolicyPlan, rlsOn: boolean): Promise<TableLock> {
+async function lockTable(
+    client: Queryable,
+    plan: CollectionPolicyPlan,
+    rlsOn: boolean,
+    run: (sql: string) => Promise<unknown> = sql => client.query(sql)
+): Promise<TableLock> {
     if (rlsOn) return { locked: true };
     try {
-        await client.query(plan.enableRls);
+        await run(plan.enableRls);
         return { locked: true };
     } catch (err) {
         // The database's own answer, not the ORM's wrapper — see
@@ -211,15 +243,23 @@ async function lockTable(client: Queryable, plan: CollectionPolicyPlan, rlsOn: b
         // the name to lower case, so a mixed-case adopted table (`"User"`)
         // was revoked as `public.user` — which fails, and a table that could
         // have been closed refused the boot instead.
-        try {
-            await client.query(revokeUserRoleSql(plan.schema, plan.table));
-            return { locked: false, error, grantWithdrawn: true };
-        } catch {
-            // Reported with `grantWithdrawn: false`, which the caller
-            // escalates. There is nothing else this can do to make the table
-            // safe.
-            return { locked: false, error, grantWithdrawn: false };
-        }
+        return withdrawGrant(client, plan, error);
+    }
+}
+
+/**
+ * Take the user role's privileges on a table back, so an RLS-off table is
+ * unreachable rather than unprotected. `REVOKE` waits for no table lock a
+ * reader holds, so it runs as a plain statement.
+ */
+async function withdrawGrant(client: Queryable, plan: CollectionPolicyPlan, error: string): Promise<TableLock> {
+    try {
+        await client.query(revokeUserRoleSql(plan.schema, plan.table));
+        return { locked: false, error, grantWithdrawn: true };
+    } catch {
+        // Reported with `grantWithdrawn: false`, which the caller escalates.
+        // There is nothing else this can do to make the table safe.
+        return { locked: false, error, grantWithdrawn: false };
     }
 }
 
@@ -267,19 +307,76 @@ export async function lockCollectionTables(
     return result;
 }
 
+/** One declared table that exists, and what the catalogue said about it. */
+interface TableWork {
+    plan: CollectionPolicyPlan;
+    rlsOn: boolean;
+    orphans: string[];
+    /** Whether the policy names on the table differ from the plan's. */
+    rulesChanged: boolean;
+}
+
+type AtomicOutcome =
+    | { kind: "applied" }
+    | { kind: "lock-timeout"; error: string }
+    | { kind: "unsupported" }
+    | { kind: "failed"; error: string };
+
+/**
+ * Bring the declared collections' RLS policies up to date. Returns what it did.
+ *
+ * Only tables that already exist are touched: the boot-time table creator runs
+ * first, so anything still missing is a table this additive path is not allowed
+ * to create (a junction, or a relation left to a migration). Enabling RLS on a
+ * non-existent table would error, so those are recorded as skipped, not failed.
+ *
+ * ## One transaction per table
+ *
+ * Each table's statements — `ENABLE` when RLS is off, every `DROP POLICY IF
+ * EXISTS` / `CREATE POLICY` pair, the orphan drops — go to Postgres as one
+ * string, which it runs as one transaction (see `boot-ddl`). Before, each was
+ * its own autocommit: at 240 tables, 4,080 commits and 4,080 ACCESS EXCLUSIVE
+ * lock acquisitions per boot, 6–22 s on a disk that really flushes. And between
+ * a policy's DROP and its CREATE, every other replica evaluated the table with
+ * that policy missing — a user's continuous reads of their own row came back
+ * empty once per boot (measured, Postgres 18). Now a concurrent request sees the
+ * old policies or the new ones, never neither.
+ *
+ * If the transaction fails for any reason but a lock timeout, the table is
+ * applied again one statement at a time, exactly as before — so a rule that
+ * cannot be created (a function a migration has not added yet) leaves the
+ * table in the same deny-leaning partial state it always did, rather than
+ * rolling back to the old, possibly looser, policies.
+ *
+ * ## Lock budget
+ *
+ * The transaction runs under `lock_timeout` (`boot-ddl`), so a table that a
+ * long transaction, a report or a dump is holding costs live traffic one
+ * second, not the statement timeout. A contended table is retried after the
+ * others, with backoff, within a retry budget for the whole step; one still
+ * held after that is reported in `deferred` — its transaction rolled back, so
+ * it is exactly as it was before this boot — or, if RLS was off on it, closed
+ * by revoking the user role's grant, as any table RLS cannot be enabled on is.
+ */
 export async function ensureCollectionPolicies(
     client: Queryable,
     collections: CollectionConfig[],
-    log?: (message: string) => void
+    log?: (message: string) => void,
+    options: BootLockOptions = {}
 ): Promise<PolicyEnsureResult> {
-    const result: PolicyEnsureResult = { policiesApplied: 0, tablesSecured: 0, skipped: [], failures: [], unsecured: [], orphansDropped: 0 };
+    const result: PolicyEnsureResult = {
+        policiesApplied: 0, tablesSecured: 0, skipped: [], failures: [], unsecured: [], orphansDropped: 0, deferred: []
+    };
 
     const plans = planCollectionPolicies(collections);
     if (plans.length === 0) return result;
+    const lock = resolveBootLockOptions(options);
 
     const schemas = Array.from(new Set(plans.map(p => p.schema)));
     const tables = await readTableSecurity(client, schemas);
+    const policyNames = await readPolicyNames(client, schemas);
 
+    const work: TableWork[] = [];
     for (const plan of plans) {
         const table = tables.get(plan.qualified);
         if (!table) {
@@ -289,41 +386,178 @@ export async function ensureCollectionPolicies(
             });
             continue;
         }
+        const present = policyNames.get(plan.qualified) ?? [];
+        const orphans = orphansOf(plan, present);
+        const presentSet = new Set(present);
+        const rulesChanged = orphans.length > 0 || [...plannedPolicyNames(plan)].some(name => !presentSet.has(name));
+        work.push({ plan, rlsOn: table.rls, orphans, rulesChanged });
+    }
 
-        // Enabling RLS is its own step, because its failure is the opposite of
-        // every other failure here. Once RLS is on, anything that goes wrong
-        // afterwards leaves the table denying; while it is off, the grant made
-        // earlier in boot leaves the table wide open. Sharing one `try` meant
-        // the dangerous case was reported in the safe case's words.
-        const lock = await lockTable(client, plan, table.rls);
-        if (!lock.locked) {
-            result.unsecured.push({ table: plan.qualified, error: lock.error, grantWithdrawn: lock.grantWithdrawn });
-            continue;
+    // Until the handle refuses a multi-statement string (an extended-protocol
+    // driver), after which every table goes one statement at a time.
+    let atomic = true;
+    let retryBudget = lock.retryBudgetMs;
+    let queue = work;
+    let lastError = new Map<TableWork, string>();
+
+    for (let attempt = 1; queue.length > 0; attempt++) {
+        if (attempt > 1) {
+            if (attempt > lock.attempts || retryBudget <= 0) break;
+            await sleep(lock.backoffMs(attempt - 1));
         }
-        result.tablesSecured++;
-
-        try {
-            let created = 0;
-            for (const statement of plan.policyStatements) {
-                await client.query(statement);
-                if (isCreatePolicy(statement)) {
-                    result.policiesApplied++;
-                    created++;
+        const contended: TableWork[] = [];
+        const errors = new Map<TableWork, string>();
+        for (const table of queue) {
+            if (attempt > 1 && retryBudget <= 0) {
+                contended.push(table);
+                errors.set(table, lastError.get(table) ?? "");
+                continue;
+            }
+            if (atomic) {
+                const outcome = await applyAtomically(client, table, lock);
+                if (outcome.kind === "applied") {
+                    record(result, table, log);
+                    continue;
+                }
+                if (outcome.kind === "lock-timeout") {
+                    if (attempt > 1) retryBudget -= lock.lockTimeoutMs;
+                    contended.push(table);
+                    errors.set(table, outcome.error);
+                    continue;
+                }
+                if (outcome.kind === "unsupported") {
+                    atomic = false;
+                } else {
+                    log?.(`${table.plan.qualified}: applying its policies in one transaction failed ` +
+                        `(${outcome.error}); applying them one statement at a time`);
                 }
             }
-
-            const orphans = await dropOrphanedPoliciesOn(client, plan);
-            result.orphansDropped += orphans;
-
-            log?.(`${plan.qualified}: RLS enabled, ${created} policy(ies) applied` +
-                (orphans > 0 ? `, ${orphans} orphan(s) dropped` : ""));
-        } catch (err) {
-            result.failures.push({
-                table: plan.qualified,
-                error: describeDriverError(err)
-            });
+            await applyEachStatement(client, table, result, log, atomic ? lock : undefined);
         }
+        queue = contended;
+        lastError = errors;
+    }
+
+    // Still contended after every attempt the budget allowed.
+    for (const table of queue) {
+        await giveUp(client, table, lastError.get(table) ?? "", lock, result);
     }
 
     return result;
+}
+
+/** The table's statements, in the order they must run. */
+const statementsOf = (table: TableWork): string[] => [
+    ...(table.rlsOn ? [] : [table.plan.enableRls]),
+    ...table.plan.policyStatements,
+    ...table.orphans.map(name => dropPolicySql(table.plan, name))
+];
+
+async function applyAtomically(
+    client: Queryable,
+    table: TableWork,
+    lock: ResolvedBootLockOptions
+): Promise<AtomicOutcome> {
+    const statements = statementsOf(table);
+    if (statements.length === 0) return { kind: "applied" };
+    try {
+        await client.query(atomicBatch(statements, lock.lockTimeoutMs));
+        return { kind: "applied" };
+    } catch (err) {
+        if (isLockTimeout(err)) return { kind: "lock-timeout", error: describeDriverError(err) };
+        if (isMultiStatementRefusal(err)) return { kind: "unsupported" };
+        return { kind: "failed", error: describeDriverError(err) };
+    }
+}
+
+function record(result: PolicyEnsureResult, table: TableWork, log?: (message: string) => void): void {
+    const created = table.plan.policyStatements.filter(isCreatePolicy).length;
+    result.tablesSecured++;
+    result.policiesApplied += created;
+    result.orphansDropped += table.orphans.length;
+    log?.(`${table.plan.qualified}: RLS enabled, ${created} policy(ies) applied` +
+        (table.orphans.length > 0 ? `, ${table.orphans.length} orphan(s) dropped` : ""));
+}
+
+/**
+ * The table applied one statement at a time — the path every table took before
+ * the per-table transaction, kept as its fallback so a failure ends exactly
+ * where it always did.
+ *
+ * Each statement still carries the lock budget when the handle can take it.
+ */
+async function applyEachStatement(
+    client: Queryable,
+    table: TableWork,
+    result: PolicyEnsureResult,
+    log: ((message: string) => void) | undefined,
+    lock: ResolvedBootLockOptions | undefined
+): Promise<void> {
+    const { plan } = table;
+    const run = (sql: string) => client.query(lock ? atomicBatch([sql], lock.lockTimeoutMs) : sql);
+
+    // Enabling RLS is its own step, because its failure is the opposite of
+    // every other failure here. Once RLS is on, anything that goes wrong
+    // afterwards leaves the table denying; while it is off, the grant made
+    // earlier in boot leaves the table wide open. Sharing one `try` meant
+    // the dangerous case was reported in the safe case's words.
+    const locked = await lockTable(client, plan, table.rlsOn, run);
+    if (!locked.locked) {
+        result.unsecured.push({ table: plan.qualified, error: locked.error, grantWithdrawn: locked.grantWithdrawn });
+        return;
+    }
+    result.tablesSecured++;
+
+    try {
+        let created = 0;
+        for (const statement of plan.policyStatements) {
+            await run(statement);
+            if (isCreatePolicy(statement)) {
+                result.policiesApplied++;
+                created++;
+            }
+        }
+        for (const name of table.orphans) {
+            await run(dropPolicySql(plan, name));
+            result.orphansDropped++;
+        }
+        log?.(`${plan.qualified}: RLS enabled, ${created} policy(ies) applied` +
+            (table.orphans.length > 0 ? `, ${table.orphans.length} orphan(s) dropped` : ""));
+    } catch (err) {
+        result.failures.push({
+            table: plan.qualified,
+            error: describeDriverError(err)
+        });
+    }
+}
+
+/**
+ * A table whose lock was held for every attempt. Its transaction rolled back
+ * each time, so it is exactly as it was before this boot.
+ *
+ * With RLS on, that is a safe state to leave it in — reported, not failed. With
+ * RLS off it is an open table over the schema-wide grant, so it is closed the
+ * way any table RLS cannot be enabled on is: the catalogue is asked once more,
+ * and only a table that really is RLS-off has the user role's grant withdrawn.
+ */
+async function giveUp(
+    client: Queryable,
+    table: TableWork,
+    lastError: string,
+    lock: ResolvedBootLockOptions,
+    result: PolicyEnsureResult
+): Promise<void> {
+    const { plan } = table;
+    const error =
+        `another session held the table's lock for every attempt (lock_timeout ${lock.lockTimeoutMs} ms` +
+        `${lastError ? `: ${lastError.split("\n")[0]}` : ""}) — a long transaction, a report or a dump`;
+    if (table.rlsOn || await rlsIsOn(client, plan)) {
+        result.tablesSecured++;
+        result.deferred.push({ table: plan.qualified, error, rulesChanged: table.rulesChanged });
+        return;
+    }
+    const closed = await withdrawGrant(client, plan, error);
+    if (!closed.locked) {
+        result.unsecured.push({ table: plan.qualified, error: closed.error, grantWithdrawn: closed.grantWithdrawn });
+    }
 }

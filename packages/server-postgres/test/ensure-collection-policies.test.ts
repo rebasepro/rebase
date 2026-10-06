@@ -111,10 +111,11 @@ describe("ensureCollectionPolicies", () => {
         expect(result.tablesSecured).toBe(2);
         expect(result.failures).toEqual([]);
         expect(result.skipped).toEqual([]);
-        expect(result.policiesApplied).toBe(ran.filter(s => /^CREATE POLICY/.test(s)).length);
+        const lines = ran.flatMap(s => s.split("\n"));
+        expect(result.policiesApplied).toBe(lines.filter(s => /^CREATE POLICY/.test(s)).length);
         expect(result.policiesApplied).toBeGreaterThan(0);
         // RLS was enabled before any policy statement ran.
-        expect(ran[0]).toMatch(/ENABLE ROW LEVEL SECURITY/);
+        expect(lines.find(s => /ENABLE ROW LEVEL SECURITY|CREATE POLICY/.test(s))).toMatch(/ENABLE ROW LEVEL SECURITY/);
     });
 
     it("skips a declared table the database does not have, without failing", async () => {
@@ -129,7 +130,10 @@ describe("ensureCollectionPolicies", () => {
     it("records a per-table policy failure and keeps going (denies, never crash-loop)", async () => {
         // Only customers' CREATE POLICY fails; its RLS is on, so it denies —
         // and tiers must still be secured.
-        const { queryable } = fakeDb(["public.tiers", "public.customers"], /^CREATE POLICY[\s\S]*"customers"/);
+        // Multiline: the table's statements arrive as one transaction, and the
+        // one-statement-at-a-time fallback that follows its failure is what
+        // leaves the table in today's partial, denying state.
+        const { queryable } = fakeDb(["public.tiers", "public.customers"], /^CREATE POLICY[\s\S]*"customers"/m);
         const result = await ensureCollectionPolicies(queryable, [tiers, customers]);
 
         expect(result.failures.map(f => f.table)).toEqual(["public.customers"]);
@@ -307,10 +311,12 @@ describe("a table whose RLS is already on", () => {
             );
             for (const statement of RLS_BOOTSTRAP_STATEMENTS) await db.exec(statement);
             const ran: string[] = [];
+            // `exec` speaks the simple protocol, as node-postgres does.
             const queryable: Queryable = {
                 async query<T>(text: string): Promise<{ rows: T[] }> {
                     ran.push(text);
-                    return db.query<T>(text);
+                    const results = await db.exec(text);
+                    return { rows: (results[results.length - 1]?.rows ?? []) as T[] };
                 }
             };
             await ensureCollectionPolicies(queryable, [tiers, customers]);
@@ -318,11 +324,143 @@ describe("a table whose RLS is already on", () => {
 
             ran.length = 0;
             const second = await ensureCollectionPolicies(queryable, [tiers, customers]);
-            expect(ran.filter(t => /ENABLE ROW LEVEL SECURITY|^REVOKE/.test(t))).toEqual([]);
+            expect(ran.filter(t => /ENABLE ROW LEVEL SECURITY|^REVOKE/m.test(t))).toEqual([]);
             expect(second.tablesSecured).toBe(2);
             expect(second.failures).toEqual([]);
         } finally {
             await db.close();
+        }
+    }, 30_000);
+});
+
+/**
+ * Each table's policies are applied in one transaction, under a lock budget.
+ *
+ * Every DROP POLICY and CREATE POLICY used to be its own autocommit: at 240
+ * tables, 4,332 statements and 4,080 commits per boot (6–22 s on a disk that
+ * really flushes), each waiting on the table's ACCESS EXCLUSIVE lock for up to
+ * the statement timeout — and between a policy's DROP and its CREATE, other
+ * replicas served the table without it (a user's own row read back empty once
+ * per boot, measured).
+ */
+describe("one transaction per table", () => {
+    const lockTimeout = (): Error => Object.assign(new Error("canceling statement due to lock timeout"), { code: "55P03" });
+    const fast = { backoffMs: () => 0 };
+
+    /** Tables (all RLS on unless listed in `rlsOff`); `fail` decides what a statement does. */
+    function db(tables: string[], fail: (text: string) => Error | undefined = () => undefined, rlsOff: string[] = []) {
+        const ran: string[] = [];
+        const queryable: Queryable = {
+            async query<T>(text: string): Promise<{ rows: T[] }> {
+                if (/information_schema\.columns/i.test(text)) {
+                    const rows = tables.map(t => {
+                        const [table_schema, table_name] = t.split(".");
+                        return { table_schema, table_name, rls: !rlsOff.includes(t) };
+                    });
+                    return { rows: rows as unknown as T[] };
+                }
+                if (/relrowsecurity/i.test(text)) return { rows: [{ rls: false }] as unknown as T[] };
+                if (/FROM pg_policies/i.test(text)) return { rows: [] };
+                ran.push(text);
+                const error = fail(text);
+                if (error) throw error;
+                return { rows: [] };
+            }
+        };
+        return { queryable, ran };
+    }
+
+    it("sends each table's statements as one string, under a lock_timeout", async () => {
+        const { queryable, ran } = db(["public.tiers", "public.customers"]);
+        const result = await ensureCollectionPolicies(queryable, [tiers, customers]);
+
+        expect(ran).toHaveLength(2);
+        for (const [i, table] of ["tiers", "customers"].entries()) {
+            expect(ran[i]).toMatch(/^SET LOCAL lock_timeout = '1000ms';\n/);
+            const lines = ran[i].split("\n").slice(1);
+            expect(lines.length).toBeGreaterThan(1);
+            expect(lines.every(l => new RegExp(`ON "public"\\."${table}"`).test(l))).toBe(true);
+        }
+        expect(result.policiesApplied).toBe(ran.join("\n").split("\n").filter(l => /^CREATE POLICY/.test(l)).length);
+        expect(result.tablesSecured).toBe(2);
+    });
+
+    it("retries a table whose lock is held and, still held, leaves it as it was — not revoked", async () => {
+        const { queryable, ran } = db(
+            ["public.tiers", "public.customers"],
+            text => (/"customers"/.test(text) ? lockTimeout() : undefined)
+        );
+        const result = await ensureCollectionPolicies(queryable, [tiers, customers], undefined, fast);
+
+        expect(ran.filter(t => /"customers"/.test(t))).toHaveLength(3);
+        expect(ran.filter(t => /^REVOKE/m.test(t))).toEqual([]);
+        expect(result.deferred.map(d => [d.table, d.rulesChanged])).toEqual([["public.customers", true]]);
+        expect(result.deferred[0].error).toMatch(/held the table's lock/);
+        expect(result.failures).toEqual([]);
+        expect(result.unsecured).toEqual([]);
+        // The neighbour is applied on the first pass, not held up by it.
+        expect(ran[0]).toMatch(/"tiers"/);
+        expect(result.tablesSecured).toBe(2);
+    });
+
+    it("succeeds on a retry once the holder lets go", async () => {
+        let held = 1;
+        const { queryable } = db(["public.customers"], text => (/"customers"/.test(text) && held-- > 0 ? lockTimeout() : undefined));
+        const result = await ensureCollectionPolicies(queryable, [customers], undefined, fast);
+
+        expect(result.deferred).toEqual([]);
+        expect(result.policiesApplied).toBeGreaterThan(0);
+    });
+
+    it("closes a table whose RLS is off when its lock is held throughout", async () => {
+        // RLS off over the schema-wide grant is an open table: whatever kept
+        // the ENABLE from running, the table is closed, as before.
+        const { queryable, ran } = db(["public.customers"], text => (/ENABLE ROW/.test(text) ? lockTimeout() : undefined), ["public.customers"]);
+        const result = await ensureCollectionPolicies(queryable, [customers], undefined, fast);
+
+        expect(ran.some(t => /^REVOKE ALL PRIVILEGES ON "public"\."customers" FROM /.test(t))).toBe(true);
+        expect(result.unsecured.map(u => [u.table, u.grantWithdrawn])).toEqual([["public.customers", true]]);
+        expect(result.deferred).toEqual([]);
+    });
+
+    it("stops retrying when the step's retry budget is spent", async () => {
+        // A holder on every table — a dump. Retrying cannot help, and the
+        // budget keeps it from costing tables × attempts × timeout.
+        const { queryable, ran } = db(["public.tiers", "public.customers"], () => lockTimeout());
+        const result = await ensureCollectionPolicies(queryable, [tiers, customers], undefined,
+            { ...fast, lockTimeoutMs: 100, retryBudgetMs: 100 });
+
+        // Two first attempts, then one retry before the budget is gone.
+        expect(ran).toHaveLength(3);
+        expect(result.deferred.map(d => d.table)).toEqual(["public.tiers", "public.customers"]);
+    });
+
+    it("falls back to one statement at a time on a handle that takes one statement per query", async () => {
+        // PGlite's `query` is extended-protocol only, like some drivers.
+        const pg = new PGlite();
+        try {
+            await pg.exec(
+                'CREATE TABLE "public"."tiers" ("id" TEXT PRIMARY KEY, "label" TEXT);' +
+                'CREATE TABLE "public"."customers" ("id" TEXT PRIMARY KEY, "owner_id" TEXT);'
+            );
+            for (const statement of RLS_BOOTSTRAP_STATEMENTS) await pg.exec(statement);
+            const ran: string[] = [];
+            const queryable: Queryable = {
+                async query<T>(text: string): Promise<{ rows: T[] }> {
+                    ran.push(text);
+                    return pg.query<T>(text);
+                }
+            };
+            const result = await ensureCollectionPolicies(queryable, [tiers, customers]);
+
+            expect(result.failures).toEqual([]);
+            expect(result.tablesSecured).toBe(2);
+            // Refused once, then never offered again.
+            expect(ran.filter(t => /^SET LOCAL/.test(t))).toHaveLength(1);
+            const { rows } = await pg.query<{ n: number }>("SELECT count(*)::int AS n FROM pg_policies WHERE schemaname = 'public'");
+            expect(rows[0].n).toBe(result.policiesApplied);
+        } finally {
+            await pg.close();
         }
     }, 30_000);
 });

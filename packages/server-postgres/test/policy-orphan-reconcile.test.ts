@@ -35,7 +35,9 @@ describe("ensureCollectionPolicies drops orphaned generated policies", () => {
                 }
                 if (/pg_type|pg_constraint|pg_description/i.test(text)) return { rows: [] };
                 if (/FROM pg_policies/i.test(text)) {
-                    return { rows: policies.map(policyname => ({ policyname })) as unknown as T[] };
+                    return {
+                        rows: policies.map(policyname => ({ schemaname: "public", tablename: "customers", policyname })) as unknown as T[]
+                    };
                 }
                 ran.push(text);
                 return { rows: [] };
@@ -48,8 +50,11 @@ describe("ensureCollectionPolicies drops orphaned generated policies", () => {
     // the SQL text cannot tell a reconciler drop from a plan drop. Count via
     // `orphansDropped`, which only the reconciler increments, and use the SQL
     // only to confirm the specific name was named.
+    //
+    // A table's statements arrive as one transaction, one per line.
+    const linesOf = (ran: string[]) => ran.flatMap(s => s.split("\n"));
     const dropsOf = (ran: string[]) =>
-        ran.filter(s => /^DROP POLICY/i.test(s)).map(s => /"([^"]+)"/.exec(s)?.[1]);
+        linesOf(ran).filter(s => /^DROP POLICY/i.test(s)).map(s => /"([^"]+)"/.exec(s)?.[1]);
 
     it("drops a stale generated policy the current rules no longer produce", async () => {
         // The shape a tightened rule leaves behind: same table, generated name,
@@ -83,7 +88,7 @@ describe("ensureCollectionPolicies drops orphaned generated policies", () => {
         // database already holding exactly those and require zero drops.
         const discover = db([]);
         await ensureCollectionPolicies(discover.queryable, [customers]);
-        const createdNames = discover.ran
+        const createdNames = linesOf(discover.ran)
             .filter(s => /^CREATE POLICY/i.test(s))
             .map(s => /"([^"]+)"/.exec(s)![1]);
         expect(createdNames.length).toBeGreaterThan(0);

@@ -1387,10 +1387,11 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
          * initialization, because the generated policies call `rebase.uid()` /
          * `rebase.roles()`, and `CREATE POLICY` validates those functions exist.
          *
-         * Runs through the same drizzle handle, one statement at a time (that
-         * handle speaks the extended query protocol, which rejects multi-command
-         * strings). Failures are per-table and non-fatal: a table left un-policed
-         * stays RLS-enabled, so it denies rather than leaks.
+         * Runs through the same drizzle handle, one transaction per table under
+         * a lock budget (see `schema/ensure-collection-policies`). Failures are
+         * per-table and non-fatal: a table left un-policed stays RLS-enabled, so
+         * it denies rather than leaks, and a table whose lock another session
+         * held throughout is left exactly as it was.
          */
         /**
          * The helper functions every generated policy calls — `rebase.uid()`,
@@ -1446,6 +1447,22 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 logger.warn(
                     `🔐 [rls] Could not fully apply policies to "${failure.table}" — RLS is on, so it denies until this is resolved: ${failure.error}`
                 );
+            }
+            // Not a failure: the table's transaction rolled back, so it is
+            // exactly as it was — RLS on, its existing policies in force. Only
+            // worth more than a warning when those are not the declared ones.
+            for (const deferred of outcome.deferred) {
+                const message =
+                    `🔐 [rls] Policies on "${deferred.table}" were not re-applied: ${deferred.error}. ` +
+                    "RLS is on and the table keeps the policies it already had";
+                if (deferred.rulesChanged) {
+                    logger.error(
+                        `${message} — which are NOT the ones this deploy declares, so its new security rules are ` +
+                        "not in force on this table yet. Boot again once that session has finished."
+                    );
+                } else {
+                    logger.warn(`${message}; they are re-applied on the next boot.`);
+                }
             }
 
             // RLS could not be turned on at all. The schema-wide grant to the
