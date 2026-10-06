@@ -80,6 +80,21 @@ export default defineConfig({
                             test: /[\\/]node_modules[\\/]lucide-react[\\/]/,
                             tags: ["$initial"]
                         },
+                        // The same for the kit and the core runtime, which this app
+                        // resolves to source: what the entry reaches statically goes
+                        // to one chunk each, and their lazy modules (the /debug/ui
+                        // design reference, six of seven translations, the icon map)
+                        // stay out, because they are not `$initial`.
+                        {
+                            name: "rebase-ui",
+                            test: /[\\/]packages[\\/]ui[\\/]src[\\/]/,
+                            tags: ["$initial"]
+                        },
+                        {
+                            name: "rebase-core",
+                            test: /[\\/]packages[\\/]app[\\/]src[\\/]/,
+                            tags: ["$initial"]
+                        },
                         {
                             name(id) {
                                 // Heavy vendor libraries — split into individually cached chunks.
@@ -134,29 +149,28 @@ export default defineConfig({
                                 // apart, and naming it welded 822 kB of icons into the
                                 // preload set. The `$initial` group above takes the static
                                 // ones; the map gets its own async chunk.
+
+                                // No `@rebasepro/*` package is named here. This app resolves
+                                // them to SOURCE, so a name applies to individual modules,
+                                // and a named group takes a module's dependencies with it:
+                                // every lazy module of the package is welded to its static
+                                // ones and preloaded on the login screen.
                                 //
-                                // The map is reached through one module of the kit,
-                                // `icons/lucide_icon_map.ts`, that only `import()` reaches.
-                                // It must not fall under the `rebase-ui` name below: a named
-                                // group takes a module's dependencies with it, so naming the
-                                // map module put all ~1,700 icons back in a preloaded chunk.
-                                if (id.includes("packages/ui/src/icons/lucide_icon_map")) return undefined;
-
-                                if (id.includes("packages/ui/")) return "rebase-ui";
-                                if (id.includes("packages/app/")) return "rebase-core";
-
-                                // `packages/cms` used to be named here too, split by
-                                // directory "to stay under size limits". It did the
-                                // opposite. This app resolves @rebasepro/* to SOURCE, so
-                                // those names applied to individual admin modules, and each
-                                // name welded a directory's lazy modules to its static ones:
-                                // `rebase-admin-editor` came out at 506 kB and eagerly
-                                // preloaded, where an installed project — which consumes
-                                // admin's `dist`, whose dynamic imports are already separate
-                                // chunks — fetches 53 kB of it on demand. That made this
-                                // build unrepresentative of every real one, which is a bad
-                                // property for the app the bundle budget measures.
-                                // Left unnamed, admin's own code splitting survives.
+                                // `packages/cms` went first — split by directory "to stay
+                                // under size limits", `rebase-admin-editor` came out at
+                                // 506 kB eagerly preloaded, where an installed project
+                                // fetches 53 kB of it on demand. `packages/ui` and
+                                // `packages/app` followed: `rebase-ui` pulled the lucide map
+                                // back in until it was exempted, and `rebase-core` carried
+                                // the /debug/ui design reference (`App.tsx` lazy-loads it)
+                                // and six translations `RebaseI18nProvider` fetches on
+                                // demand — 760 kB the login screen never used. That made
+                                // this build unrepresentative of every real one, which is a
+                                // bad property for the app the bundle budget measures, and
+                                // check-bundle-budget.mjs now refuses those modules in the
+                                // eager set. The `$initial` groups above name only what the
+                                // entry already reaches; each package's own code splitting
+                                // survives for the rest.
 
                                 return undefined;
                             }
