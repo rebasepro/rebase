@@ -14,25 +14,19 @@ import { fireEvent, render, screen } from "@testing-library/react";
 
 import { DateTimeField } from "../src/components/DateTimeField";
 
-const RealDateTimeFormat = Intl.DateTimeFormat;
-let constructed = 0;
+// Counts constructions; each call still builds a real formatter.
+let formatterSpy: jest.SpyInstance;
 
 beforeAll(() => {
-    const Counting = function (this: unknown, ...args: ConstructorParameters<typeof Intl.DateTimeFormat>) {
-        constructed++;
-        return new RealDateTimeFormat(...args);
-    } as unknown as typeof Intl.DateTimeFormat;
-    Object.assign(Counting, { supportedLocalesOf: RealDateTimeFormat.supportedLocalesOf });
-    Counting.prototype = RealDateTimeFormat.prototype;
-    Intl.DateTimeFormat = Counting;
+    formatterSpy = jest.spyOn(Intl, "DateTimeFormat");
 });
 
 afterAll(() => {
-    Intl.DateTimeFormat = RealDateTimeFormat;
+    formatterSpy.mockRestore();
 });
 
 beforeEach(() => {
-    constructed = 0;
+    formatterSpy.mockClear();
 });
 
 const value = new Date("2026-03-08T06:30:00Z");
@@ -49,9 +43,9 @@ function Field({ tick, timezone }: { tick: number, timezone?: string }) {
 describe("DateTimeField", () => {
     it("does not build a date formatter when it re-renders with the same value", () => {
         const { rerender } = render(<Field tick={0}/>);
-        constructed = 0;
+        formatterSpy.mockClear();
         for (let tick = 1; tick <= 5; tick++) rerender(<Field tick={tick}/>);
-        expect(constructed).toBe(0);
+        expect(formatterSpy).not.toHaveBeenCalled();
     });
 
     it("still shows the value in the field's timezone", () => {
@@ -65,12 +59,12 @@ describe("DateTimeField", () => {
         const input = screen.getByLabelText("Published");
         fireEvent.focus(input);
         fireEvent.change(input, { target: { value: "2026-03-08T03:30" } });
-        constructed = 0;
+        formatterSpy.mockClear();
 
         fireEvent.change(input, { target: { value: "2026-03-08T04:30" } });
         fireEvent.change(input, { target: { value: "2026-03-08T05:30" } });
 
-        expect(constructed).toBe(0);
+        expect(formatterSpy).not.toHaveBeenCalled();
         // 05:30 EDT (after the 02:00 spring switch) is 09:30 UTC.
         expect(onChange).toHaveBeenLastCalledWith(new Date("2026-03-08T09:30:00Z"));
     });
