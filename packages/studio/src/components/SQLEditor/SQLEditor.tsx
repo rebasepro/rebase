@@ -258,6 +258,11 @@ export const SQLEditor = () => {
     });
 
     const [availableDatabases, setAvailableDatabases] = useState<string[]>([]);
+    /**
+     * The database the app reads and writes — the one the CMS opens a record
+     * on. Rows read anywhere else are not that record.
+     */
+    const [appDatabase, setAppDatabase] = useState<string | undefined>(undefined);
     const [availableRoles, setAvailableRoles] = useState<string[]>([]);
     const [isLoadingConfig, setIsLoadingConfig] = useState(true);
     const [connectionConfigError, setConnectionConfigError] = useState<string | null>(null);
@@ -375,6 +380,7 @@ export const SQLEditor = () => {
                 if (mounted) {
                     setAvailableDatabases(dbs);
                     setAvailableRoles(roles);
+                    setAppDatabase(currentDbFromApi);
 
                     const loadedDb = readStoredString(`rebase_sql_selected_db_${projectPrefix}`) || undefined;
                     const loadedRole = readStoredString(`rebase_sql_selected_role_${projectPrefix}`) || undefined;
@@ -1109,8 +1115,13 @@ notices: [] });
         const resultColumnKeys = Object.keys(results[0]);
 
         // Compute matched collections for this query, including PK column detection
-        // Only collections whose key the database says is in the result can be opened.
-        const actionableCollections: ResolvedQueryCollection[] = activeTab.lastProvenance && collectionRegistry.collections
+        // Only collections whose key the database says is in the result can be opened,
+        // and only from rows read on the app's own database: the record the CMS
+        // opens is that database's row with the key, whatever database the
+        // rows on screen came from.
+        const readFromAppDatabase = activeTab.lastExecutedConnection !== null &&
+            (activeTab.lastExecutedConnection.database === undefined || activeTab.lastExecutedConnection.database === appDatabase);
+        const actionableCollections: ResolvedQueryCollection[] = activeTab.lastProvenance && collectionRegistry.collections && readFromAppDatabase
             ? resolveQueryCollections(activeTab.lastProvenance, collectionRegistry.collections)
                 .filter(mc => resultColumnKeys.includes(mc.pkColumn))
             : [];
@@ -1188,6 +1199,8 @@ resizable: false }, ...dataColumns]
 id: String(ra.entityId) })}>
                                                 <IconButton
                                                     size="small"
+                                                    aria-label={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}
                                                     className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
