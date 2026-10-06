@@ -6,12 +6,17 @@
  * import cost or need it installed.
  */
 
+import type { FileMetadata } from "@google-cloud/storage";
 import {
     StorageController,
     GCSStorageConfig,
-    DEFAULT_MAX_FILE_SIZE
+    DEFAULT_MAX_FILE_SIZE,
+    type StoredObjectInfo,
+    type StoredObjectRange,
+    type StoredObjectStream
 } from "./types";
 import { folderKey, listingPrefix } from "./keys";
+import { bufferWebStream, webStreamFrom } from "./streams";
 import { ApiError } from "../api/errors";
 import {
     UploadFileProps,
@@ -228,6 +233,105 @@ export class GCSStorageController implements StorageController {
         }
     }
 
+    /**
+     * The bucket and key a call addresses: a `gs://` or `s3://` URL names its
+     * own bucket, anything else is a key in the given (or configured) bucket.
+     */
+    private resolveLocation(key: string, bucket?: string): { bucket: string; key: string } {
+        const match = key.match(/^(gs|s3):\/\//);
+        if (match) {
+            const withoutProtocol = key.substring(match[0].length);
+            const firstSlash = withoutProtocol.indexOf("/");
+            if (firstSlash > 0) {
+                return { bucket: withoutProtocol.substring(0, firstSlash), key: withoutProtocol.substring(firstSlash + 1) };
+            }
+        }
+        return { bucket: this.getBucket(bucket), key };
+    }
+
+    /** The object's metadata and where it lives, or `null` when there is no such object. */
+    private async locate(key: string, bucket?: string): Promise<{ bucket: string; key: string; meta: FileMetadata } | null> {
+        const location = this.resolveLocation(key, bucket);
+        const client = await this.getClient();
+        try {
+            const [meta] = await client.bucket(location.bucket).file(location.key).getMetadata();
+            return { ...location, meta };
+        } catch (error: unknown) {
+            if (isNotFoundError(error)) return null;
+            throw error;
+        }
+    }
+
+    /**
+     * The generation just described, so an overwrite between describing an
+     * object and reading it fails the read instead of sending the new bytes
+     * under the old size and version.
+     */
+    private async pinnedFile(located: { bucket: string; key: string; meta: FileMetadata }) {
+        const client = await this.getClient();
+        const generation = located.meta.generation;
+        return client.bucket(located.bucket).file(located.key, generation !== undefined ? { generation } : {});
+    }
+
+    /**
+     * An object stored gzip-encoded (`gsutil cp -z`) is decompressed on the way
+     * out, so its stored size is not the size served and a range of the one is
+     * not a range of the other. Such an object is read whole, as every object
+     * used to be; nothing this server writes is stored that way.
+     */
+    private async readDecompressed(located: { bucket: string; key: string; meta: FileMetadata }): Promise<Buffer> {
+        const [contents] = await (await this.pinnedFile(located)).download();
+        return contents;
+    }
+
+    /** See {@link StorageController.statObject}. One metadata request; no body is read. */
+    async statObject(key: string, bucket?: string): Promise<StoredObjectInfo | null> {
+        const located = await this.locate(key, bucket);
+        if (!located) return null;
+        const info = storedObjectInfo(located.meta);
+        if (located.meta.contentEncoding === "gzip") {
+            return { ...info, size: (await this.readDecompressed(located)).byteLength };
+        }
+        return info;
+    }
+
+    /**
+     * See {@link StorageController.getObjectStream}. One metadata request, then
+     * a read of exactly the requested bytes, handed on as they arrive.
+     *
+     * The metadata comes first, not after the download as `getObject` has it:
+     * it is what pins the read to one generation.
+     */
+    async getObjectStream(
+        key: string,
+        options?: { bucket?: string; range?: StoredObjectRange }
+    ): Promise<StoredObjectStream | null> {
+        const located = await this.locate(key, options?.bucket);
+        if (!located) return null;
+        const info = storedObjectInfo(located.meta);
+        const range = options?.range;
+
+        if (located.meta.contentEncoding === "gzip") {
+            const contents = await this.readDecompressed(located);
+            const inRange = range && range.end < contents.byteLength && range.start <= range.end;
+            return {
+                ...info,
+                size: contents.byteLength,
+                stream: bufferWebStream(inRange ? contents.subarray(range.start, range.end + 1) : contents),
+                ...(inRange ? { range } : {})
+            };
+        }
+
+        const file = await this.pinnedFile(located);
+        return {
+            ...info,
+            // Opened on the first read: nothing is requested from the bucket
+            // for a stream the caller ends up not reading.
+            stream: webStreamFrom(() => file.createReadStream(range ? { start: range.start, end: range.end } : {})),
+            ...(range ? { range } : {})
+        };
+    }
+
     async deleteObject(key: string, bucket?: string): Promise<void> {
         // Handle gs:// and s3:// URLs
         let resolvedPath = key;
@@ -372,6 +476,17 @@ export class GCSStorageController implements StorageController {
 // ---------------------------------------------------------------------------
 // Error helpers
 // ---------------------------------------------------------------------------
+
+/** What `statObject` reports, from an object's metadata. */
+function storedObjectInfo(meta: FileMetadata): StoredObjectInfo {
+    // The object's own version — see `S3StorageController.getObject`.
+    const updated = typeof meta.updated === "string" ? Date.parse(meta.updated) : NaN;
+    return {
+        size: Number(meta.size) || 0,
+        contentType: meta.contentType || "application/octet-stream",
+        lastModified: Number.isNaN(updated) ? Date.now() : updated
+    };
+}
 
 /**
  * Check whether an error represents a 404 / Not Found from the GCS client.

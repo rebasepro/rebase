@@ -8,8 +8,12 @@ import { promisify } from "util";
 import {
     StorageController,
     LocalStorageConfig,
-    DEFAULT_MAX_FILE_SIZE
+    DEFAULT_MAX_FILE_SIZE,
+    type StoredObjectInfo,
+    type StoredObjectRange,
+    type StoredObjectStream
 } from "./types";
+import { fileWebStream } from "./streams";
 import {
     UploadFileProps,
     UploadFileResult,
@@ -330,6 +334,62 @@ export class LocalStorageController implements StorageController {
         } catch {
             return null;
         }
+    }
+
+    /** The file a read of `key` addresses — `getObject`'s resolution, `local://` URLs included. */
+    private readPath(key: string, bucket?: string): string {
+        let resolvedPath = key;
+        let resolvedBucket = bucket;
+        if (key.startsWith("local://")) {
+            const withoutProtocol = key.substring("local://".length);
+            const firstSlash = withoutProtocol.indexOf("/");
+            if (firstSlash > 0) {
+                resolvedBucket = withoutProtocol.substring(0, firstSlash);
+                resolvedPath = withoutProtocol.substring(firstSlash + 1);
+            }
+        }
+        return this.getFullPath(normalizeStoragePath(resolvedPath), resolvedBucket);
+    }
+
+    /** See {@link StorageController.statObject}. A `stat` and the metadata sidecar; the file is not read. */
+    async statObject(key: string, bucket?: string): Promise<StoredObjectInfo | null> {
+        const fullPath = this.readPath(key, bucket);
+        let fileStat: fs.Stats;
+        try {
+            fileStat = await stat(fullPath);
+        } catch {
+            return null;
+        }
+        // A folder is not an object — see `getSignedUrl`.
+        if (!fileStat.isFile()) return null;
+
+        let contentType = "application/octet-stream";
+        try {
+            const metadata = JSON.parse(await readFile(`${fullPath}.metadata.json`, "utf-8"));
+            contentType = metadata.contentType || contentType;
+        } catch {
+            // No metadata, use default content type
+        }
+        return { size: fileStat.size, contentType, lastModified: Math.trunc(fileStat.mtimeMs) };
+    }
+
+    /**
+     * See {@link StorageController.getObjectStream}. The file — or only the
+     * requested range of it — read from disk a chunk at a time, opened on the
+     * first read.
+     */
+    async getObjectStream(
+        key: string,
+        options?: { bucket?: string; range?: StoredObjectRange }
+    ): Promise<StoredObjectStream | null> {
+        const info = await this.statObject(key, options?.bucket);
+        if (!info) return null;
+        const range = options?.range;
+        return {
+            ...info,
+            stream: fileWebStream(this.readPath(key, options?.bucket), range),
+            ...(range ? { range } : {})
+        };
     }
 
     async deleteObject(key: string, bucket?: string): Promise<void> {

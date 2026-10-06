@@ -165,6 +165,35 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
         expect(revalidated.status).toBe(304);
     });
 
+    it("serves a range as exactly those bytes, and a HEAD with the size and no body", async () => {
+        const body = "0123456789abcdefghijklmnopqrstuvwxyz";
+        await h.controller.putObject({ file: textFile("clip.bin", body, "video/mp4"), key: "media/clip.bin" });
+
+        const ranged = await request("/api/storage/file/media/clip.bin", { headers: { Range: "bytes=10-14" } });
+        expect(ranged.status).toBe(206);
+        expect(await ranged.text()).toBe("abcde");
+        expect(ranged.headers.get("Content-Range")).toBe(`bytes 10-14/${body.length}`);
+        expect(ranged.headers.get("Content-Length")).toBe("5");
+
+        const suffix = await request("/api/storage/file/media/clip.bin", { headers: { Range: "bytes=-6" } });
+        expect(await suffix.text()).toBe(body.slice(-6));
+
+        const whole = await request("/api/storage/file/media/clip.bin");
+        expect(whole.status).toBe(200);
+        expect(whole.headers.get("Content-Length")).toBe(String(body.length));
+        expect(await whole.text()).toBe(body);
+
+        const head = await request("/api/storage/file/media/clip.bin", { method: "HEAD" });
+        expect(head.status).toBe(200);
+        expect(head.headers.get("Content-Length")).toBe(String(body.length));
+        expect(head.headers.get("ETag")).toBe(whole.headers.get("ETag"));
+        expect(await head.text()).toBe("");
+
+        const beyond = await request("/api/storage/file/media/clip.bin", { headers: { Range: "bytes=999-" } });
+        expect(beyond.status).toBe(416);
+        expect(beyond.headers.get("Content-Range")).toBe(`bytes */${body.length}`);
+    });
+
     it("computes a transform once, and stores one rendition for it", async () => {
         await h.controller.putObject({
             file: new File([new Uint8Array(await png())], "a.png", { type: "image/png" }),

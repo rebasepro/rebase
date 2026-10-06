@@ -11,7 +11,15 @@ import { Hono, type MiddlewareHandler } from "hono";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import type { Stats } from "node:fs";
-import { StorageController, type StorageAuthorize, type StorageAuthorizeData, type StorageOperation } from "./types";
+import {
+    StorageController,
+    type StorageAuthorize,
+    type StorageAuthorizeData,
+    type StorageOperation,
+    type StoredObjectInfo,
+    type StoredObjectStream
+} from "./types";
+import { bytesView, fileWebStream, readStreamFully } from "./streams";
 import { LocalStorageController } from "./LocalStorageController";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
 import { DEFAULT_STORAGE_SOURCE_KEY, isAnonymousUid, isPublicStorageKey, scopeGrants, type DownloadConfig, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
@@ -818,7 +826,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 applyCacheHeaders(c, validators, cachePolicy(TRANSFORM_MAX_AGE));
                 if (isNotModified(c, validators)) return c.body(null, 304);
                 c.header("Content-Type", transformed.contentType);
-                return c.body(new Uint8Array(transformed.data));
+                return c.body(bytesView(transformed.data));
             }
 
             const validators = objectValidators(localStat.size, localStat.mtimeMs);
@@ -845,22 +853,20 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 return c.body(null, 416);
             }
 
+            // A HEAD is answered from the `stat`: Hono runs this handler for it
+            // and discards the body, so a body opened here would be read (or
+            // left holding a file descriptor) for nothing.
+            const isHead = c.req.method === "HEAD";
+
             if (localRange.kind === "range") {
-                // `end` is not read here: a positioned read takes an offset and a
-                // length, and `contentRange` renders the range from the spec itself.
-                const { start, length } = localRange.range;
-                // Only the requested slice leaves the disk. Reading the whole
-                // file to answer a range would give up the reason ranges exist.
-                const handle = await fsp.open(absolutePath, "r");
-                try {
-                    const buffer = Buffer.alloc(length);
-                    await handle.read(buffer, 0, length, start);
-                    c.header("Content-Range", contentRange(localRange.range, localStat.size));
-                    c.header("Content-Length", String(length));
-                    return c.body(new Uint8Array(buffer), 206);
-                } finally {
-                    await handle.close();
-                }
+                const { start, end, length } = localRange.range;
+                c.header("Content-Range", contentRange(localRange.range, localStat.size));
+                c.header("Content-Length", String(length));
+                // Only the requested slice leaves the disk, a chunk at a time.
+                // Reading the whole file to answer a range would give up the
+                // reason ranges exist.
+                if (isHead) return c.body(null, 206);
+                return c.body(fileWebStream(absolutePath, { start, end }), 206);
             }
 
             // Declared on the full response too, not only on a 206. A player
@@ -869,14 +875,142 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             // it has no way to take up.
             c.header("Content-Length", String(localStat.size));
 
-            const fileContent = await fsp.readFile(absolutePath);
-            return c.body(new Uint8Array(fileContent));
+            // Streamed from disk as the response is written. Read whole, the
+            // file sat in memory twice (the read, then a copy of it) for as
+            // long as the slowest client took to drain it.
+            if (isHead) return c.body(null, 200);
+            return c.body(fileWebStream(absolutePath));
         }
 
         // For remote storage (S3, GCS, etc.), proxy the file through the backend.
         // We avoid redirecting to signed URLs because:
         //  1. Mixed-content (HTTPS page → HTTP MinIO) is blocked by browsers
         //  2. Internal IPs / VPC endpoints are unreachable from the browser
+        const statObject = resolved.statObject?.bind(resolved);
+        const getObjectStream = resolved.getObjectStream?.bind(resolved);
+        if (statObject && getObjectStream) {
+            const isHead = c.req.method === "HEAD";
+            const conditional = c.req.header("if-none-match") !== undefined || c.req.header("if-modified-since") !== undefined;
+            const ranged = c.req.header("range") !== undefined;
+
+            // A plain GET reads the object once and serves what it reads, as it
+            // arrives. Everything else is described first and read only if it
+            // has to be: a revalidation and a HEAD need no body, a cached
+            // rendition needs none of the source, and a range is computed
+            // against the size. Reading first answered each of those with a
+            // full download of the object, held in memory three or four times.
+            let opened: StoredObjectStream | null = null;
+            let info: StoredObjectInfo | null;
+            if (transformOpts || conditional || ranged || isHead) {
+                info = await statObject(resolvedPath, bucket);
+            } else {
+                opened = await getObjectStream(resolvedPath, { bucket });
+                info = opened;
+            }
+            if (!info) {
+                throw ApiError.notFound("File not found");
+            }
+
+            if (transformOpts && isTransformableImage(info.contentType)) {
+                const sourceVersion = buildEntityTag(info.size, info.lastModified);
+                const cacheKey = transformMemory.cache.buildKey(`${transformKeyPrefix}@${sourceVersion}`, transformOpts);
+                const transformed = await transformOnce(
+                    transformMemory,
+                    cacheKey,
+                    transformOpts,
+                    // Called on a real miss only. Should the object be replaced
+                    // between the describe and this read, the newer bytes are
+                    // cached under the older version's key — which no later
+                    // request computes, so they are never served as current.
+                    async () => {
+                        const source = await getObjectStream(resolvedPath, { bucket });
+                        if (!source) throw ApiError.notFound("File not found");
+                        return readStreamFully(source.stream, source.size);
+                    },
+                    durableRenditions
+                        ? { cache: durableRenditions, controller: resolved, bucket }
+                        : undefined
+                );
+                const validators = objectValidators(transformed.data.byteLength, info.lastModified);
+                applyCacheHeaders(c, validators, cachePolicy(TRANSFORM_MAX_AGE));
+                if (isNotModified(c, validators)) return c.body(null, 304);
+                c.header("Content-Type", transformed.contentType);
+                return c.body(bytesView(transformed.data));
+            }
+
+            /** The headers that describe an object version; set again if a read finds a newer one. */
+            const describe = (object: StoredObjectInfo) => {
+                const served = resolveServedContentType(object.contentType);
+                c.header("Content-Type", served.contentType);
+                c.header("Content-Disposition", served.attachment ? "attachment" : undefined);
+                c.header("Content-Security-Policy", served.contentSecurityPolicy);
+                const validators = objectValidators(object.size, object.lastModified);
+                applyCacheHeaders(c, validators, cachePolicy(OBJECT_MAX_AGE));
+                c.header("Accept-Ranges", "bytes");
+                return validators;
+            };
+            const sameVersion = (a: StoredObjectInfo, b: StoredObjectInfo) =>
+                a.size === b.size && a.lastModified === b.lastModified;
+
+            const validators = describe(info);
+            if (isNotModified(c, validators)) {
+                await opened?.stream.cancel();
+                return c.body(null, 304);
+            }
+
+            const remoteRange = parseRange(c.req.header("range"), info.size);
+            if (remoteRange.kind === "unsatisfiable") {
+                await opened?.stream.cancel();
+                c.header("Content-Range", unsatisfiableContentRange(info.size));
+                return c.body(null, 416);
+            }
+
+            if (isHead) {
+                if (remoteRange.kind === "range") {
+                    c.header("Content-Range", contentRange(remoteRange.range, info.size));
+                    c.header("Content-Length", String(remoteRange.range.length));
+                    return c.body(null, 206);
+                }
+                c.header("Content-Length", String(info.size));
+                return c.body(null, 200);
+            }
+
+            if (remoteRange.kind === "range") {
+                const { start, end, length } = remoteRange.range;
+                // Only these bytes are asked of the store.
+                const part = await getObjectStream(resolvedPath, { bucket, range: { start, end } });
+                if (!part) {
+                    throw ApiError.notFound("File not found");
+                }
+                if (part.range && sameVersion(part, info)) {
+                    c.header("Content-Range", contentRange(remoteRange.range, info.size));
+                    c.header("Content-Length", String(length));
+                    return c.body(part.stream, 206);
+                }
+                // Replaced since it was described, or the store answered the
+                // range with the whole object. Served whole, as what was read:
+                // a 200 is a legal answer to any range request, while a range
+                // computed against another version's size is a corrupt one.
+                if (part.range) {
+                    await part.stream.cancel();
+                    opened = await getObjectStream(resolvedPath, { bucket });
+                    if (!opened) throw ApiError.notFound("File not found");
+                } else {
+                    opened = part;
+                }
+                describe(opened);
+            } else if (!opened) {
+                opened = await getObjectStream(resolvedPath, { bucket });
+                if (!opened) throw ApiError.notFound("File not found");
+                if (!sameVersion(opened, info)) describe(opened);
+            }
+
+            c.header("Content-Length", String(opened.size));
+            return c.body(opened.stream);
+        }
+
+        // A controller without the streamed reads: the whole object, through
+        // `getObject`, for every request.
         const fileObject = await resolved.getObject(resolvedPath, bucket);
         if (!fileObject) {
             throw ApiError.notFound("File not found");
@@ -901,7 +1035,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             applyCacheHeaders(c, validators, cachePolicy(TRANSFORM_MAX_AGE));
             if (isNotModified(c, validators)) return c.body(null, 304);
             c.header("Content-Type", transformed.contentType);
-            return c.body(new Uint8Array(transformed.data));
+            return c.body(bytesView(transformed.data));
         }
 
         const servedRemote = resolveServedContentType(remoteContentType);
@@ -924,11 +1058,11 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         if (remoteRange.kind === "range") {
             const { start, end, length } = remoteRange.range;
-            // The whole object still comes from the remote store — a
-            // `StorageController` has no ranged read — so this saves the
-            // response body, not the upstream fetch. Worth it anyway: it is what
-            // makes a player seek instead of restarting, and it is the half of
-            // the cost that is on the user's connection.
+            // The whole object still comes from the remote store — this
+            // controller has no ranged read (`getObjectStream`) — so this saves
+            // the response body, not the upstream fetch. Worth it anyway: it is
+            // what makes a player seek instead of restarting, and it is the half
+            // of the cost that is on the user's connection.
             c.header("Content-Range", contentRange(remoteRange.range, fileObject.size));
             c.header("Content-Length", String(length));
             return c.body(new Uint8Array(buf.slice(start, end + 1)), 206);

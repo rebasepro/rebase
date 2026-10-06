@@ -142,6 +142,28 @@ export interface StorageController {
     getObject(key: string, bucket?: string): Promise<File | null>;
 
     /**
+     * Describe an object for serving it — its size, stored type and version —
+     * without reading its bytes, or `null` when there is no such object.
+     *
+     * Optional, together with {@link getObjectStream}. A controller that has
+     * both is served streamed: `GET /file/*` answers a `304`, a `416`, a `HEAD`
+     * and a cached image rendition from this alone, and otherwise reads only
+     * the bytes it sends — the requested range, a chunk at a time. One without
+     * them is served through {@link getObject}, which holds the whole object in
+     * memory for every request, a `Range` request for one megabyte included.
+     */
+    statObject?(key: string, bucket?: string): Promise<StoredObjectInfo | null>;
+
+    /**
+     * Read an object, or one byte range of it, as a stream, or `null` when
+     * there is no such object. See {@link statObject}.
+     *
+     * The stream holds a file or a connection until it is read to the end or
+     * cancelled, so a caller that decides not to read it must cancel it.
+     */
+    getObjectStream?(key: string, options?: { bucket?: string; range?: StoredObjectRange }): Promise<StoredObjectStream | null>;
+
+    /**
      * Delete an object
      */
     deleteObject(key: string, bucket?: string): Promise<void>;
@@ -195,6 +217,41 @@ export interface StorageController {
      * that does not implement this is held to the deployment-wide limit alone.
      */
     maxFileSize?(): number;
+}
+
+/**
+ * What serving an object needs to know before deciding whether to read it.
+ * See {@link StorageController.statObject}.
+ */
+export interface StoredObjectInfo {
+    /** The whole object's size in bytes. */
+    size: number;
+    /** The stored content type — the uploader's claim, not a sniffed one. */
+    contentType: string;
+    /**
+     * The object's own modification time, in milliseconds since the epoch.
+     * The routes build `ETag`, `Last-Modified` and the transform cache key from
+     * it, so it must be the object's version, not the time of the read.
+     */
+    lastModified: number;
+}
+
+/** An inclusive byte range, as `Range: bytes=start-end` names one. */
+export interface StoredObjectRange {
+    start: number;
+    end: number;
+}
+
+/** An object's bytes as a stream. See {@link StorageController.getObjectStream}. */
+export interface StoredObjectStream extends StoredObjectInfo {
+    /** The bytes: the range when {@link range} is set, the whole object otherwise. */
+    stream: ReadableStream<Uint8Array>;
+    /**
+     * The range {@link stream} holds — the one asked for — or absent when it
+     * holds the whole object. A controller may answer a range with the whole
+     * object, as HTTP lets a server do; the caller then serves it whole.
+     */
+    range?: StoredObjectRange;
 }
 
 /**

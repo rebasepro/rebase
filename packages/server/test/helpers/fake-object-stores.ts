@@ -33,6 +33,7 @@
  * every `@aws-sdk/client-s3` command has, so the real command classes are used
  * unmodified — only the client that sends them is replaced.
  */
+import { Readable } from "node:stream";
 
 interface StoredObject {
     body: Uint8Array;
@@ -123,7 +124,25 @@ async function toBytes(body: unknown): Promise<Uint8Array> {
     if (typeof body === "string") return new TextEncoder().encode(body);
     if (body instanceof Blob) return new Uint8Array(await body.arrayBuffer());
     if (body === undefined || body === null) return new Uint8Array(0);
+    // A source function, as `File.save` takes one so it can retry a stream.
+    if (typeof body === "function") return toBytes(body());
+    if (typeof body === "object" && Symbol.asyncIterator in body) {
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of body as AsyncIterable<Uint8Array | string>) {
+            chunks.push(typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk);
+        }
+        return new Uint8Array(Buffer.concat(chunks));
+    }
     throw new Error(`fake object store: unsupported body ${typeof body}`);
+}
+
+/** `bytes=a-b` as S3 and GCS read it, against a body of `length` bytes; undefined for none. */
+function parseFakeRange(header: unknown, length: number): { start: number; end: number } | "unsatisfiable" | undefined {
+    const match = typeof header === "string" ? /^bytes=(\d+)-(\d*)$/.exec(header) : null;
+    if (!match) return undefined;
+    const start = Number(match[1]);
+    const end = match[2] === "" ? length - 1 : Math.min(Number(match[2]), length - 1);
+    return start >= length || start > end ? "unsatisfiable" : { start, end };
 }
 
 // ─── S3 ──────────────────────────────────────────────────────────────────
@@ -161,6 +180,16 @@ function s3Body(bytes: Uint8Array) {
     };
 }
 
+/** Multipart uploads in progress — none is an object until it completes. */
+export const multipartUploads = new Map<string, {
+    bucket: string;
+    key: string;
+    contentType: string;
+    metadata: Record<string, string>;
+    parts: Map<number, Uint8Array>;
+}>();
+let multipartSequence = 0;
+
 export class FakeS3Client {
     // The real client takes its config here; nothing in it matters to a fake.
     constructor(_config?: unknown) {}
@@ -187,10 +216,14 @@ export class FakeS3Client {
             case "GetObjectCommand": {
                 const object = bucket.get(key!);
                 if (!object) throw s3Error("NoSuchKey", 404, "The specified key does not exist.");
+                const range = parseFakeRange(input.Range, object.body.length);
+                if (range === "unsatisfiable") throw s3Error("InvalidRange", 416, "The requested range is not satisfiable");
+                const body = range ? object.body.slice(range.start, range.end + 1) : object.body;
                 return {
-                    Body: s3Body(object.body),
+                    Body: s3Body(body),
+                    ...(range ? { ContentRange: `bytes ${range.start}-${range.end}/${object.body.length}` } : {}),
                     ContentType: object.contentType,
-                    ContentLength: object.body.length,
+                    ContentLength: body.length,
                     LastModified: s3LastModified(object.writtenAt),
                     Metadata: object.metadata,
                     $metadata: { httpStatusCode: 200 }
@@ -206,6 +239,41 @@ export class FakeS3Client {
                     Metadata: object.metadata,
                     $metadata: { httpStatusCode: 200 }
                 };
+            }
+            case "CreateMultipartUploadCommand": {
+                const uploadId = `upload-${++multipartSequence}`;
+                multipartUploads.set(uploadId, {
+                    bucket: bucketName,
+                    key: key!,
+                    contentType: typeof input.ContentType === "string" && input.ContentType ? input.ContentType : "binary/octet-stream",
+                    metadata: (input.Metadata as Record<string, string> | undefined) ?? {},
+                    parts: new Map()
+                });
+                return { UploadId: uploadId, $metadata: { httpStatusCode: 200 } };
+            }
+            case "UploadPartCommand": {
+                const upload = multipartUploads.get(String(input.UploadId));
+                if (!upload) throw s3Error("NoSuchUpload", 404, "The specified upload does not exist.");
+                upload.parts.set(Number(input.PartNumber), await toBytes(input.Body));
+                return { ETag: `"part-${String(input.PartNumber)}"`, $metadata: { httpStatusCode: 200 } };
+            }
+            case "CompleteMultipartUploadCommand": {
+                const upload = multipartUploads.get(String(input.UploadId));
+                if (!upload) throw s3Error("NoSuchUpload", 404, "The specified upload does not exist.");
+                const listed = ((input.MultipartUpload as { Parts?: { PartNumber?: number }[] } | undefined)?.Parts ?? [])
+                    .map(p => upload.parts.get(Number(p.PartNumber)) ?? new Uint8Array(0));
+                multipartUploads.delete(String(input.UploadId));
+                s3World.write(upload.bucket, upload.key, {
+                    body: new Uint8Array(Buffer.concat(listed)),
+                    contentType: upload.contentType,
+                    metadata: upload.metadata,
+                    writtenAt: Date.now()
+                });
+                return { $metadata: { httpStatusCode: 200 } };
+            }
+            case "AbortMultipartUploadCommand": {
+                multipartUploads.delete(String(input.UploadId));
+                return { $metadata: { httpStatusCode: 204 } };
             }
             case "DeleteObjectCommand": {
                 // AWS answers 204 whether or not the key existed.
@@ -278,7 +346,13 @@ function gcsMetadata(bucketName: string, key: string, object: StoredObject): Rec
 }
 
 class FakeGcsFile {
-    constructor(readonly bucketName: string, readonly name: string, readonly metadata: Record<string, unknown> = {}) {}
+    constructor(
+        readonly bucketName: string,
+        readonly name: string,
+        readonly metadata: Record<string, unknown> = {},
+        /** A pinned generation: reads fail once the object is overwritten, as GCS's do. */
+        readonly generation?: string | number
+    ) {}
 
     private objects(): Map<string, StoredObject> {
         const bucket = gcsWorld.bucket(this.bucketName);
@@ -289,7 +363,26 @@ class FakeGcsFile {
     private existing(): StoredObject {
         const object = this.objects().get(this.name);
         if (!object) throw gcsError(`No such object: ${this.bucketName}/${this.name}`, 404);
+        if (this.generation !== undefined && String(object.writtenAt * 1000) !== String(this.generation)) {
+            throw gcsError(`No such object: ${this.bucketName}/${this.name}#${this.generation}`, 404);
+        }
         return object;
+    }
+
+    /** The object, or `start`..`end` of it, as a Node stream — read when the stream is. */
+    createReadStream(options?: { start?: number; end?: number }): Readable {
+        const read = (): Uint8Array => {
+            const body = this.existing().body;
+            return options?.start !== undefined
+                ? body.slice(options.start, (options.end ?? body.length - 1) + 1)
+                : body;
+        };
+        return Readable.from((async function* () {
+            const bytes = read();
+            const mid = Math.floor(bytes.length / 2);
+            if (mid > 0) yield Buffer.from(bytes.slice(0, mid));
+            yield Buffer.from(bytes.slice(mid));
+        })());
     }
 
     async save(data: unknown, options?: { contentType?: string; metadata?: { contentType?: string; metadata?: Record<string, string> } }): Promise<void> {
@@ -328,8 +421,8 @@ class FakeGcsFile {
 class FakeGcsBucket {
     constructor(readonly name: string) {}
 
-    file(key: string): FakeGcsFile {
-        return new FakeGcsFile(this.name, key);
+    file(key: string, options?: { generation?: string | number }): FakeGcsFile {
+        return new FakeGcsFile(this.name, key, {}, options?.generation);
     }
 
     async getFiles(query: { prefix?: string; delimiter?: string; maxResults?: number; pageToken?: string; autoPaginate?: boolean }):
