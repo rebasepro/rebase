@@ -9,6 +9,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import zlib from "zlib";
 import { Hono } from "hono";
 import { serveSPA } from "./serve-spa";
 import { compareStaticApps } from "./boot/bundle";
@@ -432,3 +433,209 @@ describe("serveSPA's Content-Security-Policy", () => {
     });
 });
 
+
+/**
+ * Revalidation answers 304.
+ *
+ * Everything without a content hash is `no-cache`, on the promise that
+ * revalidating an unchanged document is cheap. Nothing kept it: the static
+ * server sets `Last-Modified` and never reads `If-Modified-Since`, sends no
+ * ETag, and the SPA fallback sent no validator at all — so every page view
+ * re-sent (and re-gzipped) index.html, the favicon, the logos.
+ */
+describe("serveSPA conditional requests", () => {
+    function build(): { app: Hono; dir: string } {
+        const dir = writeApp("site", {
+            "index.html": "<html>SITE</html>",
+            "favicon.svg": "<svg>" + "x".repeat(3000) + "</svg>"
+        });
+        const app = new Hono();
+        serveSPA(app, { frontendPath: dir, basePath: "/", apiBasePath: "/api", spa: true });
+        return { app, dir };
+    }
+
+    it.each(["/", "/c/posts/123", "/favicon.svg"])("answers %s with a validator, then 304 on it", async (url) => {
+        const { app } = build();
+        const first = await app.request(url);
+        const etag = first.headers.get("etag");
+        expect(first.status).toBe(200);
+        expect(etag).toMatch(/^W\/"/);
+
+        const again = await app.request(url, { headers: { "If-None-Match": etag! } });
+
+        expect(again.status).toBe(304);
+        expect(await again.text()).toBe("");
+        expect(again.headers.get("etag")).toBe(etag);
+        expect(again.headers.get("cache-control")).toBe("no-cache");
+    });
+
+    it("gives a deep link the same validator as the document it serves", async () => {
+        const { app } = build();
+        const root = (await app.request("/")).headers.get("etag");
+        expect((await app.request("/c/posts/123")).headers.get("etag")).toBe(root);
+    });
+
+    it("honours If-Modified-Since on a file", async () => {
+        const { app } = build();
+        const lastModified = (await app.request("/favicon.svg")).headers.get("last-modified");
+
+        const res = await app.request("/favicon.svg", { headers: { "If-Modified-Since": lastModified! } });
+
+        expect(res.status).toBe(304);
+    });
+
+    it("sends the file again once it changed", async () => {
+        const { app, dir } = build();
+        const etag = (await app.request("/favicon.svg")).headers.get("etag")!;
+        fs.writeFileSync(path.join(dir, "favicon.svg"), "<svg>changed</svg>");
+        const later = new Date(Date.now() + 5000);
+        fs.utimesSync(path.join(dir, "favicon.svg"), later, later);
+
+        const res = await app.request("/favicon.svg", { headers: { "If-None-Match": etag } });
+
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("<svg>changed</svg>");
+        expect(res.headers.get("etag")).not.toBe(etag);
+    });
+
+    it("sends the whole body for a validator that does not match", async () => {
+        const { app } = build();
+        const res = await app.request("/favicon.svg", { headers: { "If-None-Match": "W/\"nope\"" } });
+        expect(res.status).toBe(200);
+        expect((await res.text()).length).toBe(3011);
+    });
+});
+
+/**
+ * A content-hashed chunk is gzipped once per process, not once per visitor.
+ *
+ * No build emits precompressed siblings, so every first visit (and every visit
+ * after a deploy) pulled each chunk through `CompressionStream`: 17.7 ms of CPU
+ * per request for an 862 KB chunk. A hashed file's bytes never change under
+ * its name, so its gzip can be kept.
+ */
+describe("serveSPA compressed build assets", () => {
+    const CHUNK = "export const x = 1;\n".repeat(400);
+
+    function build(files: Record<string, string> = {}): { app: Hono; dir: string } {
+        const dir = writeApp("site", {
+            "index.html": "<html>SITE</html>",
+            "assets/index-vgugiqRO.js": CHUNK,
+            "assets/vendor-analytics.js": CHUNK,
+            ...files
+        });
+        const app = new Hono();
+        serveSPA(app, { frontendPath: dir, basePath: "/", apiBasePath: "/api", spa: true });
+        return { app, dir };
+    }
+
+    const gzipped = { headers: { "Accept-Encoding": "gzip, deflate, br, zstd" } };
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it("compresses a hashed chunk once and sends it with its length", async () => {
+        const gzip = jest.spyOn(zlib, "gzip");
+        const { app } = build();
+
+        for (let i = 0; i < 3; i++) {
+            const res = await app.request("/assets/index-vgugiqRO.js", gzipped);
+            expect(res.status).toBe(200);
+            expect(res.headers.get("content-encoding")).toBe("gzip");
+            expect(res.headers.get("vary")).toMatch(/accept-encoding/i);
+            expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+            const wire = Buffer.from(await res.arrayBuffer());
+            expect(res.headers.get("content-length")).toBe(String(wire.byteLength));
+            expect(zlib.gunzipSync(wire).toString()).toBe(CHUNK);
+        }
+        expect(gzip).toHaveBeenCalledTimes(1);
+    });
+
+    it("compresses it again when the file under that name changes", async () => {
+        const { app, dir } = build();
+        await (await app.request("/assets/index-vgugiqRO.js", gzipped)).arrayBuffer();
+        const changed = CHUNK + "export const y = 2;\n";
+        fs.writeFileSync(path.join(dir, "assets/index-vgugiqRO.js"), changed);
+
+        const res = await app.request("/assets/index-vgugiqRO.js", gzipped);
+
+        expect(zlib.gunzipSync(Buffer.from(await res.arrayBuffer())).toString()).toBe(changed);
+    });
+
+    it("leaves a client that accepts no gzip with the identity body", async () => {
+        const { app } = build();
+        const res = await app.request("/assets/index-vgugiqRO.js");
+        expect(res.headers.get("content-encoding")).toBeNull();
+        expect(await res.text()).toBe(CHUNK);
+    });
+
+    it("still compresses an unhashed file on the fly", async () => {
+        const { app } = build();
+        const res = await app.request("/assets/vendor-analytics.js", gzipped);
+        expect(res.headers.get("content-encoding")).toBe("gzip");
+        expect(zlib.gunzipSync(Buffer.from(await res.arrayBuffer())).toString()).toBe(CHUNK);
+    });
+
+    it("serves a precompressed sibling where the build has one", async () => {
+        const sibling = zlib.gzipSync(Buffer.from(CHUNK));
+        const dir = writeApp("pre", { "index.html": "<html>PRE</html>", "assets/index-vgugiqRO.js": CHUNK });
+        fs.writeFileSync(path.join(dir, "assets/index-vgugiqRO.js.gz"), sibling);
+        const app = new Hono();
+        serveSPA(app, { frontendPath: dir, basePath: "/", apiBasePath: "/api", spa: true });
+        const gzip = jest.spyOn(zlib, "gzip");
+
+        const res = await app.request("/assets/index-vgugiqRO.js", { headers: { "Accept-Encoding": "gzip" } });
+
+        expect(res.headers.get("content-encoding")).toBe("gzip");
+        expect(Buffer.from(await res.arrayBuffer()).equals(sibling)).toBe(true);
+        expect(gzip).not.toHaveBeenCalled();
+    });
+
+    it("leaves a range request to the file server", async () => {
+        const { app } = build();
+        const res = await app.request("/assets/index-vgugiqRO.js", { headers: { "Accept-Encoding": "gzip", Range: "bytes=0-9" } });
+        expect(res.status).toBe(206);
+        expect(await res.text()).toBe(CHUNK.slice(0, 10));
+    });
+});
+
+/**
+ * What one static request costs the filesystem.
+ *
+ * Two `realpath`s per request, one of them for the build root that never
+ * moves, and a synchronous `stat` for each of `.br`, `.zst` and `.gz` beside
+ * every file — siblings no build emits.
+ */
+describe("serveSPA filesystem work per request", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it("resolves the build root once and looks for no precompressed sibling the build does not have", async () => {
+        // A real path: on macOS the temp dir is behind a symlink, and a build
+        // root that is a symlink is resolved on every request on purpose.
+        const dir = fs.realpathSync(writeApp("site", { "index.html": "<html>SITE</html>", "logo.svg": "<svg/>" }));
+        const app = new Hono();
+        serveSPA(app, { frontendPath: dir, basePath: "/", apiBasePath: "/api", spa: true });
+        const realpath = jest.spyOn(fs.promises, "realpath");
+        const statSync = jest.spyOn(fs, "statSync");
+
+        for (let i = 0; i < 2; i++) {
+            const res = await app.request("/logo.svg", { headers: { "Accept-Encoding": "gzip, deflate, br, zstd" } });
+            expect(await res.text()).toBe("<svg/>");
+        }
+
+        expect(realpath).toHaveBeenCalledTimes(3);
+        expect(statSync.mock.calls.filter(([p]) => /\.(br|gz|zst)$/.test(String(p)))).toEqual([]);
+    });
+
+    it("still refuses a symlink out of the build", async () => {
+        const outside = writeApp("outside", { "secret.txt": "SECRET" });
+        const dir = fs.realpathSync(writeApp("site", { "index.html": "<html>SITE</html>" }));
+        fs.symlinkSync(outside, path.join(dir, "linked"));
+        const app = new Hono();
+        serveSPA(app, { frontendPath: dir, basePath: "/", apiBasePath: "/api", spa: true });
+
+        for (let i = 0; i < 2; i++) {
+            const res = await app.request("/linked/secret.txt");
+            expect(res.status).toBe(404);
+        }
+    });
+});
