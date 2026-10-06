@@ -61,7 +61,7 @@ Un fichier exporté depuis une collection se réimporte avec les mêmes valeurs,
 
 L'aperçu liste chaque cellule qui ne se convertit pas, par colonne, avec leur nombre et les premières d'entre elles par ligne et par raison. Ces cellules sont laissées vides dans les lignes importées ; rien n'est transformé en `0`, `false` ou une valeur vide sans être listé. Revenez en arrière pour associer la colonne à une autre propriété, ou corrigez le fichier et téléchargez-le à nouveau.
 
-Les propres règles de la collection — champs obligatoires, options d'énumération, valeurs uniques — sont vérifiées par le serveur au fur et à mesure que les lignes sont écrites, par lots de 25. Si une ligne est refusée, l'importation s'arrête et la désigne ; les lignes qui la précèdent sont déjà enregistrées, et **Retry** reprend à partir de la ligne refusée.
+Les propres règles de la collection — champs obligatoires, options d'énumération, valeurs uniques — sont vérifiées par le serveur au fur et à mesure que les lignes sont écrites, par lots pouvant atteindre 500 lignes (moins lorsque les lignes sont larges, afin qu'une requête reste sous environ 1 Mo). Un lot est enregistré en entier ou pas du tout. Si une ligne est refusée, l'importation s'arrête et la désigne ; les lots qui la précèdent sont déjà enregistrés, et **Retry** reprend à partir de la première ligne du lot de la ligne refusée.
 
 ### Créer une collection à partir d'un fichier
 

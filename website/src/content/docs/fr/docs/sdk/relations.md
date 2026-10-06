@@ -75,10 +75,10 @@ const { data } = await client.data.posts.include({
 
 | Option | Ce qu'elle fait |
 |--------|-----------------|
-| `limit` | Nombre de lignes **par parent**, et non sur l'ensemble de la page — cinq commentaires sur chaque publication, pas cinq au total. |
+| `limit` | Nombre de lignes **par parent**, et non sur l'ensemble de la page — cinq commentaires sur chaque publication, pas cinq au total. Appliquée par la requête : les lignes au-delà ne sont jamais lues dans la base de données. |
 | `where` | Le même dialecte de filtrage que celui utilisé par le `where` de premier niveau. Poussé dans la requête SQL, de sorte que le `limit` s'applique aux lignes correspondantes. |
 | `logical` | Un groupe `or`/`and`/`not` sur les lignes liées. |
-| `orderBy` | La même syntaxe de tri, y compris le [positionnement des valeurs NULL](/docs/sdk/querying#where-nulls-sort). |
+| `orderBy` | La même syntaxe de tri, y compris le [positionnement des valeurs NULL](/docs/sdk/querying#where-nulls-sort). En cas d'égalité, ou pour une `limit` sans `orderBy`, l'ordre suit la clé de la ligne liée, croissante. |
 | `fields` | Colonnes de la ligne *liée*. Sa clé est toujours conservée, afin que la ligne reste adressable. |
 | `include` | Relations de la ligne liée, à leur tour — c'est ainsi que l'arborescence s'imbrique. |
 

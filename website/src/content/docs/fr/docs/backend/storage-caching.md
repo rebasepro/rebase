@@ -48,9 +48,15 @@ la différence entre un lecteur fonctionnel et un lecteur en panne.
 - La revalidation prévaut sur un intervalle : une requête transmettant à la fois `If-None-Match` et
   `Range` reçoit le code `304`.
 
-Sur le stockage local, seul le segment demandé est lu depuis le disque. Sur S3 et GCS,
-l'objet est toujours récupéré en entier — un `StorageController` ne disposant pas de lecture partielle — le
-gain se fait donc sur la réponse, pas en amont.
+Seuls les octets demandés sont lus — depuis le disque pour le stockage local, et par une lecture
+partielle sur S3 et GCS — et chaque objet est transmis au client au fil de sa lecture (streaming) au
+lieu d'être d'abord conservé en mémoire : servir une grande vidéo coûte donc au serveur la même
+mémoire que servir une miniature. Une revalidation qui se termine par un `304`, un `HEAD`, un `416`
+et un rendu d'image en cache sont servis à partir des métadonnées de l'objet, sans lire ses octets.
+
+Un `StorageController` personnalisé obtient la même chose en implémentant les méthodes facultatives
+`statObject` et `getObjectStream`. Un contrôleur qui en est dépourvu est servi par `getObject`, qui
+lit l'objet entier à chaque requête, plages comprises.
 
 ## Placer un CDN en amont
 

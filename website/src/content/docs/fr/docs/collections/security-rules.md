@@ -52,7 +52,8 @@ securityRules: [
 ]
 ```
 
-Cela génère : `USING (user_id = rebase.uid())`
+Cela génère : `USING ((user_id)::text = (SELECT rebase.uid()))` — voir
+[Évalué une fois par instruction](#évalué-une-fois-par-instruction) pour le `SELECT`.
 
 ### Accès public
 
@@ -142,6 +143,23 @@ Importé depuis `@rebasepro/types`. Les expressions se composent ; les opérande
 | `policy.literal(value)` | une chaîne, un nombre, un booléen ou `null` |
 | `policy.authUid()` | `rebase.uid()` |
 | `policy.authRoles()` | `rebase.roles()` |
+
+#### Évalué une fois par instruction
+
+Toute partie d'une règle qui ne lit pas la ligne — l'id de l'appelant, une vérification de rôles, une
+revendication (claim), `serverContext()` — se compile à l'intérieur d'une sous-requête scalaire. Une règle de
+propriétaire devient `(user_id)::text = (SELECT rebase.uid())`, et la lecture admin par défaut devient
+`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`.
+
+Postgres calcule une telle sous-requête une fois par instruction (un *initPlan*) plutôt qu'une fois par ligne,
+et planifie comme si la vérification laissait passer la moitié de la table plutôt que 1,5 % de celle-ci. C'est
+cette estimation qui maintient une page profonde d'une grande table sur sa clé primaire : sans elle, la page 401
+d'un million de lignes était un parcours séquentiel (sequential scan) et un tri de 640 Mo. Qui peut lire ou écrire quoi
+reste inchangé.
+
+Le SQL brut de `using` / `withCheck` reçoit le même traitement lorsque Rebase peut en lire la structure
+(`owner_id = rebase.uid()` le peut). Tout le reste est inséré tel quel : enveloppez donc vous-même les
+appels : `(SELECT rebase.uid())`.
 
 ### `authenticated()` et `registered()`
 

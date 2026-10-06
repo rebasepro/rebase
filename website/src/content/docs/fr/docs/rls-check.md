@@ -341,7 +341,7 @@ de la lecture des stratégies, de sorte qu'une base Rebase en cours de migration
 La forme corrigée de la vérification précédente — `rebase.uid() IS NOT NULL AND rebase.uid() <> 'anonymous'` —
 et l'endroit où l'on s'arrête souvent par erreur. Elle exclut effectivement les appelants déconnectés. Ce qu'elle
 ne fait pas, en revanche, c'est restreindre les lignes : ce qui reste revient à dire que *chaque compte enregistré
-peut lire chaque ligne de cette table*, ce qui est une affirmation bien différente de celle généralement visée.
+peut lire chaque ligne de cette table*, ce qui est une affirmation bien différente de celle généralement visée. Sur un projet Rebase, c'est une règle dont la `condition` est `policy.authenticated()` et rien d'autre, que la base de données stocke sous la forme `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])`.
 
 C'est cette structure qui transforme une table `users` en un annuaire de toutes les adresses de la plateforme,
 lisible par quiconque s'inscrit — et là où l'inscription est ouverte, « quiconque s'inscrit » désigne n'importe qui.

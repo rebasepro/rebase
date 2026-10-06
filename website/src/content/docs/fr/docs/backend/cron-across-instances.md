@@ -46,7 +46,7 @@ Trois points à retenir :
 
 Dans le cas habituel — un redémarrage quelques minutes après qu'un créneau s'est exécuté normalement — le créneau le plus récent est déjà réclamé, donc le rattrapage ne coûte qu'une vérification de réservation par tâche par démarrage et ne fait rien de plus.
 
-Au démarrage, les réservations de plus de sept jours sont supprimées, mais la plus récente de chaque tâche est toujours conservée, quel que soit son âge. Cette réservation est la preuve que le créneau a déjà tourné : une tâche mensuelle avec une fenêtre de rattrapage d'un mois n'est donc pas réexécutée par un déploiement le 10.
+Le planificateur supprime les réservations de plus de sept jours à son démarrage, puis toutes les heures, mais conserve toujours la plus récente de chaque tâche, quel que soit son âge. Cette réservation est la preuve que le créneau a déjà tourné : une tâche mensuelle avec une fenêtre de rattrapage d'un mois n'est donc pas réexécutée par un déploiement le 10.
 
 Une exécution récupérée constitue une entrée normale dans `cron_logs` (`manual` vaut `false`), avec une première ligne de journal indiquant le créneau récupéré et son retard :
 

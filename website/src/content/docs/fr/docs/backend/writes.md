@@ -60,6 +60,8 @@ Sans cela, le mécanisme de lecture-modification-écriture applique la règle du
 
 Le jeton provient d'une propriété `date` avec `autoValue: "on_update"` lorsque la collection en déclare une — cette colonne constitue déjà une version — et d'un hachage stable de la ligne dans le cas contraire. `If-Match: *` affirme uniquement que la ligne existe. Rien n'est écrit lorsque la précondition échoue.
 
+Le jeton est comparé au sein de la propre transaction de l'écriture, une fois la ligne verrouillée. Deux écritures portant le même jeton ne peuvent pas passer toutes les deux : la seconde attend le commit de la première, lit ce qu'elle a écrit et est refusée avec un code `412`.
+
 ### Opérations sur les champs
 
 Dans le corps d'un `PATCH`, la valeur d'une propriété peut être une opération sur la valeur stockée plutôt qu'une simple valeur :

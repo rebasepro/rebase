@@ -69,7 +69,8 @@ FROM rebase.jobs WHERE status = 'failed'
 ORDER BY updated_at DESC;
 ```
 
-Les lignes en échec sont conservées 30 jours ; celles ayant réussi, 3 jours.
+Les lignes en échec sont conservées 30 jours ; celles ayant réussi, 3 jours. Chaque worker supprime les lignes
+expirées à son démarrage, puis toutes les heures, par lots, en dehors du chemin des requêtes.
 
 ## Que se passe-t-il lorsqu'un worker s'arrête brutalement
 

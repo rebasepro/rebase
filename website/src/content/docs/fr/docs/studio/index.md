@@ -72,7 +72,7 @@ Ils sont fournis avec Studio et **chargés à la demande par `RebaseStudio`** �
 
 | Onglet | Slug | Groupe | Rôle |
 |--------|------|--------|------|
-| Console SQL | `sql` | Base de données | Exécuter du SQL brut sur votre base PostgreSQL et lire les résultats dans un tableau |
+| Console SQL | `sql` | Base de données | Exécuter du SQL brut sur votre base PostgreSQL et lire les résultats dans un tableau. Le tableau affiche le résultat de la dernière instruction, dans la limite de ses 10 000 premières lignes ou de 32 Mo de valeurs ; un résultat plus long indique combien de lignes il comptait, et la copie comme l'export n'incluent que les lignes affichées |
 | Politiques RLS | `rls` | Base de données | Inspecter et gérer les politiques Row Level Security de vos tables. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Une politique est listée telle que la base de données la détient, avec le badge **Diffère du code** lorsque ce n'est pas ce que le projet déclare. Une politique que Rebase génère ne peut pas être modifiée directement dans la base de données, et sur une table que Rebase gère, une bannière indique que chaque démarrage du serveur et chaque `rebase db push` réappliquent les politiques déclarées |
 | Visualiseur de schéma | `schema-visualizer` | Base de données | Diagramme d'entités de vos collections et de leurs relations, tracé à partir des définitions de collection : tables, colonnes, types et relations sont tels que les collections les déclarent. Seuls les marqueurs RLS sont lus depuis la base de données |
 | Branches | `branches` | Base de données | Créer et gérer des [branches de base de données](/docs/backend/branching) |

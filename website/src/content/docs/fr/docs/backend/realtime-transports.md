@@ -30,8 +30,19 @@ Lorsqu'un enregistrement est modifié sur l'instance A, celle-ci diffuse une not
 
 *Remarque : `sid` représente l'identifiant unique et aléatoire d'instance du serveur généré au démarrage, `p` est le slug de la collection (chemin), et `eid` est l'identifiant de l'entité cible.*
 
+Les modifications faites au même instant — une sauvegarde en masse annonce chaque ligne écrite — partent ensemble, en aussi peu de notifications que la limite NOTIFY de Postgres (8 000 octets) le permet, chacune listant ses modifications sous forme de triplets `[p, eid, db]` :
+
+```json
+{
+  "sid": "inst_7a9c1b",
+  "c": [["posts", "45", null], ["posts", "46", null]]
+}
+```
+
+Une modification isolée garde la forme ci-dessus, de sorte qu'une instance plus ancienne la lit encore pendant un déploiement progressif (rolling deploy).
+
 - **Auto-filtrage (Self-Filtering)** : À la réception d'un message, chaque instance lit le `sid`. S'il correspond à son propre identifiant d'instance, le serveur ignore la notification afin d'éviter les boucles infinies de routage.
-- **Relais et diffusion (Fan-out)** : Si la notification provient d'une autre instance, le serveur planifie une nouvelle récupération temporisée (debounced) et relaie la mise à jour à ses abonnés WebSocket connectés localement.
+- **Relais et diffusion (Fan-out)** : Si la notification provient d'une autre instance, le serveur planifie une nouvelle récupération temporisée (debounced) pour ses abonnés connectés localement à chaque modification. Il ne lit rien à la réception : chaque trame est une nouvelle récupération sous la portée propre à son abonné.
 - **Boucle de reconnexion du superviseur** : En cas d'interruption de la connexion à la base de données, un superviseur de connexion en arrière-plan surveille l'état et déclenche une séquence de reconnexion automatique après un délai fixe de **3 secondes**, rétablissant la boucle `LISTEN` sans affecter le cycle de vie principal de l'application Hono. Chaque abonnement actif de l'instance est ensuite relu, car ce qui a été publié pendant la coupure n'a atteint personne. Si la base de données est injoignable au démarrage, la connexion est retentée de la même façon.
 - **Battement de cœur (heartbeat)** : Une connexion `LISTEN` est inactive par nature, et le délai d'inactivité d'un répartiteur de charge ou d'un NAT peut la couper sans erreur d'un côté comme de l'autre (une connexion semi-ouverte). Elle fonctionne donc avec le keepalive TCP et doit répondre à un `SELECT 1` toutes les 30 secondes, en moins de 10 secondes. Une connexion qui n'y répond pas est remplacée comme ci-dessus. Tant que la connexion est coupée, `/health` la signale sous le nom `cross-instance`, et la vérification échoue après 60 secondes de coupure.
 

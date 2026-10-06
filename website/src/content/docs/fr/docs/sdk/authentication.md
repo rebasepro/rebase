@@ -309,6 +309,10 @@ L'actualisation du jeton s'effectue automatiquement, mais vous pouvez la déclen
 const session = await client.auth.refreshSession();
 ```
 
+Une requête ne part jamais avec un jeton que le client sait expiré : les requêtes partagent une seule
+actualisation et ne sont envoyées qu'une fois, avec le nouveau jeton. Un jeton que le serveur refuse
+prématurément donne tout de même lieu à une actualisation, puis à une nouvelle tentative par requête.
+
 ## Emplacement de la session : `authFlowMode`
 
 ```typescript
@@ -369,7 +373,7 @@ function useCurrentUser() {
 }
 ```
 
-`useRebaseAuthController` dans `@rebasepro/app` effectue déjà cela, donc une application construite sur le modèle généré en bénéficie automatiquement.
+`useRebaseAuthController` dans `@rebasepro/app` effectue déjà cela, donc une application construite sur le modèle généré en bénéficie automatiquement. Les requêtes de données n'ont pas à attendre : celle émise pendant la restauration part une fois celle-ci terminée — en tant qu'utilisateur restauré, ou anonymement — de sorte qu'un premier rendu ne lit jamais une liste publique à la place de celle de l'utilisateur.
 
 Une restauration réussie parvient également à `onAuthStateChange` sous forme de `TOKEN_REFRESHED` — il s'agit bien d'un rafraîchissement — mais un écouteur seul ne peut pas vous indiquer que la restauration s'est terminée : un démarrage sans session n'émet absolument rien, ce qui ne permet pas de le distinguer d'une restauration encore en cours. Attendez la résolution de `isInitialized()` pour cette vérification et utilisez l'écouteur pour les changements ultérieurs.
 
