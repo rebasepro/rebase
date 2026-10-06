@@ -600,8 +600,8 @@ ownerField: "user_id" }
             expect(allPolicy).toContain('as: "permissive"');
             // 'all' needs both, and both must carry the owner predicate — a
             // `withCheck: sql\`false\`` fallback would still contain "withCheck:".
-            expect(allPolicy).toContain("using: sql`(user_id)::text = rebase.uid()`");
-            expect(allPolicy).toContain("withCheck: sql`(user_id)::text = rebase.uid()`");
+            expect(allPolicy).toContain("using: sql`(user_id)::text = (SELECT rebase.uid())`");
+            expect(allPolicy).toContain("withCheck: sql`(user_id)::text = (SELECT rebase.uid())`");
         });
 
         it("should generate SELECT policy with only USING clause", async () => {

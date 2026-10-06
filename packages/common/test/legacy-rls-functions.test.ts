@@ -62,9 +62,9 @@ describe("the compiler accepts a pre-1.0 raw rule", () => {
     it("compiles structured rules to the new spelling regardless", () => {
         // These never carried a schema name — they are the reason the structured
         // helpers exist, and the migration costs their users nothing.
-        expect(policyToPostgres(policy.serverContext())).toBe("rebase.uid() IS NULL");
+        expect(policyToPostgres(policy.serverContext())).toBe("(SELECT rebase.uid() IS NULL)");
         expect(policyToPostgres(policy.rolesOverlap(["admin"])))
-            .toBe("string_to_array(rebase.roles(), ',') && ARRAY['admin']");
+            .toBe("(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])");
     });
 });
 

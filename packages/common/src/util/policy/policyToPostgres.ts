@@ -32,6 +32,11 @@ interface CompileScope {
     resolveCollection?: (slug: string) => CollectionConfig | undefined;
     /** Monotonic counter for generating unique subquery aliases. */
     alias: { n: number };
+    /**
+     * True inside a hoisted `(SELECT …)`. The subquery already evaluates its
+     * whole body once per statement, so the helpers in it are emitted bare.
+     */
+    inInitPlan: boolean;
 }
 
 /**
@@ -41,6 +46,30 @@ interface CompileScope {
  * This is one of the two consumers of the shared policy model (the other being
  * {@link evaluatePolicy}); the Postgres schema generators call it so that DDL
  * and the admin UI derive from the exact same expression.
+ *
+ * ## Row-independent parts are evaluated once per statement
+ *
+ * Every part of a policy that does not read the row — `serverContext()`, a
+ * roles test, a comparison of the caller with a literal, a claim — is wrapped
+ * in a scalar subquery: the default baseline compiles to
+ * `(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`,
+ * and an owner rule to `owner_id = (SELECT rebase.uid())`. Postgres plans an
+ * uncorrelated scalar subquery as an initPlan, computed once per statement.
+ *
+ * Bare, the same clause is a security-barrier qual Postgres evaluates per row,
+ * and it estimates `uid() IS NULL OR roles && …` to pass 1.5% of the table. A
+ * page past that point (offset 20,000 of a million rows) was planned as a
+ * sequential scan and an on-disk sort of the whole table: 7.3 s and a 640 MB
+ * sort per request, against 4 ms off the primary key once the predicate is an
+ * initPlan, whose estimate is 50%.
+ *
+ * Same meaning, by construction: only subtrees that reference no column are
+ * wrapped (never `field`, `outerField`, `existsIn` or `raw`), a scalar subquery
+ * without `FROM` returns exactly one row whose value is the expression's —
+ * NULL included, so three-valued logic is untouched — and the helpers are
+ * STABLE, so their value cannot change within a statement anyway.
+ * `policy-shapes-equivalence.test.ts` runs every shape against Postgres both
+ * ways.
  */
 export function policyToPostgres(expr: PolicyExpression, collection?: CollectionConfig, options?: PolicyCompileOptions): string {
     return compile(expr, {
@@ -49,11 +78,87 @@ export function policyToPostgres(expr: PolicyExpression, collection?: Collection
         outerCollection: collection,
         outerPrefix: "",
         resolveCollection: options?.resolveCollection,
-        alias: { n: 0 }
+        alias: { n: 0 },
+        inInitPlan: false
     });
 }
 
+/**
+ * Whether `expr` never reads the row: no `field` / `outerField` operand, no
+ * correlated `existsIn`, no `raw` SQL (which may name any column).
+ */
+function readsNoRow(expr: PolicyExpression): boolean {
+    switch (expr.kind) {
+        case "and":
+        case "or":
+            return expr.operands.every(readsNoRow);
+        case "not":
+            return readsNoRow(expr.operand);
+        case "compare":
+            return !readsRow(expr.left) && !readsRow(expr.right);
+        case "existsIn":
+        case "raw":
+            return false;
+        default:
+            return true;
+    }
+}
+
+const readsRow = (operand: PolicyOperand): boolean =>
+    operand.kind === "field" || operand.kind === "outerField";
+
+const callsHelper = (operand: PolicyOperand): boolean =>
+    operand.kind === "authUid" || operand.kind === "authRoles" || operand.kind === "authClaim";
+
+/** Whether `expr` calls one of the `rebase.*` helpers anywhere. */
+function callsAuthHelper(expr: PolicyExpression): boolean {
+    switch (expr.kind) {
+        case "and":
+        case "or":
+            return expr.operands.some(callsAuthHelper);
+        case "not":
+            return callsAuthHelper(expr.operand);
+        case "compare":
+            return callsHelper(expr.left) || callsHelper(expr.right);
+        case "rolesOverlap":
+        case "rolesContain":
+        case "authenticated":
+        case "registered":
+        case "serverContext":
+            return true;
+        default:
+            return false;
+    }
+}
+
+/**
+ * Whether `expr` is compiled as one `(SELECT …)`: it reads no row and calls a
+ * helper (a constant has nothing to save).
+ *
+ * `authenticated()` and `registered()` on their own are the exception: they
+ * wrap each helper call instead — `(SELECT rebase.uid()) IS NOT NULL AND …`.
+ * Their estimate is already near 100%, so there is no plan to fix, and the
+ * per-call spelling is the one RLS linters can still read: `rls-check` flags a
+ * policy that is nothing but "signed in" (every account reads every row) by
+ * splitting it on AND, and it reads `( SELECT rebase.uid() AS uid)` as the
+ * caller id — but a whole conjunction inside one subquery is opaque to it.
+ * Inside a larger hoisted subtree they are emitted bare, like everything else
+ * there.
+ */
+function isHoistable(expr: PolicyExpression): boolean {
+    if (expr.kind === "authenticated" || expr.kind === "registered") return false;
+    return readsNoRow(expr) && callsAuthHelper(expr);
+}
+
+/** A helper call, as an initPlan unless it already sits inside one. */
+function helperSql(sqlText: string, scope: CompileScope): string {
+    return scope.inInitPlan ? sqlText : `(SELECT ${sqlText})`;
+}
+
 function compile(expr: PolicyExpression, scope: CompileScope): string {
+    if (!scope.inInitPlan && isHoistable(expr)) {
+        return `(SELECT ${compile(expr, { ...scope, inInitPlan: true })})`;
+    }
     switch (expr.kind) {
         case "true":
             return "true";
@@ -84,7 +189,7 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
             // table. See {@link claimCastType}.
             const claimSql = (operand: PolicyOperand, other: PolicyOperand): string | undefined =>
                 operand.kind === "authClaim"
-                    ? authClaimSql(operand.name, claimCastType(other, scope))
+                    ? helperSql(authClaimSql(operand.name, claimCastType(other, scope)), scope)
                     : undefined;
             const leftSql = claimSql(expr.left, expr.right)
                 ?? castForAuthUid(expr.left, operandToSql(expr.left, scope), expr.right);
@@ -107,7 +212,8 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
             // policy compiled here may be enforced against an older server that
             // still reports `'anon'`, which is exactly how excluding one
             // spelling turned this helper into a grant. See ANONYMOUS_USER_IDS.
-            return `${RLS_UID_SQL} IS NOT NULL AND ${RLS_UID_SQL} NOT IN (${ANONYMOUS_USER_IDS.map(quoteLiteral).join(", ")})`;
+            return `${helperSql(RLS_UID_SQL, scope)} IS NOT NULL`
+                + ` AND ${helperSql(RLS_UID_SQL, scope)} NOT IN (${ANONYMOUS_USER_IDS.map(quoteLiteral).join(", ")})`;
         case "registered":
             // "Signed in" AND "not a guest". The first half is the same clause
             // `authenticated` compiles to; the second is the fact anonymous
@@ -118,9 +224,9 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
             // so a policy compiled here and enforced by an older server reads
             // every session as an account — which is the behaviour that
             // deployment already had, rather than a lockout.
-            return `${RLS_UID_SQL} IS NOT NULL`
-                + ` AND ${RLS_UID_SQL} NOT IN (${ANONYMOUS_USER_IDS.map(quoteLiteral).join(", ")})`
-                + ` AND NOT ${RLS_IS_ANONYMOUS_SQL}`;
+            return `${helperSql(RLS_UID_SQL, scope)} IS NOT NULL`
+                + ` AND ${helperSql(RLS_UID_SQL, scope)} NOT IN (${ANONYMOUS_USER_IDS.map(quoteLiteral).join(", ")})`
+                + ` AND NOT ${helperSql(RLS_IS_ANONYMOUS_SQL, scope)}`;
         case "serverContext":
             // Only the built-in server flows leave `app.uid` unset.
             return `${RLS_UID_SQL} IS NULL`;
@@ -170,7 +276,8 @@ function compileExistsIn(expr: ExistsInPolicyExpression, scope: CompileScope): s
         outerCollection: scope.outerCollection,
         outerPrefix,
         resolveCollection: scope.resolveCollection,
-        alias: scope.alias
+        alias: scope.alias,
+        inInitPlan: scope.inInitPlan
     };
     return `EXISTS (SELECT 1 FROM "${joinSchema}"."${joinTable}" "${alias}" WHERE ${compile(expr.where, innerScope)})`;
 }
@@ -193,15 +300,15 @@ function operandToSql(operand: PolicyOperand, scope: CompileScope): string {
         case "literal":
             return quoteLiteral(operand.value);
         case "authUid":
-            return RLS_UID_SQL;
+            return helperSql(RLS_UID_SQL, scope);
         case "authRoles":
-            return `string_to_array(${RLS_ROLES_SQL}, ',')`;
+            return helperSql(`string_to_array(${RLS_ROLES_SQL}, ',')`, scope);
         case "authClaim":
             // Uncast — the shape a claim has when nothing says what it is being
             // compared against (a claim on both sides, or against a literal).
             // The `compare` arm replaces this whenever the other operand names
             // a typed column.
-            return authClaimSql(operand.name, "text");
+            return helperSql(authClaimSql(operand.name, "text"), scope);
     }
 }
 

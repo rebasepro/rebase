@@ -41,7 +41,7 @@ describe("policyToPostgres — existsIn (membership)", () => {
         expect(sql).toContain(`EXISTS (SELECT 1 FROM "public"."team_members" "_ex0" WHERE`);
         // inner `field` binds to the aliased join table
         expect(sql).toContain(`"_ex0".team_id`);
-        expect(sql).toContain(`("_ex0".user_id)::text = rebase.uid()`);
+        expect(sql).toContain(`("_ex0".user_id)::text = (SELECT rebase.uid())`);
         // `outerField` binds to the outer RLS row, table-qualified
         expect(sql).toContain(`"public"."documents".team_id`);
     });
@@ -53,12 +53,12 @@ describe("policyToPostgres — existsIn (membership)", () => {
         });
         const sql = policyToPostgres(expr, documents);
         expect(sql).toContain(`FROM "public"."team_members" "_ex0"`);
-        expect(sql).toContain(`("_ex0".user_id)::text = rebase.uid()`);
+        expect(sql).toContain(`("_ex0".user_id)::text = (SELECT rebase.uid())`);
     });
 
     it("does not regress non-existsIn compilation (bare columns at top level)", () => {
         const expr = policy.compare(policy.field("team_id"), "eq", policy.authUid());
-        expect(policyToPostgres(expr, documents)).toBe("(team_id)::text = rebase.uid()");
+        expect(policyToPostgres(expr, documents)).toBe("(team_id)::text = (SELECT rebase.uid())");
     });
 
     it("is treated as server-authoritative (unknown) by the JS evaluator", () => {
@@ -107,7 +107,7 @@ describe("policy.authenticated()", () => {
         // a server still reporting the legacy `'anon'`. Excluding one spelling
         // is exactly how this helper became a grant.
         expect(policyToPostgres(policy.authenticated()))
-            .toBe("rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')");
+            .toBe("(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')");
     });
 
     it("is false for an anonymous caller, in either spelling", () => {
@@ -127,13 +127,13 @@ describe("policy.authenticated()", () => {
         // "is the server context". It means "anonymous or server" now, and
         // `serverContext()` is how you ask the narrower question.
         expect(policyToPostgres(policy.not(policy.authenticated())))
-            .toBe("NOT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'))");
+            .toBe("(SELECT NOT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))");
     });
 });
 
 describe("policy.serverContext()", () => {
     it("compiles to the only state a user request cannot reach", () => {
-        expect(policyToPostgres(policy.serverContext())).toBe("rebase.uid() IS NULL");
+        expect(policyToPostgres(policy.serverContext())).toBe("(SELECT rebase.uid() IS NULL)");
     });
 
     it("is false client-side for every caller — a client is never the server", () => {
@@ -292,5 +292,104 @@ describe("sqlToPolicy → policyToPostgres round-trip", () => {
         const out = roundTrip("EXISTS (SELECT 1 FROM a WHERE a.x = 1) AND EXISTS (SELECT 1 FROM b WHERE b.y = 2)");
         expect(out).toContain("EXISTS (SELECT 1 FROM a WHERE a.x = 1)");
         expect(out).toContain("EXISTS (SELECT 1 FROM b WHERE b.y = 2)");
+    });
+});
+
+/**
+ * What does not read the row is evaluated once per statement, as an initPlan.
+ *
+ * Postgres evaluates a policy's qual per row and estimates `rebase.uid() IS
+ * NULL OR roles && …` to pass 1.5% of a table, which turns a deep page into a
+ * sequential scan and an on-disk sort of the whole table. A scalar subquery
+ * that references no column is computed once and estimated at 50%. These pin
+ * where the compiler puts it; `policy-shapes-equivalence.test.ts` in
+ * server-postgres runs every shape against Postgres to show the rows admitted
+ * are the same.
+ */
+describe("policyToPostgres — row-independent parts become initPlans", () => {
+    const owned = { slug: "notes", name: "Notes", properties: { ownerId: { type: "string", columnName: "owner_id" } } } as unknown as CollectionConfig;
+
+    it("wraps the whole server-or-admin baseline in one subquery", () => {
+        expect(policyToPostgres(policy.or(policy.serverContext(), policy.rolesOverlap(["admin"]))))
+            .toBe("(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))");
+    });
+
+    it("wraps only the caller's side of a comparison with a column", () => {
+        expect(policyToPostgres(policy.compare(policy.field("ownerId"), "eq", policy.authUid()), owned))
+            .toBe("(owner_id)::text = (SELECT rebase.uid())");
+        expect(policyToPostgres(policy.compare(policy.field("ownerId"), "eq", policy.authClaim("sub")), owned))
+            .toBe("owner_id = (SELECT NULLIF(rebase.jwt() ->> 'sub', ''))");
+    });
+
+    it("wraps each row-independent operand of a mixed OR, and leaves the row's own", () => {
+        const sql = policyToPostgres(policy.or(
+            policy.serverContext(),
+            policy.compare(policy.field("ownerId"), "eq", policy.authUid())
+        ), owned);
+        expect(sql).toBe("((SELECT rebase.uid() IS NULL)) OR ((owner_id)::text = (SELECT rebase.uid()))");
+    });
+
+    it("never wraps a subtree that reads the row, a raw clause, or a constant", () => {
+        expect(policyToPostgres(policy.compare(policy.field("ownerId"), "eq", policy.literal("x")), owned))
+            .toBe("owner_id = 'x'");
+        expect(policyToPostgres(policy.raw("owner_id = rebase.uid()"))).toBe("owner_id = rebase.uid()");
+        expect(policyToPostgres(policy.and(policy.true(), policy.false()))).toBe("(true) AND (false)");
+    });
+
+    it("hoists inside a correlated EXISTS, without hoisting the EXISTS", () => {
+        const sql = policyToPostgres(policy.existsIn({
+            collection: "team_members",
+            where: policy.compare(policy.field("user_id"), "eq", policy.authUid())
+        }), documents, { resolveCollection });
+        expect(sql).toBe(`EXISTS (SELECT 1 FROM "public"."team_members" "_ex0" WHERE ("_ex0".user_id)::text = (SELECT rebase.uid()))`);
+    });
+
+    it("spells authenticated() per call, the form RLS linters recognise", () => {
+        expect(policyToPostgres(policy.authenticated()))
+            .toBe("(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')");
+        // Inside a larger row-independent subtree, it is part of that one subquery.
+        expect(policyToPostgres(policy.and(policy.authenticated(), policy.rolesOverlap(["editor"]))))
+            .toBe("(SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')) AND (string_to_array(rebase.roles(), ',') && ARRAY['editor']))");
+    });
+});
+
+describe("sqlToPolicy — reading the initPlan spelling back", () => {
+    it("reads a fully understood (SELECT x) back as x", () => {
+        expect(sqlToPolicy("(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])"))
+            .toEqual(policy.rolesOverlap(["admin"]));
+        expect(sqlToPolicy("(SELECT rebase.uid() = 'u1')"))
+            .toEqual(policy.compare(policy.authUid(), "eq", policy.literal("u1")));
+    });
+
+    it("reads the wrapped uid operand, as the compiler and as Postgres spell it", () => {
+        const owner = policy.compare(policy.field("owner_id"), "eq", policy.authUid());
+        expect(sqlToPolicy("owner_id = (SELECT rebase.uid())")).toEqual(owner);
+        expect(sqlToPolicy("(owner_id = ( SELECT rebase.uid() AS uid))")).toEqual(owner);
+    });
+
+    it("keeps a subquery it does not fully understand as raw, parens and all", () => {
+        // Stripped of its parens this is `SELECT …`, which is not an
+        // expression: `USING (SELECT …)` does not parse.
+        for (const sql of [
+            "(SELECT rebase.uid() IS NULL)",
+            "(SELECT a = 'x' FROM t)",
+            "(SELECT owner_id FROM t WHERE id = 1)",
+            "(SELECT rebase.uid() = 'u1' LIMIT 0)"
+        ]) {
+            expect(sqlToPolicy(sql)).toEqual(policy.raw(sql));
+            expect(policyToPostgres(sqlToPolicy(sql))).toBe(sql);
+        }
+    });
+
+    it("round-trips every compiled preset to the same expression", () => {
+        for (const expr of [
+            policy.or(policy.serverContext(), policy.rolesOverlap(["admin"])),
+            policy.rolesOverlap(["admin"]),
+            policy.compare(policy.authUid(), "eq", policy.field("uid")),
+            policy.compare(policy.field("owner_id"), "eq", policy.authUid())
+        ]) {
+            const once = policyToPostgres(expr);
+            expect(policyToPostgres(sqlToPolicy(once))).toBe(once);
+        }
     });
 });

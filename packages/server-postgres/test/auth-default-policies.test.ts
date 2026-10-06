@@ -81,7 +81,7 @@ describe("auth collection default RLS policies", () => {
 
         // uuid id column must compare against text rebase.uid() via a cast.
         const ddl = generatePostgresPoliciesDdl([collection]);
-        expect(ddl).toContain("(id)::text = rebase.uid()");
+        expect(ddl).toContain("(id)::text = (SELECT rebase.uid())");
     });
 
     /**

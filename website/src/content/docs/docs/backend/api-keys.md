@@ -95,7 +95,7 @@ This is the step that makes a correctly scoped key look broken. The RLS policy
 Rebase adds to every collection by default compiles to:
 
 ```sql
-rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
+(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))
 ```
 
 That is the server context, or an admin. A service key with no `admin` role

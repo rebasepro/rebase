@@ -87,7 +87,7 @@ describe("drizzle policy clauses survive the TypeScript file", () => {
         // compiler adds — but with no escaping applied to any of it.
         const schema = await generateSchema([collectionWith("owner_id = rebase.uid()")]);
 
-        expect(schema).toContain("sql`(owner_id)::text = rebase.uid()`");
+        expect(schema).toContain("sql`(owner_id)::text = (SELECT rebase.uid())`");
         expect(schema).not.toContain("\\");
     });
 });

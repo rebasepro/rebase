@@ -51,7 +51,8 @@ securityRules: [
 ]
 ```
 
-This generates: `USING (user_id = rebase.uid())`
+This generates: `USING ((user_id)::text = (SELECT rebase.uid()))` — see
+[Evaluated once per statement](#evaluated-once-per-statement) for the `SELECT`.
 
 ### Public Access
 
@@ -153,6 +154,24 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.literal(value)` | a string, number, boolean or `null` |
 | `policy.authUid()` | `rebase.uid()` |
 | `policy.authRoles()` | `rebase.roles()` |
+
+#### Evaluated once per statement
+
+Every part of a rule that does not read the row — the caller's id, a roles
+check, a claim, `serverContext()` — compiles inside a scalar subquery. An owner
+rule becomes `(user_id)::text = (SELECT rebase.uid())`, and the default admin
+read becomes
+`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`.
+
+Postgres computes such a subquery once per statement (an *initPlan*) rather than
+once per row, and plans as though the check passes half the table rather than
+1.5% of it. That estimate is what keeps a deep page of a large table on its
+primary key: without it, page 401 of a million rows was a sequential scan and a
+640 MB sort. Who may read or write what is unchanged.
+
+Raw `using` / `withCheck` SQL gets the same treatment when Rebase can read its
+structure (`owner_id = rebase.uid()` does). Anything else is inserted as
+written, so wrap the calls yourself: `(SELECT rebase.uid())`.
 
 ### `authenticated()` and `registered()`
 
