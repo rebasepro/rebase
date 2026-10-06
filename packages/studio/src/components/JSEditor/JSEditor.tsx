@@ -86,7 +86,7 @@ const makeDefaultCode = (slug?: string) => `// Available: client (RebaseClient),
 // Press Cmd+Enter (Ctrl+Enter) to run
 //
 // Examples:
-//   const users = await client.admin.listUsers();
+//   const { users, total } = await client.admin.listUsers({ limit: 50, offset: 0 }); // one page of total
 //   const me = context.user; // who this script runs as ("Run as"), null under No Auth
 ${slug
         ? `

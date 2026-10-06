@@ -78,8 +78,8 @@ const QUICK_REFERENCE: { label: string; code: string; description: string }[] = 
     },
     {
         label: "Admin: List users",
-        code: "const { users } = await client.admin.listUsers();\nreturn users;",
-        description: "List all registered users"
+        code: "// One page: raise limit or page with offset while users.length < total\nconst { users, total } = await client.admin.listUsers({ limit: 50, offset: 0 });\nreturn { users, total };",
+        description: "A page of users, and how many there are in all"
     },
     {
         label: "Custom endpoint",

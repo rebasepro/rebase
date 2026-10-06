@@ -149,8 +149,27 @@ interface AdminUser {
     updatedAt: string;
 }
 
+interface ListUsersOptions {
+    search?: string;
+    /** Page size. The server's default is 25. */
+    limit?: number;
+    offset?: number;
+    orderBy?: string;
+    orderDir?: "asc" | "desc";
+}
+
+/** One page of users, and \`total\`: how many match in all. */
+interface UsersPage {
+    users: AdminUser[];
+    total: number;
+    limit: number;
+    offset: number;
+}
+
 interface RebaseCMS {
-    listUsers(): Promise<{ users: AdminUser[] }>;
+    /** One page of users (25 unless \`limit\` says otherwise) and the total. */
+    listUsers(options?: ListUsersOptions): Promise<UsersPage>;
+    listUsersPaginated(options?: ListUsersOptions): Promise<UsersPage>;
     getUser(userId: string): Promise<{ user: AdminUser }>;
     createUser(data: { email: string; displayName?: string; password?: string; roles?: string[] }): Promise<{ user: AdminUser }>;
     updateUser(userId: string, data: { email?: string; displayName?: string; password?: string; roles?: string[] }): Promise<{ user: AdminUser }>;
@@ -211,8 +230,8 @@ type RebaseData = {
  * // Auth
  * const session = client.auth.getSession();
  *
- * // Admin
- * const { users } = await client.admin.listUsers();
+ * // Admin: one page of users, and how many there are
+ * const { users, total } = await client.admin.listUsers({ limit: 50 });
  *
  * // Custom endpoint
  * const result = await client.call("/my-endpoint", { myData: 123 });
