@@ -103,10 +103,23 @@ export function useCreateFormex<T = any>({
     const [isValidating, setIsValidating] = useState(false);
     const [version, setVersion] = useState(0);
 
+    // Every callback the caller hands in is read through a ref, so the
+    // controller's own functions never change identity. A caller passing
+    // inline functions — `EntityForm` does — used to give the controller a new
+    // identity on *every* render, and every field reading it re-rendered with
+    // it. The controller now changes with its state, and only with its state.
     const onValuesChangeRef = useRef(onValuesChangeDeferred);
     onValuesChangeRef.current = onValuesChangeDeferred;
     const onBaselineConflictRef = useRef(onBaselineConflict);
     onBaselineConflictRef.current = onBaselineConflict;
+    const validationRef = useRef(validation);
+    validationRef.current = validation;
+    const onSubmitRef = useRef(onSubmit);
+    onSubmitRef.current = onSubmit;
+    const onResetRef = useRef(onReset);
+    onResetRef.current = onReset;
+    const initialTouchedRef = useRef(initialTouched);
+    initialTouchedRef.current = initialTouched;
     const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     const callDebouncedOnValuesChange = useCallback((values: T) => {
@@ -150,11 +163,11 @@ export function useCreateFormex<T = any>({
 
     const validate = useCallback(async () => {
         setIsValidating(true);
-        const validationErrors = await validation?.(valuesRef.current);
+        const validationErrors = await validationRef.current?.(valuesRef.current);
         setErrors(validationErrors ?? {});
         setIsValidating(false);
         return validationErrors;
-    }, [validation]);
+    }, []);
 
     const setFieldValue = useCallback(
         (key: string, value: unknown, shouldValidate?: boolean) => {
@@ -228,17 +241,17 @@ export function useCreateFormex<T = any>({
             e?.stopPropagation();
             setIsSubmitting(true);
             setSubmitCount((prev: number) => prev + 1);
-            const validationErrors = await validation?.(valuesRef.current);
+            const validationErrors = await validationRef.current?.(valuesRef.current);
             if (validationErrors && Object.keys(validationErrors).length > 0) {
                 setErrors(validationErrors);
             } else {
                 setErrors({});
-                await onSubmit?.(valuesRef.current, controllerRef.current);
+                await onSubmitRef.current?.(valuesRef.current, controllerRef.current);
             }
             setIsSubmitting(false);
             setVersion((prev: number) => prev + 1);
         },
-        [onSubmit, validation]
+        []
     );
 
     const resetForm = useCallback((props?: FormexResetProps<T>) => {
@@ -252,7 +265,7 @@ export function useCreateFormex<T = any>({
         const priorValues = valuesRef.current;
         const priorTouched = touchedRef.current;
         const nextValues = valuesProp ?? initialValuesRef.current;
-        const nextTouched = touchedProp ?? initialTouched ?? {};
+        const nextTouched = touchedProp ?? initialTouchedRef.current ?? {};
         valuesRef.current = nextValues;
         initialValuesRef.current = nextValues;
         setValuesInner(nextValues);
@@ -261,7 +274,7 @@ export function useCreateFormex<T = any>({
         setDirty(false);
         setSubmitCount(submitCountProp ?? 0);
         setVersion((prev: number) => prev + 1);
-        onReset?.(controllerRef.current);
+        onResetRef.current?.(controllerRef.current);
         if (undoable) {
             // Keep what the user typed one step behind them. The entry stepped
             // back into carries the touched map as well as the values: without
@@ -277,7 +290,7 @@ export function useCreateFormex<T = any>({
             historyRef.current = [{ values: nextValues }];
             historyIndexRef.current = 0;
         }
-    }, [onReset, initialTouched]);
+    }, []);
 
     /**
      * The `initialValues` prop moved: the record this form edits finished

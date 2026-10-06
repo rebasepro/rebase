@@ -46,32 +46,29 @@ import { ErrorBoundary } from "@rebasepro/ui";
  * @param autoFocus
  * @group Form custom fields
  */
-export const PropertyFieldBinding = React.memo(PropertyFieldBindingInternal, (a: PropertyFieldBindingProps<Record<string, unknown>>, b: PropertyFieldBindingProps<Record<string, unknown>>) => {
-    if (a.propertyKey !== b.propertyKey) {
-        return false;
-    }
-    if (a.index !== b.index) {
-        return false;
-    }
+export const PropertyFieldBinding = React.memo(PropertyFieldBindingInternal,
+    (a: PropertyFieldBindingProps<Record<string, unknown>>, b: PropertyFieldBindingProps<Record<string, unknown>>) =>
+        sameProps(a as unknown as Record<string, unknown>, b as unknown as Record<string, unknown>, DEEP_COMPARED_BINDING_PROPS)
+) as typeof PropertyFieldBindingInternal;
 
-    if (a.size !== b.size) {
+/**
+ * Props compared by value rather than identity: a property is re-resolved
+ * (`dynamicProps`, enums, a parent's `mergeDeep`) into a new object on every
+ * render of whatever holds it, and an error for an array or map is a new
+ * sub-object of the errors map whenever anything is validated.
+ */
+const DEEP_COMPARED_BINDING_PROPS = new Set(["property"]);
+const DEEP_COMPARED_FIELD_PROPS = new Set(["property", "error", "customProps"]);
+
+function sameProps(a: Record<string, unknown>, b: Record<string, unknown>, deep: Set<string>): boolean {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const key of keys) {
+        if (Object.is(a[key], b[key])) continue;
+        if (deep.has(key) && equal(a[key], b[key])) continue;
         return false;
     }
-    const aIsBuilder = isPropertyBuilder(a.property);
-    const bIsBuilder = isPropertyBuilder(b.property);
-
-    const baseCheck = (aIsBuilder === bIsBuilder || equal(a.property, b.property)) &&
-        a.disabled === b.disabled;
-    if (!baseCheck) {
-        return false;
-    }
-
-    if (shouldPropertyReRender(b.property)) {
-        return false;
-    }
-
-    return false;
-}) as typeof PropertyFieldBindingInternal;
+    return true;
+}
 
 function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record<string, unknown>>
 ({
@@ -93,6 +90,9 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
 
     const authController = useAuthController();
     const customizationController = useCustomizationController();
+    // Decided on the property as declared: once resolved, a builder or a rule
+    // no longer says it was one.
+    const alwaysRender = shouldPropertyReRender(property as Property, customizationController.plugins);
 
     return (
         <Field
@@ -171,6 +171,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
 
                 return <FieldInternal
                     Component={Component as ComponentType<FieldProps<Property, any, any>>}
+                    alwaysRender={alwaysRender}
                     componentProps={componentProps}
                     formexFieldProps={fieldProps as FormexFieldProps<unknown, Record<string, unknown>>}/>;
             }}
@@ -188,6 +189,7 @@ type ResolvedPropertyFieldBindingProps<M extends Record<string, unknown> = Recor
 function FieldInternal<CustomProps, M extends Record<string, unknown>>
 ({
      Component,
+     alwaysRender,
      componentProps: {
          propertyKey,
          property,
@@ -207,6 +209,7 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
  }:
  {
      Component: ComponentType<FieldProps<Property, any, any>>,
+     alwaysRender: boolean,
      componentProps: ResolvedPropertyFieldBindingProps<M>,
      formexFieldProps: FormexFieldProps<unknown, Record<string, unknown>>
  }) {
@@ -261,6 +264,13 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
         formexFieldProps.form.setFieldValue(otherPropertyKey, value, shouldValidate);
     }, []);
 
+    // A parent that builds `onPropertyChange` inline (an array item's
+    // `storeProps`, a map's wrapper) would otherwise hand every child a new
+    // function on each of its renders, and every child would re-render for it.
+    const onPropertyChangeRef = useRef(onPropertyChange);
+    onPropertyChangeRef.current = onPropertyChange;
+    const stableOnPropertyChange = useCallback((changed: Partial<Property>) => onPropertyChangeRef.current?.(changed), []);
+
     const cmsFieldProps: FieldProps<Property, CustomProps, M> = {
         propertyKey,
         value,
@@ -282,7 +292,7 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
         customProps: customFieldProps as CustomProps,
         context,
         size,
-        onPropertyChange
+        onPropertyChange: onPropertyChange ? stableOnPropertyChange : undefined
     };
 
     return (
@@ -290,7 +300,9 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
             {beforeField}
 
             <Suspense fallback={null}>
-                <UsedComponent {...cmsFieldProps}/>
+                <MemoisedField Component={UsedComponent}
+                    alwaysRender={alwaysRender}
+                    fieldProps={cmsFieldProps as FieldProps<Property, any, any>}/>
             </Suspense>
 
             {afterField}
@@ -304,20 +316,69 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
 
 }
 
-const shouldPropertyReRender = (property: Property, plugins?: RebasePlugin[]): boolean => {
+type MemoisedFieldProps = {
+    Component: ComponentType<FieldProps<Property, any, any>>,
+    alwaysRender: boolean,
+    fieldProps: FieldProps<Property, any, any>
+};
+
+/**
+ * The field's own component, rendered again only when its own slice of the
+ * form changed — value, error, touched, the flags — or when the context it
+ * draws the record from did (see `fieldContext` in `EntityForm`). Every field
+ * of the form used to re-render on every keystroke anywhere in it.
+ *
+ * A field that may read *another* field's value while rendering cannot know
+ * when to re-render from its own props, so those always do: see
+ * {@link shouldPropertyReRender}.
+ */
+const MemoisedField = React.memo(
+    function MemoisedField({ Component, fieldProps }: MemoisedFieldProps) {
+        return <Component {...fieldProps}/>;
+    },
+    (prev: MemoisedFieldProps, next: MemoisedFieldProps) =>
+        !next.alwaysRender &&
+        prev.Component === next.Component &&
+        sameProps(prev.fieldProps as unknown as Record<string, unknown>, next.fieldProps as unknown as Record<string, unknown>, DEEP_COMPARED_FIELD_PROPS)
+);
+
+/**
+ * Whether a field has to re-render on every change to the form, because what
+ * it draws can depend on values other than its own:
+ * - a plugin `fieldBuilder` wraps it in a component of the plugin's;
+ * - a custom `admin.Field` gets the whole form through `context`;
+ * - `dynamicProps` and `conditions` are functions of every value;
+ * - a storage path or file name given as a function is built from the values
+ *   the binding holds.
+ * Inside maps, arrays and blocks too, since their bindings render the children.
+ */
+const shouldPropertyReRender = (property: Property | undefined, plugins?: RebasePlugin[]): boolean => {
+    if (!property) return false;
     if (plugins?.some((plugin) => plugin.fieldBuilder)) {
         return true;
     }
-    if (isPropertyBuilder(property)) {
+    if (isPropertyBuilder(property) || property.conditions || property.admin?.Field) {
         return true;
     }
-    const defAProperty = property as Property;
-    const rerenderThisProperty = Boolean(defAProperty.admin?.Field);
-    if (defAProperty.type === "map" && defAProperty.properties) {
-        return Boolean(rerenderThisProperty || Object.values(defAProperty.properties).some((childProperty) => shouldPropertyReRender(childProperty as Property, plugins)));
-    } else {
-        return Boolean(rerenderThisProperty);
+    const storage = "storage" in property ? property.storage : undefined;
+    if (storage && (typeof storage.storagePath === "function" || typeof storage.fileName === "function")) {
+        return true;
     }
+    if (property.type === "map" && property.properties) {
+        return Object.values(property.properties).some((child) => shouldPropertyReRender(child as Property, plugins));
+    }
+    if (property.type === "array") {
+        if (Array.isArray(property.of)) {
+            return property.of.some((child) => shouldPropertyReRender(child as Property, plugins));
+        }
+        if (property.of && shouldPropertyReRender(property.of as Property, plugins)) {
+            return true;
+        }
+        if (property.oneOf?.properties) {
+            return Object.values(property.oneOf.properties).some((child) => shouldPropertyReRender(child as Property, plugins));
+        }
+    }
+    return false;
 }
 
 interface UseWrappedComponentParams<M extends Record<string, unknown> = Record<string, unknown>> {
