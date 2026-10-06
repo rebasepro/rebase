@@ -84,8 +84,12 @@ function statusLabel(t: Translate, kind: KeyStatusKind): string {
     }
 }
 
-/** A service key that runs as `admin` reads every row. A personal key has no roles of its own. */
-function readsEveryRow(key: ApiKeyMasked): boolean {
+/**
+ * A service key that runs as `admin`: row-level security does not limit its
+ * reads, writes or deletes, and it passes `admin` checks in functions and
+ * storage. A personal key has no roles of its own.
+ */
+function runsAsAdmin(key: ApiKeyMasked): boolean {
     return key.kind === "service" && hasAdminRole(key.roles);
 }
 
@@ -438,8 +442,9 @@ function PersonalKeysOff() {
 /**
  * Marks a service key that runs as the admin role.
  *
- * Not cosmetic: such a key reads every row through the admin policies, and
- * without this it is indistinguishable in the list from a narrow one.
+ * Not cosmetic: such a key reads, changes and deletes every row its scopes
+ * reach through the admin policies, and without this it is indistinguishable
+ * in the list from a narrow one.
  */
 function AdminChip() {
     const { t } = useTranslation();
@@ -477,7 +482,7 @@ function KeyListItem({ apiKey, catalogue, selected, onClick }: {
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 min-w-0">
                     <Typography variant="body2" className="truncate font-medium text-[13px]">{apiKey.name}</Typography>
-                    {readsEveryRow(apiKey) && <AdminChip/>}
+                    {runsAsAdmin(apiKey) && <AdminChip/>}
                 </div>
                 <Typography variant="caption" color="secondary" className="truncate text-[11px] font-mono">{apiKey.key_prefix}•••</Typography>
             </div>
@@ -515,7 +520,7 @@ function KeyDetail({ apiKey, catalogue, revoking, onRevoke }: {
                     <div className="min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
                             <Typography variant="subtitle1" className="font-semibold truncate">{apiKey.name}</Typography>
-                            {readsEveryRow(apiKey) && <AdminChip/>}
+                            {runsAsAdmin(apiKey) && <AdminChip/>}
                         </div>
                         <Typography variant="caption" color="secondary" className="font-mono text-[11px]">{apiKey.key_prefix}•••</Typography>
                     </div>
@@ -667,10 +672,10 @@ function RolesBlock({ apiKey }: { apiKey: ApiKeyMasked }) {
                     </Chip>
                 ))}
             </div>
-            {readsEveryRow(apiKey)
+            {runsAsAdmin(apiKey)
                 ? (
                     <Alert color="warning" size="small" outerClassName="mt-2">
-                        {t("studio_api_keys_admin_reads_every_row")}
+                        {t("studio_api_keys_admin_bypasses_rls")}
                     </Alert>
                 )
                 : (
@@ -767,7 +772,7 @@ function SecretDisplayDialog({ keyWithSecret, catalogue, onClose }: {
                         <strong>{t("studio_api_keys_access_label")}</strong>{" "}
                         {granted.length > 0 ? granted.map(held => heldScopeLine(t, held)).join("; ") : "—"}
                     </Typography>
-                    {readsEveryRow(keyWithSecret) && (
+                    {runsAsAdmin(keyWithSecret) && (
                         <Typography variant="caption" className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
                             <ShieldIcon size={iconSize.smallest} className="shrink-0"/>
                             <span><strong>{t("studio_api_keys_admin_granted")}</strong> — {t("studio_api_keys_admin_granted_hint")}</span>

@@ -9,9 +9,9 @@ import { summarizeScopes, type ApiKeyMasked } from "@rebasepro/types";
 
 /**
  * The key panel speaks scopes: what a key may call is its scopes, which rows
- * it reads is its RLS roles, and a service key running as `admin` reads every
- * row — which the panel has to say, because nothing else about such a key
- * looks wider than a narrow one.
+ * it reads and changes is its RLS roles, and a service key running as `admin`
+ * is not limited by row-level security at all — which the panel has to say,
+ * because nothing else about such a key looks wider than a narrow one.
  *
  * The create dialog has to send what the server mints from, and when the
  * server refuses, say which rule refused it beside the server's own words.
@@ -110,13 +110,13 @@ beforeEach(() => {
 });
 
 describe("a key's detail", () => {
-    it("says a key running as admin reads every row", async () => {
+    it("says a key running as admin is not limited by row-level security", async () => {
         listKeys.mockResolvedValue({ keys: [serviceKey({ roles: ["admin"] })] });
         render(<ApiKeysView/>);
 
         fireEvent.click(await screen.findByText("Nightly export"));
 
-        expect(await screen.findByText(en.studio_api_keys_admin_reads_every_row!)).toBeTruthy();
+        expect(await screen.findByText(en.studio_api_keys_admin_bypasses_rls!)).toBeTruthy();
     });
 
     it("does not say it of a key that runs as service alone", async () => {
@@ -126,7 +126,7 @@ describe("a key's detail", () => {
         fireEvent.click(await screen.findByText("Nightly export"));
 
         expect(await screen.findByText(en.studio_api_keys_roles_service_only!)).toBeTruthy();
-        expect(screen.queryByText(en.studio_api_keys_admin_reads_every_row!)).toBeNull();
+        expect(screen.queryByText(en.studio_api_keys_admin_bypasses_rls!)).toBeNull();
     });
 
     it("shows a collection-narrowed scope as the grant on those collections", async () => {

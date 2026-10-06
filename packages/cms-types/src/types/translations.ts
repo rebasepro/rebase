@@ -1352,7 +1352,7 @@ export interface RebaseTranslations {
     studio_api_keys_roles_rows_hint?: string;
     studio_api_keys_roles_service_only?: string;
     studio_api_keys_roles_service_plus?: string;
-    studio_api_keys_admin_reads_every_row?: string;
+    studio_api_keys_admin_bypasses_rls?: string;
     studio_api_keys_admin_chip_tooltip?: string;
     studio_api_keys_personal_roles?: string;
     studio_api_keys_revoke_title?: string;

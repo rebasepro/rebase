@@ -346,7 +346,7 @@ export function CreateApiKeyDialog({
     const scopes = buildScopeList(selection, order);
     const incomplete = incompleteScopes(selection);
     const roles = kind === "service" ? combineRoles(pickedRoles, typedRoles) : [];
-    const readsEveryRow = hasAdminRole(roles);
+    const runsAsAdmin = hasAdminRole(roles);
     const granted = groupKeyScopes(scopes, catalogue);
     const labelOf = (scope: string) => catalogue.find(summary => summary.scope === scope)?.label ?? scope;
 
@@ -518,7 +518,7 @@ export function CreateApiKeyDialog({
                                 {t("studio_api_keys_roles_unavailable")}
                             </Typography>
                         )}
-                        {readsEveryRow && (
+                        {runsAsAdmin && (
                             <Alert color="warning" size="small" outerClassName="mt-3">
                                 {t("studio_api_keys_roles_admin_warning")}
                             </Alert>
@@ -610,7 +610,7 @@ export function CreateApiKeyDialog({
                                         <div className="flex items-start gap-2">
                                             <ShieldIcon
                                                 size={iconSize.smallest}
-                                                className={cls("mt-[3px] shrink-0", readsEveryRow
+                                                className={cls("mt-[3px] shrink-0", runsAsAdmin
                                                     ? "text-amber-600 dark:text-amber-400"
                                                     : "text-surface-500 dark:text-surface-400")}
                                             />

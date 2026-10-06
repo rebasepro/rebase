@@ -504,7 +504,7 @@ export interface ScopeSummary {
 /** The roles of an access model, `admin` first. @group Auth */
 export function summarizeRoles(model: AccessModel = EMPTY_ACCESS_MODEL): RoleSummary[] {
     return [
-        { id: ADMIN_ROLE, name: "Admin", description: "Holds every scope and reads every row.", scopes: [...ADMIN_SCOPES], builtIn: true },
+        { id: ADMIN_ROLE, name: "Admin", description: "Holds every scope. Row-level security does not limit it: it reads, changes and deletes every row.", scopes: [...ADMIN_SCOPES], builtIn: true },
         ...Object.entries(model.roles).map(([id, definition]) => ({
             id,
             name: definition.name ?? id,
