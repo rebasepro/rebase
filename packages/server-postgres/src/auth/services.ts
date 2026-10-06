@@ -433,8 +433,17 @@ export class UserService implements UserRepository {
             // pattern the caller writes: the same reasoning as the collection
             // search path, so it shares that path's helper rather than growing
             // a second copy that can drift. See `escapeLikePattern`.
+            //
+            // Email, name, any role the user holds, and the uid: what an
+            // administrator has in hand when looking someone up — Studio's
+            // "Run as" picker says it searches by name, email or role, and a
+            // uid is what the users table and the logs show.
             const pattern = `%${escapeLikePattern(search)}%`;
-            conditions.push(sql`(${sql.raw(usersTableName)}.${sql.raw(emailColumn)} ILIKE ${pattern} OR ${sql.raw(usersTableName)}.${sql.raw(displayNameColumn)} ILIKE ${pattern})`);
+            const table = sql.raw(usersTableName);
+            conditions.push(sql`(${table}.${sql.raw(emailColumn)} ILIKE ${pattern}
+                OR ${table}.${sql.raw(displayNameColumn)} ILIKE ${pattern}
+                OR EXISTS (SELECT 1 FROM unnest(${table}.roles) AS user_role(name) WHERE user_role.name ILIKE ${pattern})
+                OR CAST(${table}.${sql.raw(idColumn)} AS text) ILIKE ${pattern})`);
         }
 
         const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;

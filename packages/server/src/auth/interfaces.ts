@@ -253,7 +253,11 @@ export interface ListUsersOptions {
     limit?: number;
     /** Number of results to skip (default 0) */
     offset?: number;
-    /** Search term — matches against email and displayName (case-insensitive) */
+    /**
+     * Search term — a case-insensitive substring of the email, the display
+     * name, any role the user holds, or the uid. (The Postgres store matches
+     * all four; the Mongo store, email and display name.)
+     */
     search?: string;
     /** Field to sort by (default "createdAt") */
     orderBy?: string;
