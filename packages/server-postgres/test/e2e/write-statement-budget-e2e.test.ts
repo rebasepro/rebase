@@ -517,6 +517,44 @@ describe("a write's statements (E2E)", () => {
         });
     });
 
+    describe("a batch on the server's own driver", () => {
+        it("tells realtime subscribers once the batch has committed, and nothing when it rolls back", async () => {
+            type Notify = (path: string, id: string, ...rest: unknown[]) => Promise<void>;
+            const driver = backend.driver as unknown as {
+                realtimeService: { notifyUpdate: Notify };
+                saveMany(props: { path: string; rows: Record<string, unknown>[] }): Promise<unknown>;
+            };
+            const realtime = driver.realtimeService;
+            const original = realtime.notifyUpdate;
+            const seen: { id: string; committed: boolean }[] = [];
+            realtime.notifyUpdate = async function (this: unknown, path, id, ...rest) {
+                if (path === "authors") {
+                    // Asked from another connection: what a subscriber's refetch would see.
+                    const { rowCount } = await admin.query("SELECT 1 FROM public.authors WHERE id = $1", [Number(id)]);
+                    seen.push({ id: String(id), committed: rowCount === 1 });
+                }
+                return original.call(this, path, id, ...rest);
+            };
+            try {
+                // The change feed may announce the same rows again once they
+                // commit; what matters is that no announcement comes earlier.
+                await driver.saveMany({ path: "authors", rows: [{ name: "batch a" }, { name: "batch b" }] });
+                expect(new Set(seen.map(notice => notice.id)).size).toBe(2);
+                expect(seen.every(notice => notice.committed)).toBe(true);
+
+                seen.length = 0;
+                await expect(driver.saveMany({
+                    path: "authors",
+                    rows: [{ id: 990001, name: "first" }, { id: 990001, name: "duplicate key" }]
+                })).rejects.toThrow();
+                await new Promise(resolve => setTimeout(resolve, 300));
+                expect(seen).toEqual([]);
+            } finally {
+                realtime.notifyUpdate = original;
+            }
+        });
+    });
+
     describe("the answers stay the same", () => {
         it("a missing row is the route's 404, on PATCH and DELETE", async () => {
             for (const method of ["PATCH", "DELETE"]) {

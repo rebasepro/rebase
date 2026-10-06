@@ -1728,6 +1728,39 @@ export class PostgresBackendDriver implements DataDriver {
      * Rows are applied in order, so a batch that touches the same key twice ends
      * with the last write winning, exactly as separate calls would.
      */
+    /**
+     * Run a batch in one transaction of its own, on a driver bound to it, and
+     * tell realtime subscribers about its rows only once it has committed.
+     *
+     * Inside a request's transaction the events already wait for that one to
+     * commit, and the batch adds to its list. On the server's own driver they
+     * did not wait at all: each row was announced as it was written, before
+     * the COMMIT — a subscriber's refetch found nothing yet, and a batch that
+     * then rolled back had announced rows that never existed.
+     */
+    private async inBatchTransaction<T>(run: (txDriver: PostgresBackendDriver) => Promise<T>): Promise<T> {
+        const ownNotifications = !this._deferNotifications;
+        const pending: PostgresBackendDriver["_pendingNotifications"] = ownNotifications ? [] : this._pendingNotifications;
+        const result = await this.db.transaction(async (tx) => {
+            const txDriver = this.bindToTransaction(tx);
+            txDriver._deferNotifications = true;
+            txDriver._pendingNotifications = pending;
+            return run(txDriver);
+        });
+        if (ownNotifications) {
+            for (const notification of pending) {
+                try {
+                    await this.realtimeService.notifyUpdate(
+                        notification.path, notification.id, notification.row, notification.databaseId
+                    );
+                } catch (error) {
+                    logger.error("[DataDriver] Error flushing deferred notification", { error });
+                }
+            }
+        }
+        return result;
+    }
+
     private bindToTransaction(tx: DrizzleClient): PostgresBackendDriver {
         // Bind the whole batch to the transaction handle. Without this the rows
         // would be written through `this.db` and survive a rollback.
@@ -1781,8 +1814,7 @@ export class PostgresBackendDriver implements DataDriver {
                                                           upsert,
                                                           onConflict
                                                       }: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
-        return this.db.transaction(async (tx) => {
-            const txDriver = this.bindToTransaction(tx);
+        return this.inBatchTransaction(async (txDriver) => {
 
             const saved: Record<string, unknown>[] = [];
 
@@ -1844,8 +1876,7 @@ export class PostgresBackendDriver implements DataDriver {
         updates,
         collection
     }: UpdateManyProps<M>): Promise<Record<string, unknown>[]> {
-        return this.db.transaction(async (tx) => {
-            const txDriver = this.bindToTransaction(tx);
+        return this.inBatchTransaction(async (txDriver) => {
 
             const saved: Record<string, unknown>[] = [];
 
@@ -1901,8 +1932,7 @@ export class PostgresBackendDriver implements DataDriver {
         collection,
         hard
     }: DeleteManyProps<M>): Promise<void> {
-        await this.db.transaction(async (tx) => {
-            const txDriver = this.bindToTransaction(tx);
+        await this.inBatchTransaction(async (txDriver) => {
 
             for (let i = 0; i < ids.length; i++) {
                 const id = ids[i];
@@ -1948,8 +1978,7 @@ export class PostgresBackendDriver implements DataDriver {
     async batchWrite<M extends Record<string, unknown>>({
         operations
     }: BatchWriteProps<M>): Promise<(Record<string, unknown> | null)[]> {
-        return this.db.transaction(async (tx) => {
-            const txDriver = this.bindToTransaction(tx);
+        return this.inBatchTransaction(async (txDriver) => {
 
             const results: (Record<string, unknown> | null)[] = [];
             /** What each named operation wrote, for the `$ref`s after it. */
