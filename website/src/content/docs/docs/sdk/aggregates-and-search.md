@@ -164,6 +164,10 @@ proxies (nginx: 8 KB) accept. Against a server older than 0.24, which has no suc
 route, it falls back to the `GET` — and a long embedding there can still be
 refused with a 431 or a 414.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> With a `threshold`,
+the result has no `meta.total` — counting the rows within a distance computes it
+for every row of the table. Page with `meta.hasMore`, which stays exact.
+
 ### What you have to provide
 
 - **pgvector.** A `vector` property compiles to a `VECTOR(n)` column, and that

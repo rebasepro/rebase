@@ -142,6 +142,30 @@ describe("vector search over HTTP (E2E)", () => {
         expect(res.status).toBe(431);
     });
 
+    it("thresholded, it reports no total, and `hasMore` from one row past the page", async () => {
+        const docsClient = sdk().data.collection("docs");
+        const all = await docsClient.find({ vectorSearch: { property: "embedding", vector: embeddingFor(7) }, limit: 30 });
+        const distances = all.data.map(row => Number(row._distance));
+        // Exactly 12 rows inside the threshold.
+        const threshold = (distances[11] + distances[12]) / 2;
+
+        const first = await docsClient.find({
+            vectorSearch: { property: "embedding", vector: embeddingFor(7), threshold },
+            limit: 10
+        });
+        expect(first.data.map(row => row.id)).toEqual(all.data.slice(0, 10).map(row => row.id));
+        expect(first.meta).not.toHaveProperty("total");
+        expect(first.meta.hasMore).toBe(true);
+
+        const second = await docsClient.find({
+            vectorSearch: { property: "embedding", vector: embeddingFor(7), threshold },
+            limit: 10,
+            offset: 10
+        });
+        expect(second.data.map(row => row.id)).toEqual(all.data.slice(10, 12).map(row => row.id));
+        expect(second.meta.hasMore).toBe(false);
+    });
+
     describe("GET and POST …/query answer the same, on a real database", () => {
         const bigVector = JSON.stringify(embeddingFor(99));
         const CASES: [string, Record<string, string>][] = [

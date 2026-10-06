@@ -2093,8 +2093,16 @@ id };
         // driver does not have, so it is not answered — and not counted:
         // the count used to run anyway and be thrown away. `?count=none` asks
         // for the same thing on any listing.
+        //
+        // A vector search with a threshold is not counted either. Its count is
+        // a distance computed for every row of the table — no index serves
+        // `distance < t` — beside a page the index serves in a millisecond:
+        // 7.2 ms against 1.2 on 20,000 rows × 256 dimensions, and it grows with
+        // both (est. ~2 s at 1M × 1,536). Without a threshold the count is the
+        // ordinary filtered one, and stays.
         const distinctRead = queryOptions.distinct === true;
-        const counting = !distinctRead && queryOptions.count !== "none";
+        const thresholdedVectorRead = queryOptions.vectorSearch?.threshold !== undefined;
+        const counting = !distinctRead && !thresholdedVectorRead && queryOptions.count !== "none";
 
         // One row past the page wherever `hasMore` cannot come from a count.
         // Under a cursor `offset + rows.length < total` is simply false: every

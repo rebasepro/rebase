@@ -203,7 +203,9 @@ export function generateOpenApiSpec(
             name: "vector_threshold",
             in: "query",
             schema: { type: "number" },
-            description: "Drop rows farther than this distance. Rows are returned closest-first with a `_distance` field."
+            description: "Drop rows farther than this distance. Rows are returned closest-first with a `_distance` field. "
+                + "The response then has no `meta.total`: counting the rows within a distance computes it for every row "
+                + "of the table. `meta.hasMore` is exact, from reading one row past the page."
         }
     ];
 
@@ -243,7 +245,7 @@ export function generateOpenApiSpec(
                     type: "object",
                     properties: {
                         total: { type: "integer",
-description: "Total number of matching records. Absent on a `distinct` read, which has no count of the rows it returns, and when the request asked for `count=none`." },
+description: "Total number of matching records. Absent on a `distinct` read, which has no count of the rows it returns, on a vector search with a `vector_threshold`, whose count would compute a distance for every row, and when the request asked for `count=none`." },
                         limit: { type: "integer",
 description: "Page size used for this query" },
                         offset: { type: "integer",

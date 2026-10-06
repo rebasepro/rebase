@@ -286,7 +286,8 @@ collection, which is why none of them is clamped or ignored.
 what a list request costs. `?count=none` (`GET /api/data/orders?count=none`)
 skips it: no `meta.total`, while `meta.hasMore` stays exact (the read asks for one
 row past the page). `?count=exact` is the default; any other value is a 400
-`INVALID_COUNT`. A `?distinct=true` read is never counted.
+`INVALID_COUNT`. A `?distinct=true` read is never counted, and neither is a
+vector search with a `vector_threshold` (see [Vector Search](#vector-search)).
 
 ### Cursor pagination
 
@@ -461,6 +462,13 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 | `vector` | `string` | A JSON-serialized array of floats representing the query vector. |
 | `vector_distance` | `string` | The distance metric to evaluate. Supported values: `cosine` (default, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
 | `vector_threshold` | `number` | Maximum distance threshold. Only records with distance less than this threshold are returned. |
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A vector search with a
+`vector_threshold` has no `meta.total`: counting the rows within a distance means
+computing that distance for every row of the table, which no index serves — several
+times the cost of the page itself, growing with rows × dimensions. `meta.hasMore` is
+exact, from reading one row past the page. Without a threshold the count is the
+ordinary one.
 
 An embedding is long in a URL: 768 dimensions are about 17 KB of query string and
 1,536 about 33 KB. The server accepts up to 64 KB of request line and headers
