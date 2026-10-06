@@ -107,10 +107,10 @@ describe("the autofill property map", () => {
         const ui = (values: Record<string, unknown>) => (
             <AuthControllerContext.Provider value={{ user: null } as never}>
                 <DataEnhancementControllerProvider
+                    {...({} as React.ComponentProps<typeof DataEnhancementControllerProvider>)}
                     path={"pages"}
                     collection={collection as never}
-                    formContext={{ values, setFieldValue: jest.fn() } as never}
-                    {...({} as Record<string, never>)}>
+                    formContext={{ values, setFieldValue: jest.fn() } as never}>
                     <Probe/>
                 </DataEnhancementControllerProvider>
             </AuthControllerContext.Provider>
