@@ -31,13 +31,13 @@ export const authors = pgTable("authors", {
     userId: text("user_id")
 }, (table) => ([
     pgPolicy("authors_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("authors_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("authors_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']`, withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("authors_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("authors_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("authors_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("authors_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("authors_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("authors_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("authors_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("authors_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("authors_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("authors_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("authors_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("authors_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
 ])).enableRLS();
 
 export const customers = pgTable("customers", {
@@ -58,13 +58,13 @@ export const customers = pgTable("customers", {
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
     pgPolicy("customers_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("customers_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("customers_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']`, withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("customers_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("customers_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("customers_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("customers_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("customers_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("customers_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("customers_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("customers_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("customers_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("customers_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("customers_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("customers_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
 ])).enableRLS();
 
 export const exercises = pgTable("exercises", {
@@ -90,13 +90,13 @@ export const exercises = pgTable("exercises", {
     __order: text("order")
 }, (table) => ([
     pgPolicy("exercises_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("exercises_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("exercises_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']`, withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("exercises_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("exercises_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("exercises_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("exercises_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("exercises_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("exercises_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("exercises_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("exercises_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("exercises_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("exercises_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("exercises_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("exercises_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
 ])).enableRLS();
 
 export const orderItems = pgTable("order_items", {
@@ -110,13 +110,13 @@ export const orderItems = pgTable("order_items", {
     line_total: numeric("line_total")
 }, (table) => ([
     pgPolicy("order_items_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("order_items_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("order_items_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']`, withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("order_items_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("order_items_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("order_items_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("order_items_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("order_items_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("order_items_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("order_items_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("order_items_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("order_items_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("order_items_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("order_items_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("order_items_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
 ])).enableRLS();
 
 export const orders = pgTable("orders", {
@@ -142,13 +142,13 @@ export const orders = pgTable("orders", {
     __order: text("order")
 }, (table) => ([
     pgPolicy("orders_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("orders_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("orders_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']`, withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("orders_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("orders_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("orders_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("orders_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("orders_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("orders_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("orders_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("orders_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("orders_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("orders_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("orders_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("orders_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
 ])).enableRLS();
 
 export const posts = pgTable("posts", {
@@ -170,13 +170,13 @@ export const posts = pgTable("posts", {
     index("posts_publish_date_ix_b949573").on(table.publish_date.asc().nullsLast()).where(sql`"status" = 'published'`),
     index("posts_author_id_ix_00ad191").on(table.authorId.asc().nullsLast()),
     pgPolicy("posts_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("posts_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("posts_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']`, withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("posts_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("posts_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("posts_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("posts_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("posts_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("posts_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("posts_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("posts_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("posts_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("posts_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("posts_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("posts_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
 ])).enableRLS();
 
 export const postsTags = pgTable("posts_tags", {
@@ -184,14 +184,14 @@ export const postsTags = pgTable("posts_tags", {
     tag_id: uuid("tag_id").notNull().references((): AnyPgColumn => tags.id, { onDelete: "cascade" }),
 }, (table) => ([
     primaryKey({ columns: [table.post_id, table.tag_id] }),
-    pgPolicy("posts_tags_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("posts_tags_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("posts_tags_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("posts_tags_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("posts_tags_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("posts_tags_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("posts_tags_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("posts_tags_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("posts_tags_default_edge_read", { as: "permissive", for: "select", to: ["public"], using: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE "_ex0".id = "public"."posts_tags".post_id)) AND (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE "_ex1".id = "public"."posts_tags".tag_id))` }),
-    pgPolicy("posts_tags_default_edge_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin']))))` }),
-    pgPolicy("posts_tags_default_edge_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin']))))`, withCheck: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin']))))` }),
-    pgPolicy("posts_tags_default_edge_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin']))))` }),
+    pgPolicy("posts_tags_default_edge_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((SELECT (string_to_array(rebase.roles(), ',') && ARRAY['admin']))))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((SELECT (string_to_array(rebase.roles(), ',') && ARRAY['admin'])))))` }),
+    pgPolicy("posts_tags_default_edge_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((SELECT (string_to_array(rebase.roles(), ',') && ARRAY['admin']))))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((SELECT (string_to_array(rebase.roles(), ',') && ARRAY['admin'])))))`, withCheck: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((SELECT (string_to_array(rebase.roles(), ',') && ARRAY['admin']))))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((SELECT (string_to_array(rebase.roles(), ',') && ARRAY['admin'])))))` }),
+    pgPolicy("posts_tags_default_edge_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((SELECT (string_to_array(rebase.roles(), ',') && ARRAY['admin']))))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((SELECT (string_to_array(rebase.roles(), ',') && ARRAY['admin'])))))` }),
 ])).enableRLS();
 
 export const productLocales = pgTable("product_locales", {
@@ -202,13 +202,13 @@ export const productLocales = pgTable("product_locales", {
     description: text("description")
 }, (table) => ([
     pgPolicy("product_locales_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("product_locales_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("product_locales_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']`, withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("product_locales_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("product_locales_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("product_locales_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("product_locales_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("product_locales_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("product_locales_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("product_locales_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("product_locales_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("product_locales_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("product_locales_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("product_locales_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("product_locales_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
 ])).enableRLS();
 
 export const products = pgTable("products", {
@@ -235,13 +235,13 @@ export const products = pgTable("products", {
     __order: text("order")
 }, (table) => ([
     pgPolicy("products_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("products_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("products_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']`, withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("products_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("products_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("products_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("products_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("products_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("products_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("products_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("products_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("products_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("products_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("products_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("products_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
 ])).enableRLS();
 
 export const tags = pgTable("tags", {
@@ -249,13 +249,13 @@ export const tags = pgTable("tags", {
     name: text("name").notNull()
 }, (table) => ([
     pgPolicy("tags_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("tags_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("tags_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']`, withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("tags_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("tags_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("tags_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("tags_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("tags_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("tags_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("tags_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("tags_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("tags_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("tags_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("tags_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("tags_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
 ])).enableRLS();
 
 export const tickets = pgTable("tickets", {
@@ -274,13 +274,13 @@ export const tickets = pgTable("tickets", {
     __order: text("order")
 }, (table) => ([
     pgPolicy("tickets_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("tickets_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("tickets_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']`, withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("tickets_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
-    pgPolicy("tickets_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("tickets_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("tickets_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("tickets_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("tickets_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("tickets_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("tickets_delete_3561e70_2", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("tickets_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("tickets_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("tickets_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("tickets_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
 ])).enableRLS();
 
 export const users = rebaseSchema.table("users", {
@@ -297,18 +297,18 @@ export const users = rebaseSchema.table("users", {
     createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
-    pgPolicy("users_read_policy", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (id = rebase.uid()::uuid) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("users_write_policy_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("users_write_policy_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("users_write_policy_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("users_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("users_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("users_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("users_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("users_default_self_read", { as: "permissive", for: "select", to: ["public"], using: sql`(id)::text = rebase.uid()` }),
-    pgPolicy("users_require_admin_write_insert", { as: "restrictive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("users_require_admin_write_update", { as: "restrictive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
-    pgPolicy("users_require_admin_write_delete", { as: "restrictive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("users_read_policy", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (id = rebase.uid()::uuid) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("users_write_policy_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("users_write_policy_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(rebase.uid() IS NULL) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("users_write_policy_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("users_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("users_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("users_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("users_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("users_default_self_read", { as: "permissive", for: "select", to: ["public"], using: sql`(id)::text = (SELECT rebase.uid())` }),
+    pgPolicy("users_require_admin_write_insert", { as: "restrictive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("users_require_admin_write_update", { as: "restrictive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
+    pgPolicy("users_require_admin_write_delete", { as: "restrictive", for: "delete", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
 ])).enableRLS();
 
 export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({
