@@ -290,6 +290,10 @@ export const CHECK_CONSTRAINTS_QUERY = `
 /**
  * `COMMENT ON TABLE` / `COMMENT ON COLUMN`, which is documentation the author
  * already wrote and which nothing downstream has ever read.
+ *
+ * Only comments on relations: `pg_description` also holds the stamps boot
+ * writes on each policy (`rebase:<hash>`), and an OID is unique only within
+ * its own catalogue, so a policy's could name a table.
  */
 export const COMMENTS_QUERY = `
     SELECT t.relname AS table_name,
@@ -300,6 +304,7 @@ export const COMMENTS_QUERY = `
     JOIN pg_namespace n ON n.oid = t.relnamespace
     LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.objsubid
     WHERE n.nspname = $1
+      AND d.classoid = 'pg_catalog.pg_class'::regclass
       AND t.relkind IN ('r', 'p')
       AND (d.objsubid = 0 OR a.attname IS NOT NULL)
     ORDER BY t.relname, d.objsubid

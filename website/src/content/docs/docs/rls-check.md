@@ -219,9 +219,11 @@ experiences. The findings are about what other roles get.
 ### On a Rebase database, change the rule, not the policy
 
 Every policy on a Rebase deployment is compiled from a collection's `securityRules`, and the
-runtime **re-applies them on every boot**: it drops each generated policy and creates it
-again from the config. An `ALTER POLICY` run against one of them therefore survives exactly
-until the next restart, and the finding comes back with it — after you watched it disappear.
+runtime **checks them on every boot**: each generated policy carries a stamp (a
+`rebase:<hash>` comment) of what was compiled and what Postgres stored, and a table whose
+policies no longer match it is re-applied from the config. An `ALTER POLICY` run against one
+of them therefore survives exactly until the next restart, and the finding comes back with
+it — after you watched it disappear.
 
 `rls-check` recognises those policies (a `<table>_<operation>_<hash>` name, or a call to
 `rebase.uid()` / `rebase.roles()` in the expression) and prescribes the rule instead of SQL.

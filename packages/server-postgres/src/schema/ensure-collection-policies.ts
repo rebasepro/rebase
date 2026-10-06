@@ -25,6 +25,32 @@
  * previous push left behind under an old name is not removed here; that stays a
  * `db push` / `db migrate` concern, alongside destructive schema changes.)
  *
+ * ## A table whose policies are already the declared ones is left alone
+ *
+ * Every policy this module writes carries a stamp, `COMMENT ON POLICY … IS
+ * 'rebase:<hash>'` (see {@link policyStampSql}). The hash covers the
+ * `CREATE POLICY` statement that was rendered *and* the definition Postgres
+ * stored for it — command, mode, roles, and the deparsed `USING` / `WITH
+ * CHECK` — as read back in the same transaction. A boot recomputes it from the
+ * statement it would run now and the definition the catalogue holds now, and
+ * re-applies a table only when that differs for any of its policies, a declared
+ * policy is missing, a superseded one is still there, or RLS is off.
+ *
+ * So both halves of "the declared state" still win: a rule whose compiled SQL
+ * changed (a new rule under the same name, a compiler change) misses on the
+ * first half, and a policy someone altered by hand — `ALTER POLICY`, a
+ * different role list — misses on the second, and either is re-applied exactly
+ * as every boot used to re-apply everything. A boot that changes nothing runs
+ * two catalogue reads here, no DDL and takes no table lock. It used to drop and
+ * re-create every policy, one ACCESS EXCLUSIVE lock per table: about 1 s at 200
+ * collections, and under a `pg_dump` up to the whole retry budget.
+ *
+ * A policy without a stamp — written by `db push`, by hand, or by a release
+ * that predates stamps — counts as different, so the first boot after either
+ * re-applies its table once and stamps it. Nothing else reads the comment:
+ * drift checks, `doctor`, rls-check and Studio compare names, roles, commands
+ * and clauses, never descriptions.
+ *
  * Unlike table creation, a failure here is not fatal: RLS stays enabled, so a
  * table whose policies could not be applied fails **closed** (denies) rather
  * than leaking rows. One collection's policy failing (e.g. a rule that
@@ -33,6 +59,7 @@
  * it. Failures are reported loudly and per-table so the operator can see
  * exactly which collection is not yet servable and why.
  */
+import { createHash } from "node:crypto";
 import { type CollectionConfig } from "@rebasepro/types";
 import { planCollectionPolicies, type CollectionPolicyPlan } from "./generate-postgres-ddl-logic";
 import { isGeneratedPolicyName } from "../security/policy-drift";
@@ -53,8 +80,13 @@ import {
 export interface PolicyEnsureResult {
     /** `CREATE POLICY` statements that ran successfully. */
     policiesApplied: number;
-    /** Tables that had RLS enabled. */
+    /** Tables that had RLS enabled — including the {@link unchanged} ones, which already had it. */
     tablesSecured: number;
+    /**
+     * Tables whose policies were already exactly the declared ones, RLS on, by
+     * the stamp each policy carries — left alone: no statement, no lock.
+     */
+    unchanged: number;
     /** Declared tables absent from the database — left to a real migration. */
     skipped: { table: string; reason: string }[];
     /**
@@ -132,24 +164,115 @@ const orphansOf = (plan: CollectionPolicyPlan, present: readonly string[]): stri
 const dropPolicySql = (plan: CollectionPolicyPlan, name: string): string =>
     `DROP POLICY IF EXISTS "${name}" ON "${plan.schema}"."${plan.table}"`;
 
+/** What every policy stamp starts with. See {@link policyStampSql}. */
+export const POLICY_STAMP_PREFIX = "rebase:";
+
+const sha256Hex = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");
+
+/** The same digest, computed by Postgres: hex SHA-256 of the text's UTF-8 bytes. */
+const sha256Sql = (expression: string): string => `encode(sha256(convert_to(${expression}, 'UTF8')), 'hex')`;
+
 /**
- * Every policy name on every table in the declared schemas, in one read — it
- * replaced a `pg_policies` query per table.
+ * The definition Postgres holds for the `pg_policy` row aliased `p`, as one
+ * text: command, permissive/restrictive, the role OIDs, and the deparsed
+ * `USING` and `WITH CHECK` (`-` for an absent clause, so absent and empty
+ * differ). Everything `ALTER POLICY` can change, and everything a `CREATE
+ * POLICY` sets.
+ *
+ * Read back with `pg_get_expr`, whose spelling depends on `search_path` (a
+ * name on the path prints unqualified). The stamp is written and checked by
+ * the same boot connections, so the two agree; a process with a different
+ * path would only disagree, and re-apply — what every boot did before stamps.
  */
-async function readPolicyNames(client: Queryable, schemas: string[]): Promise<Map<string, string[]>> {
-    const names = new Map<string, string[]>();
-    if (schemas.length === 0) return names;
+const liveDefinitionSql = (p: string): string =>
+    `concat_ws(E'\\n', ${p}.polcmd::text, ${p}.polpermissive::text, ${p}.polroles::text, ` +
+    `coalesce(pg_get_expr(${p}.polqual, ${p}.polrelid), '-'), ` +
+    `coalesce(pg_get_expr(${p}.polwithcheck, ${p}.polrelid), '-'))`;
+
+/** The stamp a policy rendered as `renderedHash` carries when its stored definition hashes to `liveHash`. */
+const stampOf = (renderedHash: string, liveHash: string): string =>
+    `${POLICY_STAMP_PREFIX}${sha256Hex(`${renderedHash}:${liveHash}`)}`;
+
+/** The policies a plan creates, by name, each with the hash of its `CREATE POLICY` statement. */
+const renderedHashes = (plan: CollectionPolicyPlan): Map<string, string> => {
+    const hashes = new Map<string, string>();
+    for (const statement of plan.policyStatements) {
+        const match = /^\s*CREATE POLICY\s+"([^"]+)"/i.exec(statement);
+        if (match) hashes.set(match[1], sha256Hex(statement.trim()));
+    }
+    return hashes;
+};
+
+/**
+ * One statement that stamps every policy the plan just created on its table:
+ * `COMMENT ON POLICY … IS 'rebase:<hash>'`, the hash taken over the rendered
+ * statement's hash and the definition Postgres stored — read back here, after
+ * the `CREATE`s, in the same transaction. A `DO` block because the stored
+ * definition is only known once the policy exists, and a `COMMENT` takes a
+ * literal. One line, and it names only this table.
+ *
+ * `undefined` for a table the plan gives no policies.
+ */
+export function policyStampSql(plan: CollectionPolicyPlan): string | undefined {
+    const hashes = renderedHashes(plan);
+    if (hashes.size === 0) return undefined;
+    const target = `"${plan.schema}"."${plan.table}"`;
+    const values = [...hashes].map(([name, hash]) => `(${quoteSqlLiteral(name)}, '${hash}')`).join(", ");
+    const stamp = `${quoteSqlLiteral(POLICY_STAMP_PREFIX)} || ${sha256Sql(`s.rendered || ':' || ${sha256Sql(liveDefinitionSql("p"))}`)}`;
+    return "DO $rebase_policy_stamp$ DECLARE r record; BEGIN " +
+        `FOR r IN SELECT p.polname AS name, ${stamp} AS stamp FROM pg_policy p ` +
+        `JOIN (VALUES ${values}) AS s(name, rendered) ON s.name = p.polname ` +
+        `WHERE p.polrelid = ${quoteSqlLiteral(target)}::regclass LOOP ` +
+        `EXECUTE 'COMMENT ON POLICY ' || quote_ident(r.name) || ${quoteSqlLiteral(` ON ${target} IS `)} || quote_literal(r.stamp); ` +
+        "END LOOP; END $rebase_policy_stamp$;";
+}
+
+/** One policy as the catalogue has it. */
+interface LivePolicy {
+    /** Its comment — a stamp, when this module wrote it. */
+    stamp: string | null;
+    /** Hex SHA-256 of {@link liveDefinitionSql}. */
+    live: string;
+}
+
+/**
+ * Every policy on every table in the declared schemas — name, stamp and a hash
+ * of its stored definition — in one read. It replaced a `pg_policies` query
+ * per table, and later the name-only read that preceded stamps.
+ */
+async function readLivePolicies(client: Queryable, schemas: string[]): Promise<Map<string, Map<string, LivePolicy>>> {
+    const policies = new Map<string, Map<string, LivePolicy>>();
+    if (schemas.length === 0) return policies;
     const inList = schemas.map(schema => `'${assertSafeIdentifier(schema, "schema name")}'`).join(", ");
-    const { rows } = await client.query<{ schemaname: string; tablename: string; policyname: string }>(
-        `SELECT schemaname, tablename, policyname FROM pg_policies WHERE schemaname IN (${inList})`
+    const { rows } = await client.query<{
+        schemaname: string; tablename: string; policyname: string; stamp?: string | null; live?: string | null;
+    }>(
+        `SELECT n.nspname AS schemaname, c.relname AS tablename, p.polname AS policyname,
+                obj_description(p.oid, 'pg_policy') AS stamp, ${sha256Sql(liveDefinitionSql("p"))} AS live
+         FROM pg_policy p
+         JOIN pg_class c ON c.oid = p.polrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname IN (${inList})`
     );
     for (const row of rows) {
         const key = `${row.schemaname}.${row.tablename}`;
-        if (!names.has(key)) names.set(key, []);
-        names.get(key)!.push(row.policyname);
+        if (!policies.has(key)) policies.set(key, new Map());
+        policies.get(key)!.set(row.policyname, { stamp: row.stamp ?? null, live: row.live ?? "" });
     }
-    return names;
+    return policies;
 }
+
+/**
+ * Whether every policy the plan declares is on the table, stamped for exactly
+ * the statement the plan would run and exactly the definition it holds now.
+ */
+const policiesAreCurrent = (plan: CollectionPolicyPlan, present: Map<string, LivePolicy>): boolean => {
+    for (const [name, renderedHash] of renderedHashes(plan)) {
+        const policy = present.get(name);
+        if (!policy || policy.stamp !== stampOf(renderedHash, policy.live)) return false;
+    }
+    return true;
+};
 
 /**
  * Every declared schema's tables, and whether each has row-level security on.
@@ -365,7 +488,8 @@ export async function ensureCollectionPolicies(
     options: BootLockOptions = {}
 ): Promise<PolicyEnsureResult> {
     const result: PolicyEnsureResult = {
-        policiesApplied: 0, tablesSecured: 0, skipped: [], failures: [], unsecured: [], orphansDropped: 0, deferred: []
+        policiesApplied: 0, tablesSecured: 0, unchanged: 0, skipped: [], failures: [], unsecured: [],
+        orphansDropped: 0, deferred: []
     };
 
     const plans = planCollectionPolicies(collections);
@@ -374,7 +498,7 @@ export async function ensureCollectionPolicies(
 
     const schemas = Array.from(new Set(plans.map(p => p.schema)));
     const tables = await readTableSecurity(client, schemas);
-    const policyNames = await readPolicyNames(client, schemas);
+    const livePolicies = await readLivePolicies(client, schemas);
 
     const work: TableWork[] = [];
     for (const plan of plans) {
@@ -386,11 +510,21 @@ export async function ensureCollectionPolicies(
             });
             continue;
         }
-        const present = policyNames.get(plan.qualified) ?? [];
+        const live = livePolicies.get(plan.qualified) ?? new Map<string, LivePolicy>();
+        const present = [...live.keys()];
         const orphans = orphansOf(plan, present);
+        // Already exactly what the plan would leave: nothing to run, no lock to take.
+        if (table.rls && orphans.length === 0 && policiesAreCurrent(plan, live)) {
+            result.tablesSecured++;
+            result.unchanged++;
+            continue;
+        }
         const presentSet = new Set(present);
         const rulesChanged = orphans.length > 0 || [...plannedPolicyNames(plan)].some(name => !presentSet.has(name));
         work.push({ plan, rlsOn: table.rls, orphans, rulesChanged });
+    }
+    if (result.unchanged > 0) {
+        log?.(`${result.unchanged} table(s) already have exactly the declared policies; left as they are`);
     }
 
     // Until the handle refuses a multi-statement string (an extended-protocol
@@ -446,12 +580,19 @@ export async function ensureCollectionPolicies(
     return result;
 }
 
-/** The table's statements, in the order they must run. */
-const statementsOf = (table: TableWork): string[] => [
-    ...(table.rlsOn ? [] : [table.plan.enableRls]),
-    ...table.plan.policyStatements,
-    ...table.orphans.map(name => dropPolicySql(table.plan, name))
-];
+/**
+ * The table's statements, in the order they must run — the stamp last, so it
+ * reads back the policies this same transaction created.
+ */
+const statementsOf = (table: TableWork): string[] => {
+    const stamp = policyStampSql(table.plan);
+    return [
+        ...(table.rlsOn ? [] : [table.plan.enableRls]),
+        ...table.plan.policyStatements,
+        ...table.orphans.map(name => dropPolicySql(table.plan, name)),
+        ...(stamp ? [stamp] : [])
+    ];
+};
 
 async function applyAtomically(
     client: Queryable,
@@ -528,6 +669,19 @@ async function applyEachStatement(
             table: plan.qualified,
             error: describeDriverError(err)
         });
+        return;
+    }
+
+    // Only once every policy is in. A stamp that cannot be written costs the
+    // next boot a re-apply of this table — what every boot did before stamps —
+    // so it is reported, not failed.
+    const stamp = policyStampSql(plan);
+    if (!stamp) return;
+    try {
+        await run(stamp);
+    } catch (err) {
+        log?.(`${plan.qualified}: policies applied, but not stamped (${describeDriverError(err)}); ` +
+            "the next boot applies them again");
     }
 }
 

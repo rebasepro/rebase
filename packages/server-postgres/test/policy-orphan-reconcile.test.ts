@@ -34,7 +34,7 @@ describe("ensureCollectionPolicies drops orphaned generated policies", () => {
                     return { rows: [{ table_schema: "public", table_name: "customers", column_name: "id" }] as unknown as T[] };
                 }
                 if (/pg_type|pg_constraint|pg_description/i.test(text)) return { rows: [] };
-                if (/FROM pg_policies/i.test(text)) {
+                if (/^\s*SELECT\b[\s\S]*\bFROM pg_polic(?:y|ies)\b/i.test(text)) {
                     return {
                         rows: policies.map(policyname => ({ schemaname: "public", tablename: "customers", policyname })) as unknown as T[]
                     };

@@ -252,7 +252,7 @@ describe("a table whose RLS is already on", () => {
                     return { rows: rows as unknown as T[] };
                 }
                 if (/relrowsecurity/i.test(text)) return { rows: [{ rls: options.recheck === true }] as unknown as T[] };
-                if (/FROM pg_policies/i.test(text)) return { rows: [] };
+                if (/^\s*SELECT\b[\s\S]*\bFROM pg_polic(?:y|ies)\b/i.test(text)) return { rows: [] };
                 ran.push(text);
                 if (options.enableError && /ENABLE ROW LEVEL SECURITY/.test(text)) throw options.enableError;
                 return { rows: [] };
@@ -360,7 +360,7 @@ describe("one transaction per table", () => {
                     return { rows: rows as unknown as T[] };
                 }
                 if (/relrowsecurity/i.test(text)) return { rows: [{ rls: false }] as unknown as T[] };
-                if (/FROM pg_policies/i.test(text)) return { rows: [] };
+                if (/^\s*SELECT\b[\s\S]*\bFROM pg_polic(?:y|ies)\b/i.test(text)) return { rows: [] };
                 ran.push(text);
                 const error = fail(text);
                 if (error) throw error;
