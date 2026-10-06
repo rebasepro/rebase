@@ -9,6 +9,8 @@ export interface AuthSimulationSelectorProps {
     setSelectedUser: (user: SelectableUser | null) => void;
     users: SelectableUser[];
     loading?: boolean;
+    /** For a caller that searches `users` on the server — see `UserSelectPopover`. */
+    onUserSearchTextChange?: (searchText: string) => void;
     currentUser: SelectableUser | null;
 }
 
@@ -19,6 +21,7 @@ export function AuthSimulationSelector({
     setSelectedUser,
     users,
     loading,
+    onUserSearchTextChange,
     currentUser
 }: AuthSimulationSelectorProps) {
     return (
@@ -63,6 +66,7 @@ export function AuthSimulationSelector({
                         onUserSelected={setSelectedUser}
                         users={users}
                         loading={loading}
+                        onSearchTextChange={onUserSearchTextChange}
                         currentUser={currentUser}
                     />
                 </>

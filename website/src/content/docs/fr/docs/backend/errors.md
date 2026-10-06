@@ -1,5 +1,5 @@
 ---
-sourceHash: b07d5564196f8950
+sourceHash: 87457f19450dd976
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -77,6 +77,10 @@ Envoyer le vôtre permet à une trace de traverser les sauts réseau : une passe
 | `EMAIL_NOT_VERIFIED` | 403 | Le compte existe et son adresse n'est pas vérifiée. | Vérifiez l'adresse. |
 | `FACTOR_NOT_VERIFIED` | 400 | Le facteur MFA a été enregistré mais jamais confirmé. | Confirmez le facteur. |
 | `IDENTITY_ALREADY_LINKED` | 409 | Cette identité OAuth appartient à un autre compte. | Connectez-vous avec celle-ci, ou dissociez-la d'abord de l'autre compte. |
+| `IMPERSONATION_FORBIDDEN` | 403 | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Une requête a envoyé `x-rebase-impersonate` et son appelant ne peut pas exécuter une requête en tant qu'un autre utilisateur. Seule la session propre d'un administrateur connecté le peut, jamais une clé d'API ni la clé de service. | Envoyez-la avec la session d'un administrateur, ou retirez l'en-tête. |
+| `IMPERSONATION_INVALID` | 400 | <span class="since-badge" data-since="0.24">Depuis 0.24</span> `x-rebase-impersonate` a été envoyé vide. | Envoyez l'uid de l'utilisateur au nom duquel agir, ou retirez l'en-tête. |
+| `IMPERSONATION_TARGET_NOT_FOUND` | 404 | <span class="since-badge" data-since="0.24">Depuis 0.24</span> `x-rebase-impersonate` ne désigne aucun utilisateur actif : aucun compte n'a cet uid, ou il est désactivé. | Vérifiez l'uid. |
+| `IMPERSONATION_UNAVAILABLE` | 501 | <span class="since-badge" data-since="0.24">Depuis 0.24</span> L'authentification de ce backend ne peut pas exécuter une requête en tant qu'un autre utilisateur, car son `AuthAdapter` n'a pas de `resolveUser`. | Implémentez `resolveUser` dans l'adaptateur, ou retirez l'en-tête. |
 | `INVALID_ACCOUNT` | 400 | Le compte est dans un état qui ne permet pas cette opération. | Voir le message d'erreur. |
 | `INVALID_CHALLENGE` | 400 | Le challenge MFA est inconnu ou expiré. | Démarrez-en un nouveau. |
 | `INVALID_CODE` | 400 / 401 | Le code OTP ou MFA est incorrect : 400 pour la connexion par code e-mail (`/auth/otp/verify`), 401 pour un enrôlement ou un challenge MFA. | Réessayez avec le code actuel. |

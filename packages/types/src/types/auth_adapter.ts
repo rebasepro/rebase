@@ -55,6 +55,21 @@ export interface MountableRouter {
     routes: readonly unknown[];
 }
 
+// ─── Impersonation ───────────────────────────────────────────────────────────
+
+/**
+ * The request header that asks for a data-plane request to run as another
+ * user, named by uid.
+ *
+ * The server honours it only on a signed-in administrator's own session —
+ * never on an API key or the service key — and only through an adapter that
+ * implements {@link AuthAdapter.resolveUser}. Everywhere else a request that
+ * carries it is refused, never run as its caller.
+ *
+ * @group Auth
+ */
+export const IMPERSONATE_HEADER = "x-rebase-impersonate";
+
 // ─── Authenticated User ──────────────────────────────────────────────────────
 
 /**
@@ -459,6 +474,24 @@ export interface AuthAdapter {
      * @returns The authenticated user, or `null` if the token is invalid.
      */
     verifyToken?(token: string): Promise<AuthenticatedUser | null>;
+
+    /**
+     * The identity a verified request from this account would carry right
+     * now, with no credential involved: its uid, its roles as they are now,
+     * its guest flag, and the custom claims a token minted for it now would
+     * hold. `null` when no active account has this uid — none at all, or one
+     * that is disabled.
+     *
+     * This is what lets an administrator run a request as another user (the
+     * {@link IMPERSONATE_HEADER} header). The server calls it only after it
+     * has decided the caller may do that, and it calls it for the caller too,
+     * so the decision rests on the caller's roles as they are now rather than
+     * on the ones their token claims.
+     *
+     * Optional. An adapter without it cannot be impersonated through, and a
+     * request carrying the header is refused rather than run as its caller.
+     */
+    resolveUser?(uid: string): Promise<AuthenticatedUser | null>;
 
     // ── User Management (for admin panel) ────────────────────────────
 

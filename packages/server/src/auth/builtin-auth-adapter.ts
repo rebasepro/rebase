@@ -25,7 +25,7 @@ import type {
 import { Hono } from "hono";
 import { hasAdminRole } from "@rebasepro/types";
 import { judgeAccessToken, replaceUserPassword, type AccessTokenVerdict } from "./token-revocation";
-import { verifyAccessToken } from "./jwt";
+import { customClaimsOf, verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
 import type { CaptchaConfig } from "./captcha";
@@ -297,6 +297,39 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 // The socket's tenancy reads a claim too — see verifyRequest.
                 ...(payload.claims ? { claims: payload.claims } : {}),
                 rawToken: token
+            };
+        },
+
+        async resolveUser(uid: string): Promise<AuthenticatedUser | null> {
+            // Not wrapped: a uid the id column cannot hold (`abc` against a
+            // UUID key) fails here as the database's data exception, which the
+            // error handler answers as a 400 naming the value — the answer
+            // `GET /admin/users/abc` already gives.
+            const user = await authRepository.getUserById(uid);
+            // A disabled account signs in nowhere, so nothing runs as it.
+            if (!user || user.disabled) return null;
+
+            const roles = await resolveLiveRoles(uid);
+            const isAnonymous = user.isAnonymous === true;
+
+            // What a token minted for this account now would carry, through
+            // the same hook and the same filter as a real one: the hook adds
+            // facts about the session, and the identity claims it was handed
+            // are dropped, exactly as `verifyAccessToken` drops them.
+            let claims: Record<string, unknown> | undefined;
+            if (resolvedOps.customizeAccessToken) {
+                claims = customClaimsOf(await resolvedOps.customizeAccessToken({ uid, roles, aal: "aal1" }, user));
+            }
+
+            return {
+                uid,
+                email: user.email,
+                displayName: user.displayName ?? null,
+                photoUrl: user.photoUrl ?? null,
+                roles,
+                isAdmin: hasAdminRole(roles),
+                isAnonymous,
+                ...(claims ? { claims } : {})
             };
         },
 

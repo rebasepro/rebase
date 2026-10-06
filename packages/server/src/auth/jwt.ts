@@ -138,8 +138,14 @@ const RESERVED_TOKEN_CLAIMS: ReadonlySet<string> = new Set([
     "iat", "exp", "nbf", "iss", "aud", "jti"
 ]);
 
-/** The custom half of a verified token, or nothing when there is none. */
-function customClaimsOf(decoded: Record<string, unknown>): Record<string, unknown> | undefined {
+/**
+ * The custom half of a verified token, or nothing when there is none.
+ *
+ * Exported for the one other place that builds a request identity's claims
+ * without a token to verify — `resolveUser`, which reads what a token minted
+ * now would carry — so both drop the same identity claims.
+ */
+export function customClaimsOf(decoded: Record<string, unknown>): Record<string, unknown> | undefined {
     const claims: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(decoded)) {
         if (RESERVED_TOKEN_CLAIMS.has(key)) continue;

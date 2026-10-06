@@ -71,6 +71,14 @@ export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler
             data.uid = uid;
         }
 
+        // An administrator's request run as another user is that user's
+        // request in every respect but one: who sent it. Without this the line
+        // would attribute it to the user alone.
+        const impersonator = c.get("impersonator");
+        if (impersonator) {
+            data.impersonatedBy = impersonator.uid;
+        }
+
         // Which collection, when the request was about one. "A 403 on
         // /api/data/orders" and "a 403" are different amounts of help at 3am,
         // and the path does not survive being aggregated by route.

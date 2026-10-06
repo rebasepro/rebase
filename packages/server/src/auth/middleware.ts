@@ -10,6 +10,7 @@ import { isApiKeyToken, validateApiKey } from "./api-keys/api-key-middleware";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
 import { logger } from "../utils/logger";
 import { extractBearerToken } from "./bearer-token";
+import { applyImpersonation, type ImpersonationCredential } from "./impersonation";
 // Leaf modules (`@rebasepro/types` only), so these do not close an import cycle
 // with `storage/routes.ts` — which is the point: the route, the public check and
 // both sides of the token comparison derive the object, and the source it
@@ -348,6 +349,8 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions): Middleware
     return async (c, next) => {
         // Pick the per-request delegate (multi-data-source) before scoping.
         const driver = resolveDriver ? resolveDriver(c) : baseDriver;
+        // What the caller presented — read by `applyImpersonation` below.
+        let credential: ImpersonationCredential = "none";
         if (validator) {
             // Custom validator path (e.g., API keys, external auth)
             try {
@@ -361,6 +364,7 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions): Middleware
                     const id = "uid" in authResult ? authResult.uid : undefined;
                     if (id) {
                         const roles = authResult.roles || [];
+                        credential = "session";
                         c.set("user", { uid: id,
 roles });
                         const user = { uid: id,
@@ -373,6 +377,7 @@ roles,
 roles: ["anon"] }));
                     }
                 } else if (authResult === true) {
+                    credential = "session";
                     c.set("user", { uid: "default",
 roles: [] });
                     c.set("driver", await scopeDataDriver(driver, { uid: "default",
@@ -401,6 +406,7 @@ roles: ["anon"] }));
                         uid: "service",
                         roles: ["admin"]
                     };
+                    credential = "service-key";
                     c.set("user", serviceUser);
                     try {
                         c.set("driver", await scopeDataDriver(driver, {
@@ -423,11 +429,13 @@ code: "INTERNAL_ERROR" } }, 500);
                     if (result !== true) {
                         return result;
                     }
+                    credential = "api-key";
                 } else {
                     // ── JWT verification ───────────────────────────────────
                     const payload = await extractUserFromToken(token);
 
                     if (payload) {
+                        credential = "session";
                         c.set("user", payload);
                         try {
                             // `isAnonymous` comes from the token, and reaches
@@ -476,6 +484,12 @@ code: "INTERNAL_ERROR" } }, 500);
                 }
             }
         }
+
+        // No `resolveUser` here: this middleware serves a backend with no
+        // account store to read another user from, so a request carrying the
+        // header is refused — never run as its caller.
+        const refused = await applyImpersonation(c, { credential, driver });
+        if (refused) return refused;
 
         // The API-level gate, and the one place a caller learns it exists.
         //

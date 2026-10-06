@@ -428,6 +428,12 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 #### Auth
 
+- **`AuthAdapter.resolveUser(uid)`** returns the identity a request from
+  that user would carry now, without a token. The built-in adapter
+  implements it. A custom adapter without it answers `x-rebase-impersonate`
+  with `501 IMPERSONATION_UNAVAILABLE`. `@rebasepro/types` exports the
+  header name as `IMPERSONATE_HEADER`.
+
 - **`sid` and `exp` on access tokens**, and `isCurrentSession` in the
   sessions list. Signing one device out now ends that device's access token
   too.
@@ -1021,6 +1027,18 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   target.
 
 #### Studio
+
+- **The API explorer's "Run as" runs the request as the user you pick.** It
+  sent `x-rebase-impersonate`, which no server code read, so the request ran
+  with your own session and the response showed what an administrator sees,
+  labelled as the other user's. The data and functions APIs now honour the
+  header on a signed-in administrator's session: the request runs as that
+  user, with their uid, current roles and claims, under row-level security.
+  Each such request is logged as a `[Security Audit]` event, and its request
+  log line carries `impersonatedBy`. An API key, the service key or a
+  non-administrator gets `403 IMPERSONATION_FORBIDDEN`. A uid with no active
+  user gets `404 IMPERSONATION_TARGET_NOT_FOUND`. Neither runs as the caller.
+  The picker also lists your users now; before, it offered only you.
 
 - **The source-only schema editor no longer overwrites edits made on disk
   since the server started;** it re-reads every file before each edit.

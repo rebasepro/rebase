@@ -44,6 +44,13 @@ export type HonoEnv = {
          * `callerScopes` / `hasScope`, which fill in that second case.
          */
         scopes?: string[];
+        /**
+         * Who asked, when an administrator's request runs as another user
+         * (`x-rebase-impersonate`). `user` and `driver` are then the
+         * impersonated user's; this is the only place the administrator
+         * remains. See `auth/impersonation.ts`.
+         */
+        impersonator?: { uid: string };
         /** Unique request correlation ID (generated or propagated from X-Request-ID header). */
         requestId?: string;
         /**

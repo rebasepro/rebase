@@ -1,5 +1,5 @@
 ---
-sourceHash: b07d5564196f8950
+sourceHash: 87457f19450dd976
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -77,6 +77,10 @@ Einen eigenen Header zu senden stellt sicher, dass ein Trace über Hops hinweg e
 | `EMAIL_NOT_VERIFIED` | 403 | Das Konto existiert und seine Adresse ist nicht verifiziert. | Verifizieren Sie die Adresse. |
 | `FACTOR_NOT_VERIFIED` | 400 | Der MFA-Faktor wurde registriert, aber nie bestätigt. | Bestätigen Sie den Faktor. |
 | `IDENTITY_ALREADY_LINKED` | 409 | Diese OAuth-Identität gehört zu einem anderen Konto. | Melden Sie sich damit an oder heben Sie die Verknüpfung dort zuerst auf. |
+| `IMPERSONATION_FORBIDDEN` | 403 | <span class="since-badge" data-since="0.24">Seit 0.24</span> Eine Anfrage hat `x-rebase-impersonate` gesendet, und ihr Aufrufer darf keine Anfrage als ein anderer Benutzer ausführen. Das darf nur die eigene Sitzung eines angemeldeten Administrators, nie ein API-Schlüssel oder der Service-Schlüssel. | Senden Sie sie mit der Sitzung eines Administrators oder lassen Sie den Header weg. |
+| `IMPERSONATION_INVALID` | 400 | <span class="since-badge" data-since="0.24">Seit 0.24</span> `x-rebase-impersonate` wurde leer gesendet. | Senden Sie die uid des Benutzers, als der gehandelt werden soll, oder lassen Sie den Header weg. |
+| `IMPERSONATION_TARGET_NOT_FOUND` | 404 | <span class="since-badge" data-since="0.24">Seit 0.24</span> `x-rebase-impersonate` nennt keinen aktiven Benutzer: Kein Konto hat diese uid, oder es ist deaktiviert. | Prüfen Sie die uid. |
+| `IMPERSONATION_UNAVAILABLE` | 501 | <span class="since-badge" data-since="0.24">Seit 0.24</span> Die Authentifizierung dieses Backends kann keine Anfrage als ein anderer Benutzer ausführen, weil ihr `AuthAdapter` kein `resolveUser` hat. | Implementieren Sie `resolveUser` im Adapter oder lassen Sie den Header weg. |
 | `INVALID_ACCOUNT` | 400 | Das Konto befindet sich in einem Zustand, auf den diese Operation nicht angewendet werden kann. | Siehe Nachricht. |
 | `INVALID_CHALLENGE` | 400 | Die MFA-Abfrage ist unbekannt oder abgelaufen. | Starten Sie eine neue Abfrage. |
 | `INVALID_CODE` | 400 / 401 | Der OTP- oder MFA-Code ist falsch: 400 bei der Anmeldung per E-Mail-Code (`/auth/otp/verify`), 401 bei einer MFA-Einrichtung oder -Challenge. | Versuchen Sie es mit dem aktuellen Code erneut. |

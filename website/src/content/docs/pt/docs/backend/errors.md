@@ -1,5 +1,5 @@
 ---
-sourceHash: b07d5564196f8950
+sourceHash: 87457f19450dd976
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, significado e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -104,6 +104,10 @@ ID recebido. Leia o cabeçalho de resposta.
 | `EMAIL_NOT_VERIFIED` | 403 | A conta existe e seu endereço não foi verificado. | Verifique o endereço. |
 | `FACTOR_NOT_VERIFIED` | 400 | O fator de MFA foi cadastrado, mas nunca confirmado. | Confirme o fator. |
 | `IDENTITY_ALREADY_LINKED` | 409 | Essa identidade OAuth pertence a outra conta. | Faça login com ela ou desvincule-a de lá primeiro. |
+| `IMPERSONATION_FORBIDDEN` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> Uma requisição enviou `x-rebase-impersonate` e quem a fez não pode executar uma requisição como outro usuário. Só a sessão do próprio administrador conectado pode, nunca uma chave de API nem a chave de serviço. | Envie-a com a sessão de um administrador, ou remova o cabeçalho. |
+| `IMPERSONATION_INVALID` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> `x-rebase-impersonate` foi enviado vazio. | Envie o uid do usuário em nome de quem agir, ou remova o cabeçalho. |
+| `IMPERSONATION_TARGET_NOT_FOUND` | 404 | <span class="since-badge" data-since="0.24">Since 0.24</span> `x-rebase-impersonate` não nomeia nenhum usuário ativo: nenhuma conta tem esse uid, ou ela está desativada. | Verifique o uid. |
+| `IMPERSONATION_UNAVAILABLE` | 501 | <span class="since-badge" data-since="0.24">Since 0.24</span> A autenticação deste backend não consegue executar uma requisição como outro usuário, porque seu `AuthAdapter` não tem `resolveUser`. | Implemente `resolveUser` no adaptador, ou remova o cabeçalho. |
 | `INVALID_ACCOUNT` | 400 | A conta está em um estado sobre o qual esta operação não pode atuar. | Veja a mensagem. |
 | `INVALID_CHALLENGE` | 400 | O desafio de MFA é desconhecido ou expirou. | Inicie um novo. |
 | `INVALID_CODE` | 400 / 401 | O código OTP ou MFA está incorreto: 400 no login por código de e-mail (`/auth/otp/verify`), 401 em um cadastro ou desafio de MFA. | Tente novamente com o código atual. |

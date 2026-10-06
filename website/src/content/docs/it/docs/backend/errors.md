@@ -1,5 +1,5 @@
 ---
-sourceHash: b07d5564196f8950
+sourceHash: 87457f19450dd976
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con il rispettivo stato HTTP, il significato e come gestirli — oltre all'envelope di risposta, X-Request-ID e le regole di details.
@@ -102,6 +102,10 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `EMAIL_NOT_VERIFIED` | 403 | L'account esiste ma il relativo indirizzo non è verificato. | Verifica l'indirizzo. |
 | `FACTOR_NOT_VERIFIED` | 400 | Il fattore MFA è stato registrato ma non è mai stato confermato. | Conferma il fattore. |
 | `IDENTITY_ALREADY_LINKED` | 409 | Quell'identità OAuth appartiene a un altro account. | Accedi con essa, oppure scollecala prima da quell'account. |
+| `IMPERSONATION_FORBIDDEN` | 403 | <span class="since-badge" data-since="0.24">Da 0.24</span> Una richiesta ha inviato `x-rebase-impersonate` e il chiamante non può eseguire una richiesta come un altro utente. Può farlo solo la sessione di un amministratore che ha effettuato l'accesso, mai una chiave API né la chiave di servizio. | Inviala con la sessione di un amministratore, oppure togli l'header. |
+| `IMPERSONATION_INVALID` | 400 | <span class="since-badge" data-since="0.24">Da 0.24</span> `x-rebase-impersonate` è stato inviato vuoto. | Invia l'uid dell'utente per conto del quale agire, oppure togli l'header. |
+| `IMPERSONATION_TARGET_NOT_FOUND` | 404 | <span class="since-badge" data-since="0.24">Da 0.24</span> `x-rebase-impersonate` non indica nessun utente attivo: nessun account ha quell'uid, oppure è disattivato. | Controlla l'uid. |
+| `IMPERSONATION_UNAVAILABLE` | 501 | <span class="since-badge" data-since="0.24">Da 0.24</span> L'autenticazione di questo backend non può eseguire una richiesta come un altro utente, perché il suo `AuthAdapter` non ha `resolveUser`. | Implementa `resolveUser` nell'adapter, oppure togli l'header. |
 | `INVALID_ACCOUNT` | 400 | L'account si trova in uno stato su cui questa operazione non può agire. | Consulta il messaggio. |
 | `INVALID_CHALLENGE` | 400 | La verifica MFA è sconosciuta o scaduta. | Avviane una nuova. |
 | `INVALID_CODE` | 400 / 401 | Il codice OTP o MFA non è corretto: 400 dall'accesso con codice email (`/auth/otp/verify`), 401 da una registrazione o da un challenge MFA. | Riprova con il codice attuale. |

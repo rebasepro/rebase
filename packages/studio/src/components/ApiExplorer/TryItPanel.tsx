@@ -12,10 +12,23 @@ import {
     Typography,
     XIcon
 } from "@rebasepro/ui";
-import { useRebaseContext, UserSelectPopover, SelectableUser } from "@rebasepro/app";
+import { useRebaseClient, useRebaseContext, SelectableUser } from "@rebasepro/app";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
 import type { ParsedEndpoint } from "./types";
-import type { User } from "@rebasepro/types";
+import { hasAdminRole, IMPERSONATE_HEADER, type AdminUser, type RebaseClient, type User } from "@rebasepro/types";
+
+/** How many users one search of the "Run as" picker lists. */
+const USER_PAGE_SIZE = 50;
+
+function toSelectableUser(user: AdminUser): SelectableUser {
+    return {
+        uid: user.uid,
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+        roles: user.roles
+    };
+}
 
 interface TryItPanelProps {
     endpoint: ParsedEndpoint;
@@ -28,6 +41,11 @@ interface TryItPanelProps {
 /**
  * Interactive "Try It" panel that lets the user execute API requests
  * using their current JWT token directly from the Studio.
+ *
+ * An administrator can run a request as another user: it is sent with their
+ * own token and the {@link IMPERSONATE_HEADER} header, and the server runs it
+ * as that user — their uid and roles, under row-level security — or refuses
+ * it. It never runs as the administrator instead.
  */
 export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = "" }: TryItPanelProps) {
     const storageKey = `rebase_apiexplorer_${endpoint.method}_${endpoint.path}`;
@@ -58,6 +76,35 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
 
     const rebaseContext = useRebaseContext();
     const currentUser = rebaseContext.authController?.user;
+    const client = useRebaseClient<RebaseClient>();
+
+    // Only an administrator's session may run a request as someone else, so
+    // only an administrator is offered anyone else to pick.
+    const adminApi = hasAdminRole(currentUser?.roles) ? client?.admin : undefined;
+    const [userSearch, setUserSearch] = useState("");
+    const [listedUsers, setListedUsers] = useState<SelectableUser[]>([]);
+    const [usersLoading, setUsersLoading] = useState(false);
+
+    useEffect(() => {
+        if (!adminApi) return;
+        let cancelled = false;
+        setUsersLoading(true);
+        adminApi.listUsersPaginated({ search: userSearch || undefined, limit: USER_PAGE_SIZE })
+            // A disabled account cannot be run as; the server refuses it.
+            .then(({ users }) => {
+                if (!cancelled) setListedUsers(users.filter((u) => !u.disabled).map(toSelectableUser));
+            })
+            .catch((err: unknown) => {
+                console.warn("Could not list users for the \"Run as\" picker", err);
+                if (!cancelled) setListedUsers([]);
+            })
+            .finally(() => {
+                if (!cancelled) setUsersLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [adminApi, userSearch]);
 
     const users = useMemo((): SelectableUser[] => {
         const managed: SelectableUser[] = [];
@@ -70,8 +117,8 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
                 roles: currentUser.roles
             });
         }
-        return managed;
-    }, [currentUser]);
+        return [...managed, ...listedUsers.filter((u) => u.uid !== currentUser?.uid)];
+    }, [currentUser, listedUsers]);
 
     const currentSelectableUser = useMemo((): SelectableUser | null => {
         if (!currentUser) return null;
@@ -140,7 +187,7 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
                 const token = await getAuthToken();
                 if (token) headers["Authorization"] = `Bearer ${token}`;
                 if (selectedUser && selectedUser.uid !== currentUser?.uid) {
-                    headers["x-rebase-impersonate"] = selectedUser.uid;
+                    headers[IMPERSONATE_HEADER] = selectedUser.uid;
                 }
             }
 
@@ -187,7 +234,8 @@ time: elapsed });
                     selectedUser={selectedUser}
                     setSelectedUser={setSelectedUser}
                     users={users}
-                    loading={false}
+                    loading={usersLoading}
+                    onUserSearchTextChange={setUserSearch}
                     currentUser={currentSelectableUser}
                 />
 

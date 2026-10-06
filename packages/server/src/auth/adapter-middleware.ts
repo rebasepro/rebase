@@ -11,7 +11,8 @@
  * 3. Scopes the DataDriver via `withAuth()` for RLS
  * 4. Rejects a presented-but-unverifiable token with 401, whatever
  *    `requireAuth` says
- * 5. Enforces auth (401) when `requireAuth` is true and no user is found
+ * 5. Honours or refuses `x-rebase-impersonate` (`applyImpersonation`)
+ * 6. Enforces auth (401) when `requireAuth` is true and no user is found
  *
  * The behavior is identical to `createAuthMiddleware()` — only the
  * token verification strategy is pluggable.
@@ -22,8 +23,9 @@ import type { DataDriver, AuthAdapter } from "@rebasepro/types";
 import { ANONYMOUS_USER_ID } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
-import { scopeDataDriver } from "./rls-scope";
+import { scopeDataDriver, SERVICE_IDENTITY } from "./rls-scope";
 import { validateApiKey } from "./api-keys/api-key-middleware";
+import { applyImpersonation } from "./impersonation";
 import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
 import { ApiError } from "../api/errors";
@@ -68,8 +70,10 @@ export function createAdapterAuthMiddleware(options: AdapterAuthMiddlewareOption
             if (token.startsWith("rk_")) {
                 const result = await validateApiKey(c, token, { store: apiKeyStore,
 driver });
-                if (result === true) return next();
-                return result;
+                if (result !== true) return result;
+                const refused = await applyImpersonation(c, { credential: "api-key", driver });
+                if (refused) return refused;
+                return next();
             }
         }
 
@@ -144,6 +148,19 @@ roles: ["anon"] }));
                 return refuse(c, ApiError.internal("Server configuration error"));
             }
         }
+
+        // After the caller's own scoping, so a refusal is decided on who they
+        // are, and a grant replaces their identity rather than adding to it.
+        // The built-in adapter verifies the service key as `SERVICE_IDENTITY`,
+        // which is how that credential is recognised here.
+        const refused = await applyImpersonation(c, {
+            credential: !authenticatedUser
+                ? "none"
+                : authenticatedUser.uid === SERVICE_IDENTITY.uid ? "service-key" : "session",
+            driver,
+            resolveUser: adapter.resolveUser ? adapter.resolveUser.bind(adapter) : undefined
+        });
+        if (refused) return refused;
 
         // Enforce auth if required. Word for word the JWT middleware's message,
         // for the reason set out there: a bare "Unauthorized" from a collection

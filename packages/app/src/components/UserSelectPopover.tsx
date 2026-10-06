@@ -46,6 +46,12 @@ export interface UserSelectPopoverProps {
      */
     loading?: boolean;
     /**
+     * Called with the search text each time it changes (debounced), for a
+     * parent that searches its users on a server rather than passing them all
+     * in `users`. The list is still filtered here by the same text.
+     */
+    onSearchTextChange?: (searchText: string) => void;
+    /**
      * The current user (displayed as the "self" option at the top).
      */
     currentUser?: SelectableUser | null;
@@ -86,6 +92,7 @@ export function UserSelectPopover({
     onUserSelected,
     users,
     loading = false,
+    onSearchTextChange,
     currentUser,
     defaultLabel = "Current user",
     renderLimit = 100,
@@ -245,7 +252,10 @@ export function UserSelectPopover({
                         inputRef={inputRef}
                         size="smallest"
                         placeholder="Search by name, email, or role…"
-                        onTextSearch={(val) => setSearchText(val ?? "")}
+                        onTextSearch={(val) => {
+                            setSearchText(val ?? "");
+                            onSearchTextChange?.(val ?? "");
+                        }}
                     />
                 </div>
 

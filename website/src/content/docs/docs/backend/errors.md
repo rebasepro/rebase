@@ -100,6 +100,10 @@ the ID you got. Read the response header.
 | `EMAIL_NOT_VERIFIED` | 403 | The account exists and its address is unverified. | Verify the address. |
 | `FACTOR_NOT_VERIFIED` | 400 | The MFA factor was enrolled but never confirmed. | Confirm the factor. |
 | `IDENTITY_ALREADY_LINKED` | 409 | That OAuth identity belongs to another account. | Sign in with it, or unlink it there first. |
+| `IMPERSONATION_FORBIDDEN` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> A request sent `x-rebase-impersonate` and its caller may not run a request as another user. Only a signed-in administrator's own session may, never an API key or the service key. | Send it with an administrator's session, or leave the header out. |
+| `IMPERSONATION_INVALID` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> `x-rebase-impersonate` was sent empty. | Send the uid of the user to act as, or leave the header out. |
+| `IMPERSONATION_TARGET_NOT_FOUND` | 404 | <span class="since-badge" data-since="0.24">Since 0.24</span> `x-rebase-impersonate` names no active user: no account has that uid, or it is disabled. | Check the uid. |
+| `IMPERSONATION_UNAVAILABLE` | 501 | <span class="since-badge" data-since="0.24">Since 0.24</span> This backend's auth cannot run a request as another user, because its `AuthAdapter` has no `resolveUser`. | Implement `resolveUser` in the adapter, or leave the header out. |
 | `INVALID_ACCOUNT` | 400 | The account is in a state this operation cannot act on. | See the message. |
 | `INVALID_CHALLENGE` | 400 | The MFA challenge is unknown or expired. | Start a new one. |
 | `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |
