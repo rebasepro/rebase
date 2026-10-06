@@ -46,7 +46,7 @@ const INSTANCES = 5;
  */
 interface Instance {
     pool: pg.Pool;
-    store: CronStore;
+    store: Required<CronStore>;
 }
 
 describe("Cron slot claiming across instances (E2E)", () => {
@@ -260,7 +260,7 @@ describe("Cron slot claiming across instances (E2E)", () => {
             expect(await countClaims(legitimate)).toBe(1);
         });
 
-        it("garbage-collects claims past the retention window", async () => {
+        it("garbage-collects claims past the retention window in the retention sweep, not at boot", async () => {
             // `make_interval(days => $1)` binds a parameter into a named
             // argument. That combination either parses or it does not, and a
             // fake executeSql cannot tell you which.
@@ -268,6 +268,9 @@ describe("Cron slot claiming across instances (E2E)", () => {
             // A job's most recent claim is kept however old it is — it is the
             // record a catch-up reads — so the expired job has two, and only
             // the one behind its latest goes.
+            //
+            // Retention is the scheduler's hourly `sweepClaims`, off the boot
+            // path: a year of claims used to cost the next boot ~8 s.
             const old = nextJobId("expired");
             const recent = nextJobId("retained");
 
@@ -280,6 +283,9 @@ describe("Cron slot claiming across instances (E2E)", () => {
             );
 
             await instances[0].store.ensureTable();
+            expect(await countClaims(old)).toBe(2);
+
+            await instances[0].store.sweepClaims();
 
             expect(await countClaims(old)).toBe(1);
             expect(await countClaims(recent)).toBe(1);
