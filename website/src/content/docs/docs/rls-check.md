@@ -339,7 +339,9 @@ the pre-1.0 `auth` schema is still checked.
 The corrected form of the check above — `rebase.uid() IS NOT NULL AND rebase.uid() <>
 'anonymous'` — and the place people stop. It does exclude signed-out callers. What it does
 not do is scope any rows: what remains is *every registered account may read every row of
-this table*, which is a different sentence from the one it is usually meant to be.
+this table*, which is a different sentence from the one it is usually meant to be. On a
+Rebase project this is a rule whose `condition` is `policy.authenticated()` and nothing
+else, which the database stores as `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])`.
 
 That is the shape that turns a `users` table into a directory of every address on the
 platform, readable by anyone who signed up — and where registration is open, "anyone who
