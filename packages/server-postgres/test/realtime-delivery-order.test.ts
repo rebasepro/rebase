@@ -131,11 +131,13 @@ isId: true },
             fetchOne: jest.fn().mockResolvedValue(null)
         } as never);
 
+        // The helper answers rows and, for a socket frame, its `meta` — which
+        // ordering does not depend on, so these frames carry none.
         jest.spyOn(service as never, "fetchCollectionWithAuth")
             .mockImplementation(() => {
                 const d = defer<Record<string, unknown>[]>();
                 collectionFetches.push(d);
-                return d.promise;
+                return d.promise.then((rows) => ({ rows }));
             });
         jest.spyOn(service as never, "fetchEntityWithAuth")
             .mockImplementation(() => {
@@ -394,7 +396,7 @@ title: "newer" }]
             startDriverListener("single", [], [], auth);
             await settle();
 
-            expect(service["fetchCollectionWithAuth"]).toHaveBeenCalledWith("notes", {}, auth);
+            expect(service["fetchCollectionWithAuth"]).toHaveBeenCalledWith("notes", {}, auth, { meta: false });
             expect(service["fetchEntityWithAuth"]).toHaveBeenCalledWith("notes", "n1", auth);
         });
 

@@ -818,11 +818,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         try {
             if (group.type === "collection") {
                 const request = group.collectionRequest ?? {};
-                const rows = await this.fetchCollectionWithAuth(group.path, request, group.authContext);
                 const toSockets = targets.some((target) => !target.callback);
-                const meta = toSockets
-                    ? await this.collectionMetaWithAuth(group.path, request, rows, group.authContext)
-                    : undefined;
+                const { rows, meta } = await this.fetchCollectionWithAuth(group.path, request, group.authContext, { meta: toSockets });
                 let frameTail: string | undefined;
                 for (const target of targets) {
                     if (!target.canDeliver()) continue;
@@ -940,7 +937,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         const canDeliver = this.beginDelivery(key, subscription);
         try {
             const data = subscription.type === "collection"
-                ? await this.fetchCollectionWithAuth(subscription.path, subscription.collectionRequest ?? {}, subscription.authContext)
+                ? (await this.fetchCollectionWithAuth(subscription.path, subscription.collectionRequest ?? {}, subscription.authContext, { meta: false })).rows
                 : (await this.fetchEntityWithAuth(subscription.path, String(subscription.id), subscription.authContext)) ?? null;
             if (canDeliver()) callback(data);
         } catch (error) {
@@ -1290,13 +1287,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // Send initial data. Built from the request the subscription just
             // stored, so the first answer and every refetch after it cannot
             // describe different queries.
-            const rows = await this.fetchCollectionWithAuth(
+            const { rows, meta } = await this.fetchCollectionWithAuth(
                 request.path,
                 subscription.collectionRequest!,
-                authContext
-            );
-            const meta = await this.collectionMetaWithAuth(
-                request.path, subscription.collectionRequest!, rows, authContext
+                authContext,
+                { meta: true }
             );
 
             if (canDeliver()) {
@@ -1629,15 +1624,21 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     }
 
     /**
-     * Fetch a collection with optional RLS auth context.
+     * Fetch a collection with optional RLS auth context, and with `meta: true`
+     * the `meta` a socket frame carries beside the rows.
+     *
      * When authContext is provided, the fetch runs inside a transaction
-     * with set_config calls so PostgreSQL RLS policies are enforced.
+     * with set_config calls so PostgreSQL RLS policies are enforced. The count
+     * behind `meta` runs in that same transaction — one pool acquisition and
+     * one `applyAuthContext` per refetch, where it used to take a second
+     * transaction of its own — see {@link collectionMeta}.
      */
     private async fetchCollectionWithAuth(
         notifyPath: string,
         collectionRequest: StoredCollectionRequest,
-        authContext?: SubscriptionAuthContext
-    ): Promise<Record<string, unknown>[]> {
+        authContext: SubscriptionAuthContext | undefined,
+        options: { meta: boolean }
+    ): Promise<{ rows: Record<string, unknown>[]; meta?: CollectionUpdateMeta }> {
         if (this.driver) {
             const collection = this.registry.getCollectionByPath(notifyPath);
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
@@ -1720,13 +1721,14 @@ roles: ["anon"] };
                     const globalCallbacks = this.registry?.getGlobalCallbacks();
                     const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
+                    let rows = fetchedEntities;
                     if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
                         // Bound to THIS transaction — the subscriber's — see
                         // callbackContextWithin below for what this used to be.
                         const contextForCallback = callbackContextWithin(this.driver, tx, activeAuth);
 
                         const callbackCollection = requireCallbackCollection(resolvedCollection, notifyPath);
-                        return await Promise.all(fetchedEntities.map(async (fetchedRow) => {
+                        rows = await Promise.all(fetchedEntities.map(async (fetchedRow) => {
                             let processedEntity = fetchedRow;
                             // 1. Global callbacks first
                             if (globalCallbacks?.afterRead) {
@@ -1759,7 +1761,12 @@ roles: ["anon"] };
                         }));
                     }
 
-                    return fetchedEntities;
+                    // Last, after every hook has had the transaction: a count
+                    // that fails leaves it aborted, and its rows are already read.
+                    return {
+                        rows,
+                        meta: options.meta ? await this.collectionMeta(txEntityService, notifyPath, collectionRequest, rows) : undefined
+                    };
                 }, { accessMode: "read only" })
             );
         }
@@ -1775,8 +1782,8 @@ roles: ["anon"] };
         // served to everybody — a fallback that hands out *more* than the path
         // it stands in for, which is the defect the paragraph above describes
         // one clause at a time.
-        return await withFieldViewer({ roles: authContext?.roles ?? [] }, async () =>
-            await this.dataService.fetchCollectionForRest(notifyPath, {
+        return await withFieldViewer({ roles: authContext?.roles ?? [] }, async () => {
+            const rows = await this.dataService.fetchCollectionForRest(notifyPath, {
                 filter: collectionRequest.filter as FilterValues<string>,
                 logical: collectionRequest.logical,
                 orderBy: collectionRequest.orderBy,
@@ -1789,12 +1796,18 @@ roles: ["anon"] };
                 databaseId: collectionRequest.databaseId,
                 fields: collectionRequest.fields,
                 distinct: collectionRequest.distinct
-            }, collectionRequest.include)
-        );
+            }, collectionRequest.include);
+            return {
+                rows,
+                meta: options.meta ? await this.collectionMeta(this.dataService, notifyPath, collectionRequest, rows) : undefined
+            };
+        });
     }
 
     /**
-     * The `meta` a `collection_update` frame carries beside its rows.
+     * The `meta` a `collection_update` frame carries beside its rows, counted
+     * through `service` — the subscriber's own transaction, read only, with
+     * its auth context and `beforeQuery` narrowing already bound.
      *
      * Frames used to carry rows and primary keys and nothing else, so the
      * client issued a `GET /count` **per push** to fill in a total it needed to
@@ -1802,60 +1815,44 @@ roles: ["anon"] };
      * write, per subscriber, forever. The refetch already knows the query; it
      * counts once, here, under the same RLS transaction that read the rows, so
      * the total describes the same set they came from.
+     *
+     * A first page that came back short of its limit *is* the whole set — the
+     * same filter, the same narrowing, read as the same principal — so its
+     * length is the total and nothing is counted. Not for a later page, a
+     * cursor page, a search (whose page and count are not the same query) or
+     * a `distinct` read (whose count counts rows, not values): those count.
      */
-    private async collectionMetaWithAuth(
+    private async collectionMeta(
+        service: DataService,
         notifyPath: string,
         collectionRequest: StoredCollectionRequest,
-        rows: Record<string, unknown>[],
-        authContext?: SubscriptionAuthContext
+        rows: Record<string, unknown>[]
     ): Promise<CollectionUpdateMeta> {
         const limit = collectionRequest.limit ?? rows.length;
         const offset = collectionRequest.offset ?? 0;
 
-        const countOnce = async (service: DataService) => service.count(notifyPath, {
-            filter: collectionRequest.filter as FilterValues<string>,
-            logical: collectionRequest.logical,
-            searchString: collectionRequest.searchString,
-            databaseId: collectionRequest.databaseId
-        });
+        const wholeSet = collectionRequest.limit !== undefined && rows.length < collectionRequest.limit &&
+            offset === 0 && !collectionRequest.startAfter && !collectionRequest.searchString && !collectionRequest.distinct;
 
         let total: number;
-        try {
-            if (this.driver) {
-                const activeAuth = authContext || { uid: ANONYMOUS_USER_ID, roles: ["anon"] };
-                total = await this.db.transaction(async (tx) => {
-                    await applyAuthContext(
-                        tx,
-                        {
-                            uid: activeAuth.uid,
-                            roles: activeAuth.roles,
-                            isAnonymous: activeAuth.isAnonymous === true,
-                            // A refetch is a read under the same identity, and a
-                            // tenancy policy reads a claim — without these a
-                            // subscriber would receive rows the initial GET hid.
-                            claims: activeAuth.claims
-                        },
-                        this.rlsUserRole
-                    );
-                    // The same narrowing as the rows it is counting: a frame
-                    // whose `meta.total` came from an unnarrowed count says
-                    // "1 of 4 results".
-                    let hookContext: RebaseCallContext | undefined;
-                    return countOnce(new DataService(
-                        tx, this.registry,
-                        () => (hookContext ??= callbackContextWithin(this.driver, tx, activeAuth))
-                    ));
-                }, { accessMode: "read only" });
-            } else {
-                total = await countOnce(this.dataService);
+        if (wholeSet) {
+            total = rows.length;
+        } else {
+            try {
+                total = await service.count(notifyPath, {
+                    filter: collectionRequest.filter as FilterValues<string>,
+                    logical: collectionRequest.logical,
+                    searchString: collectionRequest.searchString,
+                    databaseId: collectionRequest.databaseId
+                });
+            } catch (error) {
+                // A count that failed says nothing about the size of the
+                // collection, and a frame with no `meta` is one the client can fall
+                // back on. Reporting `rows.length` would claim a page read at
+                // offset 10 held two rows.
+                logger.warn(`[RealtimeService] Could not count '${notifyPath}' for a subscription frame`, { error });
+                return { limit, offset, hasMore: false, partial: true };
             }
-        } catch (error) {
-            // A count that failed says nothing about the size of the
-            // collection, and a frame with no `meta` is one the client can fall
-            // back on. Reporting `rows.length` would claim a page read at
-            // offset 10 held two rows.
-            logger.warn(`[RealtimeService] Could not count '${notifyPath}' for a subscription frame`, { error });
-            return { limit, offset, hasMore: false, partial: true };
         }
 
         const last = rows[rows.length - 1];

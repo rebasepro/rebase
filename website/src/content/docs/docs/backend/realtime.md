@@ -220,22 +220,24 @@ collection it touched — not with the number of open sockets:
 
 - Subscriptions that ask the same question (same path, filters, sort, page,
   `include`, `fields`, search) as the same principal (same user id, roles,
-  guest flag and claims) share one refetch. A write to a list costs **one read
-  and one count per such group**, however many sockets hold it; every member
-  still gets a frame built from rows read under that identity.
+  guest flag and claims) share one refetch. A write to a list costs **one
+  transaction per such group** — the read and its count — however many sockets
+  hold it; every member still gets a frame built from rows read under that
+  identity. A first page that comes back shorter than its `limit` is the whole
+  set, so it is not counted at all.
 - A single-record subscription is asked only when its own record changes.
 - Different principals never share a read — that is what keeps a frame from
   carrying a row its reader may not see. A list watched by a thousand
   different signed-in users is a thousand reads and a thousand counts on every
-  write to it.
+  write to it, in a thousand transactions.
 
 Measured on a laptop against a local PostgreSQL with a 20-connection pool, one
 write to a list:
 
 | Subscribers | Transactions for the write | Last frame after the write |
 |-------------|----------------------------|----------------------------|
-| 1,000, one principal | 4 | ~350 ms |
-| 1,000, each a different principal | ~2,000 | ~700 ms |
+| 1,000, one principal | 2 | ~310 ms |
+| 1,000, each a different principal | ~1,000 | ~600 ms |
 
 300 ms of each is the debounce. The second row is the ceiling to plan for. The
 refetches run on the same pool as your REST traffic, but at most a quarter of

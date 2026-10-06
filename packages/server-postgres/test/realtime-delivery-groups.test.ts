@@ -48,6 +48,7 @@ type Socket = { readyState: number; send: jest.Mock; on: jest.Mock; close: jest.
 
 let service: RealtimeService;
 let statements: string[];
+let transaction: jest.Mock;
 
 async function flush() {
     for (let i = 0; i < 40; i++) await Promise.resolve();
@@ -63,10 +64,10 @@ const frames = (ws: Socket) => ws.send.mock.calls.map(([frame]) => JSON.parse(fr
     type: string; subscriptionId?: string; rows?: unknown[]; row?: unknown; payload?: { error?: { code?: string } };
 });
 
-function subscribeList(clientId: string, subscriptionId: string, auth?: SubscriptionAuthContext, filter?: Record<string, unknown>) {
+function subscribeList(clientId: string, subscriptionId: string, auth?: SubscriptionAuthContext, filter?: Record<string, unknown>, page?: { limit: number }) {
     return service.handleClientMessage(clientId, {
         type: "subscribe_collection",
-        payload: { path: "posts", subscriptionId, ...(filter ? { filter } : {}) }
+        payload: { path: "posts", subscriptionId, ...(filter ? { filter } : {}), ...page }
     }, auth);
 }
 
@@ -83,6 +84,7 @@ beforeEach(() => {
         }),
         transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
     } as unknown as NodePgDatabase<Record<string, never>>;
+    transaction = (db as unknown as { transaction: jest.Mock }).transaction;
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([posts]);
     service = new RealtimeService(db, registry);
@@ -101,7 +103,8 @@ describe("one write, many identical subscribers", () => {
     it("is one read and one count for all of them, and every one of them gets the frame", async () => {
         const sockets = Array.from({ length: 10 }, (_, i) => connect(`c${i}`));
         for (let i = 0; i < 10; i++) {
-            for (let j = 0; j < 5; j++) await subscribeList(`c${i}`, `s${j}`, ALICE);
+            // A full page, so there is something to count.
+            for (let j = 0; j < 5; j++) await subscribeList(`c${i}`, `s${j}`, ALICE, undefined, { limit: 1 });
         }
         await flush();
         fetchCollectionForRest.mockClear();
@@ -356,5 +359,59 @@ describe("one write to a list many different principals watch", () => {
         expect(peak).toBeLessThanOrEqual(5);
         expect(fetchCollectionForRest).toHaveBeenCalledTimes(40);
         for (const ws of sockets) expect(frames(ws).filter(f => f.type === "collection_update")).toHaveLength(1);
+    });
+});
+
+describe("a list refetch for sockets", () => {
+    const subscribePage = (clientId: string, subscriptionId: string, payload: Record<string, unknown>) =>
+        service.handleClientMessage(clientId, { type: "subscribe_collection", payload: { path: "posts", subscriptionId, ...payload } }, ALICE);
+    const lastMeta = (ws: Socket) => (frames(ws).filter(f => f.type === "collection_update").pop() as { meta?: Record<string, unknown> } | undefined)?.meta;
+
+    it("reads its rows and counts them in one transaction, as one principal", async () => {
+        // The count ran in a second transaction of its own: two pool
+        // acquisitions and two rounds of BEGIN / set_config / COMMIT per group
+        // per write (801 statements for one write with 100 principals).
+        const ws = connect("a");
+        await subscribePage("a", "s", { limit: 1 });
+        await flush();
+        expect(transaction).toHaveBeenCalledTimes(1);
+        transaction.mockClear();
+        count.mockClear();
+
+        await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
+        jest.advanceTimersByTime(350);
+        await flush();
+
+        expect(transaction).toHaveBeenCalledTimes(1);
+        expect(count).toHaveBeenCalledTimes(1);
+        expect(lastMeta(ws)).toMatchObject({ total: 1, limit: 1, offset: 0, hasMore: false });
+    });
+
+    it("does not count a first page that came back short: its length is the total", async () => {
+        const ws = connect("a");
+        await subscribePage("a", "s", { limit: 10 });
+        await flush();
+        expect(count).not.toHaveBeenCalled();
+        expect(lastMeta(ws)).toEqual({ total: 1, limit: 10, offset: 0, hasMore: false });
+    });
+
+    it.each([
+        ["a later page", { limit: 10, offset: 10 }],
+        ["a search", { limit: 10, searchString: "row" }],
+        ["a cursor page", { limit: 10, startAfter: { id: 0 } }]
+    ])("still counts %s that came back short", async (_label, payload) => {
+        connect("a");
+        await subscribePage("a", "s", payload);
+        await flush();
+        expect(count).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports a failed count as a partial frame, with its rows", async () => {
+        const ws = connect("a");
+        count.mockRejectedValueOnce(new Error("statement timeout"));
+        await subscribePage("a", "s", { limit: 1 });
+        await flush();
+        expect(frames(ws).filter(f => f.type === "collection_update")).toHaveLength(1);
+        expect(lastMeta(ws)).toEqual({ limit: 1, offset: 0, hasMore: false, partial: true });
     });
 });
