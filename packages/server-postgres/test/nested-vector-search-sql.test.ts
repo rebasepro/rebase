@@ -64,8 +64,8 @@ const postsCollection = {
     ]
 } as unknown as CollectionConfig;
 
-/** A db that records the query a read composed, and answers no rows. */
-function recordingDb() {
+/** A db that records the query a read composed, and answers `rows` (none by default). */
+function recordingDb(rows: unknown[] = []) {
     const seen: { select?: unknown; where?: unknown; orderBy?: unknown[] } = {};
     const chain: Record<string, unknown> = {};
     chain.from = jest.fn(() => chain);
@@ -74,7 +74,7 @@ function recordingDb() {
     chain.orderBy = jest.fn((...order: unknown[]) => { seen.orderBy = order; return chain; });
     chain.limit = jest.fn(() => chain);
     chain.offset = jest.fn(() => chain);
-    (chain as { then: unknown }).then = (resolve: (v: unknown) => unknown) => resolve([]);
+    (chain as { then: unknown }).then = (resolve: (v: unknown) => unknown) => resolve(rows);
     return { db: { select: jest.fn((projection?: unknown) => { seen.select = projection; return chain; }) }, seen };
 }
 
@@ -129,12 +129,22 @@ describe("a nested listing with a vector search", () => {
         expect(sqlText(seen.where)).toContain("author_id");
     });
 
-    it("applies the threshold to the same WHERE", async () => {
-        const { db, seen } = recordingDb();
+    it("applies the threshold to the rows the scoped read returns", async () => {
+        // Not as a WHERE condition: the rows come back closest first, so the
+        // ones inside the threshold are the front of the page, cut after the
+        // read — a condition would send an iterative index scan past the page
+        // looking for more (see `vector-iterative-scan.ts`).
+        const { db, seen } = recordingDb([
+            { table_row: { id: 1, author_id: 1 }, _distance: 0.1 },
+            { table_row: { id: 2, author_id: 1 }, _distance: 0.2 },
+            { table_row: { id: 3, author_id: 1 }, _distance: 0.35 }
+        ]);
 
-        await new FetchService(db as never, registryFor())
+        const rows = await new FetchService(db as never, registryFor())
             .fetchCollectionForRest("authors/1/posts", { vectorSearch });
 
-        expect(sqlText(seen.where)).toContain(") < ");
+        expect(rows.map(row => row.id)).toEqual([1]);
+        expect(sqlText(seen.where)).toContain("author_id");
+        expect(sqlText(seen.where)).not.toContain(") < ");
     });
 });

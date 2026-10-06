@@ -477,6 +477,21 @@ from 768 dimensions up), and a proxy in front of it usually accepts less — ngi
 default is 8 KB. Send a vector search as [`POST …/query`](#queries-too-long-for-a-url)
 instead; the SDK always does.
 
+### Filters on an approximate index
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A vector search that
+also filters — a `where`, a search, row-level security — returns the nearest rows
+that match. An HNSW index answers with a fixed number of nearest candidates
+(`hnsw.ef_search`, 40 by default), and the other conditions are applied to those;
+when few of them match, the page came back short or empty though plenty of rows
+did, and offset pages skipped rows. With pgvector 0.8.0 or later the read turns on
+pgvector's iterative index scan (`hnsw.iterative_scan = strict_order`, for that
+read's transaction only), which keeps scanning until the page is full, up to
+`hnsw.max_scan_tuples` (20,000 by default) — a filter that matches almost nothing
+near the query vector can still return a short page. On an older pgvector, and on
+an IVFFlat index, a filtered vector search keeps the short-page behaviour; an exact
+scan (`index: false`) never had it.
+
 ## Queries too long for a URL
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> `POST /api/data/:slug/query`

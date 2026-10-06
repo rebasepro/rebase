@@ -5,6 +5,7 @@ import type { IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearc
 import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, type FilterCompilationOptions } from "../utils/drizzle-conditions";
+import { enableIterativeScan, inTransaction, iterativeScansAvailable } from "./vector-iterative-scan";
 import {
     getCollectionByPath,
     getTableForCollection,
@@ -2169,6 +2170,19 @@ relatedTo: hop }, include
             );
         }
 
+        // A vector read runs with pgvector's iterative index scan, which has to
+        // be set in a transaction — see `vector-iterative-scan.ts`. This
+        // driver's request-scoped copies already read in one; the base driver,
+        // on the pool, is given one, read-only, and reads again inside it.
+        const iterative = options.vectorSearch !== undefined
+            && await iterativeScansAvailable(this.db, this.registry);
+        if (iterative && !inTransaction(this.db)) {
+            return this.db.transaction(
+                (tx) => new FetchService(tx, this.registry, this.callContext).fetchRowsWithConditionsRaw(collectionPath, options),
+                { accessMode: "read only" }
+            );
+        }
+
         let vectorMeta: { orderBy: SQL; filter?: SQL; distanceSelect: SQL } | undefined;
         if (options.vectorSearch) {
             vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch);
@@ -2260,9 +2274,16 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             collectionPath, collection, table, "list", FetchService.describeRead(options)
         ));
 
-        if (vectorMeta?.filter) {
-            allConditions.push(vectorMeta.filter);
-        }
+        // A vector `threshold` is not a WHERE condition here. The rows come
+        // back closest first whatever the plan, so the ones within it are the
+        // front of the page — and are cut from it below, after the read. As a
+        // condition it was applied to the index's candidates after the scan,
+        // like any filter, and under an iterative scan a page asking for more
+        // rows than lie within the threshold made the index walk on to its
+        // scan limit looking for them: 22 ms against 1 ms for the same page
+        // (20,000 rows × 256 dimensions). Cut afterwards, the page and its
+        // offset are the same rows either way — those within the threshold
+        // are a prefix of the ordering — and no scan looks past the page.
 
         if (allConditions.length > 0) {
             const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(allConditions);
@@ -2327,13 +2348,21 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         // Offset (numeric pagination)
         if (options.offset && options.offset > 0) query = query.offset(options.offset);
 
+        if (iterative) await enableIterativeScan(this.db);
+
         const rawResults = await query;
 
         if (vectorMeta) {
-            return (rawResults as { table_row: Record<string, unknown>; _distance: unknown }[]).map(r => ({
-                ...r.table_row,
-                _distance: typeof r._distance === "number" ? r._distance : parseFloat(String(r._distance))
-            }));
+            const threshold = options.vectorSearch?.threshold;
+            return (rawResults as { table_row: Record<string, unknown>; _distance: unknown }[])
+                .map(r => ({
+                    ...r.table_row,
+                    _distance: typeof r._distance === "number" ? r._distance : parseFloat(String(r._distance))
+                }))
+                // `<`, as the SQL condition was: a row at exactly the threshold
+                // is outside it, and so is a NaN distance (a zero vector's
+                // cosine), which Postgres also orders above every number.
+                .filter(row => threshold == null || row._distance < threshold);
         }
 
         if (rankSelect) {

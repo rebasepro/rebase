@@ -152,10 +152,13 @@ const { data } = await client.data.docs
     .find();
 ```
 
-`where` and `orderBy` on the same query act as filters applied *before* the
-ordering — this returns the nearest rows that also match, not the nearest rows
-filtered afterwards. Producing `queryVector` is your job: Rebase stores and
-searches embeddings, it does not compute them.
+`where` on the same query is a filter on which rows are candidates — this
+returns the nearest rows that also match, not the nearest rows filtered
+afterwards. On the HNSW index that holds from pgvector 0.8.0 (see
+[Filters on an approximate index](/docs/backend/api/#filters-on-an-approximate-index));
+on an older pgvector a filter that few of the nearest rows pass returns a short
+page. Producing `queryVector` is your job: Rebase stores and searches
+embeddings, it does not compute them.
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> The SDK sends a
 vector search as `POST /api/data/<collection>/query`, with the embedding in the
