@@ -662,6 +662,21 @@ export interface DataDriver {
     count?<M extends Record<string, unknown> = Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number>;
 
     /**
+     * Run several reads as one: `work` is handed a driver whose reads all go
+     * through a single read-only transaction, under this driver's identity and
+     * row-level security, and its result is returned.
+     *
+     * A list page is a read and a count, and each was a transaction of its
+     * own — the second checkout, `BEGIN`, identity setup and `COMMIT` cost as
+     * many round trips as the count itself. In one transaction the two also
+     * read one snapshot, so `meta.total` describes the rows the page was taken
+     * from.
+     *
+     * Optional: a driver without it is called directly, read by read.
+     */
+    readTogether?<T>(work: (driver: DataDriver) => Promise<T>): Promise<T>;
+
+    /**
      * Check if the given filter combination is valid
      * @param props
      */

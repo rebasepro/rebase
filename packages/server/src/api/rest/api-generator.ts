@@ -2034,54 +2034,75 @@ id };
         const startAfter = queryOptions.cursor ? cursorToStartAfter(queryOptions.cursor) : undefined;
         const seeking = startAfter !== undefined;
 
-        // One row past the page when seeking. `hasMore` on an offset page is
-        // `offset + rows.length < total`, and under a cursor that arithmetic is
-        // simply false: every seeked page runs at offset 0, so it compares one
-        // page against the whole collection and says "more" forever.
-        const limit = queryOptions.limit;
-        const probeLimit = (seeking && limit !== undefined) ? limit + 1 : limit;
+        // A distinct read collapses rows, and `count` counts them — so a
+        // `total` would describe a different set from the one served, which is
+        // the trap `countRawEntities` documents for `vectorSearch` and soft
+        // delete. It cannot be answered without a `COUNT(DISTINCT …)` the
+        // driver does not have, so it is not answered — and not counted:
+        // the count used to run anyway and be thrown away. `?count=none` asks
+        // for the same thing on any listing.
+        const distinctRead = queryOptions.distinct === true;
+        const counting = !distinctRead && queryOptions.count !== "none";
 
+        // One row past the page wherever `hasMore` cannot come from a count.
+        // Under a cursor `offset + rows.length < total` is simply false: every
+        // seeked page runs at offset 0, so it compares one page against the
+        // whole collection and says "more" forever. Without a count there is
+        // nothing to compare against at all. Either way the probe row answers.
+        const limit = queryOptions.limit;
+        const probing = (seeking || !counting) && limit !== undefined;
+        const probeLimit = probing ? limit + 1 : limit;
+
+        // The page and its count, in one transaction where the driver can run
+        // them so: one checkout, one identity setup, one snapshot — so `total`
+        // counts the rows the page was taken from.
+        const read = async (reader: DataDriver) => {
+            const fetchService = reader.restFetchService;
+            const fetched = fetchService
+                ? await fetchService.fetchCollectionForRest(
+                    path,
+                    {
+                        filter: queryOptions.where,
+                        // `?or=`/`?and=` were parsed and then dropped right here,
+                        // so a filtered read returned every row RLS allowed.
+                        logical: queryOptions.logical,
+                        limit: probeLimit,
+                        // A cursor and an offset describe the same window two
+                        // incompatible ways. The parser refuses both together, so
+                        // reaching here with a cursor means there is no offset.
+                        offset: seeking ? undefined : queryOptions.offset,
+                        startAfter,
+                        orderBy,
+                        searchString,
+                        searchExplain,
+                        vectorSearch: queryOptions.vectorSearch,
+                        fields: queryOptions.fields,
+                        distinct: queryOptions.distinct,
+                        // `?deleted=include|only`. Unset hides soft-deleted rows.
+                        // The root list route used to pass this itself; every
+                        // listing goes through here now, the nested one included,
+                        // and `countRawEntities` below reads the same flag — a
+                        // listing that hides four rows beside a total that counts
+                        // them is a page saying "1 of 5".
+                        withDeleted: queryOptions.withDeleted
+                    },
+                    queryOptions.include
+                )
+                : await RestApiGenerator.fetchRawCollection(
+                    reader, collection, { ...queryOptions, limit: probeLimit }, searchString, searchExplain, path, startAfter
+                );
+            const total = counting
+                ? await RestApiGenerator.countRawEntities(reader, collection, queryOptions, searchString, path)
+                : undefined;
+            return { fetched, total };
+        };
+        const { fetched, total } = driver.readTogether
+            ? await driver.readTogether(read)
+            : await read(driver);
         const fetchService = driver.restFetchService;
-        const fetched = fetchService
-            ? await fetchService.fetchCollectionForRest(
-                path,
-                {
-                    filter: queryOptions.where,
-                    // `?or=`/`?and=` were parsed and then dropped right here,
-                    // so a filtered read returned every row RLS allowed.
-                    logical: queryOptions.logical,
-                    limit: probeLimit,
-                    // A cursor and an offset describe the same window two
-                    // incompatible ways. The parser refuses both together, so
-                    // reaching here with a cursor means there is no offset.
-                    offset: seeking ? undefined : queryOptions.offset,
-                    startAfter,
-                    orderBy,
-                    searchString,
-                    searchExplain,
-                    vectorSearch: queryOptions.vectorSearch,
-                    fields: queryOptions.fields,
-                    distinct: queryOptions.distinct,
-                    // `?deleted=include|only`. Unset hides soft-deleted rows.
-                    // The root list route used to pass this itself; every
-                    // listing goes through here now, the nested one included,
-                    // and `countRawEntities` below reads the same flag — a
-                    // listing that hides four rows beside a total that counts
-                    // them is a page saying "1 of 5".
-                    withDeleted: queryOptions.withDeleted
-                },
-                queryOptions.include
-            )
-            : await RestApiGenerator.fetchRawCollection(
-                driver, collection, { ...queryOptions, limit: probeLimit }, searchString, searchExplain, path, startAfter
-            );
 
         // The probe row is evidence, not data — it is never served.
-        const entities = (seeking && limit !== undefined)
-            ? (fetched as Record<string, unknown>[]).slice(0, limit)
-            : fetched as Record<string, unknown>[];
-
-        const total = await RestApiGenerator.countRawEntities(driver, collection, queryOptions, searchString, path);
+        const entities = probing ? fetched.slice(0, limit) : fetched;
 
         const rows = projectResponseFields(
             entities,
@@ -2091,19 +2112,12 @@ id };
         );
 
         const offset = queryOptions.offset ?? 0;
-        // A distinct read collapses rows, and `count` counts them — so `total`
-        // describes a different set from the one served, which is the trap
-        // `countRawEntities` documents for `vectorSearch` and soft delete. It
-        // cannot be answered without a `COUNT(DISTINCT …)` the driver does not
-        // have, so it is not answered: no `total`, and `hasMore` from the page
-        // itself. Reporting the row count instead left `hasMore` true beside a
-        // complete two-row result, which is a client paging forever.
-        const distinctRead = queryOptions.distinct === true;
-        const hasMore = seeking
-            ? (fetched as unknown[]).length > (limit ?? 0)
-            : distinctRead
-                ? (limit !== undefined && entities.length === limit)
-                : offset + entities.length < total;
+        // From the probe row wherever one was asked for; from the count
+        // otherwise. A read with neither — no count and no limit — returned
+        // every row there is.
+        const hasMore = probing
+            ? fetched.length > (limit ?? 0)
+            : total !== undefined && offset + entities.length < total;
 
         // The cursor for the *next* page, from the last row served. Issued by
         // the driver, which is the only layer that knows which columns address
@@ -2118,7 +2132,7 @@ id };
         return {
             rows,
             meta: {
-                ...(distinctRead ? {} : { total }),
+                ...(total !== undefined && { total }),
                 limit: queryOptions.limit,
                 // Always a number, as `PaginationMeta` types it and the
                 // in-process door sends it: left off when the request named

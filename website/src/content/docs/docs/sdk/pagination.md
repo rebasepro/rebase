@@ -92,6 +92,23 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100
 GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 ```
 
+#### Skipping the count
+
+`meta.total` is a `COUNT(*)` over every row the query matches, run beside the
+page — and on a large table it costs more than the page does. A read that only
+pages forward never needs it, because `meta.hasMore` does not depend on it:
+pass `count: "none"` and the read asks for one row past the page instead.
+
+```typescript
+const { data, meta } = await client.data.orders.find({ limit: 100, count: "none" });
+meta.hasMore; // exact
+```
+
+Without a count there is no total to report: over HTTP `meta.total` is absent,
+and in-process it is the rows up to the end of the page (`offset` plus the
+page). Over HTTP it is `?count=none`; `?count=exact` is the default, and any
+other value is a 400 `INVALID_COUNT`.
+
 #### Which reads are wrapped, and which are not
 
 Two shapes, and one rule: **a window is wrapped, a whole answer is not.**

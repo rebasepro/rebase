@@ -237,6 +237,24 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
     const reading = (captured: Statement[], table: string) =>
         captured.filter(s => new RegExp(`(from|join) "${table}"`, "i").test(s.text));
 
+    /**
+     * A request's cost, split the way it is budgeted: the transactions it
+     * opened, and the statements that did its work. A transaction's own
+     * ceremony — BEGIN, the identity GUCs and role switch, COMMIT — is the
+     * request pipeline's to count, and is left out of `work` so a change there
+     * moves one number, not every row of the table below.
+     */
+    const cost = (captured: Statement[]) => {
+        const ceremony = (text: string) =>
+            /^(begin|commit|rollback|savepoint|release)\b/i.test(text)
+            || /^select set_config\(/i.test(text)
+            || /^set local /i.test(text);
+        return {
+            transactions: captured.filter(s => /^begin\b/i.test(s.text)).length,
+            work: captured.filter(s => !ceremony(s.text)).map(s => s.text)
+        };
+    };
+
     beforeAll(async () => {
         process.env.NODE_ENV = "test";
         container = await startPgContainer();
@@ -297,6 +315,77 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
         await admin?.end().catch(() => {});
         if (container) await stopPgContainer(container.containerName);
     }, 60_000);
+
+    // ── statements per request ───────────────────────────────────────────────
+
+    describe("statements per request", () => {
+        /**
+         * `include` → [work statements, transactions] for one list page.
+         *
+         * One SELECT for the page, one COUNT for `meta.total`, and one query
+         * per relation per level — never one per row, so the same figures hold
+         * at 25 rows and at 100.
+         */
+        const LIST: [string, string, number, number][] = [
+            ["no include", "", 2, 1],
+            ["belongsTo", "author", 3, 1],
+            ["hasOne", "detail", 3, 1],
+            ["hasMany", "comments", 3, 1],
+            ["manyToMany", "tags", 3, 1],
+            ["via", "company", 3, 1],
+            ["all five", "author,detail,comments,tags,company", 7, 1],
+            ["*", "*", 7, 1],
+            ["nested author.company", "author.company", 4, 1]
+        ];
+
+        for (const limit of [25, 100]) {
+            for (const [name, include, work, transactions] of LIST) {
+                it(`GET /posts?limit=${limit} with ${name}: ${work} statements in ${transactions} transaction`, async () => {
+                    const query = `/posts?limit=${limit}&orderBy=id:asc${include ? `&include=${encodeURIComponent(include)}` : ""}`;
+                    const { json, statements: sent } = await measure(query);
+                    expect(json.data).toHaveLength(limit);
+                    const spent = cost(sent);
+                    expect(spent.work.length, spent.work.join("\n")).toBeLessThanOrEqual(work);
+                    expect(spent.transactions).toBeLessThanOrEqual(transactions);
+                });
+            }
+        }
+
+        it("costs the same at 25 rows as at 100, for every include (no per-row query)", async () => {
+            for (const [, include] of LIST) {
+                const at = async (limit: number) => cost((await measure(
+                    `/posts?limit=${limit}&orderBy=id:asc${include ? `&include=${encodeURIComponent(include)}` : ""}`
+                )).statements).work.length;
+                expect(await at(100)).toBe(await at(25));
+            }
+        });
+
+        it("with `count=none`, a list page is the page alone — and still says whether there is more", async () => {
+            const { json, statements: sent } = await measure("/posts?limit=25&orderBy=id:asc&count=none");
+            const spent = cost(sent);
+            expect(spent.work.length, spent.work.join("\n")).toBeLessThanOrEqual(1);
+            expect(spent.transactions).toBeLessThanOrEqual(1);
+            expect(json.data).toHaveLength(25);
+            expect(json.meta).not.toHaveProperty("total");
+            expect(json.meta?.hasMore).toBe(true);
+
+            const last = await measure("/posts?limit=25&offset=125&orderBy=id:asc&count=none");
+            expect(last.json.data).toHaveLength(25);
+            expect(last.json.meta?.hasMore).toBe(false);
+        });
+
+        it("GET /posts/:id is one statement in one transaction", async () => {
+            const spent = cost((await measure("/posts/5")).statements);
+            expect(spent.work.length, spent.work.join("\n")).toBeLessThanOrEqual(1);
+            expect(spent.transactions).toBeLessThanOrEqual(1);
+        });
+
+        it("a nested listing is its page and its count, in one transaction", async () => {
+            const spent = cost((await measure("/posts/5/comments?limit=25")).statements);
+            expect(spent.work.length, spent.work.join("\n")).toBeLessThanOrEqual(2);
+            expect(spent.transactions).toBeLessThanOrEqual(1);
+        });
+    });
 
     // ── an included row is the target's REST row ─────────────────────────────
 

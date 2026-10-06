@@ -278,6 +278,22 @@ itself: `INVALID_LIMIT`, `INVALID_OFFSET` (a whole number of 0 or more) and
 the one asked for cannot be told apart from having reached the end of the
 collection, which is why none of them is clamped or ignored.
 
+### Skipping the count
+
+`meta.total` comes from a `COUNT(*)` over every matching row, run in the same
+transaction as the page. On a large table that count is most of what a list
+request costs. `?count=none` skips it:
+
+```bash
+GET /api/data/orders?limit=100&count=none
+```
+
+The response then has no `meta.total`. `meta.hasMore` is still exact — the
+read asks for one row past the page and reports whether it came back — so a
+client that pages until `hasMore` is false loses nothing. `?count=exact` is the
+default; any other value is a 400 `INVALID_COUNT`. A `?distinct=true` read is
+never counted: its response has no `total` either way.
+
 ### Cursor pagination
 
 `offset` re-counts rows on every request, so a row inserted or deleted between

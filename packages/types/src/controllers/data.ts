@@ -392,6 +392,24 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      * carries a `searchString`; there is nothing to explain otherwise.
      */
     searchExplain?: boolean;
+
+    /**
+     * Whether to count the whole matching set for `meta.total`.
+     *
+     * `"exact"`, the default, runs a `COUNT(*)` over every row the query
+     * matches beside the page — and on a large table that count, not the page,
+     * is most of what a list read costs: it reads every matching row to report
+     * one number. `"none"` skips it. `meta.hasMore` is still exact (the read
+     * asks for one row past the page and reports whether it came back), so
+     * nothing that pages — `iterate()`, `findAll()`, a "load more" button —
+     * needs the count.
+     *
+     * Without the count there is no `total` to report: over HTTP `meta.total`
+     * is absent, and in-process it is the rows up to the end of this page
+     * (`offset` + the page), the figure a driver that cannot count reports.
+     * Sent as `?count=none`.
+     */
+    count?: "exact" | "none";
 }
 
 /**
@@ -580,6 +598,11 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
  * @group Data
  */
 export interface PaginationMeta {
+    /**
+     * Every row the query matches, counted. Not counted — and absent from an
+     * HTTP response — when the query asked for {@link FindParams.count}
+     * `"none"`, and on a `distinct` read over HTTP.
+     */
     total: number;
     limit: number;
     offset: number;

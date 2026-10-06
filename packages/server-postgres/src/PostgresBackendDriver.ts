@@ -2936,6 +2936,17 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         };
     }
 
+    /**
+     * Several reads in one read-only transaction — see
+     * {@link DataDriver.readTogether}. The same transaction every read on this
+     * driver opens for itself, with the same identity, role and field viewer;
+     * `work` is handed the transaction's driver, whose reads run on it directly
+     * instead of each opening another.
+     */
+    async readTogether<T>(work: (driver: DataDriver) => Promise<T>): Promise<T> {
+        return this.withTransaction((delegate) => work(delegate), { accessMode: "read only" });
+    }
+
     private async withTransaction<T>(
         operation: (delegate: PostgresBackendDriver) => Promise<T>,
         options?: {

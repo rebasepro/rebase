@@ -148,11 +148,23 @@ export function generateOpenApiSpec(
                 + "primary key is always in the projection, so without narrowing it every row is "
                 + "already distinct. The response has no `meta.total` — the rows before deduplication "
                 + "are a different set, so their count would not describe the page — and `meta.hasMore` "
-                + "is true when the page came back full. Refused (400) alongside "
+                + "comes from reading one row past the page. Refused (400) alongside "
                 + "`searchString` or a vector search, which attach a per-row score that makes every row "
                 + "distinct by construction, and (400 DISTINCT_ORDER_BY_NOT_SELECTED) when `orderBy` "
                 + "names a column `fields` does not return.",
             example: "true"
+        },
+        {
+            name: "count",
+            in: "query",
+            schema: { type: "string", enum: ["exact", "none"], default: "exact" },
+            description:
+                "Whether to count every matching row for `meta.total`. `exact` (the default) runs a "
+                + "`COUNT(*)` beside the page, which on a large table costs more than the page itself; "
+                + "`none` skips it, and the response then has no `meta.total`. `meta.hasMore` is exact "
+                + "either way — without a count it comes from reading one row past the page — so a walk "
+                + "that pages until `hasMore` is false needs no count. Anything else is a 400 INVALID_COUNT.",
+            example: "none"
         },
         {
             name: "searchString",
@@ -231,7 +243,7 @@ export function generateOpenApiSpec(
                     type: "object",
                     properties: {
                         total: { type: "integer",
-description: "Total number of matching records. Absent on a `distinct` read, which has no count of the rows it returns." },
+description: "Total number of matching records. Absent on a `distinct` read, which has no count of the rows it returns, and when the request asked for `count=none`." },
                         limit: { type: "integer",
 description: "Page size used for this query" },
                         offset: { type: "integer",

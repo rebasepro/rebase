@@ -371,79 +371,86 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             // one. Drivers without one (every browser driver, and so the
             // admin's own path through `buildRebaseData`) are untouched.
             //
-            // One row past the page, when seeking.
+            // One row past the page, when seeking — and when not counting.
             //
             // `hasMore` on an offset page is `offset + rows.length < total`, and
             // under a cursor that arithmetic is simply false: every seeked page
             // runs at offset 0, so it compares one page against the whole
-            // collection and says "more" forever. Asking for `limit + 1` and
-            // looking at whether the extra row arrived is the answer keyset
-            // paging actually has — and it costs nothing, where the count it
-            // replaces was a second query per page.
-            const probeLimit = startAfter ? limit + 1 : limit;
+            // collection and says "more" forever. Without a count there is
+            // nothing to compare against at all. Asking for `limit + 1` and
+            // looking at whether the extra row arrived is the answer both have —
+            // and it costs nothing, where the count it replaces is a second
+            // query over every matching row.
+            const seeking = startAfter !== undefined;
+            const counting = driver.count !== undefined && params?.count !== "none";
+            const probing = seeking || !counting;
+            const probeLimit = probing ? limit + 1 : limit;
 
-            const fetchService = driver.restFetchService;
-            const fetched = fetchService
-                ? await fetchService.fetchCollectionForRest(
-                    storedPath(),
-                    {
-                        filter,
-                        // Without this the group was dropped and the read ran
-                        // unfiltered — every row the caller's policies allow,
-                        // in place of the ones they asked for.
-                        logical: params?.logical,
+            // The page and its count in one transaction where the driver can
+            // run them so — see `DataDriver.readTogether`.
+            const read = async (reader: DataDriver) => {
+                const fetchService = reader.restFetchService;
+                const fetched = fetchService
+                    ? await fetchService.fetchCollectionForRest(
+                        storedPath(),
+                        {
+                            filter,
+                            // Without this the group was dropped and the read ran
+                            // unfiltered — every row the caller's policies allow,
+                            // in place of the ones they asked for.
+                            logical: params?.logical,
+                            limit: probeLimit,
+                            // A cursor and an offset describe the same window two
+                            // incompatible ways; seeking wins and the offset is not
+                            // sent, or the page would start `offset` rows past
+                            // where the cursor pointed.
+                            offset: seeking ? undefined : driverOffset,
+                            startAfter,
+                            orderBy,
+                            searchString: params?.searchString,
+                            fields: params?.fields,
+                            distinct: params?.distinct
+                        },
+                        params?.include
+                    )
+                    : await reader.fetchCollection<M>({
+                        path: storedPath(),
                         limit: probeLimit,
-                        // A cursor and an offset describe the same window two
-                        // incompatible ways; seeking wins and the offset is not
-                        // sent, or the page would start `offset` rows past
-                        // where the cursor pointed.
-                        offset: startAfter ? undefined : driverOffset,
+                        offset: seeking ? undefined : driverOffset,
                         startAfter,
+                        filter,
+                        logical: params?.logical,
                         orderBy,
                         searchString: params?.searchString,
+                        include: params?.include,
                         fields: params?.fields,
                         distinct: params?.distinct
-                    },
-                    params?.include
-                )
-                : await driver.fetchCollection<M>({
-                    path: storedPath(),
-                    limit: probeLimit,
-                    offset: startAfter ? undefined : driverOffset,
-                    startAfter,
-                    filter,
-                    logical: params?.logical,
-                    orderBy,
-                    searchString: params?.searchString,
-                    include: params?.include,
-                    fields: params?.fields,
-                    distinct: params?.distinct
-                });
-
-            // The probe row is evidence, not data — it is never served.
-            const seeking = startAfter !== undefined;
-            const rows = seeking ? fetched.slice(0, limit) : fetched;
-
-            // Compute real total when count is available
-            let total = rows.length + offset;
-            let hasMore = seeking ? fetched.length > limit : rows.length >= limit;
-            if (driver.count) {
+                    });
                 // The same narrowing the rows were read with. Counting only by
                 // `filter` reported the whole collection beside a narrowed
-                // page, and `hasMore` is derived from it — so the list offered
+                // page, and `hasMore` was derived from it — so the list offered
                 // a next page that did not exist.
-                total = await driver.count({
-                    path: storedPath(),
-                    filter,
-                    logical: params?.logical,
-                    searchString: params?.searchString
-                });
-                // ...but only for an *offset* page. `offset` is 0 on every
-                // seeked page, so this arithmetic compares one page against the
-                // whole collection and says "more" forever; the probe row above
-                // is what answers it under a cursor.
-                if (!seeking) hasMore = offset + rows.length < total;
-            }
+                const counted = counting && reader.count
+                    ? await reader.count({
+                        path: storedPath(),
+                        filter,
+                        logical: params?.logical,
+                        searchString: params?.searchString
+                    })
+                    : undefined;
+                return { fetched, counted };
+            };
+            const { fetched, counted } = driver.readTogether
+                ? await driver.readTogether(read)
+                : await read(driver);
+
+            // The probe row is evidence, not data — it is never served.
+            const rows = probing ? fetched.slice(0, limit) : fetched;
+
+            // Without a count, the rows up to the end of this page: all a
+            // driver that cannot count has ever been able to report.
+            const total = counted ?? rows.length + offset;
+            const hasMore = probing ? fetched.length > limit : offset + rows.length < total;
 
             // The cursor for the *next* page, from the last row served. Issued
             // by the driver, which is the only layer that knows which columns

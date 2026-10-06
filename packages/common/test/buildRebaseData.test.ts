@@ -210,6 +210,40 @@ price: "gte.100" } as never
         });
     });
 
+    // ── the count beside a page ─────────────────────────────
+    describe("CollectionAccessor.find and its count", () => {
+        const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ id: String(i + 1) }));
+
+        it("does not count with `count: \"none\"`, and takes `hasMore` from one row past the page", async () => {
+            const driver = createMockDriver({ fetchCollection: jest.fn().mockResolvedValue(rows(21)) });
+            const result = await at(buildRebaseData(driver), "products").find({ limit: 20, offset: 40, count: "none" });
+
+            expect(driver.count).not.toHaveBeenCalled();
+            expect((driver.fetchCollection as jest.Mock).mock.calls[0][0]).toMatchObject({ limit: 21, offset: 40 });
+            expect(result.data).toHaveLength(20);
+            // Not counted: the rows up to the end of this page.
+            expect(result.meta).toMatchObject({ hasMore: true, total: 60, offset: 40, limit: 20 });
+        });
+
+        it("reads the page and its count through one `readTogether`, when the driver has it", async () => {
+            const inner = createMockDriver({
+                fetchCollection: jest.fn().mockResolvedValue(rows(3)),
+                count: jest.fn().mockResolvedValue(3)
+            });
+            const readTogether = jest.fn((work: (d: DataDriver) => Promise<unknown>) => work(inner));
+            const outer = createMockDriver({ readTogether: readTogether as DataDriver["readTogether"] });
+
+            const result = await at(buildRebaseData(outer), "products").find({ limit: 20 });
+
+            expect(readTogether).toHaveBeenCalledTimes(1);
+            expect(inner.fetchCollection).toHaveBeenCalledTimes(1);
+            expect(inner.count).toHaveBeenCalledTimes(1);
+            expect(outer.fetchCollection).not.toHaveBeenCalled();
+            expect(outer.count).not.toHaveBeenCalled();
+            expect(result.meta).toMatchObject({ total: 3, hasMore: false });
+        });
+    });
+
     // ── findById ────────────────────────────────────────────
     describe("CollectionAccessor.findById", () => {
         it("delegates to driver.fetchOne", async () => {
