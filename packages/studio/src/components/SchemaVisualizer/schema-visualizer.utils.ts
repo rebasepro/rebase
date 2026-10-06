@@ -39,17 +39,76 @@ export const getColumnRowY = (rowIndex: number, headerHeight: number = HEADER_HE
 // ─── Auto-Layout via Dagre ────────────────────────────────────────────
 
 /**
+ * Positions of the graphs laid out in this page's life, by
+ * {@link layoutSignature}: the most recent few.
+ *
+ * Dagre runs on the main thread — 4.5–5 s at 200 cross-linked tables, 90 s at
+ * 500 — and the visualizer laid its graph out when it opened, again when the
+ * live RLS answer arrived (a badge, not the graph), and again on every reopen.
+ * The key is everything the layout reads, so a changed schema — a table, a
+ * column count, a relation — is a different key and is laid out afresh; the
+ * layout is deterministic, so an entry never goes stale. Holds geometry only,
+ * nothing read from the database.
+ */
+const layoutCache = new Map<string, Map<string, { x: number; y: number }>>();
+const LAYOUT_CACHE_SIZE = 8;
+
+/** What dagre is given — each node's id and height, each edge's ends, in order. */
+const layoutSignature = (nodes: Node[], nodeHeights: Map<string, number>, edges: Edge[]): string =>
+    `${nodes.map(node => `${node.id}:${nodeHeights.get(node.id)}`).join("|")}#${edges.map(edge => `${edge.source}>${edge.target}`).join("|")}`;
+
+/**
  * Compute node positions using the dagre graph layout engine.
  * Returns a new array of nodes with updated `position`.
  *
  * The graph always ranks top to bottom: an ERD read as a column of tables
  * fits the tall, narrow canvas the visualizer is given, and it is the only
  * layout the visualizer offers.
+ *
+ * A graph laid out before is not laid out again: see {@link layoutCache}.
  */
 export const getLayoutedElements = (
     nodes: Node[],
     edges: Edge[]
 ): { nodes: Node[]; edges: Edge[] } => {
+    const nodeHeights = new Map<string, number>();
+    for (const node of nodes) {
+        const data = node.data as { columns?: unknown[]; isJunction?: boolean; collectionName?: string; tableName?: string };
+        const columnCount = data.columns?.length ?? 3;
+        const headerH = getHeaderHeight({
+            isJunction: Boolean(data.isJunction),
+            collectionName: data.collectionName ?? "",
+            tableName: data.tableName ?? ""
+        });
+        nodeHeights.set(node.id, estimateNodeHeight(columnCount, headerH));
+    }
+
+    const signature = layoutSignature(nodes, nodeHeights, edges);
+    let positions = layoutCache.get(signature);
+    if (!positions) {
+        positions = runDagre(nodes, nodeHeights, edges);
+        layoutCache.set(signature, positions);
+        if (layoutCache.size > LAYOUT_CACHE_SIZE) {
+            const oldest = layoutCache.keys().next().value;
+            if (oldest !== undefined) layoutCache.delete(oldest);
+        }
+    }
+
+    const layoutedNodes = nodes.map((node) => ({
+        ...node,
+        position: { ...(positions.get(node.id) ?? { x: 0, y: 0 }) }
+    }));
+
+    return { nodes: layoutedNodes,
+edges };
+};
+
+/** Each node's top-left corner, as dagre places the graph. */
+const runDagre = (
+    nodes: Node[],
+    nodeHeights: Map<string, number>,
+    edges: Edge[]
+): Map<string, { x: number; y: number }> => {
     const g = new dagre.graphlib.Graph();
     g.setGraph({
         rankdir: "TB",
@@ -61,21 +120,10 @@ export const getLayoutedElements = (
     });
     g.setDefaultEdgeLabel(() => ({}));
 
-    const nodeHeights = new Map<string, number>();
-
     nodes.forEach((node) => {
-        const data = node.data as { columns?: unknown[]; isJunction?: boolean; collectionName?: string; tableName?: string };
-        const columnCount = data.columns?.length ?? 3;
-        const headerH = getHeaderHeight({
-            isJunction: Boolean(data.isJunction),
-            collectionName: data.collectionName ?? "",
-            tableName: data.tableName ?? ""
-        });
-        const h = estimateNodeHeight(columnCount, headerH);
-        nodeHeights.set(node.id, h);
         g.setNode(node.id, {
             width: NODE_WIDTH,
-            height: h
+            height: nodeHeights.get(node.id) ?? estimateNodeHeight(3)
         });
     });
 
@@ -85,20 +133,16 @@ export const getLayoutedElements = (
 
     dagre.layout(g);
 
-    const layoutedNodes = nodes.map((node) => {
+    const positions = new Map<string, { x: number; y: number }>();
+    for (const node of nodes) {
         const nodeWithPosition = g.node(node.id);
         const h = nodeHeights.get(node.id) ?? estimateNodeHeight(3);
-        return {
-            ...node,
-            position: {
-                x: nodeWithPosition.x - NODE_WIDTH / 2,
-                y: nodeWithPosition.y - h / 2
-            }
-        };
-    });
-
-    return { nodes: layoutedNodes,
-edges };
+        positions.set(node.id, {
+            x: nodeWithPosition.x - NODE_WIDTH / 2,
+            y: nodeWithPosition.y - h / 2
+        });
+    }
+    return positions;
 };
 
 // ─── Edge styling by relation type ────────────────────────────────────
