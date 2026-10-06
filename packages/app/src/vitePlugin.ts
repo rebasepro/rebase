@@ -563,6 +563,14 @@ export function rebaseManualChunks(id: string): string | undefined {
     // critical path.
     if (id.includes("commonjsHelpers") || id.includes("commonjs-dynamic-modules")) return "vendor-commonjs-helpers";
 
+    // Small libraries the entry needs, named before the heavy groups. A name
+    // takes the unassigned dependencies of its modules with it, so
+    // `prism-react-renderer` took `clsx` — which the kit imports statically — and
+    // the entry imported 85 kB of syntax highlighter for a 633-byte helper;
+    // React core landed in `vendor-dnd` the same way.
+    if (/[\\/]node_modules[\\/](react|scheduler|use-sync-external-store)[\\/]/.test(id)) return "vendor-react";
+    if (/[\\/]node_modules[\\/]clsx[\\/]/.test(id)) return "vendor-clsx";
+
     if (id.includes("exceljs")) return "vendor-exceljs";
     if (id.includes("prosemirror")) return "vendor-prosemirror";
     if (id.includes("monaco-editor") || id.includes("@monaco-editor")) return "vendor-monaco";
