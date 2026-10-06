@@ -1,5 +1,6 @@
 import { logger } from "@rebasepro/server";
 import type { RawSqlRunner } from "../../security/rls-enforcement";
+import { BOOT_LOCK_ATTEMPTS, BOOT_LOCK_TIMEOUT_MS, isLockTimeout, sleep } from "../../schema/boot-ddl";
 
 /**
  * Trigger-based Change Data Capture (CDC).
@@ -152,6 +153,25 @@ export function buildCdcTriggerSql(schema: string, table: string, identityColumn
     );
 }
 
+/**
+ * `CREATE TRIGGER` alone, for a table that has no capture trigger yet.
+ *
+ * Not {@link buildCdcTriggerSql}: its `DROP TRIGGER IF EXISTS` takes an ACCESS
+ * EXCLUSIVE lock on the table even when there is nothing to drop, while
+ * `CREATE TRIGGER` takes SHARE ROW EXCLUSIVE, which readers never wait for.
+ */
+const buildCdcTriggerCreateSql = (schema: string, table: string, identityColumns: readonly string[]): string => {
+    const sql = buildCdcTriggerSql(schema, table, identityColumns);
+    return sql.slice(sql.indexOf("\n") + 1);
+};
+
+/**
+ * `tgtype` of the trigger {@link buildCdcTriggerSql} creates: ROW (1) +
+ * INSERT (4) + DELETE (8) + UPDATE (16), and neither BEFORE (2), TRUNCATE (32)
+ * nor INSTEAD OF (64) — so AFTER.
+ */
+const CDC_TRIGGER_TYPE = 1 + 4 + 8 + 16;
+
 export interface CdcTableRef {
     schema: string;
     table: string;
@@ -214,6 +234,11 @@ async function resolveIdentityColumns(run: RawSqlRunner, ref: CdcTableRef): Prom
     } catch {
         return [...new Set(requested)];
     }
+    return identityFrom(columns, requested);
+}
+
+/** {@link resolveIdentityColumns}' rule, over columns already read. */
+function identityFrom(columns: Array<{ name: string; primary: boolean }>, requested: readonly string[]): string[] {
     if (columns.length === 0) return [...new Set(requested)];
     const existing = new Set(columns.map((column) => column.name));
     return [...new Set([
@@ -222,8 +247,127 @@ async function resolveIdentityColumns(run: RawSqlRunner, ref: CdcTableRef): Prom
     ])];
 }
 
+/** One table's columns and installed capture trigger, as the catalogue has them. */
+interface CaptureState {
+    /** In `attnum` order. Empty when the table does not exist. */
+    columns: Array<{ name: string; primary: boolean }>;
+    /** The installed `rebase_cdc_trigger`, or `null` when there is none. */
+    trigger: {
+        /** Whether it calls {@link CDC_TRIGGER_FUNCTION}. */
+        callsFunction: boolean;
+        type: number;
+        /** `tgenabled`: `O` is the default — fires on origin and local writes. */
+        enabled: string;
+        /** The arguments it was attached with, in order. */
+        args: string[];
+        /** A `WHEN` clause, an `UPDATE OF` column list or a constraint trigger: none of which this module creates. */
+        qualified: boolean;
+    } | null;
+}
+
+/** `tgargs` is each argument followed by a NUL byte; read as hex so no byte is lost to an encoding. */
+const decodeTriggerArgs = (hex: string): string[] => {
+    if (!hex) return [];
+    const parts = Buffer.from(hex, "hex").toString("utf8").split("\0");
+    parts.pop();
+    return parts;
+};
+
+/**
+ * Every listed table's columns and capture trigger, in one catalogue query.
+ *
+ * It replaced a key read per table followed by an unconditional `DROP TRIGGER;
+ * CREATE TRIGGER` per table: 2N round trips, N commits and N ACCESS EXCLUSIVE
+ * locks on every boot, measured holding a live `SELECT` behind the boot for
+ * 4.4 s while a report read the table.
+ */
+async function readCaptureState(run: RawSqlRunner, refs: CdcTableRef[]): Promise<Map<string, CaptureState>> {
+    const targets = refs
+        .map((ref) => `(${quoteLiteral(`${ref.schema}.${ref.table}`)}, to_regclass(${quoteLiteral(`${quoteIdent(ref.schema)}.${quoteIdent(ref.table)}`)}))`)
+        .join(", ");
+    const rows = await run(
+        `WITH target(key, rel) AS (VALUES ${targets})
+         SELECT t.key,
+                (SELECT coalesce(json_agg(json_build_object('name', a.attname,
+                                                            'primary', coalesce(a.attnum = ANY (i.indkey), false))
+                                          ORDER BY a.attnum), '[]'::json)
+                   FROM pg_attribute a
+                   LEFT JOIN pg_index i ON i.indrelid = a.attrelid AND i.indisprimary
+                  WHERE a.attrelid = t.rel AND a.attnum > 0 AND NOT a.attisdropped) AS columns,
+                (SELECT json_build_object(
+                            'callsFunction', tr.tgfoid = to_regprocedure(${quoteLiteral(`${CDC_TRIGGER_FUNCTION}()`)}),
+                            'type', tr.tgtype::int,
+                            'enabled', tr.tgenabled::text,
+                            'args', encode(tr.tgargs, 'hex'),
+                            'qualified', tr.tgqual IS NOT NULL OR coalesce(array_length(tr.tgattr::int2[], 1), 0) > 0
+                                         OR tr.tgconstraint <> 0)
+                   FROM pg_trigger tr
+                  WHERE tr.tgrelid = t.rel AND tr.tgname = ${quoteLiteral(CDC_TRIGGER_NAME)}) AS trigger
+           FROM target t`
+    );
+    const parseJson = <T>(value: unknown): T => (typeof value === "string" ? JSON.parse(value) : value) as T;
+    const states = new Map<string, CaptureState>();
+    for (const row of rows) {
+        const columns = parseJson<Array<{ name: string; primary: boolean }> | null>(row.columns) ?? [];
+        const trigger = parseJson<{ callsFunction: boolean | null; type: number; enabled: string; args: string; qualified: boolean } | null>(row.trigger);
+        states.set(String(row.key), {
+            columns: columns.map((column) => ({ name: String(column.name), primary: column.primary === true })),
+            trigger: trigger
+                ? {
+                    callsFunction: trigger.callsFunction === true,
+                    type: Number(trigger.type),
+                    enabled: String(trigger.enabled),
+                    args: decodeTriggerArgs(trigger.args ?? ""),
+                    qualified: trigger.qualified === true
+                }
+                : null
+        });
+    }
+    return states;
+}
+
+/** Whether the installed trigger is exactly the one {@link buildCdcTriggerSql} would create. */
+const triggerIsCurrent = (trigger: CaptureState["trigger"], identity: readonly string[]): boolean => {
+    if (!trigger) return false;
+    const args = [...new Set(identity)];
+    return trigger.callsFunction &&
+        trigger.type === CDC_TRIGGER_TYPE &&
+        // A trigger someone disabled by hand is not current: re-creating it is
+        // what every boot did before, and what turns capture back on.
+        trigger.enabled === "O" &&
+        !trigger.qualified &&
+        trigger.args.length === args.length &&
+        trigger.args.every((arg, i) => arg === args[i]);
+};
+
+/**
+ * Run one table's trigger DDL with a lock budget, retrying a lock timeout.
+ *
+ * `lock_timeout` because a `DROP TRIGGER` waits for ACCESS EXCLUSIVE, and every
+ * live query on the table queues behind a waiting lock — see `schema/boot-ddl`.
+ * A table still contended after the last attempt is reported by the caller like
+ * any other table it could not instrument; its existing trigger, if any, is
+ * untouched and keeps firing.
+ */
+async function attachWithLockBudget(run: RawSqlRunner, sql: string): Promise<void> {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            await run(`SET LOCAL lock_timeout = '${BOOT_LOCK_TIMEOUT_MS}ms';\n${sql}`);
+            return;
+        } catch (err) {
+            if (!isLockTimeout(err) || attempt >= BOOT_LOCK_ATTEMPTS) throw err;
+            await sleep(500 * attempt * (1 + Math.random()));
+        }
+    }
+}
+
 /**
  * Idempotently install the CDC trigger function and per-table triggers.
+ *
+ * A table whose trigger is already exactly the one this would create —
+ * same function, AFTER INSERT/UPDATE/DELETE FOR EACH ROW, enabled, same
+ * identity arguments — is left alone; one that is missing, disabled or
+ * attached with different arguments is (re-)attached.
  *
  * Runs as the owner (server) connection at bootstrap. A table that does not yet
  * exist in the database (schema drift) is skipped with a warning rather than
@@ -253,10 +397,38 @@ export async function provisionTriggerCdc(
     const installed: CdcTableRef[] = [];
     const skipped: ProvisionResult["skipped"] = [];
 
+    // What is already attached, read once. A trigger that is exactly the one
+    // this would create is left alone: the function above is replaced in place
+    // (`CREATE OR REPLACE` keeps its OID), so an attached trigger picks up a new
+    // body without being re-created. If the read itself fails, every table
+    // takes the old path — read its key, drop and re-create.
+    let states: Map<string, CaptureState> | undefined;
+    try {
+        states = byTable.size > 0 ? await readCaptureState(run, [...byTable.values()]) : new Map();
+    } catch (err) {
+        logger.debug("[CDC] Could not read the installed triggers in one query; re-attaching each table", {
+            detail: err instanceof Error ? err.message : String(err)
+        });
+    }
+    let unchanged = 0;
+
     for (const [key, ref] of byTable) {
         try {
-            const identity = await resolveIdentityColumns(run, ref);
-            await run(buildCdcTriggerSql(ref.schema, ref.table, identity));
+            const state = states?.get(key);
+            if (state) {
+                const identity = identityFrom(state.columns, ref.identityColumns ?? []);
+                if (triggerIsCurrent(state.trigger, identity)) {
+                    installed.push(ref);
+                    unchanged++;
+                    continue;
+                }
+                await attachWithLockBudget(run, state.trigger
+                    ? buildCdcTriggerSql(ref.schema, ref.table, identity)
+                    : buildCdcTriggerCreateSql(ref.schema, ref.table, identity));
+            } else {
+                const identity = await resolveIdentityColumns(run, ref);
+                await attachWithLockBudget(run, buildCdcTriggerSql(ref.schema, ref.table, identity));
+            }
             installed.push(ref);
         } catch (err) {
             const reason = err instanceof Error ? err.message : String(err);
@@ -275,6 +447,7 @@ export async function provisionTriggerCdc(
     // fires on its own.
     logger.debug(
         `📡 [CDC] Trigger-based change capture provisioned on ${installed.length} table(s)` +
+        (unchanged ? ` (${unchanged} already current)` : "") +
         (skipped.length ? ` (${skipped.length} skipped)` : "") + "."
     );
 

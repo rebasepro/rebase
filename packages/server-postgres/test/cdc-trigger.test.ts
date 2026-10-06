@@ -37,10 +37,41 @@ describe("CDC trigger SQL", () => {
     });
 });
 
+/** One table's row in the batched catalogue read `provisionTriggerCdc` makes. */
+type CaptureRow = {
+    key: string;
+    columns: Array<{ name: string; primary: boolean }>;
+    trigger: { callsFunction: boolean; type: number; enabled: string; args: string; qualified: boolean } | null;
+};
+
+/** `tgargs` as the catalogue read returns it: each argument NUL-terminated, hex-encoded. */
+const tgargs = (...args: string[]): string => Buffer.from(args.map((a) => `${a}\0`).join(""), "utf8").toString("hex");
+
+/** The trigger `buildCdcTriggerSql` creates, as the catalogue read describes it. */
+const currentTrigger = (...args: string[]): CaptureRow["trigger"] =>
+    ({ callsFunction: true, type: 29, enabled: "O", args: tgargs(...args), qualified: false });
+
+/** A runner that answers the batched catalogue read with `state` and records everything else. */
+function captureRunner(state: Record<string, Omit<CaptureRow, "key">>) {
+    const calls: string[] = [];
+    const run = jest.fn(async (text: string): Promise<Record<string, unknown>[]> => {
+        calls.push(text);
+        if (/WITH target\(key, rel\)/.test(text)) {
+            return Object.entries(state).map(([key, value]) => ({ key, ...value }));
+        }
+        return [];
+    });
+    return { run, calls };
+}
+
+const idColumn = [{ name: "id", primary: true }];
+
 describe("provisionTriggerCdc", () => {
     it("installs the function once and one trigger per unique table", async () => {
-        const calls: string[] = [];
-        const run = jest.fn(async (text: string) => { calls.push(text); return []; });
+        const { run, calls } = captureRunner({
+            "public.posts": { columns: idColumn, trigger: null },
+            "public.authors": { columns: idColumn, trigger: null }
+        });
 
         const tables: CdcTableRef[] = [
             { schema: "public", table: "posts" },
@@ -50,27 +81,28 @@ describe("provisionTriggerCdc", () => {
 
         const result = await provisionTriggerCdc(run, tables);
 
-        // 1 function + 2 unique tables, each a catalogue read of its key and a trigger
-        expect(run).toHaveBeenCalledTimes(5);
+        // 1 function + 1 catalogue read for every table + 1 trigger per unique table
+        expect(run).toHaveBeenCalledTimes(4);
         expect(calls[0]).toContain("CREATE OR REPLACE FUNCTION");
         expect(result.installed).toHaveLength(2);
         expect(result.skipped).toHaveLength(0);
         expect(calls.filter((c) => c.includes("CREATE TRIGGER"))).toHaveLength(2);
+        // Nothing to drop on a table that has no trigger, and DROP TRIGGER
+        // locks the table even when it drops nothing.
+        expect(calls.filter((c) => c.includes("DROP TRIGGER"))).toHaveLength(0);
     });
 
     it("attaches each table with its primary key and the requested identity columns it has, once per table", async () => {
-        const calls: string[] = [];
-        const run = jest.fn(async (text: string) => {
-            calls.push(text);
-            if (text.includes("pg_attribute") && text.includes("posts_tags")) {
-                return [
-                    { name: "id", is_primary: true },
-                    { name: "post_id", is_primary: false },
-                    { name: "tag_id", is_primary: false },
-                    { name: "note", is_primary: false }
-                ];
+        const { run, calls } = captureRunner({
+            "public.posts_tags": {
+                columns: [
+                    { name: "id", primary: true },
+                    { name: "post_id", primary: false },
+                    { name: "tag_id", primary: false },
+                    { name: "note", primary: false }
+                ],
+                trigger: null
             }
-            return [];
         });
 
         await provisionTriggerCdc(run, [
@@ -101,6 +133,116 @@ describe("provisionTriggerCdc", () => {
         expect(result.skipped).toHaveLength(1);
         expect(result.skipped[0].table).toBe("missing");
         expect(result.skipped[0].reason).toContain("does not exist");
+    });
+
+    /**
+     * Every boot used to drop and re-create every table's trigger: 2N round
+     * trips, N commits and N ACCESS EXCLUSIVE locks, one of which held a live
+     * `SELECT` behind the boot for 4.4 s while a report read the table.
+     */
+    describe("on a boot that changes nothing", () => {
+        it("issues the function and one catalogue read, and no trigger DDL", async () => {
+            const { run, calls } = captureRunner({
+                "public.posts": { columns: idColumn, trigger: currentTrigger("id") },
+                "public.authors": { columns: idColumn, trigger: currentTrigger("id") },
+                "public.posts_tags": {
+                    columns: [{ name: "post_id", primary: true }, { name: "tag_id", primary: true }],
+                    trigger: currentTrigger("post_id", "tag_id")
+                }
+            });
+            const result = await provisionTriggerCdc(run, [
+                { schema: "public", table: "posts" },
+                { schema: "public", table: "authors" },
+                { schema: "public", table: "posts_tags", identityColumns: ["post_id", "tag_id"] }
+            ]);
+
+            expect(calls).toHaveLength(2);
+            expect(calls.filter((c) => /DROP TRIGGER|CREATE TRIGGER/.test(c))).toEqual([]);
+            expect(result.installed).toHaveLength(3);
+            expect(result.skipped).toEqual([]);
+        });
+
+        it.each([
+            ["disabled by hand", { ...currentTrigger("id")!, enabled: "D" }],
+            ["attached with other columns", currentTrigger("id", "slug")],
+            ["calling another function", { ...currentTrigger("id")!, callsFunction: false }],
+            ["firing BEFORE", { ...currentTrigger("id")!, type: 31 }],
+            ["carrying a WHEN clause", { ...currentTrigger("id")!, qualified: true }]
+        ])("re-attaches a trigger %s", async (_label, trigger) => {
+            const { run, calls } = captureRunner({ "public.posts": { columns: idColumn, trigger } });
+            await provisionTriggerCdc(run, [{ schema: "public", table: "posts" }]);
+
+            const ddl = calls.filter((c) => /DROP TRIGGER|CREATE TRIGGER/.test(c));
+            expect(ddl).toHaveLength(1);
+            expect(ddl[0]).toContain(`DROP TRIGGER IF EXISTS "${CDC_TRIGGER_NAME}" ON "public"."posts"`);
+            expect(ddl[0]).toContain(`EXECUTE FUNCTION ${CDC_TRIGGER_FUNCTION}('id');`);
+            // With a lock budget: a held table costs live traffic a second, not
+            // the statement timeout.
+            expect(ddl[0]).toMatch(/^SET LOCAL lock_timeout = '\d+ms';/);
+        });
+
+        it("retries a table whose lock is held, then reports it skipped", async () => {
+            const calls: string[] = [];
+            const run = jest.fn(async (text: string): Promise<Record<string, unknown>[]> => {
+                calls.push(text);
+                if (/WITH target/.test(text)) return [{ key: "public.posts", columns: idColumn, trigger: null }];
+                if (/CREATE TRIGGER/.test(text)) {
+                    throw Object.assign(new Error("canceling statement due to lock timeout"), { code: "55P03" });
+                }
+                return [];
+            });
+            jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+            try {
+                const pending = provisionTriggerCdc(run, [{ schema: "public", table: "posts" }]);
+                await jest.runAllTimersAsync();
+                const result = await pending;
+                expect(calls.filter((c) => /CREATE TRIGGER/.test(c))).toHaveLength(3);
+                expect(result.skipped.map((t) => t.table)).toEqual(["posts"]);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it("leaves a real database's triggers alone on the second run", async () => {
+            const { PGlite } = await import("@electric-sql/pglite");
+            const db = new PGlite();
+            try {
+                await db.exec(
+                    "CREATE TABLE public.posts (id text PRIMARY KEY, title text);" +
+                    "CREATE TABLE public.posts_tags (post_id text, tag_id text, PRIMARY KEY (post_id, tag_id));"
+                );
+                const calls: string[] = [];
+                const run = async (text: string): Promise<Record<string, unknown>[]> => {
+                    calls.push(text);
+                    const results = await db.exec(text);
+                    return (results[results.length - 1]?.rows ?? []) as Record<string, unknown>[];
+                };
+                const tables: CdcTableRef[] = [
+                    { schema: "public", table: "posts", identityColumns: ["id"] },
+                    { schema: "public", table: "posts_tags", identityColumns: ["post_id", "tag_id"] }
+                ];
+                await provisionTriggerCdc(run, tables);
+                expect(calls.filter((c) => /CREATE TRIGGER/.test(c))).toHaveLength(2);
+
+                calls.length = 0;
+                const second = await provisionTriggerCdc(run, tables);
+                expect(calls.filter((c) => /DROP TRIGGER|CREATE TRIGGER/.test(c))).toEqual([]);
+                expect(second.installed).toHaveLength(2);
+
+                // Switched off by hand: the next boot switches it back on.
+                await db.exec(`ALTER TABLE public.posts DISABLE TRIGGER "${CDC_TRIGGER_NAME}"`);
+                calls.length = 0;
+                await provisionTriggerCdc(run, tables);
+                expect(calls.filter((c) => /CREATE TRIGGER/.test(c)).map((c) => /ON "public"\."(\w+)"/.exec(c)?.[1]))
+                    .toEqual(["posts"]);
+                const { rows } = await db.query<{ enabled: string }>(
+                    `SELECT tgenabled::text AS enabled FROM pg_trigger WHERE tgname = '${CDC_TRIGGER_NAME}' AND tgrelid = 'public.posts'::regclass`
+                );
+                expect(rows).toEqual([{ enabled: "O" }]);
+            } finally {
+                await db.close();
+            }
+        }, 30_000);
     });
 });
 
