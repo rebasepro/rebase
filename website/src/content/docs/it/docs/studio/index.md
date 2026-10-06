@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f66a1e3493fbf07
+sourceHash: 59fb182b5af4d770
 title: Strumenti Studio
 sidebar_label: Studio
 description: Rebase Studio fornisce strumenti per sviluppatori per la modifica visiva dello schema, query SQL, scripting JavaScript, gestione delle policy RLS e navigazione dello storage.
@@ -73,8 +73,8 @@ Fanno parte di Studio e vengono **caricati in modo lazy da `RebaseStudio`** — 
 | Scheda | Slug | Gruppo | Cosa fa |
 |--------|------|--------|---------|
 | Console SQL | `sql` | Database | Eseguire SQL grezzo sul tuo database PostgreSQL e leggere i risultati in tabella |
-| Policy RLS | `rls` | Database | Ispezionare e gestire le policy di Row Level Security delle tue tabelle |
-| Visualizzatore di schema | `schema-visualizer` | Database | ERD interattivo di tabelle e relazioni |
+| Policy RLS | `rls` | Database | Ispezionare e gestire le policy di Row Level Security delle tue tabelle. <span class="since-badge" data-since="0.24">Da 0.24</span> Una policy viene elencata così come la conserva il database, con il badge **Differs from code** dove non corrisponde a ciò che dichiara il progetto. Una policy che Rebase genera non può essere modificata direttamente nel database, e su una tabella gestita da Rebase un banner indica che ogni avvio del server e `rebase db push` riapplicano le policy dichiarate |
+| Visualizzatore di schema | `schema-visualizer` | Database | Diagramma delle entità delle tue collezioni e delle loro relazioni, tracciato dalle definizioni delle collezioni: tabelle, colonne, tipi e relazioni sono come le dichiarano le collezioni. Solo gli indicatori RLS vengono letti dal database |
 | Branch | `branches` | Database | Creare e gestire i [branch del database](/docs/backend/branching) |
 | Backup | `backups` | Database | Sfogliare e scaricare i backup del database |
 | Esploratore dei log | `logs` | Database | Log delle richieste in tempo reale, più tutto ciò che il server segnala a warn o error — vedi sotto |
@@ -93,6 +93,9 @@ Due flussi in un unico anello in memoria, tenuto nel processo del server:
   `code` di errore e il messaggio ricevuti dal client. Una richiesta fallita
   viene registrata a `warn` (4xx) o `error` (5xx), così il filtro per livello la
   trova.
+  <span class="since-badge" data-since="0.24">Da 0.24</span> Il suo `source` deriva dal percorso: `/api/auth/*` e `/api/oauth/*` sono
+  `auth`, `/api/storage/*` è `storage`, e tutto il resto è `api`, così il
+  filtro Source trova gli accessi sotto Auth e i caricamenti sotto Storage.
 - **Tutto ciò che il server segnala a warn o error** — un avviso di schema, un
   rifiuto di autenticazione, una diagnosi del driver, un fallimento di boot.
   `source` deriva dal prefisso del messaggio stesso (`[API]`, `[Auth]`,
@@ -110,6 +113,14 @@ questo esiste.
 L'anello è per processo e per boot: non è durevole, non è condiviso tra le
 repliche e un riavvio lo svuota. Per tutto ciò che devi conservare, leggi lo
 stdout del processo, che porta le stesse righe e altro ancora.
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> L'esploratore lo dice. Mostra il log dell'unica istanza del server che lo
+serve e ne indica il nome: l'evento `snapshot` di
+`GET /api/admin/logs/stream` porta `instance`, l'`HOSTNAME` del processo (il
+nome del pod su Kubernetes, l'id del container sotto Docker) oppure `pid-<n>`. Non
+esiste una vista tra le repliche, né dei processi `functions` e `worker` di un
+[deployment suddiviso](/docs/deployment/split-processes/). Una riconnessione che
+finisce su un'altra istanza sostituisce la finestra invece di mescolare i due log.
 
 Anche l'**editor di collezioni** è uno strumento Studio, ma non è in questo
 elenco perché viene registrato in modo diverso: `RebaseStudio` non lo carica in

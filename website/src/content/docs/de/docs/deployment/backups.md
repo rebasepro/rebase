@@ -1,5 +1,5 @@
 ---
-sourceHash: 02c94e203b545b2c
+sourceHash: 6c9aa0d1c19006ba
 title: Backups und Wiederherstellung
 sidebar_label: Backups
 description: Datenbank-Backups mit pg_dump erstellen, planen, auflisten und wiederherstellen — was ein Backup enthält, die Rollen-Datei, die mit ihm reist, und die eine Sache, die es nicht abdeckt, Ihre hochgeladenen Dateien.
@@ -264,6 +264,39 @@ der Liste den geplanten Backup-Job und seinen letzten Lauf. Ein fehlgeschlagener
 Lauf wird als Fehler mit seiner Meldung angezeigt, sodass ein nächtliches
 Backup, das nicht laufen kann, dort sichtbar ist, wo die Backups aufgeführt
 sind, nicht nur im Cron-Jobs-Werkzeug.
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> sagt es über den Job Folgendes:
+
+- **Last scheduled backup** ist der letzte Lauf, den der Zeitplan ausgeführt hat. Ein
+  seitdem von Hand gestarteter Lauf (**Run Now** im Cron-Jobs-Werkzeug) bekommt eine
+  eigene Zeile, sodass ein erfolgreicher Testlauf kein fehlgeschlagenes nächtliches
+  Backup verdecken kann und ein fehlgeschlagener nicht als das nächtliche gemeldet wird.
+- Bei einem mit `enabled: false` deklarierten Job zeigt das Werkzeug geplante Backups als
+  **aus** an. Das exportiert die obige Cron-Datei, solange `BACKUP_SCHEDULE` nicht gesetzt ist, und
+  das Setzen von `BACKUP_SCHEDULE` schaltet sie ein. **Pausiert** bedeutet, dass ein Admin den
+  Job im Cron-Jobs-Werkzeug pausiert hat, und ihn dort fortzusetzen schaltet sie wieder ein.
+- Ein Job, den der Scheduler wegen eines ungültigen Zeitplans, einer ungültigen Zeitzone
+  oder eines ungültigen Timeouts abgelehnt hat, wird mit dem Grund gemeldet. Er läuft nie,
+  bis seine Cron-Datei korrigiert ist.
+- Wenn der Ausführungsverlauf in `rebase.cron_logs` nicht gelesen werden kann, sagt das
+  Werkzeug genau das, statt zu melden, dass das Backup noch nicht gelaufen ist.
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> wird die Liste von
+dem Server-Prozess gelesen, der `GET /api/admin/backups` beantwortet, und das ist
+nicht immer der Prozess, der den Zeitplan ausführt:
+
+- Ein `s3://`-Ziel wird über einen Client für diesen Bucket aufgelistet und
+  heruntergeladen, gebaut aus denselben `S3_*`-Variablen, die der Backup-Cron verwendet.
+  Ein `gs://`-Ziel verwendet Application Default Credentials. Geben Sie sie **jedem**
+  Prozess, der `/api/admin` bedient, einschließlich der `api`-Rolle eines
+  [aufgeteilten Deployments](/docs/deployment/split-processes/), nicht nur dem, der den
+  Cron ausführt. Ein Ziel, das der Prozess nicht lesen kann, antwortet mit `503` samt Ziel
+  und Grund, und das Werkzeug zeigt dies statt einer leeren Liste an.
+- Ein lokaler Pfad ist die eigene Festplatte dieses Prozesses. Wenn der Zeitplan in einem
+  anderen Prozess läuft (ein `api` mit `REBASE_CRON_SCHEDULER=false` neben einem `worker`),
+  meldet das Werkzeug, dass es die Festplatte dieses Prozesses auflistet: Die geplanten
+  Backups erscheinen dort nur, wenn beide Prozesse dasselbe Verzeichnis einbinden. Ein
+  aufgeteiltes Deployment sollte in Object Storage sichern.
 
 Downloads streamen über `GET /api/admin/backups/download?key=…`, nur für
 Admins, sodass der Bucket niemals öffentlich sein muss; ein Key außerhalb des

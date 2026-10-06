@@ -548,6 +548,12 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 
 The OpenAPI spec is auto-generated from your collection definitions: it describes the list, read, create, update, delete and bulk endpoints of every collection the backend serves, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> For a [`softDelete`](/docs/collections/soft-delete/) collection the spec says
+that a delete, single or bulk, moves the row to the trash, and documents
+`?hard=true` on both deletes and `?deleted=include|only` on the list, the single
+read, the count and the aggregate. Studio's API explorer sends only the
+parameters the spec names, so this is what lets it purge a row or list the trash.
+
 Machine callers authenticate with a scoped key rather than a session:
 [API keys](/docs/backend/api-keys/).
 

@@ -71,7 +71,7 @@ Store it immediately.
 | `name` | `string` | A label for people |
 | `scopes` | `string[]` | What the key may do. At least one |
 | `roles` | `string[]` | RLS roles the key runs as, beside `service`. Optional |
-| `rate_limit` | `number \| null` | Requests per 15-minute window. `null` or absent uses the server's API-key default, 1000 |
+| `rate_limit` | `number \| null` | Requests per 15-minute window. `null` or absent uses the server's API-key default, 1000. See [Rate limit](#rate-limit) |
 | `expires_at` | `string \| null` | ISO-8601 expiry. Absent means it never expires |
 
 ### Scopes and RLS: two independent gates
@@ -123,9 +123,14 @@ securityRules: [
 #### The `admin` role
 
 `roles: ["admin"]` (`--roles admin` on the CLI) makes the key run as the `admin`
-RLS role too, so it clears the default admin policies and reads every row of
-every collection that keeps them. That is a statement about rows. It grants no
-scope: the key still reaches only what its `scopes` list.
+RLS role too, so it clears the default admin policies of every collection that
+keeps them. Those policies cover `SELECT`, `INSERT`, `UPDATE` and `DELETE`, so
+row-level security does not limit the key's reads, writes or deletes: it can
+read, change and delete every row its scopes reach. The role also passes the
+admin checks outside the database: `requireAdmin` in
+[custom functions](/docs/backend/custom-functions/), and the writes storage
+leaves to admins. It grants no scope: the key still reaches only what its
+`scopes` list.
 
 A creator can give a key only roles they hold themselves, unless they are an
 admin.
@@ -134,8 +139,8 @@ admin.
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> `--full-access` gives the key every scope its creator holds, less `keys:read` and
 `keys:write`, which no key may hold. Through the CLI, which uses the service key,
-that is every data-plane and admin-plane scope. Add `--roles admin` and the key
-also reads every row:
+that is every data-plane and admin-plane scope. Add `--roles admin` and
+row-level security no longer limits which rows it reads, changes or deletes:
 
 ```bash
 rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
@@ -143,6 +148,23 @@ rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
 
 That is the right shape for CI, migrations and trusted first-party tooling. It is
 not the right shape for an agent.
+
+### Rate limit
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A key's `rate_limit` is how many requests it may make in a 15-minute
+window, and every door counts against it in one bucket, `api-key:<id>`:
+
+- its HTTP requests to the data, storage and functions APIs;
+- its data frames on the realtime socket: fetches, counts, saves and deletes;
+- its requests to [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+
+Without a `rate_limit` the bucket holds the server's API-key default, 1000. A
+personal key has no `rate_limit` of its own, and counts in its own bucket at that
+default. Past the limit an HTTP request answers `429` and a socket frame
+`RATE_LIMITED`.
+
+The admin routes under `/api/admin`, and the socket's admin messages such as the
+SQL editor's, are not rate limited.
 
 ## Personal keys
 

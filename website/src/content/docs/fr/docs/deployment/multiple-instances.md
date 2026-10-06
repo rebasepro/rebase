@@ -1,5 +1,5 @@
 ---
-sourceHash: 2e1acf0a887d27a1
+sourceHash: c783339baba900fc
 title: Exécuter plus d'une instance
 sidebar_label: Plus d'une instance
 description: Chaque élément d'état qu'un processus Rebase garde pour lui seul, et le réglage qui le partage — ce qu'il faut définir avant qu'une seconde réplique, un déploiement progressif ou un déploiement scindé ne prenne du trafic.
@@ -115,7 +115,9 @@ explique que ce soit désactivé par défaut. Voir [Stockage](/docs/backend/stor
 Le Logs Explorer de Studio lit un anneau des 10 000 dernières lignes de log conservées par le
 processus qui sert la requête. Derrière un équilibreur de charge, chaque actualisation peut
 afficher les lignes d'une instance différente, et aucune d'elles ne montre l'ensemble du
-déploiement. Il n'existe aucun réglage pour le partager : le runtime écrit une ligne JSON par
+déploiement.
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> L'explorateur nomme l'instance qu'il affiche.
+Il n'existe aucun réglage pour partager l'anneau : le runtime écrit une ligne JSON par
 événement sur stdout en production, et c'est cela qu'il faut collecter — le service de logs de
 votre plateforme, Loki, ou tout ce qui lit la sortie du conteneur.
 

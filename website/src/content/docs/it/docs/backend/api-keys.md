@@ -1,5 +1,5 @@
 ---
-sourceHash: 1806e56473009c2c
+sourceHash: 411eeede8d2eab1b
 title: Chiavi API
 sidebar_label: Chiavi API
 description: "Chiavi di lunga durata per script, CI, agenti e integrazioni: chiavi di servizio e chiavi personali, gli scope che possiedono, come si combinano con la sicurezza a livello di riga e le route che le gestiscono."
@@ -72,7 +72,7 @@ Salvala subito.
 | `name` | `string` | Un'etichetta per le persone |
 | `scopes` | `string[]` | Ciò che la chiave può fare. Almeno uno |
 | `roles` | `string[]` | Ruoli RLS con cui viene eseguita la chiave, oltre a `service`. Facoltativo |
-| `rate_limit` | `number \| null` | Richieste per intervallo di 15 minuti. `null` o assente usa il valore predefinito del server per le chiavi API, 1000 |
+| `rate_limit` | `number \| null` | Richieste per intervallo di 15 minuti. `null` o assente usa il valore predefinito del server per le chiavi API, 1000. Vedi [Limite di richieste](#limite-di-richieste) |
 | `expires_at` | `string \| null` | Scadenza ISO-8601. Se assente, la chiave non scade mai |
 
 ### Scope e RLS: due controlli indipendenti
@@ -124,8 +124,12 @@ securityRules: [
 #### Il ruolo `admin`
 
 `roles: ["admin"]` (`--roles admin` nella CLI) fa sì che la chiave venga eseguita anche con il ruolo RLS
-`admin`, quindi supera i criteri admin predefiniti e legge ogni riga di ogni collezione
-che li mantiene. Questo riguarda le righe. Non concede alcuno scope: la chiave raggiunge
+`admin`, quindi supera i criteri admin predefiniti di ogni collezione che li mantiene. Quei
+criteri coprono `SELECT`, `INSERT`, `UPDATE` e `DELETE`, quindi la sicurezza a livello di riga non
+limita le letture, le scritture né le eliminazioni della chiave: può leggere, modificare ed eliminare
+ogni riga che i suoi scope raggiungono. Il ruolo supera anche i controlli admin al di fuori del
+database: `requireAdmin` nelle [funzioni personalizzate](/docs/backend/custom-functions/), e le
+scritture che lo storage riserva agli admin. Non concede alcuno scope: la chiave raggiunge
 comunque solo ciò che elencano i suoi `scopes`.
 
 Chi crea una chiave può darle solo ruoli che possiede a sua volta, a meno che non sia un
@@ -135,8 +139,8 @@ admin.
 
 <span class="since-badge" data-since="0.24">Da 0.24</span> `--full-access` dà alla chiave ogni scope che il suo creatore possiede, tranne `keys:read` e
 `keys:write`, che nessuna chiave può avere. Tramite la CLI, che usa la chiave di servizio,
-sono tutti gli scope del piano dati e del piano di amministrazione. Aggiungi `--roles admin` e la chiave
-legge anche ogni riga:
+sono tutti gli scope del piano dati e del piano di amministrazione. Aggiungi `--roles admin` e
+la sicurezza a livello di riga non limita più quali righe legge, modifica o elimina:
 
 ```bash
 rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
@@ -144,6 +148,23 @@ rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
 
 È la configurazione giusta per CI, migrazioni e strumenti proprietari affidabili. Non
 è la configurazione giusta per un agente.
+
+### Limite di richieste
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> Il `rate_limit` di una chiave è il numero di richieste che può fare in un intervallo
+di 15 minuti, e ogni porta d'accesso lo consuma in un unico bucket, `api-key:<id>`:
+
+- le sue richieste HTTP alle API di dati, storage e funzioni;
+- i suoi frame di dati sul WebSocket realtime: fetch, conteggi, salvataggi ed eliminazioni;
+- le sue richieste a [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+
+Senza un `rate_limit` il bucket ha il valore predefinito del server per le chiavi API, 1000. Una
+chiave personale non ha un `rate_limit` proprio, e conta in un suo bucket con quel valore
+predefinito. Oltre il limite una richiesta HTTP risponde `429` e un frame del socket
+`RATE_LIMITED`.
+
+Le route di amministrazione sotto `/api/admin`, e i messaggi admin del socket come quelli
+dell'editor SQL, non hanno limite di richieste.
 
 ## Chiavi personali
 

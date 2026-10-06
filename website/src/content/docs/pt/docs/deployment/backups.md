@@ -1,5 +1,5 @@
 ---
-sourceHash: 02c94e203b545b2c
+sourceHash: 6c9aa0d1c19006ba
 title: Backups e restauração
 sidebar_label: Backups
 description: Crie, agende, liste e restaure backups do banco de dados com pg_dump — o que um backup contém, o arquivo de roles que viaja com ele, e a única coisa que ele não cobre, seus arquivos enviados.
@@ -258,6 +258,39 @@ ele reporta o job de backup agendado e sua última execução. Uma execução
 falha é exibida como um erro com sua mensagem, então um backup noturno que
 não conseguiu rodar fica visível onde os backups são listados, não apenas no
 painel Cron Jobs.
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> o que ele diz sobre o job:
+
+- **Last scheduled backup** é a última execução feita pelo agendamento. Uma execução
+  iniciada manualmente depois disso (**Run Now** em Cron Jobs) ganha uma linha própria,
+  de modo que uma execução de teste que funcionou não esconde um backup noturno que
+  falhou, e uma que falhou não é reportada como o backup noturno.
+- Um job declarado com `enabled: false` aparece como backups agendados **desligados**.
+  É isso que o arquivo de cron acima exporta enquanto `BACKUP_SCHEDULE` não está
+  definida, e definir `BACKUP_SCHEDULE` os liga. **Em pausa** significa que um admin
+  pausou o job em Cron Jobs, e retomá-lo ali os liga de novo.
+- Um job que o agendador recusou, por um agendamento, fuso horário ou timeout
+  inválido, é reportado com o motivo. Ele nunca é executado até que seu arquivo de
+  cron seja corrigido.
+- Quando o histórico de execuções em `rebase.cron_logs` não pode ser lido, o painel
+  diz isso, em vez de dizer que o backup ainda não foi executado.
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> a lista é lida
+pelo processo do servidor que responde a `GET /api/admin/backups`, e esse nem
+sempre é o processo que executa o agendamento:
+
+- Um destino `s3://` é listado e baixado por meio de um cliente para esse
+  bucket, montado a partir das mesmas variáveis `S3_*` que o cron de backup usa. Um
+  `gs://` usa as credenciais padrão da aplicação. Forneça-as a **todo** processo que
+  serve `/api/admin`, incluindo o papel `api` de uma
+  [implantação dividida](/docs/deployment/split-processes/), e não apenas ao que
+  executa o cron. Um destino que o processo não consegue ler responde `503` com o
+  destino e o motivo, e o painel mostra isso em vez de uma lista vazia.
+- Um caminho local é o disco do próprio processo. Quando o agendamento roda em outro
+  processo (um `api` com `REBASE_CRON_SCHEDULER=false` ao lado de um `worker`), o
+  painel diz que está listando o disco deste processo: os backups agendados só
+  aparecem ali se os dois processos montarem o mesmo diretório. Uma implantação
+  dividida deve fazer backup em armazenamento de objetos.
 
 Os downloads passam por `GET /api/admin/backups/download?key=…`, somente para
 admin, então o bucket nunca precisa ser público; uma chave fora do prefixo do

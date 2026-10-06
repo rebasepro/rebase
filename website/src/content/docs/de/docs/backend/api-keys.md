@@ -1,5 +1,5 @@
 ---
-sourceHash: 1806e56473009c2c
+sourceHash: 411eeede8d2eab1b
 title: API-Schlüssel
 sidebar_label: API-Schlüssel
 description: "Langlebige Schlüssel für Skripte, CI, Agents und Integrationen: Service-Schlüssel und persönliche Schlüssel, die Scopes, die sie halten, wie sie mit Row-Level Security zusammenwirken, und die Routen, die sie verwalten."
@@ -72,7 +72,7 @@ Speichern Sie ihn sofort.
 | `name` | `string` | Eine Bezeichnung für Menschen |
 | `scopes` | `string[]` | Was der Schlüssel darf. Mindestens einer |
 | `roles` | `string[]` | RLS-Rollen, als die der Schlüssel neben `service` ausgeführt wird. Optional |
-| `rate_limit` | `number \| null` | Anfragen pro 15-Minuten-Fenster. `null` oder fehlend nutzt den API-Schlüssel-Standard des Servers, 1000 |
+| `rate_limit` | `number \| null` | Anfragen pro 15-Minuten-Fenster. `null` oder fehlend nutzt den API-Schlüssel-Standard des Servers, 1000. Siehe [Ratenbegrenzung](#ratenbegrenzung) |
 | `expires_at` | `string \| null` | ISO-8601-Ablaufdatum. Fehlt es, läuft der Schlüssel nie ab |
 
 ### Scopes und RLS: zwei unabhängige Prüfungen
@@ -124,9 +124,14 @@ securityRules: [
 #### Die Rolle `admin`
 
 `roles: ["admin"]` (`--roles admin` in der CLI) lässt den Schlüssel auch als RLS-Rolle `admin`
-laufen. Er passiert damit die Standard-Admin-Policies und liest jede Zeile jeder
-Collection, die sie behält. Das ist eine Aussage über Zeilen. Sie gewährt keinen
-Scope: Der Schlüssel erreicht weiterhin nur, was seine `scopes` auflisten.
+laufen. Er passiert damit die Standard-Admin-Policies jeder Collection, die sie
+behält. Diese Policies decken `SELECT`, `INSERT`, `UPDATE` und `DELETE` ab, Row-Level
+Security begrenzt also weder, was der Schlüssel liest, noch, was er schreibt oder löscht: Er kann
+jede Zeile lesen, ändern und löschen, die seine Scopes erreichen. Die Rolle besteht auch die
+Admin-Prüfungen außerhalb der Datenbank: `requireAdmin` in
+[benutzerdefinierten Funktionen](/docs/backend/custom-functions/) und die Schreibvorgänge, die
+Storage Admins vorbehält. Sie gewährt keinen Scope: Der Schlüssel erreicht weiterhin nur, was seine
+`scopes` auflisten.
 
 Ein Ersteller kann einem Schlüssel nur Rollen geben, die er selbst hält, es sei denn, er ist
 Admin.
@@ -135,8 +140,8 @@ Admin.
 
 <span class="since-badge" data-since="0.24">Seit 0.24</span> `--full-access` gibt dem Schlüssel jeden Scope, den sein Ersteller hält, abzüglich `keys:read` und
 `keys:write`, die kein Schlüssel halten darf. Über die CLI, die den Service-Key nutzt,
-ist das jeder Scope der Datenebene und der Admin-Ebene. Fügen Sie `--roles admin` hinzu, und der Schlüssel
-liest außerdem jede Zeile:
+ist das jeder Scope der Datenebene und der Admin-Ebene. Fügen Sie `--roles admin` hinzu, und
+Row-Level Security begrenzt nicht mehr, welche Zeilen er liest, ändert oder löscht:
 
 ```bash
 rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
@@ -144,6 +149,23 @@ rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
 
 Das ist das richtige Profil für CI, Migrationen und vertrauenswürdige First-Party-Tools. Es ist
 nicht das richtige Profil für einen Agent.
+
+### Ratenbegrenzung
+
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Das `rate_limit` eines Schlüssels gibt an, wie viele Anfragen er in einem 15-Minuten-Fenster
+stellen darf, und jeder Zugangsweg zählt in einem gemeinsamen Bucket dagegen, `api-key:<id>`:
+
+- seine HTTP-Anfragen an die Daten-, Storage- und Funktions-APIs;
+- seine Daten-Frames auf dem Realtime-Socket: Abrufe, Zählungen, Speichervorgänge und Löschungen;
+- seine Anfragen an [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+
+Ohne `rate_limit` fasst der Bucket den API-Schlüssel-Standard des Servers, 1000. Ein
+persönlicher Schlüssel hat kein eigenes `rate_limit` und zählt in seinem eigenen Bucket mit diesem
+Standard. Über dem Limit antwortet eine HTTP-Anfrage mit `429` und ein Socket-Frame mit
+`RATE_LIMITED`.
+
+Die Admin-Routen unter `/api/admin` und die Admin-Nachrichten des Sockets, etwa die des
+SQL-Editors, unterliegen keiner Ratenbegrenzung.
 
 ## Persönliche Schlüssel
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: c66441155e66f8f0
+sourceHash: 71e8910b2dfa49fa
 title: Environnement et configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -72,8 +72,9 @@ Toute la configuration s'effectue via des variables d'environnement dans votre f
 | `NODE_ENV` | Environnement : `development`, `production` ou `test` | `development` |
 | `CORS_ORIGINS` | Liste d'origines autorisées séparées par des virgules. **Requis en production** si différent du domaine du backend. En développement, il est *ajouté à* localhost — voir ci-dessous. | — |
 | `FRONTEND_URL` | URL de l'application frontend. Utilisé comme alternative à CORS_ORIGINS, dans les deux environnements. | — |
-| `ADMIN_CONNECTION_STRING` | Chaîne de connexion à la base de données de niveau administrateur (utilisée pour l'introspection de schéma et les opérations d'administration). | `DATABASE_URL` |
-| `DISABLE_DB_ROLE_SWITCHING` | Désactive le changement de rôle PostgreSQL dans l'éditeur SQL (utile pour l'authentification personnalisée où les rôles de base de données ne sont pas mappés). | `false` |
+| `ADMIN_CONNECTION_STRING` | Chaîne de connexion à la base de données de niveau administrateur (utilisée pour l'introspection de schéma et les opérations d'administration). <span class="since-badge" data-since="0.24">Depuis 0.24</span> La base de données qu'elle nomme n'est ni celle que la console SQL considère comme courante, ni celle qu'une nouvelle branche copie par défaut : les deux sont la base de données sur laquelle se trouve la connexion propre de l'application (voir `REBASE_BRANCH_PARENT_DATABASE` pour un serveur sur une branche). | `DATABASE_URL` |
+| `DISABLE_DB_ROLE_SWITCHING` | Désactive le changement de rôle PostgreSQL dans l'éditeur SQL (utile pour l'authentification personnalisée où les rôles de base de données ne sont pas mappés). <span class="since-badge" data-since="0.24">Depuis 0.24</span> La console SQL de Studio indique alors que les lignes ont été lues en tant que propriétaire de la connexion, le nomme, et grise son sélecteur de rôle. | `false` |
+| `REBASE_BRANCH_PARENT_DATABASE` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> La base de données à partir de laquelle a été copiée la branche sur laquelle ce serveur s'exécute. `rebase dev` la définit dans un espace de travail [basculé sur une branche](/docs/backend/branching/#cli-integration). Un serveur qui la reçoit conserve le registre des branches dans cette base de données et copie par défaut les nouvelles branches à partir d'elle, de sorte que le panneau Branches de Studio affiche les branches de la base de données principale. | — |
 
 #### CORS en développement
 
@@ -482,7 +483,7 @@ function Widget() {
 
 * **Symptômes :** Les requêtes personnalisées exécutées dans l'éditeur SQL de Rebase Studio échouent avec `cause: error: permission denied for table <name>`, même si la vue feuille de calcul du CMS charge les données avec succès.
 * **Cause :** Par défaut, Rebase tente d'exécuter les requêtes de l'éditeur SQL en basculant temporairement de rôle de base de données pour correspondre au rôle applicatif de l'utilisateur actif (par exemple, `SET LOCAL ROLE "admin"`). Si vous utilisez une authentification personnalisée où les rôles existent uniquement dans les tables de la base de données plutôt que sous forme de véritables rôles PostgreSQL, le changement de rôle échoue ou les privilèges de base de données sont manquants. La vue feuille de calcul du CMS s'exécute sous l'utilisateur propriétaire de la connexion par défaut et contourne ce mécanisme.
-* **Solution :** Ajoutez `DISABLE_DB_ROLE_SWITCHING=true` à la configuration `.env` de votre backend. Cela force Rebase à exécuter les requêtes de l'éditeur SQL en utilisant les privilèges du propriétaire de la connexion (généralement un superutilisateur/propriétaire).
+* **Solution :** Ajoutez `DISABLE_DB_ROLE_SWITCHING=true` à la configuration `.env` de votre backend. Cela force Rebase à exécuter les requêtes de l'éditeur SQL en utilisant les privilèges du propriétaire de la connexion (généralement un superutilisateur/propriétaire). <span class="since-badge" data-since="0.24">Depuis 0.24</span> L'éditeur SQL indique alors, au-dessus des résultats, qu'ils ont été lus en tant que propriétaire de la connexion, et grise son sélecteur de rôle.
 
 ### Échec de récupération du schéma dans l'éditeur SQL (`Cross-database execution requires adminConnectionString`)
 

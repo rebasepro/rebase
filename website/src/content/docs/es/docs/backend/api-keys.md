@@ -1,5 +1,5 @@
 ---
-sourceHash: 1806e56473009c2c
+sourceHash: 411eeede8d2eab1b
 title: Claves de API
 sidebar_label: Claves de API
 description: "Claves de larga duración para scripts, CI, agentes e integraciones: claves de servicio y claves personales, los alcances que tienen, cómo se combinan con la seguridad a nivel de fila y las rutas que las gestionan."
@@ -73,7 +73,7 @@ una vez**. Guárdala de inmediato.
 | `name` | `string` | Una etiqueta para personas |
 | `scopes` | `string[]` | Lo que la clave puede hacer. Al menos uno |
 | `roles` | `string[]` | Roles de RLS con los que se ejecuta la clave, además de `service`. Opcional |
-| `rate_limit` | `number \| null` | Solicitudes por ventana de 15 minutos. `null` o ausente usa el valor predeterminado del servidor para claves de API, 1000 |
+| `rate_limit` | `number \| null` | Solicitudes por ventana de 15 minutos. `null` o ausente usa el valor predeterminado del servidor para claves de API, 1000. Consulta [Límite de tasa](#límite-de-tasa) |
 | `expires_at` | `string \| null` | Caducidad en ISO-8601. Si falta, no caduca nunca |
 
 ### Alcances y RLS: dos barreras independientes
@@ -127,9 +127,14 @@ securityRules: [
 
 `roles: ["admin"]` (`--roles admin` en la CLI) hace que la clave se ejecute también
 con el rol de RLS `admin`, así que supera las políticas de administrador
-predeterminadas y lee todas las filas de cada colección que las conserve. Eso habla
-de filas. No concede ningún alcance: la clave sigue llegando solo a lo que enumeran
-sus `scopes`.
+predeterminadas de cada colección que las conserve. Esas políticas cubren `SELECT`,
+`INSERT`, `UPDATE` y `DELETE`, así que la seguridad a nivel de fila no limita las
+lecturas, escrituras ni eliminaciones de la clave: puede leer, cambiar y eliminar
+todas las filas a las que llegan sus alcances. El rol también supera las
+comprobaciones de administrador fuera de la base de datos: `requireAdmin` en las
+[funciones personalizadas](/docs/backend/custom-functions/), y las escrituras que el
+almacenamiento reserva a los administradores. No concede ningún alcance: la clave
+sigue llegando solo a lo que enumeran sus `scopes`.
 
 Quien crea una clave solo puede darle roles que tenga él mismo, salvo que sea
 administrador.
@@ -139,7 +144,8 @@ administrador.
 <span class="since-badge" data-since="0.24">Desde 0.24</span> `--full-access` da a la clave todos los alcances que tiene su creador, menos
 `keys:read` y `keys:write`, que ninguna clave puede tener. A través de la CLI, que
 usa la clave de servicio, eso son todos los alcances del plano de datos y del plano
-de administración. Añade `--roles admin` y la clave también lee todas las filas:
+de administración. Añade `--roles admin` y la seguridad a nivel de fila deja de
+limitar qué filas lee, cambia o elimina:
 
 ```bash
 rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
@@ -147,6 +153,24 @@ rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
 
 Esa es la forma adecuada para CI, migraciones y herramientas propias de confianza.
 No es la forma adecuada para un agente.
+
+### Límite de tasa
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> El `rate_limit` de una clave es cuántas solicitudes puede hacer en una ventana
+de 15 minutos, y todas las vías cuentan contra él en un mismo contador, `api-key:<id>`:
+
+- sus solicitudes HTTP a las API de datos, almacenamiento y funciones;
+- sus tramas de datos en el socket de tiempo real: lecturas, conteos, guardados y
+  eliminaciones;
+- sus solicitudes a [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+
+Sin `rate_limit`, el contador tiene el valor predeterminado del servidor para claves
+de API, 1000. Una clave personal no tiene `rate_limit` propio, y cuenta en su propio
+contador con ese valor predeterminado. Superado el límite, una solicitud HTTP
+responde `429` y una trama del socket `RATE_LIMITED`.
+
+Las rutas de administración bajo `/api/admin`, y los mensajes de administración del
+socket, como los del editor SQL, no tienen límite de tasa.
 
 ## Claves personales
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f66a1e3493fbf07
+sourceHash: 59fb182b5af4d770
 title: Outils du Studio
 sidebar_label: Studio
 description: Rebase Studio fournit des outils de développement pour l'édition visuelle de schémas, les requêtes SQL, le scripting JavaScript, la gestion des politiques RLS et la navigation dans le stockage.
@@ -73,8 +73,8 @@ Ils sont fournis avec Studio et **chargés à la demande par `RebaseStudio`** �
 | Onglet | Slug | Groupe | Rôle |
 |--------|------|--------|------|
 | Console SQL | `sql` | Base de données | Exécuter du SQL brut sur votre base PostgreSQL et lire les résultats dans un tableau |
-| Politiques RLS | `rls` | Base de données | Inspecter et gérer les politiques Row Level Security de vos tables |
-| Visualiseur de schéma | `schema-visualizer` | Base de données | ERD interactif des tables et des relations |
+| Politiques RLS | `rls` | Base de données | Inspecter et gérer les politiques Row Level Security de vos tables. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Une politique est listée telle que la base de données la détient, avec le badge **Diffère du code** lorsque ce n'est pas ce que le projet déclare. Une politique que Rebase génère ne peut pas être modifiée directement dans la base de données, et sur une table que Rebase gère, une bannière indique que chaque démarrage du serveur et chaque `rebase db push` réappliquent les politiques déclarées |
+| Visualiseur de schéma | `schema-visualizer` | Base de données | Diagramme d'entités de vos collections et de leurs relations, tracé à partir des définitions de collection : tables, colonnes, types et relations sont tels que les collections les déclarent. Seuls les marqueurs RLS sont lus depuis la base de données |
 | Branches | `branches` | Base de données | Créer et gérer des [branches de base de données](/docs/backend/branching) |
 | Sauvegardes | `backups` | Base de données | Parcourir et télécharger les sauvegardes de la base |
 | Explorateur de logs | `logs` | Base de données | Journal des requêtes en direct, plus tout ce que le serveur signale en warn ou error — voir ci-dessous |
@@ -93,6 +93,9 @@ Deux flux dans un seul anneau en mémoire, tenu par le processus serveur :
   d'erreur et le message reçus par le client. Une requête en échec est
   enregistrée en `warn` (4xx) ou `error` (5xx), de sorte que le filtre de niveau
   la retrouve.
+  <span class="since-badge" data-since="0.24">Depuis 0.24</span> Sa `source` provient du chemin : `/api/auth/*` et `/api/oauth/*` sont
+  `auth`, `/api/storage/*` est `storage`, et tout le reste est `api`, de sorte que
+  le filtre Source retrouve les connexions sous Auth et les téléversements sous Storage.
 - **Tout ce que le serveur signale en warn ou error** — un avertissement de
   schéma, un refus d'authentification, un diagnostic de driver, un échec de
   démarrage. `source` provient du préfixe du message lui-même (`[API]`, `[Auth]`,
@@ -109,6 +112,15 @@ L'anneau est par processus et par démarrage : il n'est pas durable, il n'est pa
 partagé entre les réplicas, et un redémarrage le vide. Pour tout ce que vous
 devez conserver, lisez la sortie standard du processus, qui porte les mêmes
 lignes et davantage.
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> L'explorateur le dit. Il affiche le journal de la seule instance serveur qui
+le sert et nomme cette instance : l'événement `snapshot` de
+`GET /api/admin/logs/stream` porte `instance`, le `HOSTNAME` du processus (le nom
+du pod sur Kubernetes, l'identifiant du conteneur sous Docker) ou à défaut
+`pid-<n>`. Il n'existe aucune vue couvrant plusieurs réplicas, ni les processus
+`functions` et `worker` d'un [déploiement scindé](/docs/deployment/split-processes/).
+Une reconnexion qui aboutit sur une autre instance remplace la fenêtre au lieu de
+mélanger les deux journaux.
 
 L'**éditeur de collection** est lui aussi un outil Studio, mais il ne figure pas
 dans cette liste parce qu'il est enregistré autrement : `RebaseStudio` ne le

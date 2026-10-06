@@ -1,5 +1,5 @@
 ---
-sourceHash: 2e1acf0a887d27a1
+sourceHash: c783339baba900fc
 title: Mehr als eine Instanz ausführen
 sidebar_label: Mehr als eine Instanz
 description: Jedes Stück Zustand, das ein Rebase-Prozess für sich behält, und die Einstellung, die es teilt — was zu setzen ist, bevor eine zweite Replik, ein Rolling Deployment oder ein aufgeteiltes Deployment Traffic übernimmt.
@@ -106,7 +106,9 @@ standardmäßig aus ist, sofern nicht angefordert. Siehe [Storage](/docs/backend
 
 Studios Logs Explorer liest einen Ring der letzten 10.000 Log-Zeilen, die der Prozess hält, der die
 Anfrage bedient. Hinter einem Load Balancer kann jedes Neuladen die Zeilen einer anderen Instanz
-zeigen, und keine davon zeigt das gesamte Deployment. Es gibt keine Einstellung, die dies teilt: Die
+zeigen, und keine davon zeigt das gesamte Deployment.
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Der Explorer nennt die Instanz, die er anzeigt.
+Es gibt keine Einstellung, die den Ring teilt: Die
 Runtime schreibt in der Produktion eine JSON-Zeile pro Ereignis nach stdout, und das ist es, was Sie
 sammeln sollten — der Log-Dienst Ihrer Plattform, Loki, oder alles, was Container-Output liest.
 

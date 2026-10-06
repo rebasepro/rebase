@@ -60,7 +60,7 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/admin/users` | List users (paginated) |
+| `GET` | `/api/admin/users` | List users (paginated). `?search=` matches a case-insensitive part of the email or display name. <span class="since-badge" data-since="0.24">Since 0.24</span> On Postgres it also matches any role the user holds, and the uid; on MongoDB it still matches email and display name only |
 | `POST` | `/api/admin/users` | Create a user |
 | `GET` | `/api/admin/users/:uid` | Read one user |
 | `PUT` | `/api/admin/users/:uid` | Update one user. `{ disabled: true }` switches the account off without deleting it: every sign-in and refresh is refused (`ACCOUNT_DISABLED`), its sessions end and every token it holds is refused; `false` switches it back on |

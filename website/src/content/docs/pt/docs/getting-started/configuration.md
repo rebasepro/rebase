@@ -1,5 +1,5 @@
 ---
-sourceHash: c66441155e66f8f0
+sourceHash: 71e8910b2dfa49fa
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -72,8 +72,9 @@ Toda a configuração é feita por meio de variáveis de ambiente no seu arquivo
 | `NODE_ENV` | Ambiente: `development`, `production` ou `test` | `development` |
 | `CORS_ORIGINS` | Lista separada por vírgulas de origens permitidas. **Obrigatória em produção** se diferente do domínio do backend. Em desenvolvimento, ela é *adicionada ao* localhost — veja abaixo. | — |
 | `FRONTEND_URL` | URL da aplicação frontend. Usada como alternativa ao CORS_ORIGINS, em ambos os ambientes. | — |
-| `ADMIN_CONNECTION_STRING` | String de conexão com o banco de dados em nível de administrador (usada para introspecção de schema e operações de administração). | `DATABASE_URL` |
-| `DISABLE_DB_ROLE_SWITCHING` | Desativa a troca de funções (role-switching) do PostgreSQL no SQL Editor (útil para autenticação personalizada onde as roles do banco de dados não estão mapeadas). | `false` |
+| `ADMIN_CONNECTION_STRING` | String de conexão com o banco de dados em nível de administrador (usada para introspecção de schema e operações de administração). <span class="since-badge" data-since="0.24">Desde 0.24</span> O banco de dados que ela indica não é o que o console SQL chama de atual, nem o que uma nova branch copia por padrão: ambos são o banco de dados em que está a própria conexão da aplicação (veja `REBASE_BRANCH_PARENT_DATABASE` para um servidor em uma branch). | `DATABASE_URL` |
+| `DISABLE_DB_ROLE_SWITCHING` | Desativa a troca de funções (role-switching) do PostgreSQL no SQL Editor (útil para autenticação personalizada onde as roles do banco de dados não estão mapeadas). <span class="since-badge" data-since="0.24">Desde 0.24</span> O console SQL do Studio passa então a dizer que as linhas foram lidas como o proprietário da conexão, indica qual é ele e deixa acinzentado o seu seletor de role. | `false` |
+| `REBASE_BRANCH_PARENT_DATABASE` | <span class="since-badge" data-since="0.24">Desde 0.24</span> O banco de dados do qual foi copiada a branch em que este servidor roda. O `rebase dev` a define em um checkout [alternado para uma branch](/docs/backend/branching/#cli-integration). Um servidor com ela mantém o registro de branches nesse banco de dados e, por padrão, copia as novas branches a partir dele, de modo que o painel Branches do Studio mostra as branches do banco de dados principal. | — |
 
 #### CORS em desenvolvimento
 
@@ -483,7 +484,7 @@ function Widget() {
 
 * **Sintomas:** Consultas personalizadas executadas no editor SQL do Rebase Studio falham com `cause: error: permission denied for table <name>`, mesmo que a visualização em planilha do CMS carregue os dados com sucesso.
 * **Causa:** Por padrão, o Rebase tenta executar consultas do SQL Editor alternando temporariamente as roles do banco de dados para corresponder à role de aplicação do usuário ativo (por exemplo, `SET LOCAL ROLE "admin"`). Se você estiver usando autenticação personalizada em que as roles existem apenas nas tabelas do banco de dados e não como roles reais do PostgreSQL, a troca de role falha ou os privilégios do banco de dados estão ausentes. A visualização em planilha do CMS é executada sob o usuário padrão proprietário da conexão e ignora isso.
-* **Solução:** Adicione `DISABLE_DB_ROLE_SWITCHING=true` à configuração do seu `.env` no backend. Isso força o Rebase a executar consultas do SQL Editor usando os privilégios do proprietário da conexão (normalmente um superusuário/owner).
+* **Solução:** Adicione `DISABLE_DB_ROLE_SWITCHING=true` à configuração do seu `.env` no backend. Isso força o Rebase a executar consultas do SQL Editor usando os privilégios do proprietário da conexão (normalmente um superusuário/owner). <span class="since-badge" data-since="0.24">Desde 0.24</span> O SQL Editor passa então a dizer, acima dos resultados, que eles foram lidos como o proprietário da conexão, e deixa acinzentado o seu seletor de role.
 
 ### Falha ao Carregar Schema no SQL Editor (`Cross-database execution requires adminConnectionString`)
 

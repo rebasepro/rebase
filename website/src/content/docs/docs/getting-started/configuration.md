@@ -71,8 +71,9 @@ All configuration is done via environment variables in your `.env` file at the p
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |
 | `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS, in both environments. | — |
-| `ADMIN_CONNECTION_STRING` | Admin-level database connection string (used for schema introspection and admin operations). | `DATABASE_URL` |
-| `DISABLE_DB_ROLE_SWITCHING` | Disable PostgreSQL role-switching in SQL Editor (useful for custom authentication where DB roles are not mapped). | `false` |
+| `ADMIN_CONNECTION_STRING` | Admin-level database connection string (used for schema introspection and admin operations). <span class="since-badge" data-since="0.24">Since 0.24</span> The database it names is not the one the SQL console calls current, nor what a new branch copies by default: both are the database the app's own connection is on (see `REBASE_BRANCH_PARENT_DATABASE` for a server on a branch). | `DATABASE_URL` |
+| `DISABLE_DB_ROLE_SWITCHING` | Disable PostgreSQL role-switching in SQL Editor (useful for custom authentication where DB roles are not mapped). <span class="since-badge" data-since="0.24">Since 0.24</span> Studio's SQL console then says that the rows were read as the connection owner, names it, and greys out its role picker. | `false` |
+| `REBASE_BRANCH_PARENT_DATABASE` | <span class="since-badge" data-since="0.24">Since 0.24</span> The database the branch this server runs on was copied from. `rebase dev` sets it on a checkout [switched to a branch](/docs/backend/branching/#cli-integration). A server with it keeps the branch registry on that database and copies new branches from it by default, so Studio's Branches pane shows the main database's branches. | — |
 
 #### CORS in development
 
@@ -483,7 +484,7 @@ function Widget() {
 
 * **Symptoms:** Custom queries executed in Rebase Studio's SQL editor fail with `cause: error: permission denied for table <name>`, even though the spreadsheet CMS view loads data successfully.
 * **Cause:** By default, Rebase attempts to execute SQL Editor queries by temporarily switching database roles to match the active user's application role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom authentication where roles exist only in database tables rather than actual PostgreSQL roles, the role switch fails or database privileges are missing. The CMS spreadsheet view executes under the default connection owner user and bypasses this.
-* **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This forces Rebase to run SQL Editor queries using the connection owner's privileges (typically a superuser/owner).
+* **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This forces Rebase to run SQL Editor queries using the connection owner's privileges (typically a superuser/owner). <span class="since-badge" data-since="0.24">Since 0.24</span> The SQL Editor then says, above the results, that they were read as the connection owner, and greys out its role picker.
 
 ### SQL Editor Schema Fetch Failed (`Cross-database execution requires adminConnectionString`)
 

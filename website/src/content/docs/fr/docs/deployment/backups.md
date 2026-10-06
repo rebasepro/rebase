@@ -1,5 +1,5 @@
 ---
-sourceHash: 02c94e203b545b2c
+sourceHash: 6c9aa0d1c19006ba
 title: Sauvegardes et restauration
 sidebar_label: Sauvegardes
 description: Prenez, planifiez, listez et restaurez des sauvegardes de base de données avec pg_dump — ce que contient une sauvegarde, le fichier de rôles qui l'accompagne, et la seule chose qu'elle ne couvre pas, vos fichiers téléversés.
@@ -261,6 +261,43 @@ le panneau indique la tâche de sauvegarde planifiée et sa dernière exécution
 exécution en échec s'affiche comme une erreur avec son message, de sorte qu'une
 sauvegarde nocturne qui ne peut pas s'exécuter est visible là où les sauvegardes sont
 listées, et pas seulement dans le panneau Tâches Cron.
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> ce qu'il indique sur la tâche :
+
+- **Dernière sauvegarde planifiée** est la dernière exécution effectuée par la
+  planification. Une exécution lancée à la main depuis lors (**Run Now** dans Tâches
+  Cron) a sa propre ligne, de sorte qu'une exécution de test réussie ne peut pas masquer
+  l'échec de la sauvegarde nocturne, et qu'une exécution en échec n'est pas présentée
+  comme la sauvegarde nocturne.
+- Une tâche déclarée `enabled: false` se lit comme des sauvegardes planifiées
+  **désactivées**. C'est ce qu'exporte le fichier cron ci-dessus tant que
+  `BACKUP_SCHEDULE` n'est pas définie, et définir `BACKUP_SCHEDULE` les active.
+  **En pause** signifie qu'un administrateur a mis la tâche en pause dans Tâches Cron,
+  et la reprendre à cet endroit les réactive.
+- Une tâche que le planificateur a refusée, pour une planification, un fuseau horaire
+  ou un délai d'expiration invalide, est signalée avec la raison. Elle ne s'exécute
+  jamais tant que son fichier cron n'est pas corrigé.
+- Lorsque l'historique d'exécution dans `rebase.cron_logs` ne peut pas être lu, le
+  panneau l'indique, plutôt que d'affirmer que la sauvegarde ne s'est pas encore
+  exécutée.
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> la liste est lue
+par le processus serveur qui répond à `GET /api/admin/backups`, et ce n'est pas
+toujours le processus qui exécute la planification :
+
+- Une destination `s3://` est listée et téléchargée via un client pour ce bucket,
+  construit à partir des mêmes variables `S3_*` qu'utilise le cron de sauvegarde. Une
+  destination `gs://` utilise les identifiants par défaut de l'application (application
+  default credentials). Fournissez-les à **chaque** processus qui sert `/api/admin`, y
+  compris le rôle `api` d'un [déploiement scindé](/docs/deployment/split-processes/),
+  et pas seulement à celui qui exécute le cron. Une destination que le processus ne
+  peut pas lire répond `503` avec la destination et la raison, et le panneau affiche
+  cela au lieu d'une liste vide.
+- Un chemin local est le disque propre de ce processus. Lorsque la planification
+  s'exécute dans un autre processus (un `api` avec `REBASE_CRON_SCHEDULER=false` à
+  côté d'un `worker`), le panneau indique qu'il liste le disque de ce processus : les
+  sauvegardes planifiées n'y apparaissent que si les deux processus montent le même
+  répertoire. Un déploiement scindé devrait sauvegarder vers un stockage d'objets.
 
 Les téléchargements transitent par `GET /api/admin/backups/download?key=…`, réservé
 aux administrateurs, de sorte que le bucket n'a jamais besoin d'être public ; une clé

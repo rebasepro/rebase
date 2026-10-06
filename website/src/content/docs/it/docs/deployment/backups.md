@@ -1,5 +1,5 @@
 ---
-sourceHash: 02c94e203b545b2c
+sourceHash: 6c9aa0d1c19006ba
 title: Backup e ripristino
 sidebar_label: Backup
 description: Crea, pianifica, elenca e ripristina backup del database con pg_dump — cosa contiene un backup, il file dei ruoli che lo accompagna, e l'unica cosa che non copre, i tuoi file caricati.
@@ -260,6 +260,40 @@ viene mostrato il job di backup pianificato e la sua ultima esecuzione.
 Un'esecuzione fallita viene mostrata come errore con il proprio messaggio,
 così un backup notturno che non riesce a eseguirsi è visibile dove sono
 elencati i backup, non solo nel pannello Cron Jobs.
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> ecco cosa riporta sul job:
+
+- **Last scheduled backup** è l'ultima esecuzione fatta dalla pianificazione. Un'esecuzione
+  avviata a mano da allora (**Run Now** in Cron Jobs) ha una riga a sé, così un'esecuzione
+  di prova riuscita non può nascondere un backup notturno fallito, e una fallita non viene
+  riportata come il backup notturno.
+- Un job dichiarato `enabled: false` risulta come backup pianificati **off**.
+  È ciò che esporta il file di cron qui sopra finché `BACKUP_SCHEDULE` non è impostata, e
+  impostare `BACKUP_SCHEDULE` li attiva. **Paused** significa che un admin ha messo in pausa
+  il job in Cron Jobs, e riprenderlo lì lo riattiva.
+- Un job che lo scheduler ha rifiutato, per una pianificazione, un fuso orario o un timeout
+  non validi, viene riportato con il motivo. Non viene mai eseguito finché il suo file di
+  cron non viene corretto.
+- Quando la cronologia delle esecuzioni in `rebase.cron_logs` non può essere letta, il
+  pannello lo dice, anziché dire che il backup non è ancora stato eseguito.
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> l'elenco viene letto
+dal processo server che risponde a `GET /api/admin/backups`, e non sempre è
+il processo che esegue la pianificazione:
+
+- Una destinazione `s3://` viene elencata e scaricata tramite un client per quel
+  bucket, costruito dalle stesse variabili `S3_*` usate dal cron di backup. Una `gs://`
+  usa le credenziali predefinite dell'applicazione (ADC). Forniscile a **ogni** processo che
+  serve `/api/admin`, compreso il ruolo `api` di un
+  [deployment suddiviso](/docs/deployment/split-processes/), non solo a quello che esegue
+  il cron. Una destinazione che il processo non riesce a leggere risponde `503`
+  con la destinazione e il motivo, e il pannello mostra questo anziché un
+  elenco vuoto.
+- Un percorso locale è il disco proprio di quel processo. Quando la pianificazione viene
+  eseguita in un altro processo (un `api` con `REBASE_CRON_SCHEDULER=false` accanto a un
+  `worker`), il pannello dice che sta elencando il disco di questo processo: i backup
+  pianificati compaiono lì solo se entrambi i processi montano la stessa directory. Un
+  deployment suddiviso dovrebbe fare il backup su object storage.
 
 I download passano attraverso
 `GET /api/admin/backups/download?key=…`, riservato agli admin, così il

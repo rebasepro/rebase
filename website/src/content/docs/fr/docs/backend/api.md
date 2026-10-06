@@ -1,5 +1,5 @@
 ---
-sourceHash: a8bf9ad448b91c03
+sourceHash: df4fcc013e52c859
 title: API REST
 sidebar_label: API REST
 description: Points de terminaison d'API REST générés automatiquement pour chaque collection, avec filtrage, tri, pagination et inclusion de relations.
@@ -463,6 +463,8 @@ Chaque hook est attendu, et une exception levée par l'un d'eux annule toute l'�
 ## OpenAPI / Swagger
 
 La spécification OpenAPI est générée automatiquement à partir des définitions de vos collections : elle décrit les points de terminaison de liste, de lecture, de création, de mise à jour, de suppression et en bloc de chaque collection gérée par le backend, avec leurs paramètres de requête et schémas de réponse. Il ne s'agit pas d'une cartographie complète de la surface HTTP — les routes d'authentification, de stockage, de fonctions et de cron sont documentées uniquement sur ce site — et les colonnes marquées `excludeFromApi` en sont exclues.
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Pour une collection [`softDelete`](/docs/collections/soft-delete/), la spécification indique qu'une suppression, unitaire ou en bloc, déplace la ligne dans la corbeille, et documente `?hard=true` sur les deux suppressions et `?deleted=include|only` sur la liste, la lecture unitaire, le comptage et l'agrégat. L'explorateur d'API de Studio n'envoie que les paramètres que la spécification nomme : c'est donc ce qui lui permet de purger une ligne ou de lister la corbeille.
 
 Les clients automatisés s'authentifient avec une clé restreinte plutôt qu'avec une session : [Clés API](/docs/backend/api-keys/).
 

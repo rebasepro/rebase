@@ -1,5 +1,5 @@
 ---
-sourceHash: ddd8f6798208c0d8
+sourceHash: 6d36f4d71bfe288e
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Pianifica attività ricorrenti in background con il sistema di cron job integrato di Rebase. Definisci i job come file TypeScript, monitorali in Studio e gestiscili tramite l'API REST.
@@ -280,7 +280,7 @@ Vedi [Ruoli e scope](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | Elenca tutti i cron job registrati |
 | `GET` | `/api/admin/cron/:id` | Recupera lo stato di un singolo job |
 | `POST` | `/api/admin/cron/:id/trigger` | Avvia manualmente un job — `409` mentre è già in esecuzione |
-| `GET` | `/api/admin/cron/:id/logs` | Ottieni la cronologia delle esecuzioni (`?limit=N`) |
+| `GET` | `/api/admin/cron/:id/logs` | Ottieni la cronologia delle esecuzioni (`?limit=N`). <span class="since-badge" data-since="0.24">Da 0.24</span> `503` quando `rebase.cron_logs` non può essere letto, anziché una cronologia vuota |
 | `PUT` | `/api/admin/cron/:id` | Mette in pausa o riprende un job ovunque (`{ "enabled": false }`); `null` torna a seguire il codice |
 
 ### Esempio: Elencare tutti i job
@@ -362,8 +362,8 @@ import { createRebaseClient } from "@rebasepro/client";
 
 const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
 
-// List all jobs
-const { jobs } = await client.cron.listJobs();
+// List all jobs, and the ones that did not register
+const { jobs, rejected } = await client.cron.listJobs();
 
 // Get a single job
 const { job } = await client.cron.getJob("health-check");
@@ -379,6 +379,9 @@ await client.cron.toggleJob("health-check", false); // pause
 await client.cron.toggleJob("health-check", true);  // resume
 ```
 
+<span class="since-badge" data-since="0.24">Da 0.24</span> `listJobs()` è tipizzato `CronJobListing`: `jobs`, più i campi `skipped`,
+`rejected` e `note` descritti in [Job non presenti](#job-non-presenti).
+
 ## Dashboard di Studio
 
 Quando i cron job sono configurati, lo strumento **Cron Jobs** compare in Rebase Studio sotto la voce **Compute**, accanto alla console JS. La dashboard offre:
@@ -386,17 +389,21 @@ Quando i cron job sono configurati, lo strumento **Cron Jobs** compare in Rebase
 - **Elenco dei job** — Tutti i job registrati con indicatori di stato in tempo reale
 - **Pannello dettagli** — Pianificazione, esecuzione successiva/precedente, durata e informazioni sugli errori
 - **Cronologia delle esecuzioni** — Voci di log espandibili con l'output acquisito e i risultati
-- **Avvio manuale** — Esegui qualsiasi job su richiesta con un solo clic
+- **Avvio manuale** — Esegui qualsiasi job su richiesta con un solo clic. <span class="since-badge" data-since="0.24">Da 0.24</span> Il pannello attende la fine dell'esecuzione e dice com'è andata: un'esecuzione fallita mostra il suo errore
 - **Abilita/disabilita** — Metti in pausa e riprendi i job senza riavviare il server, per tutti i processi insieme; una pausa resta valida dopo riavvii e deploy
+- **Job non presenti** — <span class="since-badge" data-since="0.24">Da 0.24</span> ogni job che lo scheduler ha rifiutato, con la sua pianificazione e il motivo, e quanti file di cron non è stato possibile caricare. Nessuno di essi è pianificato; vedi [Job non presenti](#job-non-presenti)
 
 La dashboard si aggiorna automaticamente ogni 15 secondi.
 
 Il pannello mostra la stessa cosa qualunque processo lo serva. Un job che un
-altro processo sta eseguendo appare in esecuzione, e su un processo il cui
-scheduler non è avviato — il ruolo `api` accanto a un worker — il numero di
-esecuzioni, il numero di errori e l'ultima esecuzione vengono letti da
-`rebase.cron_logs`, con una query limitata alle righe di ciascun job, anziché da
-un processo che non esegue nulla.
+altro processo sta eseguendo appare in esecuzione.
+<span class="since-badge" data-since="0.24">Da 0.24</span> Su ogni processo che dispone di uno store, il numero di esecuzioni, il numero di errori e
+l'ultima esecuzione vengono letti da `rebase.cron_logs`, con una query limitata alle righe
+di ciascun job. I contatori propri di un processo contengono solo le esecuzioni che ha fatto
+lui: il ruolo `api` accanto a un worker non esegue nulla, e di due repliche che pianificano
+entrambe, nessuna vede gli slot rivendicati dall'altra. Solo quando `cron_logs` non può essere
+letto la scheda ripiega sui contatori di questo processo, con un avviso nel log del
+server.
 
 ## Validazione della pianificazione e parsing dell'AST
 

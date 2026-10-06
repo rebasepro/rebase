@@ -247,6 +247,39 @@ reports the scheduled backup job and its last run. A failed run is shown as an
 error with its message, so a nightly backup that cannot run is visible where
 the backups are listed, not only in the Cron Jobs panel.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> what it says about the job:
+
+- **Last scheduled backup** is the last run the schedule made. A run started
+  by hand since then (**Run Now** in Cron Jobs) gets a line of its own, so a
+  test run that worked cannot hide a failed nightly, and one that failed is not
+  reported as the nightly.
+- A job declared `enabled: false` reads as scheduled backups being **off**.
+  That is what the cron file above exports while `BACKUP_SCHEDULE` is unset, and
+  setting `BACKUP_SCHEDULE` turns them on. **Paused** means an admin paused the
+  job in Cron Jobs, and resuming it there turns it back on.
+- A job the scheduler refused, for an invalid schedule, timezone or timeout,
+  is reported with the reason. It never runs until its cron file is fixed.
+- When the run history in `rebase.cron_logs` cannot be read, the panel says
+  so, rather than that the backup has not run yet.
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> the list is read
+by the server process that answers `GET /api/admin/backups`, and that is not
+always the process that runs the schedule:
+
+- An `s3://` destination is listed and downloaded through a client for that
+  bucket, built from the same `S3_*` variables the backup cron uses. A `gs://`
+  one uses application default credentials. Give them to **every** process that
+  serves `/api/admin`, the `api` role of a
+  [split deployment](/docs/deployment/split-processes/) included, not only the
+  one that runs the cron. A destination the process cannot read answers `503`
+  with the destination and the reason, and the panel shows that instead of an
+  empty list.
+- A local path is that process's own disk. When the schedule runs in another
+  process (an `api` with `REBASE_CRON_SCHEDULER=false` beside a `worker`), the
+  panel says it is listing this process's disk: the scheduled backups appear
+  there only if both processes mount the same directory. A split deployment
+  should back up to object storage.
+
 Downloads stream through `GET /api/admin/backups/download?key=…`, admin-only,
 so the bucket never has to be public; a key outside the destination's prefix is
 refused. With `BACKUP_DESTINATION` unset the panel says backups are not

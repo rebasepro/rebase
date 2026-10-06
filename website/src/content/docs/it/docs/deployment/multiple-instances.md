@@ -1,5 +1,5 @@
 ---
-sourceHash: 2e1acf0a887d27a1
+sourceHash: c783339baba900fc
 title: Eseguire più di un'istanza
 sidebar_label: Più di un'istanza
 description: Ogni elemento di stato che un processo Rebase conserva solo per sé, e l'impostazione che lo condivide — cosa impostare prima che una seconda replica, un rolling deploy o un deployment suddiviso ricevano traffico.
@@ -121,7 +121,9 @@ tuo bucket, motivo per cui è disattivato finché non viene richiesto. Vedi
 Il Logs Explorer di Studio legge un ring delle ultime 10.000 righe di log
 mantenute dal processo che serve la richiesta. Dietro un load balancer ogni
 aggiornamento può mostrare le righe di un'istanza diversa, e nessuna di esse
-mostra l'intero deployment. Non esiste un'impostazione che lo condivida: il
+mostra l'intero deployment.
+<span class="since-badge" data-since="0.24">Da 0.24</span> L'explorer indica il nome dell'istanza che sta mostrando.
+Non esiste un'impostazione che condivida il ring: il
 runtime scrive una riga JSON per evento su stdout in produzione, ed è quello
 che va raccolto — il servizio di log della tua piattaforma, Loki, o
 qualunque cosa legga l'output del container.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 2e1acf0a887d27a1
+sourceHash: c783339baba900fc
 title: Ejecutar más de una instancia
 sidebar_label: Más de una instancia
 description: Cada parte del estado que un proceso de Rebase guarda para sí mismo, y el ajuste que lo comparte — qué configurar antes de que una segunda réplica, un despliegue progresivo o un despliegue dividido reciban tráfico.
@@ -127,8 +127,9 @@ está desactivado salvo que se solicite. Consulta
 El Explorador de logs de Studio lee un anillo con las últimas 10.000 líneas
 que mantiene el proceso que atiende la petición. Detrás de un balanceador de
 carga, cada actualización puede mostrar las líneas de una instancia distinta,
-y ninguna de ellas muestra el despliegue completo. No hay ningún ajuste que lo
-comparta: el runtime escribe una línea JSON por evento en la salida estándar
+y ninguna de ellas muestra el despliegue completo.
+<span class="since-badge" data-since="0.24">Desde 0.24</span> El explorador nombra la instancia que está mostrando.
+No hay ningún ajuste que comparta el anillo: el runtime escribe una línea JSON por evento en la salida estándar
 en producción, y eso es lo que hay que recopilar — el servicio de logs de tu
 plataforma, Loki, o cualquier cosa que lea la salida del contenedor.
 

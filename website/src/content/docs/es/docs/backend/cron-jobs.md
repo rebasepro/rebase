@@ -1,5 +1,5 @@
 ---
-sourceHash: ddd8f6798208c0d8
+sourceHash: 6d36f4d71bfe288e
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Programa tareas recurrentes en segundo plano con el sistema integrado de cron jobs de Rebase. Define tareas como archivos TypeScript, monitorízalas en Studio y gestiónalas a través de la API REST.
@@ -281,7 +281,7 @@ Consulta [Roles y alcances](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | Listar todos los cron jobs registrados |
 | `GET` | `/api/admin/cron/:id` | Obtener el estado de una tarea individual |
 | `POST` | `/api/admin/cron/:id/trigger` | Activar manualmente una tarea — `409` mientras ya se está ejecutando |
-| `GET` | `/api/admin/cron/:id/logs` | Obtener el historial de ejecución (`?limit=N`) |
+| `GET` | `/api/admin/cron/:id/logs` | Obtener el historial de ejecución (`?limit=N`). <span class="since-badge" data-since="0.24">Desde 0.24</span> `503` cuando no se puede leer `rebase.cron_logs`, en lugar de un historial vacío |
 | `PUT` | `/api/admin/cron/:id` | Pausar o reanudar una tarea en todos los procesos (`{ "enabled": false }`); `null` vuelve a seguir el código |
 
 ### Ejemplo: Listar todas las tareas
@@ -363,8 +363,8 @@ import { createRebaseClient } from "@rebasepro/client";
 
 const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
 
-// List all jobs
-const { jobs } = await client.cron.listJobs();
+// List all jobs, and the ones that did not register
+const { jobs, rejected } = await client.cron.listJobs();
 
 // Get a single job
 const { job } = await client.cron.getJob("health-check");
@@ -380,6 +380,9 @@ await client.cron.toggleJob("health-check", false); // pause
 await client.cron.toggleJob("health-check", true);  // resume
 ```
 
+<span class="since-badge" data-since="0.24">Desde 0.24</span> `listJobs()` tiene el tipo `CronJobListing`: `jobs`, más los campos `skipped`,
+`rejected` y `note` descritos en [Tareas que no están ahí](#tareas-que-no-están-ahí).
+
 ## Panel de Studio
 
 Cuando los cron jobs están configurados, aparece una herramienta **Cron Jobs** en Rebase Studio bajo **Compute**, junto a la consola de JS. El panel proporciona:
@@ -387,17 +390,21 @@ Cuando los cron jobs están configurados, aparece una herramienta **Cron Jobs** 
 - **Lista de tareas** — Todas las tareas registradas con indicadores de estado en vivo
 - **Panel de detalles** — Programación, próxima/última ejecución, duración e información de errores
 - **Historial de ejecución** — Entradas de registro desplegables con salida capturada y resultados
-- **Activación manual** — Ejecuta cualquier tarea bajo demanda con un solo clic
+- **Activación manual** — Ejecuta cualquier tarea bajo demanda con un solo clic. <span class="since-badge" data-since="0.24">Desde 0.24</span> El panel espera a que termine la ejecución y dice cómo fue: una ejecución que falló muestra su error
 - **Habilitar/deshabilitar** — Pausa y reanuda tareas sin reiniciar el servidor, en todos los procesos a la vez; una pausa se mantiene tras reinicios y despliegues
+- **Tareas que no están ahí** — <span class="since-badge" data-since="0.24">Desde 0.24</span> cada tarea que el programador rechazó, con su programación y el motivo, y cuántos archivos cron fallaron al cargar. Ninguna de ellas está programada; consulta [Tareas que no están ahí](#tareas-que-no-están-ahí)
 
 El panel se actualiza automáticamente cada 15 segundos.
 
 El panel muestra lo mismo sea cual sea el proceso que lo sirve. Una tarea que
-otro proceso está ejecutando aparece como en ejecución, y en un proceso cuyo
-programador no está iniciado — el rol `api` junto a un worker — el número de
-ejecuciones, el número de fallos y la última ejecución se leen de
-`rebase.cron_logs`, con una consulta limitada a las filas de cada tarea, en lugar
-de un proceso que no ejecuta nada.
+otro proceso está ejecutando aparece como en ejecución.
+<span class="since-badge" data-since="0.24">Desde 0.24</span> En todo proceso que tiene un almacén, el número de ejecuciones, el número de
+fallos y la última ejecución se leen de `rebase.cron_logs`, con una consulta
+limitada a las filas de cada tarea. Los contadores propios de un proceso solo
+recogen las ejecuciones que hizo él: el rol `api` junto a un worker no ejecuta
+nada, y de dos réplicas que programan ambas, ninguna ve los turnos que reclamó la
+otra. Solo cuando no se puede leer `cron_logs` recurre la tarjeta a los contadores
+propios de este proceso, con una advertencia en el registro del servidor.
 
 ## Validación de programación y análisis AST
 

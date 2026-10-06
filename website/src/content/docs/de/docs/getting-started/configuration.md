@@ -1,5 +1,5 @@
 ---
-sourceHash: c66441155e66f8f0
+sourceHash: 71e8910b2dfa49fa
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -71,8 +71,9 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei
 | `NODE_ENV` | Umgebung: `development`, `production` oder `test` | `development` |
 | `CORS_ORIGINS` | Kommagetrennte Liste der erlaubten Origins. **In Produktion erforderlich**, falls abweichend von der Backend-Domain. In der Entwicklung wird sie zu localhost *hinzugefügt* – siehe unten. | — |
 | `FRONTEND_URL` | URL der Frontend-App. Wird in beiden Umgebungen als Alternative zu CORS_ORIGINS verwendet. | — |
-| `ADMIN_CONNECTION_STRING` | Datenbank-Verbindungszeichenfolge auf Admin-Ebene (wird für Schema-Introspektion und administrative Operationen verwendet). | `DATABASE_URL` |
-| `DISABLE_DB_ROLE_SWITCHING` | Deaktiviert den Wechsel von PostgreSQL-Rollen im SQL-Editor (nützlich für benutzerdefinierte Authentifizierung, bei der DB-Rollen nicht zugeordnet sind). | `false` |
+| `ADMIN_CONNECTION_STRING` | Datenbank-Verbindungszeichenfolge auf Admin-Ebene (wird für Schema-Introspektion und administrative Operationen verwendet). <span class="since-badge" data-since="0.24">Seit 0.24</span> Die Datenbank, die sie nennt, ist weder die, die die SQL-Konsole als aktuelle bezeichnet, noch die, die ein neuer Branch standardmäßig kopiert: Beides ist die Datenbank, auf der die eigene Verbindung der App liegt (siehe `REBASE_BRANCH_PARENT_DATABASE` für einen Server auf einem Branch). | `DATABASE_URL` |
+| `DISABLE_DB_ROLE_SWITCHING` | Deaktiviert den Wechsel von PostgreSQL-Rollen im SQL-Editor (nützlich für benutzerdefinierte Authentifizierung, bei der DB-Rollen nicht zugeordnet sind). <span class="since-badge" data-since="0.24">Seit 0.24</span> Die SQL-Konsole von Studio gibt dann an, dass die Zeilen als Verbindungseigentümer gelesen wurden, nennt diesen und graut ihre Rollenauswahl aus. | `false` |
+| `REBASE_BRANCH_PARENT_DATABASE` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Die Datenbank, aus der der Branch, auf dem dieser Server läuft, kopiert wurde. `rebase dev` setzt sie in einem Checkout, der [auf einen Branch umgeschaltet](/docs/backend/branching/#cli-integration) wurde. Ein Server mit dieser Variable hält die Branch-Registry in dieser Datenbank und kopiert neue Branches standardmäßig aus ihr, sodass der Branches-Bereich von Studio die Branches der Hauptdatenbank anzeigt. | — |
 
 #### CORS in der Entwicklung
 
@@ -481,7 +482,7 @@ function Widget() {
 
 * **Symptome:** Im SQL-Editor von Rebase Studio ausgeführte benutzerdefinierte Abfragen schlagen mit `cause: error: permission denied for table <name>` fehl, obwohl die Tabellen-CMS-Ansicht Daten erfolgreich lädt.
 * **Ursache:** Standardmäßig versucht Rebase, Abfragen im SQL-Editor auszuführen, indem temporär die Datenbankrollen gewechselt werden, um der Anwendungsrolle des aktiven Benutzers zu entsprechen (z. B. `SET LOCAL ROLE "admin"`). Wenn Sie eine benutzerdefinierte Authentifizierung verwenden, bei der Rollen nur in Datenbanktabellen und nicht als tatsächliche PostgreSQL-Rollen existieren, schlägt der Rollenwechsel fehl oder es fehlen Datenbankberechtigungen. Die CMS-Tabellenansicht wird unter dem Standardbenutzer des Verbindungseigentümers ausgeführt und umgeht dies.
-* **Lösung:** Fügen Sie `DISABLE_DB_ROLE_SWITCHING=true` zu Ihrer Backend-`.env`-Konfiguration hinzu. Dies zwingt Rebase dazu, SQL-Editor-Abfragen mit den Rechten des Verbindungseigentümers auszuführen (in der Regel ein Superuser/Owner).
+* **Lösung:** Fügen Sie `DISABLE_DB_ROLE_SWITCHING=true` zu Ihrer Backend-`.env`-Konfiguration hinzu. Dies zwingt Rebase dazu, SQL-Editor-Abfragen mit den Rechten des Verbindungseigentümers auszuführen (in der Regel ein Superuser/Owner). <span class="since-badge" data-since="0.24">Seit 0.24</span> Der SQL-Editor gibt dann über den Ergebnissen an, dass sie als Verbindungseigentümer gelesen wurden, und graut seine Rollenauswahl aus.
 
 ### SQL-Editor: Abrufen des Schemas fehlgeschlagen (`Cross-database execution requires adminConnectionString`)
 

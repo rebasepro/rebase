@@ -1,5 +1,5 @@
 ---
-sourceHash: bba1fa1dd7f34bed
+sourceHash: 7efffdd1ca4c7915
 title: Database Branching
 sidebar_label: Branching
 description: Crea branch di database isolati per sviluppo, staging e testing utilizzando CREATE DATABASE ... TEMPLATE di PostgreSQL — copie istantanee a fedeltà totale senza tempi di inattività.
@@ -86,6 +86,14 @@ CREATE TABLE IF NOT EXISTS rebase.branches (
 );
 ```
 
+<span class="since-badge" data-since="0.24">Da 0.24</span> Un server in esecuzione su un branch conserva i branch nel database da cui il branch è stato
+copiato. La tabella `rebase.branches` del branch stesso è solo un'istantanea, presa prima che
+la sua riga venisse scritta. Quindi `rebase dev` su un checkout [passato a un branch](#integrazione-cli)
+imposta `REBASE_BRANCH_PARENT_DATABASE` sul database indicato da `.env`, e un server
+con quella variabile legge e scrive lì il registro, e per impostazione predefinita copia da esso i nuovi branch. La scheda Branch
+di Studio, su un branch, elenca i branch del database principale, compreso quello corrente, e un branch creato lì
+è uno di quelli che `rebase db branch list` mostra.
+
 ---
 
 ## API programmatica
@@ -95,6 +103,10 @@ L'API di branching è esposta tramite il `BranchService` del backend. Di seguito
 ### Creare un branch del database
 
 Genera un nuovo database branch dal database predefinito o da un template sorgente esplicito.
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> Il database predefinito è quello su cui si trova la connessione del server stesso, oppure
+`REBASE_BRANCH_PARENT_DATABASE` quando il server è in esecuzione su un branch. Non è mai
+il database indicato da `ADMIN_CONNECTION_STRING`, quando questo è un altro.
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -122,6 +134,7 @@ Output:
 [
   {
     name: "feature_oauth",
+    database: "rb_feature_oauth",
     parentDatabase: "rebase",
     createdAt: 2026-06-20T22:00:00.000Z,
     sizeBytes: 83886080 // 80 MB
@@ -129,6 +142,10 @@ Output:
 ]
 */
 ```
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> `database` è il database PostgreSQL che costituisce il branch, come riporta il suo record:
+quello a cui connettersi, e quello da passare come `source` per copiare il branch. Non è
+il nome del branch (`staging` è il database `rb_staging`).
 
 ### Ottenere informazioni su un branch
 
@@ -147,7 +164,7 @@ await admin.deleteBranch("feature_oauth");
 ```
 
 > [!CAUTION]
-> Protezione di sicurezza: il database principale (il nome del database predefinito configurato nelle stringhe di connessione) è protetto. Se si tenta di eliminare il database padre, il `BranchService` solleva un errore `"Cannot delete the main database"` e interrompe l'operazione.
+> Protezione di sicurezza: il database principale (il nome del database predefinito configurato nelle stringhe di connessione) è protetto. <span class="since-badge" data-since="0.24">Da 0.24</span> È il database su cui si trova la connessione del server stesso, oppure `REBASE_BRANCH_PARENT_DATABASE` su un branch. Se si tenta di eliminare il database padre, il `BranchService` solleva un errore `"Cannot delete the main database"` e interrompe l'operazione.
 
 ---
 

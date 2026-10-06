@@ -303,7 +303,7 @@ See [Roles and scopes](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | List all registered cron jobs |
 | `GET` | `/api/admin/cron/:id` | Get a single job's status |
 | `POST` | `/api/admin/cron/:id/trigger` | Manually trigger a job — `409` while it is already running |
-| `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`) |
+| `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`). <span class="since-badge" data-since="0.24">Since 0.24</span> `503` when `rebase.cron_logs` cannot be read, rather than an empty history |
 | `PUT` | `/api/admin/cron/:id` | Pause or resume a job everywhere (`{ "enabled": false }`); `null` follows the code again |
 
 ### Example: List All Jobs
@@ -393,8 +393,8 @@ import { createRebaseClient } from "@rebasepro/client";
 
 const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
 
-// List all jobs
-const { jobs } = await client.cron.listJobs();
+// List all jobs, and the ones that did not register
+const { jobs, rejected } = await client.cron.listJobs();
 
 // Get a single job
 const { job } = await client.cron.getJob("health-check");
@@ -410,6 +410,9 @@ await client.cron.toggleJob("health-check", false); // pause
 await client.cron.toggleJob("health-check", true);  // resume
 ```
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> `listJobs()` is typed `CronJobListing`: `jobs`, plus the `skipped`,
+`rejected` and `note` fields described under [Jobs that are not there](#jobs-that-are-not-there).
+
 ## Studio Dashboard
 
 When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio under **Compute**, beside the JS console. The dashboard provides:
@@ -417,16 +420,21 @@ When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio und
 - **Job list** — All registered jobs with live status indicators
 - **Detail panel** — Schedule, next/last run, duration, and error information
 - **Execution history** — Expandable log entries with captured output and results
-- **Manual trigger** — Run any job on demand with one click
+- **Manual trigger** — Run any job on demand with one click. <span class="since-badge" data-since="0.24">Since 0.24</span> The panel waits for the run to end and says how it went: a run that failed shows its error
 - **Enable/disable** — Pause and resume jobs without restarting the server, for every process at once; a pause stays in place across restarts and deploys
+- **Jobs that are not there** — <span class="since-badge" data-since="0.24">Since 0.24</span> each job the scheduler refused, with its schedule and the reason, and how many cron files failed to load. None of them is scheduled; see [Jobs that are not there](#jobs-that-are-not-there)
 
 The dashboard auto-refreshes every 15 seconds.
 
 The panel shows the same thing whichever process serves it. A job another
-process is running shows as running, and on a process whose scheduler is not
-started — the `api` role beside a worker — the run count, the failure count and
-the last run are read from `rebase.cron_logs`, one query bounded to each job's
-own rows, rather than from a process that runs nothing.
+process is running shows as running.
+<span class="since-badge" data-since="0.24">Since 0.24</span> On every process that has a store, the run count, the failure count and the
+last run are read from `rebase.cron_logs`, one query bounded to each job's own
+rows. A process's own counters hold only the runs it made: the `api` role
+beside a worker runs nothing, and of two replicas that both schedule, neither
+sees the slots the other one claimed. Only when `cron_logs` cannot be read does
+the card fall back to this process's own counters, with a warning in the server
+log.
 
 ## Schedule Validation & AST Parsing
 

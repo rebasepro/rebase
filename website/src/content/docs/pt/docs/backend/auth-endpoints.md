@@ -1,5 +1,5 @@
 ---
-sourceHash: e8335b630b5757ca
+sourceHash: 56979243362b4790
 title: Endpoints de autenticação e tokens
 sidebar_label: Endpoints de autenticação
 description: As rotas de autenticação que o backend do Rebase disponibiliza, seus formatos de resposta, autenticação multifator, o contexto de banco de dados que uma política visualiza, JWKS e chaves de serviço.
@@ -61,7 +61,7 @@ Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/).
 
 | Método | Caminho | Descrição |
 |--------|---------|-----------|
-| `GET` | `/api/admin/users` | Listar usuários (paginado) |
+| `GET` | `/api/admin/users` | Listar usuários (paginado). `?search=` corresponde a uma parte do e-mail ou do nome de exibição, sem diferenciar maiúsculas de minúsculas. <span class="since-badge" data-since="0.24">Desde 0.24</span> No Postgres, também corresponde a qualquer papel que o usuário tenha e ao uid; no MongoDB, continua correspondendo apenas ao e-mail e ao nome de exibição |
 | `POST` | `/api/admin/users` | Criar um usuário |
 | `GET` | `/api/admin/users/:uid` | Ler um usuário |
 | `PUT` | `/api/admin/users/:uid` | Atualizar um usuário. `{ disabled: true }` desliga a conta sem excluí-la: todo login e refresh é recusado (`ACCOUNT_DISABLED`), suas sessões terminam e todo token que ela possui é recusado; `false` a liga de volta |

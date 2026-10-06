@@ -110,8 +110,9 @@ bucket, which is why it is off unless asked for. See
 
 Studio's Logs Explorer reads a ring of the last 10,000 log lines kept by the
 process that serves the request. Behind a load balancer each refresh may show a
-different instance's lines, and none of them shows the whole deployment. There
-is no setting that shares it: the runtime writes one JSON line per event to
+different instance's lines, and none of them shows the whole deployment.
+<span class="since-badge" data-since="0.24">Since 0.24</span> The explorer names the instance it is showing.
+There is no setting that shares the ring: the runtime writes one JSON line per event to
 stdout in production, and that is what to collect — your platform's log
 service, Loki, or anything that reads container output.
 

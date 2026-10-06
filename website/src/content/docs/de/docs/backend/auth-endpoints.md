@@ -1,5 +1,5 @@
 ---
-sourceHash: e8335b630b5757ca
+sourceHash: 56979243362b4790
 title: Auth-Endpunkte und Tokens
 sidebar_label: Auth-Endpunkte
 description: Die Authentifizierungs-Routen, die das Rebase-Backend bereitstellt, ihre Antwortstrukturen, Multi-Faktor-Authentifizierung, der Datenbankkontext für Richtlinien, JWKS und Service-Schlüssel.
@@ -57,7 +57,7 @@ Die administrative Benutzer- und Rollenverwaltung ist eine **separate Schnittste
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
-| `GET` | `/api/admin/users` | Benutzer auflisten (paginiert) |
+| `GET` | `/api/admin/users` | Benutzer auflisten (paginiert). `?search=` findet einen Teil der E-Mail-Adresse oder des Anzeigenamens, ohne Beachtung der Groß-/Kleinschreibung. <span class="since-badge" data-since="0.24">Seit 0.24</span> Auf Postgres findet es außerdem jede Rolle, die der Benutzer hält, und die uid; auf MongoDB findet es weiterhin nur E-Mail-Adresse und Anzeigenamen |
 | `POST` | `/api/admin/users` | Benutzer erstellen |
 | `GET` | `/api/admin/users/:uid` | Einzelnen Benutzer abrufen |
 | `PUT` | `/api/admin/users/:uid` | Einzelnen Benutzer aktualisieren. `{ disabled: true }` schaltet das Konto ab, ohne es zu löschen: Jede Anmeldung und jedes Refresh wird abgelehnt (`ACCOUNT_DISABLED`), seine Sitzungen enden und jedes Token, das es hält, wird abgelehnt; `false` schaltet es wieder ein |

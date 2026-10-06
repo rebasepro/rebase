@@ -1,5 +1,5 @@
 ---
-sourceHash: a8bf9ad448b91c03
+sourceHash: df4fcc013e52c859
 title: API REST
 sidebar_label: API REST
 description: Endpoints de API REST gerados automaticamente para cada coleção, com filtragem, ordenação, paginação e inclusão de relações.
@@ -543,6 +543,12 @@ Todo hook é aguardado, e um erro lançado por qualquer um deles desfaz a escrit
 ## OpenAPI / Swagger
 
 A especificação OpenAPI é gerada automaticamente a partir das definições das suas coleções: ela descreve os endpoints de listagem, leitura, criação, atualização, exclusão e operações em lote de cada coleção atendida pelo backend, com seus parâmetros de consulta e esquemas de resposta. Não se trata de um mapa completo de toda a superfície HTTP — as rotas de auth, storage, functions e cron estão documentadas apenas neste site — e colunas marcadas como `excludeFromApi` são omitidas dela.
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Para uma coleção com [`softDelete`](/docs/collections/soft-delete/), a especificação diz
+que uma exclusão, individual ou em lote, move a linha para a lixeira, e documenta
+`?hard=true` nas duas exclusões e `?deleted=include|only` na listagem, na leitura
+individual, na contagem e na agregação. O explorador de API do Studio envia apenas os
+parâmetros que a especificação nomeia, então é isso que permite a ele expurgar uma linha ou listar a lixeira.
 
 Chamadores automatizados (machine callers) se autenticam com uma chave com escopo específico em vez de uma sessão:
 [Chaves de API](/docs/backend/api-keys/).

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1806e56473009c2c
+sourceHash: 411eeede8d2eab1b
 title: Chaves de API
 sidebar_label: Chaves de API
 description: "Chaves de longa duração para scripts, CI, agentes e integrações: chaves de serviço e chaves pessoais, os escopos que elas têm, como se combinam com a segurança em nível de linha (RLS) e as rotas que as gerenciam."
@@ -72,7 +72,7 @@ Armazene-a imediatamente.
 | `name` | `string` | Um rótulo para pessoas |
 | `scopes` | `string[]` | O que a chave pode fazer. Pelo menos um |
 | `roles` | `string[]` | Papéis de RLS com que a chave é executada, além de `service`. Opcional |
-| `rate_limit` | `number \| null` | Requisições por janela de 15 minutos. `null` ou ausente usa o padrão do servidor para chaves de API, 1000 |
+| `rate_limit` | `number \| null` | Requisições por janela de 15 minutos. `null` ou ausente usa o padrão do servidor para chaves de API, 1000. Veja [Limite de taxa](#limite-de-taxa) |
 | `expires_at` | `string \| null` | Expiração em ISO-8601. Ausente significa que nunca expira |
 
 ### Escopos e RLS: duas verificações independentes
@@ -124,9 +124,14 @@ securityRules: [
 #### O papel `admin`
 
 `roles: ["admin"]` (`--roles admin` na CLI) faz a chave ser executada também com o papel de RLS `admin`,
-de modo que ela passa pelas políticas de administrador padrão e lê todas as linhas de
-todas as coleções que as mantêm. Isso diz respeito a linhas. Não concede nenhum
-escopo: a chave continua alcançando apenas o que seus `scopes` listam.
+de modo que ela passa pelas políticas de administrador padrão de todas as coleções que
+as mantêm. Essas políticas cobrem `SELECT`, `INSERT`, `UPDATE` e `DELETE`, então a
+row-level security não limita as leituras, escritas ou exclusões da chave: ela pode
+ler, alterar e excluir todas as linhas que seus escopos alcançam. O papel também passa
+nas verificações de administrador fora do banco de dados: `requireAdmin` nas
+[funções personalizadas](/docs/backend/custom-functions/) e as escritas que o storage
+reserva aos administradores. Não concede nenhum escopo: a chave continua alcançando
+apenas o que seus `scopes` listam.
 
 Quem cria uma chave só pode dar a ela papéis que ele próprio tem, a menos que seja
 administrador.
@@ -135,8 +140,8 @@ administrador.
 
 <span class="since-badge" data-since="0.24">Desde 0.24</span> `--full-access` dá à chave todos os escopos que seu criador tem, menos `keys:read` e
 `keys:write`, que nenhuma chave pode ter. Pela CLI, que usa a chave de serviço,
-isso significa todos os escopos do plano de dados e do plano administrativo. Adicione `--roles admin` e a chave
-também lê todas as linhas:
+isso significa todos os escopos do plano de dados e do plano administrativo. Adicione `--roles admin` e a
+row-level security deixa de limitar quais linhas ela lê, altera ou exclui:
 
 ```bash
 rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
@@ -144,6 +149,23 @@ rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
 
 Esse é o formato certo para CI, migrações e ferramentas próprias confiáveis. Não
 é o formato certo para um agente.
+
+### Limite de taxa
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> O `rate_limit` de uma chave é quantas requisições ela pode fazer em uma janela de
+15 minutos, e todas as portas de entrada contam para ele em um único bucket, `api-key:<id>`:
+
+- suas requisições HTTP às APIs de dados, de storage e de funções;
+- seus frames de dados no socket de realtime: buscas, contagens, salvamentos e exclusões;
+- suas requisições ao [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+
+Sem um `rate_limit`, o bucket usa o padrão do servidor para chaves de API, 1000. Uma
+chave pessoal não tem um `rate_limit` próprio e conta em seu próprio bucket com esse
+padrão. Passado o limite, uma requisição HTTP responde `429` e um frame do socket,
+`RATE_LIMITED`.
+
+As rotas administrativas em `/api/admin` e as mensagens administrativas do socket, como
+as do editor SQL, não têm limite de taxa.
 
 ## Chaves pessoais
 

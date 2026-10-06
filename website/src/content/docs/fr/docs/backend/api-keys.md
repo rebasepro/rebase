@@ -1,5 +1,5 @@
 ---
-sourceHash: 1806e56473009c2c
+sourceHash: 411eeede8d2eab1b
 title: Clés API
 sidebar_label: Clés API
 description: "Des clés de longue durée pour les scripts, la CI, les agents et les intégrations : clés de service et clés personnelles, les portées qu'elles détiennent, leur articulation avec la sécurité au niveau des lignes, et les routes qui les gèrent."
@@ -72,7 +72,7 @@ Enregistrez-la immédiatement.
 | `name` | `string` | Un libellé pour les humains |
 | `scopes` | `string[]` | Ce que la clé peut faire. Au moins une portée |
 | `roles` | `string[]` | Rôles RLS sous lesquels la clé s'exécute, à côté de `service`. Facultatif |
-| `rate_limit` | `number \| null` | Requêtes par fenêtre de 15 minutes. `null` ou absent utilise la valeur par défaut du serveur pour les clés API, 1000 |
+| `rate_limit` | `number \| null` | Requêtes par fenêtre de 15 minutes. `null` ou absent utilise la valeur par défaut du serveur pour les clés API, 1000. Voir [Limite de débit](#limite-de-débit) |
 | `expires_at` | `string \| null` | Expiration ISO-8601. Absent signifie qu'elle n'expire jamais |
 
 ### Portées et RLS : deux barrières indépendantes
@@ -124,9 +124,14 @@ securityRules: [
 #### Le rôle `admin`
 
 `roles: ["admin"]` (`--roles admin` dans le CLI) fait aussi s'exécuter la clé sous le rôle RLS
-`admin` : elle passe donc les politiques admin par défaut et lit toutes les lignes de chaque
-collection qui les conserve. C'est une affirmation sur les lignes. Elle n'accorde aucune
-portée : la clé n'atteint toujours que ce que listent ses `scopes`.
+`admin` : elle passe donc les politiques admin par défaut de chaque collection qui les conserve.
+Ces politiques couvrent `SELECT`, `INSERT`, `UPDATE` et `DELETE`, donc la sécurité au niveau des
+lignes ne limite ni les lectures, ni les écritures, ni les suppressions de la clé : elle peut lire,
+modifier et supprimer toutes les lignes que ses portées atteignent. Le rôle passe aussi les
+vérifications admin hors de la base de données : `requireAdmin` dans les
+[fonctions personnalisées](/docs/backend/custom-functions/), et les écritures que le stockage
+réserve aux administrateurs. Il n'accorde aucune portée : la clé n'atteint toujours que ce que
+listent ses `scopes`.
 
 Un créateur ne peut donner à une clé que des rôles qu'il détient lui-même, sauf s'il est
 administrateur.
@@ -136,7 +141,7 @@ administrateur.
 <span class="since-badge" data-since="0.24">Depuis 0.24</span> `--full-access` donne à la clé toutes les portées que détient son créateur, moins `keys:read` et
 `keys:write`, qu'aucune clé ne peut détenir. Via le CLI, qui utilise la clé de service, cela fait
 toutes les portées du plan des données et du plan d'administration. Ajoutez `--roles admin` et la
-clé lit aussi toutes les lignes :
+sécurité au niveau des lignes ne limite plus les lignes qu'elle lit, modifie ou supprime :
 
 ```bash
 rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
@@ -144,6 +149,23 @@ rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
 
 C'est la bonne configuration pour la CI, les migrations et les outils internes de confiance. Ce
 n'est pas la bonne pour un agent.
+
+### Limite de débit
+
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Le `rate_limit` d'une clé est le nombre de requêtes qu'elle peut faire dans une fenêtre de
+15 minutes, et chaque porte d'entrée est décomptée dans un seul compartiment, `api-key:<id>` :
+
+- ses requêtes HTTP vers les API de données, de stockage et de fonctions ;
+- ses trames de données sur le socket temps réel : lectures, comptages, enregistrements et suppressions ;
+- ses requêtes vers [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+
+Sans `rate_limit`, le compartiment reçoit la valeur par défaut du serveur pour les clés API, 1000.
+Une clé personnelle n'a pas de `rate_limit` propre, et est décomptée dans son propre compartiment
+avec cette valeur par défaut. Au-delà de la limite, une requête HTTP répond `429` et une trame du
+socket `RATE_LIMITED`.
+
+Les routes d'administration sous `/api/admin`, et les messages d'administration du socket comme
+ceux de l'éditeur SQL, ne sont pas soumis à la limite de débit.
 
 ## Clés personnelles
 

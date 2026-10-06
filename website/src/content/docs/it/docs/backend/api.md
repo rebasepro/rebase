@@ -1,5 +1,5 @@
 ---
-sourceHash: a8bf9ad448b91c03
+sourceHash: df4fcc013e52c859
 title: API REST
 sidebar_label: API REST
 description: Endpoint API REST generati automaticamente per ogni collection, con filtraggio, ordinamento, paginazione e inclusione delle relazioni.
@@ -461,6 +461,12 @@ Ogni hook viene atteso, e un errore lanciato da uno qualsiasi di essi annulla l'
 ## OpenAPI / Swagger
 
 La specifica OpenAPI viene generata automaticamente a partire dalle definizioni delle tue collection: descrive gli endpoint di elenco, lettura, creazione, aggiornamento, eliminazione e operazioni di massa (bulk) di ogni collection gestita dal backend, con i rispettivi parametri di query e schemi di risposta. Non costituisce una mappa completa dell'intera superficie HTTP — le route relative ad auth, storage, functions e cron sono documentate esclusivamente su questo sito — e le colonne contrassegnate con `excludeFromApi` ne vengono escluse.
+
+<span class="since-badge" data-since="0.24">Da 0.24</span> Per una collection con [`softDelete`](/docs/collections/soft-delete/) la specifica indica
+che un'eliminazione, singola o di massa, sposta la riga nel cestino, e documenta
+`?hard=true` su entrambe le eliminazioni e `?deleted=include|only` sull'elenco, sulla lettura
+singola, sul conteggio e sull'aggregazione. L'explorer API di Studio invia solo i
+parametri che la specifica nomina, quindi è questo che gli permette di eliminare definitivamente una riga o di elencare il cestino.
 
 I client automatizzati (machine callers) si autenticano mediante una chiave con permessi dedicati (scoped key) anziché tramite una sessione:
 [API keys](/docs/backend/api-keys/).

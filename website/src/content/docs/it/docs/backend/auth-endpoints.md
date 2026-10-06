@@ -1,5 +1,5 @@
 ---
-sourceHash: e8335b630b5757ca
+sourceHash: 56979243362b4790
 title: Endpoint e token di autenticazione
 sidebar_label: Endpoint di autenticazione
 description: Le route di autenticazione montate dal backend Rebase, la struttura delle loro risposte, l'autenticazione a più fattori, il contesto del database visibile a una policy, JWKS e chiavi di servizio.
@@ -61,7 +61,7 @@ lui. Vedi [Ruoli e scope](/docs/backend/roles-and-scopes/).
 
 | Metodo | Percorso | Descrizione |
 |--------|------|-------------|
-| `GET` | `/api/admin/users` | Elenca gli utenti (con paginazione) |
+| `GET` | `/api/admin/users` | Elenca gli utenti (con paginazione). `?search=` trova una parte dell'email o del nome visualizzato, senza distinzione tra maiuscole e minuscole. <span class="since-badge" data-since="0.24">Da 0.24</span> Su Postgres trova anche qualsiasi ruolo che l'utente possiede, e l'uid; su MongoDB trova ancora solo email e nome visualizzato |
 | `POST` | `/api/admin/users` | Crea un utente |
 | `GET` | `/api/admin/users/:uid` | Legge un singolo utente |
 | `PUT` | `/api/admin/users/:uid` | Aggiorna un singolo utente. `{ disabled: true }` disattiva l'account senza eliminarlo: ogni accesso e refresh viene rifiutato (`ACCOUNT_DISABLED`), le sue sessioni terminano e ogni token che possiede viene rifiutato; `false` lo riattiva |

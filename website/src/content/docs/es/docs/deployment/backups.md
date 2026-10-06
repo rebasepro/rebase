@@ -1,5 +1,5 @@
 ---
-sourceHash: 02c94e203b545b2c
+sourceHash: 6c9aa0d1c19006ba
 title: Copias de seguridad y restauración
 sidebar_label: Copias de seguridad
 description: Crea, programa, lista y restaura copias de seguridad de la base de datos con pg_dump — qué contiene una copia de seguridad, el archivo de roles que la acompaña, y lo único que no cubre, tus archivos subidos.
@@ -262,6 +262,43 @@ lista se informa de la tarea de copia de seguridad programada y su última
 ejecución. Una ejecución fallida se muestra como un error con su mensaje, así
 que una copia de seguridad nocturna que no puede ejecutarse es visible donde
 se listan las copias, no solo en el panel de Cron Jobs.
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> lo que dice sobre la tarea:
+
+- **Last scheduled backup** es la última ejecución que hizo la programación.
+  Una ejecución iniciada a mano desde entonces (**Run Now** en Cron Jobs) tiene
+  una línea propia, así que una ejecución de prueba que funcionó no puede
+  ocultar una nocturna fallida, y una que falló no se presenta como la nocturna.
+- Una tarea declarada con `enabled: false` aparece como copias de seguridad
+  programadas desactivadas (**off**). Es lo que exporta el archivo cron de
+  arriba mientras `BACKUP_SCHEDULE` no está definida, y definir
+  `BACKUP_SCHEDULE` las activa. **Paused** significa que un administrador pausó
+  la tarea en Cron Jobs, y reanudarla allí la vuelve a activar.
+- Una tarea que el programador rechazó, por una programación, una zona horaria
+  o un tiempo de espera no válidos, se informa con el motivo. Nunca se ejecuta
+  hasta que se corrija su archivo cron.
+- Cuando no se puede leer el historial de ejecuciones en `rebase.cron_logs`, el
+  panel lo dice, en lugar de decir que la copia de seguridad aún no se ha
+  ejecutado.
+
+<span class="since-badge" data-since="0.24">Desde 0.24</span> la lista la lee
+el proceso del servidor que responde a `GET /api/admin/backups`, y ese no
+siempre es el proceso que ejecuta la programación:
+
+- Un destino `s3://` se lista y se descarga a través de un cliente para ese
+  bucket, construido con las mismas variables `S3_*` que usa el cron de copias
+  de seguridad. Uno `gs://` usa las credenciales predeterminadas de la
+  aplicación. Dáselas a **todo** proceso que sirva `/api/admin`, incluido el
+  rol `api` de un [despliegue dividido](/docs/deployment/split-processes/), no
+  solo al que ejecuta el cron. Un destino que el proceso no puede leer responde
+  `503` con el destino y el motivo, y el panel muestra eso en lugar de una
+  lista vacía.
+- Una ruta local es el disco propio de ese proceso. Cuando la programación se
+  ejecuta en otro proceso (un `api` con `REBASE_CRON_SCHEDULER=false` junto a
+  un `worker`), el panel dice que está listando el disco de este proceso: las
+  copias de seguridad programadas solo aparecen ahí si ambos procesos montan el
+  mismo directorio. Un despliegue dividido debería hacer sus copias de
+  seguridad en almacenamiento de objetos.
 
 Las descargas se transmiten a través de `GET /api/admin/backups/download?key=…`,
 solo para administradores, así que el bucket nunca tiene que ser público; una
