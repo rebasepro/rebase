@@ -47,7 +47,7 @@ import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView,
 import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeStoredJson, writeStoredString } from "@rebasepro/utils";
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
-import { acceptsAutoLimit, buildExplainSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, type CellEditResolution, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
+import { buildExplainSql, formatSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, withAutoLimit, type CellEditResolution, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
@@ -819,13 +819,7 @@ role: connection.role });
     }, [activeTab.sql, projectPrefix]);
 
     const handlePrettify = () => {
-        // Simple formatting for now
-        const formatted = activeTab.sql
-            .replace(/\s+/g, " ")
-            .replace(/\s?,\s?/g, ", ")
-            .replace(/\s?=\s?/g, " = ")
-            .trim();
-        setSql(formatted);
+        setSql(formatSql(activeTab.sql));
     };
 
     /** The editor, for the selection the toolbar's buttons act on. */
@@ -866,15 +860,8 @@ execTime: Math.round(performance.now() - start) });
     };
 
     const executeRun = useCallback(async (sqlOverride?: string) => {
-        let sqlToRun = sqlOverride || activeTab.sql;
-
-        const isAggregate = /\b(COUNT|SUM|AVG|MIN|MAX)\s*\(/i.test(sqlToRun);
-
-        if (autoLimit && acceptsAutoLimit(sqlToRun) && !isAggregate) {
-            // Remove trailing semicolon if present to safely append LIMIT
-            sqlToRun = sqlToRun.trim().replace(/;$/, "");
-            sqlToRun = `${sqlToRun} LIMIT 1000;`;
-        }
+        const written = sqlOverride || activeTab.sql;
+        const sqlToRun = (autoLimit ? withAutoLimit(written, 1000) : null) ?? written;
 
         updateActiveTab({ loading: true,
 error: null,
@@ -1395,7 +1382,7 @@ id: String(ra.entityId) })}
                             </div>
                             <div className="flex shrink-0 items-center justify-end pr-2 gap-1.5">
                                 <Tooltip title={t("studio_sql_format_sql")}>
-                                    <IconButton size="small" onClick={handlePrettify}>
+                                    <IconButton size="small" onClick={handlePrettify} aria-label={t("studio_sql_format_sql")}>
                                         <MenuIcon size={iconSize.smallest}/>
                                     </IconButton>
                                 </Tooltip>

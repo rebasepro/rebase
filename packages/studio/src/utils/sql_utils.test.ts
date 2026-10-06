@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "@jest/globals";
-import { acceptsAutoLimit, buildExplainSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, type ResultProvenance } from "./sql_utils";
+import { acceptsAutoLimit, buildExplainSql, formatSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, withAutoLimit, type ResultProvenance } from "./sql_utils";
 import type { SqlScriptColumn, SqlScriptTable } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -301,5 +301,75 @@ describe("needsDestructiveConfirmation", () => {
         expect(needsDestructiveConfirmation("UPDATE posts SET title = 'x' WHERE id = 1; SELECT 1")).toBe(false);
         expect(needsDestructiveConfirmation("SELECT updated_at FROM posts")).toBe(false);
         expect(needsDestructiveConfirmation("-- delete these later\nSELECT * FROM posts")).toBe(false);
+    });
+});
+
+/**
+ * "Format SQL" ran three regular expressions over the whole buffer, literals
+ * and comments included. It turned `'a,b=c'` into `'a, b = c'` — a different
+ * value, written by the next Run — joined a `-- comment` to the line after it,
+ * so the comment swallowed the WHERE that followed, and split `>=` into `> =`.
+ */
+describe("formatSql", () => {
+    it("tidies the whitespace, commas and equals signs of the code", () => {
+        expect(formatSql("SELECT  a ,b\n  FROM t\tWHERE x=1")).toBe("SELECT a, b FROM t WHERE x = 1");
+    });
+
+    it("leaves string literals as they are", () => {
+        expect(formatSql("INSERT INTO cfg VALUES ('k','a,b=c')")).toBe("INSERT INTO cfg VALUES ('k', 'a,b=c')");
+        expect(formatSql("UPDATE people SET name = 'John  Smith' WHERE id=1")).toBe("UPDATE people SET name = 'John  Smith' WHERE id = 1");
+        expect(formatSql("SELECT 'it''s, here' AS a")).toBe("SELECT 'it''s, here' AS a");
+        expect(formatSql("SELECT E'a\\'b,c'  AS a")).toBe("SELECT E'a\\'b,c' AS a");
+        expect(formatSql("DO $$ BEGIN  x := 1,  2; END $$")).toBe("DO $$ BEGIN  x := 1,  2; END $$");
+        expect(formatSql("SELECT $tag$a,b$tag$")).toBe("SELECT $tag$a,b$tag$");
+    });
+
+    it("leaves quoted identifiers as they are", () => {
+        expect(formatSql("SELECT \"a , b\"  FROM t")).toBe("SELECT \"a , b\" FROM t");
+    });
+
+    it("keeps a line comment on its own line, so it does not swallow the code after it", () => {
+        expect(formatSql("SELECT * FROM t -- active only\n  WHERE active")).toBe("SELECT * FROM t -- active only\nWHERE active");
+        expect(formatSql("SELECT 1 /* a,b=c */ ,2")).toBe("SELECT 1 /* a,b=c */, 2");
+    });
+
+    it("does not split a comparison or an assignment operator", () => {
+        expect(formatSql("SELECT * FROM t WHERE a>=1 AND b<=2 AND c!=3")).toBe("SELECT * FROM t WHERE a>=1 AND b<=2 AND c!=3");
+        expect(formatSql("SELECT f(a => 1)")).toBe("SELECT f(a => 1)");
+    });
+});
+
+/**
+ * With "Limit 1000" on, ` LIMIT 1000;` was appended to the text. After a
+ * trailing `-- comment` it landed inside the comment, and the whole table came
+ * back under a checkbox saying it was capped; any text naming an aggregate
+ * function — a window `count(*) OVER ()` included — was not limited at all.
+ */
+describe("withAutoLimit", () => {
+    it("limits a plain SELECT", () => {
+        expect(withAutoLimit("SELECT * FROM posts", 1000)).toBe("SELECT * FROM posts LIMIT 1000;");
+        expect(withAutoLimit("SELECT * FROM posts;", 1000)).toBe("SELECT * FROM posts LIMIT 1000;");
+    });
+
+    it("puts the limit before a trailing comment, not inside it", () => {
+        expect(withAutoLimit("SELECT * FROM posts -- newest first", 1000)).toBe("SELECT * FROM posts LIMIT 1000; -- newest first");
+        expect(withAutoLimit("SELECT * FROM posts;\n-- trailing", 1000)).toBe("SELECT * FROM posts LIMIT 1000;\n-- trailing");
+        expect(withAutoLimit("SELECT * FROM posts /* all of them */", 1000)).toBe("SELECT * FROM posts LIMIT 1000; /* all of them */");
+    });
+
+    it("puts the limit after a statement that ends in a literal or a quoted name", () => {
+        expect(withAutoLimit("SELECT * FROM posts WHERE status = 'draft';", 1000)).toBe("SELECT * FROM posts WHERE status = 'draft' LIMIT 1000;");
+        expect(withAutoLimit("SELECT * FROM \"Posts\"", 1000)).toBe("SELECT * FROM \"Posts\" LIMIT 1000;");
+    });
+
+    it("limits a query that names an aggregate function", () => {
+        expect(withAutoLimit("SELECT *, count(*) OVER () AS total FROM posts", 1000)).toBe("SELECT *, count(*) OVER () AS total FROM posts LIMIT 1000;");
+        expect(withAutoLimit("SELECT status, count(*) FROM posts GROUP BY status", 1000)).toBe("SELECT status, count(*) FROM posts GROUP BY status LIMIT 1000;");
+    });
+
+    it("leaves what takes no automatic limit alone", () => {
+        expect(withAutoLimit("SELECT * FROM posts LIMIT 5", 1000)).toBeNull();
+        expect(withAutoLimit("INSERT INTO archive SELECT * FROM posts", 1000)).toBeNull();
+        expect(withAutoLimit("SELECT 1; DELETE FROM posts WHERE id = 1", 1000)).toBeNull();
     });
 });

@@ -168,6 +168,31 @@ describe("the automatic LIMIT", () => {
     it("leaves a script of several statements whole", async () => {
         expect(await run("SELECT 1; DELETE FROM posts WHERE id = 1")).toBe("SELECT 1; DELETE FROM posts WHERE id = 1");
     });
+
+    it("limits a SELECT that ends in a comment, before the comment", async () => {
+        // Appended to the text, the limit landed inside the comment and the
+        // whole table came back with "Limit 1000" checked.
+        expect(await run("SELECT * FROM posts -- newest first")).toBe("SELECT * FROM posts LIMIT 1000; -- newest first");
+    });
+
+    it("limits a SELECT that names an aggregate function", async () => {
+        expect(await run("SELECT *, count(*) OVER () AS total FROM posts")).toBe("SELECT *, count(*) OVER () AS total FROM posts LIMIT 1000;");
+    });
+});
+
+/**
+ * "Format SQL" rewrote the literals in the buffer along with the code: the
+ * next Run wrote `'a, b = c'` where the person had typed `'a,b=c'`.
+ */
+describe("formatting the buffer", () => {
+    it("leaves the values in string literals as they were typed", async () => {
+        render(<SQLEditor/>);
+        await typeSql("INSERT INTO cfg VALUES ('k','a,b=c')");
+
+        fireEvent.click(screen.getByRole("button", { name: label("studio_sql_format_sql") }));
+
+        expect((screen.getByLabelText("SQL") as HTMLTextAreaElement).value).toBe("INSERT INTO cfg VALUES ('k', 'a,b=c')");
+    });
 });
 
 /**

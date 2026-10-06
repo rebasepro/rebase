@@ -280,3 +280,154 @@ export function resolveQueryCollections(provenance: ResultProvenance, collection
     }
     return results;
 }
+
+/**
+ * A stretch of SQL text, by what it is to the database: code, or text that is
+ * data and must not be rewritten — a string literal (quoted, `E'…'` or
+ * dollar-quoted), a quoted identifier, or a comment.
+ */
+interface SqlSegment {
+    text: string;
+    kind: "code" | "literal" | "identifier" | "line comment" | "block comment";
+}
+
+/** A character an unquoted identifier or keyword can hold, `$` included. */
+const IDENTIFIER_CHARACTER = /[A-Za-z0-9_$]/;
+
+/**
+ * Cut `sqlText` into code and the things in it whose text is data.
+ *
+ * A lexer, not a parser: it reads text the parser refuses as well, which is
+ * most of what a person types while writing a query.
+ */
+function splitSql(sqlText: string): SqlSegment[] {
+    const segments: SqlSegment[] = [];
+    let code = "";
+    const push = (text: string, kind: SqlSegment["kind"]) => {
+        if (code) segments.push({ text: code, kind: "code" });
+        code = "";
+        segments.push({ text, kind });
+    };
+    let i = 0;
+    while (i < sqlText.length) {
+        const ch = sqlText[i];
+        const next = sqlText[i + 1];
+        if (ch === "-" && next === "-") {
+            const newline = sqlText.indexOf("\n", i);
+            const end = newline === -1 ? sqlText.length : newline + 1;
+            push(sqlText.slice(i, end), "line comment");
+            i = end;
+            continue;
+        }
+        if (ch === "/" && next === "*") {
+            // Block comments nest in Postgres.
+            let depth = 1;
+            let j = i + 2;
+            while (j < sqlText.length && depth > 0) {
+                if (sqlText[j] === "/" && sqlText[j + 1] === "*") {
+                    depth++;
+                    j += 2;
+                } else if (sqlText[j] === "*" && sqlText[j + 1] === "/") {
+                    depth--;
+                    j += 2;
+                } else {
+                    j++;
+                }
+            }
+            push(sqlText.slice(i, j), "block comment");
+            i = j;
+            continue;
+        }
+        if (ch === "'" || ch === "\"") {
+            // `E'…'` takes backslash escapes; every quoted text takes its
+            // quote doubled.
+            const backslashEscapes = ch === "'" && /(^|[^A-Za-z0-9_$])[eE]$/.test(code);
+            let j = i + 1;
+            while (j < sqlText.length) {
+                if (backslashEscapes && sqlText[j] === "\\") {
+                    j += 2;
+                } else if (sqlText[j] === ch && sqlText[j + 1] === ch) {
+                    j += 2;
+                } else if (sqlText[j] === ch) {
+                    j++;
+                    break;
+                } else {
+                    j++;
+                }
+            }
+            push(sqlText.slice(i, j), ch === "'" ? "literal" : "identifier");
+            i = j;
+            continue;
+        }
+        if (ch === "$" && !IDENTIFIER_CHARACTER.test(code.slice(-1))) {
+            // `$tag$…$tag$` — not `$1`, a parameter, whose tag would start
+            // with a digit.
+            const tag = /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.exec(sqlText.slice(i));
+            if (tag) {
+                const close = sqlText.indexOf(tag[0], i + tag[0].length);
+                const end = close === -1 ? sqlText.length : close + tag[0].length;
+                push(sqlText.slice(i, end), "literal");
+                i = end;
+                continue;
+            }
+        }
+        code += ch;
+        i++;
+    }
+    if (code) segments.push({ text: code, kind: "code" });
+    return segments;
+}
+
+/**
+ * The console's "Format SQL": runs of whitespace become one space, a comma is
+ * followed by one, and an `=` standing alone gets one on each side — in the
+ * code only.
+ *
+ * A literal, a quoted identifier and a comment are copied as they are: their
+ * text is data, and rewriting `'a,b'` to `'a, b'` changes the value the next
+ * Run writes. A line comment keeps the line break that ends it, or it would
+ * swallow the code after it. `>=`, `<=`, `!=`, `:=` and `=>` are operators of
+ * their own and are left whole.
+ */
+export function formatSql(sqlText: string): string {
+    const segments = splitSql(sqlText);
+    return segments.map((segment, index) => {
+        if (segment.kind !== "code") return segment.text;
+        const tidied = segment.text
+            .replace(/\s+/g, " ")
+            .replace(/\s*,\s*/g, ", ")
+            .replace(/(?<![<>!:=~*+\-/%^&|#@?])\s*=\s*(?![=>~*<])/g, " = ");
+        return segments[index - 1]?.kind === "line comment" ? tidied.trimStart() : tidied;
+    }).join("").trim();
+}
+
+/**
+ * `sqlText` with the console's automatic `LIMIT` on it, or `null` when it
+ * takes none (see {@link acceptsAutoLimit}).
+ *
+ * The limit goes straight after the statement's last token — before a
+ * trailing comment, which would otherwise swallow it, and in place of a
+ * trailing `;`. A query that computes an aggregate is limited like any other:
+ * the limit applies to the rows it returns, so a `count(*)` still counts every
+ * row, and a window `count(*) OVER ()` is no longer a way past the cap.
+ */
+export function withAutoLimit(sqlText: string, limit: number): string | null {
+    if (!acceptsAutoLimit(sqlText)) return null;
+    const segments = splitSql(sqlText);
+    const isComment = (segment: SqlSegment) => segment.kind === "line comment" || segment.kind === "block comment";
+    const isFiller = (segment: SqlSegment) => isComment(segment) || (segment.kind === "code" && /^[\s;]*$/.test(segment.text));
+    let last = segments.length - 1;
+    while (last >= 0 && isFiller(segments[last])) last--;
+    if (last < 0) return null;
+
+    const lastSegment = segments[last];
+    const head = lastSegment.kind === "code" ? lastSegment.text.replace(/[\s;]+$/, "") : lastSegment.text;
+    const after = lastSegment.kind === "code" ? lastSegment.text.slice(head.length) : "";
+    // What follows the statement is comments and the space between them; its
+    // `;` are dropped, the limit brings its own.
+    const tail = after.replace(/;/g, "") + segments.slice(last + 1)
+        .map(segment => segment.kind === "code" ? segment.text.replace(/;/g, "") : segment.text)
+        .join("");
+    const before = segments.slice(0, last).map(segment => segment.text).join("");
+    return `${before}${head} LIMIT ${limit};${tail.trimEnd()}`;
+}
