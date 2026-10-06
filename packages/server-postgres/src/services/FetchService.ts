@@ -59,31 +59,6 @@ type ResolvedOrderKey = {
 };
 
 /**
- * Ascending comparison for two values of one column, with NULLs placed.
- *
- * Used only to order the rows *inside* one included relation, where the sort
- * happens after a batched load rather than in SQL — see
- * {@link FetchService.shapeRelatedRows}. The NULL placement is the same
- * question the `ORDER BY` answers, and it is answered the same way here so a
- * nested `orderBy` does not put its empty values at the opposite end from the
- * identical top-level one.
- */
-function compareForSort(a: unknown, b: unknown, nullsLast: boolean): number {
-    const aNull = a === null || a === undefined;
-    const bNull = b === null || b === undefined;
-    if (aNull && bNull) return 0;
-    if (aNull) return nullsLast ? 1 : -1;
-    if (bNull) return nullsLast ? -1 : 1;
-    // Dates compare as numbers; everything else falls back to a string
-    // comparison, which is what a mixed or unknown column has.
-    const av = a instanceof Date ? a.getTime() : a;
-    const bv = b instanceof Date ? b.getTime() : b;
-    if (typeof av === "number" && typeof bv === "number") return av - bv;
-    if (typeof av === "boolean" && typeof bv === "boolean") return (av ? 1 : 0) - (bv ? 1 : 0);
-    return String(av).localeCompare(String(bv));
-}
-
-/**
  * Service for handling all row read operations.
  * Handles fetching, searching, counting, and filtering rows.
  */
@@ -668,14 +643,15 @@ target });
     }
 
     /**
-     * Sort, cap and project the rows of ONE to-many relation, per parent.
+     * Cap and project the rows of ONE relation, per parent.
      *
-     * `orderBy` and `limit` are applied here rather than in SQL because a limit
-     * on a batched relation load is *per parent*, and expressing that needs a
-     * LATERAL or a window function per relation kind — four of them, each with
-     * its own join shape. The rows were already narrowed by
-     * {@link includeNarrowing} in SQL, so what this sorts and cuts is the set
-     * the caller asked for and not the table.
+     * The order and the limit are Postgres's: the batch loader ranks each
+     * parent's related rows by the include's `orderBy` and reads back only the
+     * ones within its `limit` (see
+     * {@link RelationService.batchFetchRelatedEntitiesMany}), so `rows`
+     * arrives sorted and already cut. The slice here is what holds the limit
+     * where a `via` chain reaches one target along two paths — those rows share
+     * a rank — and it costs nothing where nothing is left to cut.
      */
     private shapeRelatedRows(
         rows: Record<string, unknown>[],
@@ -683,17 +659,7 @@ target });
         targetCollection: CollectionConfig
     ): Record<string, unknown>[] {
         let out = rows;
-        if (node.orderBy && node.orderBy.length > 0) {
-            const keys = node.orderBy;
-            out = [...out].sort((a, b) => {
-                for (const [field, direction, nulls] of keys) {
-                    const cmp = compareForSort(a[field], b[field], FetchService.nullsLast({ direction, nulls }));
-                    if (cmp !== 0) return direction === "desc" ? -cmp : cmp;
-                }
-                return 0;
-            });
-        }
-        if (node.limit !== undefined) out = out.slice(0, node.limit);
+        if (node.limit !== undefined && out.length > node.limit) out = out.slice(0, node.limit);
         if (node.fields && node.fields.length > 0) {
             const keep = new Set(node.fields);
             // The key always survives: a related row nobody can address cannot
@@ -789,8 +755,13 @@ target });
                         loaded.push(shaped);
                     }
                 } else {
+                    // The include's own order and limit, which the loader
+                    // applies per parent in SQL.
+                    const window = node.limit !== undefined || (node.orderBy && node.orderBy.length > 0)
+                        ? { limit: node.limit, orderBy: node.orderBy }
+                        : undefined;
                     const results = await this.relationService.batchFetchRelatedEntitiesMany(
-                        collectionPath, rowIds, key, relation, narrow
+                        collectionPath, rowIds, key, relation, narrow, window
                     );
                     for (const row of addressable) {
                         const related = results.get(String(addressOf(row))) ?? [];

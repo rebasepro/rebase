@@ -249,8 +249,9 @@ city: "Paris" } }
 
         const rows = await fetchService.fetchCollectionForRest("sku_items", {}, ["all_warehouses"]);
 
+        // No `where`, and no per-parent order or limit to push into the read.
         expect(batchFetchMany).toHaveBeenCalledWith(
-            "sku_items", ["ABC-1"], "all_warehouses", expect.anything(), undefined
+            "sku_items", ["ABC-1"], "all_warehouses", expect.anything(), undefined, undefined
         );
         // The embedded rows carry the target's own columns — `id` here is the
         // integer column, not a re-merged string address.

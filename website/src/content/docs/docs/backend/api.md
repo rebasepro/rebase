@@ -484,10 +484,10 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 
 | Key | Meaning |
 |-----|---------|
-| `limit` | Rows **per parent row**, not across the page |
+| `limit` | Rows **per parent row**, not across the page. Applied by the query, so the rows past it are never read out of the database |
 | `where` | The same filter dialect the top-level `where` uses |
 | `logical` | An `or`/`and`/`not` group over the related rows |
-| `orderBy` | The same sort spelling, including the NULL placement |
+| `orderBy` | The same sort spelling, including the NULL placement. Ties, and a `limit` with no `orderBy`, go by the related row's key, ascending |
 | `fields` | Columns of the *related* row; its key always survives |
 | `include` | Relations of the related row, in turn |
 

@@ -1,4 +1,4 @@
-import { and, eq, inArray, notInArray, or, sql, SQL, getTableName as drizzleTableName } from "drizzle-orm";
+import { and, eq, getTableColumns, inArray, lte, notInArray, or, sql, SQL, getTableName as drizzleTableName } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
 import { CollectionConfig, FilterValues, OrderByTuple, ResolvedRelation, ResolvedManyToMany, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
@@ -138,6 +138,74 @@ function narrowed(base: SQL, narrow?: SQL): SQL {
 function narrowBoth(a?: SQL, b?: SQL): SQL | undefined {
     if (a && b) return and(a, b)!;
     return a ?? b;
+}
+
+/**
+ * What an include asks of ONE to-many relation's rows, per parent: how many,
+ * and in what order. See {@link RelationService.batchFetchRelatedEntitiesMany}.
+ */
+export interface RelatedRowWindow {
+    /** Rows to keep per parent. */
+    limit?: number;
+    /** Their order, by the target's own columns. */
+    orderBy?: OrderByTuple[];
+}
+
+/** The alias of the subquery a limited relation read joins back to. */
+const RANKED = "__ranked";
+
+/**
+ * The order one parent's related rows come in: the include's own keys, then
+ * the target's key ascending.
+ *
+ * The key ascending is the order an unordered batch read handed rows back in
+ * on an append-only table, and so the rows a `limit` with no `orderBy` kept —
+ * stated now rather than left to the plan. A key that names no column of the
+ * target sorts nothing, as it sorted nothing when the sort ran over the
+ * returned rows in JavaScript; the caller's field access on it was already
+ * judged at the route.
+ *
+ * NULLs go where a top-level `orderBy` puts them: the stated placement, else
+ * Postgres's own (last ascending, first descending).
+ */
+export function relatedRowOrder(targetTable: PgTable, targetKeys: AnyPgColumn[], orderBy: OrderByTuple[] | undefined): SQL[] {
+    const columns = getTableColumns(targetTable);
+    const order: SQL[] = [];
+    for (const [field, direction, nulls] of orderBy ?? []) {
+        const column = Object.prototype.hasOwnProperty.call(columns, field) ? columns[field] : undefined;
+        if (!column) continue;
+        const nullsLast = nulls ? nulls === "last" : direction === "asc";
+        if (direction === "desc") {
+            order.push(nullsLast ? sql`${column} DESC NULLS LAST` : sql`${column} DESC NULLS FIRST`);
+        } else {
+            order.push(nullsLast ? sql`${column} ASC NULLS LAST` : sql`${column} ASC NULLS FIRST`);
+        }
+    }
+    for (const key of targetKeys) order.push(sql`${key} ASC`);
+    return order;
+}
+
+/**
+ * The SELECT list of a ranked-keys subquery: the columns that identify one
+ * related row under one parent, each under its own alias, and the row's rank
+ * among that parent's related rows.
+ *
+ * `dense_rank`, not `row_number`: a `via` chain can reach the same target from
+ * one parent along two paths, and those rows tie on every key, so they share a
+ * rank and count once against the limit — the same multiplicity the unlimited
+ * read serves them with.
+ */
+function rankedKeyFields(
+    keys: AnyPgColumn[],
+    partitionBy: AnyPgColumn[],
+    order: SQL[]
+): Record<string, SQL.Aliased<unknown>> {
+    const fields: Record<string, SQL.Aliased<unknown>> = {};
+    keys.forEach((key, i) => {
+        fields[`k${i}`] = sql`${key}`.as(`__k${i}`);
+    });
+    fields.rank = sql`dense_rank() over (partition by ${sql.join(partitionBy, sql`, `)} order by ${sql.join(order, sql`, `)})`.as("__rank");
+    return fields;
 }
 
 /**
@@ -1095,6 +1163,17 @@ export class RelationService {
      * Batch fetch many-cardinality related rows for multiple parent rows.
      * Returns a Map<parentId, RelatedRow[]> instead of Map<parentId, RelatedRow>.
      * Uses a single SQL query with IN clause to avoid N+1.
+     *
+     * `window` is an include's own `limit` and `orderBy`, and both are applied
+     * by Postgres. A limit is *per parent*, so it is a rank within each
+     * parent's rows rather than a `LIMIT`: a subquery ranks the keys of every
+     * matching row — under the same relation condition, `narrow`, soft delete
+     * and `beforeQuery` the unlimited read applies — and the read joins back to
+     * the ones ranked within the limit. It used to read every related row of
+     * every parent and cut the list in JavaScript: 200 rows served out of
+     * 200,000 read, parsed and rendered for `{ messages: { limit: 2 } }` on a
+     * page of 100 threads. Rows come back in the window's order, so the
+     * per-parent lists are already sorted.
      */
     async batchFetchRelatedEntitiesMany(
         parentCollectionPath: string,
@@ -1102,7 +1181,8 @@ export class RelationService {
         _relationKey: string,
         relation: ResolvedRelation,
         /** An extra condition on the target — see {@link batchFetchRelatedEntities}. */
-        narrow?: SQL
+        narrow?: SQL,
+        window?: RelatedRowWindow
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>[]>> {
         if (parentIds.length === 0) return new Map();
 
@@ -1141,7 +1221,7 @@ export class RelationService {
 
         // Handle join path relations (many-to-many through junction tables)
         if (relation.kind === "via") {
-            let query = this.db.select().from(parentTable).$dynamic();
+            const joins: { table: PgTable; condition: SQL }[] = [];
             let currentTable = parentTable;
 
             for (const join of relation.joinPath) {
@@ -1151,13 +1231,34 @@ export class RelationService {
                 const step = joinStepCondition(currentTable, joinTable, join);
                 if ("missing" in step) throw new Error(`Join columns not found: ${step.missing}`);
 
-                query = applyDynamicJoin(query, joinTable, step.condition);
+                joins.push({ table: joinTable, condition: step.condition });
                 currentTable = joinTable;
             }
+            const throughPath = <Q>(query: Q): Q =>
+                joins.reduce((joined, { table, condition }) => applyDynamicJoin(joined, table, condition), query);
 
-            query = query.where(narrowed(this.parentKeyCondition(parentTable, parentPks, parentIds), narrowTarget));
+            const scope = narrowed(this.parentKeyCondition(parentTable, parentPks, parentIds), narrowTarget);
+            const endTable = currentTable;
+            const targetKeys = targetPks.map(pk => endTable[pk.fieldName as keyof typeof endTable] as AnyPgColumn);
+            const order = relatedRowOrder(endTable, targetKeys, window?.orderBy);
 
-            const results = await query;
+            let results: unknown[];
+            if (window?.limit !== undefined) {
+                // Ranked over distinct (parent, target) pairs: two paths to
+                // one target are one related row, and share a rank.
+                const parentKeys = parentPks.map(pk => parentTable[pk.fieldName as keyof typeof parentTable] as AnyPgColumn);
+                const keys = [...parentKeys, ...targetKeys];
+                const ranked = throughPath(
+                    this.db.selectDistinct(rankedKeyFields(keys, parentKeys, order)).from(parentTable).$dynamic()
+                ).where(scope).as(RANKED);
+                results = await throughPath(this.db.select().from(parentTable).$dynamic())
+                    .innerJoin(ranked, and(...keys.map((key, i) => eq(key, ranked[`k${i}`])))!)
+                    .where(lte(ranked.rank, window.limit))
+                    .orderBy(ranked.rank);
+            } else {
+                const query = throughPath(this.db.select().from(parentTable).$dynamic()).where(scope);
+                results = window?.orderBy?.length ? await query.orderBy(...order) : await query;
+            }
             const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
             const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();
 
@@ -1197,13 +1298,37 @@ export class RelationService {
             // WHERE junction.sourceColumn IN (parentIds)
             // The target is joined in, so its soft-delete stamp is a condition
             // this query can carry.
-            const query = this.db
-                .select()
-                .from(junctionTable)
-                .innerJoin(targetTable, eq(targetJunctionCol, targetIdField))
-                .where(narrowed(inArray(sourceJunctionCol, parsedParentIds), narrowTarget));
+            const scope = narrowed(inArray(sourceJunctionCol, parsedParentIds), narrowTarget);
+            const order = relatedRowOrder(targetTable, [targetIdField], window?.orderBy);
 
-            const results = await query;
+            let results: unknown[];
+            if (window?.limit !== undefined) {
+                // A link is named by its two ends, so that pair is the key the
+                // read joins back on — the same target is a different related
+                // row under each parent. Distinct, so a junction without a
+                // primary key on the pair cannot multiply the rows it joins.
+                const keys = [sourceJunctionCol, targetJunctionCol];
+                const ranked = this.db
+                    .selectDistinct(rankedKeyFields(keys, [sourceJunctionCol], order))
+                    .from(junctionTable)
+                    .innerJoin(targetTable, eq(targetJunctionCol, targetIdField))
+                    .where(scope)
+                    .as(RANKED);
+                results = await this.db
+                    .select()
+                    .from(junctionTable)
+                    .innerJoin(targetTable, eq(targetJunctionCol, targetIdField))
+                    .innerJoin(ranked, and(eq(sourceJunctionCol, ranked.k0), eq(targetJunctionCol, ranked.k1)))
+                    .where(lte(ranked.rank, window.limit))
+                    .orderBy(ranked.rank);
+            } else {
+                const query = this.db
+                    .select()
+                    .from(junctionTable)
+                    .innerJoin(targetTable, eq(targetJunctionCol, targetIdField))
+                    .where(scope);
+                results = window?.orderBy?.length ? await query.orderBy(...order) : await query;
+            }
             const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();
             const targetTableName = getTableName(targetCollection);
             // The junction's own columns, when it declares any. Built once per
@@ -1250,22 +1375,36 @@ export class RelationService {
             : parsedParentIds;
         if (matchValues.length === 0) return new Map();
 
-        let query = this.db.select().from(targetTable).$dynamic();
+        const targetKeys = targetPks.map(pk => targetTable[pk.fieldName as keyof typeof targetTable] as AnyPgColumn);
+        const order = relatedRowOrder(targetTable, targetKeys, window?.orderBy);
+        const foreignKeyColumn = hasForeignKeyOnTarget(relation)
+            ? targetTable[fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget) as keyof typeof targetTable] as AnyPgColumn | undefined
+            : undefined;
 
-        query = applyDynamicRelationQuery(
-            query,
-            query,
-            relation,
-            matchValues,
-            targetTable,
-            parentTable,
-            parentIdCol,
-            targetIdField,
-            this.registry,
-            narrowTarget ? [narrowTarget] : []
-        );
-
-        const results = await query;
+        let results: unknown[];
+        if (window?.limit !== undefined && foreignKeyColumn) {
+            // The relation's own condition, the include's `where`, the soft
+            // delete and `beforeQuery`: everything the unlimited read applies.
+            let rankedQuery = this.db.select(rankedKeyFields(targetKeys, [foreignKeyColumn], order)).from(targetTable).$dynamic();
+            rankedQuery = applyDynamicRelationQuery(
+                rankedQuery, rankedQuery, relation, matchValues, targetTable, parentTable,
+                parentIdCol, targetIdField, this.registry, narrowTarget ? [narrowTarget] : []
+            );
+            const ranked = rankedQuery.as(RANKED);
+            results = await this.db
+                .select()
+                .from(targetTable)
+                .innerJoin(ranked, and(...targetKeys.map((key, i) => eq(key, ranked[`k${i}`])))!)
+                .where(lte(ranked.rank, window.limit))
+                .orderBy(ranked.rank);
+        } else {
+            let query = this.db.select().from(targetTable).$dynamic();
+            query = applyDynamicRelationQuery(
+                query, query, relation, matchValues, targetTable, parentTable,
+                parentIdCol, targetIdField, this.registry, narrowTarget ? [narrowTarget] : []
+            );
+            results = window?.orderBy?.length ? await query.orderBy(...order) : await query;
+        }
         const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();
 
         for (const row of results as Array<Record<string, unknown>>) {

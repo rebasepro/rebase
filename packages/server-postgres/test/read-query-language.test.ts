@@ -1,6 +1,8 @@
 import { CollectionConfig } from "@rebasepro/types";
-import { Table } from "drizzle-orm";
+import { Table, sql } from "drizzle-orm";
+import { PgDialect, integer, pgTable } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
+import { relatedRowOrder } from "../src/services/RelationService";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
@@ -135,23 +137,36 @@ describe("the read query language", () => {
             expect(narrow).toBeDefined();
         });
 
-        it("sorts and caps the rows of one relation, per parent", async () => {
+        it("hands one relation's order and limit to the batch loader, which applies them per parent", async () => {
             const { fetchService, many } = service([{ id: 1, title: "Hello" }]);
+            // The loader answers ranked and cut by Postgres, in its own order.
             many.mockResolvedValue(related([
-                { id: 10, body: "b", rank: 2 },
                 { id: 11, body: "c", rank: 3 },
-                { id: 12, body: "a", rank: 1 }
+                { id: 10, body: "b", rank: 2 }
             ]));
 
             const rows = await fetchService.fetchCollectionForRest("posts", {}, {
                 comments: { orderBy: [["rank", "desc"]], limit: 2 }
             });
 
-            // The limit is per parent, not across the page.
+            // In SQL, not over the returned rows: a slice in JavaScript read
+            // every related row of every parent to serve two of each.
+            expect(many.mock.calls[0][5]).toEqual({ limit: 2, orderBy: [["rank", "desc"]] });
             expect(rows[0].comments).toEqual([
                 { id: 11, body: "c", rank: 3 },
                 { id: 10, body: "b", rank: 2 }
             ]);
+        });
+
+        it("still holds the limit when a loader hands back more rows than it", async () => {
+            // A `via` chain reaching one target along two paths ranks both
+            // rows alike, so the loader can return more than `limit` of them.
+            const { fetchService, many } = service([{ id: 1, title: "Hello" }]);
+            many.mockResolvedValue(related([{ id: 11 }, { id: 11 }, { id: 12 }]));
+
+            const rows = await fetchService.fetchCollectionForRest("posts", {}, { comments: { limit: 2 } });
+
+            expect((rows[0].comments as { id: number }[]).map(c => c.id)).toEqual([11, 11]);
         });
 
         it("projects an included relation down to its own `fields`", async () => {
@@ -167,22 +182,19 @@ describe("the read query language", () => {
             expect(rows[0].comments).toEqual([{ id: 10, body: "b" }]);
         });
 
-        it("places a nested relation's NULLs the way the top level would", async () => {
-            const { fetchService, many } = service([{ id: 1, title: "Hello" }]);
-            many.mockResolvedValue(related([
-                { id: 10, rank: 2 },
-                { id: 11, rank: null },
-                { id: 12, rank: 1 }
-            ]));
+        it("places a nested relation's NULLs the way the top level would", () => {
+            const comments = pgTable("comments", { id: integer("id"), rank: integer("rank") });
+            const render = (orderBy: Parameters<typeof relatedRowOrder>[2]) =>
+                new PgDialect().sqlToQuery(sql.join(relatedRowOrder(comments, [comments.id], orderBy), sql`, `)).sql;
 
-            const rows = await fetchService.fetchCollectionForRest("posts", {}, {
-                comments: { orderBy: [["rank", "asc"]] }
-            });
-
-            // NULLS LAST ascending — the same convention the ORDER BY applies,
-            // so a nested sort does not put its empty values at the opposite
-            // end from the identical top-level one.
-            expect((rows[0].comments as { id: number }[]).map(c => c.id)).toEqual([12, 10, 11]);
+            // NULLS LAST ascending and FIRST descending — the same convention
+            // the top-level ORDER BY applies — unless the key says otherwise,
+            // and the target's key ascending last, so the order is total.
+            expect(render([["rank", "asc"]])).toBe(`"comments"."rank" ASC NULLS LAST, "comments"."id" ASC`);
+            expect(render([["rank", "desc"]])).toBe(`"comments"."rank" DESC NULLS FIRST, "comments"."id" ASC`);
+            expect(render([["rank", "desc", "last"]])).toBe(`"comments"."rank" DESC NULLS LAST, "comments"."id" ASC`);
+            // A key that is no column of the target sorts nothing.
+            expect(render([["nope", "asc"]])).toBe(`"comments"."id" ASC`);
         });
 
         it("refuses an unknown relation rather than dropping it", async () => {

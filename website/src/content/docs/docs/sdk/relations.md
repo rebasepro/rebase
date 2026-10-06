@@ -74,10 +74,10 @@ const { data } = await client.data.posts.include({
 
 | Option | What it does |
 |--------|--------------|
-| `limit` | Rows **per parent**, not across the page — five comments on each post, not five in total. |
+| `limit` | Rows **per parent**, not across the page — five comments on each post, not five in total. Applied by the query, so the rows past it are never read out of the database. |
 | `where` | The same filter dialect the top-level `where` uses. Pushed into the query, so the `limit` applies to rows that match. |
 | `logical` | An `or`/`and`/`not` group over the related rows. |
-| `orderBy` | The same sort spelling, including the [NULL placement](/docs/sdk/querying#where-nulls-sort). |
+| `orderBy` | The same sort spelling, including the [NULL placement](/docs/sdk/querying#where-nulls-sort). Ties, and a `limit` with no `orderBy`, go by the related row's key, ascending. |
 | `fields` | Columns of the *related* row. Its key always survives, so the row stays addressable. |
 | `include` | Relations of the related row, in turn — this is how the tree nests. |
 
