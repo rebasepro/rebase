@@ -48,7 +48,7 @@ la différence entre un lecteur fonctionnel et un lecteur en panne.
 - La revalidation prévaut sur un intervalle : une requête transmettant à la fois `If-None-Match` et
   `Range` reçoit le code `304`.
 
-Seuls les octets demandés sont lus — depuis le disque pour le stockage local, et par une lecture
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> Seuls les octets demandés sont lus — depuis le disque pour le stockage local, et par une lecture
 partielle sur S3 et GCS — et chaque objet est transmis au client au fil de sa lecture (streaming) au
 lieu d'être d'abord conservé en mémoire : servir une grande vidéo coûte donc au serveur la même
 mémoire que servir une miniature. Une revalidation qui se termine par un `304`, un `HEAD`, un `416`

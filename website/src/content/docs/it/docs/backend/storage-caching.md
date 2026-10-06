@@ -53,7 +53,7 @@ player funzionante e uno non funzionante.
 - La riconvalida ha la priorità su un range: una richiesta contenente sia
   `If-None-Match` sia `Range` riceve un `304`.
 
-Vengono letti solo i byte richiesti — da disco nello storage locale, e con una
+<span class="since-badge" data-since="0.24">Da 0.24</span> Vengono letti solo i byte richiesti — da disco nello storage locale, e con una
 lettura a intervalli da S3 e GCS — e ogni oggetto viene inviato al client in
 streaming man mano che viene letto, anziché essere prima tenuto in memoria,
 quindi servire un video di grandi dimensioni costa al server la stessa memoria

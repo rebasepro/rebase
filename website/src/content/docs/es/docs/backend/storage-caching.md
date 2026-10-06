@@ -48,7 +48,7 @@ la diferencia entre un reproductor que funciona y uno roto.
 - La revalidación prevalece sobre un rango: una solicitud que lleve tanto `If-None-Match` como
   `Range` recibe el `304`.
 
-Solo se leen los bytes solicitados —del disco en el almacenamiento local, y con una
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Solo se leen los bytes solicitados —del disco en el almacenamiento local, y con una
 lectura por rangos desde S3 y GCS—, y cada objeto se envía al cliente en streaming a medida
 que se lee, en lugar de mantenerlo antes en memoria, así que servir un vídeo grande le cuesta
 al servidor la misma memoria que servir una miniatura. Una revalidación que termina en un

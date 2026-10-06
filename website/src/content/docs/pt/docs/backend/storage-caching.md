@@ -48,7 +48,7 @@ a diferença entre um player funcional e um com defeito.
 - A revalidação tem precedência sobre o range: uma requisição contendo tanto `If-None-Match` quanto
   `Range` recebe o `304`.
 
-Apenas os bytes solicitados são lidos — do disco no armazenamento local, e com uma
+<span class="since-badge" data-since="0.24">Desde 0.24</span> Apenas os bytes solicitados são lidos — do disco no armazenamento local, e com uma
 leitura particionada (ranged read) no S3 e GCS — e todo objeto é enviado ao cliente em streaming
 conforme é lido, em vez de ser mantido antes na memória, de modo que servir um vídeo grande custa
 ao servidor a mesma memória que servir uma miniatura. Uma revalidação que termina em um

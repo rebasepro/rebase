@@ -240,7 +240,7 @@ Ces trois paramètres de fenêtre sont rejetés plutôt que corrigés automatiqu
 
 ### Ignorer le comptage
 
-`meta.total` est un `COUNT(*)` sur toutes les lignes correspondantes — sur une grande table, l'essentiel du coût
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> `meta.total` est un `COUNT(*)` sur toutes les lignes correspondantes — sur une grande table, l'essentiel du coût
 d'une requête de liste. `?count=none` (`GET /api/data/orders?count=none`) l'ignore : pas de `meta.total`, tandis que
 `meta.hasMore` reste exact (la lecture demande une ligne de plus que la page). `?count=exact` est la valeur par
 défaut ; toute autre valeur renvoie une erreur 400 `INVALID_COUNT`. Une lecture `?distinct=true` n'est jamais comptée.

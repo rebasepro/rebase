@@ -94,7 +94,7 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 
 #### Skipping the count
 
-`meta.total` is a `COUNT(*)` over every row the query matches, run beside the
+<span class="since-badge" data-since="0.24">Since 0.24</span> `meta.total` is a `COUNT(*)` over every row the query matches, run beside the
 page — and on a large table it costs more than the page does. A read that only
 pages forward never needs it, because `meta.hasMore` does not depend on it:
 pass `count: "none"` and the read asks for one row past the page instead.

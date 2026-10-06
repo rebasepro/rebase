@@ -97,7 +97,7 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 
 #### Saltare il conteggio
 
-`meta.total` è un `COUNT(*)` su ogni riga che la query trova, eseguito accanto alla pagina — e su una
+<span class="since-badge" data-since="0.24">Da 0.24</span> `meta.total` è un `COUNT(*)` su ogni riga che la query trova, eseguito accanto alla pagina — e su una
 tabella grande costa più della pagina stessa. Una lettura che si limita a procedere in avanti non ne ha
 mai bisogno, perché `meta.hasMore` non ne dipende: passa `count: "none"` e la lettura chiede invece una
 riga oltre la pagina.

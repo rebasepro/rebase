@@ -71,7 +71,7 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 
 #### Omitir el conteo
 
-`meta.total` es un `COUNT(*)` sobre todas las filas que coinciden con la consulta, ejecutado junto
+<span class="since-badge" data-since="0.24">Desde 0.24</span> `meta.total` es un `COUNT(*)` sobre todas las filas que coinciden con la consulta, ejecutado junto
 a la página — y en una tabla grande cuesta más que la página. Una lectura que solo pagina hacia
 delante nunca lo necesita, porque `meta.hasMore` no depende de él: pasa `count: "none"` y la
 lectura pide en su lugar una fila más allá de la página.

@@ -2,7 +2,7 @@
 slug: docs/upgrading/0-23-to-next
 title: Upgrading 0.23 to the next release
 sidebar_label: 0.23 → next
-description: The breaking changes already merged on main and live in these docs, before the release that carries them exists — generated SQL and SDK types, CLI paths, scopes, upserts and keys, the remote MCP endpoint, and sessions and accounts.
+description: The breaking changes already merged on main and live in these docs, before the release that carries them exists — generated SQL and SDK types, CLI paths, scopes, upserts and keys, the remote MCP endpoint, sessions and accounts, and the REST count switch.
 ---
 
 # Upgrading 0.23 → next
@@ -22,7 +22,8 @@ answers, and 51 to 55 are about access. Permissions are now
 roles and MCP tokens; if every person who uses your admin surfaces holds the
 `admin` role, most of them ask nothing of you. Sections 56 to 58 cover the remote
 MCP endpoint, in-process writes and the UI kit, and 59 to 64 the session and
-account changes.
+account changes. Sections 65 to 67 come with the performance work: the count
+switch on REST lists, the MCP collection listing, and the admin's translations.
 
 ---
 
@@ -515,3 +516,47 @@ door now answers `401 SESSION_REVOKED`, as for a session that was signed out.
 **What to change:** nothing with the SDK, which signs out on it. A client that
 treated a `404` from `/me` as "account gone" checks for `SESSION_REVOKED`
 instead. See [Errors](/docs/backend/errors/).
+
+## 65. A filter on a column named `count` goes inside `?where=`
+
+`?count=` on a REST list is now the switch for the count behind `meta.total`:
+`?count=none` skips it and `?count=exact` is the default. Any other value is
+refused with `400 INVALID_COUNT`. Before, `?count=5` filtered the rows whose
+`count` column was 5.
+
+**What to change:** nothing with the SDK, which already sends a filter on a
+column named `count` inside `?where=`. A hand-written REST call that filters on
+such a column moves the filter there:
+
+```diff lang="http"
+- GET /api/data/products?count=5
++ GET /api/data/products?where={"count":["==",5]}
+```
+
+See [Skipping the count](/docs/backend/api/#skipping-the-count).
+
+## 66. The remote MCP's `list_collections` has no `structuredContent`
+
+`list_collections` sent its listing twice: pretty-printed in the text block, and
+again as `structuredContent`. On a large project the two together were more than
+a model's context. It now sends the listing once, in the text block, as compact
+JSON. The other tools keep their `structuredContent`.
+
+**What to change:** nothing for an assistant, which reads the text. A program
+that read the listing from `structuredContent` parses the text block instead;
+its content is the same. See [The remote endpoint](/docs/ai/mcp/#the-remote-endpoint).
+
+## 67. `@rebasepro/app` no longer exports `es`
+
+The package's entry re-exported the Spanish translation table, `es`, which put
+the Spanish strings into every bundle built from it. Translations other than
+English are now fetched when a user picks their language, and `es` is no longer
+exported. `en` still is.
+
+**What to change:** nothing, unless you imported `es`. To change the admin's
+strings, pass overrides to `<Rebase translations={…}>`; to pin the language,
+pass `locale`.
+
+```bash
+grep -rnE "import \{[^}]*\bes\b[^}]*\} from \"@rebasepro/app\"" --exclude-dir=node_modules .
+```

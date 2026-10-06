@@ -35,5 +35,7 @@
     "contracts/server.api.txt": "the API-surface contract shipped in 0.23 and earlier; the entry changes when `check:api-surface` passes",
     "getSignedUrl": "the storage method shipped in 0.23 and earlier; the entry lets it take an `s3://` or `gs://` address",
     "deleteObject": "the storage method shipped in 0.23 and earlier; the entry lets it take an `s3://` or `gs://` address",
-    "client.batch()": "`client.batch()` shipped in 0.23 and earlier; the entry fixes the collection name a typed batch sends, badged where it is described"
+    "client.batch()": "`client.batch()` shipped in 0.23 and earlier; the entry fixes the collection name a typed batch sends, badged where it is described",
+    "rebase dev": "the command has shipped since 0.1; the entries make it start the backend sooner and fix a ready line it missed, and change nothing a page teaches about running it",
+    "boot": "a generic word: the docs match it inside code (a comment in a function example, a JSON message in the live-schema flow); the subcommand the entry names is its own token, `rebase cloud debug boot`"
 }

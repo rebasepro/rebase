@@ -240,7 +240,7 @@ Los tres parámetros de ventana se rechazan en lugar de corregirse, y cada uno i
 
 ### Omitir el conteo
 
-`meta.total` es un `COUNT(*)` sobre todas las filas que coinciden — en una tabla grande, la mayor parte de lo que cuesta una solicitud de listado. `?count=none` (`GET /api/data/orders?count=none`) lo omite: no hay `meta.total`, mientras que `meta.hasMore` sigue siendo exacto (la lectura pide una fila más allá de la página). `?count=exact` es el valor por defecto; cualquier otro valor es un 400 `INVALID_COUNT`. Una lectura con `?distinct=true` nunca se cuenta.
+<span class="since-badge" data-since="0.24">Desde 0.24</span> `meta.total` es un `COUNT(*)` sobre todas las filas que coinciden — en una tabla grande, la mayor parte de lo que cuesta una solicitud de listado. `?count=none` (`GET /api/data/orders?count=none`) lo omite: no hay `meta.total`, mientras que `meta.hasMore` sigue siendo exacto (la lectura pide una fila más allá de la página). `?count=exact` es el valor por defecto; cualquier otro valor es un 400 `INVALID_COUNT`. Una lectura con `?distinct=true` nunca se cuenta.
 
 ### Paginación por cursor
 

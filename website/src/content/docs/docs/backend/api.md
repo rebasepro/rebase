@@ -280,7 +280,7 @@ collection, which is why none of them is clamped or ignored.
 
 ### Skipping the count
 
-`meta.total` is a `COUNT(*)` over every matching row — on a large table, most of
+<span class="since-badge" data-since="0.24">Since 0.24</span> `meta.total` is a `COUNT(*)` over every matching row — on a large table, most of
 what a list request costs. `?count=none` (`GET /api/data/orders?count=none`)
 skips it: no `meta.total`, while `meta.hasMore` stays exact (the read asks for one
 row past the page). `?count=exact` is the default; any other value is a 400

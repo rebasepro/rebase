@@ -280,7 +280,7 @@ razão pela qual nenhum deles é ajustado ou ignorado.
 
 ### Ignorando a contagem
 
-`meta.total` é um `COUNT(*)` sobre todas as linhas correspondentes — numa tabela
+<span class="since-badge" data-since="0.24">Desde 0.24</span> `meta.total` é um `COUNT(*)` sobre todas as linhas correspondentes — numa tabela
 grande, a maior parte do custo de uma requisição de listagem. `?count=none`
 (`GET /api/data/orders?count=none`) a dispensa: sem `meta.total`, enquanto
 `meta.hasMore` continua exato (a leitura pede uma linha além da página).

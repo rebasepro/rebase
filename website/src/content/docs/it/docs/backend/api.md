@@ -240,7 +240,7 @@ Tutti e tre i parametri della finestra vengono rifiutati anziché corretti autom
 
 ### Saltare il conteggio
 
-`meta.total` è un `COUNT(*)` su ogni riga corrispondente — su una tabella grande, la maggior parte di
+<span class="since-badge" data-since="0.24">Da 0.24</span> `meta.total` è un `COUNT(*)` su ogni riga corrispondente — su una tabella grande, la maggior parte di
 ciò che costa una richiesta di elenco. `?count=none` (`GET /api/data/orders?count=none`) lo salta:
 niente `meta.total`, mentre `meta.hasMore` resta esatto (la lettura chiede una riga oltre la pagina).
 `?count=exact` è il valore predefinito; qualsiasi altro valore è un 400 `INVALID_COUNT`. Una lettura

@@ -55,7 +55,7 @@ entscheidet dies also über einen funktionierenden oder defekten Player.
 - Revalidierung hat Vorrang vor einem Bereich: Eine Anfrage, die sowohl
   `If-None-Match` als auch `Range` enthält, erhält den `304`-Status.
 
-Es werden nur die angeforderten Bytes gelesen — bei lokalem Speicher von der
+<span class="since-badge" data-since="0.24">Seit 0.24</span> Es werden nur die angeforderten Bytes gelesen — bei lokalem Speicher von der
 Festplatte, bei S3 und GCS mit einem Bereichslesezugriff —, und jedes Objekt wird
 beim Lesen an den Client gestreamt, statt zuerst im Speicher gehalten zu werden;
 die Auslieferung eines großen Videos kostet den Server also genauso viel

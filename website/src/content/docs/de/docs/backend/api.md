@@ -287,7 +287,7 @@ unterscheiden, weshalb keines davon gekappt oder ignoriert wird.
 
 ### Die Zählung überspringen
 
-`meta.total` ist ein `COUNT(*)` über alle passenden Zeilen — bei einer großen Tabelle
+<span class="since-badge" data-since="0.24">Seit 0.24</span> `meta.total` ist ein `COUNT(*)` über alle passenden Zeilen — bei einer großen Tabelle
 der größte Teil dessen, was eine Listenanfrage kostet. `?count=none`
 (`GET /api/data/orders?count=none`) überspringt sie: kein `meta.total`, während
 `meta.hasMore` exakt bleibt (der Read fragt eine Zeile über die Seite hinaus ab).

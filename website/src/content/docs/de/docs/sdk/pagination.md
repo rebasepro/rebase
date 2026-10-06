@@ -94,7 +94,7 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 
 #### Die Zählung überspringen
 
-`meta.total` ist ein `COUNT(*)` über jede Zeile, die die Abfrage trifft, neben der Seite
+<span class="since-badge" data-since="0.24">Seit 0.24</span> `meta.total` ist ein `COUNT(*)` über jede Zeile, die die Abfrage trifft, neben der Seite
 ausgeführt — und bei einer großen Tabelle kostet es mehr als die Seite selbst. Ein Read, der nur
 vorwärts paginiert, braucht es nie, denn `meta.hasMore` hängt nicht davon ab: Übergeben Sie
 `count: "none"`, und der Read fragt stattdessen eine Zeile über die Seite hinaus ab.

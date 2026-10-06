@@ -97,7 +97,7 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 
 #### Ignorer le comptage
 
-`meta.total` est un `COUNT(*)` sur toutes les lignes correspondant à la requête, exécuté à côté de la
+<span class="since-badge" data-since="0.24">Depuis 0.24</span> `meta.total` est un `COUNT(*)` sur toutes les lignes correspondant à la requête, exécuté à côté de la
 page — et sur une grande table, il coûte plus cher que la page elle-même. Une lecture qui ne fait
 qu'avancer n'en a jamais besoin, car `meta.hasMore` n'en dépend pas : passez `count: "none"` et la lecture
 demande à la place une ligne de plus que la page.
