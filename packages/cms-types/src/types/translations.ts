@@ -1282,6 +1282,9 @@ export interface RebaseTranslations {
     studio_backups_never_ran?: string;
     studio_backups_next_run?: string;
     studio_backups_schedule_paused?: string;
+    studio_backups_schedule_off_in_code?: string;
+    studio_backups_manual_run_ok?: string;
+    studio_backups_manual_run_failed?: string;
     studio_backups_history_unreadable?: string;
     studio_backups_job_refused?: string;
     studio_backups_unavailable_title?: string;

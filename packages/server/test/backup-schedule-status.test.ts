@@ -21,6 +21,32 @@ import { readBackupSchedule, type BackupScheduleSource } from "../src/backup/bac
 
 const BACKUP_CRON_MARK = Symbol.for("rebase.backupCron");
 
+function logEntry(overrides: Partial<CronJobLogEntry>): CronJobLogEntry {
+    return {
+        jobId: "backup",
+        startedAt: "2026-09-30T03:00:00.000Z",
+        finishedAt: "2026-09-30T03:00:05.000Z",
+        durationMs: 5000,
+        success: true,
+        logs: [],
+        manual: false,
+        ...overrides
+    };
+}
+
+/** A backup job whose history is `logs`, newest first, as `cron_logs` returns it. */
+function sourceWith(logs: CronJobLogEntry[]): BackupScheduleSource {
+    return {
+        jobIdsWhere: () => ["backup"],
+        rejectedJobsWhere: () => [],
+        fetchJob: async () => ({
+            id: "backup", name: "Backup", schedule: "0 3 * * *", enabled: true,
+            state: "idle", totalRuns: logs.length, totalFailures: 0
+        }),
+        getJobLogsFromDb: async () => logs
+    };
+}
+
 function backupJob(handler: CronJobDefinition["handler"]): CronJobDefinition {
     const definition: CronJobDefinition = {
         name: "Nightly",
@@ -48,7 +74,27 @@ describe("GET /admin/backups — the scheduled run", () => {
         return res.json();
     }
 
-    it("reports a failed last run, with its error", async () => {
+    it("reports a failed scheduled run, with its error", async () => {
+        const schedule = await readBackupSchedule(sourceWith([
+            logEntry({ success: false, error: "Could not find the 'pg_dump' binary." })
+        ]));
+
+        expect(schedule).toMatchObject({
+            jobId: "backup",
+            schedule: "0 3 * * *",
+            enabled: true,
+            lastRun: { success: false, error: expect.stringContaining("pg_dump"), manual: false }
+        });
+    });
+
+    it("reports a successful scheduled run", async () => {
+        const schedule = await readBackupSchedule(sourceWith([logEntry({ success: true })]));
+
+        expect(schedule?.lastRun).toMatchObject({ success: true, manual: false });
+        expect(schedule?.lastRun?.error).toBeUndefined();
+    });
+
+    it("reports a run by hand as one, not as the scheduled backup", async () => {
         const scheduler = new CronScheduler();
         scheduler.registerJobs([
             { id: "backup", definition: backupJob(async () => { throw new Error("Could not find the 'pg_dump' binary."); }) },
@@ -59,22 +105,65 @@ describe("GET /admin/backups — the scheduled run", () => {
         const body = await list(scheduler);
 
         expect(body.backups).toEqual([]);
-        expect(body.schedule).toMatchObject({
-            jobId: "backup",
-            schedule: "0 3 * * *",
-            enabled: true,
-            lastRun: { success: false, error: expect.stringContaining("pg_dump") }
+        expect(body.schedule.lastRun).toBeUndefined();
+        expect(body.schedule.lastManualRun).toMatchObject({
+            success: false,
+            error: expect.stringContaining("pg_dump"),
+            manual: true
         });
     });
 
-    it("reports a successful last run", async () => {
-        const scheduler = new CronScheduler();
-        scheduler.registerJobs([{ id: "nightly-db", definition: backupJob(async () => ({ backup: "x.dump" })) }]);
-        await scheduler.triggerJob("nightly-db");
+    it("does not let a later run by hand hide a failed scheduled one", async () => {
+        // "Run Now" from the Cron panel after the nightly failed: the newest
+        // entry is a success, and read as "the last scheduled backup" it
+        // covered the failure.
+        const schedule = await readBackupSchedule(sourceWith([
+            logEntry({ startedAt: "2026-09-30T09:00:00.000Z", success: true, manual: true }),
+            logEntry({ startedAt: "2026-09-30T03:00:00.000Z", success: false, error: "pg_dump: error: connection lost" })
+        ]));
 
-        const body = await list(scheduler);
-        expect(body.schedule.lastRun).toMatchObject({ success: true, manual: true });
-        expect(body.schedule.lastRun.error).toBeUndefined();
+        expect(schedule?.lastRun).toMatchObject({ success: false, error: "pg_dump: error: connection lost", manual: false });
+        expect(schedule?.lastManualRun).toMatchObject({ success: true, manual: true, startedAt: "2026-09-30T09:00:00.000Z" });
+    });
+
+    it("does not report a failed run by hand as a failed scheduled backup", async () => {
+        const schedule = await readBackupSchedule(sourceWith([
+            logEntry({ startedAt: "2026-09-30T09:00:00.000Z", success: false, error: "test run", manual: true }),
+            logEntry({ startedAt: "2026-09-30T03:00:00.000Z", success: true })
+        ]));
+
+        expect(schedule?.lastRun).toMatchObject({ success: true, manual: false });
+        expect(schedule?.lastManualRun).toMatchObject({ success: false, error: "test run" });
+    });
+
+    it("leaves out a run by hand older than the last scheduled one", async () => {
+        const schedule = await readBackupSchedule(sourceWith([
+            logEntry({ startedAt: "2026-09-30T03:00:00.000Z", success: true }),
+            logEntry({ startedAt: "2026-09-29T09:00:00.000Z", success: false, error: "old test run", manual: true })
+        ]));
+
+        expect(schedule?.lastRun).toMatchObject({ success: true });
+        expect(schedule?.lastManualRun).toBeUndefined();
+    });
+
+    it("tells a job declared disabled apart from one an admin paused", async () => {
+        // The documented cron file exports `enabled: false` while BACKUP_SCHEDULE
+        // is unset. "Resume it in Cron Jobs" would run that placeholder.
+        const scheduler = new CronScheduler();
+        const placeholder = backupJob(async () => undefined);
+        placeholder.enabled = false;
+        scheduler.registerJobs([{ id: "backup", definition: placeholder }]);
+
+        const declared = (await list(scheduler)).schedule;
+        expect(declared).toMatchObject({ enabled: false, disabledInCode: true });
+
+        const paused = new CronScheduler();
+        paused.registerJobs([{ id: "backup", definition: backupJob(async () => undefined) }]);
+        await paused.persistJobEnabled("backup", false);
+
+        const schedule = (await list(paused)).schedule;
+        expect(schedule.enabled).toBe(false);
+        expect(schedule.disabledInCode).toBeUndefined();
     });
 
     it("looks past a skipped overlap to the run it skipped", async () => {
@@ -170,6 +259,6 @@ describe("GET /admin/backups — the scheduled run", () => {
         });
         const body = await (await router.request("/")).json();
         expect(body.configured).toBe(false);
-        expect(body.schedule.lastRun).toMatchObject({ success: false, error: "no destination" });
+        expect(body.schedule.lastManualRun).toMatchObject({ success: false, error: "no destination" });
     });
 });

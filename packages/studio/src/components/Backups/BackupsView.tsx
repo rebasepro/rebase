@@ -44,13 +44,43 @@ function rolesFileName(dumpName: string): string {
 }
 
 /**
- * How the scheduled backup is doing, above the list.
+ * How the scheduled backup is doing, above the list — and, apart from it, a run
+ * someone started by hand since, which is not the schedule's.
+ */
+function BackupScheduleSummary({ schedule }: { schedule: BackupScheduleStatus }) {
+    const { t } = useTranslation();
+    const manual = schedule.lastManualRun;
+    return (
+        <div className="flex flex-col gap-2">
+            <ScheduledBackupStatus schedule={schedule}/>
+            {manual && (manual.success ? (
+                <Typography variant="caption" color="secondary" className="text-[12px]">
+                    {t("studio_backups_manual_run_ok", { when: formatDate(manual.startedAt) })}
+                </Typography>
+            ) : (
+                <Alert color="warning">
+                    <Typography variant="body2" className="text-[13px] font-semibold">
+                        {t("studio_backups_manual_run_failed", { when: formatDate(manual.startedAt) })}
+                    </Typography>
+                    {manual.error && (
+                        <Typography variant="caption" className="font-mono text-[12px] whitespace-pre-wrap break-words">
+                            {manual.error}
+                        </Typography>
+                    )}
+                </Alert>
+            ))}
+        </div>
+    );
+}
+
+/**
+ * The scheduled backup's own state.
  *
  * A failed last run is an error, not a footnote: a backup that fails every
  * night used to leave this panel empty under "wait for the next scheduled run",
  * with the reason only in the cron history.
  */
-function BackupScheduleSummary({ schedule }: { schedule: BackupScheduleStatus }) {
+function ScheduledBackupStatus({ schedule }: { schedule: BackupScheduleStatus }) {
     const { t } = useTranslation();
     const last = schedule.lastRun;
 
@@ -85,10 +115,15 @@ function BackupScheduleSummary({ schedule }: { schedule: BackupScheduleStatus })
     }
 
     if (!schedule.enabled) {
+        // Declared off is not paused: "resume it in Cron Jobs" would turn on
+        // the placeholder the documented cron file exports while
+        // BACKUP_SCHEDULE is unset.
         return (
             <Alert color="warning">
                 <Typography variant="body2" className="text-[13px]">
-                    {t("studio_backups_schedule_paused", { job: schedule.jobId })}
+                    {schedule.disabledInCode
+                        ? t("studio_backups_schedule_off_in_code", { job: schedule.jobId })
+                        : t("studio_backups_schedule_paused", { job: schedule.jobId })}
                 </Typography>
             </Alert>
         );

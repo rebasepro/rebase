@@ -74,6 +74,14 @@ export interface BackupScheduleStatus {
     enabled: boolean;
 
     /**
+     * True when the job is off because its own definition says
+     * `enabled: false` — the documented backup cron file exports it that way
+     * while `BACKUP_SCHEDULE` is unset — and not because someone paused it.
+     * Resuming it in Cron Jobs would run that definition as written.
+     */
+    disabledInCode?: boolean;
+
+    /**
      * Why the scheduler refused the job — an invalid schedule, timezone or
      * timeout. A refused job is not registered and never runs; the cron file
      * has to change.
@@ -84,10 +92,15 @@ export interface BackupScheduleStatus {
     nextRunAt?: string;
 
     /**
-     * The most recent run, absent when the job has never run — or when its
-     * run history could not be read, which {@link historyError} says.
+     * The most recent scheduled run, absent when the schedule has never run
+     * it — or when its run history could not be read, which
+     * {@link historyError} says. A run someone started by hand is not one:
+     * see {@link lastManualRun}.
      */
     lastRun?: BackupRunOutcome;
+
+    /** A run started by hand ("Run Now") since {@link lastRun}, when there is one. */
+    lastManualRun?: BackupRunOutcome;
 
     /**
      * Why the job's run history could not be read. Whether it ran, and how it

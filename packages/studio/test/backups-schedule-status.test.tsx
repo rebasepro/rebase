@@ -134,6 +134,56 @@ describe("Backups panel and the scheduled run", () => {
         expect(screen.queryByText(en.studio_backups_empty_hint!)).toBeNull();
     });
 
+    it("keeps a run by hand apart from the scheduled one", async () => {
+        // A failed test run from Cron Jobs is not a failed nightly, and a
+        // successful one does not stand in for the nightly either.
+        list.mockResolvedValue({
+            backups: [],
+            destinationKind: "local",
+            configured: true,
+            schedule: {
+                jobId: "backup",
+                name: "Scheduled database backup",
+                schedule: "0 3 * * *",
+                enabled: true,
+                lastRun: {
+                    startedAt: "2026-09-30T03:00:00.000Z",
+                    finishedAt: "2026-09-30T03:00:05.000Z",
+                    success: true,
+                    manual: false
+                },
+                lastManualRun: {
+                    startedAt: "2026-09-30T09:00:00.000Z",
+                    finishedAt: "2026-09-30T09:00:01.000Z",
+                    success: false,
+                    error: PG_DUMP_MISSING,
+                    manual: true
+                }
+            }
+        });
+        render(<BackupsView/>);
+
+        await waitFor(() => expect(screen.getByText(/^Last scheduled backup:/)).toBeTruthy());
+        expect(screen.getByText(/^The last run by hand failed/)).toBeTruthy();
+        expect(screen.getByText(PG_DUMP_MISSING)).toBeTruthy();
+        expect(screen.queryByText(/^The last scheduled backup failed/)).toBeNull();
+    });
+
+    it("says a job declared disabled is off, not paused", async () => {
+        // Following "Resume the job in Cron Jobs" would turn on the placeholder
+        // the documented cron file exports while BACKUP_SCHEDULE is unset.
+        list.mockResolvedValue({
+            backups: [],
+            destinationKind: "local",
+            configured: true,
+            schedule: { jobId: "backup", name: "Backup", schedule: "0 3 * * *", enabled: false, disabledInCode: true }
+        });
+        render(<BackupsView/>);
+
+        await waitFor(() => expect(screen.getByText(t("studio_backups_schedule_off_in_code", { job: "backup" }))).toBeTruthy());
+        expect(screen.queryByText(/^Scheduled backups are paused/)).toBeNull();
+    });
+
     it("says a paused schedule is paused", async () => {
         list.mockResolvedValue({
             backups: [],
