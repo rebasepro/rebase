@@ -1,5 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import { createStorage } from "../src/storage";
+import { createStorage, storageObjectPath } from "../src/storage";
 import { Transport } from "../src/transport";
 
 function createMockTransport(): jest.Mocked<Transport> {
@@ -529,6 +529,58 @@ fileNotFound: true });
 
             await storage.deleteObject("doc.pdf", "docs");
             expect(mockTransport.request).toHaveBeenCalledWith("/storage/file/docs/doc.pdf", { method: "DELETE" });
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // A key under a folder named `default`
+    // -----------------------------------------------------------------------
+    describe("a key whose first folder is named `default`", () => {
+        // The routes read one leading `default/` as the bucket, so the key
+        // `default/photo.png` sent bare named the root `photo.png`. The
+        // round trip through the real routes is
+        // packages/server/test/storage-sdk-default-folder.test.ts.
+        it("is sent behind the bucket segment, so the routes keep the folder", () => {
+            expect(storageObjectPath("default/photo.png")).toBe("default/default/photo.png");
+            expect(storageObjectPath("Default/photo.png")).toBe("default/Default/photo.png");
+            expect(storageObjectPath("default/")).toBe("default/default/");
+            expect(storageObjectPath("s3://bucket/default/photo.png")).toBe("default/default/photo.png");
+        });
+
+        it("reads and deletes by that path", async () => {
+            const storage = createStorage(mockTransport);
+            mockTransport.request.mockResolvedValueOnce({ data: { token: "tok" } });
+            mockTransport.request.mockResolvedValueOnce({});
+
+            const config = await storage.getSignedUrl("default/photo.png");
+            await storage.deleteObject("default/photo.png");
+
+            expect(mockTransport.request).toHaveBeenCalledWith("/storage/metadata/default/default/photo.png");
+            expect(config.url).toBe("http://localhost:3000/api/storage/file/default/default/photo.png?token=tok");
+            expect(mockTransport.request).toHaveBeenCalledWith("/storage/file/default/default/photo.png", { method: "DELETE" });
+        });
+
+        it("is not taken for public when its folder is `default/public`", async () => {
+            const storage = createStorage(mockTransport);
+            mockTransport.request.mockResolvedValueOnce({ data: { token: "tok" } });
+
+            const config = await storage.getSignedUrl("default/public/report.pdf");
+
+            expect(mockTransport.request).toHaveBeenCalledWith("/storage/metadata/default/default/public/report.pdf");
+            expect(config.url).toContain("token=tok");
+        });
+
+        it("leaves every path that already named its object as it was", () => {
+            expect(storageObjectPath("photo.png")).toBe("photo.png");
+            expect(storageObjectPath("default")).toBe("default");
+            expect(storageObjectPath("defaults/photo.png")).toBe("defaults/photo.png");
+            expect(storageObjectPath("images/default/photo.png")).toBe("images/default/photo.png");
+            // A storageUrl carries its bucket already.
+            expect(storageObjectPath("local://default/photo.png")).toBe("default/photo.png");
+            expect(storageObjectPath("local://default/default/photo.png")).toBe("default/default/photo.png");
+            // So does a path given with its bucket.
+            expect(storageObjectPath("photo.png", "default")).toBe("default/photo.png");
+            expect(storageObjectPath("mybucket/file.jpg", "mybucket")).toBe("mybucket/file.jpg");
         });
     });
 
