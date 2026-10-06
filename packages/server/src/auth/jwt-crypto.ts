@@ -100,6 +100,16 @@ export async function verifyJwt(
 }
 
 /**
+ * Whether a {@link verifyJwt} rejection says only that the token's `exp` has
+ * passed — the routine refusal that sends a client to refresh — rather than
+ * that the token is not one we signed. Here because the library decides how
+ * that is spelled.
+ */
+export function isExpiredJwtError(error: unknown): boolean {
+    return error instanceof jwt.TokenExpiredError;
+}
+
+/**
  * The token's unverified header — `kid` and `alg` — or an empty object.
  *
  * Unverified is the point: this is read *in order to* pick the key that will

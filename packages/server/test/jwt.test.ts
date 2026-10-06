@@ -462,6 +462,39 @@ accessExpiresIn: "1s" });
         });
     });
 
+    /**
+     * An access token that has merely expired is the 401 that drives the
+     * SDK's refresh — routine, many times an hour per signed-in client. It was
+     * logged at ERROR and teed into the Logs Explorer as one. A token that
+     * fails for any other reason (a bad signature, a forgery) still is.
+     */
+    describe("what a refused token logs", () => {
+        it("logs an expired token below ERROR, and a forged one at ERROR", async () => {
+            const { logger } = await import("../src/utils/logger");
+            const error = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+            const debug = jest.spyOn(logger, "debug").mockImplementation(() => undefined);
+            try {
+                configureJwt({ secret: testSecret, accessExpiresIn: "1s" });
+                const token = await generateAccessToken("user-1", ["admin"]);
+                jest.useFakeTimers().setSystemTime(Date.now() + 2_000);
+                try {
+                    expect(await verifyAccessToken(token)).toBeNull();
+                } finally {
+                    jest.useRealTimers();
+                }
+                expect(error).not.toHaveBeenCalled();
+                expect(debug).toHaveBeenCalledWith(expect.stringContaining("expired"));
+
+                const forged = jwt.sign({ uid: "user-1", roles: ["admin"] }, "not-the-secret-not-the-secret-not-the-secret");
+                expect(await verifyAccessToken(forged)).toBeNull();
+                expect(error).toHaveBeenCalledTimes(1);
+            } finally {
+                error.mockRestore();
+                debug.mockRestore();
+            }
+        });
+    });
+
     // ── Access token round-trip with various roles ────────────
     describe("access token round-trip", () => {
         it("should preserve multiple roles through encode/decode", async () => {

@@ -1,4 +1,4 @@
-import { decodeProtectedHeader, signJwt, verifyJwt } from "./jwt-crypto";
+import { decodeProtectedHeader, isExpiredJwtError, signJwt, verifyJwt } from "./jwt-crypto";
 import { randomHex, sha256Hex } from "../utils/portable-crypto";
 import { logger } from "../utils/logger";
 // A leaf module (node:path and `@rebasepro/types` only), so this does not close
@@ -499,6 +499,13 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
             })()
         };
     } catch (error) {
+        // An expired token is the 401 that sends a client to refresh — many
+        // times an hour per signed-in client, not an error anyone should be
+        // paged for or find filling the Logs Explorer.
+        if (isExpiredJwtError(error)) {
+            logger.debug("[JWT] Access token expired");
+            return null;
+        }
         // No part of the token. A bearer that fails here may be the service key
         // or an API key, and its first characters were going into the log of
         // every refused request.
