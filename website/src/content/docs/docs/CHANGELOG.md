@@ -374,6 +374,11 @@ description: Every released change to Rebase — new features, fixes, and the br
   `onCloseAutoFocus`; `BooleanSwitch` accepts `aria-label`, `aria-labelledby`
   and `id`.
 
+- **`Select` and `MultiSelect` accept `triggerContent`,** a node that replaces
+  everything the trigger draws: the value, the box, its padding, its height
+  and the chevron. It is for a caller that frames the select itself, as a
+  table cell does. `RelationSelector` and `UserSelector` already took it.
+
 #### Server & REST
 
 - **`REBASE_HSTS_INCLUDE_SUBDOMAINS`** opts back into the old
@@ -513,7 +518,17 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ### Changed
 
+#### Server & REST
+
+- **`createBackupRoutes` takes `storageFor(destination)`,** replacing its `storage` option. `listBackupObjects`, `readBackupBytes` and `openBackupStream` throw for an object destination they have no controller for, instead of returning nothing. `BackupScheduleStatus.lastRun` excludes manual runs, and adds `lastManualRun`, `disabledInCode`, `refused` and `historyError`. `BackupListing` adds `localDiskOfThisProcess`.
+
+- **Realtime and SQL admin:** `EXECUTE_SQL_SUCCESS` carries `effectiveRole` when a statement asked for a role, and `SqlScriptResult` has `effectiveRole`. `BranchInfo` has a required `database` field.
+
+- **`compileRulePolicies(collection, rule, options)`** in `@rebasepro/common` is the one compiler of a security rule into Postgres policies. The schema planner delegates to it.
+
 #### Studio
+
+- **The translation key `studio_api_keys_admin_reads_every_row` is renamed to `studio_api_keys_admin_bypasses_rls`.** An app that overrides it must rename its override.
 
 - **`POST /api/admin/schema/plan|apply` and
   `/api/admin/schema-editor/collection/save` accept a `patch`** (operations
@@ -537,6 +552,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 #### CLI
 
+- **`REBASE_BRANCH_PARENT_DATABASE`:** `rebase dev`, and the other commands that start a child process, export it on a switched checkout. It names the database the branch was taken from, so the server keeps the branch registry and the default source there.
+
 - **`rebase schema introspect` writes more explicit property keys than
   before:** `columnType`, `precision`/`scale`, `defaultValue`, `required`,
   the key's real strategy, `onDelete` and the `search` block. A uuid key with
@@ -558,6 +575,8 @@ description: Every released change to Rebase — new features, fixes, and the br
   stored elsewhere stop finding their row.
 
 #### Client SDK
+
+- **`client.cron.listJobs()` returns a `CronJobListing`**, which carries the jobs the server refused (`rejected`) and the files it could not load (`skipped`, `note`) beside `jobs`.
 
 - **Generated `database.types.ts` entries carry a `Slug` field** (regenerate
   with `rebase generate-sdk`; older generated files still work).
@@ -625,6 +644,10 @@ description: Every released change to Rebase — new features, fixes, and the br
 ### Fixed
 
 #### Server & REST
+
+- **The OpenAPI spec says a delete on a `softDelete` collection moves the row to the trash.** It documents `?hard=true` on DELETE and bulk delete, and `?deleted=include|only` on list, single read, count and aggregate. A column named `deleted` is no longer offered as a filter, because the server reads that name as the soft-delete parameter.
+
+- **The SQL console's "current database" is the database the app's connection is on**, not the one `ADMIN_CONNECTION_STRING` names. A statement sent under the admin URL's database name no longer runs on the app's connection. "Default (main database)" in branching copies the app's database.
 
 - **A live schema edit now reminds a project that keeps migrations to run
   `rebase db generate`.** The reminder only appeared when migrations were in
@@ -903,6 +926,18 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 #### Admin (CMS & app)
 
+- **`useBackendStorageSource` addresses a file under a folder named "default" by its own path**, instead of the root file of the same name. It now shares the SDK's path rule, which is exported from `@rebasepro/types`. The rule's bucket check also requires a slash after the bucket name now.
+
+- **Selecting a table cell no longer moves its value.** An enum's chip
+  dropped 3px when its cell was selected, and an enum array's chips 2.5px,
+  because the select inside the cell kept the height of a form field, which
+  is taller than a row's line. A number jumped 4px and switched from the mono,
+  tabular figures it shows at rest to the text font. A markdown paragraph
+  moved 2px, because its source was edited on a shorter line than the one it
+  is drawn on. All four now stay exactly where they were, at every row
+  height. Markdown with headings or lists still shows its source while it is
+  edited.
+
 - **The admin panel no longer sends requests on page load that it knows
   will be refused.** For a user without the `schema:read` scope, every load
   called `GET /api/admin/schema/status` and `GET /api/schema-editor/status`,
@@ -1038,6 +1073,50 @@ description: Every released change to Rebase — new features, fixes, and the br
   target.
 
 #### Studio
+
+- **SQL console:**
+  - An inline edit that changes no row says "No row was updated" instead of "Row updated successfully", and the grid keeps the stored value. This happens when an update policy hides the row from the chosen role, or the row changed after it was read.
+  - The console says when a query ran as the connection owner rather than the role picked (`DISABLE_DB_ROLE_SWITCHING`), and greys out the role picker.
+  - "Open <collection> #id" is offered only on rows read from the app's own database. Before, a row read from a branch or another database opened, and saved, the main database's record with that id.
+  - An empty-string cell is shown as empty, not as NULL. Opening a cell and leaving it unchanged no longer writes NULL.
+  - "Format SQL" leaves string literals, quoted names and comments alone. It no longer joins a `--` comment to the code after it, or splits `>=`, `<=` and `!=`.
+  - "Limit 1000" now limits a SELECT that ends in a comment or uses an aggregate (`count(*) OVER ()` included).
+
+- **Branches:** Create Branch's "Source Database" copies the chosen branch's database. Before, it sent the branch name, so it failed, or it copied an unrelated database of that name. On a `rebase dev` running on a branch, the pane lists the branches recorded in the main database, the current one included, and records new ones there.
+
+- **RLS editor:**
+  - On a table Rebase manages, where the editor writes straight to the database, a banner says each server start (and `rebase db push`) turns RLS back on and re-creates the declared policies.
+  - Saving a policy with nothing changed says so, instead of "Policy saved successfully". The "Unapplied" tooltip names what applies the policy.
+  - The policy help no longer points at the `authenticated` and `anon` roles, which Rebase never creates.
+
+- **The schema visualizer draws the table `db push` creates** (`blog-posts` becomes `blog_posts`), with that table's RLS marker. It says it is drawn from your collections, and shows the declared property types instead of guessed SQL types.
+
+- **Storage browser:**
+  - Deleting a folder deletes all of it: every file past the first thousand per level, and on S3 and GCS the marker left by "New folder". The browser reads the folder back after a delete and says what is still there.
+  - Listings show more than a thousand entries.
+  - Switching source or folder while a listing is loading no longer shows, or acts on, the previous one's files.
+  - The preview's link is minted when the file is opened, and Download and Copy URL each mint a fresh one, so they keep working past the token's five minutes. The preview says whether a link is temporary (anyone who has it can open the file until it expires) or public and permanent.
+
+- **Cron Jobs:**
+  - Run Now reports how the run went; a failed run shows its error instead of a green "Job triggered".
+  - The panel names cron files that failed to load and jobs the scheduler refused, with the reason.
+  - When the run history cannot be read, the panel says so (`GET /api/admin/cron/:id/logs` answers 503) instead of "No executions yet".
+  - On more than one replica, a job's card shows every replica's runs, not only the serving replica's.
+
+- **Backups:**
+  - The panel lists and downloads `s3://` and `gs://` destinations through a controller for that bucket, as the backup cron does, instead of through the app's file storage, which showed "No backups yet." for a bucket full of backups. A destination it cannot read answers 503 with the reason.
+  - "Last scheduled backup" counts scheduled runs only; a run started by hand is shown on its own line.
+  - A job declared `enabled: false` reads as off, not paused.
+  - A refused job is reported with the reason, and the history is shown as unreadable when it cannot be read.
+
+- **Logs Explorer:** the Source filter files sign-ins under Auth and uploads under Storage; before, every request was filed under API. The explorer says it shows the log of the one server instance serving it, and names that instance.
+
+- **A list that fails to load because the session ended (401), or because of a server fault, shows the error and a Retry button.** It no longer says the account lacks a scope. This applies to API keys, Backups, Cron Jobs, Branches and Storage.
+
+- **"Run as" and the JS editor:**
+  - The picker says when it lists only the first page of users ("50 of 500 users").
+  - The JS editor's "Admin: List users" snippet returns one page and its `total`, and says so.
+  - Result rows offer "Open <collection> #id" only when the script names a single collection outside comments and ran as you.
 
 - **The JS editor's "Run as" runs the script as the user you pick.** It built
   a client with your own token and nothing naming the user, so a script run
@@ -1177,6 +1256,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 #### Client SDK
 
+- **A file under a folder named "default" is the file the SDK reads and deletes.** For a key like `default/photo.png`, `getSignedUrl`, `getObject` and `deleteObject` used to name the root file of the same name. So the storage browser previewed the wrong file, and its Delete removed the root file while the intended one stayed. A key under `default/public/` was also served as the root public file, without a token.
+
 - **With `authFlowMode: "cookie"`, the client no longer sends a refresh token
   in the body of `/auth/refresh` or `/auth/logout`.** The cookie carries it.
   The client used to send back the `""` the server returns in cookie mode,
@@ -1251,6 +1332,8 @@ description: Every released change to Rebase — new features, fixes, and the br
   the now signed-out client.
 
 #### Auth
+
+- **Searching the admin user list also matches roles and uids** (`GET /api/admin/users?search=`, Postgres), so the "Run as" picker's "search by name, email, or role" works. MongoDB still matches email and name only.
 
 - **Under `cookieAuth`, a tab whose access token has expired can renew it
   again.** `/auth/refresh` answered `{"refreshToken": ""}` with
@@ -1419,6 +1502,10 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 #### Studio
 
+- **Studio's JS editor runs "No Auth" scripts anonymously.** Its client restored the session the app keeps in `localStorage`, so requests and the realtime socket carried the signed-in administrator's token. The "No Auth" and "Run as" clients now start with an empty session of their own and are closed after the run. Under "Run as", `client.auth.getSession()` is `null`, and `context.user` (`null` under "No Auth") says who the script runs as.
+
+- **The RLS editor lists a policy that is in both your code and the database as the database holds it.** It shows the database's TO list, command, mode, USING and WITH CHECK, and a "Differs from code" badge where they differ. Before, it showed the code's version, so Rebase's own policies (the admin baseline, the tenancy gate, the auth write gate) appeared with an empty USING. Saving one straight to the database in the hosted console recreated it without its condition, which removed a restrictive gate. Editing a Rebase-generated policy directly in the database is now refused.
+
 - **The SQL console's audit log line no longer contains the literals a
   statement carries.** `ALTER ROLE … PASSWORD '…'`, user-mapping passwords
   and connection strings were written verbatim to the logs.
@@ -1486,6 +1573,10 @@ description: Every released change to Rebase — new features, fixes, and the br
   unless the response already set its own.
 
 #### Auth
+
+- **The API keys panel says what the admin role on a key does.** Row-level security does not limit its reads, writes or deletes, and it passes the admin checks in custom functions and storage. The panel used to say only that such a key "reads every row".
+
+- **A key's rate limit holds on the realtime socket and on /mcp.** A key's data frames and MCP requests count in the same `api-key:<id>` bucket as its HTTP requests, at the key's own limit. Before, those doors counted it at the per-user default, separately. The panel says what the limit covers, and that admin operations are not rate limited.
 
 - **A `users:write` role cannot reach past itself.** Nobody edits, resets the
   password of, or deletes an account holding a scope they do not hold
