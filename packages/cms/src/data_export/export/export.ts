@@ -246,17 +246,21 @@ function processValuesForExport<M extends Record<string, unknown>>
         exportType: "csv" | "json",
         dateExportType: "timestamp" | "string"
     ): Record<string, unknown> {
-    const updatedValues = Object.entries(properties)
-        .map(([key, property]) => {
-            const inputValue = inputValues && (inputValues)[key];
-            const updatedValue = processValueForExport(inputValue, property as Property, exportType, dateExportType);
-            if (updatedValue === undefined) return {};
-            return ({ [key]: updatedValue });
-        })
-        .reduce((a, b) => ({ ...a,
-...b }), {}) as Record<string, unknown>;
-    return { ...inputValues,
-...updatedValues };
+    // One accumulator. Merging `{ [key]: value }` objects pairwise copied the
+    // whole row once per property — the square of the property count, per row.
+    const result: Record<string, unknown> = { ...inputValues };
+    for (const [key, property] of Object.entries(properties)) {
+        const inputValue = inputValues && (inputValues)[key];
+        const updatedValue = processValueForExport(inputValue, property as Property, exportType, dateExportType);
+        if (updatedValue === undefined) continue;
+        if (key === "__proto__") {
+            // An own property, as the object spread made it, not the prototype.
+            Object.defineProperty(result, key, { value: updatedValue, enumerable: true, writable: true, configurable: true });
+        } else {
+            result[key] = updatedValue;
+        }
+    }
+    return result;
 }
 
 /**
