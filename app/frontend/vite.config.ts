@@ -63,84 +63,105 @@ export default defineConfig({
                 warn(warning);
             },
             output: {
-                manualChunks(id) {
-                    // Heavy vendor libraries — split into individually cached chunks.
-                    //
-                    // A name here says these modules travel TOGETHER. It does not
-                    // say they travel late: a chunk becomes a static dependency of
-                    // the entry — and so a `modulepreload` in index.html — the
-                    // moment any one module in it is statically reachable. Naming
-                    // a library that is only partly lazy therefore drags the lazy
-                    // part onto the critical path. Read the two exceptions below
-                    // before adding a line.
+                // `codeSplitting.groups`, not `manualChunks`: rolldown turns a
+                // `manualChunks` function into exactly the second group below,
+                // and the first group cannot be said with `manualChunks` at all.
+                codeSplitting: {
+                    groups: [
+                        // The lucide icons the entry reaches through static
+                        // imports, in one eager chunk of their own. `$initial`
+                        // is what keeps the by-name map (an async chunk, see
+                        // below) out of it. Without this group the icons that
+                        // eager chunks and the map share come out as a dozen
+                        // tiny eager chunks named after whichever icon sorts
+                        // first, which change every time an icon is added.
+                        {
+                            name: "vendor-lucide",
+                            test: /[\\/]node_modules[\\/]lucide-react[\\/]/,
+                            tags: ["$initial"]
+                        },
+                        {
+                            name(id) {
+                                // Heavy vendor libraries — split into individually cached chunks.
+                                //
+                                // A name here says these modules travel TOGETHER. It does not
+                                // say they travel late: a chunk becomes a static dependency of
+                                // the entry — and so a `modulepreload` in index.html — the
+                                // moment any one module in it is statically reachable. Naming
+                                // a library that is only partly lazy therefore drags the lazy
+                                // part onto the critical path. Read the two exceptions below
+                                // before adding a line.
 
-                    // @rollup/plugin-commonjs emits its shared helpers as two
-                    // virtual modules ("\0commonjsHelpers.js" and
-                    // "\0commonjs-dynamic-modules") that every CommonJS
-                    // dependency reaches, the entry's included. They match no
-                    // rule below, so Rollup parks them in one of the chunks
-                    // that use them — and it chose `vendor-exceljs`, which
-                    // meant the entry statically imported 940 kB of
-                    // spreadsheet reader to get a ten-line `require` shim.
-                    // Give the helpers a chunk of their own so they can never
-                    // anchor a heavy one to the critical path.
-                    if (id.includes("commonjsHelpers") || id.includes("commonjs-dynamic-modules")) return "vendor-commonjs-helpers";
+                                // @rollup/plugin-commonjs emits its shared helpers as two
+                                // virtual modules ("\0commonjsHelpers.js" and
+                                // "\0commonjs-dynamic-modules") that every CommonJS
+                                // dependency reaches, the entry's included. They match no
+                                // rule below, so Rollup parks them in one of the chunks
+                                // that use them — and it chose `vendor-exceljs`, which
+                                // meant the entry statically imported 940 kB of
+                                // spreadsheet reader to get a ten-line `require` shim.
+                                // Give the helpers a chunk of their own so they can never
+                                // anchor a heavy one to the critical path.
+                                if (id.includes("commonjsHelpers") || id.includes("commonjs-dynamic-modules")) return "vendor-commonjs-helpers";
 
-                    if (id.includes("exceljs")) return "vendor-exceljs";
-                    if (id.includes("prosemirror")) return "vendor-prosemirror";
-                    if (id.includes("monaco-editor") || id.includes("@monaco-editor")) return "vendor-monaco";
-                    if (id.includes("@xyflow") || id.includes("dagre")) return "vendor-xyflow";
-                    if (id.includes("@dnd-kit")) return "vendor-dnd";
-                    if (id.includes("prism-react-renderer")) return "vendor-prism";
-                    if (id.includes("markdown-it")) return "vendor-markdown";
-                    if (id.includes("react-dropzone")) return "vendor-dropzone";
-                    // date-fns core only. The ~77 locales are imported one at a
-                    // time by the admin's date preview; sharing a chunk name with
-                    // the core would make all of them eager again.
-                    if (id.includes("date-fns/locale")) return undefined;
-                    if (id.includes("date-fns")) return "vendor-datefns";
-                    if (id.includes("fuse.js")) return "vendor-fuse";
-                    if (id.includes("node_modules/react-dom/")) return "vendor-react-dom";
-                    if (id.includes("node_modules/react-router") || id.includes("node_modules/@remix-run")) return "vendor-react-router";
-                    if (id.includes("node_modules/@radix-ui/")) return "vendor-radix";
-                    if (id.includes("node_modules/framer-motion/")) return "vendor-framer-motion";
-                    if (id.includes("node_modules/zod/")) return "vendor-zod";
-                    if (id.includes("node_modules/i18next") || id.includes("node_modules/react-i18next")) return "vendor-i18next";
-                    if (id.includes("node_modules/@floating-ui/")) return "vendor-floating-ui";
-                    if (id.includes("node_modules/tailwind-merge/")) return "vendor-tailwind-merge";
-                    if (id.includes("node_modules/notistack/")) return "vendor-notistack";
+                                if (id.includes("exceljs")) return "vendor-exceljs";
+                                if (id.includes("prosemirror")) return "vendor-prosemirror";
+                                if (id.includes("monaco-editor") || id.includes("@monaco-editor")) return "vendor-monaco";
+                                if (id.includes("@xyflow") || id.includes("dagre")) return "vendor-xyflow";
+                                if (id.includes("@dnd-kit")) return "vendor-dnd";
+                                if (id.includes("prism-react-renderer")) return "vendor-prism";
+                                if (id.includes("markdown-it")) return "vendor-markdown";
+                                if (id.includes("react-dropzone")) return "vendor-dropzone";
+                                // date-fns core only. The ~77 locales are imported one at a
+                                // time by the admin's date preview; sharing a chunk name with
+                                // the core would make all of them eager again.
+                                if (id.includes("date-fns/locale")) return undefined;
+                                if (id.includes("date-fns")) return "vendor-datefns";
+                                if (id.includes("fuse.js")) return "vendor-fuse";
+                                if (id.includes("node_modules/react-dom/")) return "vendor-react-dom";
+                                if (id.includes("node_modules/react-router") || id.includes("node_modules/@remix-run")) return "vendor-react-router";
+                                if (id.includes("node_modules/@radix-ui/")) return "vendor-radix";
+                                if (id.includes("node_modules/framer-motion/")) return "vendor-framer-motion";
+                                if (id.includes("node_modules/zod/")) return "vendor-zod";
+                                if (id.includes("node_modules/i18next") || id.includes("node_modules/react-i18next")) return "vendor-i18next";
+                                if (id.includes("node_modules/@floating-ui/")) return "vendor-floating-ui";
+                                if (id.includes("node_modules/tailwind-merge/")) return "vendor-tailwind-merge";
+                                if (id.includes("node_modules/notistack/")) return "vendor-notistack";
 
-                    // lucide-react has no line on purpose. The ~130 icons the
-                    // chrome imports by name are static; the by-name lookup map
-                    // is fetched on demand. One chunk name cannot hold both apart,
-                    // and naming it welded 822 kB of icons into the preload set.
-                    // Left to Rollup, the named icons land in the entry and the
-                    // map gets its own async chunk.
-                    //
-                    // The map is reached through one module of the kit,
-                    // `icons/lucide_icon_map.ts`, that only `import()` reaches.
-                    // It must not fall under the `rebase-ui` name below: a named
-                    // group takes a module's dependencies with it, so naming the
-                    // map module put all ~1,700 icons back in a preloaded chunk.
-                    if (id.includes("packages/ui/src/icons/lucide_icon_map")) return undefined;
+                                // lucide-react has no line here on purpose. The ~130 icons
+                                // the chrome imports by name are static; the by-name lookup
+                                // map is fetched on demand. One chunk name cannot hold both
+                                // apart, and naming it welded 822 kB of icons into the
+                                // preload set. The `$initial` group above takes the static
+                                // ones; the map gets its own async chunk.
+                                //
+                                // The map is reached through one module of the kit,
+                                // `icons/lucide_icon_map.ts`, that only `import()` reaches.
+                                // It must not fall under the `rebase-ui` name below: a named
+                                // group takes a module's dependencies with it, so naming the
+                                // map module put all ~1,700 icons back in a preloaded chunk.
+                                if (id.includes("packages/ui/src/icons/lucide_icon_map")) return undefined;
 
-                    if (id.includes("packages/ui/")) return "rebase-ui";
-                    if (id.includes("packages/app/")) return "rebase-core";
+                                if (id.includes("packages/ui/")) return "rebase-ui";
+                                if (id.includes("packages/app/")) return "rebase-core";
 
-                    // `packages/cms` used to be named here too, split by
-                    // directory "to stay under size limits". It did the
-                    // opposite. This app resolves @rebasepro/* to SOURCE, so
-                    // those names applied to individual admin modules, and each
-                    // name welded a directory's lazy modules to its static ones:
-                    // `rebase-admin-editor` came out at 506 kB and eagerly
-                    // preloaded, where an installed project — which consumes
-                    // admin's `dist`, whose dynamic imports are already separate
-                    // chunks — fetches 53 kB of it on demand. That made this
-                    // build unrepresentative of every real one, which is a bad
-                    // property for the app the bundle budget measures.
-                    // Left unnamed, admin's own code splitting survives.
+                                // `packages/cms` used to be named here too, split by
+                                // directory "to stay under size limits". It did the
+                                // opposite. This app resolves @rebasepro/* to SOURCE, so
+                                // those names applied to individual admin modules, and each
+                                // name welded a directory's lazy modules to its static ones:
+                                // `rebase-admin-editor` came out at 506 kB and eagerly
+                                // preloaded, where an installed project — which consumes
+                                // admin's `dist`, whose dynamic imports are already separate
+                                // chunks — fetches 53 kB of it on demand. That made this
+                                // build unrepresentative of every real one, which is a bad
+                                // property for the app the bundle budget measures.
+                                // Left unnamed, admin's own code splitting survives.
 
-                    return undefined;
+                                return undefined;
+                            }
+                        }
+                    ]
                 }
             }
         }
