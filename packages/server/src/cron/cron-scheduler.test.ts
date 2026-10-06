@@ -76,7 +76,8 @@ function makeFleetStore() {
             if (leases.get(jobId)?.holder === holder) leases.delete(jobId);
         }),
         fetchRunSummaries: jest.fn(async (_jobIds: readonly string[]) => new Map<string, CronJobRunSummary>()),
-        sweepClaims: jest.fn(async () => 0)
+        sweepClaims: jest.fn(async () => 0),
+        sweepLogs: jest.fn(async () => ({ deleted: 0, counted: 0 }))
     } satisfies Required<CronStore>;
     return { store, overrides, leases, claims, logs };
 }
@@ -922,6 +923,41 @@ reason: "already_executing" });
             await scheduler.stop();
             await jest.advanceTimersByTimeAsync(3 * 60 * 60 * 1000);
             expect(fleet.store.sweepClaims).toHaveBeenCalledTimes(4);
+        });
+
+        it("sweeps the run history on the same timer", async () => {
+            // `cron_logs` was never pruned: 1.5M rows a year for twelve
+            // ordinary jobs. The first sweep also counts a history that
+            // predates the run counters, off the boot path.
+            const fleet = makeFleetStore();
+            scheduler.setStore(fleet.store);
+            scheduler.registerJobs([makeJob("yearly", { schedule: "0 0 1 1 *" })]);
+
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(0);
+            expect(fleet.store.sweepLogs).toHaveBeenCalledTimes(1);
+
+            await jest.advanceTimersByTimeAsync(2 * 60 * 60 * 1000);
+            expect(fleet.store.sweepLogs).toHaveBeenCalledTimes(3);
+
+            await scheduler.stop();
+            await jest.advanceTimersByTimeAsync(2 * 60 * 60 * 1000);
+            expect(fleet.store.sweepLogs).toHaveBeenCalledTimes(3);
+        });
+
+        it("keeps running when a history sweep fails", async () => {
+            const fleet = makeFleetStore();
+            fleet.store.sweepLogs.mockRejectedValue(new Error("statement timeout"));
+            jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+            scheduler.setStore(fleet.store);
+            scheduler.registerJobs([makeJob("yearly", { schedule: "0 0 1 1 *" })]);
+
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(60 * 60 * 1000);
+
+            expect(fleet.store.sweepLogs).toHaveBeenCalledTimes(2);
+            expect(fleet.store.sweepClaims).toHaveBeenCalledTimes(2);
+            expect(scheduler.getJob("yearly")?.nextRunAt).toBeDefined();
         });
 
         it("keeps running when a claim sweep fails", async () => {

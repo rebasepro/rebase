@@ -36,7 +36,8 @@ export interface CronStore {
 
     /**
      * Fetch aggregate stats for all jobs (totalRuns, totalFailures, lastRunAt).
-     * Used to seed in-memory counters on startup.
+     * Used to seed in-memory counters on startup. The SQL store reads them from
+     * the all-time counters on `cron_job_state`, not from the history.
      */
     fetchJobStats(): Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string }>>;
 
@@ -109,9 +110,10 @@ export interface CronStore {
     releaseRunLease?(jobId: string, holder: string): Promise<void>;
 
     /**
-     * Run count, failure count and last run of each job, read from
-     * `cron_logs` — every process's runs, where the scheduler's own counters
-     * hold only the ones it made.
+     * Run count, failure count and last run of each job — every process's
+     * runs, where the scheduler's own counters hold only the ones it made. The
+     * SQL store keeps them as all-time counters on `cron_job_state`, so they
+     * outlive the history's retention.
      */
     fetchRunSummaries?(jobIds: readonly string[]): Promise<Map<string, CronJobRunSummary>>;
 
@@ -121,6 +123,23 @@ export interface CronStore {
      * timer while it is started; a store without it keeps every claim.
      */
     sweepClaims?(): Promise<number>;
+
+    /**
+     * Delete run history past retention, and count into the job counters any
+     * run that is not counted yet — a history written before the counters
+     * existed, or by an older server during a rolling deploy. Both in batches.
+     * The scheduler runs it with {@link sweepClaims}; a store without it keeps
+     * every run.
+     */
+    sweepLogs?(): Promise<CronLogSweep>;
+}
+
+/** What one {@link CronStore.sweepLogs} did. */
+export interface CronLogSweep {
+    /** History rows deleted past retention. */
+    deleted: number;
+    /** Runs counted into the job counters that were not counted before. */
+    counted: number;
 }
 
 /** One job's row in `rebase.cron_job_state`, as the scheduler reads it. */
@@ -174,6 +193,69 @@ const CLAIM_SWEEP_BATCH = 5_000;
 const FUTURE_CLAIM_SKEW_MINUTES = 2;
 
 /**
+ * How long a run stays in `cron_logs`, which is what the history panel and
+ * `GET /api/admin/cron/:id/logs` show. The run and failure counts do not
+ * shrink with it: they are kept on `cron_job_state` for all time.
+ *
+ * Nothing used to delete from `cron_logs`: twelve ordinary jobs wrote 1.5M rows
+ * and 617 MB a year, and the counts were `count(*)` over all of it on every
+ * poll of the Studio panel.
+ */
+const LOG_RETENTION_DAYS = 30;
+
+/** History rows one retention or counting statement handles; a sweep repeats it until a batch comes back short. */
+const LOG_SWEEP_BATCH = 5_000;
+
+/**
+ * Whether the run being folded in is at least as recent as the job's last
+ * one. The last-run fields only move forward: a long run is logged when it
+ * ends, after the skip that started while it ran, and a counting batch can
+ * hold any run of the job's history.
+ */
+const IS_NEWER_RUN = "(s.last_run_at IS NULL OR EXCLUDED.last_run_at >= s.last_run_at)";
+
+/**
+ * Add a set of runs to their jobs' counters on `cron_job_state`, as one
+ * `INSERT … ON CONFLICT`. `runs` names a relation of the runs —
+ * `job_id, started_at, duration_ms, success, error` — and becomes one row per
+ * job: how many, how many failed, and the most recent of them.
+ *
+ * Ordered by job, so two statements folding the same jobs lock their rows in
+ * the same order and cannot deadlock.
+ */
+function foldIntoCounters(runs: string): string {
+    return `
+        INSERT INTO ${STATE_TABLE} AS s
+            (job_id, total_runs, total_failures, last_run_at, last_duration_ms, last_success, last_error)
+        SELECT tally.job_id, tally.runs, tally.failures,
+               latest.started_at, latest.duration_ms, latest.success, latest.error
+        FROM (
+            SELECT job_id, count(*) AS runs, count(*) FILTER (WHERE NOT success) AS failures
+            FROM ${runs} GROUP BY job_id
+        ) AS tally
+        JOIN (
+            SELECT DISTINCT ON (job_id) job_id, started_at, duration_ms, success, error
+            FROM ${runs} ORDER BY job_id, started_at DESC
+        ) AS latest ON latest.job_id = tally.job_id
+        ORDER BY tally.job_id
+        ON CONFLICT (job_id) DO UPDATE SET
+            total_runs = s.total_runs + EXCLUDED.total_runs,
+            total_failures = s.total_failures + EXCLUDED.total_failures,
+            last_run_at = CASE WHEN ${IS_NEWER_RUN} THEN EXCLUDED.last_run_at ELSE s.last_run_at END,
+            last_duration_ms = CASE WHEN ${IS_NEWER_RUN} THEN EXCLUDED.last_duration_ms ELSE s.last_duration_ms END,
+            last_success = CASE WHEN ${IS_NEWER_RUN} THEN EXCLUDED.last_success ELSE s.last_success END,
+            last_error = CASE WHEN ${IS_NEWER_RUN} THEN EXCLUDED.last_error ELSE s.last_error END`;
+}
+
+/**
+ * SQLSTATEs that mean the counters are not there to write to — a column or
+ * table a failed boot did not create, or a privilege it did not get. A log
+ * insert that meets one is written without its count; the next sweep counts
+ * it. Anything else is not retried, because a statement that failed after it
+ * committed would then be logged — and counted — twice.
+ */
+const COUNTERS_MISSING_SQLSTATES = new Set(["42703", "42P01", "42501"]);
+/**
  * Detect a unique-constraint violation anywhere in an error's cause chain.
  * Match the SQLSTATE code, never message text. Also covers SQLite
  * ("UNIQUE constraint failed") and MySQL (ER_DUP_ENTRY 1062) for future SQL
@@ -203,6 +285,31 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
         admin.executeSql(sqlText, options?.params ? { params: options.params } : undefined);
 
     const ddl = createDdlBootstrapper(exec, "cron-store");
+
+    /** Whether `rebase.<table>` has `column`. False when it cannot tell, so the idempotent ALTER still runs. */
+    const hasColumn = async (table: string, column: string): Promise<boolean> => {
+        try {
+            const rows = await exec(
+                `SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'rebase' AND table_name = $1 AND column_name = $2`,
+                { params: [table, column] }
+            );
+            return (rows ?? []).length > 0;
+        } catch {
+            return false;
+        }
+    };
+
+    /** Run one sweep statement until a batch comes back short. Resolves with the total of `column`. */
+    const inBatches = async (sqlText: string, params: unknown[], column: string): Promise<number> => {
+        let total = 0;
+        for (;;) {
+            const rows = await exec(sqlText, { params });
+            const done = Number((rows?.[0] as Record<string, unknown> | undefined)?.[column] ?? 0);
+            total += done;
+            if (done < LOG_SWEEP_BATCH) return total;
+        }
+    };
 
     return {
         async ensureTable(): Promise<void> {
@@ -234,14 +341,37 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
                 ON ${TABLE}(job_id, started_at DESC)
             `);
 
-            // What a process whose scheduler is not started reads to show a
-            // job's failure count. Partial, so it holds only the failed runs:
-            // the count reads those and nothing else, and a healthy job's
-            // inserts never touch it.
-            await ddl.ensureObject("Creating idx_cron_logs_job_failures", `
-                CREATE INDEX IF NOT EXISTS idx_cron_logs_job_failures
-                ON ${TABLE}(job_id) WHERE NOT success
+            // Whether a run is in its job's counters. A run logged by this
+            // server is counted in the statement that logs it; NULL is a run
+            // written before the counters existed, or by an older server
+            // during a rolling deploy, which `sweepLogs` counts. Asked of the
+            // catalog first: `ADD COLUMN IF NOT EXISTS` takes an ACCESS
+            // EXCLUSIVE lock on the table even when the column is there.
+            if (!(await hasColumn("cron_logs", "counted"))) {
+                await ddl.ensureObject(`Adding ${TABLE}.counted`, `
+                    ALTER TABLE ${TABLE} ADD COLUMN IF NOT EXISTS counted BOOLEAN
+                `);
+            }
+
+            // The runs not counted yet — every row of a history that predates
+            // the counters, then nothing. What the counting sweep walks, and
+            // what a listing adds to the counters until it has.
+            await ddl.ensureObject("Creating idx_cron_logs_uncounted", `
+                CREATE INDEX IF NOT EXISTS idx_cron_logs_uncounted
+                ON ${TABLE}(job_id, started_at DESC) WHERE counted IS NULL
             `);
+
+            // The retention sweep's index: it deletes the oldest rows first,
+            // whatever job wrote them.
+            await ddl.ensureObject("Creating idx_cron_logs_started", `
+                CREATE INDEX IF NOT EXISTS idx_cron_logs_started
+                ON ${TABLE}(started_at)
+            `);
+
+            // It held the failed runs, for a failure count over the whole
+            // history on every listing. The count is a counter now.
+            await ddl.ensureObject("Dropping idx_cron_logs_job_failures",
+                "DROP INDEX IF EXISTS rebase.idx_cron_logs_job_failures");
 
             await ddl.ensureObject(`Creating ${CLAIMS_TABLE}`, `
                 CREATE TABLE IF NOT EXISTS ${CLAIMS_TABLE} (
@@ -267,6 +397,21 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
                     running_by TEXT
                 )
             `);
+
+            // Each job's all-time run counts and its last run, kept in the
+            // statement that logs the run, so a listing is one row per job
+            // however long the history — and outlives its retention.
+            if (!(await hasColumn("cron_job_state", "total_runs"))) {
+                await ddl.ensureObject(`Adding the run counters to ${STATE_TABLE}`, `
+                    ALTER TABLE ${STATE_TABLE}
+                        ADD COLUMN IF NOT EXISTS total_runs BIGINT NOT NULL DEFAULT 0,
+                        ADD COLUMN IF NOT EXISTS total_failures BIGINT NOT NULL DEFAULT 0,
+                        ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMPTZ,
+                        ADD COLUMN IF NOT EXISTS last_duration_ms INTEGER,
+                        ADD COLUMN IF NOT EXISTS last_success BOOLEAN,
+                        ADD COLUMN IF NOT EXISTS last_error TEXT
+                `);
+            }
 
             // Everything from here is keyed on what actually exists, not on
             // whether *this* instance is the one that created it. A single
@@ -405,26 +550,103 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
             }
         },
 
-        async insertLog(entry: CronJobLogEntry): Promise<void> {
-            try {
-                const resultJson = entry.result !== undefined ? JSON.stringify(entry.result) : null;
-                const logsJson = entry.logs.length > 0 ? JSON.stringify(entry.logs) : null;
+        async sweepLogs(): Promise<CronLogSweep> {
+            // Retention first, so a history that predates the counters is
+            // not marked counted row by row only to be deleted after. A row
+            // deleted uncounted is counted in the statement that deletes it:
+            // retention never takes a run out of the totals.
+            //
+            // Both statements take their rows `FOR UPDATE SKIP LOCKED`, so
+            // replicas sweeping at once divide the rows between them, and a
+            // row another sweep has just counted fails the `counted IS NULL`
+            // recheck instead of being counted twice. Each batch is its own
+            // short transaction: on a table that has grown for years this is
+            // many of them, off the boot path, and never one long lock.
+            const deleted = await inBatches(
+                `WITH gone AS (
+                     DELETE FROM ${TABLE}
+                     WHERE id IN (
+                         SELECT id FROM ${TABLE}
+                         WHERE started_at < now() - make_interval(days => $1)
+                         ORDER BY started_at
+                         LIMIT $2
+                         FOR UPDATE SKIP LOCKED
+                     )
+                     RETURNING job_id, counted, started_at, duration_ms, success, error
+                 ), uncounted AS (
+                     SELECT job_id, started_at, duration_ms, success, error FROM gone WHERE counted IS NULL
+                 ), folded AS (
+                     ${foldIntoCounters("uncounted")}
+                     RETURNING 1
+                 )
+                 SELECT count(*)::int AS deleted FROM gone`,
+                [LOG_RETENTION_DAYS, LOG_SWEEP_BATCH],
+                "deleted"
+            );
 
-                await exec(
-                    `INSERT INTO ${TABLE} (job_id, started_at, finished_at, duration_ms, success, error, result, logs, manual)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9)`,
-                    { params: [
-                        entry.jobId,
-                        entry.startedAt,
-                        entry.finishedAt,
-                        entry.durationMs,
-                        entry.success,
-                        entry.error || null,
-                        resultJson,
-                        logsJson,
-                        entry.manual
-                    ]}
-                );
+            // Then the rest of the uncounted runs, newest first per job.
+            const counted = await inBatches(
+                `WITH batch AS (
+                     SELECT id FROM ${TABLE}
+                     WHERE counted IS NULL
+                     ORDER BY job_id, started_at DESC
+                     LIMIT $1
+                     FOR UPDATE SKIP LOCKED
+                 ), marked AS (
+                     UPDATE ${TABLE} AS l SET counted = true
+                     FROM batch WHERE l.id = batch.id
+                     RETURNING l.job_id, l.started_at, l.duration_ms, l.success, l.error
+                 ), folded AS (
+                     ${foldIntoCounters("marked")}
+                     RETURNING 1
+                 )
+                 SELECT count(*)::int AS counted FROM marked`,
+                [LOG_SWEEP_BATCH],
+                "counted"
+            );
+
+            return { deleted, counted };
+        },
+
+        async insertLog(entry: CronJobLogEntry): Promise<void> {
+            const resultJson = entry.result !== undefined ? JSON.stringify(entry.result) : null;
+            const logsJson = entry.logs.length > 0 ? JSON.stringify(entry.logs) : null;
+            const params = [
+                entry.jobId,
+                entry.startedAt,
+                entry.finishedAt,
+                entry.durationMs,
+                entry.success,
+                entry.error || null,
+                resultJson,
+                logsJson,
+                entry.manual
+            ];
+            const columns = "job_id, started_at, finished_at, duration_ms, success, error, result, logs, manual";
+            const values = "$1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9";
+            try {
+                try {
+                    // The run and its count in one statement, so neither is
+                    // ever written without the other. Every run counts — a
+                    // skip too, as it always has: it is a row of the history.
+                    await exec(
+                        `WITH logged AS (
+                             INSERT INTO ${TABLE} (${columns}, counted)
+                             VALUES (${values}, true)
+                             RETURNING job_id, started_at, duration_ms, success, error
+                         )
+                         ${foldIntoCounters("logged")}`,
+                        { params }
+                    );
+                } catch (err) {
+                    if (!hasInCauseChain(err, (e) => typeof e.code === "string" && COUNTERS_MISSING_SQLSTATES.has(e.code))) {
+                        throw err;
+                    }
+                    // The counters are not there to write to. Keep the run
+                    // anyway, uncounted: a listing adds it to the counts, and
+                    // the next sweep counts it.
+                    await exec(`INSERT INTO ${TABLE} (${columns}) VALUES (${values})`, { params });
+                }
             } catch (err) {
                 // Non-blocking — log persistence should never crash the scheduler
                 logger.error(`[cron-store] Failed to persist log for "${entry.jobId}"`, { error: err });
@@ -447,21 +669,21 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
         async fetchJobStats(): Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string }>> {
             const stats = new Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string }>();
             try {
+                // The counters, one row per job — not a GROUP BY over the
+                // whole history, which every start used to run. Runs not
+                // counted yet are left to the sweep the scheduler starts with;
+                // a listing adds them meanwhile.
                 const rows = await exec(`
-                    SELECT
-                        job_id,
-                        COUNT(*)::int AS total_runs,
-                        COUNT(*) FILTER (WHERE NOT success)::int AS total_failures,
-                        MAX(started_at) AS last_run_at
-                    FROM ${TABLE}
-                    GROUP BY job_id
+                    SELECT job_id, total_runs, total_failures, last_run_at
+                    FROM ${STATE_TABLE}
+                    WHERE total_runs > 0
                 `);
 
-                for (const row of rows) {
-                    stats.set(row.job_id as string, {
-                        totalRuns: row.total_runs as number,
-                        totalFailures: row.total_failures as number,
-                        lastRunAt: row.last_run_at ? new Date(row.last_run_at as string).toISOString() : undefined
+                for (const row of rows ?? []) {
+                    stats.set(String(row.job_id), {
+                        totalRuns: Number(row.total_runs),
+                        totalFailures: Number(row.total_failures),
+                        lastRunAt: toIsoString(row.last_run_at)
                     });
                 }
             } catch (err) {
@@ -566,23 +788,42 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
         async fetchRunSummaries(jobIds: readonly string[]): Promise<Map<string, CronJobRunSummary>> {
             const summaries = new Map<string, CronJobRunSummary>();
             if (jobIds.length === 0) return summaries;
-            // Per job, never a GROUP BY over the whole table: each subquery
-            // reads one job's range of `idx_cron_logs_job` (the failures, the
-            // partial `idx_cron_logs_job_failures`), and the last run is one
-            // index probe. Jobs no longer registered are never read at all.
+            // One primary-key read of the counters per job. It used to be two
+            // `count(*)` over the job's whole history, on every 15-second poll
+            // of the Studio panel: 64–132 ms at a year of twelve jobs, and
+            // doubling every year.
+            //
+            // Plus the runs not counted yet, so the answer is exact while the
+            // counting sweep has not caught up: a history from before the
+            // counters, or a run an older server logged during a rolling
+            // deploy. Both read only `idx_cron_logs_uncounted`, which is empty
+            // once the sweep has run.
             const rows = await exec(
                 `SELECT j.job_id,
-                        (SELECT count(*)::int FROM ${TABLE} l WHERE l.job_id = j.job_id) AS total_runs,
-                        (SELECT count(*)::int FROM ${TABLE} l WHERE l.job_id = j.job_id AND NOT l.success) AS total_failures,
-                        last.started_at, last.duration_ms, last.success, last.error
+                        COALESCE(s.total_runs, 0) + COALESCE(pending.runs, 0) AS total_runs,
+                        COALESCE(s.total_failures, 0) + COALESCE(pending.failures, 0) AS total_failures,
+                        CASE WHEN newer.later THEN pending_last.started_at ELSE s.last_run_at END AS started_at,
+                        CASE WHEN newer.later THEN pending_last.duration_ms ELSE s.last_duration_ms END AS duration_ms,
+                        CASE WHEN newer.later THEN pending_last.success ELSE s.last_success END AS success,
+                        CASE WHEN newer.later THEN pending_last.error ELSE s.last_error END AS error
                  FROM (VALUES ${jobIds.map((_, i) => `($${i + 1}::text)`).join(", ")}) AS j(job_id)
+                 LEFT JOIN ${STATE_TABLE} AS s ON s.job_id = j.job_id
+                 LEFT JOIN LATERAL (
+                     SELECT count(*) AS runs, count(*) FILTER (WHERE NOT l.success) AS failures
+                     FROM ${TABLE} l
+                     WHERE l.job_id = j.job_id AND l.counted IS NULL
+                 ) AS pending ON true
                  LEFT JOIN LATERAL (
                      SELECT l.started_at, l.duration_ms, l.success, l.error
                      FROM ${TABLE} l
-                     WHERE l.job_id = j.job_id
+                     WHERE l.job_id = j.job_id AND l.counted IS NULL
                      ORDER BY l.started_at DESC
                      LIMIT 1
-                 ) AS last ON true`,
+                 ) AS pending_last ON true
+                 CROSS JOIN LATERAL (
+                     SELECT pending_last.started_at IS NOT NULL
+                        AND (s.last_run_at IS NULL OR pending_last.started_at >= s.last_run_at) AS later
+                 ) AS newer`,
                 { params: [...jobIds] }
             );
             for (const row of rows ?? []) {

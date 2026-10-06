@@ -332,7 +332,8 @@ describe("an aged database", () => {
              WHERE table_schema = 'rebase' AND table_name = 'cron_job_state' ORDER BY ordinal_position`
         );
         expect(columns.map(c => c.column_name)).toEqual([
-            "job_id", "enabled", "updated_at", "updated_by", "running_until", "running_by"
+            "job_id", "enabled", "updated_at", "updated_by", "running_until", "running_by",
+            "total_runs", "total_failures", "last_run_at", "last_duration_ms", "last_success", "last_error"
         ]);
         // Writable by end users, it would let any of them pause a job for the
         // whole fleet or hold its lease so that nothing runs it.
@@ -342,10 +343,12 @@ describe("an aged database", () => {
             [REBASE_USER_ROLE]
         );
         expect(privileges[0]).toEqual({ can_write: false, can_read: false });
+        // The failures index is gone: the failure count is a counter now.
         const { rows: index } = await db.query("SELECT 1 FROM pg_indexes WHERE indexname = 'idx_cron_logs_job_failures'");
-        expect(index).toHaveLength(1);
+        expect(index).toHaveLength(0);
 
-        // The history it had is still there, and read through the new query.
+        // The history it had is still there, counted in the listing before any
+        // sweep has folded it into the counters.
         const summary = (await store.fetchRunSummaries(["nightly"])).get("nightly");
         expect(summary).toMatchObject({ totalRuns: 1, totalFailures: 1, lastSuccess: false, lastError: "old failure" });
 

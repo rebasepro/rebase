@@ -372,6 +372,8 @@ CREATE INDEX idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
 
 Log persistence is **non-blocking** — if the database insert fails, the error is logged but the scheduler continues normally.
 
+The history keeps **30 days**: an hourly sweep deletes older rows in batches. The run and failure counts are all-time — they live on `rebase.cron_job_state` (`total_runs`, `total_failures`, `last_run_at`, …), written in the same statement as each run's row, and a listing reads one row per job.
+
 ### In-Memory Ring Buffer
 
 Regardless of database persistence, the scheduler keeps an **in-memory ring buffer** of the last **50 log entries per job**. The REST API falls back to this buffer when database persistence is unavailable.
@@ -386,7 +388,7 @@ Regardless of database persistence, the scheduler keeps an **in-memory ring buff
 
 ### Startup Seeding
 
-On startup, the scheduler seeds `totalRuns`, `totalFailures`, and `lastRunAt` counters from the database. This is **non-blocking** — the scheduler starts immediately and counters are updated asynchronously.
+On startup, the scheduler seeds `totalRuns`, `totalFailures`, and `lastRunAt` counters from the counters on `rebase.cron_job_state`. This is **non-blocking** — the scheduler starts immediately and counters are updated asynchronously.
 
 ## REST API
 

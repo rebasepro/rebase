@@ -317,7 +317,7 @@ export { drainBackgroundWork, pendingBackgroundWork } from "./functions/wait-unt
 // Cron Jobs (auto-discovered scheduled tasks)
 // =============================================================================
 export { loadCronJobsFromDirectory, loadCronJobsWithDiagnostics, CronScheduler, validateCronExpression, createCronRoutes, createCronStore, defineCron } from "./cron";
-export type { LoadedCronJob, CronStore, CronJobPersistedState, CronRunLease, CronJobRunSummary } from "./cron";
+export type { LoadedCronJob, CronStore, CronJobPersistedState, CronRunLease, CronJobRunSummary, CronLogSweep } from "./cron";
 
 // =============================================================================
 // Backups (admin routes + storage-generic helpers)

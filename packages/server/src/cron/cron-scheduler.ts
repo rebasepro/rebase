@@ -447,9 +447,9 @@ function setLongTimeout(callback: () => void, delayMs: number): () => void {
 const DEFAULT_TIMEOUT_SECONDS = 300;
 
 /**
- * How often a started scheduler deletes slot claims past retention. Claims
- * accrue one per job per fire, so a scheduler that lives for months needs to
- * prune while it runs, not only when it next boots.
+ * How often a started scheduler deletes slot claims and run history past
+ * retention. Both accrue one row per job per fire, so a scheduler that lives
+ * for months needs to prune while it runs, not only when it next boots.
  */
 const CLAIM_SWEEP_INTERVAL_MS = 60 * 60_000;
 
@@ -580,9 +580,10 @@ export class CronScheduler {
      * ever clear the lease that run took.
      */
     private readonly instanceLabel = `${hostname()}:${process.pid}`;
-    /** The hourly claim-retention sweep, while the scheduler is started with a store. */
+    /** The hourly claim- and log-retention sweep, while the scheduler is started with a store. */
     private claimSweepTimer?: ReturnType<typeof setInterval>;
     private sweepingClaims = false;
+    private sweepingLogs = false;
 
     /**
      * Set the server singleton to make it available to cron job handlers.
@@ -721,10 +722,16 @@ export class CronScheduler {
         void this.catchUpMissedSlots();
 
         // Off the boot path too, and then hourly. It cannot take a claim the
-        // catch-up is asking about: a job's latest claim is never swept.
-        if (this.store?.sweepClaims) {
-            void this.sweepClaims();
-            this.claimSweepTimer = setInterval(() => { void this.sweepClaims(); }, CLAIM_SWEEP_INTERVAL_MS);
+        // catch-up is asking about: a job's latest claim is never swept. The
+        // first log sweep is also what counts a history that predates the run
+        // counters — a backlog it works through in batches, not in the boot.
+        if (this.store?.sweepClaims || this.store?.sweepLogs) {
+            const sweep = () => {
+                void this.sweepClaims();
+                void this.sweepLogs();
+            };
+            sweep();
+            this.claimSweepTimer = setInterval(sweep, CLAIM_SWEEP_INTERVAL_MS);
             this.claimSweepTimer.unref?.();
         }
 
@@ -742,6 +749,27 @@ export class CronScheduler {
             logger.warn("[cron] The claim retention sweep failed; it runs again within the hour", { error: err });
         } finally {
             this.sweepingClaims = false;
+        }
+    }
+
+    /**
+     * Delete run history past retention, and count the runs not counted yet.
+     * Failures are logged; the next hour tries again, from where this one
+     * stopped — each batch it finished is committed.
+     */
+    private async sweepLogs(): Promise<void> {
+        const store = this.store;
+        if (!store?.sweepLogs || this.sweepingLogs) return;
+        this.sweepingLogs = true;
+        try {
+            const { counted } = await store.sweepLogs();
+            if (counted > 0) {
+                logger.info(`[cron] Counted ${counted} earlier run(s) into the jobs' run totals`);
+            }
+        } catch (err) {
+            logger.warn("[cron] The run history sweep failed; it runs again within the hour", { error: err });
+        } finally {
+            this.sweepingLogs = false;
         }
     }
 
@@ -1162,8 +1190,8 @@ export class CronScheduler {
                 }
             }
         }
-        // Wherever this process stands. Its own counters are seeded from
-        // `cron_logs` once, at start, and after that count only its own runs:
+        // Wherever this process stands. Its own counters are seeded from the
+        // store once, at start, and after that count only its own runs:
         // with two replicas scheduling, a slot the other one claimed never
         // reached them, and the card said "idle, 0 runs" over a history that
         // listed the failure.
