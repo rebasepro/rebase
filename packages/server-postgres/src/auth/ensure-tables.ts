@@ -5,6 +5,7 @@ import { revokeInternalTableAccess } from "@rebasepro/common";
 import type { CollectionConfig } from "@rebasepro/types";
 import { AUTH_USERS_COLUMNS, authUsersColumnSql } from "../schema/auth-users-columns";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../schema/rls-bootstrap-sql";
+import { BOOT_LOCK_TIMEOUT_MS } from "../schema/boot-ddl";
 import {
     AuthSchemaVersionError,
     assertAuthSchemaCompatible,
@@ -45,6 +46,56 @@ async function readIndexNames(db: NodePgDatabase, schemas: string[]): Promise<Se
  */
 const sameDefault = (actual: string | null, expected: string): boolean =>
     actual !== null && actual.toLowerCase().replace(/[\s()]/g, "") === expected.toLowerCase().replace(/[\s()]/g, "");
+
+/**
+ * The plain `token_hash` indexes every era created next to the UNIQUE
+ * constraint's own index on the same column. No longer created; dropped where
+ * found — see {@link dropDuplicateTokenHashIndexesSql}.
+ */
+const DUPLICATE_TOKEN_HASH_INDEXES = [
+    "idx_refresh_tokens_hash",
+    "idx_password_reset_tokens_hash",
+    "idx_magic_link_tokens_hash"
+] as const;
+
+/**
+ * One statement that drops each named index — but only one that covers a
+ * single column that a valid, unique, non-partial btree on the same table also
+ * leads with. That is the UNIQUE (token_hash) constraint's index, which serves
+ * every `token_hash = $1` lookup; a table that somehow lacks it keeps its
+ * plain index, so no lookup is ever left without one.
+ *
+ * `DROP INDEX` takes the table's ACCESS EXCLUSIVE lock, on the tables every
+ * sign-in and token refresh touches, so it runs under the boot lock budget
+ * (`lock_timeout`, transaction-local to this statement — see `boot-ddl`).
+ */
+export function dropDuplicateTokenHashIndexesSql(schema: string, names: readonly string[]): string {
+    return `
+DO $rebase_drop_hash_index$
+DECLARE duplicate record;
+BEGIN
+    PERFORM set_config('lock_timeout', '${BOOT_LOCK_TIMEOUT_MS}ms', true);
+    FOR duplicate IN
+        SELECT ic.relname AS name
+        FROM pg_index d
+        JOIN pg_class ic ON ic.oid = d.indexrelid
+        JOIN pg_namespace n ON n.oid = ic.relnamespace
+        WHERE n.nspname = ${literal(schema)}
+          AND ic.relname IN (${names.map(literal).join(", ")})
+          AND d.indnatts = 1
+          AND EXISTS (
+              SELECT 1 FROM pg_index o
+              JOIN pg_class oc ON oc.oid = o.indexrelid
+              JOIN pg_am am ON am.oid = oc.relam
+              WHERE o.indrelid = d.indrelid AND o.indexrelid <> d.indexrelid
+                AND o.indisvalid AND o.indisunique AND o.indpred IS NULL AND o.indexprs IS NULL
+                AND am.amname = 'btree' AND o.indkey[0] = d.indkey[0])
+    LOOP
+        EXECUTE format('DROP INDEX IF EXISTS %I.%I', ${literal(schema)}, duplicate.name);
+    END LOOP;
+END
+$rebase_drop_hash_index$`.trim();
+}
 
 /**
  * Auto-create auth tables if they don't exist.
@@ -345,12 +396,6 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             )
         `);
 
-        // Create index on token_hash for faster lookups
-        await ensureIndex(authSchema, "idx_refresh_tokens_hash", sql`
-            CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash
-            ON ${sql.raw(refreshTokensTableName)}(token_hash)
-        `);
-
         // Create index on uid for cleanup operations
         await ensureIndex(authSchema, "idx_refresh_tokens_user", sql`
             CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user
@@ -367,12 +412,6 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                 used_at TIMESTAMP WITH TIME ZONE,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             )
-        `);
-
-        // Create index on token_hash for password reset lookups
-        await ensureIndex(authSchema, "idx_password_reset_tokens_hash", sql`
-            CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash
-            ON ${sql.raw(passwordResetTokensTableName)}(token_hash)
         `);
 
         // Create index on uid for password reset cleanup
@@ -394,17 +433,32 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             )
         `);
 
-        // Create index on token_hash for magic link lookups
-        await ensureIndex(authSchema, "idx_magic_link_tokens_hash", sql`
-            CREATE INDEX IF NOT EXISTS idx_magic_link_tokens_hash
-            ON ${sql.raw(magicLinkTokensTableName)}(token_hash)
-        `);
-
         // Create index on uid for magic link cleanup
         await ensureIndex(authSchema, "idx_magic_link_tokens_user", sql`
             CREATE INDEX IF NOT EXISTS idx_magic_link_tokens_user
             ON ${sql.raw(magicLinkTokensTableName)}(uid)
         `);
+
+        // Every lookup on the three token tables is `token_hash = $1`, which
+        // the index behind each table's UNIQUE (token_hash) answers. Every era
+        // also created `idx_<table>_hash`, a second btree on the same column,
+        // which each sign-in, refresh, reset and magic link paid to maintain
+        // and never used. Dropped where present — read from the catalogue
+        // above, so a database without them issues nothing.
+        const duplicateHashIndexes = DUPLICATE_TOKEN_HASH_INDEXES.filter(name => indexNames.has(`${authSchema}.${name}`));
+        if (duplicateHashIndexes.length > 0) {
+            try {
+                await db.execute(sql.raw(dropDuplicateTokenHashIndexesSql(authSchema, duplicateHashIndexes)));
+            } catch (err) {
+                // Redundant, not wrong: a table whose lock another session
+                // held for the whole budget keeps its extra index until a
+                // later boot drops it.
+                logger.warn(
+                    `⚠️ Left the duplicate token-hash index(es) ${duplicateHashIndexes.join(", ")} in place for now: ` +
+                    (err instanceof Error ? err.message : String(err))
+                );
+            }
+        }
 
         // Create app config table
         await db.execute(sql`

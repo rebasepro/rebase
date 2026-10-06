@@ -26,6 +26,37 @@ import { parseStoredPermissions, scopesFromStoredPermissions } from "./legacy-pe
 const TABLE = "rebase.api_keys";
 
 /**
+ * Drops `rebase.idx_api_keys_hash` — a plain btree on `key_hash`, next to the
+ * UNIQUE (key_hash) constraint's own index — but only while a valid, unique,
+ * non-partial btree on the table leads with the same column, so a lookup is
+ * never left without one. Under a one-second `lock_timeout`, local to this
+ * statement's transaction: `DROP INDEX` takes the table's ACCESS EXCLUSIVE lock.
+ * A no-op read once the index is gone.
+ */
+const DROP_DUPLICATE_KEY_HASH_INDEX_SQL = `
+DO $rebase_drop_hash_index$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_index d
+        JOIN pg_class ic ON ic.oid = d.indexrelid
+        JOIN pg_namespace n ON n.oid = ic.relnamespace
+        WHERE n.nspname = 'rebase' AND ic.relname = 'idx_api_keys_hash' AND d.indnatts = 1
+          AND EXISTS (
+              SELECT 1 FROM pg_index o
+              JOIN pg_class oc ON oc.oid = o.indexrelid
+              JOIN pg_am am ON am.oid = oc.relam
+              WHERE o.indrelid = d.indrelid AND o.indexrelid <> d.indexrelid
+                AND o.indisvalid AND o.indisunique AND o.indpred IS NULL AND o.indexprs IS NULL
+                AND am.amname = 'btree' AND o.indkey[0] = d.indkey[0])
+    ) THEN
+        PERFORM set_config('lock_timeout', '1000ms', true);
+        DROP INDEX IF EXISTS rebase.idx_api_keys_hash;
+    END IF;
+END
+$rebase_drop_hash_index$`.trim();
+
+/**
  * Generate a plaintext API key with the `rk_live_` prefix.
  *
  * Format: `rk_live_` + 32 random hex characters.
@@ -236,10 +267,19 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
                 )
             `);
 
-            await ddl.ensureObject("Creating idx_api_keys_hash", `
-                CREATE INDEX IF NOT EXISTS idx_api_keys_hash
-                ON ${TABLE}(key_hash)
-            `);
+            // Every key lookup is `key_hash = $1`, which the UNIQUE (key_hash)
+            // constraint's index answers. `idx_api_keys_hash` was a second btree
+            // on the same column that every key creation paid to maintain; it is
+            // no longer created, and dropped where an older boot left it — only
+            // while the unique index is there to serve the lookups, and under a
+            // one-second lock budget, since DROP INDEX locks the whole table.
+            try {
+                await exec(DROP_DUPLICATE_KEY_HASH_INDEX_SQL);
+            } catch (err) {
+                // Redundant, not wrong: a later boot drops it.
+                logger.warn(`[api-key-store] Left the duplicate idx_api_keys_hash in place for now: ${
+                    err instanceof Error ? err.message : String(err)}`);
+            }
 
             await ddl.ensureObject("Creating idx_api_keys_prefix", `
                 CREATE INDEX IF NOT EXISTS idx_api_keys_prefix

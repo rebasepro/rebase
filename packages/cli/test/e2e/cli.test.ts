@@ -218,9 +218,13 @@ force: true });
         `);
         const indexNames = indexesRes.rows.map(r => r.indexname);
         console.log("Detected indexes:", indexNames);
-        expect(indexNames).toContain("idx_refresh_tokens_hash");
+        // A token hash is looked up through its UNIQUE constraint's index; the
+        // plain `idx_*_hash` btree beside it is no longer created.
+        expect(indexNames).toContain("refresh_tokens_token_hash_key");
+        expect(indexNames).not.toContain("idx_refresh_tokens_hash");
         expect(indexNames).toContain("idx_refresh_tokens_user");
-        expect(indexNames).toContain("idx_password_reset_tokens_hash");
+        expect(indexNames).toContain("password_reset_tokens_token_hash_key");
+        expect(indexNames).not.toContain("idx_password_reset_tokens_hash");
         expect(indexNames).toContain("idx_password_reset_tokens_user");
 
         console.log("8. Inserting a mock user...");

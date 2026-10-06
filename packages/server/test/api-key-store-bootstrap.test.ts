@@ -64,7 +64,10 @@ describe("createApiKeyStore().ensureTable — concurrent boot", () => {
         const all = statements.join("\n");
         expect(all).toContain("CREATE SCHEMA IF NOT EXISTS rebase");
         expect(all).toContain("CREATE TABLE IF NOT EXISTS rebase.api_keys");
-        expect(all).toContain("CREATE INDEX IF NOT EXISTS idx_api_keys_hash");
+        // `key_hash` is looked up through its UNIQUE constraint's index; the
+        // plain btree an older boot built beside it is dropped, not created.
+        expect(all).not.toContain("CREATE INDEX IF NOT EXISTS idx_api_keys_hash");
+        expect(all).toContain("DROP INDEX IF EXISTS rebase.idx_api_keys_hash");
         expect(all).toContain("CREATE INDEX IF NOT EXISTS idx_api_keys_prefix");
         for (const column of ["kind", "scopes", "roles", "owner_uid"]) {
             expect(all).toContain(`ADD COLUMN IF NOT EXISTS ${column}`);
