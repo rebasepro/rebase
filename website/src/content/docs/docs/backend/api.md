@@ -280,19 +280,11 @@ collection, which is why none of them is clamped or ignored.
 
 ### Skipping the count
 
-`meta.total` comes from a `COUNT(*)` over every matching row, run in the same
-transaction as the page. On a large table that count is most of what a list
-request costs. `?count=none` skips it:
-
-```bash
-GET /api/data/orders?limit=100&count=none
-```
-
-The response then has no `meta.total`. `meta.hasMore` is still exact — the
-read asks for one row past the page and reports whether it came back — so a
-client that pages until `hasMore` is false loses nothing. `?count=exact` is the
-default; any other value is a 400 `INVALID_COUNT`. A `?distinct=true` read is
-never counted: its response has no `total` either way.
+`meta.total` is a `COUNT(*)` over every matching row — on a large table, most of
+what a list request costs. `?count=none` (`GET /api/data/orders?count=none`)
+skips it: no `meta.total`, while `meta.hasMore` stays exact (the read asks for one
+row past the page). `?count=exact` is the default; any other value is a 400
+`INVALID_COUNT`. A `?distinct=true` read is never counted.
 
 ### Cursor pagination
 
@@ -529,9 +521,8 @@ Included relations are embedded directly in the response:
 }
 ```
 
-An included row is the row the target's own route serves
-(`GET /api/data/authors/42`): the same columns and value encodings, its own
-foreign keys as columns, and never a reference object.
+An included row is what the target's own route (`GET /api/data/authors/42`)
+serves: the same columns and encodings, foreign keys as columns, no reference objects.
 
 ## Writing
 

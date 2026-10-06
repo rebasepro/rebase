@@ -71,6 +71,10 @@ const NOT_OURS = new Map([
     ["NODE_ENV", "the platform's, and the page explains it in prose"],
     ["DOTENV_CONFIG_PATH", "dotenv's own preload variable"],
     ["DOTENV_CONFIG_QUIET", "dotenv's own preload variable"],
+    // libuv's: Node sizes its thread pool from it. Read only to learn how many
+    // password hashes a bulk user create can run at once, never to configure
+    // anything of Rebase's.
+    ["UV_THREADPOOL_SIZE", "libuv's own; read to size the bulk-create hash concurrency"],
     // Read to *recognise* where the process is running, never set by anyone
     // configuring Rebase. Documenting them would tell a reader to set a
     // variable that decides whether the runtime thinks it is on Cloud Run.
