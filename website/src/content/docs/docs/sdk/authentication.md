@@ -322,6 +322,13 @@ Token refresh happens automatically, but you can trigger it manually:
 const session = await client.auth.refreshSession();
 ```
 
+A request never goes out with a token the client knows is spent. When the
+access token has expired — a session restored from storage after its token
+lapsed, or a device that slept through the scheduled refresh — requests wait for
+one refresh, shared by all of them, and are sent once with the new token, rather
+than each being refused with a 401 and sent again. A token the server refuses
+early still takes the 401 path: one refresh, then one retry per request.
+
 ## Where the Session Lives: `authFlowMode`
 
 ```typescript
@@ -390,6 +397,11 @@ function useCurrentUser() {
 
 `useRebaseAuthController` in `@rebasepro/app` already does this, so an app built
 on the generated template gets it for free.
+
+Data requests do not need to wait for it themselves. One made while the session
+is still being restored waits for the restore and is sent as the restored user —
+or anonymously, once it is clear there was no session — so a first render never
+reads a public listing in place of the user's own.
 
 A successful restore also reaches `onAuthStateChange` as `TOKEN_REFRESHED` — it
 *is* a refresh — but a listener alone cannot tell you that the restore finished:

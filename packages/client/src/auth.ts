@@ -342,6 +342,63 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         }
     }
 
+    /**
+     * Requests the refresh itself is making — the `/me` read when its answer
+     * carries no user. They go out with the token the refresh has just put on
+     * the transport, and must not wait for the refresh they are part of.
+     */
+    let refreshOwnRequests = 0;
+
+    /** The cookie-mode restore started on load, until it settles. */
+    let cookieRestore: Promise<void> | null = null;
+
+    /**
+     * How close to expiry a token is treated as spent by a request about to
+     * carry it — the margin the socket's token check uses. Well inside the
+     * scheduled refresh's own lead ({@link REFRESH_BUFFER_MS}), so while that
+     * timer runs a request never waits for it.
+     */
+    const SPENT_TOKEN_MARGIN_MS = 10_000;
+
+    /**
+     * The transport's {@link TokenRefresher}: whether a request should wait for
+     * a fresher token than the one held, and which token to send when it does.
+     *
+     * It waits when this client holds a session whose access token has expired
+     * (or is about to) and that can be refreshed. That is a session restored
+     * from storage with an expired token, whose refresh started at load and
+     * left the transport holding no token at all until it landed — so a request
+     * made meanwhile went out anonymous and, on a route with a public read
+     * policy, was answered with public rows instead of a 401. And it is a
+     * session whose refresh timer never fired — a laptop asleep past
+     * `expiresAt`, a frozen tab restored — where every request went out with a
+     * dead token, came back 401, and was sent again: twice the requests and a
+     * round trip of latency each.
+     *
+     * The refresh is {@link refreshSession}, so a burst of requests shares one
+     * (the one started at load included). A refresh that fails, or one whose
+     * session ended while it ran, hands back the token the request would have
+     * carried anyway: the 401 path then does exactly what it always did.
+     */
+    function tokenForRequest(): Promise<string | undefined> | undefined {
+        if (refreshOwnRequests > 0) return undefined;
+        const session = currentSession;
+        // Cookie mode restores on load with no session in memory at all — the
+        // refresh token is a cookie this page cannot read — so a request made
+        // before that restore answers would go out anonymous. It waits for the
+        // answer and then carries whatever token the transport holds: the
+        // restored session's, or none when there was nothing to restore.
+        if (!session) return cookieRestore?.then(() => undefined);
+        if (session.expiresAt > Date.now() + SPENT_TOKEN_MARGIN_MS) return undefined;
+        if (authFlowMode !== "cookie" && !session.refreshToken) return undefined;
+        const epoch = sessionEpoch;
+        return refreshSession().then(
+            (fresh) => (epoch === sessionEpoch ? fresh.accessToken : session.accessToken),
+            () => session.accessToken
+        );
+    }
+    transport.setTokenRefresher?.(tokenForRequest);
+
     async function attemptScheduledRefresh(attempt: number) {
         const epoch = sessionEpoch;
         try {
@@ -823,9 +880,12 @@ redirectUri });
         if (body.user && typeof body.user.uid === "string") {
             user = mapRawUser(body.user as Record<string, unknown>);
         } else if (!user || !user.uid) {
+            refreshOwnRequests++;
             try {
                 user = await getUser();
-            } catch { /* fall through to the empty stub below */ }
+            } catch { /* fall through to the empty stub below */ } finally {
+                refreshOwnRequests--;
+            }
             // Whoever ended the session meanwhile has already set the
             // transport's token; nothing of this refresh is kept.
             if (epoch !== sessionEpoch) return supersededRefresh();
@@ -1413,11 +1473,14 @@ refreshToken: session.refreshToken };
             }
         } else if (authFlowMode === "cookie") {
             // Silent refresh on boot to pick up httpOnly session
-            refreshSession().then(() => {
+            const restore = refreshSession().then(() => {
                 resolveInitialized!();
             }).catch(() => {
                 resolveInitialized!();
+            }).finally(() => {
+                if (cookieRestore === restore) cookieRestore = null;
             });
+            cookieRestore = restore;
         } else {
             resolveInitialized!();
         }

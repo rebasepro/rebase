@@ -393,11 +393,26 @@ export interface ResponseMeta {
     status?: number;
 }
 
+/** See {@link Transport.setTokenRefresher}. */
+export type TokenRefresher = () => Promise<string | undefined> | undefined;
+
 export interface Transport {
     request: <T = unknown>(path: string, init?: RequestInit, meta?: ResponseMeta) => Promise<T>;
     setToken: (newToken: string | null) => void;
     setAuthTokenGetter: (getter: () => Promise<string | null>) => void;
     setOnUnauthorized: (handler: () => Promise<boolean>) => void;
+    /**
+     * Install the hook asked, before each request that carries this
+     * transport's own token, whether that token is known to be spent. It
+     * answers `undefined` to send the token as held, or a promise for the one
+     * to send instead — the auth module's refresh, so a request made while a
+     * session is being restored, or after its token expired unnoticed, goes
+     * out once with a good token rather than with none or a dead one.
+     *
+     * Not consulted when an auth token getter is installed: the getter owns
+     * the token then. Optional so a hand-written transport need not have it.
+     */
+    setTokenRefresher?: (refresher: TokenRefresher | null) => void;
     readonly baseUrl: string;
     readonly apiPath: string;
     /** See {@link RebaseClientConfig.storageUrlOrigin}. Undefined = use `baseUrl`. */
@@ -492,6 +507,7 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
     }
     let token = config.token;
     let tokenGetter: (() => Promise<string | null>) | undefined;
+    let tokenRefresher: TokenRefresher | undefined;
     let onUnauthorizedHandler = config.onUnauthorized;
     /** Once per client, never per request — log spam is its own bug. */
     let anonymousWarningIssued = false;
@@ -622,20 +638,39 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
         );
     }
 
-    async function request<T = unknown>(path: string, init?: RequestInit, meta?: ResponseMeta): Promise<T> {
-        const url = resolveBaseUrl(config.baseUrl) + apiPath + path;
-
-        let activeToken = token;
+    /**
+     * The token a request should carry: the getter's when one is installed,
+     * otherwise the one held — or, when the token refresher says the held one
+     * is spent, the one it hands back once its refresh lands.
+     */
+    async function tokenForRequest(): Promise<string | undefined> {
         if (tokenGetter) {
             try {
                 const fetched = await tokenGetter();
-                if (fetched !== null && fetched !== undefined) {
-                    activeToken = fetched;
-                }
+                if (fetched !== null && fetched !== undefined) return fetched;
             } catch (e) {
                 // Ignore error, fallback to static token if any
             }
+            return token;
         }
+        const pending = tokenRefresher?.();
+        if (pending) {
+            try {
+                const fresh = await pending;
+                if (fresh) return fresh;
+            } catch (e) {
+                // The refresher answers its own failures with a token; a
+                // throw is a bug in it, and the held token is still the
+                // best thing to send.
+            }
+        }
+        return token;
+    }
+
+    async function request<T = unknown>(path: string, init?: RequestInit, meta?: ResponseMeta): Promise<T> {
+        const url = resolveBaseUrl(config.baseUrl) + apiPath + path;
+
+        const activeToken = await tokenForRequest();
 
         warnIfAnonymousServerClient(activeToken);
 
@@ -742,21 +777,12 @@ headers: retryHeaders });
         setToken(newToken: string | null) { token = newToken || undefined; },
         setAuthTokenGetter(getter: () => Promise<string | null>) { tokenGetter = getter; },
         setOnUnauthorized(handler: () => Promise<boolean>) { onUnauthorizedHandler = handler; },
+        setTokenRefresher(refresher: TokenRefresher | null) { tokenRefresher = refresher ?? undefined; },
         get baseUrl() { return resolveBaseUrl(config.baseUrl); },
         get apiPath() { return apiPath; },
         get storageUrlOrigin() { return config.storageUrlOrigin?.replace(/\/$/, "") || undefined; },
         get fetchFn() { return fetchFn; },
         getHeaders: (init?: RequestInit) => getHeaders(token, init),
-        resolveToken: async () => {
-            if (tokenGetter) {
-                try {
-                    const fetched = await tokenGetter();
-                    if (fetched !== null && fetched !== undefined) {
-                        return fetched;
-                    }
-                } catch (e) { /* ignore */ }
-            }
-            return token || null;
-        }
+        resolveToken: async () => (await tokenForRequest()) || null
     };
 }
