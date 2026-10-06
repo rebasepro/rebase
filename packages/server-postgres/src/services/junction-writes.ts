@@ -230,6 +230,8 @@ export async function removeJunctionLink(
  * and never for a pair that might differ (a JSON value, a `numeric` read back
  * as text): those are written, as every one of them used to be.
  */
+const PIVOT_SELECTION_PREFIX = "pivot:";
+
 function holdsPivot(stored: Record<string, unknown> | undefined, wanted: Record<string, unknown>): boolean {
     if (!stored) return false;
     return Object.entries(wanted).every(([key, value]) => samePivotValue(value, stored[key]));
@@ -292,14 +294,16 @@ export async function applyJunctionMembership(
 ): Promise<void> {
     // The link's own columns are read with its key, so a link sent back with
     // the values it already holds is not rewritten below.
-    const payloadColumns: Record<string, AnyPgColumn> = {};
+    // Flat, under a prefix no key column can carry, so a payload column named
+    // like the key cannot shadow it.
+    const selection: Record<string, AnyPgColumn> = { targetId: binding.targetColumn };
+    const payloadKeys: string[] = [];
     for (const key of Object.keys(binding.payload)) {
         const payloadColumn = binding.table[key as keyof typeof binding.table] as AnyPgColumn | undefined;
-        if (payloadColumn) payloadColumns[key] = payloadColumn;
+        if (!payloadColumn) continue;
+        selection[`${PIVOT_SELECTION_PREFIX}${key}`] = payloadColumn;
+        payloadKeys.push(key);
     }
-    const selection = Object.keys(payloadColumns).length > 0
-        ? { targetId: binding.targetColumn, pivot: payloadColumns }
-        : { targetId: binding.targetColumn };
     const existingRows = visibleTargets
         ? await tx
             .select(selection)
@@ -316,10 +320,15 @@ export async function applyJunctionMembership(
     // missed that would delete and re-insert every link on every save.
     const existingById = new Map<string, unknown>();
     const storedPivotById = new Map<string, Record<string, unknown>>();
-    for (const row of existingRows as Array<{ targetId: unknown; pivot?: Record<string, unknown> }>) {
+    for (const row of existingRows as Array<Record<string, unknown>>) {
         if (row.targetId === null || row.targetId === undefined) continue;
         existingById.set(String(row.targetId), row.targetId);
-        if (row.pivot) storedPivotById.set(String(row.targetId), row.pivot);
+        if (payloadKeys.length > 0) {
+            storedPivotById.set(
+                String(row.targetId),
+                Object.fromEntries(payloadKeys.map(key => [key, row[`${PIVOT_SELECTION_PREFIX}${key}`]]))
+            );
+        }
     }
 
     const wantedById = new Map<string, JunctionLinkWrite>();
