@@ -59,6 +59,27 @@ describe("server backup-common", () => {
             expect(list[0].createdAt).toBe("2026-07-14T03:00:00.000Z");
         });
 
+        it("lists with no synchronous filesystem call, so a long history never blocks the server", async () => {
+            // A year of hourly backups is 8,760 dumps, and the panel's listing
+            // stat'ed each one synchronously on the request path.
+            const sync = [jest.spyOn(fs, "statSync"), jest.spyOn(fs, "readdirSync"), jest.spyOn(fs, "existsSync")];
+            try {
+                const list = await listBackupObjects(parseBackupDestination(dir));
+                const byFile = await listBackupObjects(parseBackupDestination(path.join(dir, "rebase-app-20260101T000000Z.dump")));
+                const missing = await listBackupObjects(parseBackupDestination(path.join(root, "nowhere")));
+
+                expect(list.map((b) => [b.name, b.sizeBytes])).toEqual([
+                    ["rebase-app-20260714T030000Z.dump", 3],
+                    ["rebase-app-20260101T000000Z.dump", 2]
+                ]);
+                expect(byFile.map((b) => b.name)).toEqual(list.map((b) => b.name));
+                expect(missing).toEqual([]);
+                for (const spy of sync) expect(spy).not.toHaveBeenCalled();
+            } finally {
+                for (const spy of sync) spy.mockRestore();
+            }
+        });
+
         it("attaches the roles sidecar to its dump, and only where one exists", async () => {
             const [withRoles, withoutRoles] = await listBackupObjects(parseBackupDestination(dir));
             expect(withRoles.globalsKey).toBe(path.join(dir, "rebase-app-20260714T030000Z.globals.sql"));

@@ -422,6 +422,23 @@ export async function uploadBackup(
     return { key, storageUrl: result.storageUrl };
 }
 
+/** Stats in flight at once while listing a local backup folder. */
+const LOCAL_STAT_CONCURRENCY = 32;
+
+/** `fn` over `items`, at most `limit` at a time; results in input order. */
+async function mapBounded<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let next = 0;
+    const worker = async () => {
+        while (next < items.length) {
+            const i = next++;
+            results[i] = await fn(items[i]);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+    return results;
+}
+
 /**
  * List existing backups at a destination. For local destinations reads the
  * directory; for object storage lists the prefix via the controller.
@@ -431,17 +448,18 @@ export async function listBackups(
     storage?: StorageController
 ): Promise<BackupObject[]> {
     if (dest.kind === "local") {
-        if (!fs.existsSync(dest.path)) return [];
-        const stat = fs.statSync(dest.path);
+        // Asynchronous throughout, a few stats at a time: retention lists the
+        // folder after every scheduled backup, inside the server process, and
+        // a year of hourly backups is 8,760 dumps stat'ed one by one.
+        const stat = await fs.promises.stat(dest.path).catch(() => null);
+        if (!stat) return [];
         const dir = stat.isDirectory() ? dest.path : path.dirname(dest.path);
-        return fs
-            .readdirSync(dir)
-            .filter((f) => f.endsWith(".dump"))
-            .map((f) => {
-                const full = path.join(dir, f);
-                const stats = fs.statSync(full);
-                const createdAt = parseBackupTimestamp(f) ?? stats.mtime;
-                return { key: full, createdAt, sizeBytes: stats.size };
+        const dumps = (await fs.promises.readdir(dir)).filter((f) => f.endsWith(".dump"));
+        const stats = await mapBounded(dumps, LOCAL_STAT_CONCURRENCY, (f) => fs.promises.stat(path.join(dir, f)));
+        return dumps
+            .map((f, i) => {
+                const createdAt = parseBackupTimestamp(f) ?? stats[i].mtime;
+                return { key: path.join(dir, f), createdAt, sizeBytes: stats[i].size };
             })
             .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
     }

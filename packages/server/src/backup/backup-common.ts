@@ -128,17 +128,21 @@ export async function listBackupObjects(
     storage?: StorageController
 ): Promise<BackupInfo[]> {
     if (dest.kind === "local") {
-        if (!fs.existsSync(dest.path)) return [];
-        const stat = fs.statSync(dest.path);
+        // Asynchronous throughout, a few stats at a time. This runs on the
+        // Backups panel's request path, and a year of hourly backups is 8,760
+        // dumps: stat'ed synchronously, the server answered nothing else
+        // while it listed them.
+        const stat = await fs.promises.stat(dest.path).catch(() => null);
+        if (!stat) return [];
         const dir = stat.isDirectory() ? dest.path : path.dirname(dest.path);
-        if (!fs.existsSync(dir)) return [];
-        const files = fs.readdirSync(dir);
+        const files = await fs.promises.readdir(dir);
         const present = new Set(files);
-        return files
-            .filter((f) => f.endsWith(DUMP_SUFFIX))
-            .map((f): BackupInfo => {
+        const dumps = files.filter((f) => f.endsWith(DUMP_SUFFIX));
+        const stats = await mapBounded(dumps, LOCAL_STAT_CONCURRENCY, (f) => fs.promises.stat(path.join(dir, f)));
+        return dumps
+            .map((f, i): BackupInfo => {
                 const full = path.join(dir, f);
-                const st = fs.statSync(full);
+                const st = stats[i];
                 const createdAt = parseBackupTimestamp(f) ?? st.mtime;
                 const globals = globalsKeyFor(f);
                 return {
@@ -173,6 +177,23 @@ export async function listBackupObjects(
             };
         })
         .sort(byNewest);
+}
+
+/** Stats in flight at once while listing a local backup folder. */
+const LOCAL_STAT_CONCURRENCY = 32;
+
+/** `fn` over `items`, at most `limit` at a time; results in input order. */
+async function mapBounded<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let next = 0;
+    const worker = async () => {
+        while (next < items.length) {
+            const i = next++;
+            results[i] = await fn(items[i]);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+    return results;
 }
 
 function noControllerFor(dest: { kind: "s3" | "gcs"; bucket: string; prefix: string }): string {
