@@ -45,6 +45,7 @@ import {
 import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiBase, useApiConfig, useTranslation } from "@rebasepro/app";
 import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStorageKey, type DownloadConfig, type StorageReference, type StorageSource } from "@rebasepro/types";
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { useVisibleFileMetadata } from "./useVisibleFileMetadata";
 import { useSearchParams } from "react-router";
 import { useDropzone } from "react-dropzone";
 
@@ -56,7 +57,7 @@ interface StorageFile {
     name: string;
     fullPath: string;
     isFolder: boolean;
-    /** Only populated when metadata is fetched */
+    /** Only populated once the file's metadata is read — see `useVisibleFileMetadata`. */
     size?: number;
     contentType?: string;
     downloadUrl?: string;
@@ -172,16 +173,41 @@ async function listAllPages(
     return { items, prefixes };
 }
 
+/** How many deletes run at once: one at a time, a folder of 1,000 files took a minute. */
+const DELETE_CONCURRENCY = 8;
+
+/**
+ * `work` for each of `items`, at most `limit` at once. The first failure stops
+ * what has not started; what has started is let finish, then it is thrown.
+ */
+async function forEachBounded<T>(items: readonly T[], limit: number, work: (item: T) => Promise<void>): Promise<void> {
+    const run: { next: number; failure?: { error: unknown } } = { next: 0 };
+    const lane = async (): Promise<void> => {
+        while (!run.failure && run.next < items.length) {
+            const item = items[run.next++];
+            try {
+                await work(item);
+            } catch (error: unknown) {
+                run.failure ??= { error };
+            }
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
+    if (run.failure) throw run.failure.error;
+}
+
 /**
  * Delete a folder: every file in it, every folder below it, and the folder
  * itself — the directory on local disk, or the zero-byte `name/` marker that
  * "New folder" writes on S3 and GCS, which no listing shows as an entry.
+ *
+ * The files of a level go {@link DELETE_CONCURRENCY} at a time; the folders
+ * below it one after another, so no more than that are ever in flight, and a
+ * folder's own marker goes last, once everything in it has.
  */
 async function deleteFolderRecursive(source: StorageSource, prefix: string): Promise<void> {
     const { items, prefixes } = await listAllPages(source, prefix);
-    for (const item of items) {
-        await source.deleteObject(item.fullPath);
-    }
+    await forEachBounded(items, DELETE_CONCURRENCY, item => source.deleteObject(item.fullPath));
     for (const sub of prefixes) {
         await deleteFolderRecursive(source, sub.fullPath);
     }
@@ -623,6 +649,14 @@ export const StorageView = () => {
     // Contents
     const [folders, setFolders] = useState<StorageFile[]>([]);
     const [files, setFiles] = useState<StorageFile[]>([]);
+    /** The source `files` were listed from: their metadata is read through it, whatever is selected since. */
+    const [listedFrom, setListedFrom] = useState<StorageSource | null>(null);
+    const { metadata, observe: observeFile } = useVisibleFileMetadata(listedFrom, files);
+    /** `file` with what its metadata has said so far. */
+    const withMetadata = useCallback((file: StorageFile): StorageFile => {
+        const read = metadata.get(file.fullPath);
+        return read ? { ...file, ...read } : file;
+    }, [metadata]);
 
     // Selection and preview
     const [selectedFile, setSelectedFile] = useState<StorageFile | null>(null);
@@ -658,10 +692,11 @@ export const StorageView = () => {
     }, [storageSource]);
 
     /**
-     * The latest listing asked for. Only its answer is shown: a listing awaits
-     * every file's metadata, so an earlier one — of the source or folder the
-     * view has since left — can answer after a later one, and showed that
-     * source's files under the one selected, where their actions ran.
+     * The latest listing asked for. Only its answer is shown: a listing of a
+     * large folder takes several pages, so an earlier one — of the source or
+     * folder the view has since left — can answer after a later one, and
+     * showed that source's files under the one selected, where their actions
+     * ran.
      */
     const listingRequestRef = useRef(0);
 
@@ -669,7 +704,7 @@ export const StorageView = () => {
     const fetchContents = useCallback(async (path: string) => {
         const request = ++listingRequestRef.current;
         const isCurrent = () => request === listingRequestRef.current;
-        // One source for the whole listing, metadata included.
+        // One source for the whole listing; its metadata is read through it too.
         const source = storageSourceRef.current;
         setLoading(true);
         setFailure(null);
@@ -682,32 +717,18 @@ export const StorageView = () => {
                 isFolder: true
             }));
 
-            // Build file items and fetch metadata for each
-            const fileItems: StorageFile[] = await Promise.all(
-                result.items.map(async (ref) => {
-                    try {
-                        const downloadConfig = await source.getSignedUrl(ref.fullPath);
-                        return {
-                            name: ref.name,
-                            fullPath: ref.fullPath,
-                            isFolder: false,
-                            size: downloadConfig.metadata?.size,
-                            contentType: downloadConfig.metadata?.contentType,
-                            downloadUrl: downloadConfig.url ?? undefined
-                        };
-                    } catch {
-                        return {
-                            name: ref.name,
-                            fullPath: ref.fullPath,
-                            isFolder: false
-                        };
-                    }
-                })
-            );
+            // Shown as listed. Each file's metadata — one request per file —
+            // is read when the file comes on screen: see `useVisibleFileMetadata`.
+            const fileItems: StorageFile[] = result.items.map(ref => ({
+                name: ref.name,
+                fullPath: ref.fullPath,
+                isFolder: false
+            }));
 
             if (!isCurrent()) return;
             setFolders(folderItems);
             setFiles(fileItems);
+            setListedFrom(source);
         } catch (e) {
             if (!isCurrent()) return;
             console.error("Storage list error:", e);
@@ -960,12 +981,9 @@ key });
      */
     const deleteItems = useCallback(async (items: StorageFile[], folder: string): Promise<StorageFile[]> => {
         const source = storageSourceRef.current;
+        await forEachBounded(items.filter(item => !item.isFolder), DELETE_CONCURRENCY, item => source.deleteObject(item.fullPath));
         for (const item of items) {
-            if (item.isFolder) {
-                await deleteFolderRecursive(source, item.fullPath);
-            } else {
-                await source.deleteObject(item.fullPath);
-            }
+            if (item.isFolder) await deleteFolderRecursive(source, item.fullPath);
         }
         const listed = await listAllPages(source, folder);
         const stillListed = new Set([...listed.items, ...listed.prefixes].map(ref => ref.fullPath));
@@ -1263,12 +1281,15 @@ message: e instanceof Error ? e.message : String(e) });
                                     </tr>
                                 );
                             })}
-                            {files.map(file => {
+                            {files.map(listed => {
+                                const file = withMetadata(listed);
                                 const FileIconComp = getFileIcon(file.contentType);
                                 const isChecked = selectedPaths.has(file.fullPath);
                                 return (
                                     <tr
                                         key={file.fullPath}
+                                        ref={observeFile}
+                                        data-storage-path={file.fullPath}
                                         data-storage-item
                                         className={cls(
                                             "cursor-pointer transition-colors border-b group",
@@ -1378,7 +1399,8 @@ message: e instanceof Error ? e.message : String(e) });
                             {t("studio_storage_files_heading", { count: files.length })}
                         </Typography>
                         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
-                            {files.map(file => {
+                            {files.map(listed => {
+                                const file = withMetadata(listed);
                                 const FileIconComp = getFileIcon(file.contentType);
                                 const ext = getExtension(file.name)?.toLowerCase() || "";
                                 const isImage = file.contentType?.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
@@ -1387,6 +1409,8 @@ message: e instanceof Error ? e.message : String(e) });
                                 return (
                                     <div
                                         key={file.fullPath}
+                                        ref={observeFile}
+                                        data-storage-path={file.fullPath}
                                         data-storage-item
                                         className={cls(
                                             "rounded-lg overflow-hidden cursor-pointer border",
@@ -1646,7 +1670,7 @@ message: e instanceof Error ? e.message : String(e) });
                         {selectedFile && (
                             <div className="w-80 lg:w-96 shrink-0">
                                 <FilePreviewPanel
-                                    file={selectedFile}
+                                    file={withMetadata(selectedFile)}
                                     link={selectedLink}
                                     mintLink={refreshPreviewLink}
                                     onClose={() => {

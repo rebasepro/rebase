@@ -11,8 +11,8 @@ import { useEnTranslation } from "./en-translation";
 /**
  * A listing that answers after the storage browser has moved on.
  *
- * Every listing asks for each file's metadata, so a large folder takes
- * seconds. A slow listing of the source (or folder) switched away from that
+ * A large folder is listed a page at a time, so its listing takes a while.
+ * A slow listing of the source (or folder) switched away from that
  * resolved after the new one replaced it: the picker said "Media" while the
  * grid held the default source's files, and their actions ran through Media
  * by the default source's paths.
