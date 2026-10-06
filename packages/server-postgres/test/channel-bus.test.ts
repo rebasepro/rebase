@@ -375,6 +375,34 @@ describe("Channel bus — cross-instance broadcast & presence", () => {
         expect([...state.presence.keys()]).toEqual([]);
     });
 
+    it("a disconnect of a socket that never tracked presence touches no roster row", async () => {
+        // Every socket close ran `DELETE … WHERE client_id = $1` whenever the
+        // bus was on — the sockets that only subscribe to data included, which
+        // is most of them, and all of them at once on a deploy.
+        const { service, execute } = createService(state);
+        await service.configureChannelBus(new FakeBus(wire));
+        const rosterDeletes = () => execute.mock.calls
+            .map(([query]) => readQuery(query).text)
+            .filter(text => text.includes("DELETE FROM rebase.channel_presence") && text.includes("client_id"));
+        try {
+            connect(service, "reader", "room:1");
+            connect(service, "tracker", "room:1");
+            service.trackPresence("tracker", "room:1", { name: "Tess" });
+            await flush();
+
+            await service.removeClient("reader");
+            await flush();
+            expect(rosterDeletes()).toHaveLength(0);
+
+            await service.removeClient("tracker");
+            await flush();
+            expect(rosterDeletes()).toHaveLength(1);
+            expect([...state.presence.keys()]).toEqual([]);
+        } finally {
+            await service.destroy();
+        }
+    });
+
     it("reaps presence left behind by an instance that stopped heartbeating", async () => {
         const local = connect(a, "a1", "room:1");
         const remote = connect(b, "b1", "room:1");

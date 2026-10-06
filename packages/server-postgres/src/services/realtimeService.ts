@@ -432,6 +432,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private presenceSweepInterval?: ReturnType<typeof setInterval>;
 
     /**
+     * The clients that have tracked presence through this instance — the only
+     * ones with roster rows to delete when their socket closes. Most sockets
+     * never track presence, and each of their closes was a `DELETE` too.
+     */
+    private presenceTrackers = new Set<string>();
+
+    /**
      * Channels whose oversized ephemeral broadcasts have already been reported,
      * so a hot channel logs the problem once rather than once per message.
      */
@@ -1107,8 +1114,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // subscription and timer cleanup above stays synchronous on purpose: it
         // is what leaks if the database is slow, and it owes nothing to the
         // shared table. With no bus configured this is a no-op that never awaits
-        // a query.
-        await this.presenceStoreOp(() => this.presenceStore!.removeClient(clientId), "client removal");
+        // a query, and so is it for a client that never tracked presence here:
+        // it has no rows.
+        if (this.presenceTrackers.delete(clientId)) {
+            await this.presenceStoreOp(() => this.presenceStore!.removeClient(clientId), "client removal");
+        }
 
         // Remove from all broadcast channels
         for (const [channel, members] of this.channels.entries()) {
@@ -2817,6 +2827,7 @@ roles: ["anon"] };
         }
 
         const channelPresence = this.presence.get(channel)!;
+        this.presenceTrackers.add(clientId);
         const previous = channelPresence.get(clientId);
         const changed = !previous || JSON.stringify(previous.state) !== JSON.stringify(state);
         channelPresence.set(clientId, { state,
@@ -3051,6 +3062,7 @@ lastSeen: Date.now() });
         // 3. Clear broadcast channels and presence
         this.channels.clear();
         this.presence.clear();
+        this.presenceTrackers.clear();
         // Pending history writes hold the pool open; let them settle before the
         // caller closes it, but never let a rejected one break shutdown.
         await Promise.allSettled([...this.channelSendQueues.values(), ...this.channelReceiveQueues.values()]);

@@ -90,6 +90,14 @@ export class ChannelPresenceStore {
             ON rebase.channel_presence (last_seen)
         `);
 
+        // A socket's close removes its rows by client alone, which the primary
+        // key — led by the channel — cannot answer: every close scanned the
+        // roster, and a deploy closes every socket at once.
+        await ddl.ensureObject("channel_presence client index", `
+            CREATE INDEX IF NOT EXISTS idx_channel_presence_client
+            ON rebase.channel_presence (client_id)
+        `);
+
         // The roster of every client on every channel, with no RLS — a row
         // policy has nothing to match on here, since a channel name is a string
         // a client invents rather than a row anyone owns. What guards it is the
