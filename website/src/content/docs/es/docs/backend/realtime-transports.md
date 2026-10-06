@@ -30,8 +30,19 @@ Cuando se modifica un registro en la Instancia A, esta transmite una notificaci�
 
 *Nota: `sid` representa el ID de instancia aleatorio y único del servidor generado al iniciar, `p` es el slug de la colección (ruta) y `eid` es el ID de la entidad de destino.*
 
+Los cambios hechos en el mismo instante — un guardado masivo anuncia cada fila que escribió — salen juntos, en tan pocas notificaciones como quepan bajo el límite de 8000 bytes del NOTIFY de Postgres, cada una con sus cambios como tripletas `[p, eid, db]`:
+
+```json
+{
+  "sid": "inst_7a9c1b",
+  "c": [["posts", "45", null], ["posts", "46", null]]
+}
+```
+
+Un cambio individual conserva la forma de arriba, de modo que una instancia más antigua sigue leyéndolo durante un despliegue progresivo (rolling deploy).
+
 - **Autofiltrado**: Al recibir un mensaje, cada instancia lee el `sid`. Si coincide con su propio ID de instancia, el servidor descarta la notificación para evitar bucles infinitos de enrutamiento.
-- **Retransmisión y distribución (Fan-out)**: Si la notificación proviene de otra instancia, el servidor programa una nueva consulta con debounce y retransmite la actualización a sus suscriptores WebSocket conectados localmente.
+- **Retransmisión y distribución (Fan-out)**: Si la notificación proviene de otra instancia, el servidor programa una nueva consulta con debounce para los suscriptores conectados localmente a cada cambio. No lee nada al recibirla: cada trama es una nueva consulta bajo el alcance de su propio suscriptor.
 - **Bucle de reconexión del supervisor**: Si la conexión con la base de datos se interrumpe, un supervisor de conexión en segundo plano monitorea el estado y activa una secuencia de reconexión automática tras un retraso fijo de **3 segundos**, restaurando el bucle `LISTEN` sin afectar el ciclo de vida de la aplicación Hono principal. Después se vuelve a consultar cada suscripción activa de la instancia, porque lo que se publicó mientras la conexión estaba caída no llegó a nadie. Si la base de datos no está disponible al arrancar, la conexión se reintenta de la misma forma.
 - **Latido (heartbeat)**: Una conexión `LISTEN` está inactiva por naturaleza, y el tiempo de espera por inactividad de un balanceador de carga o de un NAT puede cortarla sin error en ninguno de los dos extremos (una conexión semiabierta). Por eso funciona con TCP keepalive y debe responder a un `SELECT 1` cada 30 segundos en menos de 10 segundos. La que no responde se reemplaza como se describe arriba. Mientras la conexión está caída, `/health` la incluye como `cross-instance`, y cuando lleva 60 segundos caída la comprobación falla.
 

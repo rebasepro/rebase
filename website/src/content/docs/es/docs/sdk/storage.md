@@ -75,7 +75,11 @@ const { url } = await client.storage.getSignedUrl(
 );
 ```
 
-El SDK almacena en caché las URL firmadas para evitar llamadas redundantes al servidor.
+El SDK almacena en caché las URL firmadas para evitar llamadas redundantes al servidor, hasta que
+caduca el token de descarga de cada una. La caché pertenece a la credencial que la pidió: cuando
+cambia el token de acceso —un cierre de sesión, otro usuario que inicia sesión, una
+actualización—, empieza de cero, de modo que a un usuario nunca se le entrega una URL generada
+para otro.
 
 ### URL privadas vs. públicas
 

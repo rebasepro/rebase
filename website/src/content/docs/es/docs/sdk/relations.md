@@ -75,10 +75,10 @@ const { data } = await client.data.posts.include({
 
 | Opción | Qué hace |
 |--------|----------|
-| `limit` | Filas **por elemento principal**, no en toda la página: cinco comentarios en cada publicación, no cinco en total. |
+| `limit` | Filas **por elemento principal**, no en toda la página: cinco comentarios en cada publicación, no cinco en total. Lo aplica la consulta, así que las filas que lo superan nunca se leen de la base de datos. |
 | `where` | El mismo dialecto de filtrado que utiliza el `where` de nivel superior. Se inserta en la consulta, por lo que el `limit` se aplica a las filas que coinciden. |
 | `logical` | Un grupo `or`/`and`/`not` sobre las filas relacionadas. |
-| `orderBy` | La misma sintaxis de ordenación, incluyendo la [ubicación de NULL](/docs/sdk/querying#where-nulls-sort). |
+| `orderBy` | La misma sintaxis de ordenación, incluyendo la [ubicación de NULL](/docs/sdk/querying#where-nulls-sort). Los empates, y un `limit` sin `orderBy`, se resuelven por la clave de la fila relacionada, en orden ascendente. |
 | `fields` | Columnas de la fila *relacionada*. Su clave siempre se conserva, por lo que la fila sigue siendo direccionable. |
 | `include` | Relaciones de la fila relacionada, a su vez; así es como se anida el árbol. |
 

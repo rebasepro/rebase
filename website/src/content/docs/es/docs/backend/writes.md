@@ -60,6 +60,8 @@ Sin esto, lectura-modificación-escritura funciona como «gana el último» sobr
 
 La etiqueta se deriva de una propiedad `date` con `autoValue: "on_update"` cuando la colección declara una — esa columna ya *es* una versión — y de un hash estable de la fila en caso contrario. `If-Match: *` solo afirma que la fila existe. No se escribe nada si la precondición falla.
 
+La etiqueta se compara dentro de la propia transacción de la escritura, una vez bloqueada la fila. Dos escrituras con la misma etiqueta no pueden pasar ambas: la segunda espera a que la primera confirme, lee lo que escribió y se rechaza con `412`.
+
 ### Operaciones de campo
 
 El valor de una propiedad en el cuerpo de un `PATCH` puede ser una operación sobre el valor almacenado en lugar de un valor estático:

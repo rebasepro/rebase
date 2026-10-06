@@ -69,6 +69,24 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100
 GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 ```
 
+#### Omitir el conteo
+
+`meta.total` es un `COUNT(*)` sobre todas las filas que coinciden con la consulta, ejecutado junto
+a la página — y en una tabla grande cuesta más que la página. Una lectura que solo pagina hacia
+delante nunca lo necesita, porque `meta.hasMore` no depende de él: pasa `count: "none"` y la
+lectura pide en su lugar una fila más allá de la página.
+
+```typescript
+const { data, meta } = await client.data.orders.find({ limit: 100, count: "none" });
+meta.hasMore; // exact
+```
+
+Sin conteo no hay total que informar: a través de HTTP `meta.total` está ausente, y en proceso es
+el número de filas hasta el final de la página (`offset` más la página). A través de HTTP es
+`?count=none`; `?count=exact` es el valor por defecto, y cualquier otro valor es un 400
+`INVALID_COUNT`. `iterate()` y `findAll()` lo envían por sí solos en cada página, ya que un
+recorrido no informa de ningún total.
+
 #### Qué lecturas están envueltas y cuáles no
 
 Dos formas y una regla: **una ventana está envuelta, una respuesta completa no.**
@@ -117,17 +135,30 @@ Tres opciones configuran el recorrido:
 | Opción | Por defecto | Qué hace |
 |--------|-------------|----------|
 | `pageSize` | 200 | Filas por solicitud. |
-| `cursor` | — | Busca en una columna en lugar de paginar por offset. Ver más abajo. |
+| `cursor` | — | Exige la búsqueda por cursor: lanza un error en lugar de recurrir al offset. Ver más abajo. |
 | `maxPages` | 10 000 | Límite máximo de solicitudes, para que un servidor que nunca deja de responder `hasMore` no entre en un bucle infinito. |
 | `maxRows` | 10 000 | Solo en `findAll()`. Superarlo **lanza un error** en lugar de devolver un array truncado como si fuera la respuesta completa. Pasa `Infinity` para desactivar este límite o usa `iterate()`. |
 
-**Prefiere `cursor` siempre que la colección tenga una columna única y ordenable.** La paginación por offset vuelve a contar las filas en cada solicitud, por lo que una fila insertada o eliminada *mientras se ejecuta el recorrido* desplaza la ventana y el recorrido omite o repite filas de forma silenciosa. La búsqueda por cursor solicita filas estrictamente posteriores a la última vista, lo que evita que las escrituras concurrentes anteriores al cursor alteren los resultados:
+**El recorrido busca por cursor por sí solo.** Tras la primera página devuelve
+[el cursor del servidor](#paginación-por-cursor) —`meta.nextCursor`— como `after`, de modo que
+cada solicitud pide filas estrictamente posteriores a la última vista. Las escrituras
+concurrentes anteriores a esa fila no pueden desplazar la ventana, y la base de datos nunca
+tiene que saltarse filas por conteo, que era lo que hacía lentos los recorridos largos por
+offset: cada página costaba más que la anterior.
+
+Donde el servidor no emite ningún cursor —una búsqueda ordenada por relevancia, una búsqueda
+vectorial, una lectura `distinct`, una proyección `fields` que deja fuera un campo de
+ordenación—, el recorrido pagina por offset, y una fila insertada o eliminada *mientras se
+ejecuta el recorrido* puede hacer que omita o repita una fila. Pasa `cursor` para que la búsqueda
+por cursor sea un requisito en lugar de una preferencia:
 
 ```typescript
 for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
 ```
 
-Aquí, `cursor` significa «buscar en lugar de paginar por offset», e indica la columna por la cual ordenar cuando la consulta no lo especifica previamente. La búsqueda en sí es [el cursor del servidor](#paginación-por-cursor): el recorrido devuelve `meta.nextCursor` como `after` y no construye ninguna comparación propia, razón por la cual funciona la ordenación por múltiples claves —
+`cursor` indica la columna por la cual ordenar cuando la consulta no lo especifica previamente, y
+hace que recurrir al offset sea un error. El recorrido no construye ninguna comparación propia,
+razón por la cual funciona la ordenación por múltiples claves —
 
 ```typescript
 for await (const job of client.data.jobs.iterate({
@@ -138,7 +169,7 @@ for await (const job of client.data.jobs.iterate({
 
 — y por qué también funciona una clave de ordenación que admite nulos.
 
-La ordenación aún debe ser **total**, lo que en la práctica significa única: el id de la fila resuelve el desempate final, por lo que cualquier columna funciona como criterio de desempate, pero un recorrido cuyo cursor deja de avanzar lanza `cursor-stalled` en lugar de entrar en un bucle infinito. Una consulta que ningún cursor puede describir (como la relevancia) lanza `cursor-missing`; elimina `cursor` y pagina mediante offset.
+La ordenación aún debe ser **total**, lo que en la práctica significa única: el id de la fila resuelve el desempate final, por lo que cualquier columna funciona como criterio de desempate. Con `cursor`, un recorrido cuyo cursor deja de avanzar lanza `cursor-stalled` en lugar de entrar en un bucle infinito, y una consulta que ningún cursor puede describir (como la relevancia) lanza `cursor-missing`; elimina `cursor` y el recorrido pagina esas consultas mediante offset.
 
 ## Véase también
 

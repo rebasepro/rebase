@@ -61,7 +61,7 @@ Un archivo exportado desde una colección se importa de vuelta con los mismos va
 
 La vista previa enumera cada celda que no se convierte, por columna, con cuántas hay y las primeras por fila y motivo. Esas celdas se dejan vacías en las filas importadas; nada se convierte en `0`, `false` o un valor vacío sin aparecer en la lista. Vuelve atrás para mapear la columna con otra propiedad, o corrige el archivo y vuelve a subirlo.
 
-Las propias reglas de la colección — campos obligatorios, opciones de enum, valores únicos — las comprueba el servidor a medida que se escriben las filas, de 25 en 25. Si se rechaza una fila, la importación se detiene y la identifica; las filas anteriores a ella ya están guardadas, y **Retry** continúa desde la fila rechazada.
+Las propias reglas de la colección — campos obligatorios, opciones de enum, valores únicos — las comprueba el servidor a medida que se escriben las filas, en lotes de hasta 500 filas (menos cuando las filas son anchas, para que una solicitud se mantenga por debajo de aproximadamente 1 MB). Un lote se guarda completo o no se guarda. Si se rechaza una fila, la importación se detiene y la identifica; los lotes anteriores ya están guardados, y **Retry** continúa desde la primera fila del lote de la fila rechazada.
 
 ### Crear una colección a partir de un archivo
 

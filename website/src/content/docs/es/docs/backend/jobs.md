@@ -69,7 +69,9 @@ FROM rebase.jobs WHERE status = 'failed'
 ORDER BY updated_at DESC;
 ```
 
-Las filas fallidas se conservan 30 días; las exitosas, 3.
+Las filas fallidas se conservan 30 días; las exitosas, 3. Cada worker elimina las
+filas caducadas al arrancar y después cada hora, por lotes y fuera de la ruta de
+las solicitudes.
 
 ## Qué sucede cuando un worker muere
 

@@ -148,7 +148,7 @@ Un cambio nunca viaja a un suscriptor como datos directos. Viaja como el hecho d
 
 1. **Invalidación.** Cuando una entidad cambia (creada, actualizada, eliminada), el servidor marca las rutas afectadas. La fila que se escribió no se reenvía: se leyó bajo la autorización de quien escribió, lo cual no garantiza lo que un suscriptor tiene permitido ver.
 
-2. **Refetch con RLS y debounce.** Tras **300ms** (`REFETCH_DEBOUNCE_MS`), el servidor vuelve a consultar la colección con tus filtros y orden originales. La consulta se ejecuta dentro de una transacción que establece `app.user_id` y `app.user_roles` locales a la transacción a partir del `SubscriptionAuthContext` del suscriptor, de modo que Postgres evalúa la Row-Level Security (RLS) bajo la identidad de ese cliente y solo las filas que tiene autorización para ver se envían en el `collection_update`. El debounce también agrupa ráfagas de escrituras en una sola consulta.
+2. **Refetch con RLS y debounce.** Tras **300ms** (`REFETCH_DEBOUNCE_MS`), el servidor vuelve a consultar la colección con tus filtros y orden originales. La consulta se ejecuta dentro de una transacción que establece `app.user_id` y `app.user_roles` locales a la transacción a partir del `SubscriptionAuthContext` del suscriptor, de modo que Postgres evalúa la Row-Level Security (RLS) bajo la identidad de ese cliente y solo las filas que tiene autorización para ver se envían en el `collection_update`. El debounce también agrupa ráfagas de escrituras en una sola consulta. Espera 300 ms sin un cambio más, pero nunca más de **1 s** (`REFETCH_MAX_WAIT_MS`) tras el primero, de modo que una colección escrita varias veces por segundo envía de todos modos una trama a sus suscriptores al menos una vez por segundo.
 
 Las versiones anteriores enviaban un `collection_patch` inmediato con la fila escrita antes de este refetch, para ofrecer una respuesta de submilisegundos entre pestañas. Esa fila se había leído bajo el alcance de quien escribió, por lo que podía llegar —y llegaba— a suscriptores cuyas propias políticas la habrían denegado, y el filtro `where` propio de la suscripción tampoco se le aplicaba. El parche se ha eliminado: la latencia percibida para una actualización es ahora la ventana del debounce.
 
@@ -188,28 +188,33 @@ abiertos:
 - Las suscripciones que hacen la misma pregunta (misma ruta, filtros, orden,
   página, `include`, `fields`, búsqueda) como el mismo principal (mismo id de
   usuario, roles, marca de invitado y claims) comparten un único refetch. Una
-  escritura a una lista cuesta **una lectura y un conteo por cada grupo así**,
-  sin importar cuántos sockets la tengan; cada miembro sigue recibiendo una
-  trama construida a partir de filas leídas bajo esa identidad.
+  escritura a una lista cuesta **una transacción por cada grupo así** — la
+  lectura y su conteo —, sin importar cuántos sockets la tengan; cada miembro
+  sigue recibiendo una trama construida a partir de filas leídas bajo esa
+  identidad. Una primera página que llega más corta que su `limit` es el
+  conjunto completo, así que no se cuenta en absoluto.
 - Una suscripción de un solo registro solo se consulta cuando cambia su propio
   registro.
 - Los principals distintos nunca comparten una lectura — eso es lo que evita
   que una trama lleve una fila que su lector no debería ver. Una lista
   observada por mil usuarios distintos con la sesión iniciada son mil lecturas
-  y mil conteos en cada escritura a ella.
+  y mil conteos en cada escritura a ella, en mil transacciones.
 
 Medido en una laptop contra un PostgreSQL local con un pool de 20 conexiones, una escritura a una lista:
 
 | Suscriptores | Transacciones por la escritura | Última trama tras la escritura |
 |-------------|----------------------------|----------------------------|
-| 1.000, un solo principal | 4 | ~350 ms |
-| 1.000, cada uno un principal distinto | ~2.000 | ~700 ms |
+| 1.000, un solo principal | 2 | ~310 ms |
+| 1.000, cada uno un principal distinto | ~1.000 | ~600 ms |
 
 300 ms de cada una son el debounce. La segunda fila es el techo para el que
-hay que planificar: los refetches se encolan en el mismo pool que tu tráfico
-REST, así que una colección escrita varias veces por segundo mientras
-**cientos de usuarios distintos** observan la misma lista es donde el tiempo
-real empieza a competir con las solicitudes. Más allá de eso, prefiere
+hay que planificar. Los refetches se ejecutan en el mismo pool que tu tráfico
+REST, pero como máximo en una cuarta parte de sus conexiones a la vez (5 de
+las 20 por defecto, nunca menos de 2); el resto espera su turno en el
+servidor, así que la distribución de una escritura retrasa sus propias tramas
+y no tus solicitudes. Una colección escrita varias veces por segundo mientras
+**cientos de usuarios distintos** observan la misma lista es donde esas
+tramas empiezan a retrasarse. Más allá de eso, prefiere
 suscripciones más estrechas (una página, un filtro sobre las propias filas
 del usuario) o un [canal de difusión](#canales-de-difusión-broadcast-channels)
 que lleve el cambio para que los clientes vuelvan a consultar en su propio
@@ -369,7 +374,7 @@ El seguimiento de presencia registra qué usuarios están conectados actualmente
 | `presence_state`  | Servidor → Cliente | Entidad completa de todas las presencias en un canal  |
 | `presence_diff`   | Servidor → Cliente | Actualización incremental (ingresos y salidas)       |
 
-Cuando un cliente envía `presence_track`, el servidor lo une automáticamente al canal (sin necesidad de un `join_channel` aparte) y difunde un `presence_diff` a todos los miembros del canal.
+Cuando un cliente envía `presence_track`, el servidor lo une automáticamente al canal (sin necesidad de un `join_channel` aparte) y difunde un `presence_diff` a todos los miembros del canal. El SDK reenvía su estado cada ~20 segundos como latido (heartbeat); un latido cuyo estado no ha cambiado solo renueva el tiempo de espera del cliente y no envía ningún `presence_diff`.
 
 ```typescript
 // Track presence

@@ -309,6 +309,11 @@ La actualización del token se realiza automáticamente, pero puedes activarla m
 const session = await client.auth.refreshSession();
 ```
 
+Una solicitud nunca sale con un token que el cliente sabe que ha caducado: las solicitudes
+comparten una única actualización y se envían una sola vez, con el token nuevo. Un token que el
+servidor rechaza antes de tiempo recibe igualmente una actualización, y después un reintento por
+solicitud.
+
 ## Dónde reside la sesión: `authFlowMode`
 
 ```typescript
@@ -369,7 +374,7 @@ function useCurrentUser() {
 }
 ```
 
-`useRebaseAuthController` en `@rebasepro/app` ya hace esto, por lo que una aplicación construida sobre la plantilla generada lo obtiene de forma automática.
+`useRebaseAuthController` en `@rebasepro/app` ya hace esto, por lo que una aplicación construida sobre la plantilla generada lo obtiene de forma automática. Las solicitudes de datos no tienen que esperar: una hecha a mitad de la restauración se envía en cuanto esta termina —como el usuario restaurado, o de forma anónima—, de modo que un primer renderizado nunca lee un listado público en lugar del propio del usuario.
 
 Una restauración exitosa también llega a `onAuthStateChange` como `TOKEN_REFRESHED` — *es* una actualización —, pero un escuchador por sí solo no puede indicarte que la restauración ha finalizado: un arranque sin sesión no emite absolutamente nada, lo cual es indistinguible de uno que aún está en curso. Espera con `await isInitialized()` para esa comprobación y utiliza el escuchador para los cambios posteriores.
 

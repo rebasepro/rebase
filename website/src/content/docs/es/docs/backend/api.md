@@ -238,6 +238,10 @@ El límite predeterminado es **50**, y el máximo es **1000**. Ambos provienen d
 
 Los tres parámetros de ventana se rechazan en lugar de corregirse, y cada uno indica su error: `INVALID_LIMIT`, `INVALID_OFFSET` (un número entero de 0 o más) e `INVALID_PAGE` (un número entero de 1 o más). Una ventana sutilmente diferente a la solicitada no se puede distinguir de haber llegado al final de la colección, razón por la cual ninguno de ellos se trunca ni se ignora.
 
+### Omitir el conteo
+
+`meta.total` es un `COUNT(*)` sobre todas las filas que coinciden — en una tabla grande, la mayor parte de lo que cuesta una solicitud de listado. `?count=none` (`GET /api/data/orders?count=none`) lo omite: no hay `meta.total`, mientras que `meta.hasMore` sigue siendo exacto (la lectura pide una fila más allá de la página). `?count=exact` es el valor por defecto; cualquier otro valor es un 400 `INVALID_COUNT`. Una lectura con `?distinct=true` nunca se cuenta.
+
 ### Paginación por cursor
 
 `offset` vuelve a contar las filas en cada solicitud, por lo que una fila insertada o eliminada entre dos páginas desplaza la ventana y la iteración omite o repite filas de forma silenciosa. En cambio, `?after=` realiza una búsqueda por cursor: la siguiente página comienza estrictamente después de la última fila servida.
@@ -406,10 +410,10 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 
 | Clave | Significado |
 |-------|-------------|
-| `limit` | Filas **por fila principal**, no en toda la página |
+| `limit` | Filas **por fila principal**, no en toda la página. Lo aplica la consulta, así que las filas que lo superan nunca se leen de la base de datos |
 | `where` | El mismo dialecto de filtrado que utiliza el `where` de nivel superior |
 | `logical` | Un grupo `or`/`and`/`not` sobre las filas relacionadas |
-| `orderBy` | La misma sintaxis de ordenación, incluida la posición de NULL |
+| `orderBy` | La misma sintaxis de ordenación, incluida la posición de NULL. Los empates, y un `limit` sin `orderBy`, se resuelven por la clave de la fila relacionada, en orden ascendente |
 | `fields` | Columnas de la fila *relacionada*; su clave primaria siempre se conserva |
 | `include` | Relaciones de la fila relacionada, a su vez |
 
@@ -427,10 +431,13 @@ Las relaciones incluidas se incrustan directamente en la respuesta:
     "author": {
         "id": 42,
         "name": "Jane Doe",
-        "email": "jane@example.com"
+        "email": "jane@example.com",
+        "companyId": 7
     }
 }
 ```
+
+Una fila incluida es la que sirve la ruta propia del destino (`GET /api/data/authors/42`): las mismas columnas y codificaciones, claves foráneas como columnas, sin objetos de referencia.
 
 ## Escritura
 

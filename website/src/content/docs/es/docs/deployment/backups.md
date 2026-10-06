@@ -139,6 +139,11 @@ del contexto de la tarea, porque el `rebase.storage` del contexto es la API de
 almacenamiento del lado del cliente, no un controlador para el bucket de
 copias de seguridad.
 
+Una copia de seguridad no está sujeta a los límites de subida del controlador. `maxFileSize`
+(50 MB salvo que se configure) y `allowedMimeTypes` se aplican a lo que suben los usuarios, así
+que un volcado de cualquier tamaño se sube, y también uno escrito a través del controlador que
+sirve los archivos de tu app.
+
 | Variable | Significado |
 | --- | --- |
 | `BACKUP_SCHEDULE` | Expresión cron, p. ej. `0 3 * * *` para las 03:00 cada día. Sin definir desactiva las copias de seguridad programadas. |

@@ -75,7 +75,10 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
 ```
 
 La cola es en proceso y en memoria: un fallo del proceso o un despliegue entre la confirmación y la
-entrega pierde el evento. Llama a `await dispatcher.flush()` al apagar. Si las entregas deben sobrevivir
+entrega pierde el evento. Cada webhook tiene su propia cola, así que un receptor caído retrasa solo
+sus propias entregas, nunca las de otro webhook. Llama a `await dispatcher.flush(10_000)` al apagar:
+espera a lo que está en cola y se resuelve con `false` si se agota el tiempo antes, porque un receptor
+caído puede retener cada una de sus entregas hasta ~36 segundos de reintentos. Si las entregas deben sobrevivir
 a un reinicio, escribe una fila de outbox en la misma transacción y vacíala desde un job.
 
 ### Llamar directamente a un endpoint

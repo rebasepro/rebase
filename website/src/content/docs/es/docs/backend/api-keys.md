@@ -97,7 +97,7 @@ Este es el paso que hace parecer rota una clave con los alcances correctos. La
 política de RLS que Rebase añade por defecto a cada colección se compila en:
 
 ```sql
-rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
+(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))
 ```
 
 Es decir, el contexto del servidor o un administrador. Una clave de servicio sin el

@@ -45,7 +45,7 @@ Tres cosas a tener en cuenta:
 
 En el caso habitual —un reinicio minutos después de que un intervalo se ejecutara normalmente—, el intervalo más reciente ya está reclamado, por lo que catch-up solo cuesta una comprobación de reclamación por tarea en cada inicio y no hace nada.
 
-Al arrancar se eliminan las reclamaciones de más de siete días, pero siempre se conserva la más reciente de cada tarea, sea cual sea su antigüedad. Esa reclamación es el registro de que el intervalo ya se ejecutó, así que un despliegue el día 10 no vuelve a ejecutar una tarea mensual con una ventana de catch-up de un mes.
+El programador elimina las reclamaciones de más de siete días al arrancar y después cada hora, pero siempre conserva la más reciente de cada tarea, sea cual sea su antigüedad. Esa reclamación es el registro de que el intervalo ya se ejecutó, así que un despliegue el día 10 no vuelve a ejecutar una tarea mensual con una ventana de catch-up de un mes.
 
 Una ejecución recuperada es una entrada normal en `cron_logs` (`manual` es `false`), con una primera línea de registro indicando el intervalo que recuperó y cuánto retraso tuvo:
 
