@@ -565,12 +565,20 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 };
             }
 
-            client.find(params).then((result) => deliver(result, false)).catch((error) => {
-                if (!closed) onError?.(error as Error);
-            });
+            // Subscribe first. A socket that already holds this query's rows —
+            // another observer has the same subscription — replays them
+            // synchronously, and then the fetch could only ever be dropped by
+            // `deliver` above, after the server had run the query and its
+            // count for it. Only when the socket has nothing yet does the fetch
+            // go out, as the fast path to a first answer.
             const live = wantsLive
                 ? client.listen(params, (result) => deliver(result, true), onError)
                 : undefined;
+            if (!liveDelivered) {
+                client.find(params).then((result) => deliver(result, false)).catch((error) => {
+                    if (!closed) onError?.(error as Error);
+                });
+            }
             return () => {
                 closed = true;
                 live?.();
@@ -598,12 +606,16 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 onResult(row, { fromCache: false, hasPendingWrites: false });
             };
 
-            client.findById(id).then((row) => deliver(row, false)).catch((error) => {
-                if (!closed) onError?.(error as Error);
-            });
+            // Subscribe first, for the reason `observe` does: a replayed row
+            // makes the fetch one whose answer would be dropped.
             const live = options?.realtime !== false && !isUnsupported(client.listenById)
                 ? client.listenById(id, (row) => deliver(row, true), onError)
                 : undefined;
+            if (!liveDelivered) {
+                client.findById(id).then((row) => deliver(row, false)).catch((error) => {
+                    if (!closed) onError?.(error as Error);
+                });
+            }
             return () => {
                 closed = true;
                 live?.();
