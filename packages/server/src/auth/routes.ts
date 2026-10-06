@@ -29,7 +29,7 @@ import { assertMfaSatisfied } from "./mfa-gate";
 import { mountSessionRoutes } from "./session-routes";
 import { mountMagicLinkRoutes } from "./magic-link-routes";
 import { mountOtpRoutes } from "./otp-routes";
-import { isBootstrapWindowOpen, isSteadyStateRegistrationOpen, SETUP_REQUIRED_MESSAGE } from "./registration-policy";
+import { isBootstrapWindowOpen, isOnlyUser, isSteadyStateRegistrationOpen, isUserTableEmpty, SETUP_REQUIRED_MESSAGE } from "./registration-policy";
 import { decideOAuthAutoLink, isRedirectUriAllowed } from "./oauth-signin-policy";
 import { confirmAddressOwnership, identityProfileData, identityVouchesForAddress } from "./address-ownership";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
@@ -487,19 +487,6 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     }
 
     /**
-     * Is the account just created the only one there is?
-     *
-     * Two rows at most: the total says whether anyone else exists, and the
-     * one row left when nobody does says whether it is this account. It used
-     * to be `listUsers()` — the whole users table, password hashes included,
-     * on every sign-up, to compare its length with one.
-     */
-    async function isOnlyUser(uid: string): Promise<boolean> {
-        const { users, total } = await authRepo.listUsersPaginated({ limit: 2 });
-        return total === 1 && users[0]?.id === uid;
-    }
-
-    /**
      * Helper to generate and store session tokens.
      *
      * Every route that signs somebody in comes through here — password login,
@@ -597,11 +584,10 @@ refreshToken };
         // moment one user exists the flag is enforced again.
         let bootstrapRegistration = false;
         if (!isRegistrationAllowed()) {
-            // Paginated on purpose: this runs for anonymous callers, and the
-            // unbounded listUsers() would hand them a full-table fetch per
-            // rejected attempt.
-            const { total } = await authRepo.listUsersPaginated({ limit: 1 });
-            bootstrapRegistration = total === 0;
+            // One id at most, on purpose: this runs for anonymous callers, and
+            // anything that counts or lists the table would hand them a
+            // full-table scan per rejected attempt.
+            bootstrapRegistration = await isUserTableEmpty(authRepo);
             if (!bootstrapRegistration) {
                 throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
             }
@@ -657,7 +643,7 @@ refreshToken };
         // Auto-bootstrap: if this is the very first user in the system, promote to admin.
         // This avoids the chicken-and-egg problem where the first user has no permissions
         // and no way to access the bootstrap endpoint from the UI.
-        const isFirstUser = await isOnlyUser(user.id);
+        const isFirstUser = await isOnlyUser(authRepo, user.id);
 
         if (bootstrapRegistration && !isFirstUser) {
             // Two registrations raced through the empty-table check. Only the
@@ -943,8 +929,7 @@ displayName: user.displayName });
                         }
                         let bootstrapRegistration = false;
                         if (!isRegistrationAllowed()) {
-                            const { total } = await authRepo.listUsersPaginated({ limit: 1 });
-                            bootstrapRegistration = total === 0;
+                            bootstrapRegistration = await isUserTableEmpty(authRepo);
                             if (!bootstrapRegistration) {
                                 throw ApiError.forbidden(noSignupsMessage, "REGISTRATION_DISABLED");
                             }
@@ -986,7 +971,7 @@ displayName: user.displayName });
                         }
 
                         // Auto-bootstrap: first user in the system gets admin
-                        const isFirstUser = await isOnlyUser(user.id);
+                        const isFirstUser = await isOnlyUser(authRepo, user.id);
 
                         if (bootstrapRegistration && !isFirstUser) {
                             // Two sign-ups raced through the empty-table check;

@@ -404,6 +404,21 @@ export class UserService implements UserRepository {
         return (rows as Record<string, unknown>[]).map(row => this.mapRowToUser(row));
     }
 
+    /**
+     * @see UserRepository.firstUserIds — an unordered `LIMIT` read of the
+     * primary key, not `listUsersPaginated`'s count and sort of every row.
+     */
+    async firstUserIds(limit: number): Promise<string[]> {
+        const idCol = getColumn(this.usersTable, "id");
+        const idColumn = idCol ? idCol.name : "id";
+        const result = await this.db.execute(sql`
+            SELECT ${sql.identifier(idColumn)} AS id FROM ${sql.raw(this.getQualifiedUsersTableName())} LIMIT ${limit}
+        `);
+        // Read as `mapRowToUser` reads it, so an id compares equal to the
+        // `UserData.id` the same repository returned for that row.
+        return (result.rows as Array<{ id: string }>).map(row => row.id);
+    }
+
     async listUsersPaginated(options?: ListUsersOptions): Promise<PaginatedUsersResult> {
         const limit = options?.limit ?? 25;
         const offset = options?.offset ?? 0;
@@ -1436,6 +1451,10 @@ export class PostgresAuthRepository implements AuthRepository {
 
     async listUsersPaginated(options?: ListUsersOptions): Promise<PaginatedUsersResult> {
         return this.userService.listUsersPaginated(options);
+    }
+
+    async firstUserIds(limit: number): Promise<string[]> {
+        return this.userService.firstUserIds(limit);
     }
 
     async updatePassword(id: string, passwordHash: string | null): Promise<void> {
