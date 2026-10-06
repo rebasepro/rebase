@@ -57,6 +57,7 @@ import {
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, takesDevUrl } from "./schema/atlas-argv";
 import { ScratchDatabase } from "./cli-scratch-database";
+import { applyPushPlan } from "./cli-push";
 import { unexpectedBranchArgs } from "./branch-argv";
 import { assertKnownFlags, collectionsPathIn, parseDriverLine } from "./cli-flags";
 import { assertCollectionsPathExists } from "./cli-collections-path";
@@ -658,50 +659,52 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 }
             }
 
-            if (rebuildable.length > 0 && databaseUrl) {
-                for (const conflict of rebuildable) {
-                    out(chalk.gray(`  Dropping ${describeConflict(conflict)} — it reads a column this push retypes.`));
-                }
-                await dropGeneratedColumns(databaseUrl, dropGeneratedColumnStatements(rebuildable));
-            }
-
-            try {
-                // Thrown, not exited: an exit from inside runAtlas skipped this
-                // catch entirely, so a failed apply left the search columns it
-                // had just dropped dropped.
-                await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], collectionsPath, { throwOnFailure: true });
-            } catch (err) {
-                // Atlas rolled its transaction back, so the columns those
-                // expressions read are as they were and the definitions in
-                // search.sql still fit. Put them back before surfacing the
-                // failure: a push that fails must not also leave search broken.
-                if (rebuildable.length > 0 && databaseUrl) {
+            // Without a database URL there is nothing to drop or rebuild: runAtlas
+            // refuses to run without one anyway.
+            const rebuildCount = databaseUrl ? rebuildable.length : 0;
+            await applyPushPlan({ dryRun: plan, rebuildable: rebuildCount }, {
+                dropRebuildable: async () => {
+                    if (!databaseUrl) return;
+                    for (const conflict of rebuildable) {
+                        out(chalk.gray(`  Dropping ${describeConflict(conflict)} — it reads a column this push retypes.`));
+                    }
+                    await dropGeneratedColumns(databaseUrl, dropGeneratedColumnStatements(rebuildable));
+                },
+                // Thrown, not exited: an exit from inside runAtlas skipped the
+                // rebuild below entirely, so a failed apply left the search
+                // columns it had just dropped dropped.
+                atlasApply: async () => {
+                    await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], collectionsPath, { throwOnFailure: true });
+                },
+                reportSynced: () => out("Schema is synced, no changes to be made"),
+                rebuildAfterFailure: async () => {
+                    if (!databaseUrl) return;
                     out(chalk.gray("  The apply failed — rebuilding the generated columns it needed out of the way."));
                     await applySearchDdl(databaseUrl);
+                },
+                afterApply: async () => {
+                    out("");
+                    if (!databaseUrl) {
+                        outWarn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
+                        return;
+                    }
+                    // First, before anything below can fail. Atlas has just
+                    // committed any new table with RLS off and the user role
+                    // already holding DML on it; every later step may refuse.
+                    await lockManagedTables(databaseUrl, collectionsPath);
+                    await ensureAuthTables(databaseUrl, collectionsPath);
+                    // After the tables exist and before the policies: the vector and
+                    // search columns are `ALTER TABLE ... ADD COLUMN`, and a policy
+                    // may reference the table they are added to.
+                    await applyVectorDdl(databaseUrl);
+                    await applySearchDdl(databaseUrl);
+                    await applyTriggersDdl(databaseUrl);
+                    await applyPolicies(databaseUrl);
+                    await reconcilePolicies(databaseUrl, collectionsPath);
+                    await ensureRlsUserRole(databaseUrl);
+                    await retireLegacyAuthSchema(databaseUrl);
                 }
-                throw err;
-            }
-            out("");
-
-            if (databaseUrl) {
-                // First, before anything below can fail. Atlas has just
-                // committed any new table with RLS off and the user role
-                // already holding DML on it; every later step may refuse.
-                await lockManagedTables(databaseUrl, collectionsPath);
-                await ensureAuthTables(databaseUrl, collectionsPath);
-                // After the tables exist and before the policies: the vector and
-                // search columns are `ALTER TABLE ... ADD COLUMN`, and a policy
-                // may reference the table they are added to.
-                await applyVectorDdl(databaseUrl);
-                await applySearchDdl(databaseUrl);
-                await applyTriggersDdl(databaseUrl);
-                await applyPolicies(databaseUrl);
-                await reconcilePolicies(databaseUrl, collectionsPath);
-                await ensureRlsUserRole(databaseUrl);
-                await retireLegacyAuthSchema(databaseUrl);
-            } else {
-                outWarn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
-            }
+            });
         } else if (subcommand === "migrate") {
             const databaseUrl = process.env.DATABASE_URL;
             if (databaseUrl) {
