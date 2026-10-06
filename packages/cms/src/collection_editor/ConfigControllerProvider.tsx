@@ -69,14 +69,6 @@ export const ConfigControllerProvider = React.memo(
         const authController = useAuthController();
         const [unmappedTables, setUnmappedTables] = useState<string[]>([]);
 
-        useEffect(() => {
-            if (!databaseAdmin?.fetchUnmappedTables || authController.initialLoading || !authController.user) return;
-            const existingPaths = (collectionConfigController.collections ?? []).map(c => getTableName(c) ?? "").filter(Boolean);
-            databaseAdmin.fetchUnmappedTables(existingPaths)
-                .then((tables: string[]) => setUnmappedTables(tables))
-                .catch((e: unknown) => console.warn("Could not fetch unmapped tables:", e));
-        }, [databaseAdmin, authController.initialLoading, authController.user, collectionConfigController.collections]);
-
         /**
          * Studio's writers, routed through the same plan/apply dialog the
          * collection editor uses.
@@ -125,6 +117,24 @@ export const ConfigControllerProvider = React.memo(
             initialView?: "general" | "display" | "properties";
             expandKanban?: boolean;
         }>();
+
+        /**
+         * The tables no collection maps, which the "new collection" dialog
+         * offers to import — asked for when that dialog opens, and only then.
+         * They were asked for on every admin page load, and again whenever
+         * the collections or the user changed: `information_schema.tables`
+         * and the junction-table query, ~50–70 ms of catalogue at 2,000
+         * tables, for a list most sessions never see.
+         */
+        const newCollectionDialogOpen = Boolean(currentDialog?.isNewCollection);
+        useEffect(() => {
+            if (!newCollectionDialogOpen) return;
+            if (!databaseAdmin?.fetchUnmappedTables || authController.initialLoading || !authController.user) return;
+            const existingPaths = (collectionConfigController.collections ?? []).map(c => getTableName(c) ?? "").filter(Boolean);
+            databaseAdmin.fetchUnmappedTables(existingPaths)
+                .then((tables: string[]) => setUnmappedTables(tables))
+                .catch((e: unknown) => console.warn("Could not fetch unmapped tables:", e));
+        }, [newCollectionDialogOpen, databaseAdmin, authController.initialLoading, authController.user, collectionConfigController.collections]);
 
         const [currentPropertyDialog, setCurrentPropertyDialog] = React.useState<{
             propertyKey?: string,
