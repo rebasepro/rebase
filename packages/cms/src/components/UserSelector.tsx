@@ -38,7 +38,15 @@ const DEFAULT_PAGE_SIZE = 10;
 /**
  * Local hook to fetch users from the collection REST API with search and pagination.
  */
-function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number } = {}) {
+function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE, enabled = true }: {
+    pageSize?: number,
+    /**
+     * Fetch the first page. False until the picker is first opened: the list is
+     * for picking, and the selected user is resolved on its own
+     * (`useResolvedUser`), so a closed picker has nothing to ask for.
+     */
+    enabled?: boolean
+} = {}) {
     const client = useRebaseClient<{ baseUrl?: string, apiPath?: string }>();
     const { getAuthToken } = useAuthController();
 
@@ -108,9 +116,10 @@ user };
     }, [client?.baseUrl, client?.apiPath, getAuthToken, pageSize]);
 
     useEffect(() => {
+        if (!enabled) return;
         offsetRef.current = 0;
         fetchUsers("", 0, false);
-    }, [fetchUsers]);
+    }, [fetchUsers, enabled]);
 
     const search = useCallback((searchStr: string) => {
         // Debounced like the relation picker's type-ahead: a request per
@@ -203,16 +212,27 @@ export const UserSelector = React.forwardRef<
         ref
     ) => {
 
+        const [isPopoverOpen, setIsPopoverOpenState] = useState(false);
+        // Latched on first open, as in `RelationSelector`: a form with three
+        // user fields fetched the list three times on every open, and a table
+        // fired one request per user cell the selection passed over.
+        const [listRequested, setListRequested] = useState(false);
+        useEffect(() => {
+            if (isPopoverOpen) setListRequested(true);
+        }, [isPopoverOpen]);
+
         const {
             items: availableItems,
-            isLoading,
+            isLoading: isLoadingList,
             hasMore,
             search,
             loadMore,
             getUser
-        } = useUserSelector({ pageSize });
+        } = useUserSelector({ pageSize, enabled: listRequested });
+        // Open, and the first page not asked for yet: that is loading too, not
+        // "no users".
+        const isLoading = isLoadingList || (isPopoverOpen && !listRequested);
 
-        const [isPopoverOpen, setIsPopoverOpenState] = useState(false);
         const isPopoverOpenRef = useRef(false);
         const onOpenChangeRef = useRef(onOpenChange);
         onOpenChangeRef.current = onOpenChange;
