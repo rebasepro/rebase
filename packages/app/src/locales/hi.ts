@@ -1145,7 +1145,7 @@ export const hi: RebaseTranslations = {
     studio_tool_cron: "क्रॉन जॉब",
     studio_tool_cron_description: "निर्धारित कार्य प्रबंधित करें",
     studio_tool_schema_visualizer: "स्कीमा विज़ुअलाइज़र",
-    studio_tool_schema_visualizer_description: "इंटरैक्टिव डेटाबेस ERD",
+    studio_tool_schema_visualizer_description: "आपके कलेक्शनों का एंटिटी डायग्राम",
     studio_tool_branches: "ब्रांच",
     studio_tool_branches_description: "डेटाबेस ब्रांच बनाएँ और प्रबंधित करें",
     studio_tool_backups: "बैकअप",
@@ -1340,6 +1340,7 @@ export const hi: RebaseTranslations = {
     studio_schema_no_collections: "कोई कलेक्शन घोषित नहीं",
     studio_schema_no_collections_body: "अभी बनाने के लिए कुछ नहीं है। config/collections/ में एक कलेक्शन जोड़ें, या यहाँ जोड़ने के लिए “कलेक्शन संपादित करें” खोलें।",
     studio_schema_introspect_hint: "जिस डेटाबेस में पहले से टेबल हैं, वहाँ rebase schema introspect आपके लिए कलेक्शन फ़ाइलें लिख देता है।",
+    studio_schema_visualizer_source: "आपके कलेक्शनों से बनाया गया: टेबल, कॉलम, टाइप और रिलेशन वैसे ही जैसे वे घोषित करते हैं। केवल RLS चिह्न डेटाबेस से पढ़े जाते हैं।",
 
 
     // ─── Studio: RLS editor confirmations ───────────────────────

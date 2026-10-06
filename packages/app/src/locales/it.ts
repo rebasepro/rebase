@@ -1145,7 +1145,7 @@ export const it: RebaseTranslations = {
     studio_tool_cron: "Processi cron",
     studio_tool_cron_description: "Gestisci le attività pianificate",
     studio_tool_schema_visualizer: "Visualizzatore di schema",
-    studio_tool_schema_visualizer_description: "Diagramma ER interattivo del database",
+    studio_tool_schema_visualizer_description: "Diagramma delle entità delle tue collection",
     studio_tool_branches: "Rami",
     studio_tool_branches_description: "Crea e gestisci i rami del database",
     studio_tool_backups: "Backup",
@@ -1340,6 +1340,7 @@ export const it: RebaseTranslations = {
     studio_schema_no_collections: "Nessuna collection dichiarata",
     studio_schema_no_collections_body: "Non c'è ancora nulla da disegnare. Aggiungi una collection in config/collections/, oppure apri «Modifica collection» per aggiungerne una qui.",
     studio_schema_introspect_hint: "Su un database che ha già delle tabelle, rebase schema introspect scrive i file di collection al posto tuo.",
+    studio_schema_visualizer_source: "Disegnato dalle tue collection: tabelle, colonne, tipi e relazioni come le dichiarano. Solo gli indicatori RLS sono letti dal database.",
 
 
     // ─── Studio: RLS editor confirmations ───────────────────────

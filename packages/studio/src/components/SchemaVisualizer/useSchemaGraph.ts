@@ -3,8 +3,8 @@ import type { Node, Edge } from "@xyflow/react";
 import { MarkerType } from "@xyflow/react";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import type { Relation, ResolvedRelation } from "@rebasepro/types";
-import { resolveCollectionRelations } from "@rebasepro/common";
-import { getLayoutedElements, getCardinalityLabel, getTypeLabel, NODE_WIDTH } from "./schema-visualizer.utils";
+import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
+import { getLayoutedElements, getCardinalityLabel, NODE_WIDTH } from "./schema-visualizer.utils";
 import type { RelationEdgeData } from "./schema-visualizer.utils";
 import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/cms-types";
 
@@ -13,6 +13,12 @@ import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/cms-ty
 export interface ColumnInfo {
     name: string;
     type: string;
+    /**
+     * The type the collection declares — `string`, `number`, `date`… — or
+     * `FK` for a relation's key. Not the database's column type: the diagram
+     * is drawn from the collections, and a property's column type depends on
+     * more than its `type` (`columnType`, `isId`, integer validation).
+     */
     typeLabel: string;
     isPrimaryKey: boolean;
     isForeignKey: boolean;
@@ -70,7 +76,7 @@ const extractColumns = (collection: AdminCollection): ColumnInfo[] => {
         columns.push({
             name: propName,
             type: prop.type,
-            typeLabel: getTypeLabel(prop.type),
+            typeLabel: prop.type,
             isPrimaryKey: isPk,
             isForeignKey: false,
             isRequired: Boolean(prop.validation?.required),
@@ -154,10 +160,15 @@ const buildGraph = (
     };
 
     // 1. Create nodes for each collection
+    //
+    // Named by `getTableName`, the table `db push` creates: `table`, or the
+    // slug in snake case. The slug as it stands (`blog-posts`) names a table
+    // the database does not have, and the live RLS answer is keyed by the real
+    // one.
     for (const collection of collections) {
         if (!isPostgresCollectionConfig(collection)) continue;
 
-        const tableName = collection.table ?? collection.slug;
+        const tableName = getTableName(collection);
         const nodeId = `table-${tableName}`;
         tableToNodeId.set(tableName, nodeId);
 
@@ -195,7 +206,7 @@ y: 0 },
     for (const collection of collections) {
         if (!isPostgresCollectionConfig(collection)) continue;
 
-        const tableName = collection.table ?? collection.slug;
+        const tableName = getTableName(collection);
         const sourceNodeId = tableToNodeId.get(tableName);
         if (!sourceNodeId) continue;
 
@@ -216,7 +227,7 @@ y: 0 },
 
             if (!isPostgresCollectionConfig(targetCollection)) continue;
 
-            const targetTable = targetCollection.table ?? targetCollection.slug;
+            const targetTable = getTableName(targetCollection);
             const targetNodeId = tableToNodeId.get(targetTable);
             if (!targetNodeId) continue;
 

@@ -1452,6 +1452,7 @@ export interface RebaseTranslations {
     studio_schema_no_collections?: string;
     studio_schema_no_collections_body?: string;
     studio_schema_introspect_hint?: string;
+    studio_schema_visualizer_source?: string;
 
 
     // ─── Studio: RLS editor confirmations ───────────────────────

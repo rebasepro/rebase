@@ -101,21 +101,6 @@ export const getLayoutedElements = (
 edges };
 };
 
-// ─── Column type → display label ──────────────────────────────────────
-
-const TYPE_LABELS: Record<string, string> = {
-    string: "varchar",
-    number: "integer",
-    boolean: "boolean",
-    date: "timestamp",
-    map: "jsonb",
-    array: "jsonb",
-    relation: "FK"
-};
-
-export const getTypeLabel = (type: string): string =>
-    TYPE_LABELS[type] ?? type;
-
 // ─── Edge styling by relation type ────────────────────────────────────
 
 export interface RelationEdgeData {

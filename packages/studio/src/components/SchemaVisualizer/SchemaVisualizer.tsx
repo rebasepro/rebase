@@ -33,6 +33,7 @@ import {
 } from "@rebasepro/app";
 
 import { isPostgresCollectionConfig } from "@rebasepro/types";
+import { getTableName } from "@rebasepro/common";
 import { useSchemaGraph } from "./useSchemaGraph";
 import { useLiveRlsTables } from "./useLiveRls";
 import type { TableNodeData } from "./useSchemaGraph";
@@ -57,6 +58,7 @@ function SchemaVisualizerCanvas({
 }: {
     collections: AdminCollection[];
 }) {
+    const { t } = useTranslation();
     const reactFlowInstance = useReactFlow();
     const liveRls = useLiveRlsTables();
     // React Flow stamps its own `light` / `dark` class on the canvas. Left at
@@ -176,7 +178,7 @@ duration: 400 }
         return postgresCollections.filter(
             (c) =>
                 c.name.toLowerCase().includes(q) ||
-                c.table?.toLowerCase().includes(q) ||
+                getTableName(c).toLowerCase().includes(q) ||
                 c.slug?.toLowerCase().includes(q)
         );
     }, [postgresCollections, searchQuery]);
@@ -199,8 +201,7 @@ duration: 400 }
      */
     const rlsEnabledFor = useCallback(
         (collection: AdminCollection): boolean => {
-            const table = (isPostgresCollectionConfig(collection) ? collection.table : undefined) ?? collection.slug;
-            const node = nodes.find((n) => n.id === `table-${table}`);
+            const node = nodes.find((n) => n.id === `table-${getTableName(collection)}`);
             return Boolean((node?.data as TableNodeData | undefined)?.rlsEnabled);
         },
         [nodes]
@@ -276,7 +277,7 @@ duration: 400 }
                         {/* Regular collections */}
                         <div className="space-y-0.5">
                             {filteredCollections.map((collection) => {
-                                const table = collection.table ?? collection.slug;
+                                const table = getTableName(collection);
                                 const nodeId = `table-${table}`;
                                 const isSelected = selectedTable === nodeId;
                                 return (
@@ -465,12 +466,21 @@ duration: 400 }
                             defaultBorderMixin
                         )}
                     >
-                        <div className="flex items-center gap-2 px-4">
+                        <div className="flex flex-col min-w-0 px-4">
                             <Typography
                                 variant="subtitle2"
                                 className="font-medium text-text-primary dark:text-text-primary-dark"
                             >
                                 Schema Visualizer
+                            </Typography>
+                            {/* What this diagram is drawn from. Everything on it
+                                but the RLS markers comes from the collection
+                                configs, not from the database's catalog. */}
+                            <Typography
+                                variant="caption"
+                                className="text-text-secondary dark:text-text-secondary-dark truncate"
+                            >
+                                {t("studio_schema_visualizer_source")}
                             </Typography>
                         </div>
                         <div className="flex shrink-0 items-center gap-1.5">
