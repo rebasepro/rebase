@@ -27,6 +27,10 @@
   "license": "MIT",
   "author": "Rebase",
   "type": "module",
+  "//sideEffects": "No module of this package does anything just by being imported, so a bundler may drop the ones whose exports nobody uses (with them, everything a barrel import of one hook used to keep). test/module-side-effects.test.ts holds every module to that; a stylesheet would be the exception, hence the glob.",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
