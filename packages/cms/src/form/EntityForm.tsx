@@ -418,7 +418,10 @@ export function EntityForm<M extends Record<string, unknown>>({
         openEntityMode,
         disabled,
         isSaving
-    }), [collection, entityId, path, entity, savingError, status, openEntityMode, disabled, isSaving, formex.version]);
+        // `formex.version` is a key, not an input: a reset or re-seed has to
+        // hand the fields a new context even though nothing above reads it.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [formContext.setFieldValue, collection, entityId, path, entity, savingError, status, openEntityMode, disabled, isSaving, formex.version]);
 
     useEffect(() => {
         onFormContextReady?.(formContext);

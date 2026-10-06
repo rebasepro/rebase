@@ -668,6 +668,9 @@ customEntityActions });
     // returns one even when nothing passes — drew every visible row again on
     // every render of the list. Keyed by the row object, so a row that changes
     // gets its actions asked again; dropped with the actions function.
+    // `getListViewActions` is the cache's key, not an input: a new actions
+    // function has to start an empty cache, so it stays in the array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const listViewActionsCache = useMemo(() => new WeakMap<Entity<M>, EntityAction[]>(), [getListViewActions]);
     const listViewActionsFor = useCallback((entity: Entity<M>): EntityAction[] => {
         let actions = listViewActionsCache.get(entity);
