@@ -83,7 +83,7 @@ async function measureSmallBody(c: Context): Promise<void> {
     if (!/\b(?:gzip|deflate)\b|\*/i.test(c.req.header("Accept-Encoding") ?? "")) return;
 
     const reader = res.body.getReader();
-    const read: Uint8Array[] = [];
+    const read: Array<Uint8Array<ArrayBuffer>> = [];
     let size = 0;
     // One read past the threshold: a body built from a string (`c.json`,
     // `c.text`) arrives as a single chunk, and seeing it end lets it be
@@ -91,7 +91,7 @@ async function measureSmallBody(c: Context): Promise<void> {
     for (let pastThreshold = 0; pastThreshold < 2;) {
         const chunk = await reader.read();
         if (chunk.done) {
-            const bytes = read.length === 1 ? read[0] : new Uint8Array(size);
+            const bytes: Uint8Array<ArrayBuffer> = read.length === 1 ? read[0] : new Uint8Array(size);
             if (read.length !== 1) {
                 let offset = 0;
                 for (const part of read) {
