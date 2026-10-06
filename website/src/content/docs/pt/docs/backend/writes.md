@@ -1,5 +1,5 @@
 ---
-sourceHash: b3fe9c24649203e8
+sourceHash: d08885437a232187
 title: Escrita via REST
 sidebar_label: Escrita via REST
 description: Chaves de idempotência, escritas condicionais com ETag e If-Match, operações de campo, upserts em chave natural, return=minimal e lotes entre coleções.

@@ -1,5 +1,5 @@
 ---
-sourceHash: bad3ea0d4f6e00f8
+sourceHash: 9c1c44ab184d5bd4
 title: Caché de almacenamiento y CDN
 sidebar_label: Caché de almacenamiento y CDN
 description: Cómo sirve Rebase los archivos almacenados para que los navegadores y las CDN puedan almacenarlos en caché — ETags y 304, Cache-Control según quién puede leer un objeto, rangos de bytes para desplazarse en audio y vídeo, y qué configurar en una CDN por delante.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 4449046fbaa30bb3
+sourceHash: ec6f7d14029f08d0
 title: Pagination
 sidebar_label: Pagination
 description: Parcourir une collection par pagination limit/offset, numéros de page ou curseur keyset — et quand chacune cesse d'être exacte.

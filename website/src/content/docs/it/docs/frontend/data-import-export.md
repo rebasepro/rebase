@@ -1,5 +1,5 @@
 ---
-sourceHash: d8dc261c256b2bc3
+sourceHash: 6d792c1a29a7f0a9
 title: Importazione ed esportazione dati
 sidebar_label: Importazione ed esportazione dati
 description: Importa dati da file CSV, JSON ed Excel nelle tue collezioni ed esporta i dati delle collezioni in CSV o JSON con campi calcolati opzionali.

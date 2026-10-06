@@ -1,5 +1,5 @@
 ---
-sourceHash: ce3b9ea649b09037
+sourceHash: 864934488ef2c5a1
 title: Relationen abfragen
 sidebar_label: Relationen
 description: "Binden Sie verknüpfte Entitäten in eine Abfrage ein und lesen Sie eine Child-Collection über ihr Parent mit den Relations-Accessors des SDKs."

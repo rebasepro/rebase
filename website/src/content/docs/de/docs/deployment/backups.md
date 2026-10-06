@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c9aa0d1c19006ba
+sourceHash: e2016628fc9eafc4
 title: Backups und Wiederherstellung
 sidebar_label: Backups
 description: Datenbank-Backups mit pg_dump erstellen, planen, auflisten und wiederherstellen — was ein Backup enthält, die Rollen-Datei, die mit ihm reist, und die eine Sache, die es nicht abdeckt, Ihre hochgeladenen Dateien.

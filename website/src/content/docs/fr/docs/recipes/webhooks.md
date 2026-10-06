@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d8f8d760d14c7f4
+sourceHash: 39e76a1b431b1678
 title: "Recette : Intégration de Webhooks"
 sidebar_label: Webhooks
 description: Utilisez les callbacks d'entité pour envoyer des webhooks à des services externes lorsque les données changent, sans maintenir ouverte la transaction de l'écriture.

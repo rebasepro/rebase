@@ -1,5 +1,5 @@
 ---
-sourceHash: df4fcc013e52c859
+sourceHash: c1b5befefc405c3b
 title: API REST
 sidebar_label: API REST
 description: Endpoints de la API REST autogenerados para cada colección, con filtrado, ordenación, paginación e inclusión de relaciones.

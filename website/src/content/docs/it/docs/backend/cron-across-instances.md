@@ -1,5 +1,5 @@
 ---
-sourceHash: e38cb2eddd8b623a
+sourceHash: cd43978985b8b565
 title: Cron su più istanze
 sidebar_label: Cron su più istanze
 description: "Come si comportano i cron job con più di un processo server: un'esecuzione per slot, uno slot perso per un riavvio, una pausa rispettata da ogni replica ed esecuzioni che non si sovrappongono mai."

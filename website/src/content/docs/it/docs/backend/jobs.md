@@ -1,5 +1,5 @@
 ---
-sourceHash: 9a7137f85a2187fd
+sourceHash: 81ca845faa40b4f5
 title: Job in background
 sidebar_label: Job in background
 description: Una coda di job persistente basata su Postgres — lavoro che sopravvive a un riavvio, ritentato con backoff, con i fallimenti conservati anziché eliminati.

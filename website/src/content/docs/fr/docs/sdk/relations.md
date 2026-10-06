@@ -1,5 +1,5 @@
 ---
-sourceHash: ce3b9ea649b09037
+sourceHash: 864934488ef2c5a1
 title: Interroger les relations
 sidebar_label: Relations
 description: "Incluez des entités liées dans une requête et lisez une collection enfant via son parent grâce aux accesseurs de relations du SDK."

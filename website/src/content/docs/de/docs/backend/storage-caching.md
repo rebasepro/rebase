@@ -1,5 +1,5 @@
 ---
-sourceHash: bad3ea0d4f6e00f8
+sourceHash: 9c1c44ab184d5bd4
 title: Storage-Caching und CDNs
 sidebar_label: Storage-Caching und CDNs
 description: Wie Rebase gespeicherte Dateien ausliefert, damit Browser und CDNs sie zwischenspeichern können — ETags und 304er, Cache-Control je nachdem, wer ein Objekt lesen darf, Byte-Bereiche zum Spulen in Audio und Video, und was an einem vorgeschalteten CDN zu konfigurieren ist.

@@ -1,5 +1,5 @@
 ---
-sourceHash: cba58e3dbe87b090
+sourceHash: 22ec003847a742c2
 title: Tiempo real entre instancias
 sidebar_label: Tiempo real entre instancias
 description:"\"Cómo los canales de difusión (broadcast) y la presencia sobreviven a más de un proceso de servidor: el bus LISTEN/NOTIFY, qué posee cada instancia y cómo escribir tu propio transporte.\""

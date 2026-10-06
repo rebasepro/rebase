@@ -1,5 +1,5 @@
 ---
-sourceHash: e38cb2eddd8b623a
+sourceHash: cd43978985b8b565
 title: Cron entre instancias
 sidebar_label: Cron entre instancias
 description: "Cómo se comportan las tareas cron con más de un proceso de servidor: una ejecución por intervalo, un intervalo que un reinicio perdió, una pausa que respetan todas las réplicas y ejecuciones que nunca se solapan."

@@ -1,5 +1,5 @@
 ---
-sourceHash: b3d7ff032778e376
+sourceHash: fb452e747e0c0980
 title: Callbacks de Entidade
 sidebar_label: Callbacks
 description: Use callbacks de ciclo de vida para executar lógica personalizada quando entidades forem criadas, atualizadas, lidas ou excluídas. Inclui a API context.data para operações entre coleções.

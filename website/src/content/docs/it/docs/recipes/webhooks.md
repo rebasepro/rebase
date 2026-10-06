@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d8f8d760d14c7f4
+sourceHash: 39e76a1b431b1678
 title: "Ricetta: Integrazione Webhook"
 sidebar_label: Webhooks
 description: Utilizza i callback delle entità per inviare webhook a servizi esterni quando i dati cambiano, senza tenere aperta la transazione della scrittura.

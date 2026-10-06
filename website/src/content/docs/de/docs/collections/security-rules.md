@@ -1,5 +1,5 @@
 ---
-sourceHash: 22cf5bf2953fb715
+sourceHash: 9531407dffbf3092
 title: Sicherheitsregeln (RLS)
 sidebar_label: Sicherheitsregeln
 description: Definieren Sie Row-Level-Security-Richtlinien für Ihre Collections mithilfe praktischer Shortcuts oder reiner SQL-Ausdrücke.

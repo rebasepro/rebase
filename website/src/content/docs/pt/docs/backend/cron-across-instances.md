@@ -1,5 +1,5 @@
 ---
-sourceHash: e38cb2eddd8b623a
+sourceHash: cd43978985b8b565
 title: Cron entre instâncias
 sidebar_label: Cron entre instâncias
 description: "Como os cron jobs se comportam com mais de um processo de servidor: uma execução por slot, um slot perdido em uma reinicialização, uma pausa que toda réplica respeita e execuções que nunca se sobrepõem."

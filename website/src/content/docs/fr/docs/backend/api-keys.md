@@ -1,5 +1,5 @@
 ---
-sourceHash: 411eeede8d2eab1b
+sourceHash: 297f773f647b4668
 title: Clés API
 sidebar_label: Clés API
 description: "Des clés de longue durée pour les scripts, la CI, les agents et les intégrations : clés de service et clés personnelles, les portées qu'elles détiennent, leur articulation avec la sécurité au niveau des lignes, et les routes qui les gèrent."

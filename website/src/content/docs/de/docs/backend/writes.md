@@ -1,5 +1,5 @@
 ---
-sourceHash: b3fe9c24649203e8
+sourceHash: d08885437a232187
 title: Schreiben über REST
 sidebar_label: Schreiben über REST
 description: Idempotenz-Schlüssel, bedingte Schreibvorgänge mit ETag und If-Match, Feldoperationen, Upserts über natürliche Schlüssel, return=minimal und sammlungsübergreifende Batches.

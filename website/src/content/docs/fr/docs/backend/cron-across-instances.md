@@ -1,5 +1,5 @@
 ---
-sourceHash: e38cb2eddd8b623a
+sourceHash: cd43978985b8b565
 title: Cron entre plusieurs instances
 sidebar_label: Cron entre plusieurs instances
 description: "Comment les tâches cron se comportent avec plus d'un processus serveur : une exécution par créneau, un créneau perdu lors d'un redémarrage, une pause que toutes les répliques respectent, et des exécutions qui ne se chevauchent jamais."

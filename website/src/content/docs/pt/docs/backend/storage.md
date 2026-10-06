@@ -1,5 +1,5 @@
 ---
-sourceHash: 123256f487ac8a71
+sourceHash: 34273012e2b25122
 title: Configuração de Armazenamento
 sidebar_label: Configuração de Armazenamento
 description: Configure backends de armazenamento em sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.

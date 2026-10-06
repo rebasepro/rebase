@@ -1,5 +1,5 @@
 ---
-sourceHash: bad3ea0d4f6e00f8
+sourceHash: 9c1c44ab184d5bd4
 title: Cache de armazenamento e CDNs
 sidebar_label: Cache de armazenamento e CDNs
 description: Como o Rebase serve arquivos armazenados para que navegadores e CDNs possam fazer cache deles — ETags e 304s, Cache-Control de acordo com quem pode ler um objeto, byte ranges para navegação em áudio e vídeo, e o que configurar em uma CDN na frente.

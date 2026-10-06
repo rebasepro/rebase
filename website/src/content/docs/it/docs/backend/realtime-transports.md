@@ -1,5 +1,5 @@
 ---
-sourceHash: cba58e3dbe87b090
+sourceHash: 22ec003847a742c2
 title: Realtime su più istanze
 sidebar_label: Realtime su più istanze
 description:"\"Come i canali di broadcast e la presence sopravvivono a più di un processo server: il bus LISTEN/NOTIFY, cosa appartiene a ciascuna istanza e come scrivere un transport personalizzato.\""

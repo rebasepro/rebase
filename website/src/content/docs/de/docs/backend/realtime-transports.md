@@ -1,5 +1,5 @@
 ---
-sourceHash: cba58e3dbe87b090
+sourceHash: 22ec003847a742c2
 title: Echtzeit über mehrere Instanzen
 sidebar_label: Echtzeit über mehrere Instanzen
 description:"\"Wie Broadcast-Channels und Presence mehr als einen Server-Prozess überstehen: der LISTEN/NOTIFY-Bus, was jede Instanz besitzt, und das Schreiben eines eigenen Transports.\""

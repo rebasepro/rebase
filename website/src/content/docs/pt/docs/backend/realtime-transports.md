@@ -1,5 +1,5 @@
 ---
-sourceHash: cba58e3dbe87b090
+sourceHash: 22ec003847a742c2
 title: Tempo real entre instâncias
 sidebar_label: Tempo real entre instâncias
 description:"\"Como canais de broadcast e presença sobrevivem a mais de um processo de servidor: o barramento LISTEN/NOTIFY, o que pertence a cada instância e como escrever seu próprio transporte.\""

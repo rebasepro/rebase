@@ -1,5 +1,5 @@
 ---
-sourceHash: 59fb182b5af4d770
+sourceHash: 0557a6f9a5ede10a
 title: Strumenti Studio
 sidebar_label: Studio
 description: Rebase Studio fornisce strumenti per sviluppatori per la modifica visiva dello schema, query SQL, scripting JavaScript, gestione delle policy RLS e navigazione dello storage.

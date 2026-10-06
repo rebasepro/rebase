@@ -145,6 +145,13 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **`RealtimeSocketLimits` is now `RealtimeSocketOptions`.** It carries the API-key
   resolver beside the limits, as the sixth argument of `initializeWebsockets`.
 
+- **`?count=` on a REST list is now the count switch, so a filter on a column
+  named "count" goes inside `?where=`.** `?count=none` skips the count behind
+  `meta.total`, `?count=exact` is the default (see Added), and any other value
+  is a 400 `INVALID_COUNT`. Before, `?count=5` filtered on a `count` column.
+  Write that filter as `?where={"count":["==",5]}`. The SDK already sends it
+  that way.
+
 #### MCP
 
 - **The remote MCP endpoint (`/mcp`) takes the SDK's own arguments:** `where`
@@ -155,12 +162,25 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `limit` above 1000 is refused, as on REST, instead of silently clamped to
   200.
 
+- **The remote MCP's `list_collections` reply carries its listing once, in the
+  text block, with no `structuredContent`.** A client that read the listing
+  from `structuredContent` reads the text instead: the same content, as
+  compact JSON. The other tools keep their `structuredContent`.
+
 #### Client SDK
 
 - **A write made through `context.data` or `rebase.data` (in a function, hook
   or seed) now throws `UNSUPPORTED_OPTION` if it is given `ifMatch` or
   `idempotencyKey`,** instead of silently ignoring them. Neither option means
   anything for a write that never leaves the process.
+
+#### Admin (CMS & app)
+
+- **`@rebasepro/app` no longer exports the Spanish translation table.** The
+  entry re-exported `es` from `./locales/es`, the only language besides
+  English it exported, and that kept the Spanish strings in every bundle built
+  from the package. `en` is still exported. To change the admin's strings,
+  pass overrides through `<Rebase translations={…}>`.
 
 #### UI kit & plugins
 
@@ -350,6 +370,15 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   are exported from `@rebasepro/client` and `@rebasepro/types`,** for reading
   `rebase-storage:` references out of a markdown or text field.
 
+- **Storage controllers can stream, through two new optional methods,
+  `statObject` and `getObjectStream`.** The file route uses them to serve a
+  file, a `Range` request, a revalidation and a `HEAD` without holding the
+  object in memory, and backups use them to stream a dump. The built-in local,
+  S3 and GCS controllers implement both; a custom controller without them keeps
+  the buffered path. `putObject(props, { uploadLimits: false })` writes without
+  the controller's upload limits; only the server's own backup upload passes it
+  (see Fixed), and it is not part of the client's upload props.
+
 #### Realtime
 
 - **The realtime socket honours `impersonate`,** sent with the socket's
@@ -431,6 +460,26 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   another table points at it. The live schema editor treats re-keying an
   existing collection as a migration and names the new key. `rebase doctor`
   and the boot warning tell you to mark every key column.
+
+- **A list can skip its count, with `?count=none` over REST or
+  `count: "none"` on `find()`; a value the server does not know is a 400
+  `INVALID_COUNT`.** `meta.total` is a `COUNT(*)` over every matching row,
+  most of what a list request costs on a large table. With `none` nothing is counted and
+  `meta.hasMore` stays exact, because the read asks for one row past the page;
+  over HTTP `meta.total` is then absent. `exact` is the default. The SDK's
+  `iterate()` and `findAll()` send it on every page, and the admin's table
+  on every read past its live first page (see Changed). A new client talking
+  to a server that does not know the parameter repeats that read once without
+  it and stops sending it.
+
+- **Custom data drivers gain `readTogether()` and row preconditions.**
+  `DataDriver.readTogether(work)` runs several reads in one read-only
+  REPEATABLE READ transaction under the driver's identity; the REST list reads
+  its page and count through it, and a get-by-id its ETag row and body.
+  `SaveProps.precondition` and `DeleteProps.precondition` carry the 404 and
+  `If-Match` checks into the write's own transaction, on a driver that
+  declares `checksRowPreconditions`. All three are optional: a driver without
+  them keeps the separate reads it had. Both Postgres drivers implement them.
 
 #### CI & tooling
 
@@ -530,6 +579,317 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 - **`compileRulePolicies(collection, rule, options)`** in `@rebasepro/common` is the one compiler of a security rule into Postgres policies. The schema planner delegates to it.
 
+- **A list page and its count are read in one transaction.** A
+  `GET /posts?limit=25` was 8 statements in 2 transactions and is 5 in 1 (4
+  with `?count=none`); with `include=*`, 13 → 10. The count now comes from the
+  same snapshot as the page. A `?distinct=true` read is no longer counted,
+  since its answer never carried `meta.total`.
+
+- **A get-by-id with an include or a field list reads in one transaction
+  instead of two.** `?include=author`: 2 transactions and 9 statements → 1 and
+  6; `?fields=id,title`: 8 → 5 statements. The ETag is unchanged.
+
+- **An include's per-relation limit is applied by Postgres.**
+  `{ comments: { limit: 2 } }` on a page of 100 posts read every comment of
+  every post and kept two of each. At 2,000 comments a post that was 200,000
+  rows, 4.5 s and about 100 MB of heap; it is now 200 rows and 0.2 s. Ties, and
+  a `limit` with no `orderBy`, go by the related row's key, ascending. It is
+  still one statement per relation.
+
+- **A to-one include takes the foreign keys from the rows it already has.** One
+  statement fewer per `belongsTo` per level: `include=author` 4 → 3,
+  `include=author.company` 6 → 4.
+
+- **PATCH and DELETE no longer load every relation of the row before writing
+  it.** The 404 and the `If-Match` check run on the read the write already
+  makes, inside its transaction. A PATCH of a post with 20,000 comments and 200
+  tags took 123 ms, 20.6 MB of heap and 2 transactions; it takes 5 ms, 0.8 MB
+  and 1. An item PATCH is 13 → 9 statements, with `If-Match` 17 → 10, a DELETE
+  12 → 8. Bulk update, `_batch` update and the history routes do the same.
+
+- **A write with no hooks skips its savepoint and its pre-commit check.** A
+  create is 8 → 5 statements, an update 9 → 6, a delete 8 → 5. A write a hook
+  started, and a write outside a request's transaction, keep their savepoint.
+
+- **Bulk writes send half the statements.** For 1,000 rows: create 4,007 →
+  2,005, update 6,007 → 3,005, delete 4,007 → 2,005, upsert of existing rows
+  6,007 → 3,005. An upsert that meets a stored row reads it once, not twice,
+  and history pruning after a write is one statement, not two.
+
+- **Re-sending a parent's unchanged children rewrites none of them, and a
+  many-to-many write updates only the links whose pivot values changed.**
+  Saving a post with its 2,000 unchanged comment ids (the admin form sends them
+  on every save) rewrote all 2,000 rows, sent 2,000 change notifications and
+  bumped every child's `updated_at`; it now touches none. 20 unchanged junction
+  rows were 20 UPDATEs and are 0.
+
+- **A bulk create of users hashes their passwords several at a time.** 200
+  users: 5.7 s → 1.5 s. It applies when the user adapter declares itself
+  `independent` (`UserCreationWriteContract`), as the built-in one does when
+  there is no `onCreateUser`, `onAdminCreateUser` or custom `hashPassword`;
+  otherwise users are still created one at a time.
+
+- **API responses under 1 KB are sent uncompressed, with a Content-Length.** A
+  single-row answer costs 22 µs instead of 68. Larger and streamed bodies are
+  compressed as before; a JSON body of 1 KB or more costs about 10 µs more,
+  for the measurement.
+
+- **Static apps answer revalidations with 304 and gzip each hashed chunk
+  once.** Files and SPA deep links carry a weak ETag and honour
+  `If-None-Match` and `If-Modified-Since`, so `/`, a deep link or
+  `/logo.svg` revalidates with no body. Content-hashed assets from 1 KB to
+  8 MB are gzipped once into a 32 MB in-memory cache: an 862 KB chunk costs
+  0.4 ms of CPU per request instead of 16.7. Precompressed `.br`, `.gz` and
+  `.zst` siblings are served when a scan at mount finds them, and a release
+  path behind a symlink (`current -> releases/N`) is still resolved on every
+  request.
+
+- **`/api/docs` builds the OpenAPI document once per mount, not on every
+  request.** At 200 collections a request after the first takes 1.7 ms
+  instead of 39.
+
+- **Webhooks each drain on their own, and an entity change is delivered to
+  every matching webhook at once.** With `enqueueEntityChange` and no
+  `jobQueue`, a receiver that was down delayed every other webhook by 6–36 s
+  per event; a healthy receiver now gets its deliveries in milliseconds, and
+  each webhook keeps its own order. `flush(timeoutMs)` takes a time budget and
+  resolves `false` if it runs out (it resolved `undefined`). `onEntityChange`
+  with three matching webhooks that each answer in T took 3T and now takes T;
+  the results stay in webhook order. The in-memory queue is still unbounded.
+
+- **The in-memory rate limiter's cost no longer grows with the limit.** A hit
+  near a limit of 100,000 took about 1 ms and takes 0.1 µs; at 1,000, 11 µs →
+  0.2 µs. It makes the same decisions.
+
+#### Postgres
+
+- **A server booting against an unchanged database runs about a tenth of the
+  statements, and no longer re-applies what is already there.** It re-created
+  the helper functions and four indexes (the example app logged "Applied 7
+  additive schema change(s)" on every boot, now none), re-attached the
+  change-capture trigger on every table, ran ENABLE ROW LEVEL SECURITY on
+  tables that had it, and re-issued the auth tables' columns, indexes and
+  back-fills. A function altered or an index dropped by hand is still put back.
+  Each table's RLS policies are now replaced in one transaction instead of one
+  commit per statement. At 200 collections on a disk that really flushes, a
+  warm boot took 8.8–13 s and 5,080 statements; it takes 1.3 s and 467.
+
+- **A first deploy builds its tables in a few dozen transactions instead of one
+  commit per column.** At 200 collections the table step makes 49 round trips
+  instead of 3,769, and the cold boot takes 2.2 s and 762 statements instead of
+  15.9 s and 8,839. A batch that fails is replayed one statement at a time.
+
+- **Boot waits for a busy table in one-second slices, so live queries on it
+  wait at most a second behind a deploy.** Schema and policy changes take the
+  table's lock with a 1 s `lock_timeout` and retry, where a live read used to
+  queue behind the boot for up to the 30 s statement timeout: with a reader
+  holding a table for 5 s, live reads on it waited 4,981 ms and now wait
+  991 ms. Policies retry 3 times within a 10 s budget; a table still locked
+  keeps exactly the policies it had, and the boot logs it, at error when the
+  policy names differ. A table change retries for about 30 s, as before, then
+  fails the boot with a hint naming the lock. The change-capture trigger
+  retries 3 times, then is skipped with a warning, as before.
+
+- **RLS policies check the caller once per query instead of once per row.**
+  Every part of a compiled policy that does not read the row is wrapped in
+  `(SELECT …)`, which Postgres evaluates once per statement and plans around.
+  A deep page of a large table no longer turns into a full scan and an
+  on-disk sort: 1M rows, `ORDER BY id DESC LIMIT 50 OFFSET 20000` as an admin,
+  7.3 s → 4 ms, and `count(*)` 300 → 45 ms. Owner- and tenant-scoped reads are
+  2–8× faster. Policy names, and who may read or write what, are unchanged; the
+  next boot or `rebase db push` rewrites each policy in place. A deployment that
+  applies only generated migrations keeps the old, equivalent text until its
+  next `rebase db generate` writes a migration.
+
+- **Each authenticated transaction sets the caller's identity and role in one
+  statement instead of two.** `set_config('role', …, true)` joins the claims
+  query in place of a separate `SET LOCAL ROLE`, which saves a round trip on
+  every read, write and realtime refetch: a get-by-id is 6 → 5 statements, a
+  list 11 → 9.
+
+- **Schema planning scales linearly with the number of collections.** At 1,000
+  collections it takes 55 ms instead of 164. Boot, `rebase db push` and
+  `rebase db generate` plan the schema.
+
+#### Realtime
+
+- **Live views of a collection written several times a second update at least
+  once a second.** The refetch debounce had no maximum wait, so a steady stream
+  of writes held every live view of the collection frozen until the writes
+  stopped. With a write every 100 ms for 3 s, the first update came at 3.3 s;
+  it now comes at 1.1 s.
+
+- **One write's realtime fan-out uses at most a quarter of the connection
+  pool.** Refetches queue, at most max(2, pool size / 4) at a time (5 on the
+  default pool of 20), so REST requests no longer wait behind them. An
+  unrelated query during a fan-out to 200 principals waited 1,001 ms for a
+  connection; it now waits 13 ms.
+
+- **A live list's refetch reads and counts in one transaction, and skips the
+  count when the first page holds the whole set.** Statements per write: 9 → 6
+  for one principal watching, 801 → 501 for 100.
+
+- **A bulk UPDATE on a list many users watch no longer stalls the event loop.**
+  Every changed row visited every group watching the list. A 100k-row UPDATE
+  with 1,000 principals watching stalled the server for 940 ms and delivered
+  its last frame 4.4 s after the commit; now 92 ms and 2.5 s.
+
+- **Change capture reads a changed row's id without reading the rest of the
+  row.** A row with a 200 KB document cost the trigger 150 µs and costs 9 µs; a
+  20-column row, 32 → 21 µs. The trigger function keeps its name and arguments,
+  its payload is unchanged, and the next boot gives existing triggers the new
+  body.
+
+- **A presence heartbeat that repeats its state sends nothing.** Every
+  heartbeat sent each member of the room a `presence_diff`: one round at 1,000
+  members was 1,000,000 frames (108 MB); it is now none.
+
+- **A closing socket finds its presence rows by index, and a socket that never
+  tracked presence runs no query.** 1,000 closes on a 20,000-member roster took
+  615 ms and take 3 ms. The index is created at boot.
+
+- **Without change capture, a bulk save is announced to other instances in a
+  few notifications, and they read nothing on receipt.** A 1,000-row save
+  across two instances sent 1,000 `pg_notify` and made the other instance read
+  1,000 rows it never used; it now sends 3 and reads none, and the save takes
+  ~235 ms instead of 447. A single change keeps the previous payload; a batch
+  uses a new shape, which an instance still on the previous version ignores
+  during a rolling deploy.
+
+- **Channel names that clients invent no longer accumulate in server memory.**
+  History retention is resolved per rule rather than cached per channel name,
+  and the prune throttle forgets expired entries: 20,000 invented names at
+  3,600 a minute left 40,000 entries, now fewer than 6,000.
+
+#### Admin (CMS & app)
+
+- **The admin's login screen preloads about 2 MB less JavaScript.** The example
+  app's eager set was 3.3 MB (966 kB gzipped) and is 1.3 MB (415 kB). Only
+  English ships up front: another language is fetched the first time it is
+  picked or configured, and the panel waits for it instead of flashing
+  English. The collection table, record views, entity form and side panel
+  load when a collection opens, prefetched while idle after sign-in. The
+  lucide icon map and markdown-it load on first use (see UI kit & plugins),
+  and the `/debug/ui` view is out of the preload set. `@rebasepro/app` and
+  `@rebasepro/cms` declare `"sideEffects": ["**/*.css"]`, so a bundler keeps
+  only the modules an app uses from their barrels.
+
+- **A scaffolded admin no longer preloads the syntax highlighter to get
+  clsx.** `rebaseManualChunks`, and the template's copy of it, put React and
+  clsx in chunks of their own (`vendor-react`, `vendor-clsx`), so
+  `vendor-prism` (85 kB) leaves the preload set.
+
+- **A collection view loads only the relations its properties declare.** List
+  reads (table, list, cards, board, relation picker, `useCollection`) name the
+  relations a property declares instead of `include: ["*"]`. A relation
+  declared only for a record's tabs is no longer loaded for every row of every
+  page and every realtime re-read: the demo's orders went from 2 relation
+  queries and about 125 embedded line items per page to 1 and none. Custom code
+  that read a tab-only relation off a list row (`tableController.data`, an
+  additional field, an entity action) no longer finds it there.
+
+- **A scrolled table re-reads the rows it holds at most once every 2 s under a
+  stream of writes, and never counts them.** A write after a quiet spell is
+  still picked up at once. Writes every 300 ms for 10 s with 1,000 rows held
+  made 34 reads of 32,300 rows; now 6 of 5,700. Every read past the live
+  first page sends `?count=none`: scrolling to 10,000 rows ran 199 `COUNT(*)`s
+  nobody read, now none.
+
+- **The collection table redraws only what changed.** A view render that
+  changes nothing no longer redraws the rows; ticking a checkbox redraws the
+  row actions instead of every cell (460 cell renders → 0); a table holding
+  10,000 rows compares only the rows on screen on each realtime update (27 ms
+  → 1–2 ms). Cells share one ResizeObserver (784 per mount → 3) and one
+  validation schema per column (276 → 12). Asking whether a row is selected
+  takes constant time, so "select all loaded rows" at 10,000 rows takes
+  0.3 ms instead of 172. A date column in a fixed timezone builds its
+  formatters once (60 cells: 240 → 2), and a table with pinned rows (the
+  relation picker's dialog) no longer gets a new row array on every render.
+
+- **Loading the next page of cards draws the new cards only, and the list view
+  no longer redraws every row on each update.** With 2,000 cards loaded, the
+  next page rendered 4,050 cards (798 ms); now 50.
+
+- **The kanban board no longer keeps the table view's first page subscribed
+  beside its columns.** A board of N columns held N + 1 subscriptions; now N.
+  The toolbar's "select loaded" no longer selects the hidden table's rows;
+  "select all matching" is unchanged. `DataTableControllerProps.enabled`
+  (default `true`) turns a table controller's reads off.
+
+- **The relation picker reads the rows already linked in one request per
+  1,000.** 40 linked rows took 40 requests and take 1; 2,500 take 3. This
+  covers the dialog and the inline picker; a target with a composite key keeps
+  one read per id.
+
+- **A keystroke in a record form re-renders the field typed into, not every
+  field.** In a 40-field form with a 500-item array, one keystroke re-rendered
+  540 field bindings; now 1. A custom `admin.Field`, `dynamicProps`,
+  `conditions`, a function `storagePath` or `fileName`, and every field when a
+  plugin has a `fieldBuilder`, still re-render on each change. A form opened
+  with a draft no longer rebuilds its touched map on every keystroke (1,000
+  keys: 62 ms per render → 0).
+
+- **Array fields no longer re-hash every item on every render or keep a
+  document listener per item.** 2,000 items made 2,000 hash calls per render,
+  now none; re-rendering a 500-item sortable list took 192 ms and takes 23; and
+  a 500-item list kept 500 document listeners with no menu open, now none.
+
+- **Form undo keeps the last 200 steps instead of every keystroke.** 10,000
+  keystrokes in a 500-item array retained about 43 MB of history and retain
+  about 0.9 MB. The limit is `FORMEX_MAX_UNDO_STEPS`, exported from
+  `@rebasepro/forms`.
+
+- **CSV and JSON import writes up to 500 rows per request instead of 25.** A
+  batch is capped at about 1 MB, and a 413 halves it for the rest of the
+  import instead of failing. 10,000 rows took 400 requests and take 20. A
+  failed batch names the row of the file that failed (`failedRow`), and Retry
+  resumes after the last committed batch. Reading the file no longer throws an
+  exception per text cell (10,000 × 20 cells: 600 → 90 ms).
+
+- **Export and "select all" read 1,000 rows per page by cursor instead of 500
+  by offset, and process each row in time linear in its columns.** A
+  100,000-row export makes 100 requests instead of 200, with no growing
+  OFFSET; turning 100,000 × 20 into CSV takes 0.8 s instead of 1.35.
+
+- **Thumbnails of stored images download a small webp rendition instead of
+  the original.** Tables and cards ask the file route for a 96, 200, 400 or
+  800 px webp: a 2.47 MB photo comes down as 3.5 KB at 96 px, and a 100-row
+  page as 0.34 MB instead of 247 MB. A server without `sharp` is detected with
+  one probe per page load and keeps serving originals, and a failed rendition
+  falls back to the original.
+
+- **The user picker fetches its list when opened, not when it mounts.** A form
+  with three user fields made three list requests on open; it makes none until
+  a picker opens.
+
+#### UI kit & plugins
+
+- **Importing one component from `@rebasepro/ui` bundles that component, not
+  the whole kit.** The package ships one file per module: an app importing
+  `{ Button }` bundles 31 kB instead of 925 kB, minified. Import paths and the
+  package's exports are unchanged, and the entry is still one `"use client"`
+  boundary.
+
+- **The lucide icon map behind icons chosen by name loads the first time one
+  renders, not before the login screen.** That is about 480 kB less preloaded
+  in the example admin.
+
+- **Markdown loads its parser the first time it renders.** markdown-it (44 kB
+  gzipped) leaves the preload set. The first markdown of a session shows its
+  source text for one chunk fetch; server rendering, and the hydration after
+  it, show plain text.
+
+- **Chips follow the theme with one observer, multiline fields re-measure only
+  when their content or styling changes, and date fields format once per
+  change.** 500 chips created 500 MutationObservers, now 1; five identical
+  re-renders of a multiline field measured it five times, now never; date
+  fields reuse their formatters for named time zones and share one stylesheet
+  (ten fields added 11 copies, now 1).
+
+- **Typing in a form no longer rebuilds the AI plugin's autofill property map,
+  and building it is linear.** It was rebuilt on every keystroke; it is built
+  once per run. At 1,000 blocks a build took 371 ms and takes about 5.
+
 #### Studio
 
 - **The translation key `studio_api_keys_admin_reads_every_row` is renamed to `studio_api_keys_admin_bypasses_rls`.** An app that overrides it must rename its override.
@@ -553,6 +913,34 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **`useLiveSchemaEditing`'s `writeSourceOnly` option is removed.**
   "Edit source only" is now a committed `/apply` call with `sourceOnly: true`
   (see Added/Studio and Fixed/Studio).
+
+- **The SQL console keeps at most 10,000 rows, or 32 MB of values, of a
+  result, and only the last statement's.** A million-row `SELECT` no longer
+  takes the server down: its heap went from 432 MB to 7 MB, peak memory from
+  2.1 GB to 240 MB, and the browser reads it in 31 ms instead of 4 s. A result
+  cut short says how many rows there were ("Showing the first N of M rows");
+  `SqlScriptResult` carries `truncated: true` and the true `rowCount`. Copy and
+  export include the rows shown. A result too large for one string is no
+  longer reported as an SQL error. `client.executeSql` is unchanged.
+
+- **The storage browser shows a folder as soon as it is listed, and reads
+  metadata only for the files on screen.** A 500-file folder with 12 on screen
+  made 501 requests before it rendered and 500 metadata requests; it makes 1,
+  then 12, six at a time. Deleting a folder deletes up to eight files at once.
+
+- **Picking a table in the RLS editor no longer re-reads the catalogue.**
+  Opening it makes 3 catalogue reads instead of 6, and a table click none
+  instead of 3.
+
+- **The SQL console's schema browser groups 5,000 tables in 10 ms instead of
+  1.8 s.**
+
+- **The schema visualizer lays a graph out once.** It laid it out again when
+  RLS status arrived and when the view was reopened, 5 s each at 200 tables;
+  both now take 0.1 ms. The first layout still blocks.
+
+- **The admin no longer asks the database for unmapped tables on every
+  load.** The new-collection dialog asks when it opens, its only reader.
 
 #### CLI
 
@@ -578,6 +966,31 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `--allow-destructive`, and says what changes: URLs, foreign keys and ids
   stored elsewhere stop finding their row.
 
+- **`rebase dev` no longer reads through the node_modules folder under config
+  before it starts the backend.** tsx's default ignores apply only under the
+  project root, so with a `config/node_modules`, as in the monorepo's example
+  app, the backend started after 16–17 s of crawling; it now starts in 0.1 s.
+  Installing a package there, or a `.DS_Store` or editor swap file appearing
+  in `config/`, no longer restarts the backend.
+
+- **`rebase dev` reaches "Server running at" about a second sooner.** It no
+  longer re-checks a schema it has just generated, and the driver it runs no
+  longer loads the server package: 11 collections took 3.7–4.7 s and take
+  2.6–2.8 s.
+
+- **Driver commands start without loading the server package.** `db push`,
+  `db generate`, `schema …` and `doctor` resolve 189 modules instead of 426;
+  `rebase schema generate` at 11 collections takes 1.2 s instead of 1.6–2.0.
+
+- **`rebase db push` on a database that already matches runs Atlas once
+  instead of twice.** That is one Atlas plan fewer (about 0.9 s at 111 tables,
+  5.5 s at 411) and 7 database connections fewer per push. The post-steps (RLS,
+  auth tables, vector, search, triggers, policies, role) all still run.
+
+- **The CLI loads a command's code only when that command runs.**
+  `rebase --version` and `--help` load about a fifth of the modules they did:
+  from source, 254 → 103 ms. Their output is unchanged.
+
 #### Client SDK
 
 - **`client.cron.listJobs()` returns a `CronJobListing`**, which carries the jobs the server refused (`rejected`) and the files it could not load (`skipped`, `note`) beside `jobs`.
@@ -589,6 +1002,28 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   same row was refused, with code `DEPENDENCY_REJECTED`** and the earlier
   refusal as `cause`. Before, the discarded write carried the refused
   write's own error.
+
+- **Walking a collection seeks by cursor and skips the count on every page.**
+  `iterate()` and `findAll()` hand the server's `meta.nextCursor` back as
+  `after` instead of a growing `offset`, and send `count: "none"`, since a walk
+  reports no total. A 100,000-row walk spent about 4.5 s in the database and
+  spends about 26 ms. Listings the server issues no cursor for (relevance,
+  vector, distinct) still page by offset; `cursor:` now means "require
+  seeking".
+
+- **Response bodies and realtime frames parse at plain JSON.parse speed.** The
+  typed-value revive runs only on text that names a `__type`: a 1,000-row page
+  took 10 ms of main thread and takes 1.7; a 1,000-row socket frame, 36–41 ms
+  → 4–6. The parsed values are identical.
+
+- **A live query sends no HTTP request for rows the socket already replayed to
+  it.** Ten `observe()` calls on a query the socket held sent ten requests whose
+  answers were discarded; they send none.
+
+- **A request made with a token the client knows has expired waits for one
+  shared refresh.** It went out, failed with a 401 and was sent again: ten
+  requests after a device slept made 21 round trips, now 11. A custom
+  `Transport` can take part through the optional `setTokenRefresher`.
 
 #### Storage & email
 
@@ -603,6 +1038,88 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **`getSignedUrl`/`deleteObject` given an `s3://bucket/key` or
   `gs://bucket/key` address the object by key,** so a file stored with
   `includeBucketUrl` on S3 or GCS can be previewed and deleted.
+
+- **Storage files are streamed instead of read whole, and a Range request
+  reads only that range from S3 and GCS.** Serving a 100 MB object from S3 held
+  401 MB of buffers and holds 33 MB. A 1 MiB `Range`, what a `<video>` sends on
+  load and on every seek, read the whole object; it reads 1 MiB. A
+  revalidation that ends in 304, a `HEAD`, a 416 and a cached image rendition
+  read no body at all. GCS reads are pinned to the generation the route
+  described.
+
+- **Uploads are written a chunk at a time.** S3 files over 8 MiB go up as
+  multipart uploads, which also lifts the 5 GB single-upload cap; GCS writes
+  from a stream; local disk writes a temporary file and renames it into place.
+  A 100 MB upload to S3 held 201 MB and holds 73 MB. A resumable (TUS)
+  upload's finalize no longer reads the whole file into memory: it looked for
+  `openAsBlob` in the wrong module and always fell back to reading the file.
+  `POST /upload` still parses its multipart body in memory.
+
+- **Backups to and from S3 and GCS stream, and dumps over 2 GiB upload.** A
+  100 MB dump held 402 MB of the server's memory and holds 73 MB; a dump over
+  2 GiB failed to upload and now uploads. The backup download route and
+  `rebase db restore s3://…` stream the dump.
+
+- **Paging through a local storage folder reads the directory once, not once
+  per page.** 20,000 files in pages of 100 took 5 s and take 40 ms.
+
+- **Listing a local backup folder no longer blocks the server while it stats
+  every dump.** At 8,760 dumps the longest stall went from about 50 ms to about
+  20 ms.
+
+- **An image transform with the rendition cache on reads one stored rendition,
+  not four.** It probed four file extensions; on S3 or GCS that is one round
+  trip instead of up to four.
+
+- **S3's metadata route no longer signs a URL it throws away.**
+
+- **Previews of one file share one signed-URL request, at most 8 run at once,
+  and the URL caches are bounded.** 50 previews of one private file made 50
+  `/storage/metadata` requests and make 1; 100 different files go 8 at a time;
+  at most 2,000 URLs are kept. This covers the SDK's `client.storage`,
+  `useBackendStorageSource` and the admin's thumbnails, through
+  `createDownloadUrlCache` and `createConcurrencyLimit` in `@rebasepro/common`.
+
+- **SMTP mail reuses its connections and holds at most 5 open at once.** 50
+  sends one after another opened 50 connections and open 1, at 112 ms a
+  message instead of 163. A burst now queues behind 5 connections: 50 at once
+  against a server with no connection cap took 175 ms and take 1.15 s. Set
+  `smtp.maxConnections` to change the cap (3 for Office 365); the pool closes
+  5 s after the last send.
+
+#### Jobs & cron
+
+- **A cron job with a time zone no longer blocks the server while it finds its
+  next run.** The search read the zone's wall clock once per minute: a yearly
+  schedule in Madrid took 319 ms and takes 0.4 ms, 29 February in New York 1.9 s
+  and 2 ms. Studio's Cron panel on a split deployment's `api` role spent 450 ms
+  per poll on four zoned jobs; it now spends 1 ms, then nothing, since each
+  job's next run is kept until it passes.
+
+- **Finished jobs and old cron claims are pruned every hour, in batches,
+  instead of once at boot.** A boot with 2M finished jobs ran a 6 s DELETE
+  before serving; the backlog now drains in the background in batches of at
+  most about 220 ms, and a long-lived pod stays near its retention size. A
+  year of claims took 7.8 s at boot and now goes in batches of at most 170 ms,
+  then about 8 ms an hour. The new partial index `rebase.idx_jobs_finished` is
+  built at the first boot after upgrading (4.7 s on a 2M-row table). A custom
+  store takes part through the optional `JobStore.sweepExpired()` and
+  `CronStore.sweepClaims()`.
+
+#### MCP
+
+- **Every MCP tool answers in compact JSON, and the collection listing is sent
+  once.** Indentation was about half of every answer. A project of 200
+  collections with 20 fields each got a 1,983 KB listing reply, about 317,000
+  tokens of it read by the model; it is 697 KB and about 150,000 tokens. At
+  20 collections, about 32,000 tokens → 15,000. This covers the remote and the
+  local MCP server.
+
+- **The connected-apps list and disconnecting an app read refresh tokens
+  through an index, and expired ones are swept while the server runs.** At
+  210,000 refresh tokens the list took 547 ms and takes 9. Expired codes and
+  refresh tokens are swept at most once an hour, when a credential is issued,
+  instead of only at boot.
 
 #### CI & tooling
 
@@ -619,6 +1136,15 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **The unit test suites run under `TZ=America/Los_Angeles` in CI and in
   `verify-quality.sh`.** A test that needs a specific zone pins it with
   `tooling/scripts/jest/zone-environment.cjs`.
+
+- **The bundle budget fails when a module that should load lazily reaches the
+  login screen.** `check-bundle-budget.mjs` reads the eager chunks' sourcemaps
+  and refuses non-English translations, `packages/app/src/debug/`, the CMS
+  record views and entity form, prism-react-renderer, markdown-it and more
+  than 400 lucide icon modules; a chunk without a sourcemap fails. `--dist`
+  runs the same check and exits 1 on a violation. `@rebasepro/ui`'s build
+  checks that `{ cls }`, `{ Button }` and `{ Typography }` each bundle under
+  60 kB.
 
 #### Auth
 
@@ -644,6 +1170,20 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 - A database failure while judging a token is 503 on every door; the
   watermark-only check failed open.
+
+- **`/auth/config` and sign-up learn whether any user exists without counting
+  and sorting the users table.** At 100,000 users that was 2 statements and
+  26–43 ms; it is 1 statement and 0.3 ms, and in production `/auth/config`
+  runs no query at all. A custom auth repository can provide the optional
+  `firstUserIds`.
+
+- **Verifying an access token no longer re-imports the JWT secret.** A
+  verification takes 5.8 µs instead of 20.6, an HS256 signature 3.2 µs instead
+  of 15. A rotated secret is imported once, on first use.
+
+- **A storage request verifies the caller's token once in the rate limiter, not
+  twice, and a personal API key reads its owner in one statement, not two.** A
+  disabled owner's key is still refused.
 
 ### Fixed
 
@@ -743,6 +1283,26 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   as `password` or `apiKey`, and the SQL and bound parameters of a logged
   query error, are replaced. The lines stored with the run are unchanged.
 
+- **A `via` relation loads on a booted schema.** `include`, get-by-id, and the
+  nested listing whose path ends on a foreign key returned the relation absent:
+  a join column written in column terms (`author_id`) was looked up as a
+  Drizzle key (`authorId`).
+
+- **An included row is the row its target's own route serves.** Included rows
+  carried admin reference objects (`{ id, path, __type: "relation" }`) for the
+  target's own to-one relations and dropped undeclared columns. They now carry
+  the foreign key as a column (`postId`) and no `__type` anywhere. Code that
+  read the reference object off an included row reads the foreign-key column,
+  or includes that relation.
+
+- **A `distinct` listing's `meta.hasMore` is false when nothing follows.** It
+  was true whenever the page came back full.
+
+- **Two `If-Match` writes carrying the same tag can no longer both succeed.**
+  Each compared the tag in a read-only transaction before either had written.
+  The tag is now compared after the row is locked, so the second write waits
+  for the first and gets 412.
+
 #### Postgres
 
 - **Queues and topics declared in `config/resources.ts` now run.** The
@@ -795,6 +1355,30 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   relations between…" once the child had two links back to the parent, and
   for every `hasOne` to its own collection. Both now name the join columns,
   and the related row is typed as possibly `null`.
+
+- **A server that boots while a long report, transaction or `pg_dump` reads
+  the database no longer revokes `rebase_user`'s access to tables that already
+  had RLS.** A no-op ENABLE ROW LEVEL SECURITY that timed out on the table's
+  lock was read as "RLS could not be enabled", and the table was revoked, so
+  every replica lost those collections until the next clean boot (12 of 12 in
+  the test). Boot now skips ENABLE where RLS is on, and revokes only after
+  reading that it really is off. `rebase db push` does the same.
+
+- **While a server boots, signed-in users no longer briefly read an empty
+  result for their own rows.** Each policy was dropped and re-created in
+  separate commits, so for a moment other replicas evaluated RLS without it.
+  Each table's policies are now replaced in one transaction.
+
+- **A claim-tenancy policy on a uuid column, brought in with "Import from
+  table" or Studio's "Import to codebase", admits its tenants again.** A raw
+  policy's `{column}` placeholders were also replaced inside string literals,
+  which broke the claim's uuid guard regex (`{8}`, `{12}`), so the imported
+  policy denied every tenant. Placeholders are now replaced only outside
+  literals, quoted identifiers and comments.
+
+- **Per-database pools (cross-database admin SQL, branches) time out like the
+  main pool.** They waited for a connection with no limit; they now give up
+  after 10 s, and a statement after 30 s.
 
 #### CLI
 
@@ -927,6 +1511,18 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `.gitignore` excludes. `node_modules`, `dist*` and hidden directories are
   skipped either way. Outside a repository, or run inside a copy its repository
   ignores as a whole, it walks every directory.
+
+- **`rebase doctor` and `rebase db push` no longer report every
+  `policy.authenticated()` and `policy.registered()` policy as the insecure
+  `uid() IS NOT NULL` tautology.** The drift check accepted only
+  `<> 'anonymous'`, and Postgres stores the guard as
+  `<> ALL (ARRAY['anonymous', 'anon'])`.
+
+- **`rebase dev` no longer misses "Server running at" when that line arrives in
+  two chunks.** When it missed it, the admin panel never started,
+  `.rebase-dev-port` was never written, and after 30 s a healthy backend was
+  reported as down. A partial line is carried to the next chunk, and flushed
+  after 100 ms of quiet so prompts still appear.
 
 #### Admin (CMS & app)
 
@@ -1076,6 +1672,24 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - In the import's mapping step, a key-value map can be chosen as a column's
   target.
 
+- **The record form checks `validation.unique` when saving a changed value.**
+  It built the check and never ran it, so a duplicate was left to the server
+  to refuse. A duplicate is now an error on that field. It is one lookup per
+  changed unique field, made with the user's own access, on save only.
+
+- **Table cells already drawn follow inline editing, permissions, additional
+  columns and row actions when they change.** A mounted cell kept the setting
+  it was drawn with until its row changed: switching inline editing off left
+  every visible cell editable. Row actions also follow the collection, open
+  mode and selection setting they are drawn for.
+
+- **An export releases its file from memory once the download starts.** The
+  file stayed in the tab until it closed: 32 MB for a 100,000 × 20 CSV.
+
+- **The relation picker's dialog shows its selection when one preselected row
+  fails to load.** The failure left the selection uninitialised; the row is now
+  logged and left out.
+
 #### Studio
 
 - **SQL console:**
@@ -1205,6 +1819,11 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `bytea`, `json`, `numeric`, timestamps — because the console now reads and
   writes Postgres's own text form.
 
+- **The SQL console's CSV export follows RFC 4180.** Values with commas,
+  quotes or line breaks are quoted, with quotes doubled; the header is escaped
+  too; NULL is an empty field; each value sits under its own column; and
+  objects are written as JSON.
+
 #### Realtime
 
 - **Realtime socket requests are no longer sent twice after a dropped
@@ -1257,6 +1876,12 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   closing (lost signal, sleep) kept its subscriptions refetched on every write
   for about two hours. Clients that speak the protocol directly must answer
   pings, which every standard WebSocket library does.
+
+- **A batch on the server's own driver announces its rows after it commits,
+  and announces nothing when it rolls back.** `saveMany`, `updateMany`,
+  `deleteMany` and `batchWrite` on the base driver announced each row inside
+  the open transaction, so another instance could refetch the state before the
+  commit, and rows that were rolled back were announced.
 
 #### Client SDK
 
@@ -1335,6 +1960,16 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   longer leaves that user's cached rows readable, or their outbox writable, by
   the now signed-out client.
 
+- **Requests sent while a stored session is being restored go out as the
+  restored user.** With an expired token in json mode, or on any load in
+  cookie mode, they went out with no token, so a collection with a public read
+  policy answered them with its public rows. They now wait for the restore.
+
+- **A session whose token answer states no expiry no longer refreshes in a
+  loop.** A backend that omitted `accessTokenExpiresAt` caused about 1,900
+  `/auth/refresh` calls in 15 s, and one before every request. An unstated
+  expiry is no longer read as passed; a 401 still refreshes.
+
 #### Auth
 
 - **Searching the admin user list also matches roles and uids** (`GET /api/admin/users?search=`, Postgres), so the "Run as" picker's "search by name, email, or role" works. MongoDB still matches email and name only.
@@ -1372,6 +2007,14 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   guest read `anonymous`, then `password`. The method is stored with the
   session (`refresh_tokens.method`, added at boot) and carried across every
   rotation; sessions signed in before the upgrade read `password`.
+
+- **An expired access token is logged at debug, not as an ERROR.** These are
+  the 401s the SDK refreshes on. Every other verification failure still logs
+  as an error.
+
+- **Shutdown waits for the expired-token sweep's tick.** Closing the pool right
+  after `backend.shutdown()` logged "Cannot use a pool after calling end on the
+  pool" from the sweep.
 
 #### MCP
 
@@ -1414,6 +2057,15 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **AI autofill never offers or applies a suggestion for a locked field, or
   for a key that is not a property of the form.**
 
+- **A `VirtualTable` cell draws with the current renderer, columns and sort
+  props.** Its comparator ignored them, so a change reached a drawn cell only
+  when its row changed. Studio's SQL and JS consoles pass an inline renderer,
+  so their visible cells now redraw with each console render.
+
+- **The table header shows the filter just applied, not the one before.** A
+  filter set from outside the header (the URL, a preset, a clear) appeared one
+  render late.
+
 #### rls-check
 
 - **`unqualified-column-in-subquery` fires on a live database,** instead of
@@ -1433,6 +2085,13 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 - **A 20,000-table catalogue is scanned in about a second,** down from
   about 34 seconds.
+
+- **`policy-authenticated-tautology` reports a rule whose condition is only
+  `policy.authenticated()`.** Its pattern expected `array [` with a space, and
+  Postgres stores `ARRAY[…]`, so it never fired on Rebase's own policies. It is
+  a high, heuristic finding, so `rls-check` with the default `--fail-on high`
+  now exits 1 on such a rule: scope the rule, or skip the check with
+  `--skip policy-authenticated-tautology`.
 
 #### CI & tooling
 
@@ -1486,6 +2145,15 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - `/api/storage/file/DEFAULT/public/x`, `public//x` and `.%2Fpublic/x` are
   served anonymously like `public/x`. The route already served that object;
   the public check refused it.
+
+- **Backups over 50 MB upload.** A backup was held to the storage's upload
+  limits, `maxFileSize` (50 MB unless set) and `allowedMimeTypes`, so
+  `rebase db backup` to `s3://` or `gs://`, and the backup cron set up as the
+  docs show, failed with `PAYLOAD_TOO_LARGE` once a dump passed 50 MB. The
+  backup upload now skips them (see Added); user uploads still apply them.
+
+- **A local-storage write that fails part-way no longer leaves a truncated file
+  in place of the previous object.**
 
 ### Security
 
@@ -1556,6 +2224,16 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   The default source is now always `undefined`, including for `?storageId=`
   and `?storageId=(default)`.
 
+- **A private file's signed URL is no longer handed to the next user in the
+  same tab.** The SDK's `createStorage`, the admin's `useBackendStorageSource`
+  and the CMS thumbnail cache kept download URLs for the token's life (about
+  5 minutes) with no owner. After a sign-out, or another user signing in, the
+  next user's preview of the same path got the previous user's URL, even for
+  a file they may not read. Each cache now belongs to the credential that
+  asked (the signed-in user, for thumbnails); a change empties it, and a
+  request in flight at the switch is not reused. A token refresh also starts
+  the cache over.
+
 #### MCP
 
 - **The remote MCP endpoint fences the row data it returns in the same
@@ -1575,6 +2253,13 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   Breaking). Static apps, the CMS included, now send
   `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri 'self'`
   unless the response already set its own.
+
+- **A one-to-many membership write no longer takes a child that the target's
+  `beforeQuery` scope or the trash hides.** Setting the foreign key on the
+  listed children ignored the scope that the clear step beside it applied, so
+  a caller could name a hidden child and take it from its current parent
+  wherever RLS allowed the UPDATE. A hidden child is now left alone, as an
+  unknown id is, so the answer does not reveal that it exists.
 
 #### Auth
 

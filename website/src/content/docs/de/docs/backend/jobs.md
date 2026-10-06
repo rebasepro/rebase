@@ -1,5 +1,5 @@
 ---
-sourceHash: 9a7137f85a2187fd
+sourceHash: 81ca845faa40b4f5
 title: Hintergrund-Jobs
 sidebar_label: Hintergrund-Jobs
 description: Eine dauerhafte, Postgres-gestützte Job-Warteschlange – Aufgaben, die einen Neustart überstehen, mit Backoff wiederholt werden und bei denen Fehler aufbewahrt statt verworfen werden.

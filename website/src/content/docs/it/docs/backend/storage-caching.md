@@ -1,5 +1,5 @@
 ---
-sourceHash: bad3ea0d4f6e00f8
+sourceHash: 9c1c44ab184d5bd4
 title: Caching dello storage e CDN
 sidebar_label: Caching dello storage e CDN
 description: Come Rebase serve i file memorizzati in modo che browser e CDN possano metterli in cache — ETag e 304, Cache-Control in base a chi può leggere un oggetto, byte range per il seeking in audio e video, e cosa configurare su una CDN davanti.

@@ -1,5 +1,5 @@
 ---
-sourceHash: b3fe9c24649203e8
+sourceHash: d08885437a232187
 title: Écriture via REST
 sidebar_label: Écriture via REST
 description: Clés d'idempotence, écritures conditionnelles avec ETag et If-Match, opérations sur les champs, upserts sur clé naturelle, return=minimal et lots multi-collections.
