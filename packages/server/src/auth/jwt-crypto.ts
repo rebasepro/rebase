@@ -39,6 +39,7 @@
  * @module
  */
 import jwt from "jsonwebtoken";
+import { importedSigningKey, importedVerificationKey } from "./jwt-keys";
 
 /**
  * Key material, as whatever the current implementation accepts.
@@ -67,7 +68,7 @@ export async function signJwt(
     key: JwtSigningKey,
     options: JwtSignOptions
 ): Promise<string> {
-    return jwt.sign(payload, key, {
+    return jwt.sign(payload, importedSigningKey(key), {
         algorithm: options.algorithm as jwt.SignOptions["algorithm"],
         ...(options.expiresIn === undefined
             ? {}
@@ -93,7 +94,7 @@ export async function verifyJwt(
     key: JwtVerificationKey,
     options: { algorithms: string[] }
 ): Promise<JwtClaims> {
-    return jwt.verify(token, key, {
+    return jwt.verify(token, importedVerificationKey(key), {
         algorithms: options.algorithms as jwt.VerifyOptions["algorithms"]
     }) as JwtClaims;
 }
