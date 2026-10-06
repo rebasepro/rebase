@@ -9,6 +9,7 @@ import {
     getCollectionByPath,
     getTableForCollection,
     getPrimaryKeys,
+    idCanAddressTable,
     requirePrimaryKeys,
     rowIdentityCondition,
     parseIdValues,
@@ -158,6 +159,33 @@ export class PersistService {
             `Not allowed to ${operation} "${id}" in "${collectionPath}": a row-level security policy rejected the write.`,
             `No row "${id}" in "${collectionPath}" to ${operation}.`
         );
+    }
+
+    /**
+     * Lock one row against every other write to it until this transaction
+     * ends: `FOR NO KEY UPDATE`, the lock an UPDATE of it takes anyway.
+     *
+     * For a conditional write (`If-Match`): taken before the row is read and
+     * compared, so a write that lands meanwhile is either already committed and
+     * read, or waits for this one. Without it two writes carrying the same tag
+     * both read the old row, both passed, and the second overwrote the first.
+     *
+     * Under row-level security the lock reads through the caller's UPDATE
+     * policies as well as their SELECT ones, so a row they may read but not
+     * update is simply not locked — and their write is refused by the database
+     * all the same. A nested address locks the row it ends in.
+     */
+    async lockRow(collectionPath: string, id: string | number): Promise<void> {
+        const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
+        const collection = hop ? hop.targetCollection : getCollectionByPath(collectionPath, this.registry);
+        const table = getTableForCollection(collection, this.registry);
+        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        // An id the key cannot hold names no row, and the read after this
+        // answers that as a 404 — sent to Postgres it is a 22P02 that aborts
+        // the write's transaction instead.
+        if (!idCanAddressTable(id, table, idInfoArray)) return;
+        const condition = rowIdentityCondition(table, idInfoArray, id, collectionPath);
+        await this.db.select({ locked: sql`1` }).from(table).where(condition).for("no key update");
     }
 
     /**

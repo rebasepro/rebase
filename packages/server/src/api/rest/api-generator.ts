@@ -1,5 +1,5 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
-import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, ResolvedRelation, getCollectionDataPath, isManyToMany, scopeGrants, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
+import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, ResolvedRelation, getCollectionDataPath, isManyToMany, scopeGrants, type RowPrecondition, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
@@ -1144,26 +1144,8 @@ export class RestApiGenerator {
         const restoring = restoresSoftDeletedRow(collection, body) ? true : undefined;
 
         return this.runIdempotent(c, body, async () => {
-            const existingEntity = await driver.fetchOne({
-                path,
-                id,
-                collection: address.driverCollection,
-                withDeleted: restoring
-            });
-
-            if (!existingEntity) {
-                throw this.entityNotFound(address.name, id);
-            }
-
             const ifMatch = c.req.header(IF_MATCH_HEADER);
-            if (ifMatch) {
-                await assertIfMatch(
-                    ifMatch,
-                    await RestApiGenerator.rowForETag(driver, address, id, existingEntity, restoring),
-                    collection,
-                    { collection: collection.slug, id }
-                );
-            }
+            const precondition = await this.storedRowPrecondition(driver, address, id, restoring, ifMatch);
 
             const [values] = await this.prepareUserUpdates(collection, [{ uid: id, values: body }]);
             const entity = await driver.save({
@@ -1171,12 +1153,70 @@ export class RestApiGenerator {
                 id,
                 values,
                 collection: address.driverCollection,
-                status: "existing"
+                status: "existing",
+                ...(precondition ? { precondition } : {})
             });
             return this.formatResponse(entity);
         }, (result) => prefersMinimal(c)
             ? minimalResponse()
             : c.json(result as never));
+    }
+
+    /**
+     * The 404 and the `If-Match` of an update or a delete, as a precondition
+     * the driver runs inside the write — or, for a driver that cannot, and for
+     * the auth collection, the same judgement made here on a read first.
+     *
+     * Inside the write is the point. The route used to read the row in a
+     * transaction of its own, through the admin's view-model walk, before
+     * writing it: every declared relation of the row was loaded — all 200,000
+     * comments of a post, for a PATCH of its title — and thrown away, and the
+     * write's own read of the row then repeated the lookup. And two writes
+     * carrying the same tag could both pass: each compared before either had
+     * written. Judged on the write's own read, after the row is locked when a
+     * tag is sent, the second one reads what the first wrote and is a 412.
+     *
+     * The auth collection is still read here first, without relations: the
+     * adapter's steps run before the write (`prepareUserUpdates`, and a
+     * deletion's `beforeUserDelete` veto, a hook of the application's), and an
+     * unknown uid must be the 404 before them, as it always was.
+     *
+     * @returns The precondition to hand the driver, or `undefined` for a driver
+     *   that does not run one (the row was judged here).
+     */
+    private async storedRowPrecondition(
+        driver: DataDriver,
+        address: RowAddress,
+        id: string,
+        withDeleted: true | undefined,
+        ifMatch: string | undefined
+    ): Promise<RowPrecondition | undefined> {
+        const { collection } = address;
+        const judge = async (stored: Record<string, unknown> | undefined): Promise<void> => {
+            if (!stored) throw this.entityNotFound(address.name, id);
+            if (ifMatch) {
+                await assertIfMatch(ifMatch, stored, collection, { collection: collection.slug, id });
+            }
+        };
+
+        if (!driver.checksRowPreconditions) {
+            // Read as it always was. A driver without a REST read hashes the
+            // row `fetchOne` returns, which is what its `GET` hashed too.
+            const existing = await driver.fetchOne({
+                path: address.path,
+                id,
+                collection: address.driverCollection,
+                withDeleted
+            });
+            if (!existing) throw this.entityNotFound(address.name, id);
+            if (ifMatch) await judge(await RestApiGenerator.rowForETag(driver, address, id, existing, withDeleted));
+            return undefined;
+        }
+
+        if (isAuthCollection(collection)) {
+            await judge(await RestApiGenerator.rowForETag(driver, address, id, undefined, withDeleted));
+        }
+        return { lock: ifMatch !== undefined, check: judge };
     }
 
     /**
@@ -1203,38 +1243,23 @@ export class RestApiGenerator {
             // `?hard=true` — a real DELETE on a soft-delete collection. Same
             // permission as the delete it replaces; see `soft-delete-params.ts`.
             const hardDelete = parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM));
-            const existingEntity = await driver.fetchOne({
-                path,
-                id,
-                collection: address.driverCollection,
-                // `withDeleted` when the caller asked to purge: a hard delete of an
-                // ALREADY soft-deleted row is the "empty trash" operation, and the
-                // default read hides exactly the rows it is meant to remove. Without
-                // this the route answered 404 for a row `?deleted=only` was listing a
-                // moment earlier, so a trashed row could never be purged at all.
-                withDeleted: hardDelete ? true : undefined
-            });
-
-            if (!existingEntity) {
-                throw this.entityNotFound(address.name, id);
-            }
-
-            const ifMatch = c.req.header(IF_MATCH_HEADER);
-            if (ifMatch) {
-                // A conditional delete is the one that matters most:
-                // "remove the row I read" is a different instruction from
-                // "remove whatever is there now", and only the first is
-                // safe once somebody else has edited it in between.
-                await assertIfMatch(
-                    ifMatch,
-                    await RestApiGenerator.rowForETag(driver, address, id, existingEntity, hardDelete ? true : undefined),
-                    collection,
-                    { collection: collection.slug, id }
-                );
-            }
+            // `withDeleted` when the caller asked to purge: a hard delete of an
+            // ALREADY soft-deleted row is the "empty trash" operation, and the
+            // default read hides exactly the rows it is meant to remove. Without
+            // this the route answered 404 for a row `?deleted=only` was listing a
+            // moment earlier, so a trashed row could never be purged at all.
+            //
+            // A conditional delete is the one that matters most: "remove the
+            // row I read" is a different instruction from "remove whatever is
+            // there now", and only the first is safe once somebody else has
+            // edited it in between. See `storedRowPrecondition`.
+            const precondition = await this.storedRowPrecondition(
+                driver, address, id, hardDelete ? true : undefined, c.req.header(IF_MATCH_HEADER)
+            );
 
             await this.deletingUsers(collection, [id], () => driver.delete({
                 hard: hardDelete,
+                ...(precondition ? { precondition } : {}),
                 row: {
                     // The address is the one in the URL, not something read
                     // back off the row: a row is only its columns, so

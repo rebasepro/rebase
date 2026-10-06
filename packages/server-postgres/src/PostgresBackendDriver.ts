@@ -349,9 +349,23 @@ function authContextOf(user: User | undefined): SubscriptionAuthContext {
     };
 }
 
+/**
+ * A bulk or batch update's answer for an id that names no row this caller can
+ * see: a 404 naming the id, which the entry's own label then wraps.
+ */
+function assertBatchRowFound(stored: Record<string, unknown> | undefined, id: unknown): void {
+    if (stored) return;
+    throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
+        statusCode: 404,
+        code: "NOT_FOUND"
+    });
+}
+
 export class PostgresBackendDriver implements DataDriver {
     key = "postgres";
     initialised = true;
+    /** `save` and `delete` read the row they address and run a caller's precondition on it. */
+    readonly checksRowPreconditions = true;
 
     public dataService: DataService;
     public realtimeService: RealtimeService;
@@ -668,6 +682,21 @@ export class PostgresBackendDriver implements DataDriver {
      * collection's afterRead (so `post.author.email` is masked by the authors
      * collection, not left raw).
      */
+    /**
+     * One stored row as `restFetchService.fetchOneForRest` serves it: through
+     * `afterRead`, on a copy, so the row the write itself goes on with (its
+     * previous values, its history) stays the stored one. A precondition
+     * compares against what the caller was served — an `ETag` is a hash of that.
+     */
+    private async asRestServes(
+        row: Record<string, unknown> | null | undefined,
+        path: string
+    ): Promise<Record<string, unknown> | undefined> {
+        if (!row) return undefined;
+        const [served] = await this.applyAfterReadForRest([{ ...row }], path);
+        return served;
+    }
+
     async applyAfterReadForRest(
         rows: Record<string, unknown>[],
         path: string
@@ -1151,7 +1180,8 @@ export class PostgresBackendDriver implements DataDriver {
                                                             collection,
                                                             status,
                                                             upsert,
-                                                            onConflict
+                                                            onConflict,
+                                                            precondition
                                                         }: SaveProps<M>, frame: WriteFrame): Promise<Record<string, unknown>> {
 
         const {
@@ -1172,12 +1202,18 @@ export class PostgresBackendDriver implements DataDriver {
         // hides updated and then answered 500. The read runs in the write's
         // transaction; a row it cannot see is still met safely by the
         // statement's own conflict branch below.
-        if (status === "existing") {
+        const assertUpdateShape = () => {
+            if (status !== "existing") return;
             assertUpdateDoesNotSoftDelete(resolvedCollection as CollectionConfig | undefined, values, path);
             if (isPresentKey(id)) {
                 assertKeyUnchanged(resolvedCollection as CollectionConfig | undefined, this.registry, id, values as Record<string, unknown>, path);
             }
-        }
+        };
+        // A caller's precondition is answered first, as the REST routes
+        // answered their own read of the row before handing the body on: a
+        // body that is wrong for a row that is not there is still a 404.
+        const preconditionFirst = precondition !== undefined && status === "existing" && Boolean(id);
+        if (!preconditionFirst) assertUpdateShape();
 
         const upserting = upsert === true && status !== "existing";
         if (upserting && resolvedCollection) {
@@ -1239,16 +1275,32 @@ export class PostgresBackendDriver implements DataDriver {
             // its own collection. A read that fails for another reason (a
             // collection whose key the registry cannot resolve) stays
             // best-effort enrichment and is not a reason to fail a write.
+            //
+            // A caller's `precondition` (the REST routes' 404 and `If-Match`)
+            // judges this same read, inside this transaction — after the row
+            // is locked, when it asks for that — so the routes no longer read
+            // the row in a transaction of their own first.
             try {
+                const withDeleted = restoresSoftDeletedRow(
+                    resolvedCollection as CollectionConfig | undefined,
+                    values as Record<string, unknown>
+                ) ? true : undefined;
+                if (precondition?.lock) await this.dataService.getPersistService().lockRow(path, id);
+                const storedPath = this.storedRowPath(path);
                 const existing = await this.dataService.getFetchService().fetchOneForRest(
-                    this.storedRowPath(path), id, undefined, resolvedCollection?.databaseId,
-                    {
-                        withDeleted: restoresSoftDeletedRow(
-                            resolvedCollection as CollectionConfig | undefined,
-                            values as Record<string, unknown>
-                        ) ? true : undefined
-                    }
+                    storedPath, id, undefined, resolvedCollection?.databaseId, { withDeleted }
                 );
+                if (precondition) {
+                    // Judged at the address written: through a many-to-many
+                    // path that is the row as a member of the parent's set, which
+                    // the stored-row read above does not establish.
+                    const addressed = storedPath === path
+                        ? existing
+                        : await this.dataService.getFetchService().fetchOneForRest(
+                            path, id, undefined, resolvedCollection?.databaseId, { withDeleted }
+                        );
+                    await precondition.check(await this.asRestServes(addressed, path));
+                }
                 if (!existing) {
                     throw ApiError.notFound(`No row "${id}" in "${path}" to update.`);
                 }
@@ -1256,6 +1308,7 @@ export class PostgresBackendDriver implements DataDriver {
                     const { id: _existingId, ...existingValues } = existing;
                     previousValuesForHistory = existingValues as Partial<M>;
                 }
+                if (preconditionFirst) assertUpdateShape();
             } catch (err) {
                 // The refusal above is the answer, not a failed enrichment.
                 if (err instanceof ApiError) throw err;
@@ -1263,6 +1316,9 @@ export class PostgresBackendDriver implements DataDriver {
                 // has aborted the write's transaction, and carrying on only
                 // turns the next statement into an unrelated 25P02.
                 if (reachedDatabase(err)) throw err;
+                // And so is whatever a caller's precondition threw: the write
+                // it guards must not go ahead on a read that failed.
+                if (precondition) throw err;
                 // Best-effort enrichment: callbacks and history run without
                 // previous values rather than the save failing on a read the
                 // write itself does not need (e.g. a collection whose key the
@@ -1756,33 +1812,19 @@ export class PostgresBackendDriver implements DataDriver {
             for (let i = 0; i < updates.length; i++) {
                 const { id, values } = updates[i];
                 try {
-                    // Read first so a missing row is a 404 rather than a silent
-                    // no-op. `save` with status "existing" would otherwise write
-                    // an UPDATE that matches nothing and report success.
-                    // A restore is an update of a row the default read hides;
-                    // see `restoresSoftDeletedRow`.
-                    const existing = await txDriver.fetchOne({
-                        path,
-                        id: String(id),
-                        collection: collection as CollectionConfig,
-                        withDeleted: restoresSoftDeletedRow(
-                            (collection as CollectionConfig | undefined) ?? this.registry?.getCollectionByPath(path),
-                            values as Record<string, unknown>
-                        ) ? true : undefined
-                    });
-                    if (!existing) {
-                        throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
-                            statusCode: 404,
-                            code: "NOT_FOUND"
-                        });
-                    }
-
+                    // A missing row is a 404 rather than a silent no-op, judged
+                    // on the read `save` makes of the row it updates (a restore
+                    // reading the trash too). That read used to be preceded by
+                    // one of its own here, through the admin view-model walk,
+                    // which loaded every declared relation of the row — every
+                    // comment of a post — to learn that it existed.
                     saved.push(await txDriver.save<M>({
                         path,
                         id: String(id),
                         values,
                         collection,
-                        status: "existing"
+                        status: "existing",
+                        precondition: { check: stored => assertBatchRowFound(stored, id) }
                     }));
                 } catch (error) {
                     // Say which entry, as saveMany does: "the batch failed" is
@@ -1905,33 +1947,17 @@ export class PostgresBackendDriver implements DataDriver {
                             });
                             break;
                         case "update": {
-                            // Read first, so an id matching no row is a 404
-                            // rather than an UPDATE that matches nothing and
-                            // reports success — the same rule `updateMany` and
-                            // the single-row route both apply.
-                            const existing = await txDriver.fetchOne({
-                                path: operation.path,
-                                id: id!,
-                                collection: operation.collection as CollectionConfig,
-                                // A restore is an update of a row the default
-                                // read hides; see `restoresSoftDeletedRow`.
-                                withDeleted: restoresSoftDeletedRow(
-                                    (operation.collection as CollectionConfig | undefined) ?? this.registry?.getCollectionByPath(operation.path),
-                                    values as Record<string, unknown> | undefined
-                                ) ? true : undefined
-                            });
-                            if (!existing) {
-                                throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
-                                    statusCode: 404,
-                                    code: "NOT_FOUND"
-                                });
-                            }
+                            // An id matching no row is a 404 rather than an
+                            // UPDATE that matches nothing and reports success —
+                            // the same rule `updateMany` and the single-row
+                            // route apply, on the read `save` makes anyway.
                             row = await txDriver.save<M>({
                                 path: operation.path,
                                 id: id!,
                                 values: values ?? ({} as Partial<EntityValues<M>>),
                                 collection: operation.collection,
-                                status: "existing"
+                                status: "existing",
+                                precondition: { check: stored => assertBatchRowFound(stored, id) }
                             });
                             break;
                         }
@@ -1978,7 +2004,8 @@ export class PostgresBackendDriver implements DataDriver {
     private async deleteInFrame<M extends Record<string, unknown>>({
                                                               row,
                                                               collection,
-                                                              hard
+                                                              hard,
+                                                              precondition
                                                           }: DeleteProps<M>, frame: WriteFrame): Promise<void> {
 
         const targetPath = row.path;
@@ -2014,6 +2041,10 @@ export class PostgresBackendDriver implements DataDriver {
         // `{ __type: "date" }` and every relation in a ref carrying the related
         // row, and that is what the delete's history entry held: a revert to
         // it handed the envelope to Postgres as the column's value.
+        //
+        // A caller's `precondition` (the REST route's 404 and `If-Match`)
+        // judges this same read, after the row is locked when it asks for that.
+        if (precondition?.lock) await this.dataService.getPersistService().lockRow(targetPath, row.id);
         const stored = await this.dataService.fetchOneForRest<M>(
             targetPath,
             row.id,
@@ -2021,6 +2052,7 @@ export class PostgresBackendDriver implements DataDriver {
             resolvedCollection?.databaseId,
             { withDeleted: hard ? true : undefined }
         );
+        if (precondition) await precondition.check(await this.asRestServes(stored, targetPath));
         // Not found is answered before any callback runs: a callback handed a
         // row that is not there — or not there for this caller — would be
         // judging something it cannot see.
@@ -2779,6 +2811,8 @@ export class PostgresBackendDriver implements DataDriver {
 export class AuthenticatedPostgresBackendDriver implements DataDriver {
     key = "postgres";
     initialised = true;
+    /** Its delegate's, run inside this caller's transaction. */
+    readonly checksRowPreconditions = true;
 
     public user: User;
     public data: RebaseSdkData;

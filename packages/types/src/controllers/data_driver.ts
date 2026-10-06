@@ -285,6 +285,41 @@ export interface SaveProps<M extends Record<string, unknown> = Record<string, un
      * targets rather than a 500 naming a constraint the caller never wrote.
      */
     onConflict?: readonly string[];
+
+    /**
+     * A check on the stored row an update addresses, run by the driver inside
+     * the write's own transaction, before any hook runs and before anything is
+     * written. See {@link RowPrecondition}. Honoured only by a driver that
+     * declares {@link DataDriver.checksRowPreconditions}; ignored on a create.
+     */
+    precondition?: RowPrecondition;
+}
+
+/**
+ * A check a caller makes on the row a write addresses, inside that write.
+ *
+ * The REST routes used to read the row in a transaction of their own before
+ * writing it, to answer a missing row with their 404 and to compare
+ * `If-Match`. Two transactions: the read loaded every declared relation of the
+ * row, and two writes carrying the same tag could both pass the comparison,
+ * because neither saw the other's write before making its own.
+ *
+ * @internal
+ */
+export interface RowPrecondition {
+    /**
+     * Lock the row before it is read, so no other write to it can land between
+     * this check and this write. A conditional write (`If-Match`) sets it; a
+     * plain existence check does not need it and does not pay for it.
+     */
+    lock?: boolean;
+    /**
+     * Judge the row as this caller reads it at the address written (their
+     * policies, their `beforeQuery`, the trash hidden unless the write is a
+     * restore or a purge) — `undefined` when there is none. Throw to refuse the
+     * write; nothing has been written when this runs.
+     */
+    check(stored: Record<string, unknown> | undefined): void | Promise<void>;
 }
 
 /**
@@ -348,6 +383,13 @@ export interface DeleteProps<M extends Record<string, unknown> = Record<string, 
      * already this one.
      */
     hard?: boolean;
+
+    /**
+     * A check on the stored row, inside the delete's own transaction, before
+     * any hook runs. See {@link RowPrecondition}. Honoured only by a driver
+     * that declares {@link DataDriver.checksRowPreconditions}.
+     */
+    precondition?: RowPrecondition;
 }
 
 /**
@@ -658,6 +700,15 @@ export interface DataDriver {
      * `fetchCollection` pipeline, enabling include-aware eager-loading.
      */
     restFetchService?: RestFetchService;
+
+    /**
+     * This driver reads the row an update or a delete addresses inside that
+     * write's own transaction, and runs {@link SaveProps.precondition} /
+     * {@link DeleteProps.precondition} on it there. A caller may then leave its
+     * own read of the row out. A driver without it ignores the precondition,
+     * so a caller must read the row itself.
+     */
+    readonly checksRowPreconditions?: boolean;
 
     // ── Admin capabilities ─────────────────────────────────────────────
     //

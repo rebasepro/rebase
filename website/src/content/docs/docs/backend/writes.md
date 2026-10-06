@@ -92,6 +92,10 @@ collection declares one — that column already *is* a version — and from a st
 hash of the row otherwise. `If-Match: *` asserts only that the row exists.
 Nothing is written when the precondition fails.
 
+The tag is compared inside the write's own transaction, after the row is
+locked. Two writes carrying the same tag cannot both pass: the second waits for
+the first to commit, reads what it wrote, and is refused with `412`.
+
 ### Field operations
 
 A property's value in a `PATCH` body may be an operation on the stored value

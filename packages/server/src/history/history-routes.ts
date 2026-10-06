@@ -224,7 +224,14 @@ export function createHistoryRoutes(params: {
         const scoped = c.get("driver") as DataDriver | undefined;
         if (!scoped) throw ApiError.internal("Scoped driver not available");
 
-        const row = await scoped.fetchOne({ path: collection.slug, id, collection, withDeleted: true });
+        // The REST read of the row: its columns, through the same policies.
+        // `fetchOne` is the admin's view-model walk, which loaded every
+        // declared relation of the row — every comment of a post — to answer
+        // whether one row may be read. It is also the rendering a history
+        // entry is stored in, which is what a revert compares it against.
+        const row = scoped.restFetchService
+            ? await scoped.restFetchService.fetchOneForRest(collection.slug, id, undefined, undefined, { withDeleted: true }) ?? undefined
+            : await scoped.fetchOne({ path: collection.slug, id, collection, withDeleted: true });
         if (!row) {
             throw ApiError.notFound(`Entity '${id}' not found in collection '${collection.slug}'`);
         }
