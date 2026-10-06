@@ -43,7 +43,7 @@ export interface RateLimitStore {
  * the honest reason {@link RateLimitStore} exists.
  */
 export class MemoryRateLimitStore implements RateLimitStore {
-    private store = new Map<string, number[]>();
+    private store = new Map<string, HitWindow>();
     private cleanupInterval?: ReturnType<typeof setInterval>;
     private now: () => number;
 
@@ -62,32 +62,36 @@ export class MemoryRateLimitStore implements RateLimitStore {
 
     async hit(key: string, windowMs: number, limit: number): Promise<RateLimitDecision> {
         const now = this.now();
-        const timestamps = (this.store.get(key) ?? []).filter(t => now - t < windowMs);
+        let window = this.store.get(key);
+        if (!window) {
+            window = { stamps: [], head: 0, ordered: true };
+            this.store.set(key, window);
+        }
+        expire(window, now, windowMs);
+        const live = window.stamps.length - window.head;
 
-        if (timestamps.length >= limit) {
-            this.store.set(key, timestamps);
+        if (live >= limit) {
             return {
                 allowed: false,
                 remaining: 0,
-                retryAfterMs: Math.max(0, timestamps[0] + windowMs - now)
+                retryAfterMs: Math.max(0, window.stamps[window.head] + windowMs - now)
             };
         }
 
-        timestamps.push(now);
-        this.store.set(key, timestamps);
+        if (live > 0 && now < window.stamps[window.stamps.length - 1]) window.ordered = false;
+        window.stamps.push(now);
         return {
             allowed: true,
-            remaining: limit - timestamps.length,
+            remaining: limit - (live + 1),
             retryAfterMs: 0
         };
     }
 
     private sweep(windowMs: number): void {
         const now = this.now();
-        for (const [key, timestamps] of this.store.entries()) {
-            const live = timestamps.filter(t => now - t < windowMs);
-            if (live.length === 0) this.store.delete(key);
-            else this.store.set(key, live);
+        for (const [key, window] of this.store.entries()) {
+            expire(window, now, windowMs);
+            if (window.head === window.stamps.length) this.store.delete(key);
         }
     }
 
@@ -95,5 +99,47 @@ export class MemoryRateLimitStore implements RateLimitStore {
         if (this.cleanupInterval) clearInterval(this.cleanupInterval);
         this.cleanupInterval = undefined;
         this.store.clear();
+    }
+}
+
+/**
+ * One key's hits, oldest first, from `head` on.
+ *
+ * Every hit used to `filter` the whole window into a new array — O(limit) work
+ * and garbage per request, on the event loop: over a millisecond and 700 KB per
+ * request at a limit of 100,000. Hits are recorded in the order they happen, so
+ * the expired ones are a prefix: moving `head` past them is the same filter,
+ * amortised O(1). The array is compacted once more than half of it is behind
+ * `head`.
+ *
+ * `ordered` is false once a hit was recorded at an earlier time than the one
+ * before it — a wall clock stepped back. Expiry is then no longer a prefix,
+ * and the window is filtered as it always was until it empties.
+ */
+interface HitWindow {
+    stamps: number[];
+    head: number;
+    ordered: boolean;
+}
+
+/** Drop the hits at least `windowMs` old — `now - t < windowMs` stays, as before. */
+function expire(window: HitWindow, now: number, windowMs: number): void {
+    if (!window.ordered) {
+        window.stamps = window.stamps.slice(window.head).filter(t => now - t < windowMs);
+        window.head = 0;
+        if (window.stamps.length === 0) window.ordered = true;
+        return;
+    }
+    const { stamps } = window;
+    let head = window.head;
+    while (head < stamps.length && now - stamps[head] >= windowMs) head++;
+    if (head === stamps.length) {
+        window.stamps = [];
+        window.head = 0;
+    } else if (head >= 32 && head * 2 >= stamps.length) {
+        window.stamps = stamps.slice(head);
+        window.head = 0;
+    } else {
+        window.head = head;
     }
 }
