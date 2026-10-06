@@ -562,7 +562,10 @@ function excludedLiterals(conjunct: string): string[] | null {
     m = /^'([^']*)' (?:<>|!=) callerid$/.exec(conjunct);
     if (m) return [m[1]];
 
-    m = /^callerid (?:<>|!=) all \( ?array \[(.*)\] ?\)$/.exec(conjunct);
+    // `ARRAY[` with no space is how Postgres stores it; `NOT IN (…)` reads
+    // back as this. Requiring `array [` missed every stored list, Rebase's own
+    // `authenticated()` included.
+    m = /^callerid (?:<>|!=) all \( ?array ?\[(.*)\] ?\)$/.exec(conjunct);
     if (m) return literalList(m[1]);
 
     m = /^callerid not in \((.*)\)$/.exec(conjunct);

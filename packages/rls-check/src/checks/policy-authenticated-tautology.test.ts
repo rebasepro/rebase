@@ -59,6 +59,33 @@ describe("policy-authenticated-tautology", () => {
         expect(findings[0].detail).toContain("is not the anonymous");
     });
 
+    /**
+     * `policy.authenticated()` as Postgres stores it (read back from
+     * `pg_policies`): the compiler's `NOT IN ('anonymous', 'anon')` comes back
+     * as `<> ALL (ARRAY['anonymous'::text, …])`, with no space after `ARRAY`.
+     * The parser wanted `array [`, so this check never fired on the most common
+     * policy Rebase writes.
+     */
+    it("flags Rebase's own authenticated(), as the database stores it", () => {
+        for (const using of [
+            "((rebase.uid() IS NOT NULL) AND (rebase.uid() <> ALL (ARRAY['anonymous'::text, 'anon'::text])))",
+            "((( SELECT rebase.uid() AS uid) IS NOT NULL) AND (( SELECT rebase.uid() AS uid) <> ALL (ARRAY['anonymous'::text, 'anon'::text])))"
+        ]) {
+            expect({ using, findings: policyAuthenticatedTautology.run(withPolicy(using)).length }).toEqual({ using, findings: 1 });
+            expect({ using, findings: policyAnonymousTautology.run(withPolicy(using)).length }).toEqual({ using, findings: 0 });
+        }
+    });
+
+    it("stays quiet when the stored form also scopes rows or names a role", () => {
+        for (const using of [
+            "((rebase.uid() IS NOT NULL) AND (rebase.uid() <> ALL (ARRAY['anonymous'::text, 'anon'::text])) AND (owner_id = rebase.uid()))",
+            "( SELECT ((rebase.uid() IS NOT NULL) AND (rebase.uid() <> ALL (ARRAY['anonymous'::text, 'anon'::text])) AND (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])))"
+        ]) {
+            expect({ using, findings: policyAuthenticatedTautology.run(withPolicy(using)).length }).toEqual({ using, findings: 0 });
+            expect({ using, findings: policyAnonymousTautology.run(withPolicy(using)).length }).toEqual({ using, findings: 0 });
+        }
+    });
+
     it("recognises the reversed order", () => {
         expect(policyAuthenticatedTautology.run(
             withPolicy("(auth.uid() <> 'anonymous' AND auth.uid() IS NOT NULL)")

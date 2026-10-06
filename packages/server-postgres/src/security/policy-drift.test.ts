@@ -275,6 +275,51 @@ describe("checkPolicyDrift", () => {
         }
     });
 
+    /**
+     * What Postgres stores for `policy.authenticated()` and `registered()`,
+     * read back from `pg_policies` (PGlite, PG 17). The compiler writes
+     * `NOT IN ('anonymous', 'anon')`; Postgres stores `<> ALL (ARRAY[…])`, and
+     * a check that only knew `<> 'anonymous'` called every one of them the
+     * insecure tautology — in `doctor` and on every `db push`.
+     */
+    it("clears every spelling Postgres stores for authenticated() and registered()", async () => {
+        const cols = [collection("posts")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const stored = [
+            // Before the initPlan wrapping (and on a database not pushed since).
+            "((rebase.uid() IS NOT NULL) AND (rebase.uid() <> ALL (ARRAY['anonymous'::text, 'anon'::text])))",
+            "((rebase.uid() IS NOT NULL) AND (rebase.uid() <> ALL (ARRAY['anonymous'::text, 'anon'::text])) AND (NOT rebase.is_anonymous()))",
+            // After it.
+            "((( SELECT rebase.uid() AS uid) IS NOT NULL) AND (( SELECT rebase.uid() AS uid) <> ALL (ARRAY['anonymous'::text, 'anon'::text])))",
+            "((( SELECT rebase.uid() AS uid) IS NOT NULL) AND (( SELECT rebase.uid() AS uid) <> ALL (ARRAY['anonymous'::text, 'anon'::text])) AND (NOT ( SELECT rebase.is_anonymous() AS is_anonymous)))",
+            // and(authenticated(), rolesOverlap(...)), wrapped whole.
+            "( SELECT ((rebase.uid() IS NOT NULL) AND (rebase.uid() <> ALL (ARRAY['anonymous'::text, 'anon'::text])) AND (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])))",
+            // The compiler's own text, as a DDL file carries it.
+            "(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')"
+        ];
+        for (const qual of stored) {
+            const live = expected.map((p) => liveRow(p, { qual: p.hasUsing ? qual : null }));
+            const drift = await checkPolicyDrift(dbWith(live), cols);
+            expect({ qual, insecure: drift.insecure.length }).toEqual({ qual, insecure: 0 });
+        }
+    });
+
+    it("still flags the tautology whose only guard excludes nobody, and the wrapped bare test", async () => {
+        // `'anon'` is not the sentinel a signed-out request carries, so
+        // excluding only it leaves the policy open; and a bare null test is the
+        // tautology however the call is wrapped.
+        const cols = [collection("posts")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        for (const qual of [
+            "((rebase.uid() IS NOT NULL) AND (rebase.uid() <> ALL (ARRAY['anon'::text])))",
+            "(( SELECT rebase.uid() AS uid) IS NOT NULL)"
+        ]) {
+            const live = expected.map((p) => liveRow(p, { qual: p.hasUsing ? qual : null }));
+            const drift = await checkPolicyDrift(dbWith(live), cols);
+            expect({ qual, flagged: drift.insecure.length > 0 }).toEqual({ qual, flagged: true });
+        }
+    });
+
     it("also flags the tautology in a WITH CHECK clause", async () => {
         const cols = [collection("posts")];
         const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
