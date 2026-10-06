@@ -28,8 +28,15 @@ class ResizeObserverStub {
 }
 Object.assign(global, { ResizeObserver: ResizeObserverStub });
 
+// Calls of `flattenKeys` on a draft handed to the form, by the draft.
+const mockFlattened = new Map<unknown, number>();
 jest.mock("@rebasepro/app", () => {
+    const actualFlattenKeys = (jest.requireActual("@rebasepro/app") as { flattenKeys: (o: unknown) => string[] }).flattenKeys;
     const overrides: Record<string, unknown> = {
+        flattenKeys: (o: unknown) => {
+            mockFlattened.set(o, (mockFlattened.get(o) ?? 0) + 1);
+            return actualFlattenKeys(o);
+        },
         useRebaseContext: () => ({}),
         useCustomizationController: () => ({ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] }),
         useAuthController: () => ({ user: { uid: "u1", roles: ["admin"] } }),
@@ -236,5 +243,37 @@ describe("the form controller", () => {
         rerender(form(1));
         rerender(form(2));
         expect(seen[seen.length - 1]).toBe(before);
+    });
+
+    it("reads a draft's touched keys once, not on every keystroke", async () => {
+        const { properties, values } = fortyFields();
+        properties.attributes = { type: "map", name: "Attributes", keyValue: true };
+        const attributes: Record<string, string> = {};
+        for (let i = 0; i < 50; i++) attributes["k" + i] = "v" + i;
+        const draft = { f1: "draft", attributes };
+        const collection = { slug: "posts", name: "Posts", properties } as never;
+        render(<RebaseI18nProvider locale="en">
+            <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
+                <CustomizationControllerContext.Provider
+                    value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
+                    <EntityForm<Row>
+                        path="posts"
+                        entityId="1"
+                        collection={collection}
+                        entity={{ id: "1", path: "posts", values } as never}
+                        initialStatus="existing"
+                        onSubmit={jest.fn(async (v: Row) => ({ id: "1", path: "posts", values: v })) as never}
+                        initialDirtyValues={draft}
+                        computedInitialValues={values}/>
+                </CustomizationControllerContext.Provider>
+            </AuthControllerContext.Provider>
+        </RebaseI18nProvider>);
+        await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+        const atMount = mockFlattened.get(draft) ?? 0;
+        expect(atMount).toBeGreaterThanOrEqual(1);
+
+        for (let k = 1; k <= 3; k++) await type("F0", "v0" + "x".repeat(k));
+
+        expect(mockFlattened.get(draft)).toBe(atMount);
     });
 });

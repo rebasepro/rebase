@@ -217,17 +217,25 @@ export function EntityForm<M extends Record<string, unknown>>({
             : undefined
     ).current;
 
+    /**
+     * Every key of the handed-over edit, marked touched. Read once, at mount,
+     * like the edit itself: it was rebuilt on every render — a key-value map
+     * of 1,000 entries cost ~60 ms per keystroke — by a spread that copied the
+     * map once per key.
+     */
+    const [initialTouched] = useState<Record<string, boolean>>(() => {
+        const touched: Record<string, boolean> = {};
+        if (initialDirtyValues) {
+            for (const key of flattenKeys(initialDirtyValues)) touched[key] = true;
+        }
+        return touched;
+    });
+
     const internalFormex = useCreateFormex<M>({
         initialValues: baseInitialValues as M,
         initialModifiedValues: initialModifiedValues as M | undefined,
         debugId: `EntityForm:${path}/${entityIdProp}`,
-        initialTouched: initialDirtyValues ?
-            flattenKeys(initialDirtyValues!)
-                .reduce((previousValue, currentValue) => ({
-                    ...previousValue,
-                    [currentValue]: true
-                }), {})
-            : {},
+        initialTouched,
         onSubmit,
         onReset: () => {
             setUnderlyingChanges({});
