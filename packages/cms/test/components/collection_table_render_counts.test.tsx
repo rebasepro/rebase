@@ -179,13 +179,17 @@ function buildRow(i: number): Entity<Record<string, unknown>> {
     return { id: `id_${i}`, path: "products", values };
 }
 
-function View({ selectionEnabled = true }: { selectionEnabled?: boolean }) {
+function View({ selectionEnabled = true, additionalFields }: {
+    selectionEnabled?: boolean;
+    additionalFields?: { key: string; name: string; Builder: React.ComponentType<{ entity: Entity }> }[];
+}) {
     return <MemoryRouter>
         <CollectionViewBinding slug={"products"}
             name={"Products"}
             path={"products"}
             defaultViewMode={"table"}
             selectionEnabled={selectionEnabled}
+            additionalFields={additionalFields as never}
             properties={properties as never}/>
     </MemoryRouter>;
 }
@@ -250,6 +254,23 @@ describe("the collection table draws again only what changed", () => {
         // selection controller. At most once per row drawn.
         expect(mockState.rowActionRenders).toBeGreaterThan(0);
         expect(mockState.rowActionRenders).toBeLessThanOrEqual(drawnRows);
+        view.unmount();
+    });
+
+    it("rows drawn before selection was switched off lose their checkbox", async () => {
+        let view!: ReturnType<typeof render>;
+        await act(async () => {
+            view = render(<View selectionEnabled={true}/>);
+        });
+        expect(rowCheckboxes(view.container).length).toBeGreaterThan(10);
+
+        // The row actions were built by a builder that remembered the first
+        // `selectionEnabled` it saw: the checkboxes stayed until each row
+        // changed for some other reason.
+        await act(async () => {
+            view.rerender(<View selectionEnabled={false}/>);
+        });
+        expect(rowCheckboxes(view.container)).toHaveLength(0);
         view.unmount();
     });
 });

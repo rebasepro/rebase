@@ -876,6 +876,10 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             return (largeLayout ? (80 + actionsWidth) : (70 + actionsWidth)) + (collapsedActions.length > 0 ? (largeLayout ? 40 : 30) : 0);
         }, [getActionsForEntity, largeLayout]);
 
+        const customEntityActions = useMemo(() => (collection.entityActions ?? EMPTY_ARRAY)
+            .map(action => resolveEntityAction(action, customizationController.entityActions))
+            .filter(Boolean) as EntityAction<M>[], [collection.entityActions, customizationController.entityActions]);
+
         const tableRowActionsBuilder = useCallback(({
             entity,
             size,
@@ -889,9 +893,6 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         }) => {
 
             const isSelected = usedSelectionController.isEntitySelected(entity);
-            const customEntityActions = (collection.entityActions ?? EMPTY_ARRAY)
-                .map(action => resolveEntityAction(action, customizationController.entityActions))
-                .filter(Boolean) as EntityAction<M>[];
 
             const actions = getActionsForEntity({
                 entity,
@@ -918,7 +919,11 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                 />
             );
 
-        }, [updateLastDeleteTimestamp, usedSelectionController]);
+            // Everything it reads. It listed two of them, so the row actions
+            // kept the first collection, actions, open mode and
+            // `selectionEnabled` they were built with.
+        }, [updateLastDeleteTimestamp, usedSelectionController, customEntityActions, getActionsForEntity,
+            activeSelectionEnabled, unselectNavigatedEntity, collection, path, openEntityMode]);
 
         // Built once per change rather than once per render: each of these is a
         // prop of the table (and of the other views), and a new array or a new

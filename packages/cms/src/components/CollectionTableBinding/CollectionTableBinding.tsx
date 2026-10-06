@@ -269,7 +269,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
             </EntityTableCell>
         );
 
-    }, [size]);
+    }, [size, additionalFieldsMap, context]);
 
     // Same source the filter fields read their engine from, so the header's
     // filter control and the field it opens cannot disagree about what the
@@ -376,7 +376,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 <ErrorView error={e instanceof Error ? e : new Error(String(e))}/>
             </EntityTableCell>;
         }
-    }, [additionalCellRenderer, propertyCellRenderer, size]);
+    }, [additionalFieldsMap, additionalCellRenderer, propertyCellRenderer, size]);
 
     return (
 
