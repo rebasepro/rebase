@@ -71,9 +71,10 @@ export function useBackendStorageSource({
 
     // Cache for download URLs to avoid redundant API calls, keyed by
     // `[bucket/]keyOrUrl`. A private file's URL carries a download token that
-    // expires, and the entry with it; `deleteObject` drops it; bounded LRU.
-    // Concurrent lookups of one key share one `/metadata` request, and at most
-    // DOWNLOAD_URL_CONCURRENCY of those are open at once.
+    // expires, and the entry with it; `deleteObject` drops it; bounded LRU;
+    // owned by the access token its URLs were minted with (see
+    // `getSignedUrl`). Concurrent lookups of one key share one `/metadata`
+    // request, and at most DOWNLOAD_URL_CONCURRENCY of those are open at once.
     const urlsCache = useMemo(() => createDownloadUrlCache(), []);
     const limitMetadata = useMemo(() => createConcurrencyLimit(DOWNLOAD_URL_CONCURRENCY), []);
 
@@ -200,13 +201,32 @@ export function useBackendStorageSource({
     /**
      * Get download URL for a file
      */
-    const getSignedUrl = useCallback((
+    const getSignedUrl = useCallback(async (
         keyOrUrl: string,
         bucket?: string
     ): Promise<DownloadConfig> => {
         const cacheKey = bucket ? `${bucket}/${keyOrUrl}` : keyOrUrl;
+        // A private file's URL carries a download token the server minted for
+        // whoever asked, and this source outlives them: after a sign-out, or
+        // another user signing in in the same tab, the next preview of the
+        // path was handed the previous user's URL. This hook knows the user
+        // only by `getAuthToken`, so that token owns the cache, and a
+        // different one empties it first (a refresh too: one request per file
+        // shown afterwards, once per access-token lifetime). A public file's
+        // URL carries no token and belongs to no one, so it is not asked for
+        // one: signed out, `getAuthToken` may be a refresh request.
+        const filePath = storageObjectPath(keyOrUrl, bucket);
+        if (!filePath || !isPublicStoragePath(filePath)) {
+            let credential = "";
+            try {
+                credential = await getAuthToken();
+            } catch {
+                // Signed out: the anonymous owner.
+            }
+            urlsCache.claim(credential);
+        }
         return urlsCache.get(cacheKey, () => resolveDownload(keyOrUrl, bucket));
-    }, [resolveDownload, urlsCache]);
+    }, [getAuthToken, resolveDownload, urlsCache]);
 
     /**
      * Get file as a File object

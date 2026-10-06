@@ -74,7 +74,10 @@ const { url } = await client.storage.getSignedUrl(
 );
 ```
 
-The SDK caches signed URLs to avoid redundant server calls.
+The SDK caches signed URLs to avoid redundant server calls, until each one's
+download token expires. The cache belongs to the credential that asked: when
+the access token changes — a sign-out, another user signing in, a refresh — it
+starts over, so one user is never handed a URL minted for another.
 
 ### Private vs. public URLs
 

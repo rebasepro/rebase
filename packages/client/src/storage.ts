@@ -35,8 +35,9 @@ export function encodeStorageKey(key: string): string {
 export function createStorage(transport: Transport, storageId?: string): StorageSource {
     // Keyed by `[bucket/]keyOrUrl`; an entry lives until its download token
     // expires (public URLs: until evicted), is dropped by `deleteObject`, and
-    // is bounded LRU. One per source instance, i.e. per client — so it is
-    // never shared with another session's tokens. Concurrent lookups of one
+    // is bounded LRU. One per source instance, i.e. per client, and owned by
+    // the credential its URLs were minted with (see `getSignedUrl`), so a
+    // sign-out or another user's sign-in empties it. Concurrent lookups of one
     // key share one `/metadata` request, and at most
     // DOWNLOAD_URL_CONCURRENCY of those are open at once.
     const urlsCache = createDownloadUrlCache();
@@ -121,11 +122,20 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         return result.data;
     }
 
-    function getSignedUrl(
+    async function getSignedUrl(
         keyOrUrl: string,
         bucket?: string
     ): Promise<DownloadConfig> {
         const cacheKey = bucket ? `${bucket}/${keyOrUrl}` : keyOrUrl;
+        // A private file's URL carries a download token the server minted for
+        // whoever asked, and this source outlives them: after a sign-out, or
+        // another user signing in in the same tab, the next preview of the
+        // path was handed the previous user's URL. The credential the request
+        // goes out with is the owner — the access token, in cookie mode too
+        // (only the refresh token is a cookie) — so a different one empties
+        // the cache first. A token refresh empties it as well, which costs one
+        // request per file shown afterwards, once per access-token lifetime.
+        urlsCache.claim((await transport.resolveToken()) ?? "");
         return urlsCache.get(cacheKey, () => resolveDownload(keyOrUrl, bucket));
     }
 

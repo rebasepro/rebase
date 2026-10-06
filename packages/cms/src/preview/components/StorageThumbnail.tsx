@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 import { renderSkeletonImageThumbnail } from "../property_previews/SkeletonPropertyComponent";
 import { UrlComponentPreview } from "./UrlComponentPreview";
 import { knownStorageRenditionUrl, storageRenditionUrl } from "./storageRenditions";
-import { useStorageSource, useStorageSources, useTranslation } from "@rebasepro/app";
+import { AuthControllerContext, useStorageSource, useStorageSources, useTranslation } from "@rebasepro/app";
 import { createDownloadUrlCache, resolveStorageSource } from "@rebasepro/common";
 import { DownloadConfig, FileType } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
@@ -38,6 +38,11 @@ function areEqual(prevProps: StorageThumbnailProps, nextProps: StorageThumbnailP
  * remount draws at once instead of a skeleton; the effect still asks the
  * source again, which owns validity. Bounded (least recently used dropped past
  * 2,000), so a long session browsing thousands of files does not keep them all.
+ *
+ * Owned by the signed-in user ({@link claimThumbnailCaches}): a private URL
+ * carries a download token minted for whoever asked, and this module outlives
+ * them — after a sign-out and another user's sign-in in the same tab, the next
+ * user's thumbnail of the same path drew the previous user's URL on mount.
  */
 const URL_CACHE = createDownloadUrlCache();
 
@@ -60,6 +65,16 @@ const URL_CACHE = createDownloadUrlCache();
  */
 const IN_FLIGHT = new Map<string, Promise<DownloadConfig>>();
 
+/**
+ * Make `owner` the user the thumbnail caches answer for. Another user empties
+ * both, the requests in flight included, so the next user's thumbnails neither
+ * draw a remembered URL of the previous user's nor wait on one of their
+ * requests. Called on every render, before anything is read from them.
+ */
+function claimThumbnailCaches(owner: string): void {
+    if (URL_CACHE.claim(owner)) IN_FLIGHT.clear();
+}
+
 function getSignedUrlOnce(
     storage: { getSignedUrl: (path: string) => Promise<DownloadConfig> },
     path: string,
@@ -68,8 +83,8 @@ function getSignedUrlOnce(
     const existing = IN_FLIGHT.get(cacheKey);
     if (existing) return existing;
 
-    const request = storage.getSignedUrl(path).finally(() => {
-        IN_FLIGHT.delete(cacheKey);
+    const request: Promise<DownloadConfig> = storage.getSignedUrl(path).finally(() => {
+        if (IN_FLIGHT.get(cacheKey) === request) IN_FLIGHT.delete(cacheKey);
     });
     IN_FLIGHT.set(cacheKey, request);
     return request;
@@ -85,6 +100,10 @@ export function StorageThumbnailInternal({
 }: StorageThumbnailProps) {
 
     const { t } = useTranslation();
+    // Not `useAuthController`: a thumbnail may render outside <Rebase>, where
+    // there is no signed-in user to own anything.
+    const owner = React.useContext(AuthControllerContext)?.user?.uid ?? "";
+    claimThumbnailCaches(owner);
     const [error, setError] = React.useState<Error | undefined>(undefined);
     const defaultStorage = useStorageSource();
     const storageSources = useStorageSources();
@@ -121,13 +140,14 @@ export function StorageThumbnailInternal({
                 const previewUrl = await storageRenditionUrl(downloadConfig, size, fill);
                 if (!unmounted) {
                     setShown({ config: downloadConfig, previewUrl });
-                    URL_CACHE.set(cacheKey, { config: downloadConfig });
+                    // Not for whoever signed in while this was in flight.
+                    if (URL_CACHE.owner === owner) URL_CACHE.set(cacheKey, { config: downloadConfig });
                 }
             }).catch(setError);
         return () => {
             unmounted = true;
         };
-    }, [storagePathOrDownloadUrl, cacheKey, size, fill]);
+    }, [storagePathOrDownloadUrl, cacheKey, size, fill, owner]);
 
     if (!storagePathOrDownloadUrl) return null;
 

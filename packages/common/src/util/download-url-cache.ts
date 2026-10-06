@@ -38,9 +38,11 @@ export interface DownloadUrlCacheOptions {
  *  - a failed load is not kept: the next lookup asks again.
  *
  * The key is whatever the source passes — its own path (and bucket). The cache
- * belongs to ONE source instance, which belongs to one client/session: it must
- * never be shared between users, because a private URL carries a token minted
- * for the user who asked.
+ * belongs to ONE source instance, and its entries to ONE user: a private URL
+ * carries a token minted for the user who asked. A source outlives its user —
+ * a sign-out, or another user signing in, in the same tab — so it names whose
+ * entries it is holding with {@link claim} before every lookup, and a different
+ * owner empties the cache.
  */
 export interface DownloadUrlCache {
     get(key: string, load: () => Promise<ResolvedDownload>): Promise<DownloadConfig>;
@@ -49,7 +51,20 @@ export interface DownloadUrlCache {
     /** Remember an answer obtained some other way. */
     set(key: string, resolved: ResolvedDownload): void;
     delete(key: string): void;
+    /**
+     * Forget everything, as a hard boundary: a load still in flight is not
+     * stored when it lands, and a lookup made after this starts its own load
+     * rather than waiting on one started before.
+     */
     clear(): void;
+    /**
+     * Say whose lookups follow — the user, or the credential the loads are
+     * made with. The same owner keeps the entries; a different one
+     * {@link clear}s them first. Returns whether it did.
+     */
+    claim(owner: string): boolean;
+    /** The last owner {@link claim}ed, if any. */
+    readonly owner: string | undefined;
     readonly size: number;
 }
 
@@ -62,6 +77,16 @@ export function createDownloadUrlCache(options: DownloadUrlCacheOptions = {}): D
     // key the least recently used one.
     const entries = new Map<string, { config: DownloadConfig; expiresAt?: number }>();
     const inFlight = new Map<string, Promise<DownloadConfig>>();
+    // Bumped by every clear(): a load stores its answer only if none happened
+    // since it started, so a URL minted for the previous owner never lands.
+    let generation = 0;
+    let owner: string | undefined;
+
+    function clear(): void {
+        entries.clear();
+        inFlight.clear();
+        generation++;
+    }
 
     function valid(key: string): DownloadConfig | undefined {
         const entry = entries.get(key);
@@ -92,12 +117,15 @@ export function createDownloadUrlCache(options: DownloadUrlCacheOptions = {}): D
             const pending = inFlight.get(key);
             if (pending) return pending;
 
-            const request = load()
+            const startedIn = generation;
+            const request: Promise<DownloadConfig> = load()
                 .then(resolved => {
-                    store(key, resolved);
+                    if (generation === startedIn) store(key, resolved);
                     return resolved.config;
                 })
-                .finally(() => inFlight.delete(key));
+                .finally(() => {
+                    if (inFlight.get(key) === request) inFlight.delete(key);
+                });
             inFlight.set(key, request);
             return request;
         },
@@ -106,8 +134,15 @@ export function createDownloadUrlCache(options: DownloadUrlCacheOptions = {}): D
         delete(key) {
             entries.delete(key);
         },
-        clear() {
-            entries.clear();
+        clear,
+        claim(next) {
+            if (next === owner) return false;
+            owner = next;
+            clear();
+            return true;
+        },
+        get owner() {
+            return owner;
         },
         get size() {
             return entries.size;

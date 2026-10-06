@@ -218,4 +218,53 @@ describe("useBackendStorageSource", () => {
             expect(backend.peak).toBeLessThanOrEqual(8);
         });
     });
+
+    /**
+     * A private file's URL carries a download token minted for whoever asked.
+     * The hook knows the user only through `getAuthToken`, so the credential is
+     * what owns the cache: another user signing in — or a sign-out — in the
+     * same tab must not be handed the URL minted for the one before.
+     */
+    describe("after a change of user", () => {
+        function mintingBackend() {
+            const asked: string[] = [];
+            Object.defineProperty(global, "fetch", {
+                configurable: true,
+                writable: true,
+                value: async (input: RequestInfo | URL, init?: RequestInit) => {
+                    const bearer = new Headers(init?.headers).get("Authorization")?.replace(/^Bearer /, "") ?? "";
+                    asked.push(bearer);
+                    return reply(200, { json: { data: { token: `download-for-${bearer}`, tokenExpiresIn: 300 } } });
+                }
+            });
+            return asked;
+        }
+
+        it("asks again as the new user instead of reusing the previous user's URL", async () => {
+            const asked = mintingBackend();
+            let token = "token-alice";
+            const source = renderHook(() => useBackendStorageSource({
+                apiUrl: API,
+                getAuthToken: async () => token
+            })).result.current;
+
+            await expect(source.getSignedUrl("private/report.pdf")).resolves.toMatchObject({ url: expect.stringContaining("download-for-token-alice") });
+            await source.getSignedUrl("private/report.pdf");
+            expect(asked).toEqual(["token-alice"]);
+
+            token = "token-bob";
+            await expect(source.getSignedUrl("private/report.pdf")).resolves.toMatchObject({ url: expect.stringContaining("download-for-token-bob") });
+            expect(asked).toEqual(["token-alice", "token-bob"]);
+        });
+
+        it("does not ask for a token to serve a public file", async () => {
+            const asked = mintingBackend();
+            const getAuthToken = jest.fn(async (): Promise<string> => { throw new Error("signed out"); });
+            const source = renderHook(() => useBackendStorageSource({ apiUrl: API, getAuthToken })).result.current;
+
+            await expect(source.getSignedUrl("public/logo.png")).resolves.toMatchObject({ url: `${API}/api/storage/file/public/logo.png` });
+            expect(asked).toEqual([]);
+            expect(getAuthToken).not.toHaveBeenCalled();
+        });
+    });
 });

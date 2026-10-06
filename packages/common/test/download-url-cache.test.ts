@@ -55,6 +55,60 @@ describe("createDownloadUrlCache", () => {
     });
 });
 
+/**
+ * A cached URL carries a download token minted for whoever asked. A user
+ * signing out — or another signing in, in the same tab — must not be handed the
+ * previous user's URLs for the rest of their life (~5 min).
+ */
+describe("createDownloadUrlCache across a change of user", () => {
+    it("claim() keeps a returning owner's entries and empties the cache for a new one", async () => {
+        const cache = createDownloadUrlCache();
+        cache.claim("user-a");
+        await cache.get("private/report.pdf", async () => ({ config: config("minted-for-a") }));
+
+        expect(cache.claim("user-a")).toBe(false);
+        expect(cache.peek("private/report.pdf")).toEqual(config("minted-for-a"));
+
+        expect(cache.claim("user-b")).toBe(true);
+        expect(cache.owner).toBe("user-b");
+        expect(cache.size).toBe(0);
+        await expect(cache.get("private/report.pdf", async () => ({ config: config("minted-for-b") })))
+            .resolves.toEqual(config("minted-for-b"));
+    });
+
+    it("a load in flight when the cache is emptied neither lands in it nor is joined after", async () => {
+        const cache = createDownloadUrlCache();
+        cache.claim("user-a");
+        let releaseA!: () => void;
+        const forA = cache.get("private/report.pdf", () => new Promise(resolve => {
+            releaseA = () => resolve({ config: config("minted-for-a") });
+        }));
+
+        cache.claim("user-b");
+        // B's lookup starts its own load rather than waiting on A's.
+        const loadB = jest.fn(async () => ({ config: config("minted-for-b") }));
+        const forB = cache.get("private/report.pdf", loadB);
+        releaseA();
+
+        await expect(forA).resolves.toEqual(config("minted-for-a"));
+        await expect(forB).resolves.toEqual(config("minted-for-b"));
+        expect(loadB).toHaveBeenCalledTimes(1);
+        expect(cache.peek("private/report.pdf")).toEqual(config("minted-for-b"));
+    });
+
+    it("clear() is the same boundary", async () => {
+        const cache = createDownloadUrlCache();
+        let release!: () => void;
+        const pending = cache.get("k", () => new Promise(resolve => {
+            release = () => resolve({ config: config("before") });
+        }));
+        cache.clear();
+        release();
+        await pending;
+        expect(cache.peek("k")).toBeUndefined();
+    });
+});
+
 describe("createConcurrencyLimit", () => {
     it("runs at most `max` tasks at once and all of them in the end", async () => {
         const limit = createConcurrencyLimit(3);

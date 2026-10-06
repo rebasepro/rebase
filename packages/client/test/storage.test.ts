@@ -283,7 +283,8 @@ alsoNope: null } as any
             const storage = createStorage(mockTransport);
 
             mockTransport.request.mockResolvedValueOnce({ data: { size: 50 } });
-            mockTransport.resolveToken.mockResolvedValueOnce("tok");
+            // The same credential on both calls: the cache belongs to it.
+            mockTransport.resolveToken.mockResolvedValue("tok");
 
             const first = await storage.getSignedUrl("cached.jpg");
             const second = await storage.getSignedUrl("cached.jpg");
@@ -342,6 +343,8 @@ alsoNope: null } as any
                 const backend = deferredTransport();
 
                 const all = Promise.all(Array.from({ length: 50 }, () => storage.getSignedUrl("photos/cat.png")));
+                // The lookups read the credential first, so the request goes out a tick later.
+                await new Promise(resolve => setTimeout(resolve, 0));
                 await backend.drain();
                 const configs = await all;
 
