@@ -4,7 +4,6 @@ import { execa } from "execa";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { logger } from "@rebasepro/server";
 import { out, outWarn, outError } from "./cli-output";
 import { formatRelativeTime } from "@rebasepro/utils";
 import {
@@ -1739,6 +1738,11 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
             // this does. Said out loud all the same — this command used to exit
             // 0 in silence here, which is indistinguishable from a clean run.
             unreadable = err instanceof Error ? err.message : String(err);
+            // Imported here, not at the top: the server is a 1.2 MB bundle plus
+            // hono, drizzle and zod, and every driver command — `db push`, the
+            // two runs in each `rebase dev` start — paid ~0.4 s under tsx to
+            // load it before parsing its argv, for this one debug line.
+            const { logger } = await import("@rebasepro/server");
             logger.debug(`schema stale: skipped (${unreadable})`);
         }
     }

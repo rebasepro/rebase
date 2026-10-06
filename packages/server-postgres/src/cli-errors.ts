@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { outWarn, outError } from "./cli-output";
-import { extractCauseMessage } from "./utils/pg-error-utils";
+import { extractCauseMessage } from "./utils/error-cause";
 
 /**
  * Detect whether an error (or AggregateError wrapping multiple attempts)
