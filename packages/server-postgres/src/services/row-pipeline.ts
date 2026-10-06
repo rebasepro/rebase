@@ -129,12 +129,13 @@ function toRestScalar(value: unknown, property: Property | undefined): unknown {
 /**
  * Apply {@link toRestScalar} across a row, leaving undeclared columns alone.
  *
- * Exported because the include loader attaches related rows itself, and a
- * target rendered differently from its parent is the shape bug this whole file
- * exists to prevent — a date was a string at the top level and a
- * `{ __type: "date" }` envelope one level down, in the same response.
+ * A target rendered differently from its parent is the shape bug this whole
+ * file exists to prevent — a date was a string at the top level and a
+ * `{ __type: "date" }` envelope one level down, in the same response. The
+ * include loader renders its targets with {@link toRestRow}, through
+ * `RelationService`'s `"rest"` style, for the same reason.
  */
-export function toRestValues(
+function toRestValues(
     row: Record<string, unknown>,
     collection: CollectionConfig
 ): Record<string, unknown> {

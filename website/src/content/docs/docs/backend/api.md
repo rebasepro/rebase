@@ -507,10 +507,15 @@ Included relations are embedded directly in the response:
     "author": {
         "id": 42,
         "name": "Jane Doe",
-        "email": "jane@example.com"
+        "email": "jane@example.com",
+        "companyId": 7
     }
 }
 ```
+
+An included row is the row the target's own route serves
+(`GET /api/data/authors/42`): the same columns and value encodings, its own
+foreign keys as columns, and never a reference object.
 
 ## Writing
 

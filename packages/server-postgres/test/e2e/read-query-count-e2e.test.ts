@@ -298,6 +298,39 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
         if (container) await stopPgContainer(container.containerName);
     }, 60_000);
 
+    // ── an included row is the target's REST row ─────────────────────────────
+
+    describe("an included row", () => {
+        /** Every `{ __type: … }` envelope anywhere under `value`, by path. */
+        const envelopes = (value: unknown, path = "$"): string[] => {
+            if (Array.isArray(value)) return value.flatMap((item, i) => envelopes(item, `${path}[${i}]`));
+            if (value && typeof value === "object") {
+                if ("__type" in value) return [path];
+                return Object.entries(value).flatMap(([key, item]) => envelopes(item, `${path}.${key}`));
+            }
+            return [];
+        };
+
+        it("carries no admin `{ __type }` envelope, at any depth", async () => {
+            const { json } = await measure("/posts?limit=10&orderBy=id:asc&include=author.company,comments,detail,tags,company");
+            expect(envelopes(json.data)).toEqual([]);
+            const one = await measure("/posts/3?include=comments.post,detail");
+            expect(envelopes(one.json)).toEqual([]);
+        });
+
+        it("is the same row its own route serves", async () => {
+            const { json } = await measure("/posts/4?include=comments,detail,author");
+            const comments = json.comments as Row[];
+            expect(comments.length).toBeGreaterThan(0);
+            for (const comment of comments) {
+                const own = await measure(`/comments/${comment.id}`);
+                expect(comment).toEqual(own.json);
+            }
+            expect(json.detail).toEqual((await measure(`/post_details/${(json.detail as Row).id}`)).json);
+            expect(json.author).toEqual((await measure(`/authors/${(json.author as Row).id}`)).json);
+        });
+    });
+
     // ── `via` on a booted schema ───────────────────────────────────────────
 
     describe("a `via` relation, written in column terms", () => {

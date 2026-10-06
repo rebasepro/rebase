@@ -24,7 +24,7 @@ import { RelationService } from "./RelationService";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { toFlatRow, toRestRow, toRestValues, stripUnreadable } from "./row-pipeline";
+import { toFlatRow, toRestRow, stripUnreadable } from "./row-pipeline";
 import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-column";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 // One rule, one place. See `soft-delete.ts` for why every read has to ask.
@@ -734,8 +734,14 @@ target });
 
             try {
                 if (relation.cardinality === "one") {
+                    // Rendered by the loader exactly as the target's own route
+                    // renders it (`style: "rest"`): a target left in the walk's
+                    // own types is how a date came back as a string at the top
+                    // level and a `{ __type: "date" }` envelope one level down,
+                    // in one response — and how the target's own to-one
+                    // relations arrived as `{ __type: "relation" }` refs.
                     const results = await this.relationService.batchFetchRelatedEntities(
-                        collectionPath, rowIds, key, relation, narrow
+                        collectionPath, rowIds, key, relation, narrow, { style: "rest" }
                     );
                     for (const row of addressable) {
                         const related = results.get(String(addressOf(row)));
@@ -743,14 +749,7 @@ target });
                         // nothing is a fact about the row, and leaving the key
                         // off makes it indistinguishable from not having asked.
                         if (!related) { row[key] = null; continue; }
-                        // Rendered exactly as the parent is: the include loader
-                        // attaches these itself, and a target left in the walk's
-                        // own types is how a date came back as a string at the
-                        // top level and a `{ __type: "date" }` envelope one
-                        // level down, in one response.
-                        const [shaped] = this.shapeRelatedRows(
-                            [toRestValues({ ...related.values }, targetCollection)], node, targetCollection
-                        );
+                        const [shaped] = this.shapeRelatedRows([related.values], node, targetCollection);
                         row[key] = shaped;
                         loaded.push(shaped);
                     }
@@ -761,7 +760,7 @@ target });
                         ? { limit: node.limit, orderBy: node.orderBy }
                         : undefined;
                     const results = await this.relationService.batchFetchRelatedEntitiesMany(
-                        collectionPath, rowIds, key, relation, narrow, window
+                        collectionPath, rowIds, key, relation, narrow, window, { style: "rest" }
                     );
                     for (const row of addressable) {
                         const related = results.get(String(addressOf(row))) ?? [];
@@ -771,12 +770,10 @@ target });
                             // it is nested rather than merged: two posts sharing
                             // a tag see one tag row and two different links, and
                             // a flattened `role` would collide with a column of
-                            // the target's own. It stays outside `toRestValues`
-                            // for the same reason: the target's collection does
-                            // not describe the link's columns.
-                            related.map(e => (e.pivot
-                                ? { ...toRestValues({ ...e.values }, targetCollection), [JUNCTION_PIVOT_KEY]: e.pivot }
-                                : toRestValues({ ...e.values }, targetCollection))),
+                            // the target's own. It is not part of the target's
+                            // REST rendering for the same reason: the target's
+                            // collection does not describe the link's columns.
+                            related.map(e => (e.pivot ? { ...e.values, [JUNCTION_PIVOT_KEY]: e.pivot } : e.values)),
                             node, targetCollection
                         );
                         row[key] = shaped;

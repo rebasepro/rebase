@@ -1,6 +1,7 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { Table } from "drizzle-orm";
 import { FetchService } from "../src/services/FetchService";
+import { toRestRow } from "../src/services/row-pipeline";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
 /**
@@ -115,9 +116,13 @@ describe("read-shape parity across the entry points", () => {
         };
         const fetchService = new FetchService(db as never, registry);
         const relations = (fetchService as never as { relationService: Record<string, unknown> }).relationService;
-        relations.batchFetchRelatedEntities = jest.fn().mockResolvedValue(
-            new Map([["1", { id: 7, path: "authors", values: AUTHOR }]])
-        );
+        // The loader renders the target; the include path asks it for the
+        // target's own REST rendering, which is `toRestRow` — the parent's.
+        relations.batchFetchRelatedEntities = jest.fn((...args: unknown[]) => {
+            const options = args[5] as { style?: string } | undefined;
+            const values = options?.style === "rest" ? toRestRow({ ...AUTHOR }, authorsCollection, registry) : AUTHOR;
+            return Promise.resolve(new Map([["1", { id: 7, path: "authors", values }]]));
+        });
         relations.batchFetchRelatedEntitiesMany = jest.fn().mockResolvedValue(new Map());
         return fetchService;
     };

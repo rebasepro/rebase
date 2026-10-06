@@ -20,7 +20,8 @@ import {
     type PrimaryKeyInfo
 } from "./collection-helpers";
 import { parseDataFromServer } from "../data-transformer";
-import { stripUnreadable } from "./row-pipeline";
+import { stripUnreadable, toRestRow } from "./row-pipeline";
+import { hiddenColumnsOption } from "../schema/search-column";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ApiError, logger } from "@rebasepro/server";
 import type { NestedPathHop } from "./nested-path";
@@ -153,6 +154,19 @@ export interface RelatedRowWindow {
     /** Their order, by the target's own columns. */
     orderBy?: OrderByTuple[];
 }
+
+/**
+ * How the batch loaders render a target row.
+ *
+ * - `"admin"` — the view model the admin panel reads: declared types parsed
+ *   (`parseDataFromServer`), the target's own to-one relations as
+ *   `{ __type: "relation" }` refs, undeclared columns dropped.
+ * - `"rest"` — the row the target's own route serves (`toRestRow`): what an
+ *   `include` embeds. The REST contract is that a developer never sees a ref,
+ *   and an included row is rendered exactly as the same row is at the top
+ *   level.
+ */
+export type RelatedRowStyle = "admin" | "rest";
 
 /** The alias of the subquery a limited relation read joins back to. */
 const RANKED = "__ranked";
@@ -353,20 +367,29 @@ export class RelationService {
         targetRow: Record<string, unknown>,
         targetCollection: CollectionConfig,
         targetPks: PrimaryKeyInfo[],
-        options?: { resolveNested?: boolean }
+        options?: {
+            resolveNested?: boolean;
+            /** The REST rendering, when the caller asked for it — see {@link restRendering}. */
+            rest?: (row: Record<string, unknown>) => Record<string, unknown>;
+        }
     ): Promise<RelatedRow<M>> {
-        const values = options?.resolveNested
-            ? await parseDataFromServer(targetRow, targetCollection, this.db, this.registry)
-            : await parseDataFromServer(targetRow, targetCollection);
+        let values: Record<string, unknown>;
+        if (options?.rest) {
+            values = options.rest(targetRow);
+        } else {
+            values = options?.resolveNested
+                ? await parseDataFromServer(targetRow, targetCollection, this.db, this.registry)
+                : await parseDataFromServer(targetRow, targetCollection);
 
-        // The target's OWN exclusions, applied to the target's own columns.
-        // This is the second rendering of a relation target (row-pipeline's
-        // `renderTarget` is the first) and it reached the same clients by a
-        // different route: WebSocket fetches and every realtime frame come
-        // through here. REST was clean and `.listen()` was not, which is the
-        // worst version of this to have — the leak is invisible from the surface
-        // people test.
-        stripUnreadable(values as Record<string, unknown>, targetCollection);
+            // The target's OWN exclusions, applied to the target's own columns.
+            // This is the second rendering of a relation target (row-pipeline's
+            // `renderTarget` is the first) and it reached the same clients by a
+            // different route: WebSocket fetches and every realtime frame come
+            // through here. REST was clean and `.listen()` was not, which is the
+            // worst version of this to have — the leak is invisible from the surface
+            // people test.
+            stripUnreadable(values, targetCollection);
+        }
 
         return {
             // The whole key: a composite target addressed by its first column
@@ -374,6 +397,33 @@ export class RelationService {
             id: buildCompositeId(targetRow, targetPks),
             path: targetCollection.slug,
             values: values as M
+        };
+    }
+
+    /**
+     * A target row as its own REST route serves it, for the `"rest"` style.
+     *
+     * The loaders read the target with `SELECT *`, so the columns a REST read
+     * never selects — a generated search vector — are dropped first; then
+     * `toRestRow` renders the rest, which applies the target's field access.
+     * Built once per batch: the hidden set is a property of the table.
+     *
+     * It replaces a second pass. An include used to render each target row as
+     * the admin's view model (`parseDataFromServer`, which also minted a
+     * `{ __type: "relation" }` ref for the target's own to-one relations) and
+     * then re-render that for REST: 3.4 µs a row against 1.4 µs for the row
+     * itself, and an envelope in a response whose contract has none.
+     */
+    private restRendering(
+        targetCollection: CollectionConfig,
+        targetTable: PgTable
+    ): (row: Record<string, unknown>) => Record<string, unknown> {
+        const hidden = Object.keys(hiddenColumnsOption(getTableColumns(targetTable), targetCollection) ?? {});
+        return (row) => {
+            if (hidden.length === 0) return toRestRow(row, targetCollection, this.registry);
+            const visible = { ...row };
+            for (const name of hidden) delete visible[name];
+            return toRestRow(visible, targetCollection, this.registry);
         };
     }
 
@@ -943,13 +993,16 @@ export class RelationService {
         parentIds: (string | number)[],
         _relationKey: string,
         relation: ResolvedRelation,
-        narrow?: SQL
+        narrow?: SQL,
+        /** `style` — how each target row is rendered; see {@link RelatedRowStyle}. */
+        options?: { style?: RelatedRowStyle }
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>>> {
         if (parentIds.length === 0) return new Map();
 
         const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
         const targetCollection = relation.target();
         const targetTable = getTableForCollection(targetCollection, this.registry);
+        const render = { rest: options?.style === "rest" ? this.restRendering(targetCollection, targetTable) : undefined };
         const targetPks = requirePrimaryKeys(targetCollection, this.registry);
         const targetIdInfo = targetPks[0];
         const targetIdField = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
@@ -1017,7 +1070,7 @@ export class RelationService {
 
                 resultMap.set(
                     buildCompositeId(parentRow, parentPks),
-                    await this.toRelatedRow(targetRow, targetCollection, targetPks)
+                    await this.toRelatedRow(targetRow, targetCollection, targetPks, render)
                 );
             }
 
@@ -1084,7 +1137,7 @@ export class RelationService {
             for (const [parentIdStr, fkValue] of parentToFk) {
                 const targetRow = targetById.get(String(fkValue));
                 if (targetRow) {
-                    resultMap.set(parentIdStr, await this.toRelatedRow(targetRow, targetCollection, targetPks));
+                    resultMap.set(parentIdStr, await this.toRelatedRow(targetRow, targetCollection, targetPks, render));
                 }
             }
 
@@ -1155,7 +1208,7 @@ export class RelationService {
 
             const parentId = parentIdByKey.get(String(foreignKeyValue));
             if (parentId !== undefined) {
-                resultMap.set(String(parentId), await this.toRelatedRow(targetRow, targetCollection, targetPks));
+                resultMap.set(String(parentId), await this.toRelatedRow(targetRow, targetCollection, targetPks, render));
             }
         }
 
@@ -1185,13 +1238,16 @@ export class RelationService {
         relation: ResolvedRelation,
         /** An extra condition on the target — see {@link batchFetchRelatedEntities}. */
         narrow?: SQL,
-        window?: RelatedRowWindow
+        window?: RelatedRowWindow,
+        /** `style` — how each target row is rendered; see {@link RelatedRowStyle}. */
+        options?: { style?: RelatedRowStyle }
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>[]>> {
         if (parentIds.length === 0) return new Map();
 
         const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
         const targetCollection = relation.target();
         const targetTable = getTableForCollection(targetCollection, this.registry);
+        const render = { rest: options?.style === "rest" ? this.restRendering(targetCollection, targetTable) : undefined };
         const targetPks = requirePrimaryKeys(targetCollection, this.registry);
         const targetIdInfo = targetPks[0];
         const targetIdField = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
@@ -1270,7 +1326,7 @@ export class RelationService {
                 const targetRow = (row[targetTableName] || row) as Record<string, unknown>;
                 const parentId = buildCompositeId(parentRow, parentPks);
                 const arr = resultMap.get(parentId) || [];
-                arr.push(await this.toRelatedRow(targetRow, targetCollection, targetPks));
+                arr.push(await this.toRelatedRow(targetRow, targetCollection, targetPks, render));
                 resultMap.set(parentId, arr);
             }
 
@@ -1349,7 +1405,7 @@ export class RelationService {
 
                 const parentId = String(junctionData[relation.through.sourceColumn]);
                 const arr = resultMap.get(parentId) || [];
-                const related = await this.toRelatedRow(targetData, targetCollection, targetPks);
+                const related = await this.toRelatedRow(targetData, targetCollection, targetPks, render);
                 if (junctionConfig) {
                     related.pivot = await this.readPivot(junctionData, junctionConfig, payloadKeys);
                 }
@@ -1426,7 +1482,7 @@ export class RelationService {
             if (parentId !== undefined) {
                 const key = String(parentId);
                 const arr = resultMap.get(key) || [];
-                arr.push(await this.toRelatedRow(targetRow, targetCollection, targetPks));
+                arr.push(await this.toRelatedRow(targetRow, targetCollection, targetPks, render));
                 resultMap.set(key, arr);
             }
         }
