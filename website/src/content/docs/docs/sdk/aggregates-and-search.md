@@ -157,6 +157,13 @@ ordering — this returns the nearest rows that also match, not the nearest rows
 filtered afterwards. Producing `queryVector` is your job: Rebase stores and
 searches embeddings, it does not compute them.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> The SDK sends a
+vector search as `POST /api/data/<collection>/query`, with the embedding in the
+body: in the URL, 768 dimensions are about 17 KB, past what Node (16 KB) and most
+proxies (nginx: 8 KB) accept. Against a server older than 0.24, which has no such
+route, it falls back to the `GET` — and a long embedding there can still be
+refused with a 431 or a 414.
+
 ### What you have to provide
 
 - **pgvector.** A `vector` property compiles to a `VECTOR(n)` column, and that

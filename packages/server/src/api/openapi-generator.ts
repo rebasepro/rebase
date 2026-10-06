@@ -711,36 +711,54 @@ description: "Whether more records exist beyond this page" },
         };
 
         // ── GET /data/{slug} — List entities ──────────────────────────
+        const listParameters = [
+            ...listQueryParameters(),
+            ...deletedParameters(collection),
+            ...buildFilterParameters(collection, reservedParameterNames)
+        ];
+        const listResponses = {
+            200: {
+                description: "Paginated list of entities",
+                content: {
+                    "application/json": {
+                        schema: {
+                            type: "object",
+                            properties: {
+                                data: {
+                                    type: "array",
+                                    items: { $ref: `#/components/schemas/${schemaName}` }
+                                },
+                                meta: { $ref: "#/components/schemas/PaginationMeta" }
+                            }
+                        }
+                    }
+                }
+            },
+            ...errorResponses(requireAuth)
+        };
+
+        // ── POST /data/{slug}/query — the same listing, parameters in the body
+        //
+        // Before the list path, as `/count` is. Documented from the list's own
+        // parameter list, so the two cannot describe different listings.
+        paths[`${dataPath}/query`] = {
+            post: queryOperation({
+                tags: [collection.name],
+                summary: `List ${collection.name}, parameters in the body`,
+                operationId: `query${schemaName}`,
+                parameters: listParameters,
+                responses: listResponses,
+                reserved: reservedParameterNames
+            })
+        };
+
         paths[dataPath] = {
             get: {
                 tags: [collection.name],
                 summary: `List ${collection.name}`,
                 operationId: `list${schemaName}`,
-                parameters: [
-                    ...listQueryParameters(),
-                    ...deletedParameters(collection),
-                    ...buildFilterParameters(collection, reservedParameterNames)
-                ],
-                responses: {
-                    200: {
-                        description: "Paginated list of entities",
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    type: "object",
-                                    properties: {
-                                        data: {
-                                            type: "array",
-                                            items: { $ref: `#/components/schemas/${schemaName}` }
-                                        },
-                                        meta: { $ref: "#/components/schemas/PaginationMeta" }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    ...errorResponses(requireAuth)
-                }
+                parameters: listParameters,
+                responses: listResponses
             },
             post: {
                 tags: [collection.name],
@@ -1134,6 +1152,40 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
             const targetSchema = schemaNameFor(targetCollection);
 
             const subPath = `/data/${slug}/{parentId}/${relationName}`;
+            const nestedParameters = [
+                { name: "parentId",
+in: "path",
+required: true,
+schema: { type: "string" },
+description: `${collection.singularName || collection.name} ID` },
+                // The nested list handler goes through the same
+                // `parseQueryOptions` and the same fetch as the root
+                // one, so it honours the same parameters. It documented
+                // four of them.
+                ...listQueryParameters()
+            ];
+            const nestedResponses = {
+                200: {
+                    description: `List of related ${relationName}`,
+                    content: {
+                        "application/json": {
+                            schema: {
+                                type: "object",
+                                properties: {
+                                    data: {
+                                        type: "array",
+                                        items: schemas[targetSchema]
+                                            ? { $ref: `#/components/schemas/${targetSchema}` }
+                                            : { type: "object" }
+                                    },
+                                    meta: { $ref: "#/components/schemas/PaginationMeta" }
+                                }
+                            }
+                        }
+                    }
+                },
+                ...errorResponses(requireAuth)
+            };
 
             // Only add if the schema exists (target collection is also registered)
             paths[subPath] = {
@@ -1141,41 +1193,19 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
                     tags: [collection.name],
                     summary: `List ${relationName} for ${withIndefiniteArticle(collection.singularName || collection.name)}`,
                     operationId: `list${schemaName}${toPascalCase(relationName)}`,
-                    parameters: [
-                        { name: "parentId",
-in: "path",
-required: true,
-schema: { type: "string" },
-description: `${collection.singularName || collection.name} ID` },
-                        // The nested list handler goes through the same
-                        // `parseQueryOptions` and the same fetch as the root
-                        // one, so it honours the same parameters. It documented
-                        // four of them.
-                        ...listQueryParameters()
-                    ],
-                    responses: {
-                        200: {
-                            description: `List of related ${relationName}`,
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        type: "object",
-                                        properties: {
-                                            data: {
-                                                type: "array",
-                                                items: schemas[targetSchema]
-                                                    ? { $ref: `#/components/schemas/${targetSchema}` }
-                                                    : { type: "object" }
-                                            },
-                                            meta: { $ref: "#/components/schemas/PaginationMeta" }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        ...errorResponses(requireAuth)
-                    }
+                    parameters: nestedParameters,
+                    responses: nestedResponses
                 }
+            };
+            paths[`${subPath}/query`] = {
+                post: queryOperation({
+                    tags: [collection.name],
+                    summary: `List ${relationName} for ${withIndefiniteArticle(collection.singularName || collection.name)}, parameters in the body`,
+                    operationId: `query${schemaName}${toPascalCase(relationName)}`,
+                    parameters: nestedParameters,
+                    responses: nestedResponses,
+                    reserved: reservedParameterNames
+                })
             };
         }
     }
@@ -1970,6 +2000,67 @@ function buildFilterParameters(
     }
 
     return params;
+}
+
+/**
+ * A `POST …/query` operation: the listing whose `parameters` are given, with
+ * its query parameters moved into a JSON body.
+ *
+ * Built from the `GET`'s own parameter list, so the body documents exactly
+ * what the route accepts — it turns the body back into those parameters and
+ * runs the `GET`'s parser (`query-body.ts`). A filter parameter takes a list
+ * where the URL would repeat it, and the four parameters whose URL value is
+ * JSON take the JSON value itself.
+ */
+function queryOperation(operation: {
+    tags: string[];
+    summary: string;
+    operationId: string;
+    parameters: Array<Record<string, unknown>>;
+    responses: Record<string, unknown>;
+    /** The listing's own parameter names; every other query parameter is a per-field filter. */
+    reserved: ReadonlySet<string>;
+}): Record<string, unknown> {
+    const jsonValued: Record<string, Record<string, unknown>> = {
+        where: { oneOf: [{ type: "object", additionalProperties: true }, { type: "string" }] },
+        include: { oneOf: [{ type: "object", additionalProperties: true }, { type: "string" }] },
+        orderBy: { oneOf: [{ type: "array", items: {} }, { type: "string" }] },
+        vector: { oneOf: [{ type: "array", items: { type: "number" } }, { type: "string" }] }
+    };
+    const properties: Record<string, unknown> = {};
+    for (const parameter of operation.parameters) {
+        if (parameter.in !== "query") continue;
+        const name = String(parameter.name);
+        const schema = parameter.schema as Record<string, unknown>;
+        const isFilter = !operation.reserved.has(name);
+        properties[name] = {
+            ...(jsonValued[name]
+                ?? (isFilter ? { oneOf: [schema, { type: "array", items: schema }] } : schema)),
+            ...(parameter.description ? { description: parameter.description } : {})
+        };
+    }
+    return {
+        tags: operation.tags,
+        summary: operation.summary,
+        description:
+            "The listing `GET` answers, with its query parameters in a JSON body instead of the URL: " +
+            "the same filters, page, count, cursor and includes, the same row-level security, and the " +
+            "same errors. It reads and never writes, so a credential needs `data:read` for it. Use it " +
+            "when the URL would not fit: a vector search's embedding is a JSON array in `vector`, and " +
+            "768 dimensions of it is 17 KB of URL, past what Node and most proxies accept. A parameter " +
+            "also on the URL is a 400 INVALID_QUERY_BODY.",
+        operationId: operation.operationId,
+        parameters: operation.parameters.filter(parameter => parameter.in !== "query"),
+        requestBody: {
+            required: true,
+            content: {
+                "application/json": {
+                    schema: { type: "object", properties }
+                }
+            }
+        },
+        responses: operation.responses
+    };
 }
 
 /**

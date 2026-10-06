@@ -21,6 +21,7 @@ For each collection, the following endpoints are generated. Every other route th
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/data/:slug` | List entities |
+| `POST` | `/api/data/:slug/query` | <span class="since-badge" data-since="0.24">Since 0.24</span> The same listing, its query parameters in a JSON body — for a query too long for a URL. See [Queries too long for a URL](#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | Count entities |
 | `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, optionally grouped. Takes the same filters as the list endpoint, and RLS applies to the rows being aggregated — see [Querying](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
@@ -38,6 +39,7 @@ Nested relations are accessible via URL paths:
 
 ```
 GET    /api/data/authors/42/posts         → list author's posts
+POST   /api/data/authors/42/posts/query   → the same listing, parameters in the body (0.24+)
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
 PATCH  /api/data/authors/42/posts/7       → update the post
@@ -459,6 +461,48 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 | `vector` | `string` | A JSON-serialized array of floats representing the query vector. |
 | `vector_distance` | `string` | The distance metric to evaluate. Supported values: `cosine` (default, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
 | `vector_threshold` | `number` | Maximum distance threshold. Only records with distance less than this threshold are returned. |
+
+An embedding is long in a URL: 768 dimensions are about 17 KB of query string and
+1,536 about 33 KB. The server accepts up to 64 KB of request line and headers
+(<span class="since-badge" data-since="0.24">Since 0.24</span>; 16 KB before, a 431
+from 768 dimensions up), and a proxy in front of it usually accepts less — nginx's
+default is 8 KB. Send a vector search as [`POST …/query`](#queries-too-long-for-a-url)
+instead; the SDK always does.
+
+## Queries too long for a URL
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> `POST /api/data/:slug/query`
+is the listing `GET /api/data/:slug` answers, with the query parameters in a JSON
+body instead of the URL. Use it when the URL would not fit — a vector search's
+embedding, a filter on a long `in` list. The SDK sends every vector search this way,
+and any other query whose URL would pass 6 KB.
+
+```bash
+POST /api/data/docs/query
+Content-Type: application/json
+
+{
+  "vector_search": "embedding",
+  "vector": [0.15, 0.22, -0.05],
+  "vector_threshold": 0.8,
+  "where": { "status": ["==", "published"] },
+  "limit": 10
+}
+```
+
+The body's keys are the query parameters, and the server reads them back into
+exactly the parameters the `GET` reads, through the same parser — same filters,
+page, count, cursor and includes, same row-level security, same errors. A value is
+spelled as the URL spells it: a string (or a number or boolean), and for a filter
+repeated in the URL a list (`"views": ["gte.10", "lte.99"]`). `where`, `include`,
+`orderBy` and `vector` take their JSON value itself or that JSON as a string. A
+list for a parameter the URL reads once, an object anywhere else, or a parameter
+also put on the URL is a 400 `INVALID_QUERY_BODY`.
+
+It only reads, so an API key needs `data:read` for it, not `data:write`, and it
+counts against the same rate limit as the `GET`. Nested listings have it too:
+`POST /api/data/authors/42/posts/query`. A server older than 0.24 answers it 404;
+the SDK then sends the `GET`.
 
 ## Relation Inclusion
 

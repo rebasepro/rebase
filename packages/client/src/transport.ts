@@ -214,30 +214,40 @@ export function assertNoUndefinedFilterValues(where: Record<string, unknown>): v
     }
 }
 
-export function buildQueryString(params?: FindParams): string {
-    if (!params) return "";
-    const parts: string[] = [];
+/**
+ * A find's parameters as `[name, value]` pairs, in the order the URL carries
+ * them, values not yet URL-encoded.
+ *
+ * One list for both spellings of a listing: {@link buildQueryString} encodes it
+ * into the `GET`'s URL, and {@link buildQueryBody} gathers it into the body of
+ * `POST …/query`, which the server turns back into exactly these parameters.
+ * Two serializers would be two chances to send a query one way and not the
+ * other.
+ */
+function findParamPairs(params?: FindParams): [string, string][] {
+    if (!params) return [];
+    const pairs: [string, string][] = [];
 
-    if (params.limit != null) parts.push(`limit=${params.limit}`);
-    if (params.offset != null) parts.push(`offset=${params.offset}`);
-    if (params.page != null) parts.push(`page=${params.page}`);
+    if (params.limit != null) pairs.push(["limit", String(params.limit)]);
+    if (params.offset != null) pairs.push(["offset", String(params.offset)]);
+    if (params.page != null) pairs.push(["page", String(params.page)]);
     // The opaque keyset cursor, passed straight back. Nothing on this side
     // reads it: the encoding is the server's, and a client that parsed it would
     // be depending on something that exists to be changed.
-    if (params.after) parts.push(`after=${encodeURIComponent(params.after)}`);
+    if (params.after) pairs.push(["after", params.after]);
     // Only `none`: `exact` is the server's default, so sending it says
     // nothing — and a server older than the parameter reads any `?count=` as
     // a filter on a column named `count` (see `find` in collection.ts).
-    if (params.count === "none") parts.push("count=none");
+    if (params.count === "none") pairs.push(["count", "none"]);
 
     if (params.orderBy) {
         const wire = serializeOrderBy(params.orderBy);
-        if (wire) parts.push(`orderBy=${encodeURIComponent(wire)}`);
+        if (wire) pairs.push(["orderBy", wire]);
     }
 
     if (params.searchString) {
-        parts.push(`searchString=${encodeURIComponent(params.searchString)}`);
-        if (params.searchExplain) parts.push("searchExplain=true");
+        pairs.push(["searchString", params.searchString]);
+        if (params.searchExplain) pairs.push(["searchExplain", "true"]);
     }
 
     // The server keys vector search off `vector_search` naming the property and
@@ -245,10 +255,10 @@ export function buildQueryString(params?: FindParams): string {
     // it ignores the pair entirely.
     if (params.vectorSearch) {
         const vs = params.vectorSearch;
-        parts.push(`vector_search=${encodeURIComponent(vs.property)}`);
-        parts.push(`vector=${encodeURIComponent(JSON.stringify(vs.vector))}`);
-        if (vs.distance) parts.push(`vector_distance=${encodeURIComponent(vs.distance)}`);
-        if (vs.threshold !== undefined) parts.push(`vector_threshold=${encodeURIComponent(String(vs.threshold))}`);
+        pairs.push(["vector_search", vs.property]);
+        pairs.push(["vector", JSON.stringify(vs.vector)]);
+        if (vs.distance) pairs.push(["vector_distance", vs.distance]);
+        if (vs.threshold !== undefined) pairs.push(["vector_threshold", String(vs.threshold)]);
     }
 
     // Through the shared codec, which picks the wire spelling: comma-separated
@@ -256,25 +266,50 @@ export function buildQueryString(params?: FindParams): string {
     // server accepts both and tells them apart the same way. Joining an array
     // here — which is what this did — could not express the tree at all.
     const include = serializeInclude(params.include);
-    if (include) parts.push(`include=${encodeURIComponent(include)}`);
+    if (include) pairs.push(["include", include]);
 
     if (params.fields && params.fields.length > 0) {
-        parts.push(`fields=${encodeURIComponent(params.fields.join(","))}`);
+        pairs.push(["fields", params.fields.join(",")]);
     }
 
     // Only when true. `?distinct=false` is the default and sending it says
     // nothing, while the server refuses anything that is neither.
-    if (params.distinct) parts.push("distinct=true");
+    if (params.distinct) pairs.push(["distinct", "true"]);
 
     if (params.logical) {
         const root = params.logical;
         const serialized = (root.conditions ?? []).map(serializeLogicalCondition).join(",");
-        parts.push(`${root.type}=${encodeURIComponent(`(${serialized})`)}`);
+        pairs.push([root.type, `(${serialized})`]);
     }
 
-    if (params.where) appendWhere(parts, params.where);
+    if (params.where) appendWhere(pairs, params.where);
 
-    return parts.length > 0 ? "?" + parts.join("&") : "";
+    return pairs;
+}
+
+const encodePairs = (pairs: [string, string][]): string =>
+    pairs.length > 0
+        ? "?" + pairs.map(([name, value]) => `${encodeURIComponent(name)}=${encodeURIComponent(value)}`).join("&")
+        : "";
+
+export function buildQueryString(params?: FindParams): string {
+    return encodePairs(findParamPairs(params));
+}
+
+/**
+ * The body of `POST /data/<collection>/query`: the parameters
+ * {@link buildQueryString} puts in the URL, spelled as the URL spells them —
+ * each value a string, and a parameter the URL repeats (a filter with two
+ * conditions on one field) a list of them. The server reads it back into the
+ * same parameters and runs the same listing.
+ */
+export function buildQueryBody(params?: FindParams): Record<string, string | string[]> {
+    const body: Record<string, string | string[]> = {};
+    for (const [name, value] of findParamPairs(params)) {
+        const held = body[name];
+        body[name] = held === undefined ? value : [...(Array.isArray(held) ? held : [held]), value];
+    }
+    return body;
 }
 
 /**
@@ -288,7 +323,7 @@ export function buildQueryString(params?: FindParams): string {
  * same dot-string spelling, which the server decodes through the same codec and
  * merges in. A collection with no such column sends exactly what it did before.
  */
-function appendWhere(parts: string[], where: Record<string, unknown>): void {
+function appendWhere(pairs: [string, string][], where: Record<string, unknown>): void {
     assertNoUndefinedFilterValues(where);
     const serialized = serializeFilter(where);
     const reserved: Record<string, string | string[]> = {};
@@ -297,16 +332,10 @@ function appendWhere(parts: string[], where: Record<string, unknown>): void {
             reserved[field] = value;
             continue;
         }
-        if (Array.isArray(value)) {
-            for (const v of value) {
-                parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(v)}`);
-            }
-        } else {
-            parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(value)}`);
-        }
+        for (const v of Array.isArray(value) ? value : [value]) pairs.push([field, v]);
     }
     if (Object.keys(reserved).length > 0) {
-        parts.push(`where=${encodeURIComponent(JSON.stringify(reserved))}`);
+        pairs.push(["where", JSON.stringify(reserved)]);
     }
 }
 
@@ -324,29 +353,29 @@ function appendWhere(parts: string[], where: Record<string, unknown>): void {
  * and bounds the number of *groups*.
  */
 export function buildAggregateQueryString(params: AggregateParams): string {
-    const parts: string[] = [];
+    const pairs: [string, string][] = [];
 
     const select = params.select
         .map(entry => `${entry.fn}(${(entry as { field?: string }).field ?? ""})`)
         .join(",");
-    parts.push(`select=${encodeURIComponent(select)}`);
+    pairs.push(["select", select]);
 
     if (params.groupBy && params.groupBy.length > 0) {
-        parts.push(`groupBy=${encodeURIComponent(params.groupBy.join(","))}`);
+        pairs.push(["groupBy", params.groupBy.join(",")]);
     }
-    if (params.limit != null) parts.push(`limit=${params.limit}`);
-    if (params.offset != null) parts.push(`offset=${params.offset}`);
+    if (params.limit != null) pairs.push(["limit", String(params.limit)]);
+    if (params.offset != null) pairs.push(["offset", String(params.offset)]);
     if (params.searchString) {
-        parts.push(`searchString=${encodeURIComponent(params.searchString)}`);
+        pairs.push(["searchString", params.searchString]);
     }
     if (params.logical) {
         const root = params.logical;
         const serialized = (root.conditions ?? []).map(serializeLogicalCondition).join(",");
-        parts.push(`${root.type}=${encodeURIComponent(`(${serialized})`)}`);
+        pairs.push([root.type, `(${serialized})`]);
     }
-    if (params.where) appendWhere(parts, params.where);
+    if (params.where) appendWhere(pairs, params.where);
 
-    return "?" + parts.join("&");
+    return encodePairs(pairs);
 }
 
 /**

@@ -195,6 +195,7 @@ the ID you got. Read the response header.
 | `INVALID_ORDER_BY` | 400 | `?orderBy=` is not `field`, `field:desc`, or a JSON array of `{ field, direction }`. | See the message; it shows all three spellings. |
 | `INVALID_PAGE` | 400 | `?page=` is not a whole number of 1 or more. Pages are 1-based, so `?page=0` is a mistake rather than the first page. | Send `1` or higher, or use `?offset=`. |
 | `INVALID_PARAM` | 400 | A query parameter is malformed. | See the message. |
+| `INVALID_QUERY_BODY` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> The body of a `POST …/query` holds a value the URL could not have carried: a list for a parameter the URL reads once (`fields`, `limit`, …), an object for a filter, or a parameter that is also on the URL. | Spell each value as the URL does — a string, or a list for a repeated filter; `where`, `include`, `orderBy` and `vector` take JSON. See [Queries too long for a URL](/docs/backend/api/#queries-too-long-for-a-url). |
 | `INVALID_VECTOR` | 400 | `?vector=` is not a JSON array of numbers. | Send `[0.1,0.2,0.3]`. |
 | `INVALID_VECTOR_DISTANCE` | 400 | `?vector_distance=` is not `cosine`, `l2` or `inner_product`. | Use one of those three. |
 | `INVALID_VECTOR_THRESHOLD` | 400 | `?vector_threshold=` is not a number. | Send a number. |
@@ -217,6 +218,7 @@ the ID you got. Read the response header.
 | `ROW_IN_TRASH` | 409 | <span class="since-badge" data-since="0.24">Since 0.24</span> An upsert's key belongs to a row in the trash (a soft-deleted row still holds its key). An upsert does not write into a deleted row, on any door: REST `?on_conflict=`, `/bulk` and `/_batch` upserts, the SDK and the realtime socket. Nothing was written. | Restore the row first (an update setting the soft-delete field to `null`), or purge it with `?hard=true` and upsert again. See [Soft delete](/docs/collections/soft-delete/). |
 | `SCHEMA_DRIFT` | 500 | A table or column the code expects does not exist in the database. | `rebase db push` in development; redeploy on a managed tenant. |
 | `SCORE_CURSOR_UNSUPPORTED` | 400 | `startAfter` was combined with `orderBy: "_score"`. Relevance is computed per query rather than stored, so it cannot key a cursor. | Page relevance with `limit`/`offset`, or order by a column. |
+| `SQL_ERROR` | 400 | The database refused SQL a person wrote. Over the realtime socket's `EXECUTE_SQL` it is an `ERROR` frame carrying the database's message. <span class="since-badge" data-since="0.24">Since 0.24</span> `POST /api/admin/sql/csv` answers it before any of the file is sent: a syntax error, a write (the download runs read-only), more than one statement, or a role the connection may not take. | Fix the SQL. A download takes one `SELECT`, `WITH … SELECT`, `TABLE` or `VALUES`. |
 | `TENANT_IMMUTABLE` | 400 | A write would move a row from one tenant to another. A row cannot change tenant. `details.violations` names the field. | Create the row in the other tenant and delete this one, or write with a role in `tenant.bypassRoles`. |
 | `TENANT_MISMATCH` | 400 | The write names a tenant this caller does not belong to; the database would refuse it as well. | Write into a tenant the caller belongs to, or authenticate as one that belongs to it. |
 | `TENANT_REQUIRED` | 400 | The collection is tenant-scoped and the tenant cannot be inferred: the request carries none, or the caller belongs to several. | Send the tenant field explicitly, or authenticate as a caller belonging to exactly one. |
@@ -320,6 +322,7 @@ so a panel can grey the feature out instead of showing an error.
 | `SCHEMA_EDITOR_MISSING_DEPENDENCY` | 501 | The schema editor needs `ts-morph`, which is not installed. | `pnpm add -D ts-morph@28.0.0`. |
 | `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | The server has no `collectionsDir`, so the editor has nothing to write to. | Set `collectionsDir`. |
 | `SCHEMA_EDITOR_PRODUCTION` | 501 | The editor is off under `NODE_ENV=production`: a deployed server's files are rebuilt from your repository on every deploy, so an edit here would be discarded. | Edit collections in development and deploy. |
+| `SQL_EXPORT_UNSUPPORTED` | 501 | <span class="since-badge" data-since="0.24">Since 0.24</span> `POST /api/admin/sql/csv` cannot stream a result here: the in-process development database (PGlite) has one connection, and a cursor held across a download would hold every other query behind it; or the data source has no SQL cursor. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one), or add a `LIMIT` and export the rows on screen. |
 
 ## Generic codes
 

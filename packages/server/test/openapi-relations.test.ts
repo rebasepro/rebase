@@ -77,9 +77,13 @@ foreignKeyOnTarget: "post_id" }]
     };
 
     it("documents to-many relations that never spelled out a name", () => {
+        // Each listing with its `POST …/query` twin, which reads the same
+        // parameters from a body.
         expect(nestedPaths()).toEqual([
             "/data/posts/{parentId}/comments",
-            "/data/posts/{parentId}/tags"
+            "/data/posts/{parentId}/comments/query",
+            "/data/posts/{parentId}/tags",
+            "/data/posts/{parentId}/tags/query"
         ]);
     });
 

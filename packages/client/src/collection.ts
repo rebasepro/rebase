@@ -1,6 +1,7 @@
 import {
     assertNoUndefinedFilterValues,
     buildAggregateQueryString,
+    buildQueryBody,
     buildQueryString,
     FindParams,
     RebaseApiError,
@@ -123,6 +124,39 @@ function inflightCountsFor(transport: Transport): Map<string, Promise<number>> {
  * page load.
  */
 const serversWithoutCountParam = new WeakSet<Transport>();
+
+/**
+ * The longest URL a `find()` sends as a `GET`. Past it the parameters go in
+ * the body of `POST /data/<collection>/query` instead.
+ *
+ * Not the server's own ceiling but the one in front of it: nginx refuses a
+ * request line over 8 KB by default (414), and a proxy or CDN is in front of
+ * most deployments. 6 KB leaves the rest of the request line, and the headers
+ * some proxies count against the same buffer, room.
+ */
+const MAX_FIND_URL_LENGTH = 6 * 1024;
+
+/**
+ * Transports whose server has no `POST …/query` — every server before 0.24.
+ *
+ * Such a server answers the POST 404 (or a proxy 405), and the read is sent
+ * again as the `GET` it has always been, which may well be refused for its
+ * length: that refusal is the old server's answer, and the caller sees it.
+ * Membership is never cleared, as for {@link serversWithoutCountParam}.
+ */
+const serversWithoutQueryRoute = new WeakSet<Transport>();
+
+/**
+ * Whether a `find()` goes as `POST …/query` rather than `GET`: always for a
+ * vector search, whose embedding is a JSON array in the URL (768 dimensions
+ * are 17 KB of it, past Node's 16 KB and nginx's 8 KB), and for anything else
+ * whose URL would not fit through a proxy.
+ */
+function sendsQueryBody(transport: Transport, path: string, queryString: string, params: FindParams | undefined): boolean {
+    if (serversWithoutQueryRoute.has(transport)) return false;
+    if (params?.vectorSearch) return true;
+    return `${transport.baseUrl ?? ""}${transport.apiPath ?? ""}${path}${queryString}`.length > MAX_FIND_URL_LENGTH;
+}
 
 function isCountReadAsFilter(error: unknown): boolean {
     if (!(error instanceof RebaseApiError) || error.status !== 400 || error.code !== "UNKNOWN_FILTER_FIELD") {
@@ -291,10 +325,33 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
 
     const client: CollectionClient<M> = {
         async find(params?: FindParams<M>): Promise<FindResult<M>> {
-            const read = (p: FindParams<M> | undefined) => transport.request<{
-                data: Record<string, unknown>[];
-                meta: FindResult<M>["meta"]
-            }>(basePath + buildQueryString(p), { method: "GET" });
+            type Page = { data: Record<string, unknown>[]; meta: FindResult<M>["meta"] };
+            const read = async (p: FindParams<M> | undefined): Promise<Page> => {
+                const queryString = buildQueryString(p);
+                const get = () => transport.request<Page>(basePath + queryString, { method: "GET" });
+                if (!sendsQueryBody(transport, basePath, queryString, p)) return get();
+                try {
+                    return await transport.request<Page>(`${basePath}/query`, {
+                        method: "POST",
+                        body: JSON.stringify(buildQueryBody(p))
+                    });
+                } catch (error) {
+                    if (!(error instanceof RebaseApiError) || (error.status !== 404 && error.status !== 405)) throw error;
+                    // A server without the route, or a collection it does not
+                    // have: the GET tells the two apart. A 404 from it as well
+                    // is the collection's, and says nothing about the route.
+                    try {
+                        const page = await get();
+                        serversWithoutQueryRoute.add(transport);
+                        return page;
+                    } catch (getError) {
+                        if (!(getError instanceof RebaseApiError && getError.status === 404)) {
+                            serversWithoutQueryRoute.add(transport);
+                        }
+                        throw getError;
+                    }
+                }
+            };
             const counted = { ...params, count: undefined };
             let raw: Awaited<ReturnType<typeof read>>;
             if (params?.count !== "none") {

@@ -33,6 +33,7 @@ import {
     type IdempotencyStore
 } from "./idempotency";
 import { HARD_DELETE_QUERY_PARAM, parseHardDelete } from "./soft-delete-params";
+import { queryDictFromBody } from "./query-body";
 
 /**
  * Parse a JSON request body for a create/update. An empty body yields `{}`
@@ -1291,6 +1292,53 @@ export class RestApiGenerator {
     }
 
     /**
+     * A listing — `GET /<collection>` and `POST /<collection>/query`, and the
+     * same two through a parent — from the parameters as the `GET` reads them
+     * off its URL.
+     *
+     * One method for both verbs is the whole contract of the POST route: the
+     * same parser, the same field-access refusals, the same page, count,
+     * cursor and include, the same errors. The caller has already checked the
+     * credential's scope for `collection`.
+     *
+     * @param collectionPath a nested listing's `parent/:id/child` path; unset
+     *   for the collection's own.
+     */
+    private async listRows(
+        c: Context<HonoEnv>,
+        collection: CollectionConfig,
+        queryDict: Record<string, string[]>,
+        collectionPath?: string
+    ): Promise<Response> {
+        const queryOptions = this.parseQuery(queryDict, { collection, c });
+        const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
+        // `?searchExplain=true` asks each row which declared field matched.
+        // Opt-in per request because it costs a `ts_headline` per field per
+        // row; any value other than "true" is a no.
+        const searchExplainRaw = Array.isArray(queryDict.searchExplain) ? queryDict.searchExplain[queryDict.searchExplain.length - 1] : undefined;
+
+        const page = await RestApiGenerator.readPage(
+            this.getScopedDriver(c),
+            collection,
+            queryOptions,
+            searchString,
+            searchExplainRaw === "true",
+            collectionPath
+        );
+
+        return c.json({
+            data: page.rows,
+            meta: page.meta
+        });
+    }
+
+    /** A `POST …/query` body, as the dictionary {@link listRows} reads. See `query-body.ts`. */
+    private async queryDictFromRequest(c: Context<HonoEnv>): Promise<Record<string, string[]>> {
+        const body = await parseJsonBody(c);
+        return queryDictFromBody(body, Object.keys(c.req.queries()));
+    }
+
+    /**
      * Create REST routes for a collection using existing Rebase patterns
      */
     private createCollectionRoutes(collection: CollectionConfig): void {
@@ -1404,25 +1452,19 @@ export class RestApiGenerator {
         // GET /collection - List entities
         this.router.get(basePath, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
-            const queryDict = c.req.queries();
-            const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
-            const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-            // `?searchExplain=true` asks each row which declared field matched.
-            // Opt-in per request because it costs a `ts_headline` per field per
-            // row; any value other than "true" is a no.
-            const searchExplainRaw = Array.isArray(queryDict.searchExplain) ? queryDict.searchExplain[queryDict.searchExplain.length - 1] : undefined;
-            const searchExplain = searchExplainRaw === "true";
+            return this.listRows(c, resolvedCollection, c.req.queries());
+        });
 
-            const driver = this.getScopedDriver(c);
-
-            const page = await RestApiGenerator.readPage(
-                driver, resolvedCollection, queryOptions, searchString, searchExplain
-            );
-
-            return c.json({
-                data: page.rows,
-                meta: page.meta
-            });
+        // POST /collection/query — the same listing, its parameters in the
+        // body. For a query whose URL would not fit: a vector search's
+        // embedding, a long `in` list. See `query-body.ts`.
+        //
+        // A read, so it needs `data:read` and not the `data:write` its verb
+        // would map to: a key scoped to read must be able to search, and one
+        // scoped to write must not read through it.
+        this.router.post(`${basePath}/query`, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug, "read");
+            return this.listRows(c, resolvedCollection, await this.queryDictFromRequest(c));
         });
 
         // GET /collection/:id - Get single entity
@@ -1886,27 +1928,11 @@ id };
                 // filter would have excluded. Rewriting it to match was not
                 // enough: every parameter added afterwards had to be remembered
                 // in two places, and this is the copy that kept being missed.
-                const queryDict = c.req.queries();
-                const queryOptions = this.parseQuery(queryDict, nestedAccess);
-                const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-                const searchExplainRaw = Array.isArray(queryDict.searchExplain) ? queryDict.searchExplain[queryDict.searchExplain.length - 1] : undefined;
-
-                const page = await RestApiGenerator.readPage(
-                    driver,
-                    // The collection hoisted above, not a second lookup of the
-                    // same path: one resolve, so the access check and the read
-                    // are answered about the same collection.
-                    nestedCollection,
-                    queryOptions,
-                    searchString,
-                    searchExplainRaw === "true",
-                    nested.path
-                );
-
-                return c.json({
-                    data: page.rows,
-                    meta: page.meta
-                });
+                //
+                // The collection hoisted above, not a second lookup of the
+                // same path: one resolve, so the access check and the read
+                // are answered about the same collection.
+                return this.listRows(c, nestedCollection, c.req.queries(), nested.path);
             }
         });
 
@@ -1916,7 +1942,18 @@ id };
             if (!rest || rest === "undefined") return next();
             const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${rest}`;
             const parsed = parseSubPath(rawPath);
-            if (!parsed || parsed.id) return next();
+            if (!parsed) return next();
+
+            // POST /parent/:parentId/child/query — the nested listing, its
+            // parameters in the body, as `POST /<collection>/query` is the
+            // root one. A POST to a row's address is otherwise no route, so
+            // `query` in the id position names nothing else.
+            if (parsed.id === "query") {
+                const nested = this.resolveNestedPath(parsed.collectionPath);
+                this.enforceSubcollectionApiKeyPermission({ get: (key: string) => c.get(key as never), req: { method: "GET" } }, nested);
+                return this.listRows(c, nested.chain[nested.chain.length - 1], await this.queryDictFromRequest(c), nested.path);
+            }
+            if (parsed.id) return next();
 
             const driver = this.getScopedDriver(c);
 
