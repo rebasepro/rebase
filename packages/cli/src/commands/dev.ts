@@ -790,15 +790,36 @@ function projectHasCollections(projectRoot: string): boolean {
  * problem itself. A dev server that refuses to boot because codegen failed is
  * worse than one that boots and says so.
  */
-async function ensureGeneratedSchema(projectRoot: string): Promise<void> {
-    if (!projectHasCollections(projectRoot)) return;
+async function ensureGeneratedSchema(projectRoot: string): Promise<SchemaGeneration> {
+    if (!projectHasCollections(projectRoot)) return "skipped";
     try {
         await runDriverSchemaCommand(["node", "rebase", "schema", "generate"], { quiet: true });
+        return "generated";
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.log(`  ${chalk.yellow("⚠")} ${chalk.gray(`Could not regenerate the database schema: ${message}`)}`);
         console.log(`  ${chalk.gray(`Run ${chalk.cyan("rebase schema generate")} to see why. Collection reads will fail until it succeeds.`)}`);
+        return "failed";
     }
+}
+
+/** What {@link ensureGeneratedSchema} did at startup. */
+export type SchemaGeneration = "generated" | "skipped" | "failed";
+
+/**
+ * Whether dev must still run the driver's `schema stale --fix` before the
+ * backend boots.
+ *
+ * Not after a regeneration that succeeded: that wrote `schema.generated.ts`
+ * from these collections with this driver, moments earlier, and `stale`
+ * compares the file against the same generator — it can only answer "nothing
+ * stale", and it cost a driver process (~0.6 s) on every start. The repair it
+ * exists for, a library upgrade that changed what the generator derives, is
+ * exactly what the regeneration already did. When generation was skipped or
+ * failed, the preflight is the remaining safety net and still runs.
+ */
+export function needsStaleSchemaPreflight(generation: SchemaGeneration): boolean {
+    return generation !== "generated";
 }
 
 /**
@@ -1015,12 +1036,13 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // has one that is plainly local and plainly not running. Everything about
     // when it declines is in `ensureDevDatabase`; the frontend-only case is
     // decided here because there is no backend to need a database at all.
+    let schemaGeneration: SchemaGeneration = "skipped";
     if (!frontendOnly) {
         // Before the database, because neither needs one and because the push
         // below regenerates the schema anyway on the one path that reaches it.
         // Side by side: they read the same collections and write different
         // files, so the SDK costs nothing on top of the schema's two seconds.
-        await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdk(projectRoot)]);
+        [schemaGeneration] = await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdk(projectRoot)]);
         await runDatabasePreflight({
             projectRoot,
             disabled: noDb,
@@ -1427,7 +1449,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         try {
             const activePlugin = getActiveBackendPlugin(backendDir);
             const pluginCli = activePlugin ? resolvePluginCliScript(backendDir, activePlugin) : null;
-            if (pluginCli) {
+            if (pluginCli && needsStaleSchemaPreflight(schemaGeneration)) {
                 await execa(tsxBin, [pluginCli, "schema", "stale", "--fix"], {
                     cwd: backendDir,
                     stdio: "inherit",

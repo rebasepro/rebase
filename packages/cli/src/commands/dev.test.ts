@@ -18,7 +18,7 @@ import net from "net";
 import os from "os";
 import path from "path";
 
-import { appBannerLines, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devStaticShape, devWatchArgs, devWatchIncludes, getProjectPort, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
+import { appBannerLines, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devStaticShape, devWatchArgs, devWatchIncludes, getProjectPort, needsStaleSchemaPreflight, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
 import type { PreparedDatabase } from "../dev-db/prepare";
 import { validateManifest } from "../manifest";
 
@@ -231,6 +231,26 @@ describe("devWatchArgs", () => {
             fs.rmSync(root, { recursive: true, force: true });
         }
     }, 30_000);
+});
+
+/**
+ * One driver process for the schema on a `rebase dev` start, not two.
+ *
+ * Dev regenerates `schema.generated.ts` before the database, then used to run
+ * the driver's `schema stale --fix` too — which compares that file against the
+ * generator that wrote it a moment earlier, so it could only answer "nothing
+ * stale", for ~0.6 s of every start. It still runs when there was nothing to
+ * regenerate or the regeneration failed: then it is the only safety net.
+ */
+describe("needsStaleSchemaPreflight", () => {
+    it("is skipped after a regeneration that succeeded", () => {
+        expect(needsStaleSchemaPreflight("generated")).toBe(false);
+    });
+
+    it("still runs when the regeneration was skipped or failed", () => {
+        expect(needsStaleSchemaPreflight("skipped")).toBe(true);
+        expect(needsStaleSchemaPreflight("failed")).toBe(true);
+    });
 });
 
 describe("getProjectPort", () => {
