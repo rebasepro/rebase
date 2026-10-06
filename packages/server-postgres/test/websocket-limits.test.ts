@@ -179,6 +179,40 @@ describe("socket rate limits", () => {
         expect(errorCode(await exchange(other, fetchFrame("e")))).toBeUndefined();
     });
 
+    it("counts an API key's data frames at the key's own rate limit, across its sockets", async () => {
+        // The limit the API keys panel shows. Bucketed as the key's uid, a key
+        // limited to 2 got the per-user allowance on the socket.
+        const { port, fetched } = await start({
+            auth: { requireAuth: true, jwtSecret: "s".repeat(32) },
+            limits: {
+                resolveApiKey: async (token: string) => ({
+                    uid: "api-key:k1",
+                    roles: ["service"],
+                    scopes: ["data:read"],
+                    apiKey: { id: token === "rk_live_k1" ? "k1" : "k2", rate_limit: 2 }
+                }),
+                dataRateLimit: createDataRateLimitCheck({ user: 100, apiKey: 100, store: new MemoryRateLimitStore(60_000) })
+            }
+        });
+        const signInWithKey = async (key: string) => {
+            const ws = await open(port);
+            const answer = await exchange(ws, { type: "AUTHENTICATE", requestId: "auth", payload: { token: key } });
+            expect(answer.kind === "message" && answer.frame.type).toBe("AUTH_SUCCESS");
+            return ws;
+        };
+        const first = await signInWithKey("rk_live_k1");
+        const second = await signInWithKey("rk_live_k1");
+
+        expect(errorCode(await exchange(first, fetchFrame("a")))).toBeUndefined();
+        expect(errorCode(await exchange(second, fetchFrame("b")))).toBeUndefined();
+        expect(errorCode(await exchange(first, fetchFrame("c")))).toBe("RATE_LIMITED");
+        expect(fetched()).toBe(2);
+
+        // Another key's allowance is its own.
+        const other = await signInWithKey("rk_live_k2");
+        expect(errorCode(await exchange(other, fetchFrame("d")))).toBeUndefined();
+    });
+
     it("counts frames from a socket that has not authenticated against the connection's budget", async () => {
         const { port } = await start({ auth: { requireAuth: true, jwtSecret: "s".repeat(32) } });
         const ws = await open(port);

@@ -564,6 +564,9 @@ function KeyDetail({ apiKey, catalogue, revoking, onRevoke }: {
                         ? <StatCard label={t("studio_api_keys_stat_created_by")} value={apiKey.created_by} mono/>
                         : <StatCard label={t("studio_api_keys_stat_owner")} value={apiKey.owner_uid ?? "—"} mono/>}
                 </div>
+                <Typography variant="caption" color="secondary" className="block mt-2 text-[11px] leading-snug">
+                    {t("studio_api_keys_rate_limit_scope")}
+                </Typography>
             </div>
 
             {/* Scopes */}

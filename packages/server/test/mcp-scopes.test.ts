@@ -83,6 +83,21 @@ describe("an API key at /mcp", () => {
         expect(scopedAs.at(-1)).toEqual(expect.objectContaining({ uid: "user-7", roles: ["editor"] }));
     });
 
+    it("is limited at the key's own rate limit, not as the account it acts as", async () => {
+        // The limit the API keys panel shows. Bucketed as its uid, the key got
+        // the per-user allowance here, shared with its owner's own requests.
+        const limited: ApiKeyIdentity = {
+            ...identity(["data:read"]),
+            apiKey: { id: "k7", rate_limit: 2 } as ApiKeyIdentity["apiKey"]
+        };
+        const { app } = buildApp({ rateLimit: { user: 100, apiKey: 100 }, resolveApiKey: async () => limited });
+        const ping = { jsonrpc: "2.0", id: 1, method: "ping" };
+
+        expect((await rpc(app, "rk_live_test", ping)).status).toBe(200);
+        expect((await rpc(app, "rk_live_test", ping)).status).toBe(200);
+        expect((await rpc(app, "rk_live_test", ping)).status).toBe(429);
+    });
+
     it("refuses a key that does not verify, with the reason", async () => {
         const { app } = buildApp({ resolveApiKey: async () => ({ message: "API key has been revoked" }) });
         const res = await rpc(app, "rk_live_test", { jsonrpc: "2.0", id: 1, method: "tools/list" });

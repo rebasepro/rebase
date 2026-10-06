@@ -203,6 +203,11 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
                     { "WWW-Authenticate": bearerChallenge(config.publicUrl, config.mcpPath, DEFAULT_MCP_SCOPE) }
                 );
             }
+            // The request is authenticated by this key, so the rate limiter
+            // counts it in the key's own bucket at the key's own `rate_limit`
+            // — the one its HTTP requests and socket frames count in — rather
+            // than as the account it acts as.
+            c.set("apiKey", resolved.apiKey);
             return {
                 uid: resolved.uid,
                 roles: resolved.roles,

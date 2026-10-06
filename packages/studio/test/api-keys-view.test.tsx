@@ -141,6 +141,16 @@ describe("a key's detail", () => {
         expect(screen.queryByText(en.studio_api_keys_target_all_collection!)).toBeNull();
         expect(screen.getByText("Read server logs")).toBeTruthy();
     });
+
+    it("says which requests its rate limit counts, and that admin operations are not among them", async () => {
+        listKeys.mockResolvedValue({ keys: [serviceKey({ rate_limit: 50 })] });
+        render(<ApiKeysView/>);
+
+        fireEvent.click(await screen.findByText("Nightly export"));
+
+        expect(await screen.findByText("50/15min")).toBeTruthy();
+        expect(screen.getByText(en.studio_api_keys_rate_limit_scope!)).toBeTruthy();
+    });
 });
 
 describe("creating a service key", () => {
@@ -167,6 +177,12 @@ describe("creating a service key", () => {
             expires_at: null
         });
         expect(await screen.findByText("rk_live_secret")).toBeTruthy();
+    });
+
+    it("says which requests the rate limit counts", async () => {
+        await openDialog();
+
+        expect(screen.getByText(en.studio_api_keys_rate_limit_scope!, { exact: false })).toBeTruthy();
     });
 
     it("never offers key management, even to a caller who holds it", async () => {

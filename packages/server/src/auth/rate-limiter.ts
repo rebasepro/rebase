@@ -631,6 +631,9 @@ export function createDataRateLimitCheck(
     return async (caller) => {
         if (caller.uid === SERVICE_IDENTITY.uid) return null;
         const bucket = bucketFor({
+            // A key's frames count where its HTTP requests do: its own bucket,
+            // at its own `rate_limit`.
+            apiKey: caller.apiKey,
             uid: caller.uid !== undefined && !isAnonymousUid(caller.uid) ? caller.uid : undefined,
             address: () => clientAddress(caller.header, () => caller.socketAddress, trustedProxyHops)
         });

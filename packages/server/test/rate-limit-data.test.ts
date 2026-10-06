@@ -213,6 +213,35 @@ describe("createDataRateLimitCheck", () => {
         expect((await app.fetch(new Request("http://localhost/data"))).status).toBe(429);
     });
 
+    it("counts an API key's frames in the key's own bucket, at the key's own limit", async () => {
+        // The key's `rate_limit` is what the API keys panel shows. Bucketed as
+        // its uid instead, a key limited to 2 got the per-user 100 over the
+        // socket, on top of its 2 over HTTP.
+        const key = { id: "k1", rate_limit: 2 };
+        const app = new Hono();
+        app.use("/*", async (c, next) => {
+            c.set("user" as never, { uid: "api-key:k1" } as never);
+            c.set("apiKey" as never, key as never);
+            await next();
+        });
+        app.use("/*", createDataRateLimiter({ store, user: 100, apiKey: 100 }));
+        app.get("/data", (c) => c.json({ ok: true }));
+        const check = createDataRateLimitCheck({ store, user: 100, apiKey: 100 });
+        const asKey = { ...from("api-key:k1"), apiKey: key };
+
+        expect((await app.fetch(new Request("http://localhost/data"))).status).toBe(200);
+        expect((await check(asKey))?.allowed).toBe(true);
+        // Two spent between the two doors: the key's own allowance is gone.
+        expect((await check(asKey))?.allowed).toBe(false);
+        expect((await app.fetch(new Request("http://localhost/data"))).status).toBe(429);
+
+        // A key with no limit of its own gets the API-key default, not the user one.
+        const unlimited = { ...from("api-key:k2"), apiKey: { id: "k2", rate_limit: null } };
+        const strict = createDataRateLimitCheck({ store, user: 100, apiKey: 1 });
+        expect((await strict(unlimited))?.allowed).toBe(true);
+        expect((await strict(unlimited))?.allowed).toBe(false);
+    });
+
     it("never limits the service identity", async () => {
         const check = createDataRateLimitCheck({ store, user: 1 });
         expect(await check(from("service"))).toBeNull();

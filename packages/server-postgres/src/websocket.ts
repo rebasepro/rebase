@@ -101,6 +101,12 @@ interface WsUserIdentity {
      * `impersonate`: every other field is then the impersonated user's.
      */
     impersonator?: string;
+    /**
+     * The API key this session authenticated with: its frames count in the
+     * key's own rate-limit bucket, at the key's own `rate_limit`, as its HTTP
+     * requests do.
+     */
+    apiKey?: { id: string; rate_limit: number | null };
 }
 
 /**
@@ -220,7 +226,7 @@ function jwtExpiryMs(token: string): number | undefined {
 
 /** Everything about an identity that decides what its frames may do. */
 function identityFingerprint(user: WsUserIdentity): string {
-    return JSON.stringify([user.uid, [...user.roles].sort(), user.isAdmin, user.isAnonymous, user.scopes ?? null, user.claims ?? null]);
+    return JSON.stringify([user.uid, [...user.roles].sort(), user.isAdmin, user.isAnonymous, user.scopes ?? null, user.claims ?? null, user.apiKey ?? null]);
 }
 
 /** Frames counted against the channel budget rather than the general one. */
@@ -471,7 +477,8 @@ export function createPostgresWebSocket(
                     roles: resolved.roles,
                     isAdmin: hasAdminRole(resolved.roles),
                     isAnonymous: false,
-                    scopes: resolved.scopes
+                    scopes: resolved.scopes,
+                    ...(resolved.apiKey ? { apiKey: { id: resolved.apiKey.id, rate_limit: resolved.apiKey.rate_limit } } : {})
                 }
             };
         }
@@ -909,15 +916,16 @@ roles: verifiedUser.roles }
                 }
 
                 // A data frame is a data-API request by another door, and
-                // counts in the bucket that request would: this person's (or,
-                // with no account, this address's), shared with their HTTP
-                // requests and their other sockets. The counter above is per
-                // connection, so on its own a caller bought budget by
-                // opening sockets.
+                // counts in the bucket that request would: this person's — or
+                // the API key's, at its own rate limit, or with no account this
+                // address's — shared with their HTTP requests and their other
+                // sockets. The counter above is per connection, so on its own
+                // a caller bought budget by opening sockets.
                 if (options?.dataRateLimit && PUBLIC_TYPES.has(type)) {
                     const decision = await options.dataRateLimit({
                         ...origin,
-                        uid: clientSessions.get(clientId)?.user?.uid
+                        uid: clientSessions.get(clientId)?.user?.uid,
+                        apiKey: clientSessions.get(clientId)?.user?.apiKey
                     });
                     if (decision && !decision.allowed) {
                         sendError("ERROR", "RATE_LIMITED", "Too many requests, please try again later.");

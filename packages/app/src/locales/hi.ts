@@ -1274,6 +1274,7 @@ export const hi: RebaseTranslations = {
     studio_api_keys_expiry_1y: "1 वर्ष में",
     studio_api_keys_rate_limit_unit: "प्रति 15 मिनट",
     studio_api_keys_rate_limit_hint: "सर्वर के डिफ़ॉल्ट (हर 15 मिनट की अवधि में 1000 अनुरोध) के लिए खाली छोड़ें।",
+    studio_api_keys_rate_limit_scope: "यह सीमा कुंजी के डेटा, फ़ाइल और फ़ंक्शन अनुरोधों को गिनती है, चाहे वे HTTP, रियलटाइम सॉकेट या MCP से आएँ। एडमिन ऑपरेशन पर कोई दर सीमा नहीं है।",
     studio_api_keys_summary_title: "यह कुंजी कर सकेगी",
     studio_api_keys_summary_empty: "अभी कुछ नहीं — कम से कम एक स्कोप चुनें।",
     studio_api_keys_summary_roles: "रो-लेवल सिक्योरिटी इसे {{roles}} मानती है",

@@ -1274,6 +1274,7 @@ export const fr: RebaseTranslations = {
     studio_api_keys_expiry_1y: "Dans 1 an",
     studio_api_keys_rate_limit_unit: "par 15 min",
     studio_api_keys_rate_limit_hint: "Laissez vide pour la valeur par défaut du serveur : 1000 requêtes par fenêtre de 15 minutes.",
+    studio_api_keys_rate_limit_scope: "La limite compte les requêtes de données, de fichiers et de fonctions de la clé via HTTP, le socket temps réel et MCP. Les opérations d'administration ne sont pas limitées.",
     studio_api_keys_summary_title: "Cette clé pourra",
     studio_api_keys_summary_empty: "Rien pour l'instant : choisissez au moins une portée.",
     studio_api_keys_summary_roles: "La sécurité au niveau des lignes la traite en tant que {{roles}}",

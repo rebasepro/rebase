@@ -911,6 +911,12 @@ export interface DataRateLimitCaller {
      */
     uid?: string;
     /**
+     * The API key the connection authenticated with. Its frames count in the
+     * key's own bucket at the key's own `rate_limit`, the bucket its HTTP
+     * requests count in, rather than as `uid`.
+     */
+    apiKey?: { id: string; rate_limit: number | null };
+    /**
      * A header of the request that opened the connection, by lower-case name:
      * the proxy headers an address is read from when proxies are declared.
      */
@@ -932,7 +938,13 @@ export interface RealtimeSocketOptions {
      * the deployment has no API-key store, and then keys cannot authenticate
      * the socket.
      */
-    resolveApiKey?: (token: string) => Promise<{ uid: string; roles: string[]; scopes: string[] } | { message: string }>;
+    resolveApiKey?: (token: string) => Promise<{
+        uid: string;
+        roles: string[];
+        scopes: string[];
+        /** The key itself: its id and `rate_limit` decide which rate-limit bucket its frames count in. */
+        apiKey?: { id: string; rate_limit: number | null };
+    } | { message: string }>;
     /**
      * The largest frame accepted, in bytes — the data API's body limit. `0` or
      * less for none. Defaults to the server's default body limit.

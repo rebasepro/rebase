@@ -575,7 +575,7 @@ export function CreateApiKeyDialog({
                     </div>
                     {kind === "service" && (
                         <Typography variant="caption" color="secondary" gutterBottom={false} className="block mt-1.5 text-2xs">
-                            {t("studio_api_keys_rate_limit_hint")}
+                            {t("studio_api_keys_rate_limit_hint")} {t("studio_api_keys_rate_limit_scope")}
                         </Typography>
                     )}
                 </div>

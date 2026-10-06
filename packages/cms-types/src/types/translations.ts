@@ -1385,6 +1385,7 @@ export interface RebaseTranslations {
     studio_api_keys_expiry_1y?: string;
     studio_api_keys_rate_limit_unit?: string;
     studio_api_keys_rate_limit_hint?: string;
+    studio_api_keys_rate_limit_scope?: string;
     studio_api_keys_summary_title?: string;
     studio_api_keys_summary_empty?: string;
     studio_api_keys_summary_roles?: string;
