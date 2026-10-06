@@ -351,13 +351,16 @@ describe("export processing scales with the property count", () => {
         }
         const data: Entity<Record<string, unknown>>[] = Array.from({ length: rowCount },
             (_, i) => ({ id: String(i), path: "items", values }));
-        const runs: number[] = [];
-        for (let run = 0; run < 5; run++) {
+        // The fastest of several runs: the run least disturbed by the rest of
+        // the machine. A median of five still moved with the load of a full
+        // `pnpm test` (52× once, on linear code).
+        let fastest = Infinity;
+        for (let run = 0; run < 7; run++) {
             const t0 = performance.now();
             getEntityJsonExportableData(data, undefined, properties, "string");
-            runs.push(performance.now() - t0);
+            fastest = Math.min(fastest, performance.now() - t0);
         }
-        return runs.sort((a, b) => a - b)[2];
+        return fastest;
     }
 
     test("ten times the properties costs about ten times as much, not a hundred", () => {
@@ -365,9 +368,10 @@ describe("export processing scales with the property count", () => {
         const small = exportRows(300, 10);
         const large = exportRows(3_000, 10);
         // Linear measures 10–20× (large objects cost V8 a little more per key);
-        // the quadratic merge measured over 100×. The floor keeps a
-        // sub-millisecond `small` from turning timer noise into a ratio.
-        expect(large / Math.max(small, 1)).toBeLessThan(40);
+        // the quadratic merge measured ~560×. The bound sits between the two
+        // with room on both sides, and the floor keeps a sub-millisecond
+        // `small` from turning timer noise into a ratio.
+        expect(large / Math.max(small, 1)).toBeLessThan(100);
     });
 
     test("keeps the values' own keys first and in order, and adds the declared ones after", () => {
