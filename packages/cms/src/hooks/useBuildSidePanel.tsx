@@ -10,9 +10,12 @@ import { getNavigationEntriesFromPath, removeInitialAndTrailingSlashes, removeTr
 import { resolvedSelectedEntityView } from "../util/resolutions";
 import { CONTAINER_FULL_WIDTH, SIDE_PANEL_DEFAULT_WIDTH } from "@rebasepro/app";
 import { useCustomizationController, useLargeLayout, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
-import { JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../components/EditViewBinding";
-import React from "react";
-import { SidePanelBinding } from "../components/SidePanelBinding";
+import { JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../util/view_constants";
+import React, { Suspense } from "react";
+import { CircularProgressCenter } from "@rebasepro/ui";
+// Lazy: this hook runs on every page (the side-panel provider is mounted by
+// RebaseNavigation), and the panel's form stack is not needed until one opens.
+import { LazySidePanelBinding as SidePanelBinding } from "../components/lazy_record_views";
 
 /**
  * Thin wrapper that resolves the Entity.SidePanel component override.
@@ -21,8 +24,10 @@ import { SidePanelBinding } from "../components/SidePanelBinding";
  * top level of a React component per the Rules of Hooks.
  */
 function ResolvedSidePanelBindingInner(props: SidePanelBindingProps) {
-    const Resolved = useComponentOverride("Entity.SidePanel", SidePanelBinding);
-    return <Resolved {...props}/>;
+    const Resolved = useComponentOverride<SidePanelBindingProps>("Entity.SidePanel", SidePanelBinding);
+    return <Suspense fallback={<CircularProgressCenter/>}>
+        <Resolved {...props}/>
+    </Suspense>;
 }
 
 function ResolvedSidePanelBinding(props: SidePanelBindingProps) {

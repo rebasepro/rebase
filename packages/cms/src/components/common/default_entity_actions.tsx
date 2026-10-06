@@ -20,7 +20,8 @@ import {
     TextField,
     Trash2Icon,
     Unlink2Icon,
-    Typography
+    Typography,
+    lazyChunk
 } from "@rebasepro/ui";
 import type { User } from "@rebasepro/types";
 import type { EntityAction, UserCreationResult } from "@rebasepro/cms-types";
@@ -31,13 +32,16 @@ import {
     useSnackbarController,
     useTranslation
 } from "@rebasepro/app";
-import { DeleteEntityDialog } from "../DeleteEntityDialog";
+// Lazy: the navigation layer imports the account actions from this module on
+// every page, and the delete dialog renders the record's preview — a static
+// import here put the entity preview stack on the login screen.
+const DeleteEntityDialog = lazyChunk(() => import("../DeleteEntityDialog").then(m => ({ default: m.DeleteEntityDialog })));
 import { addRecentId } from "../CollectionViewBinding/utils";
 import { navigateToEntity } from "../../util/navigation_utils";
 import { callerHoldsScope } from "../../util/caller_scopes";
 import { resolveDefaultSelectedView } from "@rebasepro/app";
 import { CreationResultDialog } from "../admin/CreationResultDialog";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 export const editEntityAction: EntityAction = {
     icon: <PencilIcon size={iconSize.smallest}/>,
@@ -199,7 +203,7 @@ function buildRemoveEntityAction({
                 Component: ({ open }) => {
                     if (!collection || !path)
                         throw new Error(`${key}EntityAction: Collection is undefined`);
-                    return <DeleteEntityDialog
+                    return <Suspense fallback={null}><DeleteEntityDialog
                         target={entity}
                         path={path}
                         collection={collection}
@@ -220,7 +224,7 @@ function buildRemoveEntityAction({
                                 navigateBack?.();
                             }
                         }}
-                        onClose={closeDialog}/>;
+                        onClose={closeDialog}/></Suspense>;
                 }
             });
             return Promise.resolve(undefined);
