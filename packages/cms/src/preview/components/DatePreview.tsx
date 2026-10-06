@@ -19,6 +19,31 @@ export interface DatePreviewProps {
 }
 
 /**
+ * `Intl.DateTimeFormat`s already built, for dates shown in a fixed timezone.
+ *
+ * Building one is the expensive part of formatting (~90 µs, against ~6 µs to
+ * format with it), and a table column of zoned dates used to build two per
+ * cell per render. Key: locale, timezone and what is shown — everything the
+ * options are made of, so a cached formatter formats exactly as a fresh one
+ * would. Nothing invalidates an entry: a formatter is a pure function of its
+ * key and holds no record data. Bounded anyway, since a timezone can come from
+ * data: past the cap the map starts over.
+ */
+const FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+const MAX_FORMATTERS = 200;
+
+function cachedFormatter(key: string, build: () => Intl.DateTimeFormat): Intl.DateTimeFormat {
+    const cached = FORMATTERS.get(key);
+    if (cached) return cached;
+    // Built before it is stored: an unknown timezone throws here exactly as it
+    // did uncached, and leaves nothing behind.
+    const formatter = build();
+    if (FORMATTERS.size >= MAX_FORMATTERS) FORMATTERS.clear();
+    FORMATTERS.set(key, formatter);
+    return formatter;
+}
+
+/**
  * @group Preview components
  */
 export function DatePreview({
@@ -61,18 +86,16 @@ export function DatePreview({
             options.minute = "2-digit";
         }
 
-        const formatter = new Intl.DateTimeFormat(customizationController?.locale ?? "en-US", options);
+        const locale = customizationController?.locale ?? "en-US";
+        const formatter = cachedFormatter(`${locale}|${timezone}|${mode}`, () => new Intl.DateTimeFormat(locale, options));
         const formattedDate = formatter.format(date);
 
-        // Get timezone abbreviation
-        const tzFormatter = new Intl.DateTimeFormat("en-US", {
-            timeZone: timezone,
-            timeZoneName: "short"
-        });
-        const parts = tzFormatter.formatToParts(date);
         // A day on its own has no time for a zone to qualify.
         const tzAbbrev = mode === "date_time"
-            ? parts.find(p => p.type === "timeZoneName")?.value ?? ""
+            ? cachedFormatter(`en-US|${timezone}|zone`, () => new Intl.DateTimeFormat("en-US", {
+                timeZone: timezone,
+                timeZoneName: "short"
+            })).formatToParts(date).find(p => p.type === "timeZoneName")?.value ?? ""
             : "";
 
         return (
