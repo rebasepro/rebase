@@ -398,7 +398,10 @@ position });
             customView,
             onColumnResize: onColumnResizeInternal,
             onColumnResizeEnd: onColumnResizeEndInternal,
-            filter: filterRef.current,
+            // The prop, not `filterRef`: the ref is brought up to date by an
+            // effect, after this render has read it, so the header showed the
+            // filter from before — until something else redrew it.
+            filter: filterInput,
             onColumnSort,
             onFilterUpdate: onFilterUpdateInternal,
             sortIndex,
