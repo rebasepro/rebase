@@ -43,7 +43,7 @@ import {
     isKeyHandled
 } from "@rebasepro/ui";
 import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiBase, useApiConfig, useTranslation } from "@rebasepro/app";
-import { DEFAULT_STORAGE_SOURCE_KEY, type StorageReference, type StorageSource } from "@rebasepro/types";
+import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStorageKey, type DownloadConfig, type StorageReference, type StorageSource } from "@rebasepro/types";
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 import { useSearchParams } from "react-router";
 import { useDropzone } from "react-dropzone";
@@ -60,6 +60,43 @@ interface StorageFile {
     size?: number;
     contentType?: string;
     downloadUrl?: string;
+}
+
+/**
+ * A link to one file, as the preview shows, downloads and copies it.
+ *
+ * Minted when it is used rather than taken from the listing: a private file's
+ * URL carries a download token (five minutes by default) minted when the folder
+ * was listed, and a preview, a download or a copied link built from that one
+ * stopped working while the page stayed open.
+ */
+interface FileLink {
+    url: string;
+    /**
+     * How long the link's token was minted for, in seconds: a link to a private
+     * file, which opens it for whoever holds the link until then. Absent when
+     * the source does not say.
+     */
+    expiresInSeconds?: number;
+    /** A public file's link: no token, open to anyone, and it does not expire. */
+    isPublic: boolean;
+}
+
+function fileLinkOf(config: DownloadConfig, fullPath: string): FileLink | null {
+    if (!config.url) return null;
+    const metadata = config.metadata;
+    return {
+        url: config.url,
+        expiresInSeconds: metadata?.token && typeof metadata.tokenExpiresIn === "number" ? metadata.tokenExpiresIn : undefined,
+        // The SDK skips the metadata round trip only for a key under the public
+        // prefix, and the server says so on every other public object.
+        isPublic: metadata ? metadata.public === true : isPublicStorageKey(fullPath)
+    };
+}
+
+/** A URL the browser can open from anywhere: relative ones are this page's origin's. */
+function absoluteUrl(url: string): string {
+    return url.startsWith("http") ? url : `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
 // ──────────────────────────────────────────────
@@ -304,20 +341,47 @@ function FilePreviewPanel({
     file,
     onClose,
     onDelete,
-    downloadUrl
+    link,
+    mintLink
 }: {
     file: StorageFile;
     onClose: () => void;
     onDelete: () => void;
-    downloadUrl: string | null;
+    /** The link minted when the file was opened, shown and previewed. */
+    link: FileLink | null;
+    /** A fresh link for a download or a copy, minted at the click. */
+    mintLink: () => Promise<FileLink | null>;
 }) {
     const { t } = useTranslation();
+    const snackbarController = useSnackbarController();
     const isImage = file.contentType?.startsWith("image/");
     const isVideo = file.contentType?.startsWith("video/");
     const isAudio = file.contentType?.startsWith("audio/");
     const FileIconComponent = getFileIcon(file.contentType);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [urlCopied, setUrlCopied] = useState(false);
+
+    const reportLinkError = (e: unknown) => {
+        snackbarController.open({ type: "error",
+message: e instanceof Error ? e.message : String(e) });
+    };
+
+    const handleDownload = () => {
+        mintLink()
+            .then(fresh => { if (fresh) window.open(fresh.url, "_blank"); })
+            .catch(reportLinkError);
+    };
+
+    const handleCopy = () => {
+        mintLink()
+            .then(async fresh => {
+                if (!fresh) return;
+                await navigator.clipboard.writeText(absoluteUrl(fresh.url));
+                setUrlCopied(true);
+                setTimeout(() => setUrlCopied(false), 2000);
+            })
+            .catch(reportLinkError);
+    };
 
     return (
         <>
@@ -332,11 +396,11 @@ function FilePreviewPanel({
                         {file.name}
                     </Typography>
                     <div className="flex items-center gap-0.5">
-                        {downloadUrl && (
+                        {link && (
                             <Tooltip title={t("studio_storage_download")}>
                                 <IconButton aria-label={t("studio_storage_download")}
                                     size="small"
-                                    onClick={() => window.open(downloadUrl, "_blank")}
+                                    onClick={handleDownload}
                                 >
                                     <DownloadIcon size={iconSize.smallest}/>
                                 </IconButton>
@@ -365,29 +429,29 @@ function FilePreviewPanel({
                             const isImage = file.contentType?.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
                             const isVideo = file.contentType?.startsWith("video/") || ["mp4", "webm", "ogg", "mov"].includes(ext);
                             const isAudio = file.contentType?.startsWith("audio/") || ["mp3", "wav", "ogg", "m4a"].includes(ext);
-                            const downloadUrl = file.downloadUrl;
+                            const previewUrl = link?.url;
 
-                            if (isImage && downloadUrl) {
+                            if (isImage && previewUrl) {
                                 return (
                                     <img
-                                        src={downloadUrl}
+                                        src={previewUrl}
                                         alt={file.name}
                                         className="max-w-full max-h-[400px] object-contain rounded-md shadow-sm"
                                     />
                                 );
-                            } else if (isVideo && downloadUrl) {
+                            } else if (isVideo && previewUrl) {
                                 return (
                                     <video
-                                        src={downloadUrl}
+                                        src={previewUrl}
                                         className="max-w-full max-h-[400px] rounded-md"
                                         controls
                                     />
                                 );
-                            } else if (isAudio && downloadUrl) {
+                            } else if (isAudio && previewUrl) {
                                 return (
                                     <div className="flex flex-col items-center gap-4">
                                         <Music2Icon className="text-surface-accent-400 w-10 h-10"/>
-                                        <audio src={downloadUrl} controls className="w-full max-w-xs"/>
+                                        <audio src={previewUrl} controls className="w-full max-w-xs"/>
                                     </div>
                                 );
                             } else {
@@ -456,7 +520,7 @@ function FilePreviewPanel({
                             </div>
                         </div>
 
-                        {downloadUrl && (
+                        {link && (
                             <div className="pt-2">
                                 <Typography variant="caption" className="text-surface-accent-500 text-[11px] block mb-1">
                                     {t("studio_storage_url")}
@@ -466,23 +530,10 @@ function FilePreviewPanel({
                                         "flex items-center gap-2 p-2 rounded cursor-pointer transition-colors",
                                         "bg-surface-raised hover:bg-surface-raised-hover"
                                     )}
-                                    onClick={() => {
-                                        const fullUrl = downloadUrl.startsWith("http")
-                                            ? downloadUrl
-                                            : `${window.location.origin}${downloadUrl.startsWith("/") ? "" : "/"}${downloadUrl}`;
-                                        navigator.clipboard.writeText(fullUrl).then(() => {
-                                            setUrlCopied(true);
-                                            setTimeout(() => setUrlCopied(false), 2000);
-                                        });
-                                    }}
+                                    onClick={handleCopy}
                                 >
                                     <Typography variant="caption" className="font-mono text-[11px] truncate flex-1 min-w-0 text-primary">
-                                        {(() => {
-                                            const fullUrl = downloadUrl.startsWith("http")
-                                                ? downloadUrl
-                                                : `${window.location.origin}${downloadUrl.startsWith("/") ? "" : "/"}${downloadUrl}`;
-                                            return fullUrl;
-                                        })()}
+                                        {absoluteUrl(link.url)}
                                     </Typography>
                                     <Tooltip title={urlCopied ? t("studio_storage_url_copied") : t("studio_storage_copy_url")}>
                                         <div className="shrink-0">
@@ -493,6 +544,15 @@ function FilePreviewPanel({
                                         </div>
                                     </Tooltip>
                                 </div>
+                                {link.isPublic ? (
+                                    <Typography variant="caption" color="secondary" className="block mt-1 text-[11px]">
+                                        {t("studio_storage_url_public")}
+                                    </Typography>
+                                ) : link.expiresInSeconds !== undefined ? (
+                                    <Typography variant="caption" color="secondary" className="block mt-1 text-[11px]">
+                                        {t("studio_storage_url_temporary", { minutes: Math.max(1, Math.round(link.expiresInSeconds / 60)) })}
+                                    </Typography>
+                                ) : null}
                             </div>
                         )}
                     </div>
@@ -566,7 +626,9 @@ export const StorageView = () => {
 
     // Selection and preview
     const [selectedFile, setSelectedFile] = useState<StorageFile | null>(null);
-    const [selectedDownloadUrl, setSelectedDownloadUrl] = useState<string | null>(null);
+    const [selectedLink, setSelectedLink] = useState<FileLink | null>(null);
+    /** The latest link asked for the preview: an earlier one answering later is dropped. */
+    const linkRequestRef = useRef(0);
 
     // Upload
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -664,10 +726,33 @@ export const StorageView = () => {
         fetchContents(currentPath);
     }, [currentPath, fetchContents, selectedSourceKey]);
 
+    /** A link to `file`, minted now through the source being browsed — see {@link FileLink}. */
+    const mintFileLink = useCallback(async (file: StorageFile): Promise<FileLink | null> =>
+        fileLinkOf(await storageSourceRef.current.getSignedUrl(file.fullPath), file.fullPath), []);
+
+    /** Open `file` in the preview, with a link minted for it now. */
+    const openPreview = useCallback((file: StorageFile) => {
+        const request = ++linkRequestRef.current;
+        setSelectedFile(file);
+        setSelectedLink(null);
+        mintFileLink(file)
+            .then(link => { if (request === linkRequestRef.current) setSelectedLink(link); })
+            .catch(() => { if (request === linkRequestRef.current) setSelectedLink(null); });
+    }, [mintFileLink]);
+
+    /** A fresh link to the previewed file, for a download or a copy. It replaces the one shown. */
+    const refreshPreviewLink = useCallback(async (): Promise<FileLink | null> => {
+        if (!selectedFile) return null;
+        const request = ++linkRequestRef.current;
+        const link = await mintFileLink(selectedFile);
+        if (request === linkRequestRef.current) setSelectedLink(link);
+        return link;
+    }, [selectedFile, mintFileLink]);
+
     // What was previewed and selected belongs to the listing it was picked in.
     const clearSelection = useCallback(() => {
         setSelectedFile(null);
-        setSelectedDownloadUrl(null);
+        setSelectedLink(null);
         setSelectedPaths(new Set());
         lastClickedRef.current = null;
     }, []);
@@ -740,36 +825,22 @@ export const StorageView = () => {
             lastClickedRef.current = path;
             // Also open preview if it's a file
             if (!item.isFolder) {
-                setSelectedFile(item);
-                if (item.downloadUrl) {
-                    setSelectedDownloadUrl(item.downloadUrl);
-                } else {
-                    storageSourceRef.current.getSignedUrl(item.fullPath)
-                        .then(config => setSelectedDownloadUrl(config.url))
-                        .catch(() => setSelectedDownloadUrl(null));
-                }
+                openPreview(item);
             } else {
                 setSelectedFile(null);
-                setSelectedDownloadUrl(null);
+                setSelectedLink(null);
             }
         }
-    }, [allItems]);
+    }, [allItems, openPreview]);
 
     // Double-click: open folder or preview file
     const handleItemDoubleClick = useCallback((item: StorageFile) => {
         if (item.isFolder) {
             handleNavigate(item.fullPath);
         } else {
-            setSelectedFile(item);
-            if (item.downloadUrl) {
-                setSelectedDownloadUrl(item.downloadUrl);
-            } else {
-                storageSourceRef.current.getSignedUrl(item.fullPath)
-                    .then(config => setSelectedDownloadUrl(config.url))
-                    .catch(() => setSelectedDownloadUrl(null));
-            }
+            openPreview(item);
         }
-    }, [handleNavigate]);
+    }, [handleNavigate, openPreview]);
 
     // Upload files
     const handleUpload = useCallback(async (uploadFiles: File[]) => {
@@ -923,7 +994,7 @@ key });
 message: t("studio_storage_file_deleted", { name: file.name }) });
             }
             setSelectedFile(null);
-            setSelectedDownloadUrl(null);
+            setSelectedLink(null);
             setSelectedPaths(prev => {
                 const next = new Set(prev);
                 next.delete(file.fullPath);
@@ -950,7 +1021,7 @@ message: t("studio_storage_items_deleted", { count: items.length }) });
             }
             setSelectedPaths(new Set());
             setSelectedFile(null);
-            setSelectedDownloadUrl(null);
+            setSelectedLink(null);
             await fetchContents(currentPath);
         } catch (e) {
             snackbarController.open({ type: "error",
@@ -978,7 +1049,7 @@ message: deleteDialogTarget.isFolder
             }
             if (!deleteDialogTarget.isFolder && selectedFile?.fullPath === deleteDialogTarget.fullPath) {
                 setSelectedFile(null);
-                setSelectedDownloadUrl(null);
+                setSelectedLink(null);
             }
             setSelectedPaths(prev => {
                 const next = new Set(prev);
@@ -1022,7 +1093,7 @@ message: e instanceof Error ? e.message : String(e) });
             if (e.key === "Escape") {
                 setSelectedPaths(new Set());
                 setSelectedFile(null);
-                setSelectedDownloadUrl(null);
+                setSelectedLink(null);
             }
             // Delete / Backspace: delete selected
             if ((e.key === "Delete" || e.key === "Backspace") && selectedPaths.size > 0 && !e.metaKey && !e.ctrlKey) {
@@ -1431,7 +1502,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                 onClick={() => {
                                                     setSelectedPaths(new Set());
                                                     setSelectedFile(null);
-                                                    setSelectedDownloadUrl(null);
+                                                    setSelectedLink(null);
                                                 }}
                                             >
                                                 <XIcon size={14} className="mr-1"/>
@@ -1527,7 +1598,7 @@ message: e instanceof Error ? e.message : String(e) });
                                      if (!target.closest("[data-storage-item]") && selectedPaths.size > 0) {
                                          setSelectedPaths(new Set());
                                          setSelectedFile(null);
-                                         setSelectedDownloadUrl(null);
+                                         setSelectedLink(null);
                                      }
                                  }}
                             >
@@ -1576,10 +1647,11 @@ message: e instanceof Error ? e.message : String(e) });
                             <div className="w-80 lg:w-96 shrink-0">
                                 <FilePreviewPanel
                                     file={selectedFile}
-                                    downloadUrl={selectedDownloadUrl}
+                                    link={selectedLink}
+                                    mintLink={refreshPreviewLink}
                                     onClose={() => {
                                         setSelectedFile(null);
-                                        setSelectedDownloadUrl(null);
+                                        setSelectedLink(null);
                                     }}
                                     onDelete={() => handleDeleteFile(selectedFile)}
                                 />

@@ -1415,6 +1415,8 @@ export const hi: RebaseTranslations = {
     studio_storage_url: "URL",
     studio_storage_copy_url: "URL कॉपी करें",
     studio_storage_url_copied: "कॉपी हो गया!",
+    studio_storage_url_temporary: "अस्थायी लिंक: जिसके पास यह है, वह इस फ़ाइल को अधिकतम {{minutes}} मिनट तक खोल सकता है। डाउनलोड करें और URL कॉपी करें से नया लिंक बनता है।",
+    studio_storage_url_public: "सार्वजनिक लिंक: कोई भी इस फ़ाइल को खोल सकता है, और यह लिंक समाप्त नहीं होता।",
     studio_storage_folder: "फ़ोल्डर",
     studio_storage_folders: "फ़ोल्डर",
     studio_storage_files_heading: "फ़ाइलें ({{count}})",

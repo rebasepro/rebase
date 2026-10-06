@@ -1415,6 +1415,8 @@ export const de: RebaseTranslations = {
     studio_storage_url: "URL",
     studio_storage_copy_url: "URL kopieren",
     studio_storage_url_copied: "Kopiert!",
+    studio_storage_url_temporary: "Temporärer Link: Wer ihn hat, kann diese Datei bis zu {{minutes}} Min. lang öffnen. Herunterladen und „URL kopieren“ erzeugen einen neuen.",
+    studio_storage_url_public: "Öffentlicher Link: Jeder kann diese Datei öffnen, und der Link läuft nicht ab.",
     studio_storage_folder: "Ordner",
     studio_storage_folders: "Ordner",
     studio_storage_files_heading: "Dateien ({{count}})",

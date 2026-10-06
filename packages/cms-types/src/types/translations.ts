@@ -1527,6 +1527,8 @@ export interface RebaseTranslations {
     studio_storage_url?: string;
     studio_storage_copy_url?: string;
     studio_storage_url_copied?: string;
+    studio_storage_url_temporary?: string;
+    studio_storage_url_public?: string;
     studio_storage_folder?: string;
     studio_storage_folders?: string;
     studio_storage_files_heading?: string;

@@ -1423,6 +1423,8 @@ export const es: RebaseTranslations = {
     studio_storage_url: "URL",
     studio_storage_copy_url: "Copiar URL",
     studio_storage_url_copied: "¡Copiado!",
+    studio_storage_url_temporary: "Enlace temporal: cualquiera que lo tenga puede abrir este archivo durante un máximo de {{minutes}} min. Descargar y Copiar URL generan uno nuevo.",
+    studio_storage_url_public: "Enlace público: cualquiera puede abrir este archivo y el enlace no caduca.",
     studio_storage_folder: "Carpeta",
     studio_storage_folders: "Carpetas",
     studio_storage_files_heading: "Archivos ({{count}})",
