@@ -27,7 +27,8 @@ const NOTIFY_SITES: Record<string, string> = {
     "services/cdc/trigger-cdc.ts":
         "rebase_cdc — { schema, table, op, row } where row is the key and nothing else (cdc-payload-identity.test.ts)",
     "services/realtimeService.ts":
-        "rebase_entity_changes — { sid, p, eid, db }: an address, never a row (pinned below)",
+        "rebase_entity_changes — { sid, p, eid, db }, or a batch { sid, c: [[p, eid, db], …] }: addresses, never a row " +
+        "(pinned below; cross-instance-notify.test.ts)",
     "services/channel-bus/PostgresChannelBus.ts":
         "rebase_channel_bus — channel broadcast and presence frames, which clients put on the channel to share",
     "services/channel-history.ts":

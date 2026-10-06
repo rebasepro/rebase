@@ -29,8 +29,19 @@ When a record is modified on Instance A, it broadcasts a notification on the `re
 
 *Note: `sid` represents the server's unique random instance ID generated at startup, `p` is the collection slug (path), and `eid` is the target entity ID.*
 
+Changes made in the same moment — a bulk save announces every row it wrote — go out together, as few notifications as fit under Postgres's 8000-byte NOTIFY limit, each listing its changes as `[p, eid, db]` triples:
+
+```json
+{
+  "sid": "inst_7a9c1b",
+  "c": [["posts", "45", null], ["posts", "46", null]]
+}
+```
+
+A single change keeps the shape above, so an older instance still reads it during a rolling deploy.
+
 - **Self-Filtering**: Upon receiving a message, each instance reads the `sid`. If it matches its own instance ID, the server discards the notification to prevent infinite routing loops.
-- **Relay and Fan-out**: If the notification came from another instance, the server schedules a debounced refetch and relays the update to its locally connected WebSocket subscribers.
+- **Relay and Fan-out**: If the notification came from another instance, the server schedules a debounced refetch for its locally connected subscribers of each change. It reads nothing on receipt: every frame is a refetch under its subscriber's own scope.
 - **Supervisor Reconnection Loop**: If the database connection drops, a background connection supervisor monitors the state and triggers an auto-reconnect sequence after a fixed **3-second** delay, restoring the `LISTEN` loop without affecting the main Hono application lifecycle. Every live subscription on the instance is then refetched, because whatever was published while the connection was down reached nobody. If the database cannot be reached at startup, the connection is retried the same way.
 - **Heartbeat**: A `LISTEN` connection is idle by nature, and an idle-flow timeout on a load balancer or a NAT can drop it with no error on either side (a half-open connection). So it runs with TCP keepalive and must answer a `SELECT 1` every 30 seconds within 10 seconds. One that misses it is replaced as above. While the connection is down, `/health` lists it as `cross-instance`, and once it has been down for 60 seconds the check fails.
 

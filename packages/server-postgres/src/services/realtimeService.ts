@@ -539,6 +539,12 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private crossInstanceListener?: PgNotifyListener;
     /** Whether cross-instance broadcasting is active. */
     private broadcasting = false;
+    /**
+     * Changes waiting to be announced on {@link PG_NOTIFY_CHANNEL}, and the
+     * send that will announce them — see {@link broadcastChange}.
+     */
+    private pendingBroadcasts = new Map<string, { p: string; eid: string; db: string | null }>();
+    private broadcastFlush?: Promise<void>;
     /** Debounce window (ms) for coalescing rapid row updates into a single correctness refetch. */
     private static readonly REFETCH_DEBOUNCE_MS = 300;
     /**
@@ -1579,12 +1585,15 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // When CDC is active it IS the cross-instance channel — every instance
         // observes every commit through the change stream — so the legacy
         // per-mutation broadcast is redundant (and would double-deliver). Skip it.
+        //
+        // Not awaited: the changes of one burst — a bulk save announces each
+        // row after commit, one `notifyUpdate` at a time — go out together, a
+        // few notifications instead of one round trip per row ahead of the
+        // response.
         if (broadcast && this.broadcasting && !this.cdcActive) {
-            try {
-                await this.broadcastChange(path, id, databaseId);
-            } catch (err) {
+            this.broadcastChange(path, id, databaseId).catch((err) => {
                 logger.error("❌ [RealtimeService] Failed to broadcast change via pg_notify", { error: err });
-            }
+            });
         }
 
         this.debugLog("🔔 [RealtimeService] notifyUpdate completed for path:", path);
@@ -3091,7 +3100,9 @@ lastSeen: Date.now() });
             this.presenceStore = undefined;
         }
 
-        // 4. Disconnect the dedicated LISTEN client(s)
+        // 4. Disconnect the dedicated LISTEN client(s), once any changes still
+        // waiting to be announced have gone out.
+        await this.broadcastFlush?.catch(() => undefined);
         await this.stopListening();
         await this.stopCdc();
         await this.bus.stop().catch((error) =>
@@ -3431,69 +3442,102 @@ lastSeen: Date.now() });
     }
 
     /**
-     * Broadcast a change notification to other instances via pg_notify.
-     * Uses the main Drizzle connection (pooled) — NOT the LISTEN client.
+     * Announce a change to the other instances on {@link PG_NOTIFY_CHANNEL},
+     * with the rest of its burst. Resolves once the notification carrying it
+     * has been sent. Uses the main Drizzle connection (pooled), not the LISTEN
+     * client.
+     *
+     * Changes queued in the same turn of the event loop go out together, as
+     * many to a notification as fit under the NOTIFY ceiling: a 1,000-row save
+     * used to be 1,000 round trips. A burst of one keeps the single-change
+     * shape `{ sid, p, eid, db }`, which an older instance in a rolling deploy
+     * still reads; a batch is `{ sid, c: [[p, eid, db], …] }`. Both carry
+     * addresses and nothing else.
      */
-    private async broadcastChange(path: string, id: string, databaseId?: string): Promise<void> {
-        const payload = JSON.stringify({
-            sid: this.instanceId,
-            p: path,
-            eid: id,
-            db: databaseId ?? null
-        });
-        await this.db.execute(drizzleSql`SELECT pg_notify(${PG_NOTIFY_CHANNEL}, ${payload})`);
+    private broadcastChange(path: string, id: string, databaseId?: string): Promise<void> {
+        const change = { p: path, eid: id, db: databaseId ?? null };
+        this.pendingBroadcasts.set(JSON.stringify([change.p, change.eid, change.db]), change);
+        this.broadcastFlush ??= new Promise<void>((resolve) => setImmediate(resolve)).then(() => this.flushBroadcasts());
+        return this.broadcastFlush;
     }
 
-    /** One change another instance published on {@link PG_NOTIFY_CHANNEL}. */
+    private async flushBroadcasts(): Promise<void> {
+        this.broadcastFlush = undefined;
+        const changes = [...this.pendingBroadcasts.values()];
+        this.pendingBroadcasts.clear();
+        for (const payload of packEntityChanges(this.instanceId, changes)) {
+            await this.db.execute(drizzleSql`SELECT pg_notify(${PG_NOTIFY_CHANNEL}, ${payload})`);
+        }
+    }
+
+    /** One notification another instance published on {@link PG_NOTIFY_CHANNEL}: one change, or a batch. */
     private async handleCrossInstanceNotification(payload: string): Promise<void> {
         try {
-            const { sid, p, eid, db } = JSON.parse(payload) as {
+            const parsed = JSON.parse(payload) as {
                 sid: string;
-                p: string;
-                eid: string;
-                db: string | null;
+                p?: string;
+                eid?: string;
+                db?: string | null;
+                c?: Array<[string, string, string | null]>;
             };
 
             // Skip our own notifications — already processed locally
-            if (sid === this.instanceId) return;
+            if (parsed.sid === this.instanceId) return;
 
             // A foreign sid is proof of a second process. Nothing here
             // needs that fact, but the channel path does — see
             // `warnIfMemoryBusOnMultiplePods`.
             this.foreignInstanceSeen = true;
 
-            this.debugLog(`📡 [RealtimeService] Received cross-instance notification: path=${p}, id=${eid}, from=${sid}`);
+            const changes: Array<[string, string, string | null]> = Array.isArray(parsed.c)
+                ? parsed.c
+                : [[parsed.p!, parsed.eid!, parsed.db ?? null]];
+            this.debugLog(`📡 [RealtimeService] Received ${changes.length} cross-instance change(s) from ${parsed.sid}`);
 
-            // Refetch the row from the DB so row subscriptions
-            // receive the actual data instead of null (which the client
-            // would interpret as "deleted").
-            let refetchedRow: Record<string, unknown> | null = null;
-            try {
-                if (this.driver) {
-                    const collection = this.registry.getCollectionByPath(p);
-                    const fetched = await this.driver.fetchOne({
-                        path: p,
-                        id: eid,
-                        collection: collection
-                    });
-                    refetchedRow = fetched ?? null;
-                } else {
-                    const fetched = await this.dataService.fetchOne(
-                        p, eid, db ?? undefined
-                    );
-                    refetchedRow = fetched ?? null;
-                }
-            } catch (fetchErr) {
-                // If the fetch fails (e.g. row was deleted), refetchedRow stays null
-                this.debugLog(`📡 [RealtimeService] Could not refetch row ${eid} from ${p} — treating as deleted`, fetchErr);
+            // Local fan-out only (broadcast=false, so nothing is re-announced).
+            // The row is not read here: every subscriber's frame is a refetch
+            // under its own scope, so the marker is all a change has to say.
+            for (const [path, id, db] of changes) {
+                await this.notifyUpdate(path, id, { _rebase_invalidated: true }, db ?? undefined, false);
             }
-
-            // Trigger local fan-out with broadcast=false to avoid re-broadcasting
-            await this.notifyUpdate(p, eid, refetchedRow, db ?? undefined, false);
         } catch (err) {
             logger.error("❌ [RealtimeService] Error processing cross-instance notification", { error: err });
         }
     }
+}
+
+/**
+ * The bytes a notification on the entity channel may take. `pg_notify` refuses
+ * 8000 and over; the rest is headroom.
+ */
+const ENTITY_NOTIFY_MAX_BYTES = 7500;
+
+/**
+ * Pack `changes` into as few payloads as fit under
+ * {@link ENTITY_NOTIFY_MAX_BYTES}. One change keeps the single-change shape.
+ */
+export function packEntityChanges(sid: string, changes: Array<{ p: string; eid: string; db: string | null }>): string[] {
+    if (changes.length === 1) {
+        const [{ p, eid, db }] = changes;
+        return [JSON.stringify({ sid, p, eid, db })];
+    }
+    const payloads: string[] = [];
+    const head = `{"sid":${JSON.stringify(sid)},"c":[`;
+    let batch: string[] = [];
+    let bytes = Buffer.byteLength(head) + 2;
+    for (const { p, eid, db } of changes) {
+        const entry = JSON.stringify([p, eid, db]);
+        const entryBytes = Buffer.byteLength(entry) + 1;
+        if (batch.length > 0 && bytes + entryBytes > ENTITY_NOTIFY_MAX_BYTES) {
+            payloads.push(`${head}${batch.join(",")}]}`);
+            batch = [];
+            bytes = Buffer.byteLength(head) + 2;
+        }
+        batch.push(entry);
+        bytes += entryBytes;
+    }
+    if (batch.length > 0) payloads.push(`${head}${batch.join(",")}]}`);
+    return payloads;
 }
 
 /**
