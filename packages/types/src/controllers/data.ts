@@ -752,11 +752,12 @@ export interface AggregateResult extends Array<AggregateRow> {
 }
 
 /**
- * Which column an iteration seeks on, for keyset ("seek") pagination.
+ * Which column an iteration sorts by when it is asked to seek, for keyset
+ * ("seek") pagination.
  *
  * Either the column name on its own — sorted ascending — or the column plus an
- * explicit direction. The column must be **unique** and must be the column the
- * query is ordered by; see {@link PageWalkOptions.cursor}.
+ * explicit direction. It is used only when the query names no `orderBy`; see
+ * {@link PageWalkOptions.cursor}.
  *
  * @group Data
  */
@@ -778,23 +779,23 @@ export interface PageWalkOptions<M extends Record<string, unknown> = Record<stri
      */
     pageSize?: number;
     /**
-     * Paginate by **seeking on a column** instead of by offset.
+     * **Require** seeking: fail rather than fall back to offset paging.
      *
-     * Offset paging — the default — re-counts rows on every request, so a row
-     * inserted or deleted *while the iteration runs* shifts the window and the
-     * walk silently skips or repeats rows. Seeking is immune to that: each page
-     * asks for rows strictly after the last one seen, so concurrent writes
-     * before the cursor cannot move it.
+     * Every walk already seeks when it can. After the first page it hands the
+     * server's `meta.nextCursor` back as `after`, so each page asks for rows
+     * strictly after the last one seen — concurrent writes before that row
+     * cannot shift the window, and the database never skips rows by count.
+     * Where the server issues no cursor (a relevance-ordered search, a vector
+     * search, a `distinct` read, a server that predates cursors), the default
+     * walk pages by offset instead, which a concurrent insert or delete can
+     * make skip or repeat a row.
      *
-     * Prefer this whenever the collection has a unique, sortable column
-     * (typically its primary key). The column must be unique — a repeated value
-     * at a page boundary either skips rows or stalls, and the iterator throws
-     * rather than looping — and the query is ordered by it, so a `cursor` and a
-     * conflicting `orderBy` is an error, not a silent override.
-     *
-     * Implemented with the parameters `find()` already takes (an `orderBy` plus
-     * a `>` / `<` filter on the cursor column), so it works on every transport
-     * and needs nothing new from the server.
+     * Passing `cursor` turns that fallback into an error: a listing with no
+     * cursor throws `cursor-missing`, and a cursor that stops advancing throws
+     * `cursor-stalled`. It also names the column to sort by when the query has
+     * no `orderBy`; an explicit `orderBy` wins, and the cursor follows whatever
+     * the query is sorted by, multi-key sorts and nullable keys included. The
+     * row id breaks the final tie, so the order is always total.
      *
      * @example
      * for await (const job of client.data.jobs.iterate({ cursor: "id" })) { … }
@@ -1276,14 +1277,15 @@ export interface SDKCollectionClient<
      *
      * ## Consistency
      *
-     * By default this pages by **offset**, which is only as stable as the table
-     * is still: a row inserted or deleted ahead of the cursor between two
-     * requests shifts every later window, so the walk can skip a row or hand
-     * back the same one twice. That is inherent to offset paging, not a bug
-     * here. On a collection with a unique sortable column, pass
-     * {@link PageWalkOptions.cursor} to seek on it instead — the walk then
-     * asks for rows strictly after the last one it saw, which concurrent writes
-     * cannot perturb.
+     * After the first page the walk **seeks**: it hands the server's
+     * `meta.nextCursor` back as `after`, so each page asks for rows strictly
+     * after the last one it saw, which concurrent writes cannot perturb. A
+     * listing the server issues no cursor for — relevance, a vector search, a
+     * `distinct` read — is paged by **offset** instead, which is only as stable
+     * as the table is still: a row inserted or deleted ahead of the window
+     * between two requests shifts every later one, so the walk can skip a row
+     * or hand back the same one twice. Pass {@link PageWalkOptions.cursor} to
+     * make seeking a requirement rather than a preference.
      *
      * @example
      * for await (const job of client.data.jobs.iterate({
@@ -1306,7 +1308,7 @@ export interface SDKCollectionClient<
      * {@link FindAllParams.maxRows} when the data really is bigger, or switch to
      * `iterate()` and stream it.
      *
-     * The offset-drift caveat on {@link iterate} applies here too.
+     * The consistency notes on {@link iterate} apply here too.
      *
      * @throws When more rows match than `maxRows` allows.
      *

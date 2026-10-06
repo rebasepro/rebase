@@ -37546,25 +37546,30 @@ Three options shape the walk:
 | Option | Default | What it does |
 |--------|---------|--------------|
 | `pageSize` | 200 | Rows per request. |
-| `cursor` | — | Seek on a column instead of paging by offset. See below. |
+| `cursor` | — | Require seeking: throw instead of falling back to offset. See below. |
 | `maxPages` | 10 000 | Ceiling on requests, so a server that never stops saying `hasMore` cannot spin forever. |
 | `maxRows` | 10 000 | `findAll()` only. Exceeding it **throws** rather than returning a truncated array as if it were the whole answer. Pass `Infinity` to opt out, or use `iterate()`. |
 
-**Prefer `cursor` whenever the collection has a unique, sortable column.**
-Offset paging re-counts rows on every request, so a row inserted or deleted
-*while the walk runs* shifts the window and the walk silently skips or repeats
-rows. Seeking asks for rows strictly after the last one seen, which concurrent
-writes before the cursor cannot move:
+**The walk seeks by itself.** After the first page it hands
+[the server's cursor](#cursor-pagination) — `meta.nextCursor` — back as `after`,
+so each request asks for rows strictly after the last one seen. Concurrent
+writes before that row cannot shift the window, and the database never has to
+skip rows by count, which is what made long offset walks slow: every page cost
+more than the one before it.
+
+Where the server issues no cursor — a relevance-ordered search, a vector
+search, a `distinct` read, a `fields` projection that leaves out a sort
+field — the walk pages by offset instead, and a row
+inserted or deleted *while the walk runs* can make it skip or repeat a row.
+Pass `cursor` to make seeking a requirement rather than a preference:
 
 ```typescript
 for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
 ```
 
-`cursor` here means "seek rather than page by offset", and names the column to
-sort by when the query does not already say. The seeking itself is
-[the server's cursor](#cursor-pagination): the walk hands `meta.nextCursor` back
-as `after` and builds no comparison of its own, which is why a multi-key sort
-works —
+`cursor` names the column to sort by when the query does not already say, and
+turns the offset fallback into an error. The walk builds no comparison of its
+own, which is why a multi-key sort works —
 
 ```typescript
 for await (const job of client.data.jobs.iterate({
@@ -37576,10 +37581,10 @@ for await (const job of client.data.jobs.iterate({
 — and why a nullable sort key does too.
 
 The sort still has to be **total**, which in practice means unique: the row id
-breaks the final tie, so any column works as a tie-breaker, but a walk whose
-cursor stops advancing throws `cursor-stalled` rather than looping forever. A
-query no cursor can describe (relevance) throws `cursor-missing`; drop `cursor`
-and page by offset.
+breaks the final tie, so any column works as a tie-breaker. Given `cursor`, a
+walk whose cursor stops advancing throws `cursor-stalled` rather than looping
+forever, and a query no cursor can describe (relevance) throws
+`cursor-missing`; drop `cursor` and the walk pages those by offset.
 
 ### See also
 

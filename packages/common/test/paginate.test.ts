@@ -1,7 +1,16 @@
 import { buildSdkData } from "../src/data/buildRebaseData";
 import { decodeCursor, encodeCursor } from "../src/data/cursor";
-import { RebasePaginationError } from "../src/data/paginate";
-import { DataDriver, FetchCollectionProps, OrderByTuple, RebaseSdkData, SDKCollectionClient } from "@rebasepro/types";
+import { paginateFind, RebasePaginationError } from "../src/data/paginate";
+import {
+    DataDriver,
+    FetchCollectionProps,
+    FindParams,
+    FindResult,
+    IterateParams,
+    OrderByTuple,
+    RebaseSdkData,
+    SDKCollectionClient
+} from "@rebasepro/types";
 
 /**
  * `iterate()` / `findAll()` on the **in-process** accessor — `rebase.data.*`
@@ -291,5 +300,142 @@ describe("in-process accessor pagination", () => {
 
         expect(seen).toEqual([5, 6, 7]);
         expect(calls.map((c) => c.offset)).toEqual([4, 6]);
+    });
+});
+
+/**
+ * The default walk — no `cursor`, no `after` — follows the server's
+ * `meta.nextCursor` whenever one is issued.
+ *
+ * It used to advance `offset` by each page's length and ignore the cursor the
+ * server had already put on the page. Every request then made the database
+ * skip `offset` rows before reading the next 200, so the walk's cost grew with
+ * the square of the collection: at 100k rows that was 4.5 s of SQL where the
+ * keyset walk is 1.8 s with the per-page count, 26 ms without it.
+ *
+ * These drive `paginateFind` directly with a fake `find`, which is the whole
+ * contract a transport supplies, so they hold for the HTTP client and the
+ * in-process accessor alike.
+ */
+describe("the default walk seeks with the server's cursor", () => {
+    type Params = FindParams<Row>;
+
+    /**
+     * A server over rows `1..total`: it honours `offset` and `after`, refuses
+     * both together as the real route does (`CURSOR_WITH_OFFSET`), and issues
+     * `meta.nextCursor` on every page with more after it — unless
+     * `issueCursor` says otherwise for that page.
+     */
+    function createServer(
+        total: number,
+        options: { issueCursor?: (pageIndex: number) => boolean; stallAt?: number } = {}
+    ): { find: (p: Params) => Promise<FindResult<Row>>; calls: Params[] } {
+        const calls: Params[] = [];
+        const all = rows(1, total);
+        const find = async (p: Params): Promise<FindResult<Row>> => {
+            calls.push({ ...p });
+            if (p.after !== undefined && p.offset !== undefined) {
+                throw new Error("CURSOR_WITH_OFFSET: after and offset together");
+            }
+            const limit = p.limit ?? 20;
+            const start = p.after !== undefined
+                ? all.findIndex((r) => r.id > Number(String(p.after).slice(2)))
+                : (p.offset ?? 0);
+            const from = start < 0 ? all.length : start;
+            const data = all.slice(from, from + limit);
+            const hasMore = from + data.length < all.length;
+            const pageIndex = calls.length - 1;
+            const last = data[data.length - 1];
+            const issue = hasMore && last && (options.issueCursor?.(pageIndex) ?? true);
+            const cursorId = options.stallAt !== undefined && pageIndex >= options.stallAt
+                ? all[options.stallAt * limit - 1].id
+                : last?.id;
+            return {
+                data,
+                meta: { total: all.length, limit, offset: p.offset ?? 0, hasMore, ...(issue && { nextCursor: `c:${cursorId}` }) }
+            };
+        };
+        return { find, calls };
+    }
+
+    async function drain(find: (p: Params) => Promise<FindResult<Row>>, params?: Record<string, unknown>): Promise<number[]> {
+        const seen: number[] = [];
+        for await (const row of paginateFind<Row>(find, params as IterateParams<Row>, "jobs")) seen.push(row.id);
+        return seen;
+    }
+
+    it("sends the cursor, not a growing offset, on every page after the first", async () => {
+        const server = createServer(1_000);
+        const seen = await drain(server.find, { pageSize: 100 });
+
+        expect(seen).toEqual(rows(1, 1_000).map((r) => r.id));
+        expect(server.calls).toHaveLength(10);
+        // The first page has no cursor to continue from yet.
+        expect(server.calls[0].after).toBeUndefined();
+        // Every later page seeks, and none of them asks the database to skip
+        // rows by count — which is the quadratic part.
+        for (const call of server.calls.slice(1)) {
+            expect(call.after).toMatch(/^c:\d+$/);
+            expect(call).not.toHaveProperty("offset");
+        }
+        expect(server.calls.map((c) => c.after)).toEqual(
+            [undefined, ...Array.from({ length: 9 }, (_, i) => `c:${(i + 1) * 100}`)]
+        );
+    });
+
+    it("starts at the caller's offset, then seeks", async () => {
+        const server = createServer(10);
+        const seen = await drain(server.find, { pageSize: 3, offset: 4 });
+
+        expect(seen).toEqual([5, 6, 7, 8, 9, 10]);
+        expect(server.calls[0]).toMatchObject({ offset: 4 });
+        expect(server.calls[0].after).toBeUndefined();
+        expect(server.calls[1]).toMatchObject({ after: "c:7" });
+        expect(server.calls[1]).not.toHaveProperty("offset");
+    });
+
+    it("pages by offset when the server issues no cursor, as before", async () => {
+        // A relevance or vector listing, a distinct read, or an older server.
+        const server = createServer(7, { issueCursor: () => false });
+        const seen = await drain(server.find, { pageSize: 3 });
+
+        expect(seen).toEqual([1, 2, 3, 4, 5, 6, 7]);
+        expect(server.calls.map((c) => [c.offset, c.after])).toEqual([[0, undefined], [3, undefined], [6, undefined]]);
+    });
+
+    it("falls back to the offset it has reached when a cursor stops being issued mid-walk", async () => {
+        // Page 0 issues one, page 1 does not: the walk must neither stop early
+        // nor send `after` and `offset` together.
+        const server = createServer(10, { issueCursor: (page) => page === 0 });
+        const seen = await drain(server.find, { pageSize: 3 });
+
+        expect(seen).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+        expect(server.calls.map((c) => [c.offset, c.after])).toEqual([
+            [0, undefined],
+            [undefined, "c:3"],
+            [6, undefined],
+            [9, undefined]
+        ]);
+    });
+
+    it("falls back to offset rather than looping when the cursor stalls", async () => {
+        // A server bug: from page 1 on, it hands back the cursor it was given.
+        // An explicit `cursor:` walk throws `cursor-stalled`; the default walk
+        // never asked to seek, so it carries on by offset as it always did.
+        const server = createServer(9, { stallAt: 1 });
+        const seen = await drain(server.find, { pageSize: 3 });
+
+        expect(seen).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        expect(server.calls.every((c) => !(c.after !== undefined && c.offset !== undefined))).toBe(true);
+    });
+
+    it("an explicit cursor walk still refuses a listing with no cursor", async () => {
+        const server = createServer(7, { issueCursor: () => false });
+        await expect(drain(server.find, { pageSize: 3, cursor: "id" })).rejects.toMatchObject({ code: "cursor-missing" });
+    });
+
+    it("an explicit cursor walk still refuses a stalled cursor", async () => {
+        const server = createServer(9, { stallAt: 1 });
+        await expect(drain(server.find, { pageSize: 3, cursor: "id" })).rejects.toMatchObject({ code: "cursor-stalled" });
     });
 });
