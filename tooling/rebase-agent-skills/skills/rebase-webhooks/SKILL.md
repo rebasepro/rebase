@@ -409,7 +409,7 @@ A refused destination comes back as `success: false` with the reason in `respons
 
 The most common pattern is to wire the dispatcher into Rebase collection callbacks so webhooks fire automatically on CRUD operations. Use `enqueueEntityChange()` here, never `await onEntityChange()`:
 
-> **IMPORTANT FOR AGENTS**: `afterSave` and `afterDelete` are awaited **inside the write's Postgres transaction**. Awaiting a delivery there holds a pooled connection and the row's locks until the receiver answers — up to ~36 seconds across three attempts, per matching webhook — and a throw from the callback rolls the customer's write back. `enqueueEntityChange()` returns `void` immediately and queues the deliveries once the write commits — never for a write that rolls back — which is why it is the pattern for callbacks.
+> **IMPORTANT FOR AGENTS**: `afterSave` and `afterDelete` are awaited **inside the write's Postgres transaction**. Awaiting a delivery there holds a pooled connection and the row's locks until the receiver answers — up to ~36 seconds across three attempts for the slowest matching webhook — and a throw from the callback rolls the customer's write back. `enqueueEntityChange()` returns `void` immediately and queues the deliveries once the write commits — never for a write that rolls back — which is why it is the pattern for callbacks.
 
 ```typescript
 // config/collections/orders.ts
@@ -705,7 +705,7 @@ afterSave: async ({ id, values, collection }) => {
 | **Receiver streams a huge body** | Read stops at 64 KB and the rest is cancelled. |
 | **URL points at a private or link-local address** | Refused before connecting. Terminal — not retried. |
 | **Receiver answers a redirect** | Not followed. Terminal — not retried. |
-| **Multiple webhooks match same event** | All matching webhooks are dispatched **sequentially** (not in parallel). |
+| **Multiple webhooks match same event** | `onEntityChange` delivers to all of them **at once** and resolves when the slowest finishes; results stay in webhook order. `enqueueEntityChange` gives each webhook its own queue. |
 | **Disabled webhook in `setWebhooks()`** | Silently filtered out. Never dispatched. |
 | **`setWebhooks()` called multiple times** | Replaces the entire list each time. Previous webhooks are discarded. |
 | **`secret` is not set** | No `X-Webhook-Signature` header is sent. Payload is not signed. |
@@ -713,7 +713,7 @@ afterSave: async ({ id, values, collection }) => {
 | **Response body very large** | Truncated to **1000 characters** in the `WebhookDeliveryResult`. |
 | **`entity` is `null` for DELETE** | Sent as `"record": null` in the payload. |
 | **`previousEntity` not passed for UPDATE** | `old_record` is `undefined` (omitted from JSON). |
-| **`onEntityChange` is async** | The entire retry sequence is awaited: up to 10s per attempt plus 1s and 5s of backoff, so **~36s** worst case per matching webhook — not the ~6s the backoffs alone suggest. Inside a collection callback that is transaction time; use `enqueueEntityChange`. |
+| **`onEntityChange` is async** | The entire retry sequence is awaited: up to 10s per attempt plus 1s and 5s of backoff, so **~36s** worst case for the slowest matching webhook — not the ~6s the backoffs alone suggest. Inside a collection callback that is transaction time; use `enqueueEntityChange`. |
 | **`enqueueEntityChange` returns `void`** | Deliveries run after the caller returns. Nothing awaits them but `flush()`, and results arrive only through `onDelivery`. |
 | **Process exits with deliveries queued** | They are lost. `await dispatcher.flush(10_000)` on shutdown. |
 | **One receiver is down** | Each webhook has its own in-process queue: its deliveries wait out their retries, every other webhook's go out as usual. Order is kept per webhook. |

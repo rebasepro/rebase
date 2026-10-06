@@ -450,6 +450,38 @@ url: "https://b.com/hook" })
         });
     });
 
+    describe("onEntityChange with several matching webhooks", () => {
+        it("delivers to them at once, and returns the results in webhook order", async () => {
+            // One after another, three receivers that each take ten seconds
+            // to answer held the caller thirty, and one timing out on all
+            // three attempts held it thirty-six per webhook.
+            const dispatcher = makeDispatcher();
+            dispatcher.setWebhooks(["a", "b", "c"].map(id =>
+                makeWebhook({ id: `wh_${id}`, url: `https://${id}.example.com/hook` })));
+            const started: string[] = [];
+            const answer = new Map<string, (response: Response) => void>();
+            mockFetch.mockImplementation((url: string) => {
+                const host = new URL(url).hostname;
+                started.push(host);
+                return new Promise<Response>(resolve => answer.set(host, resolve));
+            });
+
+            const delivering = dispatcher.onEntityChange("users", "INSERT", "id_1", { id: "id_1" });
+            for (let i = 0; i < 100 && started.length < 3; i++) await new Promise(r => setTimeout(r, 1));
+
+            // All three are open before any has answered.
+            expect(started.sort()).toEqual(["a.example.com", "b.example.com", "c.example.com"]);
+
+            // Answered out of order; the results are not.
+            answer.get("c.example.com")!(respond(202));
+            answer.get("a.example.com")!(respond(200));
+            answer.get("b.example.com")!(respond(201));
+
+            const results = await delivering;
+            expect(results.map(r => `${r.webhookId}:${r.statusCode}`)).toEqual(["wh_a:200", "wh_b:201", "wh_c:202"]);
+        });
+    });
+
     describe("enqueueEntityChange", () => {
         it("returns before the delivery runs", async () => {
             // The point of the method: `afterSave` is awaited inside the write's

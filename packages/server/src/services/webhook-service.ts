@@ -122,14 +122,16 @@ export class WebhookDispatcher {
 
     /**
      * Called when a entity changes — checks if any webhook matches, and awaits
-     * every delivery, retries included.
+     * every delivery, retries included. The matching webhooks are delivered to
+     * at the same time, so the wait is the slowest receiver's, not the sum of
+     * all of them; the results come back in webhook order either way.
      *
      * **Do not await this inside a collection callback.** `afterSave` and
      * `afterDelete` run inside the write's Postgres transaction, so awaiting a
      * delivery here holds a pooled connection and the row's locks for as long
-     * as the receiver takes to answer — up to ~36s across three attempts, per
-     * matching webhook. Use {@link enqueueEntityChange} there; this method is
-     * for a custom function or a job that wants the results.
+     * as the slowest receiver takes to answer — up to ~36s across three
+     * attempts. Use {@link enqueueEntityChange} there; this method is for a
+     * custom function or a job that wants the results.
      */
     async onEntityChange(
         table: string,
@@ -140,14 +142,13 @@ export class WebhookDispatcher {
     ): Promise<WebhookDeliveryResult[]> {
         const jobs = this.buildDeliveries(table, event, entity, previousEntity);
 
-        const results: WebhookDeliveryResult[] = [];
-        for (const job of jobs) {
+        // One delivery per matching webhook, so nothing here has an order to
+        // keep but the results', which `Promise.all` keeps.
+        return Promise.all(jobs.map(async (job) => {
             const result = await this.deliverWithRetry(job.webhook, job.event, job.payload);
             this.options.onDelivery?.(result);
-            results.push(result);
-        }
-
-        return results;
+            return result;
+        }));
     }
 
     /**
