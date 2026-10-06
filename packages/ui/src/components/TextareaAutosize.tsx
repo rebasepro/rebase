@@ -234,9 +234,17 @@ export const TextareaAutosize = React.forwardRef(function TextareaAutosize(
         };
     }, [syncHeightWithFlushSync]);
 
+    // Measuring is a forced synchronous layout (write the shadow, read
+    // `getComputedStyle` and `scrollHeight`), so it runs when something that
+    // decides the height changes — not on every render, which made each
+    // multiline field pay one per re-render of the form around it. Width
+    // changes re-sync through the ResizeObserver above; an uncontrolled
+    // textarea re-syncs in `handleChange`. The style is compared by content:
+    // callers pass it inline.
+    const styleKey = style ? JSON.stringify(style) : "";
     useLayoutEffect(() => {
         syncHeight();
-    });
+    }, [syncHeight, value, props.className, props.shadowClassName, styleKey, sizeRef, ignoreBoxSizing]);
 
     React.useEffect(() => {
         renders.current = 0;
