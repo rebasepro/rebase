@@ -1,4 +1,4 @@
-import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, isPublicStoragePath } from "@rebasepro/types";
+import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, isPublicStoragePath, storageObjectPath } from "@rebasepro/types";
 import { Transport } from "./transport";
 
 /**
@@ -29,57 +29,6 @@ import { Transport } from "./transport";
  */
 export function encodeStorageKey(key: string): string {
     return key.split("/").map(encodeURIComponent).join("/");
-}
-
-/**
- * The path the storage routes address an object by, from a key or from the
- * `storageUrl` an upload returned (`<scheme>://<bucket>/<key>`, which is what a
- * property with `includeBucketUrl: true` keeps in its column).
- *
- * The routes address a source's objects by key. On S3 and GCS the bucket in a
- * `storageUrl` is always the source's own — the server refuses any other — so
- * it is dropped: sent along, `s3://acme-media/products/a.png` reached the
- * server as the key `acme-media/products/a.png`, the preview found nothing and
- * a delete reported success while the object stayed. It worked on local disk
- * only, because `local://default/<key>` happens to carry the one bucket
- * segment the routes recognise — which is kept, as is any other local bucket.
- *
- * A bare key whose first folder is `default` is sent behind that bucket
- * segment. The routes read one leading `default/` (in any case) as the bucket,
- * so the key `default/photo.png` sent as it is names the root `photo.png`:
- * {@link defaultBucketPath} is the spelling that names the key itself.
- */
-export function storageObjectPath(keyOrUrl: string, bucket?: string): string {
-    let filePath = keyOrUrl;
-    // Whether `filePath` already carries a bucket segment, rather than being a key.
-    let bucketQualified = false;
-    const scheme = /^(local|s3|gs):\/\//.exec(filePath);
-    if (scheme) {
-        filePath = filePath.substring(scheme[0].length);
-        if (scheme[1] !== "local") {
-            const slash = filePath.indexOf("/");
-            if (slash > 0) filePath = filePath.substring(slash + 1);
-        } else {
-            bucketQualified = true;
-        }
-    }
-    if (bucket && filePath) {
-        if (!filePath.startsWith(bucket)) filePath = `${bucket}/${filePath}`;
-        bucketQualified = true;
-    }
-    return bucketQualified ? filePath : defaultBucketPath(filePath);
-}
-
-/**
- * The request path of a key in the default bucket: the key itself, unless the
- * routes would read its first folder as the bucket — a first folder named
- * `default`, matched as the routes match it (case-insensitively, and only when
- * something follows it). Then the bucket segment goes in front, so exactly the
- * one segment the routes strip is the one added.
- */
-function defaultBucketPath(key: string): string {
-    const segments = key.split("/");
-    return segments.length > 1 && segments[0].toLowerCase() === "default" ? `default/${key}` : key;
 }
 
 export function createStorage(transport: Transport, storageId?: string): StorageSource {

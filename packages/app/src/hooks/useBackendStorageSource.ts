@@ -10,7 +10,8 @@ import {
     DownloadConfig,
     DownloadMetadata,
     StorageListResult,
-    isPublicStoragePath
+    isPublicStoragePath,
+    storageObjectPath
 } from "@rebasepro/types";
 import { DEFAULT_API_PATH } from "./ApiConfigContext";
 
@@ -142,19 +143,8 @@ export function useBackendStorageSource({
             return cached.config;
         }
 
-        // Build the file path for the API
-        let filePath = keyOrUrl;
-
-        // Handle local:// and s3:// URLs
-        if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://"))) {
-            const withoutProtocol = filePath.substring(filePath.indexOf("://") + 3);
-            filePath = withoutProtocol;
-        }
-
-        // If bucket is provided separately, prepend it
-        if (bucket && filePath && !filePath.startsWith(bucket)) {
-            filePath = `${bucket}/${filePath}`;
-        }
+        // The path the storage routes address the object by — the SDK's rule.
+        const filePath = storageObjectPath(keyOrUrl, bucket);
 
         if (!filePath || filePath.trim() === "" || filePath === "/") {
             return { url: null,
@@ -249,17 +239,7 @@ fileNotFound: true };
         key: string,
         bucket?: string
     ): Promise<void> => {
-        let filePath = key;
-
-        // Handle protocol URLs
-        if (filePath && (filePath.startsWith("local://") || filePath.startsWith("s3://"))) {
-            const withoutProtocol = filePath.substring(filePath.indexOf("://") + 3);
-            filePath = withoutProtocol;
-        }
-
-        if (bucket && filePath && !filePath.startsWith(bucket)) {
-            filePath = `${bucket}/${filePath}`;
-        }
+        const filePath = storageObjectPath(key, bucket);
 
         if (!filePath || filePath.trim() === "" || filePath === "/") {
             return;

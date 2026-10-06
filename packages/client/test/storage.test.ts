@@ -1,5 +1,6 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
-import { createStorage, storageObjectPath } from "../src/storage";
+import { storageObjectPath } from "@rebasepro/types";
+import { createStorage } from "../src/storage";
 import { Transport } from "../src/transport";
 
 function createMockTransport(): jest.Mocked<Transport> {
@@ -581,6 +582,8 @@ fileNotFound: true });
             // So does a path given with its bucket.
             expect(storageObjectPath("photo.png", "default")).toBe("default/photo.png");
             expect(storageObjectPath("mybucket/file.jpg", "mybucket")).toBe("mybucket/file.jpg");
+            // ...and only then: a key that merely begins with the bucket's name is not behind it.
+            expect(storageObjectPath("mybucketfile.jpg", "mybucket")).toBe("mybucket/mybucketfile.jpg");
         });
     });
 

@@ -92,6 +92,59 @@ describe("useBackendStorageSource", () => {
         expect(file?.name).toBe("cat.png");
     });
 
+    /**
+     * The routes read one leading `default/` of a path as the bucket, so the
+     * key `default/photo.png` sent bare named the root `photo.png`: its
+     * preview showed the root file and its delete deleted it. The rule is the
+     * SDK's `storageObjectPath`, from `@rebasepro/types`, and its round trip
+     * through the real routes is packages/server/test/storage-sdk-default-folder.test.ts.
+     */
+    describe("a key whose first folder is named `default`", () => {
+        it("is read by its own path, not the root file's", async () => {
+            const calls = mockBackend({ token: "scoped-token", tokenExpiresIn: 300 });
+
+            const { url } = await storage().getSignedUrl("default/photo.png");
+
+            expect(calls[0].url).toBe(`${API}/api/storage/metadata/default/default/photo.png`);
+            expect(url).toBe(`${API}/api/storage/file/default/default/photo.png?token=scoped-token`);
+        });
+
+        it("is deleted by its own path, not the root file's", async () => {
+            const calls = mockBackend({});
+
+            await storage().deleteObject("default/photo.png");
+
+            expect(calls).toHaveLength(1);
+            expect(calls[0].url).toBe(`${API}/api/storage/file/default/default/photo.png`);
+            expect(calls[0].init?.method).toBe("DELETE");
+        });
+
+        it("is not taken for public when its folder is `default/public`", async () => {
+            const calls = mockBackend({ token: "scoped-token", tokenExpiresIn: 300 });
+
+            const { url } = await storage().getSignedUrl("default/public/report.pdf");
+
+            expect(calls[0].url).toBe(`${API}/api/storage/metadata/default/default/public/report.pdf`);
+            expect(url).toContain("token=scoped-token");
+        });
+    });
+
+    it("prefixes a bucket to a key that only begins with the bucket's name", async () => {
+        const calls = mockBackend({ token: "scoped-token", tokenExpiresIn: 300 });
+
+        await storage().getSignedUrl("defaults/photo.png", "default");
+
+        expect(calls[0].url).toBe(`${API}/api/storage/metadata/default/defaults/photo.png`);
+    });
+
+    it("reads a storageUrl on S3 by its key, as the SDK does", async () => {
+        const calls = mockBackend({ token: "scoped-token", tokenExpiresIn: 300 });
+
+        await storage().getSignedUrl("s3://acme-media/products/a.png");
+
+        expect(calls[0].url).toBe(`${API}/api/storage/metadata/products/a.png`);
+    });
+
     it("asks for a new token once the old one has expired", async () => {
         jest.useFakeTimers({ now: 1_000_000 });
         const calls = mockBackend({ token: "scoped-token", tokenExpiresIn: 300 });

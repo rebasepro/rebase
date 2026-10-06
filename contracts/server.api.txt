@@ -598,6 +598,7 @@ function setQueueRuntime
 function setTopicRuntime
 function sortKeyToString
 function storageEnvSuffix
+function storageObjectPath
 function storageReference
 function summarizeRoles
 function summarizeScopes
