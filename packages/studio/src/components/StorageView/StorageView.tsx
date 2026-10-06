@@ -548,12 +548,24 @@ export const StorageView = () => {
         storageSourceRef.current = storageSource;
     }, [storageSource]);
 
+    /**
+     * The latest listing asked for. Only its answer is shown: a listing awaits
+     * every file's metadata, so an earlier one — of the source or folder the
+     * view has since left — can answer after a later one, and showed that
+     * source's files under the one selected, where their actions ran.
+     */
+    const listingRequestRef = useRef(0);
+
     // ── Fetch directory contents ──
     const fetchContents = useCallback(async (path: string) => {
+        const request = ++listingRequestRef.current;
+        const isCurrent = () => request === listingRequestRef.current;
+        // One source for the whole listing, metadata included.
+        const source = storageSourceRef.current;
         setLoading(true);
         setFailure(null);
         try {
-            const result: StorageListResult = await storageSourceRef.current.listObjects(path);
+            const result: StorageListResult = await source.listObjects(path);
 
             const folderItems: StorageFile[] = (result.prefixes ?? []).map(ref => ({
                 name: ref.name,
@@ -565,7 +577,7 @@ export const StorageView = () => {
             const fileItems: StorageFile[] = await Promise.all(
                 (result.items ?? []).map(async (ref) => {
                     try {
-                        const downloadConfig = await storageSourceRef.current.getSignedUrl(ref.fullPath);
+                        const downloadConfig = await source.getSignedUrl(ref.fullPath);
                         return {
                             name: ref.name,
                             fullPath: ref.fullPath,
@@ -584,16 +596,18 @@ export const StorageView = () => {
                 })
             );
 
+            if (!isCurrent()) return;
             setFolders(folderItems);
             setFiles(fileItems);
         } catch (e) {
+            if (!isCurrent()) return;
             console.error("Storage list error:", e);
             // A refusal from the project's own `storageAuthorize` hook is not a
             // fault — see `load-failure.ts`. Rendering both the same way told
             // a customer with a working project that their storage was broken.
             setFailure(classifyLoadFailure(e));
         } finally {
-            setLoading(false);
+            if (isCurrent()) setLoading(false);
         }
     }, []);
 
