@@ -1,8 +1,9 @@
 import path from "path";
-import { createServer, type Server } from "http";
+import { type Server } from "http";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { runtimeSecureHeaders } from "./security-headers";
+import { createRuntimeHttpServer } from "./http-server";
 import { getRequestListener } from "@hono/node-server";
 import {
     DEFAULT_DATA_SOURCE_KEY,
@@ -301,7 +302,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         app.use("/*", metrics.middleware);
     }
 
-    const server = createServer(getRequestListener(app.fetch));
+    const server = createRuntimeHttpServer(getRequestListener(app.fetch));
 
     // ── Backend ──────────────────────────────────────────────────────────────
     const usersCollection = await loadUsersCollection(bundle);
@@ -682,7 +683,7 @@ async function bootStaticApp(
     const metrics = metricsEnabled ? createMetricsMiddleware(basePath) : undefined;
     if (metrics) app.use("/*", metrics.middleware);
 
-    const server = createServer(getRequestListener(app.fetch));
+    const server = createRuntimeHttpServer(getRequestListener(app.fetch));
 
     // Liveness and readiness are the same for a static app: it is ready the
     // moment it can serve, and there is no database to make readiness lie.
