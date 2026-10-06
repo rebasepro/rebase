@@ -215,37 +215,31 @@ export class HistoryService {
      * Prune history for a single row: enforce maxEntries and TTL.
      */
     async pruneEntity(tableName: string, id: string): Promise<number> {
-        let deleted = 0;
-
-        // 1. TTL — delete entries older than ttlDays
-        const ttlResult = await this.db.execute(sql`
+        // One statement for both rules: older than `ttlDays`, or beyond the
+        // newest `maxEntries`. They were two DELETEs, each its own pool
+        // checkout after every recorded change — 2,000 of them queued by a
+        // 1,000-row bulk. Together they remove the same rows: an expired entry
+        // is older than every live one, so the newest `maxEntries` of all of
+        // them are the newest of the live ones whenever there are that many,
+        // and otherwise every entry past them has expired anyway.
+        const result = await this.db.execute(sql`
             DELETE FROM rebase.entity_history
             WHERE table_name = ${tableName}
               AND entity_id = ${String(id)}
-              AND updated_at < NOW() - MAKE_INTERVAL(days => ${this.retention.ttlDays})
+              AND (
+                updated_at < NOW() - MAKE_INTERVAL(days => ${this.retention.ttlDays})
+                OR id IN (
+                    SELECT id FROM rebase.entity_history
+                    WHERE table_name = ${tableName}
+                      AND entity_id = ${String(id)}
+                    ORDER BY updated_at DESC
+                    OFFSET ${this.retention.maxEntries}
+                )
+              )
         `);
-        deleted += ttlResult.rowCount ?? 0;
-
-        // 2. Max entries — keep the newest maxEntries, delete the rest
-        const maxResult = await this.db.execute(sql`
-            DELETE FROM rebase.entity_history
-            WHERE id IN (
-                SELECT id FROM rebase.entity_history
-                WHERE table_name = ${tableName}
-                  AND entity_id = ${String(id)}
-                ORDER BY updated_at DESC
-                OFFSET ${this.retention.maxEntries}
-            )
-        `);
-        deleted += maxResult.rowCount ?? 0;
-
-        return deleted;
+        return result.rowCount ?? 0;
     }
 
-    /**
-     * Global prune: enforce TTL across ALL rows in a single sweep.
-     * Intended to be called periodically (e.g. once per hour or daily).
-     */
     async pruneExpired(): Promise<number> {
         const result = await this.db.execute(sql`
             DELETE FROM rebase.entity_history

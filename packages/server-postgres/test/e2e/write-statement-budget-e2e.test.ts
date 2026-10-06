@@ -36,6 +36,7 @@ import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js"
 import { errorHandler } from "../../../server/src/api/errors.js";
 import { createHistoryRoutes } from "../../../server/src/history/history-routes.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
+import { HistoryService } from "../../src/history/HistoryService.js";
 
 // ── statement capture ──────────────────────────────────────────────────────
 //
@@ -473,6 +474,46 @@ describe("a write's statements (E2E)", () => {
                 return { ...rest, updatedAt: typeof updatedAt };
             };
             expect(previous(upserted)).toEqual(previous(patched));
+        });
+    });
+
+    describe("history pruning after a write", () => {
+        const prunes = (statements: string[]) => statements.filter(s => /^delete from rebase\.entity_history/i.test(s));
+
+        async function seedHistory(entityId: string, expired: number, fresh: number): Promise<string[]> {
+            await admin.query(
+                `INSERT INTO rebase.entity_history (table_name, entity_id, action, updated_at)
+                 SELECT 'pruned', $1, 'update', NOW() - INTERVAL '3 days' - g * INTERVAL '1 minute' FROM generate_series(1, $2) g`,
+                [entityId, expired]
+            );
+            const { rows } = await admin.query<{ id: string }>(
+                `INSERT INTO rebase.entity_history (table_name, entity_id, action, updated_at)
+                 SELECT 'pruned', $1, 'update', NOW() - g * INTERVAL '1 minute' FROM generate_series(1, $2) g
+                 RETURNING id`,
+                [entityId, fresh]
+            );
+            return rows.map(row => row.id);
+        }
+        const remaining = async (entityId: string) => (await admin.query<{ id: string }>(
+            "SELECT id FROM rebase.entity_history WHERE table_name = 'pruned' AND entity_id = $1", [entityId]
+        )).rows.map(row => row.id).sort();
+
+        it("is one statement, and keeps exactly the newest entries inside the retention period", async () => {
+            const service = new HistoryService(connection.db as never, { maxEntries: 5, ttlDays: 1 });
+
+            // More fresh entries than the cap: the expired ones and the oldest fresh ones go.
+            const fresh = await seedHistory("crowded", 3, 8);
+            const crowded = await statementsOf(() => service.pruneEntity("pruned", "crowded"));
+            expect(prunes(crowded.statements)).toHaveLength(1);
+            expect(crowded.result).toBe(6);
+            expect(await remaining("crowded")).toEqual(fresh.slice(0, 5).sort());
+
+            // Fewer than the cap: only the expired ones go.
+            const few = await seedHistory("sparse", 3, 2);
+            const sparse = await statementsOf(() => service.pruneEntity("pruned", "sparse"));
+            expect(prunes(sparse.statements)).toHaveLength(1);
+            expect(sparse.result).toBe(3);
+            expect(await remaining("sparse")).toEqual([...few].sort());
         });
     });
 
