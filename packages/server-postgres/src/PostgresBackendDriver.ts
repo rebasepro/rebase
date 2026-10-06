@@ -412,7 +412,10 @@ export class PostgresBackendDriver implements DataDriver {
 
         // Initialize BranchService when adminConnectionString is configured
         if (poolManager) {
-            this.branchService = new BranchService(db, poolManager);
+            this.branchService = new BranchService(db, poolManager, {
+                database: () => this.appDatabaseName(),
+                registry: async () => this.db
+            });
         }
 
     }
@@ -2242,8 +2245,38 @@ export class PostgresBackendDriver implements DataDriver {
         );
     }
 
-    private getTargetDb(databaseName?: string): DrizzleClient {
-        if (!databaseName || databaseName === this.poolManager?.defaultDatabaseName) {
+    /** The answer to {@link appDatabaseName}, once it has been given. */
+    private appDatabase?: Promise<string>;
+
+    /**
+     * The database this driver's own connection is on: the app's, which every
+     * data request and the CMS read and write.
+     *
+     * Asked of the connection rather than read off the admin connection
+     * string, which can name another database — the server's `postgres`, or
+     * the main database while this process runs on a branch. The SQL console
+     * preselects this name, a statement sent to it runs on this connection,
+     * and branching copies it by default.
+     */
+    async appDatabaseName(): Promise<string> {
+        this.appDatabase ??= this.db.execute(drizzleSql.raw("SELECT current_database() AS name")).then((result) => {
+            const name = result.rows?.[0]?.name;
+            if (typeof name !== "string") {
+                throw new Error("The database did not say which database this connection is on.");
+            }
+            return name;
+        });
+        try {
+            return await this.appDatabase;
+        } catch (error: unknown) {
+            // Asked again next time, rather than failing every later call.
+            this.appDatabase = undefined;
+            throw error;
+        }
+    }
+
+    private async getTargetDb(databaseName?: string): Promise<DrizzleClient> {
+        if (!databaseName || databaseName === await this.appDatabaseName()) {
             return this.db;
         }
         if (!this.poolManager) {
@@ -2283,7 +2316,7 @@ export class PostgresBackendDriver implements DataDriver {
     }): Promise<Record<string, unknown>[]> {
         if (options?.isolateSession) {
             return this.onIsolatedSession(
-                this.getTargetDb(options.database),
+                await this.getTargetDb(options.database),
                 options.role,
                 (db, role) => this.executeSqlOn(db, sqlText, { ...options, role })
             );
@@ -2291,7 +2324,7 @@ export class PostgresBackendDriver implements DataDriver {
         if (!options?.database && !options?.role) {
             return this.dataService.executeSql(sqlText, options?.params);
         }
-        return this.executeSqlOn(this.getTargetDb(options?.database), sqlText, options);
+        return this.executeSqlOn(await this.getTargetDb(options?.database), sqlText, options);
     }
 
     /**
@@ -2302,7 +2335,7 @@ export class PostgresBackendDriver implements DataDriver {
         database?: string,
         role?: string
     }): Promise<SqlScriptResult> {
-        const targetDb = this.getTargetDb(options?.database);
+        const targetDb = await this.getTargetDb(options?.database);
         const pool = "$client" in targetDb ? targetDb.$client : undefined;
         if (!(pool instanceof Pool)) {
             // One session in process: nothing on the wire to read a column's
@@ -2494,10 +2527,10 @@ export class PostgresBackendDriver implements DataDriver {
         );
         const databases = result.map((r: Record<string, unknown>) => r.datname as string);
         // Ensure the current connected database is always first in the list
-        const currentDb = this.poolManager?.defaultDatabaseName;
-        if (currentDb && !databases.includes(currentDb)) {
+        const currentDb = await this.appDatabaseName();
+        if (!databases.includes(currentDb)) {
             databases.unshift(currentDb);
-        } else if (currentDb) {
+        } else {
             // Move it to the front
             const idx = databases.indexOf(currentDb);
             if (idx > 0) {
@@ -2566,7 +2599,7 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     async fetchCurrentDatabase(): Promise<string | undefined> {
-        return this.poolManager?.defaultDatabaseName;
+        return this.appDatabaseName();
     }
 
     /**

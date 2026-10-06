@@ -136,11 +136,40 @@ function toBranchDbName(name: string): string {
     return `${BRANCH_DB_PREFIX}${name}`;
 }
 
+/**
+ * Where a server's branches are kept: the main database — what a branch is
+ * copied from unless told otherwise, and what may never be dropped — and the
+ * connection whose `rebase.branches` records them.
+ */
+export interface BranchHome {
+    /** The main database's name. */
+    database(): Promise<string>;
+    /**
+     * A connection on the database the registry is in. Asked for at each use:
+     * a pool to the main database is closed before it is copied.
+     */
+    registry(): Promise<DrizzleClient>;
+}
+
 export class BranchService {
+    private readonly home: BranchHome;
+
+    /**
+     * @param db    A connection on the server the branches are made on. Branch
+     *              DDL runs here.
+     * @param home  Where branches are kept. Without one, the database the
+     *              pool manager's connection string names, and `db`'s registry.
+     */
     constructor(
         private db: DrizzleClient,
-        private poolManager: DatabasePoolManager
-    ) {}
+        private poolManager: DatabasePoolManager,
+        home?: BranchHome
+    ) {
+        this.home = home ?? {
+            database: async () => poolManager.defaultDatabaseName,
+            registry: async () => db
+        };
+    }
 
     /**
      * Refuse a branch mutation the connected server cannot honour.
@@ -166,9 +195,10 @@ export class BranchService {
      */
     async ensureBranchMetadataTable(): Promise<void> {
         // Create the rebase schema (idempotent — may already exist from auth/history init)
-        await this.db.execute(sql`CREATE SCHEMA IF NOT EXISTS rebase`);
+        const registry = await this.home.registry();
+        await registry.execute(sql`CREATE SCHEMA IF NOT EXISTS rebase`);
 
-        await this.db.execute(sql.raw(`
+        await registry.execute(sql.raw(`
             CREATE TABLE IF NOT EXISTS ${BRANCHES_TABLE} (
                 name         TEXT PRIMARY KEY,
                 db_name      TEXT NOT NULL UNIQUE,
@@ -180,7 +210,7 @@ export class BranchService {
 
         // Not a collection, so no RLS — and it names every branch database on
         // this server. The driver's schema-wide grant reaches it, so revoke.
-        await this.db.execute(sql.raw(revokeInternalTableSql("rebase", "branches")));
+        await registry.execute(sql.raw(revokeInternalTableSql("rebase", "branches")));
     }
 
     /**
@@ -203,10 +233,10 @@ export class BranchService {
         }
 
         const dbName = toBranchDbName(name);
-        const sourceDb = options?.source || this.poolManager.defaultDatabaseName;
+        const sourceDb = options?.source || await this.home.database();
 
         // Check if branch already exists
-        const existing = await this.db.execute(
+        const existing = await (await this.home.registry()).execute(
             sql`SELECT name FROM rebase.branches WHERE name = ${name} OR db_name = ${dbName}`
         );
         if ((existing.rows as unknown[]).length > 0) {
@@ -252,9 +282,10 @@ export class BranchService {
             throw describeBranchDdlError(err, dbName);
         }
 
-        // Record metadata in the default database
+        // Record metadata in the registry — asked for again, as copying the
+        // main database closed any pool on it.
         const now = new Date();
-        await this.db.execute(
+        await (await this.home.registry()).execute(
             sql`INSERT INTO rebase.branches (name, db_name, parent_db, created_at)
                 VALUES (${name}, ${dbName}, ${sourceDb}, ${now.toISOString()})`
         );
@@ -279,7 +310,8 @@ export class BranchService {
         // Safety, first pass: a request that would target the default database
         // is refused before any metadata is read, so the answer costs nothing
         // and cannot depend on what a row happens to say.
-        if (toBranchDbName(name) === this.poolManager.defaultDatabaseName) {
+        const mainDatabase = await this.home.database();
+        if (toBranchDbName(name) === mainDatabase) {
             throw new Error("Cannot delete the main database.");
         }
 
@@ -289,7 +321,7 @@ export class BranchService {
         // derives `rb_my-feature`; re-deriving would drop a database this row
         // never named — or, if that name happened to exist, somebody else's.
         // The stored value is the only one that is true by construction.
-        const existing = await this.db.execute(
+        const existing = await (await this.home.registry()).execute(
             sql`SELECT db_name FROM rebase.branches WHERE name = ${name}`
         );
         const existingRows = existing.rows as Record<string, unknown>[];
@@ -301,7 +333,7 @@ export class BranchService {
         // Safety, second pass: the first checked a name we derived, this checks
         // the one we are about to drop. They differ for any row written under
         // the old scheme, and it is this one that governs.
-        if (dbName === this.poolManager.defaultDatabaseName) {
+        if (dbName === mainDatabase) {
             throw new Error("Cannot delete the main database.");
         }
 
@@ -330,7 +362,7 @@ export class BranchService {
         }
 
         // Remove metadata
-        await this.db.execute(
+        await (await this.home.registry()).execute(
             sql`DELETE FROM rebase.branches WHERE name = ${name}`
         );
     }
@@ -414,7 +446,7 @@ export class BranchService {
      * find, and a join hides both.
      */
     async pruneCandidates(): Promise<{ rows: BranchRow[]; databases: string[] }> {
-        const rowResult = await this.db.execute(sql.raw(`
+        const rowResult = await (await this.home.registry()).execute(sql.raw(`
             SELECT name, db_name, created_at FROM ${BRANCHES_TABLE} ORDER BY created_at
         `));
         const rows = (rowResult.rows as Record<string, unknown>[]).map((row) => ({
@@ -433,7 +465,7 @@ export class BranchService {
 
     /** Remove a metadata row whose database is already gone. */
     async forgetBranchRow(name: string): Promise<void> {
-        await this.db.execute(sql`DELETE FROM rebase.branches WHERE name = ${name}`);
+        await (await this.home.registry()).execute(sql`DELETE FROM rebase.branches WHERE name = ${name}`);
     }
 
     /**
@@ -447,7 +479,7 @@ export class BranchService {
      */
     async dropDatabase(dbName: string): Promise<void> {
         validateIdentifier(dbName, "database name");
-        if (dbName === this.poolManager.defaultDatabaseName) {
+        if (dbName === await this.home.database()) {
             throw new Error("Cannot delete the main database.");
         }
 
@@ -464,7 +496,7 @@ export class BranchService {
      * Optionally fetches database sizes from pg_database.
      */
     async listBranches(): Promise<BranchInfo[]> {
-        const result = await this.db.execute(sql.raw(`
+        const result = await (await this.home.registry()).execute(sql.raw(`
             SELECT 
                 b.name,
                 b.db_name,
@@ -491,7 +523,7 @@ export class BranchService {
     async getBranchInfo(name: string): Promise<BranchInfo | undefined> {
         assertValidBranchName(name);
 
-        const result = await this.db.execute(sql`
+        const result = await (await this.home.registry()).execute(sql`
             SELECT
                 b.name,
                 b.db_name,
