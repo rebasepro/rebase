@@ -79,6 +79,18 @@ function BackupScheduleSummary({ schedule }: { schedule: BackupScheduleStatus })
         );
     }
 
+    // Unknown is not "has not run yet": that line would be read off an empty
+    // history the server could not fetch.
+    if (schedule.historyError) {
+        return (
+            <Alert color="warning">
+                <Typography variant="body2" className="text-[13px]">
+                    {t("studio_backups_history_unreadable")}
+                </Typography>
+            </Alert>
+        );
+    }
+
     const parts = [
         last ? t("studio_backups_last_run_ok", { when: formatDate(last.startedAt) }) : t("studio_backups_never_ran"),
         schedule.nextRunAt ? t("studio_backups_next_run", { when: formatDate(schedule.nextRunAt) }) : null

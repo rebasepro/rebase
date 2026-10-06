@@ -431,6 +431,18 @@ describe("createCronStore", () => {
         });
     });
 
+    describe("fetchLogs", () => {
+        it("throws when the history cannot be read — an unread history is not an empty one", async () => {
+            // Caught and answered `[]`, a failed query became a 200 with no
+            // executions, and Studio said the job had never run.
+            const store = createCronStore(makeDriver(async () => {
+                throw drizzleError("42P01", 'relation "rebase.cron_logs" does not exist');
+            }))!;
+
+            await expect(store.fetchLogs("nightly", 25)).rejects.toThrow("Failed query");
+        });
+    });
+
     describe("fetchRunSummaries", () => {
         it("reads each job's count and last run from its own rows", async () => {
             const exec = jest.fn<ExecuteSql>().mockResolvedValue([

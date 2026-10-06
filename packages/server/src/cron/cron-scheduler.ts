@@ -721,7 +721,12 @@ export class CronScheduler {
 
     /**
      * Get log entries for a job from the database (if store is available).
-     * Falls back to in-memory logs if no store is configured.
+     * Falls back to in-memory logs if no store is configured, or if the store
+     * has none — a run whose row is still being written.
+     *
+     * Throws when the store cannot read the history. This process's memory is
+     * not a stand-in for it: it is empty on the `api` role and after a
+     * restart, and holds one replica's runs at most.
      */
     async getJobLogsFromDb(id: string, limit?: number): Promise<CronJobLogEntry[]> {
         if (this.store) {

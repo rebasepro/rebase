@@ -1170,6 +1170,7 @@ export const hi: RebaseTranslations = {
     studio_backups_never_ran: "शेड्यूल किया गया बैकअप अभी तक नहीं चला है",
     studio_backups_next_run: "अगला रन: {{when}}",
     studio_backups_schedule_paused: "शेड्यूल किए गए बैकअप रुके हुए हैं। क्रॉन जॉब में {{job}} जॉब फिर से शुरू करें।",
+    studio_backups_history_unreadable: "शेड्यूल किए गए बैकअप का रन इतिहास नहीं पढ़ा जा सका, इसलिए पता नहीं कि वह चला या नहीं। कारण सर्वर लॉग में है।",
     studio_backups_unavailable_title: "बैकअप उपलब्ध नहीं हैं",
     studio_backups_unavailable_body: "यह बैकएंड बैकअप API उपलब्ध नहीं कराता।",
     studio_cron_denied_title: "आप इस प्रोजेक्ट के क्रॉन जॉब सूचीबद्ध नहीं कर सकते",

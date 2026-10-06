@@ -1170,6 +1170,7 @@ export const fr: RebaseTranslations = {
     studio_backups_never_ran: "La sauvegarde planifiée ne s'est pas encore exécutée",
     studio_backups_next_run: "Prochaine exécution : {{when}}",
     studio_backups_schedule_paused: "Les sauvegardes planifiées sont en pause. Reprenez la tâche {{job}} dans Tâches cron.",
+    studio_backups_history_unreadable: "Impossible de lire l'historique d'exécution de la sauvegarde planifiée : on ne sait donc pas si elle s'est exécutée. La raison figure dans le journal du serveur.",
     studio_backups_unavailable_title: "Sauvegardes indisponibles",
     studio_backups_unavailable_body: "Ce backend n'expose pas l'API des sauvegardes.",
     studio_cron_denied_title: "Vous ne pouvez pas lister les tâches cron de ce projet",

@@ -89,6 +89,28 @@ describe("Backups panel and the scheduled run", () => {
         expect(screen.queryByText(/^The last scheduled backup failed/)).toBeNull();
     });
 
+    it("says the run history could not be read, not that the backup has not run", async () => {
+        // The cron_logs query failed. "The scheduled backup has not run yet"
+        // would be a claim about a history nobody could read.
+        list.mockResolvedValue({
+            backups: [],
+            destinationKind: "local",
+            configured: true,
+            schedule: {
+                jobId: "backup",
+                name: "Scheduled database backup",
+                schedule: "0 3 * * *",
+                enabled: true,
+                nextRunAt: "2026-10-01T03:00:00.000Z",
+                historyError: "The backup job's run history could not be read. The server log has the reason."
+            }
+        });
+        render(<BackupsView/>);
+
+        await waitFor(() => expect(screen.getByText(en.studio_backups_history_unreadable!)).toBeTruthy());
+        expect(screen.queryByText(new RegExp(en.studio_backups_never_ran!))).toBeNull();
+    });
+
     it("says a paused schedule is paused", async () => {
         list.mockResolvedValue({
             backups: [],

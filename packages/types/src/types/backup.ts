@@ -76,8 +76,18 @@ export interface BackupScheduleStatus {
     /** ISO timestamp of the next scheduled run, when one is armed. */
     nextRunAt?: string;
 
-    /** The most recent run, absent when the job has never run. */
+    /**
+     * The most recent run, absent when the job has never run — or when its
+     * run history could not be read, which {@link historyError} says.
+     */
     lastRun?: BackupRunOutcome;
+
+    /**
+     * Why the job's run history could not be read. Whether it ran, and how it
+     * went, is then unknown: `lastRun` is absent for that reason, not because
+     * the job never ran.
+     */
+    historyError?: string;
 }
 
 /** What the backup listing (`GET /admin/backups`) answers. */

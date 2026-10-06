@@ -103,6 +103,22 @@ describe("GET /admin/backups — the scheduled run", () => {
         expect(schedule?.lastRun).toMatchObject({ success: false, error: "pg_dump: error: connection lost" });
     });
 
+    it("says the run history could not be read, rather than that the job never ran", async () => {
+        const source: BackupScheduleSource = {
+            jobIdsWhere: () => ["backup"],
+            fetchJob: async () => ({
+                id: "backup", name: "Backup", schedule: "0 3 * * *", enabled: true,
+                state: "idle", totalRuns: 0, totalFailures: 0
+            }),
+            getJobLogsFromDb: async () => { throw new Error("connection terminated unexpectedly"); }
+        };
+
+        const schedule = await readBackupSchedule(source);
+
+        expect(schedule?.lastRun).toBeUndefined();
+        expect(schedule?.historyError).toMatch(/could not be read/);
+    });
+
     it("says a registered backup job has not run yet", async () => {
         const scheduler = new CronScheduler();
         scheduler.registerJobs([{ id: "backup", definition: backupJob(async () => undefined) }]);

@@ -1175,6 +1175,7 @@ export const pt: RebaseTranslations = {
     studio_backups_never_ran: "A cópia de segurança agendada ainda não foi executada",
     studio_backups_next_run: "Próxima execução: {{when}}",
     studio_backups_schedule_paused: "As cópias de segurança agendadas estão em pausa. Retome a tarefa {{job}} em Tarefas cron.",
+    studio_backups_history_unreadable: "Não foi possível ler o histórico de execuções da cópia de segurança agendada, por isso não se sabe se foi executada. O motivo está no registo do servidor.",
     studio_backups_unavailable_title: "Cópias de segurança indisponíveis",
     studio_backups_unavailable_body: "Este backend não expõe a API de cópias de segurança.",
     studio_cron_denied_title: "Não pode listar as tarefas cron deste projeto",

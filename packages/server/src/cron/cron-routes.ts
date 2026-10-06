@@ -122,7 +122,13 @@ job: await scheduler.fetchJob(id) });
             throw ApiError.notFound(`Cron job "${id}" not found`);
         }
 
-        const logs = await scheduler.getJobLogsFromDb(id, limit);
+        const logs = await scheduler.getJobLogsFromDb(id, limit).catch((err: unknown) => {
+            // Not an empty 200: Studio shows that as "No executions yet".
+            logger.error(`[cron] Could not read the run history of "${id}"`, { error: err });
+            throw ApiError.serviceUnavailable(
+                `The run history of cron job "${id}" could not be read. The server log has the reason.`
+            );
+        });
         return c.json({ logs });
     });
 

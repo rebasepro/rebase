@@ -8,6 +8,7 @@
  */
 import type { BackupScheduleStatus, CronJobDefinition, CronJobLogEntry, CronJobStatus } from "@rebasepro/types";
 import { isAlreadyExecutingSkip } from "../cron/cron-scheduler";
+import { logger } from "../utils/logger";
 
 /**
  * The mark `createBackupCron` (in `@rebasepro/server-postgres`) puts on the
@@ -50,7 +51,17 @@ export async function readBackupSchedule(source: BackupScheduleSource): Promise<
     const job = await source.fetchJob(jobId);
     if (!job) return null;
 
-    const recent = await source.getJobLogsFromDb(jobId, RECENT_RUNS);
+    let recent: CronJobLogEntry[];
+    let historyError: string | undefined;
+    try {
+        recent = await source.getJobLogsFromDb(jobId, RECENT_RUNS);
+    } catch (err) {
+        // Said, not read as "has not run yet". The listing itself still
+        // answers: the backups at the destination are worth showing.
+        logger.error(`[backups] Could not read the run history of the backup job "${jobId}"`, { error: err });
+        recent = [];
+        historyError = "The backup job's run history could not be read. The server log has the reason.";
+    }
     const last = recent.find(entry => !isAlreadyExecutingSkip(entry));
 
     return {
@@ -59,6 +70,7 @@ export async function readBackupSchedule(source: BackupScheduleSource): Promise<
         schedule: job.schedule,
         enabled: job.enabled,
         ...(job.nextRunAt ? { nextRunAt: job.nextRunAt } : {}),
+        ...(historyError ? { historyError } : {}),
         ...(last ? {
             lastRun: {
                 startedAt: last.startedAt,

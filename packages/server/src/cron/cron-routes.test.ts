@@ -301,6 +301,23 @@ description: "First job" }),
             const res = await app.request("/cron/ghost/logs");
             expect(res.status).toBe(404);
         });
+
+        it("answers 503 when the run history cannot be read, not an empty list", async () => {
+            // The empty 200 read as "never ran" in Studio, and the fallback to
+            // this process's memory is empty on the api role and after a restart.
+            const store: CronStore = {
+                ...makeStateStore(),
+                fetchLogs: async () => { throw new Error("connection terminated unexpectedly"); }
+            };
+            const { app: storeApp } = appWithStore(store, [makeJob("nightly")]);
+
+            const res = await storeApp.request("/cron/nightly/logs");
+
+            expect(res.status).toBe(503);
+            const body = await jsonBody(res);
+            expect(JSON.stringify(body)).toContain("could not be read");
+            expect(body.logs).toBeUndefined();
+        });
     });
 
     // ── PUT /:id (enable/disable) ───────────────────────────────────

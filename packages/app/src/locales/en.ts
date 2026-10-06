@@ -1178,6 +1178,7 @@ export const en: RebaseTranslations = {
     studio_backups_never_ran: "The scheduled backup has not run yet",
     studio_backups_next_run: "Next run: {{when}}",
     studio_backups_schedule_paused: "Scheduled backups are paused. Resume the {{job}} job in Cron Jobs.",
+    studio_backups_history_unreadable: "Could not read the scheduled backup's run history, so whether it ran is not known. The server log has the reason.",
     studio_backups_unavailable_title: "Backups not available",
     studio_backups_unavailable_body: "This backend does not expose the backups API.",
     studio_cron_denied_title: "You cannot list this project's cron jobs",

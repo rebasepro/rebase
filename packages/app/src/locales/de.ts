@@ -1170,6 +1170,7 @@ export const de: RebaseTranslations = {
     studio_backups_never_ran: "Die geplante Sicherung ist noch nicht gelaufen",
     studio_backups_next_run: "Nächster Lauf: {{when}}",
     studio_backups_schedule_paused: "Geplante Sicherungen sind pausiert. Setze den Job {{job}} unter Cron-Jobs fort.",
+    studio_backups_history_unreadable: "Der Ausführungsverlauf der geplanten Sicherung konnte nicht gelesen werden, daher ist unbekannt, ob sie gelaufen ist. Der Grund steht im Server-Log.",
     studio_backups_unavailable_title: "Sicherungen nicht verfügbar",
     studio_backups_unavailable_body: "Dieses Backend stellt die Sicherungs-API nicht bereit.",
     studio_cron_denied_title: "Du darfst die Cron-Jobs dieses Projekts nicht auflisten",

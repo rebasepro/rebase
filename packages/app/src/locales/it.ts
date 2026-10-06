@@ -1170,6 +1170,7 @@ export const it: RebaseTranslations = {
     studio_backups_never_ran: "Il backup pianificato non è ancora stato eseguito",
     studio_backups_next_run: "Prossima esecuzione: {{when}}",
     studio_backups_schedule_paused: "I backup pianificati sono in pausa. Riprendi il processo {{job}} in Processi cron.",
+    studio_backups_history_unreadable: "Non è stato possibile leggere la cronologia delle esecuzioni del backup pianificato, quindi non si sa se è stato eseguito. Il motivo è nel log del server.",
     studio_backups_unavailable_title: "Backup non disponibili",
     studio_backups_unavailable_body: "Questo backend non espone l'API dei backup.",
     studio_cron_denied_title: "Non puoi elencare i processi cron di questo progetto",

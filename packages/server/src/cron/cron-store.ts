@@ -24,6 +24,10 @@ export interface CronStore {
 
     /**
      * Fetch the most recent logs for a job.
+     *
+     * Throws when the history cannot be read. An empty array is a claim — the
+     * job has no recorded runs — and a caller shows it as "never ran".
+     *
      * @param jobId  The job identifier
      * @param limit  Max entries to return (default 50)
      * @returns Logs sorted newest-first
@@ -393,21 +397,16 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
         },
 
         async fetchLogs(jobId: string, limit = 50): Promise<CronJobLogEntry[]> {
-            try {
-                const rows = await exec(
-                    `SELECT job_id, started_at, finished_at, duration_ms, success, error, result, logs, manual
-                     FROM ${TABLE}
-                     WHERE job_id = $1
-                     ORDER BY started_at DESC
-                     LIMIT $2`,
-                    { params: [jobId, limit] }
-                );
+            const rows = await exec(
+                `SELECT job_id, started_at, finished_at, duration_ms, success, error, result, logs, manual
+                 FROM ${TABLE}
+                 WHERE job_id = $1
+                 ORDER BY started_at DESC
+                 LIMIT $2`,
+                { params: [jobId, limit] }
+            );
 
-                return rows.map(rowToLogEntry);
-            } catch (err) {
-                logger.error(`[cron-store] Failed to fetch logs for "${jobId}"`, { error: err });
-                return [];
-            }
+            return rows.map(rowToLogEntry);
         },
 
         async fetchJobStats(): Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string }>> {
