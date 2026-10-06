@@ -83,6 +83,24 @@ const DEFAULT_POOL: Required<PostgresPoolConfig> = {
     keepAlive: true
 };
 
+/**
+ * The time limits every pool to this server shares: how long to wait for a
+ * connection (then 503), the server-side statement timeout, the client-side
+ * read backstop above it, and TCP keep-alive. Exported for the per-database
+ * pools (`DatabasePoolManager`), which had none of them — pg's default
+ * `connectionTimeoutMillis` is 0, wait forever.
+ */
+export function defaultPoolTimeouts(): Pick<PoolConfig,
+    "connectionTimeoutMillis" | "query_timeout" | "statement_timeout" | "keepAlive" | "keepAliveInitialDelayMillis"> {
+    return {
+        connectionTimeoutMillis: DEFAULT_POOL.connectionTimeoutMillis,
+        query_timeout: DEFAULT_POOL.queryTimeout,
+        statement_timeout: DEFAULT_POOL.statementTimeout,
+        keepAlive: DEFAULT_POOL.keepAlive,
+        keepAliveInitialDelayMillis: 0
+    };
+}
+
 /** ReadyForQuery status byte: `I` idle, `T` in transaction, `E` failed transaction. */
 const TX_IDLE = "I";
 
