@@ -1,6 +1,6 @@
 import { AggregateParams, FindParams as TypesFindParams, FindResponse as TypesFindResponse, IMPERSONATE_HEADER, type IncludeSpec, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
 import { RESERVED_QUERY_KEYS, serializeFilter, serializeInclude, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
-import { rebaseReviver } from "./reviver";
+import { parseRebaseJson } from "./reviver";
 
 // The canonical client error now lives in `@rebasepro/types` so every package
 // (client, auth, …) throws one type. Re-exported here to preserve the historical
@@ -671,7 +671,7 @@ headers });
         let unreadableBody = false;
         if (text) {
             try {
-                body = JSON.parse(text, rebaseReviver) as Record<string, unknown>;
+                body = parseRebaseJson<Record<string, unknown>>(text);
             } catch (e) {
                 unreadableBody = true;
             }
@@ -705,7 +705,7 @@ headers: retryHeaders });
                 let retryUnreadable = false;
                 if (retryText) {
                     try {
-                        retryBody = JSON.parse(retryText, rebaseReviver);
+                        retryBody = parseRebaseJson<Record<string, unknown>>(retryText);
                     } catch (e) {
                         retryUnreadable = true;
                     }
