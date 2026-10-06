@@ -366,6 +366,31 @@ export class S3StorageController implements StorageController {
         return { bucket: this.getBucket(bucket), key };
     }
 
+    /**
+     * See {@link StorageController.getMetadata}. One `HeadObject`. Without it,
+     * `GET /metadata/*` fell back to `getSignedUrl`, which signed a URL per
+     * call — ~134 µs of CPU — only for the route to throw it away.
+     */
+    async getMetadata(key: string, bucket?: string): Promise<DownloadMetadata | null> {
+        const location = this.resolveLocation(key, bucket);
+        const s3 = await loadS3();
+        const client = await this.getClient();
+        try {
+            const head = await client.send(new s3.HeadObjectCommand({ Bucket: location.bucket, Key: location.key }));
+            return {
+                bucket: location.bucket,
+                fullPath: location.key,
+                name: location.key.split("/").pop() || location.key,
+                size: head.ContentLength || 0,
+                contentType: head.ContentType || "application/octet-stream",
+                customMetadata: head.Metadata || {}
+            };
+        } catch (error: unknown) {
+            if (isS3NotFound(error)) return null;
+            throw error;
+        }
+    }
+
     /** See {@link StorageController.statObject}. One `HeadObject`; no body is read. */
     async statObject(key: string, bucket?: string): Promise<StoredObjectInfo | null> {
         const location = this.resolveLocation(key, bucket);

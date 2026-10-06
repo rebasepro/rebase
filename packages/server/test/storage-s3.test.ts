@@ -202,6 +202,32 @@ signedUrlExpiration: 60 });
         });
     });
 
+    describe("getMetadata", () => {
+        // What `GET /metadata/*` asks for. Falling back to `getSignedUrl`
+        // signed a URL per call that the route then discarded.
+        it("describes an object with one HEAD and signs nothing", async () => {
+            mockSend.mockResolvedValueOnce({ ContentType: "image/png", ContentLength: 5, Metadata: { a: "b" } });
+
+            const metadata = await controller.getMetadata("images/a.png");
+
+            expect(metadata).toEqual({
+                bucket: "test-bucket",
+                fullPath: "images/a.png",
+                name: "a.png",
+                size: 5,
+                contentType: "image/png",
+                customMetadata: { a: "b" }
+            });
+            expect(mockSend).toHaveBeenCalledTimes(1);
+            expect(getSignedUrl).not.toHaveBeenCalled();
+        });
+
+        it("answers null for a missing object", async () => {
+            mockSend.mockRejectedValueOnce(Object.assign(new Error("NotFound"), { name: "NotFound", $metadata: { httpStatusCode: 404 } }));
+            expect(await controller.getMetadata("missing.png")).toBeNull();
+        });
+    });
+
     describe("getObject", () => {
         it("should return null for non-existent file", async () => {
             const error = new Error("NoSuchKey");
