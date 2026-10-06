@@ -70,8 +70,15 @@ export interface BackupScheduleStatus {
     /** Its cron expression. */
     schedule: string;
 
-    /** False when the job is paused (or declared `enabled: false`). */
+    /** False when the job is paused (or declared `enabled: false`), or refused. */
     enabled: boolean;
+
+    /**
+     * Why the scheduler refused the job — an invalid schedule, timezone or
+     * timeout. A refused job is not registered and never runs; the cron file
+     * has to change.
+     */
+    refused?: string;
 
     /** ISO timestamp of the next scheduled run, when one is armed. */
     nextRunAt?: string;

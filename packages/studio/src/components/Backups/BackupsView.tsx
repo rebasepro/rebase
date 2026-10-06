@@ -54,6 +54,21 @@ function BackupScheduleSummary({ schedule }: { schedule: BackupScheduleStatus })
     const { t } = useTranslation();
     const last = schedule.lastRun;
 
+    // Refused at boot: it never runs, and resuming it in Cron Jobs is not
+    // possible — it is not a job there. Only its cron file can fix it.
+    if (schedule.refused) {
+        return (
+            <Alert color="error">
+                <Typography variant="body2" className="text-[13px] font-semibold">
+                    {t("studio_backups_job_refused", { job: schedule.jobId })}
+                </Typography>
+                <Typography variant="caption" className="font-mono text-[12px] whitespace-pre-wrap break-words">
+                    {schedule.schedule} — {schedule.refused}
+                </Typography>
+            </Alert>
+        );
+    }
+
     if (last && !last.success) {
         return (
             <Alert color="error">

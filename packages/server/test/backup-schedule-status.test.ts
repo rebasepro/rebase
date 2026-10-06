@@ -92,6 +92,7 @@ describe("GET /admin/backups — the scheduled run", () => {
         };
         const source: BackupScheduleSource = {
             jobIdsWhere: () => ["backup"],
+            rejectedJobsWhere: () => [],
             fetchJob: async () => ({
                 id: "backup", name: "Backup", schedule: "0 * * * *", enabled: true,
                 state: "error", totalRuns: 2, totalFailures: 1
@@ -106,6 +107,7 @@ describe("GET /admin/backups — the scheduled run", () => {
     it("says the run history could not be read, rather than that the job never ran", async () => {
         const source: BackupScheduleSource = {
             jobIdsWhere: () => ["backup"],
+            rejectedJobsWhere: () => [],
             fetchJob: async () => ({
                 id: "backup", name: "Backup", schedule: "0 3 * * *", enabled: true,
                 state: "idle", totalRuns: 0, totalFailures: 0
@@ -126,6 +128,26 @@ describe("GET /admin/backups — the scheduled run", () => {
         const body = await list(scheduler);
         expect(body.schedule).toMatchObject({ jobId: "backup", enabled: true });
         expect(body.schedule.lastRun).toBeUndefined();
+    });
+
+    it("reports a backup job the scheduler refused, with the reason", async () => {
+        // A six-field BACKUP_SCHEDULE: the job is refused at boot and never
+        // runs. The panel used to answer `schedule: null` — no backup job —
+        // under a hint to add the cron file the project already has.
+        const scheduler = new CronScheduler();
+        const definition = backupJob(async () => undefined);
+        definition.schedule = "0 0 3 * * *";
+        scheduler.registerJobs([{ id: "backup", definition }]);
+
+        const body = await list(scheduler);
+
+        expect(body.schedule).toMatchObject({
+            jobId: "backup",
+            name: "Nightly",
+            schedule: "0 0 3 * * *",
+            enabled: false,
+            refused: expect.stringContaining("Expected 5 fields")
+        });
     });
 
     it("is null when no backup job is registered — an unmarked cron is not one", async () => {

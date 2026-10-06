@@ -6,7 +6,13 @@
  * cron that could not run `pg_dump` left an empty list under "wait for the next
  * scheduled run" — while each failure sat in `cron_logs`, one panel away.
  */
-import type { BackupScheduleStatus, CronJobDefinition, CronJobLogEntry, CronJobStatus } from "@rebasepro/types";
+import type {
+    BackupScheduleStatus,
+    CronJobDefinition,
+    CronJobLogEntry,
+    CronJobStatus,
+    RejectedCronJob
+} from "@rebasepro/types";
 import { isAlreadyExecutingSkip } from "../cron/cron-scheduler";
 import { logger } from "../utils/logger";
 
@@ -29,6 +35,7 @@ export function isBackupCronDefinition(definition: CronJobDefinition): boolean {
 /** The part of the cron scheduler this reads. */
 export interface BackupScheduleSource {
     jobIdsWhere(predicate: (definition: CronJobDefinition) => boolean): string[];
+    rejectedJobsWhere(predicate: (definition: CronJobDefinition) => boolean): RejectedCronJob[];
     fetchJob(id: string): Promise<CronJobStatus | undefined>;
     getJobLogsFromDb(id: string, limit?: number): Promise<CronJobLogEntry[]>;
 }
@@ -42,11 +49,18 @@ const RECENT_RUNS = 20;
 
 /**
  * The scheduled backup job and its last run, or `null` when the deployment
- * registers none.
+ * has none — registered or refused.
  */
 export async function readBackupSchedule(source: BackupScheduleSource): Promise<BackupScheduleStatus | null> {
     const [jobId] = source.jobIdsWhere(isBackupCronDefinition);
-    if (jobId === undefined) return null;
+    if (jobId === undefined) {
+        // A refused job is not registered, and answered `null` here it read
+        // as "no backup cron" under a hint to add the file the project has.
+        const [refused] = source.rejectedJobsWhere(isBackupCronDefinition);
+        return refused
+            ? { jobId: refused.id, name: refused.name, schedule: refused.schedule, enabled: false, refused: refused.reason }
+            : null;
+    }
 
     const job = await source.fetchJob(jobId);
     if (!job) return null;

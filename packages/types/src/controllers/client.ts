@@ -3,7 +3,7 @@ import type { ResourceRef } from "../types/resources";
 import type { RebaseSdkData } from "./data";
 import type { EmailService } from "./email";
 import type { StorageSource } from "./storage";
-import type { CronJobStatus, CronJobLogEntry } from "../types/cron";
+import type { CronJobStatus, CronJobLogEntry, CronJobListing } from "../types/cron";
 import type { BackupListing } from "../types/backup";
 import type { ApiKeysAPI, PersonalKeysAPI } from "../types/api_keys";
 import type { RoleSummary } from "../types/scopes";
@@ -196,7 +196,8 @@ export interface AdminAPI {
  * @group Cron
  */
 export interface CronAPI {
-    listJobs(): Promise<{ jobs: CronJobStatus[] }>;
+    /** The registered jobs, and the cron files and jobs that did not become one. */
+    listJobs(): Promise<CronJobListing>;
     getJob(jobId: string): Promise<{ job: CronJobStatus }>;
     triggerJob(jobId: string): Promise<{ log: CronJobLogEntry; job: CronJobStatus }>;
     getJobLogs(jobId: string, options?: { limit?: number }): Promise<{ logs: CronJobLogEntry[] }>;

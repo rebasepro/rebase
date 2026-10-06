@@ -230,6 +230,40 @@ export interface CronJobStatus {
     totalFailures: number;
 }
 
+/**
+ * A job the scheduler refused, and why.
+ *
+ * It is not a `CronJobStatus`: it has no state, no next run and no counters,
+ * because it was never registered. Reporting it as a job with `state: "error"`
+ * would be a lie in the other direction — nothing is going to run it.
+ */
+export interface RejectedCronJob {
+    id: string;
+    name: string;
+    schedule: string;
+    /** Why it was refused — most often `Expected 5 fields, got 6`. */
+    reason: string;
+}
+
+/** What the cron listing (`GET /admin/cron`) answers. */
+export interface CronJobListing {
+    /** The registered jobs. */
+    jobs: CronJobStatus[];
+
+    /**
+     * Cron files that did not become jobs: the files that failed to load,
+     * plus the jobs in {@link rejected}. Absent when there are none. None of
+     * them is scheduled.
+     */
+    skipped?: number;
+
+    /** The jobs the scheduler refused, by name, with the reason. */
+    rejected?: RejectedCronJob[];
+
+    /** {@link skipped} and {@link rejected}, in a sentence. */
+    note?: string;
+}
+
 // =============================================================================
 // CRON JOB LOG ENTRY
 // =============================================================================

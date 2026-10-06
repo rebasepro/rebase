@@ -1,5 +1,5 @@
 import { Transport } from "./transport";
-import type { CronJobStatus, CronJobLogEntry } from "@rebasepro/types";
+import type { CronJobStatus, CronJobLogEntry, CronJobListing } from "@rebasepro/types";
 
 export interface CreateCronOptions {
     cronPath?: string;
@@ -8,8 +8,8 @@ export interface CreateCronOptions {
 export function createCron(transport: Transport, options?: CreateCronOptions) {
     const cronPath = options?.cronPath || "/cron";
 
-    async function listJobs(): Promise<{ jobs: CronJobStatus[] }> {
-        return transport.request<{ jobs: CronJobStatus[] }>(cronPath, { method: "GET" });
+    async function listJobs(): Promise<CronJobListing> {
+        return transport.request<CronJobListing>(cronPath, { method: "GET" });
     }
 
     async function getJob(jobId: string): Promise<{ job: CronJobStatus }> {

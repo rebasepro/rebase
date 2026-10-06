@@ -3,7 +3,8 @@ import type {
     CronJobStatus,
     CronJobLogEntry,
     CronJobRunState,
-    CronJobContext
+    CronJobContext,
+    RejectedCronJob
 } from "@rebasepro/types";
 import type { RebaseServerClient } from "@rebasepro/types";
 import { hostname } from "node:os";
@@ -417,23 +418,15 @@ type LeaseOutcome =
     | { acquired: true; token?: string }
     | { acquired: false; holder?: string };
 
-/**
- * A job the scheduler refused, and why.
- *
- * It is not a `CronJobStatus`: it has no state, no next run and no counters,
- * because it was never registered. Reporting it as a job with `state: "error"`
- * would be a lie in the other direction — nothing is going to run it.
- */
-export interface RejectedCronJob {
-    id: string;
-    name: string;
-    schedule: string;
-    reason: string;
+/** A job the scheduler refused, with the definition it was refused from. */
+interface RefusedJob {
+    job: RejectedCronJob;
+    definition: CronJobDefinition;
 }
 
 export class CronScheduler {
     private jobs = new Map<string, RegisteredJob>();
-    private rejected = new Map<string, RejectedCronJob>();
+    private rejected = new Map<string, RefusedJob>();
     private started = false;
     private store?: CronStore;
     private client?: RebaseServerClient;
@@ -493,12 +486,7 @@ export class CronScheduler {
                 // to land here is a 6-field expression copied from a tool that
                 // supports seconds, which is a one-character fix nobody could
                 // see without boot-log access.
-                this.rejected.set(loaded.id, {
-                    id: loaded.id,
-                    name: loaded.definition.name ?? loaded.id,
-                    schedule: loaded.definition.schedule,
-                    reason: validation.reason
-                });
+                this.refuse(loaded, validation.reason);
                 continue;
             }
             // Rejected, not read as local time: a misspelled zone that fell
@@ -511,12 +499,7 @@ export class CronScheduler {
                     `unknown timezone "${loaded.definition.timezone}" — ` +
                     'use an IANA name such as "Europe/Madrid" or "UTC"';
                 logger.error(`[cron] Rejecting job "${loaded.id}": ${reason}.`);
-                this.rejected.set(loaded.id, {
-                    id: loaded.id,
-                    name: loaded.definition.name ?? loaded.id,
-                    schedule: loaded.definition.schedule,
-                    reason
-                });
+                this.refuse(loaded, reason);
                 continue;
             }
             // Same treatment: a timeout that fails every run the moment it
@@ -524,12 +507,7 @@ export class CronScheduler {
             const timeoutProblem = invalidTimeoutReason(loaded.definition.timeoutSeconds);
             if (timeoutProblem) {
                 logger.error(`[cron] Rejecting job "${loaded.id}": ${timeoutProblem}.`);
-                this.rejected.set(loaded.id, {
-                    id: loaded.id,
-                    name: loaded.definition.name ?? loaded.id,
-                    schedule: loaded.definition.schedule,
-                    reason: timeoutProblem
-                });
+                this.refuse(loaded, timeoutProblem);
                 continue;
             }
             // A re-register that now validates clears the earlier complaint.
@@ -655,6 +633,19 @@ export class CronScheduler {
         return [...this.jobs.values()].map((job) => this.toStatus(job));
     }
 
+    /** Keep a refused job, so the admin surface can say why it never runs. */
+    private refuse(loaded: LoadedCronJob, reason: string): void {
+        this.rejected.set(loaded.id, {
+            job: {
+                id: loaded.id,
+                name: loaded.definition.name ?? loaded.id,
+                schedule: loaded.definition.schedule,
+                reason
+            },
+            definition: loaded.definition
+        });
+    }
+
     /**
      * Jobs that loaded but whose schedule the scheduler refused.
      *
@@ -663,7 +654,16 @@ export class CronScheduler {
      * cron will never fire" look identical from the admin panel.
      */
     listRejectedJobs(): RejectedCronJob[] {
-        return [...this.rejected.values()];
+        return [...this.rejected.values()].map(refused => refused.job);
+    }
+
+    /**
+     * {@link listRejectedJobs}, those whose definition matches — how a surface
+     * finds a refused job by what it is, as {@link jobIdsWhere} does for the
+     * registered ones.
+     */
+    rejectedJobsWhere(predicate: (definition: CronJobDefinition) => boolean): RejectedCronJob[] {
+        return [...this.rejected.values()].filter(refused => predicate(refused.definition)).map(refused => refused.job);
     }
 
     /**

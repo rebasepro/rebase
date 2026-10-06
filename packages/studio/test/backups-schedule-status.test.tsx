@@ -111,6 +111,29 @@ describe("Backups panel and the scheduled run", () => {
         expect(screen.queryByText(new RegExp(en.studio_backups_never_ran!))).toBeNull();
     });
 
+    it("says the backup job was refused, and why, instead of that none exists", async () => {
+        // A six-field BACKUP_SCHEDULE. The job never runs; the panel used to get
+        // no schedule at all, and told the reader to add the cron file they have.
+        list.mockResolvedValue({
+            backups: [],
+            destinationKind: "s3",
+            configured: true,
+            schedule: {
+                jobId: "backup",
+                name: "Scheduled database backup",
+                schedule: "0 0 3 * * *",
+                enabled: false,
+                refused: "Expected 5 fields, got 6"
+            }
+        });
+        render(<BackupsView/>);
+
+        await waitFor(() => expect(screen.getByText(/Expected 5 fields, got 6/)).toBeTruthy());
+        expect(screen.getByText(t("studio_backups_job_refused", { job: "backup" }))).toBeTruthy();
+        expect(screen.queryByText(/^Scheduled backups are paused/)).toBeNull();
+        expect(screen.queryByText(en.studio_backups_empty_hint!)).toBeNull();
+    });
+
     it("says a paused schedule is paused", async () => {
         list.mockResolvedValue({
             backups: [],

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
+    Alert,
     AlertCircleIcon,
     Button,
     CalendarIcon,
@@ -20,7 +21,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useRebaseClient, useSnackbarController, useTranslation } from "@rebasepro/app";
-import type { CronJobStatus, CronJobLogEntry } from "@rebasepro/types";
+import type { CronJobListing, CronJobStatus, CronJobLogEntry, RejectedCronJob } from "@rebasepro/types";
 import type { RebaseClient } from "@rebasepro/types";
 
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
@@ -44,6 +45,50 @@ function formatRelative(iso: string | undefined): string {
     return d.toLocaleString();
 }
 
+/** What the listing says did not become a job — see {@link CronLoadProblems}. */
+interface CronProblems {
+    rejected: RejectedCronJob[];
+    /** Cron files that failed to load: `skipped` counts these and the refused jobs together. */
+    filesFailed: number;
+}
+
+function problemsOf(listing: CronJobListing): CronProblems {
+    const rejected = listing.rejected ?? [];
+    return { rejected, filesFailed: Math.max(0, (listing.skipped ?? 0) - rejected.length) };
+}
+
+/**
+ * The cron files that failed to load and the jobs the scheduler refused. None
+ * of them is scheduled, and none is in the list: without this a refused job
+ * was simply absent, and a project whose only job was refused read "No cron
+ * jobs registered".
+ */
+function CronLoadProblems({ problems }: { problems: CronProblems }) {
+    const { t } = useTranslation();
+    if (problems.rejected.length === 0 && problems.filesFailed === 0) return null;
+    return (
+        <Alert color="error">
+            <div className="flex flex-col gap-2">
+                {problems.rejected.map(job => (
+                    <div key={job.id} className="flex flex-col">
+                        <Typography variant="body2" className="text-[13px] font-semibold">
+                            {t("studio_cron_job_refused", { job: job.name })}
+                        </Typography>
+                        <Typography variant="caption" className="font-mono text-[12px] break-words">
+                            {job.schedule} — {job.reason}
+                        </Typography>
+                    </div>
+                ))}
+                {problems.filesFailed > 0 && (
+                    <Typography variant="body2" className="text-[13px]">
+                        {t("studio_cron_files_failed", { count: problems.filesFailed })}
+                    </Typography>
+                )}
+            </div>
+        </Alert>
+    );
+}
+
 const stateColors: Record<string, string> = {
     idle: "bg-emerald-500",
 running: "bg-blue-500",
@@ -57,6 +102,7 @@ export function CronJobsView() {
     const snackbar = useSnackbarController();
     const { t } = useTranslation();
     const [jobs, setJobs] = useState<CronJobStatus[]>([]);
+    const [problems, setProblems] = useState<CronProblems>({ rejected: [], filesFailed: 0 });
     const [loading, setLoading] = useState(true);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [logs, setLogs] = useState<CronJobLogEntry[]>([]);
@@ -91,6 +137,7 @@ export function CronJobsView() {
                 const res = await c.cron.listJobs();
                 if (!cancelled) {
                     setJobs(res.jobs);
+                    setProblems(problemsOf(res));
                     setFailure(null);
                 }
             } catch (e: unknown) {
@@ -167,6 +214,7 @@ export function CronJobsView() {
         try {
             const res = await c.cron.listJobs();
             setJobs(res.jobs);
+            setProblems(problemsOf(res));
             setFailure(null);
         } catch (e: unknown) {
             // Swallowed before, which left the list showing whatever it last
@@ -198,9 +246,13 @@ export function CronJobsView() {
         if (!c?.cron) return;
         setTriggering(id);
         try {
-            await c.cron.triggerJob(id);
-            snackbarRef.current.open({ type: "success",
-message: "Job triggered" });
+            // The request returns when the run has ended, with how it went: a
+            // run that threw is still a 200, so the log decides the toast.
+            const { log } = await c.cron.triggerJob(id);
+            const job = jobs.find(j => j.id === id)?.name ?? id;
+            snackbarRef.current.open(log.success
+                ? { type: "success", message: t("studio_cron_run_succeeded", { job }) }
+                : { type: "error", message: t("studio_cron_run_failed", { job, error: log.error ?? "—" }) });
             await refreshJobs();
             if (selectedId === id) refreshLogs(id);
         } catch (e: unknown) {
@@ -237,13 +289,23 @@ message: e instanceof Error ? e.message : String(e) });
         />
     );
 
+    const hasProblems = problems.rejected.length > 0 || problems.filesFailed > 0;
+
     if (jobs.length === 0) return (
         <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
             <CalendarIcon size={iconSize.medium} className="text-surface-300 dark:text-surface-600"/>
-            <Typography variant="h6" color="secondary">{t("studio_cron_empty_title")}</Typography>
-            <Typography variant="body2" color="disabled" className="max-w-md">
-                {t("studio_cron_empty_body")}
-            </Typography>
+            {hasProblems ? (
+                <div className="max-w-lg text-left">
+                    <CronLoadProblems problems={problems}/>
+                </div>
+            ) : (
+                <>
+                    <Typography variant="h6" color="secondary">{t("studio_cron_empty_title")}</Typography>
+                    <Typography variant="body2" color="disabled" className="max-w-md">
+                        {t("studio_cron_empty_body")}
+                    </Typography>
+                </>
+            )}
             <a
                 href="https://rebase.pro/docs/backend/cron-jobs"
                 target="_blank"
@@ -267,6 +329,11 @@ message: e instanceof Error ? e.message : String(e) });
                     </div>
                     <IconButton size="small" onClick={refreshJobs} title="Refresh"><RefreshCwIcon size={iconSize.smallest}/></IconButton>
                 </div>
+                {hasProblems && (
+                    <div className="p-2">
+                        <CronLoadProblems problems={problems}/>
+                    </div>
+                )}
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {jobs.map(job => (
                         <div

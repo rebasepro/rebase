@@ -1283,6 +1283,7 @@ export interface RebaseTranslations {
     studio_backups_next_run?: string;
     studio_backups_schedule_paused?: string;
     studio_backups_history_unreadable?: string;
+    studio_backups_job_refused?: string;
     studio_backups_unavailable_title?: string;
     studio_backups_unavailable_body?: string;
     studio_cron_denied_title?: string;
@@ -1290,6 +1291,11 @@ export interface RebaseTranslations {
     studio_cron_read_failed?: string;
     studio_cron_logs_read_failed?: string;
     studio_cron_logs_denied_title?: string;
+    studio_cron_run_succeeded?: string;
+    studio_cron_run_failed?: string;
+    studio_cron_job_refused?: string;
+    studio_cron_files_failed?: string;
+    studio_cron_files_failed_one?: string;
     studio_api_keys_denied_title?: string;
     studio_api_keys_denied_hint?: string;
     studio_api_keys_read_failed?: string;
