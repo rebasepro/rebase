@@ -3,7 +3,7 @@
  */
 import { MAX_LIST_LIMIT, resolveClientListLimit } from "@rebasepro/types";
 import type { Entity, FindParams, FindResponse } from "@rebasepro/types";
-import { CollectionWindow, CollectionWindowState } from "../../src/hooks/data/collectionWindow";
+import { CollectionWindow, CollectionWindowState, REREAD_INTERVAL_MS } from "../../src/hooks/data/collectionWindow";
 
 /**
  * The paging behind every scrolled collection view. See the class's own
@@ -57,7 +57,7 @@ class FakeCollection {
     };
 }
 
-function open(collection: FakeCollection, options: { pageSize?: number; target?: number; live?: boolean; fallbackToFind?: boolean; firstPaintTimeoutMs?: number } = {}) {
+function open(collection: FakeCollection, options: { pageSize?: number; target?: number; live?: boolean; fallbackToFind?: boolean; firstPaintTimeoutMs?: number; rereadIntervalMs?: number } = {}) {
     const states: CollectionWindowState<Row>[] = [];
     const window = new CollectionWindow<Row>({
         accessor: options.live === false ? { find: collection.find } : collection,
@@ -66,6 +66,7 @@ function open(collection: FakeCollection, options: { pageSize?: number; target?:
         target: options.target ?? options.pageSize ?? 10,
         fallbackToFind: options.fallbackToFind,
         firstPaintTimeoutMs: options.firstPaintTimeoutMs,
+        rereadIntervalMs: options.rereadIntervalMs,
         onChange: (state) => states.push(state)
     });
     window.start();
@@ -172,7 +173,9 @@ describe("CollectionWindow", () => {
 
     it("folds pushes that arrive during a re-read into one more", async () => {
         const collection = new FakeCollection(rowsOf(40));
-        const { window, last } = open(collection);
+        // No quiet interval, so the one more runs as soon as the first ends —
+        // the interval has tests of its own below.
+        const { window, last } = open(collection, { rereadIntervalMs: 0 });
         collection.push!(collection.answer({ limit: 10 }));
         await until(() => last()?.rows?.length === 10);
         window.setTarget(30);
@@ -293,5 +296,120 @@ describe("CollectionWindow", () => {
         await settle();
         await settle();
         expect(states).toHaveLength(0);
+    });
+});
+
+/**
+ * A table scrolled deep re-reads every row it holds past the first page when a
+ * push says the collection changed. Under a stream of writes the server pushes
+ * every ~300 ms–1 s, and each push used to start another full re-read the
+ * moment the last one ended: ten 1,000-row reads back to back, for as long as
+ * the writes went on, for a table scrolled to 10,000 rows.
+ */
+describe("CollectionWindow — re-reads under a stream of writes", () => {
+
+    // The fake collection answers without a timer, so microtasks are enough.
+    const flush = async () => {
+        for (let i = 0; i < 50; i++) await Promise.resolve();
+    };
+
+    afterEach(() => jest.useRealTimers());
+
+    async function scrolledTo30(collection: FakeCollection) {
+        jest.useFakeTimers();
+        const opened = open(collection);
+        collection.push!(collection.answer({ limit: 10 }));
+        await flush();
+        opened.window.setTarget(30);
+        await flush();
+        expect(opened.last().rows).toHaveLength(30);
+        return opened;
+    }
+
+    const rename = (collection: FakeCollection, id: string, name: string) => {
+        collection.rows = collection.rows.map(row => row.id === id ? { ...row, values: { name } } : row);
+    };
+
+    it("re-reads once for a burst of pushes, not once per push", async () => {
+        const collection = new FakeCollection(rowsOf(40));
+        const { last } = await scrolledTo30(collection);
+        collection.reads = [];
+
+        // Five writes to a row past the first page, each far enough from the
+        // last for the server to push it on its own.
+        for (let i = 0; i < 5; i++) {
+            rename(collection, "r25", `v${i}`);
+            collection.push!(collection.answer({ limit: 10 }));
+            await flush();
+            jest.advanceTimersByTime(400);
+            await flush();
+        }
+        jest.advanceTimersByTime(REREAD_INTERVAL_MS);
+        await flush();
+
+        // The first at once; the other four folded into one, which reads
+        // the last write.
+        expect(collection.reads).toEqual([{ limit: 20, offset: 10 }, { limit: 20, offset: 10 }]);
+        expect(last().rows!.find(row => row.id === "r25")!.values.name).toBe("v4");
+    });
+
+    it("re-reads a push after a quiet spell at once", async () => {
+        const collection = new FakeCollection(rowsOf(40));
+        const { last } = await scrolledTo30(collection);
+        rename(collection, "r25", "first");
+        collection.push!(collection.answer({ limit: 10 }));
+        await flush();
+        expect(last().rows!.find(row => row.id === "r25")!.values.name).toBe("first");
+
+        jest.advanceTimersByTime(REREAD_INTERVAL_MS);
+        collection.reads = [];
+        rename(collection, "r25", "second");
+        collection.push!(collection.answer({ limit: 10 }));
+        await flush();
+        expect(collection.reads).toHaveLength(1);
+        expect(last().rows!.find(row => row.id === "r25")!.values.name).toBe("second");
+    });
+
+    it("applies the pushed first page at once, whatever the rows past it wait for", async () => {
+        const collection = new FakeCollection(rowsOf(40));
+        const { last } = await scrolledTo30(collection);
+        collection.push!(collection.answer({ limit: 10 }));
+        await flush();
+
+        rename(collection, "r2", "on the first page");
+        collection.push!(collection.answer({ limit: 10 }));
+        await flush();
+        expect(last().rows!.find(row => row.id === "r2")!.values.name).toBe("on the first page");
+    });
+
+    it("does not keep a scroll waiting on the interval", async () => {
+        const collection = new FakeCollection(rowsOf(60));
+        const { window, last } = await scrolledTo30(collection);
+        collection.push!(collection.answer({ limit: 10 }));
+        await flush();
+        rename(collection, "r25", "changed");
+        collection.push!(collection.answer({ limit: 10 }));
+        await flush();
+
+        collection.reads = [];
+        window.setTarget(40);
+        await flush();
+        // The pending re-read, then the next page — no timer involved.
+        expect(collection.reads).toEqual([{ limit: 20, offset: 10 }, { limit: 10, offset: 30 }]);
+        expect(last().rows).toHaveLength(40);
+        expect(last().rows!.find(row => row.id === "r25")!.values.name).toBe("changed");
+    });
+
+    it("leaves no timer behind when it is disposed with a re-read pending", async () => {
+        const collection = new FakeCollection(rowsOf(40));
+        const { window } = await scrolledTo30(collection);
+        collection.push!(collection.answer({ limit: 10 }));
+        await flush();
+        collection.push!(collection.answer({ limit: 10 }));
+        await flush();
+        expect(jest.getTimerCount()).toBe(1);
+
+        window.dispose();
+        expect(jest.getTimerCount()).toBe(0);
     });
 });

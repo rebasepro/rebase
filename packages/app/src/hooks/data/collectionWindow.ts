@@ -54,8 +54,27 @@ export interface CollectionWindowOptions<M extends Record<string, unknown>> {
      * The subscription still wins whenever it does answer.
      */
     firstPaintTimeoutMs?: number;
+    /**
+     * The quiet time kept between the end of one re-read of the rows past the
+     * first page and the start of the next. Defaults to
+     * {@link REREAD_INTERVAL_MS}. A push after a quiet spell is re-read at
+     * once; pushes inside this window fold into one re-read at its end.
+     */
+    rereadIntervalMs?: number;
     onChange: (state: CollectionWindowState<M>) => void;
 }
+
+/**
+ * The quiet time between two re-reads of the rows held past the first page.
+ *
+ * The server pushes at most once per ~300 ms of quiet per subscription, and at
+ * least once a second under a steady stream of writes; each push used to start
+ * a re-read of every held row past the first page as soon as the last one
+ * ended, so a table scrolled to 10,000 rows ran ten 1,000-row reads back to
+ * back for as long as the writes went on. This keeps the duty cycle bounded:
+ * at most one re-read per re-read time plus this.
+ */
+export const REREAD_INTERVAL_MS = 2_000;
 
 /**
  * A scrolled collection view's rows, read one page at a time.
@@ -84,7 +103,11 @@ export interface CollectionWindowOptions<M extends Record<string, unknown>> {
  *   re-runs a subscription on every write to its collection, so each push after
  *   the first says "something changed". The rows past the first page are then
  *   read again, in reads of at most `MAX_LIST_LIMIT`, and replaced in one step.
- *   Pushes that arrive while that re-read runs are folded into one more.
+ *   A push after a quiet spell is re-read at once; pushes that arrive while a
+ *   re-read runs, or within `rereadIntervalMs` of the last one ending, fold
+ *   into one re-read at the end of that interval — sooner if the view asks
+ *   for more rows meanwhile, so scrolling never waits on the timer. The first
+ *   page itself is applied the moment it is pushed, as always.
  *
  * Rows are de-duplicated by id: between a push moving the first page and the
  * re-read of the rest, a row can briefly belong to both.
@@ -118,6 +141,10 @@ export class CollectionWindow<M extends Record<string, unknown>> {
     private liveAnswered = false;
     private unsubscribe: (() => void) | undefined;
     private firstPaintTimer: ReturnType<typeof setTimeout> | undefined;
+    /** When the last re-read of the rows past the first page finished. */
+    private lastRereadEndedAt: number | undefined;
+    /** A re-read waiting out {@link REREAD_INTERVAL_MS}. */
+    private rereadTimer: ReturnType<typeof setTimeout> | undefined;
 
     constructor(options: CollectionWindowOptions<M>) {
         this.options = options;
@@ -177,6 +204,8 @@ export class CollectionWindow<M extends Record<string, unknown>> {
     dispose(): void {
         this.disposed = true;
         if (this.firstPaintTimer !== undefined) clearTimeout(this.firstPaintTimer);
+        if (this.rereadTimer !== undefined) clearTimeout(this.rereadTimer);
+        this.rereadTimer = undefined;
         this.unsubscribe?.();
         this.unsubscribe = undefined;
     }
@@ -264,8 +293,16 @@ export class CollectionWindow<M extends Record<string, unknown>> {
         try {
             while (!this.disposed && this.head !== undefined) {
                 if (this.stale && this.headFull && !this.tailError) {
+                    // A view asking for more rows is not kept waiting: the
+                    // re-read runs now, and the next page after it.
+                    const wait = this.wanted() > 0 ? 0 : this.rereadWait();
+                    if (wait > 0) {
+                        this.armReread(wait);
+                        break;
+                    }
                     this.stale = false;
                     await this.reread();
+                    this.lastRereadEndedAt = Date.now();
                     continue;
                 }
                 const wanted = this.wanted();
@@ -279,6 +316,21 @@ export class CollectionWindow<M extends Record<string, unknown>> {
             this.pumping = false;
         }
         this.emit();
+    }
+
+    /** How long a re-read due now still has to wait. 0 after a quiet spell. */
+    private rereadWait(): number {
+        if (this.lastRereadEndedAt === undefined) return 0;
+        const interval = this.options.rereadIntervalMs ?? REREAD_INTERVAL_MS;
+        return Math.max(0, this.lastRereadEndedAt + interval - Date.now());
+    }
+
+    private armReread(wait: number): void {
+        if (this.rereadTimer !== undefined || this.disposed) return;
+        this.rereadTimer = setTimeout(() => {
+            this.rereadTimer = undefined;
+            void this.pump();
+        }, wait);
     }
 
     private async readNext(wanted: number): Promise<void> {
