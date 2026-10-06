@@ -26,12 +26,36 @@ function getServerSnapshot(): boolean {
     return false;
 }
 
+/**
+ * Every subscriber shares one observer of `<html>`.
+ *
+ * `Chip` subscribes, and a table can mount hundreds of chips; an observer per
+ * subscriber meant hundreds of observers on one element, rebuilt on every
+ * virtualised scroll step. The observer is created with the first subscriber
+ * and disconnected with the last. Entries are per subscription, not per
+ * callback, so one callback subscribed twice still needs two unsubscribes.
+ */
+const subscribers = new Set<{ onChange: () => void }>();
+let observer: MutationObserver | undefined;
+
 function subscribe(onChange: () => void): () => void {
     if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => undefined;
-    const observer = new MutationObserver(onChange);
-    observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class", "data-theme"]
-    });
-    return () => observer.disconnect();
+    const entry = { onChange };
+    subscribers.add(entry);
+    if (!observer) {
+        observer = new MutationObserver(() => {
+            for (const subscriber of [...subscribers]) subscriber.onChange();
+        });
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["class", "data-theme"]
+        });
+    }
+    return () => {
+        subscribers.delete(entry);
+        if (subscribers.size === 0 && observer) {
+            observer.disconnect();
+            observer = undefined;
+        }
+    };
 }
