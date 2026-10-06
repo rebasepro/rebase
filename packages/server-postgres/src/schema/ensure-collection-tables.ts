@@ -50,6 +50,7 @@ import {
     type WithheldConstraint
 } from "./plan/diff-plan";
 import { extractCauseMessage, extractPgError } from "../utils/pg-error-utils";
+import { atomicBatch, isLockTimeout, isMultiStatementRefusal, sleep } from "./boot-ddl";
 import { columnTypeDriftMessage, type ColumnTypeDrift } from "./column-type-drift";
 
 export type {
@@ -89,6 +90,14 @@ export interface EnsureOptions extends DiffOptions {
      * reads the world.
      */
     databaseExtensions?: readonly string[];
+    /**
+     * Run each statement that changes an existing table under this
+     * `lock_timeout` (ms), retrying a timeout with backoff — see
+     * `schema/boot-ddl`. The boot sets it; absent, statements wait on locks for
+     * as long as the connection's `statement_timeout` allows, as the live schema
+     * editor's confirmed changes do.
+     */
+    lockTimeoutMs?: number;
 }
 
 export interface EnsureOutcome extends EnsurePlan {
@@ -570,9 +579,12 @@ export async function ensureCollectionTables(
         return { ...plan, failures };
     }
 
+    const lockBudget = options.lockTimeoutMs !== undefined
+        ? { lockTimeoutMs: options.lockTimeoutMs, atomic: true }
+        : undefined;
     for (const action of plan.actions) {
         try {
-            if (await applyAction(client, action)) {
+            if (await applyAction(client, action, lockBudget)) {
                 log?.(`${action.kind}: ${action.target}`);
             } else {
                 log?.(`${action.kind}: ${action.target} (already created by a peer)`);
@@ -609,8 +621,12 @@ export async function ensureCollectionTables(
                 failures.push({ kind: action.kind, target: action.target, error: message });
                 continue;
             }
+            const lockHint = isLockTimeout(err)
+                ? "\n  hint: another session held this table's lock for every attempt (a long transaction, a " +
+                  "report or a dump). Nothing was changed; boot again once it has finished."
+                : "";
             throw new Error(
-                `Failed to ${action.kind} ${action.target}: ${message}${vectorExtensionHint(message)}\n  ${action.sql}`
+                `Failed to ${action.kind} ${action.target}: ${message}${vectorExtensionHint(message)}${lockHint}\n  ${action.sql}`
             );
         }
     }
@@ -677,6 +693,27 @@ function isTransactionBlockRefusal(err: unknown): boolean {
 const DDL_ATTEMPTS = 4;
 
 /**
+ * Attempts at an action whose table lock is held, including the first.
+ *
+ * Unlike a policy, a schema change cannot be deferred — the collection's code
+ * expects the column — so a lock that never frees still fails the boot, as a
+ * statement timeout did. Ten one-second attempts with backoff between them wait
+ * about as long as the old 30 s statement timeout did, but a live query on that
+ * table now waits at most one second at a time instead of thirty.
+ */
+const LOCK_ATTEMPTS = 10;
+
+/**
+ * Whether an action may be sent as `SET LOCAL lock_timeout; <statement>` — one
+ * implicit transaction. Not `CREATE INDEX CONCURRENTLY`, which Postgres refuses
+ * inside any transaction block (and which waits on no lock a reader holds), and
+ * not `ALTER TYPE … ADD VALUE`, which Postgres before 12 refuses there too and
+ * which locks a type, not a table.
+ */
+const takesLockBudget = (action: EnsureAction, sql: string): boolean =>
+    action.kind !== "add-enum-value" && !CONCURRENTLY_RE.test(sql);
+
+/**
  * Run one planned statement, surviving a simultaneous boot.
  *
  * Every statement in a plan is written to be idempotent, and that is not the
@@ -699,14 +736,37 @@ const DDL_ATTEMPTS = 4;
  */
 async function applyAction(
     client: Queryable,
-    action: EnsureAction
+    action: EnsureAction,
+    lockBudget?: { lockTimeoutMs: number; atomic: boolean }
 ): Promise<boolean> {
     let sqlText = action.sql;
+    let lockAttempts = 0;
     for (let attempt = 1; ; attempt++) {
+        const budgeted = lockBudget?.atomic === true && takesLockBudget(action, sqlText);
         try {
-            await client.query(sqlText);
+            await client.query(budgeted ? atomicBatch([sqlText], lockBudget.lockTimeoutMs) : sqlText);
             return true;
         } catch (err) {
+            // A handle that takes one statement per query (extended protocol)
+            // cannot carry the `SET LOCAL`. Nothing ran; say it once and send
+            // every statement as it is from here on.
+            if (budgeted && isMultiStatementRefusal(err)) {
+                lockBudget.atomic = false;
+                attempt--;
+                continue;
+            }
+            // Something held the table for longer than the budget — a long
+            // transaction, a report, a dump. The statement did nothing; let
+            // the queue behind it drain, then ask again.
+            if (budgeted && isLockTimeout(err) && ++lockAttempts < LOCK_ATTEMPTS) {
+                logger.debug(
+                    `[schema] ${action.kind} ${action.target}: the table's lock is held by another session ` +
+                    `(attempt ${lockAttempts}/${LOCK_ATTEMPTS}) — retrying`
+                );
+                attempt--;
+                await sleep(Math.min(500 * lockAttempts, 2_000) * (1 + Math.random()));
+                continue;
+            }
             // `CREATE INDEX CONCURRENTLY` is the one statement here Postgres
             // refuses inside a transaction block (25001), and whether we are in
             // one is not ours to know: the client is whatever handle the caller
