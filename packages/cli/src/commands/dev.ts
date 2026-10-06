@@ -36,6 +36,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { createHash } from "crypto";
+import { StringDecoder } from "string_decoder";
 import { fileURLToPath } from "url";
 import {
     cmsMountOf,
@@ -115,6 +116,57 @@ const LIVENESS_INTERVAL_MS = 5_000;
  */
 // eslint-disable-next-line no-control-regex
 const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
+
+/**
+ * Calls `onLine` with each line a child process writes to `stream`.
+ *
+ * A pipe hands over whatever has been written so far, so one line can arrive
+ * in two chunks. Split chunk by chunk, "Server running at http://localhost:3001"
+ * could read as two fragments that neither matched, and `rebase dev` then
+ * never announced the backend or started the admin panel. So the piece after
+ * the last newline is held for the next chunk, decoded as UTF-8 across chunk
+ * boundaries. A held piece is handed over at the end of the stream, or after
+ * `idleFlushMs` with nothing more written, so a prompt or a progress line
+ * still shows when it is written.
+ *
+ * Exported for its test.
+ */
+export function forEachOutputLine(
+    stream: NodeJS.ReadableStream | null | undefined,
+    onLine: (line: string) => void,
+    idleFlushMs = 100
+): void {
+    if (!stream) return;
+    const decoder = new StringDecoder("utf8");
+    let pending = "";
+    let idle: NodeJS.Timeout | undefined;
+
+    const emit = (text: string) => {
+        for (const line of text.split("\n")) if (line) onLine(line);
+    };
+    // At the end of the stream the decoder gives up what it holds too; after
+    // an idle wait it keeps a character still missing its last bytes.
+    const flush = (atEnd: boolean) => {
+        clearTimeout(idle);
+        idle = undefined;
+        const rest = pending + (atEnd ? decoder.end() : "");
+        pending = "";
+        emit(rest);
+    };
+
+    stream.on("data", (data: Buffer | string) => {
+        clearTimeout(idle);
+        const text = pending + (typeof data === "string" ? data : decoder.write(data));
+        const lastNewline = text.lastIndexOf("\n");
+        pending = text.slice(lastNewline + 1);
+        if (lastNewline >= 0) emit(text.slice(0, lastNewline));
+        if (pending) {
+            idle = setTimeout(() => flush(false), idleFlushMs);
+            idle.unref?.();
+        }
+    });
+    stream.on("end", () => flush(true));
+}
 
 /**
  * The corrected banner line, when the backend says it moved port.
@@ -1280,24 +1332,18 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         );
         frontendChild.catch(() => {}); // prevent unhandled promise rejection on exit
 
-        frontendChild.stdout?.on("data", (data: Buffer) => {
-            const lines = data.toString().split("\n").filter(Boolean);
-            lines.forEach((line: string) => {
-                console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
-                const cleanLine = stripAnsi(line);
-                const urlMatch = cleanLine.match(/(http:\/\/(?:localhost|127\.0\.0\.1):\d+)/);
-                if (cleanLine.includes("Local:") && urlMatch) {
-                    frontendUrl = urlMatch[1];
-                    printSummary();
-                }
-            });
+        forEachOutputLine(frontendChild.stdout, (line) => {
+            console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
+            const cleanLine = stripAnsi(line);
+            const urlMatch = cleanLine.match(/(http:\/\/(?:localhost|127\.0\.0\.1):\d+)/);
+            if (cleanLine.includes("Local:") && urlMatch) {
+                frontendUrl = urlMatch[1];
+                printSummary();
+            }
         });
 
-        frontendChild.stderr?.on("data", (data: Buffer) => {
-            const lines = data.toString().split("\n").filter(Boolean);
-            lines.forEach((line: string) => {
-                console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
-            });
+        forEachOutputLine(frontendChild.stderr, (line) => {
+            console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
         });
 
         children.push(frontendChild);
@@ -1752,82 +1798,76 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             if (backendOnly) process.exitCode = code ?? 1;
         });
 
-        backendChild.stdout?.on("data", (data: Buffer) => {
-            const lines = data.toString().split("\n").filter(Boolean);
-            lines.forEach((line: string) => {
-                console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
-                noticeWatcherRestart(line);
-                noticePortMoved(line);
-                const cleanLine = stripAnsi(line);
-                const swaggerMatch = cleanLine.match(/Swagger UI available.*"path":"([^"]+)"/);
-                if (swaggerMatch) swaggerPath = swaggerMatch[1];
+        forEachOutputLine(backendChild.stdout, (line) => {
+            console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
+            noticeWatcherRestart(line);
+            noticePortMoved(line);
+            const cleanLine = stripAnsi(line);
+            const swaggerMatch = cleanLine.match(/Swagger UI available.*"path":"([^"]+)"/);
+            if (swaggerMatch) swaggerPath = swaggerMatch[1];
 
-                const serverMatch = cleanLine.match(/Server running at http:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
-                if (serverMatch) {
-                    backendAnnounced = true;
-                    backendDownReported = false;
-                    missedProbes = 0;
-                    // The backend is up, so an earlier failure is no longer the
-                    // answer this run gives.
-                    if (backendOnly) process.exitCode = 0;
-                    disarmReadyDeadline();
-                    resolvedBackendPort = parseInt(serverMatch[1], 10);
-                    backendUrl = "started";
-                    printSummary();
+            const serverMatch = cleanLine.match(/Server running at http:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
+            if (serverMatch) {
+                backendAnnounced = true;
+                backendDownReported = false;
+                missedProbes = 0;
+                // The backend is up, so an earlier failure is no longer the
+                // answer this run gives.
+                if (backendOnly) process.exitCode = 0;
+                disarmReadyDeadline();
+                resolvedBackendPort = parseInt(serverMatch[1], 10);
+                backendUrl = "started";
+                printSummary();
 
-                    // Save the url to a temp file for scripts to pick up
-                    const urlFile = path.join(projectRoot, ".rebase-dev-url");
-                    fs.writeFileSync(urlFile, `http://localhost:${resolvedBackendPort}`, "utf-8");
+                // Save the url to a temp file for scripts to pick up
+                const urlFile = path.join(projectRoot, ".rebase-dev-url");
+                fs.writeFileSync(urlFile, `http://localhost:${resolvedBackendPort}`, "utf-8");
 
-                    // Save the port to .rebase-dev-port for port affinity
-                    const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
-                    fs.writeFileSync(portFile, String(resolvedBackendPort), "utf-8");
+                // Save the port to .rebase-dev-port for port affinity
+                const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
+                fs.writeFileSync(portFile, String(resolvedBackendPort), "utf-8");
 
-                    // Start frontend now that we know the real port
-                    if (!backendOnly && frontendDir && !frontendLaunched) {
-                        frontendLaunched = true;
-                        startFrontend(resolvedBackendPort);
-                    }
+                // Start frontend now that we know the real port
+                if (!backendOnly && frontendDir && !frontendLaunched) {
+                    frontendLaunched = true;
+                    startFrontend(resolvedBackendPort);
                 }
-            });
+            }
         });
 
         /** Whether we've already shown a corrupted-modules recovery hint. */
         let corruptedModulesWarned = false;
 
-        backendChild.stderr?.on("data", (data: Buffer) => {
-            const lines = data.toString().split("\n").filter(Boolean);
-            lines.forEach((line: string) => {
-                console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
+        forEachOutputLine(backendChild.stderr, (line) => {
+            console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
 
-                noticeWatcherRestart(line);
-                noticePortMoved(line);
+            noticeWatcherRestart(line);
+            noticePortMoved(line);
 
-                // Detect corrupted node_modules at runtime
-                // (covers tsx and any other dependency whose pnpm store entry is broken)
-                if (!corruptedModulesWarned) {
-                    const cleanLine = stripAnsi(line);
-                    if (
-                        cleanLine.includes("Cannot find module") &&
-                        cleanLine.includes("node_modules/.pnpm/")
-                    ) {
-                        corruptedModulesWarned = true;
-                        // Delay slightly so the full Node.js error stack prints first
-                        setTimeout(() => {
-                            const pm = detectPackageManager(projectRoot);
-                            const installCmd = getPMCommands(pm).install.join(" ");
-                            console.error("");
-                            console.error(chalk.red("  ✗ node_modules appears corrupted — a required file is missing."));
-                            console.error(chalk.gray("    This usually happens when a previous install was interrupted"));
-                            console.error(chalk.gray("    or the package manager store was cleaned."));
-                            console.error("");
-                            console.error(chalk.gray("    To fix, stop the dev server and run:"));
-                            console.error(chalk.cyan(`      rm -rf node_modules && ${installCmd}`));
-                            console.error("");
-                        }, 200);
-                    }
+            // Detect corrupted node_modules at runtime
+            // (covers tsx and any other dependency whose pnpm store entry is broken)
+            if (!corruptedModulesWarned) {
+                const cleanLine = stripAnsi(line);
+                if (
+                    cleanLine.includes("Cannot find module") &&
+                    cleanLine.includes("node_modules/.pnpm/")
+                ) {
+                    corruptedModulesWarned = true;
+                    // Delay slightly so the full Node.js error stack prints first
+                    setTimeout(() => {
+                        const pm = detectPackageManager(projectRoot);
+                        const installCmd = getPMCommands(pm).install.join(" ");
+                        console.error("");
+                        console.error(chalk.red("  ✗ node_modules appears corrupted — a required file is missing."));
+                        console.error(chalk.gray("    This usually happens when a previous install was interrupted"));
+                        console.error(chalk.gray("    or the package manager store was cleaned."));
+                        console.error("");
+                        console.error(chalk.gray("    To fix, stop the dev server and run:"));
+                        console.error(chalk.cyan(`      rm -rf node_modules && ${installCmd}`));
+                        console.error("");
+                    }, 200);
                 }
-            });
+            }
         });
 
         children.push(backendChild);
