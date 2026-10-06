@@ -221,4 +221,35 @@ describe("the collection table draws again only what changed", () => {
         expect(mockState.rowActionRenders).toBe(0);
         view.unmount();
     });
+
+    it("ticking a row's checkbox draws the row actions and no property cell", async () => {
+        let view!: ReturnType<typeof render>;
+        await act(async () => {
+            view = render(<View/>);
+        });
+        const drawnRows = view.container.querySelectorAll("#virtual-table [style*=\"position: absolute\"]").length;
+        expect(drawnRows).toBeGreaterThan(10);
+
+        const checkbox = rowCheckboxes(view.container)[2];
+        expect(checkbox.getAttribute("aria-checked")).toBe("false");
+
+        mockResetCounts();
+        await act(async () => {
+            fireEvent.click(checkbox);
+        });
+
+        // The row shows it.
+        const ticked = rowCheckboxes(view.container)[2];
+        expect(ticked.getAttribute("aria-checked")).toBe("true");
+        expect(rowCheckboxes(view.container).filter(c => c.getAttribute("aria-checked") === "true")).toHaveLength(1);
+
+        // Nothing a property cell shows depends on what is selected.
+        expect(mockState.cellRendererRuns).toBe(0);
+        expect(mockState.propertyCellRenders).toBe(0);
+        // The row actions do: an action's `isEnabled` is asked with the
+        // selection controller. At most once per row drawn.
+        expect(mockState.rowActionRenders).toBeGreaterThan(0);
+        expect(mockState.rowActionRenders).toBeLessThanOrEqual(drawnRows);
+        view.unmount();
+    });
 });
