@@ -380,6 +380,29 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
             expect(spent.transactions).toBeLessThanOrEqual(1);
         });
 
+        // A narrowed read takes its `ETag` from the row read plain, so it reads
+        // the row twice — once for the tag, once as asked — but in one
+        // transaction, not two.
+        it("GET /posts/:id?include=author is the tag's read and the narrowed read, in one transaction", async () => {
+            const spent = cost((await measure("/posts/5?include=author")).statements);
+            expect(spent.work.length, spent.work.join("\n")).toBeLessThanOrEqual(3);
+            expect(spent.transactions).toBeLessThanOrEqual(1);
+        });
+
+        it("GET /posts/:id?fields=id,title is the tag's read and the projected read, in one transaction", async () => {
+            const spent = cost((await measure("/posts/5?fields=id,title")).statements);
+            expect(spent.work.length, spent.work.join("\n")).toBeLessThanOrEqual(2);
+            expect(spent.transactions).toBeLessThanOrEqual(1);
+        });
+
+        it("tags a narrowed read with the plain read's ETag", async () => {
+            const etagOf = async (path: string) => (await app.request(`/api/data${path}`)).headers.get("etag");
+            const plain = await etagOf("/posts/5");
+            expect(plain).toBeTruthy();
+            expect(await etagOf("/posts/5?include=author")).toBe(plain);
+            expect(await etagOf("/posts/5?fields=id,title")).toBe(plain);
+        });
+
         it("a nested listing is its page and its count, in one transaction", async () => {
             const spent = cost((await measure("/posts/5/comments?limit=25")).statements);
             expect(spent.work.length, spent.work.join("\n")).toBeLessThanOrEqual(2);

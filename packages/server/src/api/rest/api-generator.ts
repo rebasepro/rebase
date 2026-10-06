@@ -987,20 +987,35 @@ export class RestApiGenerator {
         }
 
         const narrowed = queryOptions.fields !== undefined || queryOptions.include !== undefined;
-        // Read before the narrowed row, not after: a write landing between the
-        // two then leaves the tag older than the body — a 412 the caller
-        // recovers from by reading again — and never newer, which would pass a
-        // write made against the older body over the change it never saw.
-        const tagged = narrowed ? await RestApiGenerator.rowForETag(driver, address, id, undefined, withDeleted) : undefined;
         // `fields` reaches the driver as a projection: the same columns a list
         // read would select, so one row and a page of them cost the same per
         // row rather than the get route paying for every column.
-        const row = await fetchService.fetchOneForRest(
+        const readNarrowed = (reader: DataDriver) => (reader.restFetchService ?? fetchService).fetchOneForRest(
             address.path, id, queryOptions.include, undefined,
             { fields: queryOptions.fields, withDeleted }
         );
+        if (!narrowed) {
+            const row = await readNarrowed(driver);
+            return row ? { row, etag: await rowETag(row, address.collection) } : undefined;
+        }
+
+        // Both reads in one transaction where the driver can run them so: they
+        // were two, each with its own checkout, identity setup and commit, and
+        // a write could land between them. On one snapshot the tag names the
+        // version the body was rendered from. Where they stay two, the tag is
+        // read first: a write landing between them then leaves the tag older
+        // than the body — a 412 the caller recovers from by reading again —
+        // and never newer, which would pass a write made against the older
+        // body over the change it never saw.
+        const readBoth = async (reader: DataDriver) => {
+            const tagged = await RestApiGenerator.rowForETag(reader, address, id, undefined, withDeleted);
+            return { tagged, row: await readNarrowed(reader) };
+        };
+        const { tagged, row } = driver.readTogether
+            ? await driver.readTogether(readBoth)
+            : await readBoth(driver);
         if (!row) return undefined;
-        return { row, etag: await rowETag(narrowed ? tagged : row, address.collection) };
+        return { row, etag: await rowETag(tagged, address.collection) };
     }
 
     /**

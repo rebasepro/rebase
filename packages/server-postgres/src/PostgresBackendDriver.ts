@@ -2942,9 +2942,18 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
      * driver opens for itself, with the same identity, role and field viewer;
      * `work` is handed the transaction's driver, whose reads run on it directly
      * instead of each opening another.
+     *
+     * `REPEATABLE READ`, because the point of reading together is reading one
+     * snapshot: under the default `READ COMMITTED` each statement takes its
+     * own, and a count could still describe a different set from the page
+     * beside it. A read-only transaction cannot fail serialization at this
+     * level, so it costs nothing.
      */
     async readTogether<T>(work: (driver: DataDriver) => Promise<T>): Promise<T> {
-        return this.withTransaction((delegate) => work(delegate), { accessMode: "read only" });
+        return this.withTransaction((delegate) => work(delegate), {
+            accessMode: "read only",
+            isolationLevel: "repeatable read"
+        });
     }
 
     private async withTransaction<T>(
