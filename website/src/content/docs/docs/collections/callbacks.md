@@ -172,7 +172,9 @@ are worth knowing:
 - **A write to a row it excludes is a 404.** An update or a delete addressed at
   a row outside the scope is refused before the write, with the same "no row …"
   answer a read gives — so a scope is a scope for writes too, not only for
-  reads. What it does *not* gate is the values being written: refusing a write
+  reads. A one-to-many membership write (`comments: [ids]` on a post) leaves a
+  child the target's scope hides where it is, as it leaves an id that names no
+  row. What it does *not* gate is the values being written: refusing a write
   on its contents is `beforeSave`.
 
 One read is deliberately not narrowed: the uniqueness check behind

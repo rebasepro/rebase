@@ -142,7 +142,33 @@ const notesCollection = {
     }
 };
 
-const collections = [authorsCollection, tagsCollection, commentsCollection, postsCollection, notesCollection] as unknown as CollectionConfig[];
+/** A child collection whose `beforeQuery` hides some rows from everybody. */
+const tasksCollection: Record<string, unknown> = {
+    name: "Tasks", slug: "tasks", table: "tasks",
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        title: { name: "Title", type: "string" },
+        hidden: { name: "Hidden", type: "boolean" }
+    },
+    callbacks: {
+        beforeQuery: () => ({ filter: { hidden: ["==", false] } })
+    }
+};
+const projectsCollection = {
+    name: "Projects", slug: "projects", table: "projects",
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        name: { name: "Name", type: "string" },
+        tasks: { name: "Tasks", type: "relation", relation: { kind: "hasMany", target: () => tasksCollection, foreignKeyOnTarget: "project_id" } }
+    }
+};
+(tasksCollection.properties as Record<string, unknown>).project = {
+    name: "Project", type: "relation", relation: { kind: "belongsTo", target: () => projectsCollection, localKey: "project_id" }
+};
+
+const collections = [
+    authorsCollection, tagsCollection, commentsCollection, postsCollection, notesCollection, tasksCollection, projectsCollection
+] as unknown as CollectionConfig[];
 
 const ADMIN = { uid: "admin-1", roles: ["admin"] };
 const STRANGER = { uid: "stranger-1", roles: [] as string[] };
@@ -311,6 +337,53 @@ describe("a write's statements (E2E)", () => {
             const { result, statements } = await statementsOf(() => http("PATCH", `/posts/${id}`, { body: { title: "hooked 2" } }));
             expect(result.status).toBe(200);
             expect(commitChecks(statements)).toHaveLength(1);
+        });
+    });
+
+    describe("a hasMany membership write", () => {
+        /** Each child's row version: an UPDATE, even one that changes nothing, gives it a new one. */
+        const versions = async (postId: number) => (await admin.query<{ id: number; xmin: string }>(
+            "SELECT id, xmin::text FROM public.comments WHERE post_id = $1 ORDER BY id", [postId]
+        )).rows;
+
+        it("re-sending the children a post already has rewrites none of them", async () => {
+            const id = await newPost("resend", 25);
+            const before = await versions(id);
+            const answer = await http("PATCH", `/posts/${id}`, { body: { title: "resend 2", comments: before.map(row => row.id) } });
+            expect(answer.status).toBe(200);
+            expect(await versions(id)).toEqual(before);
+        });
+
+        it("still links a new child and unlinks a dropped one", async () => {
+            const id = await newPost("membership", 3);
+            const [kept, , dropped] = (await versions(id)).map(row => row.id);
+            const { rows } = await admin.query<{ id: number }>("INSERT INTO public.comments (body) VALUES ('new') RETURNING id");
+            const added = rows[0].id;
+            const answer = await http("PATCH", `/posts/${id}`, {
+                body: { comments: (await versions(id)).map(row => row.id).filter(c => c !== dropped).concat(added) }
+            });
+            expect(answer.status).toBe(200);
+            const now = (await versions(id)).map(row => row.id);
+            expect(now).toContain(kept);
+            expect(now).toContain(added);
+            expect(now).not.toContain(dropped);
+        });
+
+        it("does not take a child the target's beforeQuery hides from another parent", async () => {
+            const { rows: projects } = await admin.query<{ id: number }>(
+                "INSERT INTO public.projects (name) VALUES ('mine'), ('theirs') RETURNING id"
+            );
+            const [mine, theirs] = projects.map(row => row.id);
+            const { rows: tasks } = await admin.query<{ id: number }>(
+                "INSERT INTO public.tasks (title, hidden, project_id) VALUES ('open', false, NULL), ('secret', true, $1) RETURNING id",
+                [theirs]
+            );
+            const [open, secret] = tasks.map(row => row.id);
+
+            const answer = await http("PATCH", `/projects/${mine}`, { body: { tasks: [open, secret] } });
+            expect(answer.status).toBe(200);
+            const { rows } = await admin.query("SELECT id, project_id FROM public.tasks ORDER BY id");
+            expect(rows).toEqual([{ id: open, project_id: mine }, { id: secret, project_id: theirs }]);
         });
     });
 
