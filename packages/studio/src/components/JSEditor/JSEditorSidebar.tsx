@@ -67,9 +67,14 @@ const QUICK_REFERENCE: { label: string; code: string; description: string }[] = 
         description: "Chained query builder"
     },
     {
+        label: "Who am I",
+        code: "return context.user;",
+        description: "The user this script runs as, or null under No Auth"
+    },
+    {
         label: "Auth: Current session",
         code: "const session = client.auth.getSession();\nreturn session;",
-        description: "Get current auth session"
+        description: "The session this client holds: yours, or none under Run as and No Auth"
     },
     {
         label: "Admin: List users",

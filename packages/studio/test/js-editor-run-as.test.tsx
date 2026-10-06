@@ -26,6 +26,8 @@ const listUsersPaginated = jest.fn(async (_options?: { search?: string; limit?: 
 }));
 /** The options of every client the editor built for a run. */
 const built: Array<Record<string, unknown>> = [];
+/** How many of those clients were released after their run. */
+let closed = 0;
 
 jest.mock("@rebasepro/app", () => ({
     useRebaseContext: () => ({
@@ -57,8 +59,13 @@ jest.mock("@rebasepro/app", () => ({
 jest.mock("@rebasepro/client", () => ({
     createRebaseClient: (options: Record<string, unknown>) => {
         built.push(options);
-        return { data: { whoami: "the scoped client" }, ws: { disconnect: () => undefined } };
-    }
+        return {
+            data: { whoami: "the scoped client" },
+            setAuthTokenGetter: () => undefined,
+            close: () => { closed += 1; }
+        };
+    },
+    createMemoryStorage: () => ({ getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
 }));
 
 jest.mock("../src/components/JSEditor/JSMonacoEditor", () => ({
@@ -77,6 +84,7 @@ function runScript(code: string) {
 beforeEach(() => {
     localStorage.clear();
     built.length = 0;
+    closed = 0;
     listUsersPaginated.mockClear();
     session.roles = ["admin"];
 });
@@ -89,8 +97,15 @@ describe("the JS editor's Run as", () => {
         runScript("return client.data.whoami;");
 
         await waitFor(() => expect(built).toHaveLength(1));
-        expect(built[0]).toEqual({ baseUrl: "http://api.test", token: "admin-token", impersonate: "user-b" });
+        expect(built[0]).toEqual({
+            baseUrl: "http://api.test",
+            token: "admin-token",
+            impersonate: "user-b",
+            // Its own empty session: never the one the app saved.
+            auth: expect.objectContaining({ persistSession: false, autoRefresh: false })
+        });
         expect(await screen.findByText(/the scoped client/)).toBeTruthy();
+        await waitFor(() => expect(closed).toBe(1));
     });
 
     it("runs as the administrator through their own client when nobody else is chosen", async () => {

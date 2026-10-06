@@ -38,7 +38,7 @@ import {
 import { useStudioUrlController, useStudioCollectionRegistry, useStudioSidePanelController } from "@rebasepro/app";
 import { useRebaseContext, useRebaseClient, useSnackbarController, useApiConfig, useTranslation, useModeController, ErrorView, SelectableUser, IconForView } from "@rebasepro/app";
 
-import { createRebaseClient } from "@rebasepro/client";
+import { createMemoryStorage, createRebaseClient, type CreateAuthOptions } from "@rebasepro/client";
 import { JSMonacoEditor } from "./JSMonacoEditor";
 import { JSEditorSidebar, JSSnippet } from "./JSEditorSidebar";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
@@ -82,12 +82,12 @@ const MAX_HISTORY = 50;
  * new user did be a 404 — a placeholder presented as working code. `slug` is
  * the project's first collection when one is known.
  */
-const makeDefaultCode = (slug?: string) => `// Available: client (RebaseClient)
+const makeDefaultCode = (slug?: string) => `// Available: client (RebaseClient), context
 // Press Cmd+Enter (Ctrl+Enter) to run
 //
 // Examples:
 //   const users = await client.admin.listUsers();
-//   const session = client.auth.getSession();
+//   const me = context.user; // who this script runs as ("Run as"), null under No Auth
 ${slug
         ? `
 const result = await client.data.collection(${JSON.stringify(slug)}).find({ limit: 10 });
@@ -98,10 +98,22 @@ return result;
 //   const result = await client.data.collection("posts").find({ limit: 10 });
 //   return result;
 
-return client.auth.getSession();
+return context.user;
 `}`;
 
 const DEFAULT_CODE = makeDefaultCode();
+
+/**
+ * The auth of a client built for one run: its own, in memory, and empty.
+ *
+ * The SDK's default auth restores the session the app saved in `localStorage`,
+ * sends its token on every request and keeps refreshing it. A run under "No
+ * Auth" or as another user must do none of that: it would go out as the
+ * signed-in user, and `client.auth` would describe the wrong person.
+ */
+function runOnlyAuth(): CreateAuthOptions {
+    return { storage: createMemoryStorage(), persistSession: false, autoRefresh: false };
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -351,12 +363,13 @@ code: DEFAULT_CODE };
         }
 
         if (authMode === "none") {
+            // No credential at all, and no session to find one in.
             const client = createRebaseClient({
                 baseUrl: apiUrl,
-                token: undefined
+                auth: runOnlyAuth()
             });
             return { client,
-isScoped: true };
+release: () => client.close() };
         }
 
         // If not running as another user safely reuse the application's global client.
@@ -364,17 +377,12 @@ isScoped: true };
             if (!rebaseClient) {
                 throw new Error("Application client is not initialized.");
             }
-            return { client: rebaseClient,
-isScoped: false };
+            return { client: rebaseClient };
         }
 
         // Get the current auth token
-        let token: string | undefined;
-        if (getAuthToken) {
-            token = (await getAuthToken()) ?? undefined;
-        }
-
-        if (!token) {
+        const token = getAuthToken ? (await getAuthToken()) ?? undefined : undefined;
+        if (!getAuthToken || !token) {
             throw new Error("No auth token available. Please sign in first.");
         }
 
@@ -382,14 +390,18 @@ isScoped: false };
         // administrator's own token, and `impersonate` naming who to run as.
         // The server runs data, functions and realtime as that user, and
         // refuses every other route rather than answer as the administrator.
+        // It holds no session: the token is asked of the app for each request,
+        // so the app's own session is the one that gets refreshed.
         const client = createRebaseClient({
             baseUrl: apiUrl,
             token,
-            impersonate: selectedUser.uid
+            impersonate: selectedUser.uid,
+            auth: runOnlyAuth()
         });
+        client.setAuthTokenGetter(getAuthToken);
 
         return { client,
-isScoped: true };
+release: () => client.close() };
     }, [apiConfig, rebaseClient, selectedUser, currentUser, authMode]);
 
     // ─── Execution engine ────────────────────────────────────────
@@ -409,7 +421,7 @@ isScoped: true };
 
         const consoleEntries: ConsoleEntry[] = [];
         const startTime = performance.now();
-        let scopedClientToCleanUp: { ws?: { disconnect(): void } } | null = null;
+        let release: (() => void) | undefined;
 
         // Capture console methods
         const originalConsole = {
@@ -433,19 +445,21 @@ timestamp: Date.now() });
             console.info = captureConsole("info");
 
             // Build an authenticated client
-            const { client, isScoped } = await buildClient();
-            if (isScoped) {
-                scopedClientToCleanUp = client;
-            }
+            const built = await buildClient();
+            release = built.release;
+            const client = built.client;
 
-            // Build context object with useful info about selected user
+            // The user the requests run as: nobody under "No Auth", the chosen
+            // user when running as someone else, the signed-in user otherwise.
             const context = {
-                user: selectedUser ?? (currentUser ? {
-                    uid: currentUser.uid,
-                    displayName: currentUser.displayName,
-                    email: currentUser.email,
-                    roles: currentUser.roles
-                } : null),
+                user: authMode === "none"
+                    ? null
+                    : selectedUser ?? (currentUser ? {
+                        uid: currentUser.uid,
+                        displayName: currentUser.displayName,
+                        email: currentUser.email,
+                        roles: currentUser.roles
+                    } : null),
                 collections: collectionInfos
             };
 
@@ -490,12 +504,11 @@ timestamp: Date.now() });
             console.info = originalConsole.info;
             setIsRunning(false);
 
-            if (scopedClientToCleanUp) {
-                // Ensure we disconnect WebSockets to prevent leaking connections
-                scopedClientToCleanUp.ws?.disconnect();
-            }
+            // A client built for this run holds a socket and timers; release
+            // them. The app's own client is left alone.
+            release?.();
         }
-    }, [activeTab?.code, buildClient, selectedUser, currentUser, collectionInfos]);
+    }, [activeTab?.code, buildClient, authMode, selectedUser, currentUser, collectionInfos]);
 
     // ─── Snippet management ──────────────────────────────────────
 

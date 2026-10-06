@@ -232,12 +232,16 @@ interface RebaseClient {
     [collectionSlug: string]: unknown;
 }
 
-/** The pre-configured client instance. Already authenticated with the current user session. */
+/**
+ * The client for this run: your own, one that runs every request as the user
+ * picked in "Run as" (it holds no session, so \`client.auth.getSession()\` is null),
+ * or an unauthenticated one under "No Auth".
+ */
 declare const client: RebaseClient;
 
 /** Execution context with user and collection information. */
 interface JSEditorContext {
-    /** The user the script is running as. */
+    /** The user the script runs as: the one picked in "Run as", or you. \`null\` under "No Auth". */
     user: {
         uid: string;
         displayName: string | null;
