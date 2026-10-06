@@ -12,7 +12,7 @@ import path from "path";
 // `execa` is ESM-only and nothing here runs a process.
 jest.mock("execa", () => ({ execa: jest.fn() }));
 import { uploadBackup } from "../src/backup/backup-service";
-import type { StorageController } from "@rebasepro/server";
+import { LocalStorageController, type StorageController } from "@rebasepro/server";
 
 describe("uploadBackup", () => {
     let dir: string;
@@ -73,4 +73,64 @@ describe("uploadBackup", () => {
         expect(seen.size).toBe(size);
         expect(seen.bytes).toBe(size);
     }, 120_000);
+});
+
+/**
+ * A backup is not a user upload, so the storage's upload limits do not apply.
+ *
+ * `maxFileSize` (50 MB unless configured) and `allowedMimeTypes` say what a
+ * user may upload. `uploadBackup` went through the same `putObject` and was
+ * held to them: the CLI and the documented cron build their controller with
+ * no `maxFileSize`, so every dump over 50 MB answered `PAYLOAD_TOO_LARGE`.
+ */
+describe("uploadBackup and the storage's upload limits", () => {
+    let dir: string;
+    beforeEach(() => {
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), "backup-limits-"));
+    });
+    afterEach(() => {
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    function sparseDump(name: string, size: number): string {
+        const file = path.join(dir, name);
+        const fd = fs.openSync(file, "w");
+        fs.ftruncateSync(fd, size);
+        fs.closeSync(fd);
+        return file;
+    }
+
+    it("uploads a dump over the default 50 MB limit through a controller built as the docs build it", async () => {
+        const storage = new LocalStorageController({ type: "local", basePath: path.join(dir, "bucket") });
+        const size = storage.maxFileSize() + 1;
+        const dump = sparseDump("rebase-app-20260714T030000Z.dump", size);
+
+        const result = await uploadBackup(storage, dump, { kind: "s3", bucket: "backups", prefix: "nightly" });
+
+        expect(result.key).toBe("nightly/rebase-app-20260714T030000Z.dump");
+        expect(fs.statSync(path.join(dir, "bucket", "backups", "nightly", "rebase-app-20260714T030000Z.dump")).size).toBe(size);
+    });
+
+    it("is not held to a configured maxFileSize or allowedMimeTypes", async () => {
+        const storage = new LocalStorageController({
+            type: "local",
+            basePath: path.join(dir, "bucket"),
+            maxFileSize: 1024,
+            allowedMimeTypes: ["image/png"]
+        });
+        const dump = sparseDump("rebase-app-20260714T040000Z.dump", 4096);
+
+        await uploadBackup(storage, dump, { kind: "gcs", bucket: "backups", prefix: "" });
+
+        expect(fs.statSync(path.join(dir, "bucket", "backups", "rebase-app-20260714T040000Z.dump")).size).toBe(4096);
+        // The same controller still holds a user's upload to both.
+        await expect(storage.putObject({
+            file: new File([Buffer.alloc(4096)], "x.png", { type: "image/png" }),
+            key: "x.png"
+        })).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+        await expect(storage.putObject({
+            file: new File([Buffer.alloc(16)], "x.dump", { type: "application/octet-stream" }),
+            key: "x.dump"
+        })).rejects.toThrow(/not allowed/);
+    });
 });

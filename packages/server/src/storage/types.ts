@@ -106,13 +106,33 @@ export type {
 } from "@rebasepro/types";
 
 /**
+ * How the server writes an object. See {@link StorageController.putObject}.
+ */
+export interface PutObjectOptions {
+    /**
+     * Hold this write to the controller's upload limits: `maxFileSize` and
+     * `allowedMimeTypes`. Defaults to `true`.
+     *
+     * Those limits say what a user may upload. A write the server makes for
+     * itself, such as a database backup, passes `false`. A dump is neither of
+     * an allowed type nor, past a small database, under 50 MB. The upload
+     * routes never pass it.
+     */
+    uploadLimits?: boolean;
+}
+
+/**
  * Storage controller interface for backend implementations
  */
 export interface StorageController {
     /**
-     * Upload an object
+     * Upload an object.
+     *
+     * A write is held to the controller's upload limits — `maxFileSize` and
+     * `allowedMimeTypes` — unless `options.uploadLimits` is `false`. Only the
+     * server's own writes pass that; nothing a request sends reaches it.
      */
-    putObject(props: UploadFileProps): Promise<UploadFileResult>;
+    putObject(props: UploadFileProps, options?: PutObjectOptions): Promise<UploadFileResult>;
 
     /**
      * Get a download URL (signed URL equivalent) for an object

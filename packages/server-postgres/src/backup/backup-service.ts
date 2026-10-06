@@ -409,12 +409,16 @@ export async function uploadBackup(
     // times over in the process running the cron, and one over 2 GiB could
     // not be read at all (`ERR_FS_FILE_TOO_LARGE`), so it never uploaded.
     const file = new File([await fs.openAsBlob(localFile)], fileName, { type: "application/octet-stream" });
+    // Not held to the controller's upload limits: `maxFileSize` (50 MB unless
+    // set) and `allowedMimeTypes` say what a user may upload, and the CLI and
+    // the documented cron build their controller without either. Held to
+    // them, every dump over 50 MB failed with PAYLOAD_TOO_LARGE.
     const result = await storage.putObject({
         file,
         key,
         bucket: dest.bucket,
         metadata: { "rebase-backup": "1" }
-    });
+    }, { uploadLimits: false });
     return { key, storageUrl: result.storageUrl };
 }
 

@@ -14,6 +14,7 @@ import {
     DEFAULT_MAX_FILE_SIZE,
     type StoredObjectInfo,
     type StoredObjectRange,
+    type PutObjectOptions,
     type StoredObjectStream
 } from "./types";
 import { fileWebStream } from "./streams";
@@ -204,8 +205,8 @@ export class LocalStorageController implements StorageController {
         key,
         metadata,
         bucket
-    }: UploadFileProps): Promise<UploadFileResult> {
-        this.validateFile(file);
+    }: UploadFileProps, options?: PutObjectOptions): Promise<UploadFileResult> {
+        if (options?.uploadLimits !== false) this.validateFile(file);
 
         // Always use a bucket (default to 'default'). `||`, not `??`: an empty
         // bucket is "the caller named none", and it used to resolve to the

@@ -9,6 +9,7 @@ import {
     StorageController,
     type StoredObjectInfo,
     type StoredObjectRange,
+    type PutObjectOptions,
     type StoredObjectStream
 } from "./types";
 import { folderKey, listingPrefix } from "./keys";
@@ -149,8 +150,8 @@ export class S3StorageController implements StorageController {
         key,
         metadata,
         bucket
-    }: UploadFileProps): Promise<UploadFileResult> {
-        this.validateFile(file);
+    }: UploadFileProps, options?: PutObjectOptions): Promise<UploadFileResult> {
+        if (options?.uploadLimits !== false) this.validateFile(file);
 
         const usedBucket = this.getBucket(bucket);
         const s3 = await loadS3();

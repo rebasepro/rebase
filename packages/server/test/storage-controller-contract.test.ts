@@ -351,3 +351,50 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
         await expect(h.controller.deleteObject("rt/missing.txt")).resolves.toBeUndefined();
     });
 });
+
+/**
+ * `maxFileSize` and `allowedMimeTypes` are a policy for what users upload. The
+ * server's own writes (a database backup) opt out with `uploadLimits: false`;
+ * every other write, and every write that names no option, is held to them.
+ */
+describe.each<Kind>(["local", "s3", "gcs"])("storage controller upload limits — %s", (kind) => {
+    let controller: StorageController;
+    let cleanup: () => Promise<void> = async () => undefined;
+
+    beforeEach(async () => {
+        const limits = { maxFileSize: 8, allowedMimeTypes: ["image/png"] };
+        if (kind === "local") {
+            const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-storage-limits-"));
+            controller = new LocalStorageController({ type: "local", basePath: dir, ...limits });
+            cleanup = () => fs.promises.rm(dir, { recursive: true, force: true });
+        } else if (kind === "s3") {
+            s3World.reset([S3_BUCKET]);
+            controller = new S3StorageController({ type: "s3", bucket: S3_BUCKET, accessKeyId: "test", secretAccessKey: "test", ...limits });
+        } else {
+            gcsWorld.reset([GCS_BUCKET]);
+            controller = new GCSStorageController({ type: "gcs", bucket: GCS_BUCKET, ...limits });
+        }
+    });
+
+    afterEach(async () => {
+        await cleanup();
+        cleanup = async () => undefined;
+    });
+
+    it("holds an upload to maxFileSize and allowedMimeTypes", async () => {
+        await expect(controller.putObject({ file: textFile("big.png", "0123456789", "image/png"), key: "u/big.png" }))
+            .rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+        await expect(controller.putObject({ file: textFile("a.txt", "hi"), key: "u/a.txt" }, { uploadLimits: true }))
+            .rejects.toThrow(/not allowed/);
+        expect(await controller.getObject("u/big.png")).toBeNull();
+        expect(await controller.getObject("u/a.txt")).toBeNull();
+    });
+
+    it("stores a server write that opts out of them, whatever its size and type", async () => {
+        const body = "x".repeat(64);
+        await controller.putObject({ file: textFile("db.dump", body, "application/octet-stream"), key: "b/db.dump" }, { uploadLimits: false });
+
+        const stored = await controller.getObject("b/db.dump");
+        expect(Buffer.from(await stored!.arrayBuffer()).toString()).toBe(body);
+    });
+});
