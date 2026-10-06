@@ -90,6 +90,9 @@ function fakeDb(present: string[], failOn?: RegExp): { queryable: Queryable; ran
             // such.
             if (/pg_enum/i.test(text)) return { rows: [] };
             if (/pg_class/i.test(text)) return { rows: [] };
+            // The helper functions and extensions the table ensure looks up so
+            // an unchanged one is not re-created.
+            if (/pg_proc|pg_extension/i.test(text)) return { rows: [] };
             if (/EXISTS\(SELECT 1 FROM/i.test(text)) return { rows: [] };
             ran.push(text);
             if (failOn && failOn.test(text)) throw new Error("boom");

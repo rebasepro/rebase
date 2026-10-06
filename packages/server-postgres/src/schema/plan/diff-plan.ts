@@ -102,7 +102,121 @@ export interface ExistingSchema {
     columnTypes?: Map<string, string>;
     /** `schema.table.trigger` of every trigger that already exists. */
     triggers?: Set<string>;
+    /**
+     * `schema.name` of every index (any relation of kind `i`/`I`) that already
+     * exists. Absent means unknown, and every index is planned as before —
+     * `IF NOT EXISTS` makes that correct, just not free.
+     */
+    indexes?: Set<string>;
+    /**
+     * Names of the extensions installed in the database. `CREATE EXTENSION IF
+     * NOT EXISTS` skips by name whatever schema the extension is in, so the name
+     * is the whole test. Absent means unknown.
+     */
+    extensions?: Set<string>;
+    /**
+     * {@link HELPER_FUNCTIONS} as they are in the catalogue: `schema.name(args)`
+     * → {@link describeHelperFunction} of what `CREATE OR REPLACE` would set.
+     * Absent means unknown, and every helper is re-created as before.
+     */
+    functions?: Map<string, string>;
 }
+
+/**
+ * The functions the plan creates with `CREATE OR REPLACE`, which the catalogue
+ * reader looks up so a boot that finds them unchanged plans nothing.
+ *
+ * A helper missing from this list is not wrong, only re-created on every boot,
+ * which is what all of them were before.
+ */
+export const HELPER_FUNCTIONS: readonly string[] = [SEARCH_TEXT_FN, SEARCH_UNACCENT_FN, SET_UPDATED_AT_FN];
+
+/**
+ * Everything `CREATE OR REPLACE FUNCTION` sets on a function, as one string.
+ *
+ * Built from the catalogue by the reader and from the statement by
+ * {@link parseHelperFunction}, so the two meet in one shape. It covers every
+ * attribute a `CREATE OR REPLACE` resets — body, language, volatility,
+ * strictness, parallel safety, security, leakproofness, cost and `SET` options —
+ * so a function someone altered by hand (`ALTER FUNCTION … VOLATILE`) still
+ * compares unequal and is re-created, exactly as the unconditional statement
+ * used to re-create it.
+ */
+export interface HelperFunctionFacts {
+    returns: string;
+    language: string;
+    /** `provolatile`: `i`mmutable, `s`table, `v`olatile. */
+    volatility: string;
+    strict: boolean;
+    /** `proparallel`: `s`afe, `r`estricted, `u`nsafe. */
+    parallel: string;
+    securityDefiner: boolean;
+    leakproof: boolean;
+    cost: number;
+    /** Whether the function carries any `SET` options (`proconfig`). */
+    hasConfig: boolean;
+    /** `prosrc`: the text between the dollar quotes, exactly. */
+    body: string;
+}
+
+export const helperFunctionKey = (schema: string, name: string, args: string): string =>
+    `${schema}.${name}(${args.replace(/\s+/g, " ").trim().toLowerCase()})`;
+
+export const describeHelperFunction = (facts: HelperFunctionFacts): string =>
+    JSON.stringify([
+        facts.returns.toLowerCase(), facts.language.toLowerCase(), facts.volatility, facts.strict, facts.parallel,
+        facts.securityDefiner, facts.leakproof, Number(facts.cost), facts.hasConfig, facts.body
+    ]);
+
+const HELPER_FUNCTION_RE = new RegExp(
+    "^\\s*CREATE OR REPLACE FUNCTION\\s+([A-Za-z_]\\w*)\\.([A-Za-z_]\\w*)\\(([^)]*)\\)" +
+    "\\s+RETURNS\\s+([\\w\\[\\]]+)\\s+LANGUAGE\\s+(\\w+)" +
+    "((?:\\s+(?:IMMUTABLE|STABLE|VOLATILE|STRICT|PARALLEL\\s+(?:SAFE|RESTRICTED|UNSAFE)))*)" +
+    "\\s+AS\\s+\\$\\$([\\s\\S]*)\\$\\$;?\\s*$",
+    "i"
+);
+
+/**
+ * What a helper's `CREATE OR REPLACE FUNCTION` statement would leave in the
+ * catalogue, or `undefined` for a statement this does not recognise — which is
+ * then planned unconditionally, as every statement was before.
+ *
+ * Only ever given statements this package renders (`searchHelperFunctions`,
+ * `setUpdatedAtFunction`), so a strict pattern is the right tool: anything it
+ * does not match exactly falls back to the safe behaviour.
+ */
+export function parseHelperFunction(statement: string): { key: string; definition: string } | undefined {
+    const match = HELPER_FUNCTION_RE.exec(statement);
+    if (!match) return undefined;
+    const [, schema, name, args, returns, language, attributes, body] = match;
+    const words = attributes.toUpperCase();
+    const parallel = /PARALLEL\s+SAFE/.test(words) ? "s" : /PARALLEL\s+RESTRICTED/.test(words) ? "r" : "u";
+    const volatility = /\bIMMUTABLE\b/.test(words) ? "i" : /\bSTABLE\b/.test(words) ? "s" : "v";
+    return {
+        key: helperFunctionKey(schema, name, args),
+        definition: describeHelperFunction({
+            returns,
+            language,
+            volatility,
+            strict: /\bSTRICT\b/.test(words),
+            parallel,
+            securityDefiner: false,
+            leakproof: false,
+            // Postgres's default for every language but C and internal.
+            cost: 100,
+            hasConfig: false,
+            body
+        })
+    };
+}
+
+/** The name a rendered `CREATE [UNIQUE] INDEX [CONCURRENTLY] IF NOT EXISTS "<name>"` creates. */
+const indexNameOf = (statement: string): string | undefined =>
+    /^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?IF\s+NOT\s+EXISTS\s+"([^"]+)"/i.exec(statement)?.[1];
+
+/** The extension a rendered `CREATE EXTENSION IF NOT EXISTS <name> …` installs. */
+const extensionNameOf = (statement: string): string | undefined =>
+    /^\s*CREATE\s+EXTENSION\s+IF\s+NOT\s+EXISTS\s+"?([\w-]+)"?/i.exec(statement)?.[1];
 
 /**
  * How far the planner may go in making the database's constraints match the
@@ -342,9 +456,14 @@ export function diffPlanAgainstCatalogue(
     //     reference them: a generated column's expression is resolved when the
     //     column is created, so a table whose search column calls
     //     `rebase_search_text` cannot be added before that function exists.
-    //     Both forms are idempotent, so a boot against a database that already
-    //     has them plans nothing.
+    //     Both forms are idempotent, and a boot against a database that already
+    //     has them plans nothing: each is looked up in the catalogue first. An
+    //     unconditional `CREATE OR REPLACE` rewrote the function's `pg_proc` row
+    //     and invalidated every cached plan that calls it, on every replica, on
+    //     every boot — and was reported as a change applied.
     for (const statement of plan.extensions) {
+        const extension = extensionNameOf(statement);
+        if (extension && existing.extensions?.has(extension)) continue;
         actions.push({
             kind: "create-extension",
             target: statement.replace(/^CREATE EXTENSION IF NOT EXISTS |;$/g, ""),
@@ -352,6 +471,8 @@ export function diffPlanAgainstCatalogue(
         });
     }
     for (const statement of plan.functions) {
+        const helper = parseHelperFunction(statement);
+        if (helper && existing.functions?.get(helper.key) === helper.definition) continue;
         actions.push({ kind: "create-function", target: functionTarget(statement), sql: statement });
     }
 
@@ -772,9 +893,16 @@ export function diffPlanAgainstCatalogue(
     //    withholding rather than merely harmless, because CONCURRENTLY is the
     //    one index form Postgres refuses inside a transaction block.
     const concurrent = (schema: string, table: string): boolean => !created.has(`${schema}.${table}`);
+    //    An index already in the catalogue under its name is not planned:
+    //    `IF NOT EXISTS` would skip it by that same name, so the outcome is the
+    //    same — minus a lock on the table to find that out, and minus a change
+    //    reported on a database that has none.
+    const indexExists = (schema: string, name: string | undefined): boolean =>
+        name !== undefined && existing.indexes?.has(`${schema}.${name}`) === true;
     for (const table of collectionTables) {
         if (!table.search) continue;
         for (const statement of searchIndexStatements(table.search)) {
+            if (indexExists(table.schema, indexNameOf(statement))) continue;
             actions.push({
                 kind: "create-index",
                 target: table.qualified,
@@ -792,6 +920,7 @@ export function diffPlanAgainstCatalogue(
     for (const table of collectionTables) {
         if (!table.vector) continue;
         for (const spec of table.vector.specs) {
+            if (indexExists(spec.schema, spec.indexName)) continue;
             actions.push({
                 kind: "create-index",
                 target: `${spec.schema}.${spec.table}`,
@@ -813,6 +942,7 @@ export function diffPlanAgainstCatalogue(
     //    rendered SQL: the `.replace(…)` above silently does nothing for a
     //    UNIQUE index, whose text is `CREATE UNIQUE INDEX …`.
     for (const spec of sortIndexSpecs(collectionTables.flatMap(t => t.indexes))) {
+        if (indexExists(spec.schema, spec.indexName)) continue;
         actions.push({
             kind: "create-index",
             target: `${spec.schema}.${spec.table}`,

@@ -35,7 +35,10 @@ import { quoteRelation } from "./introspect-db-queries";
 import { planSchema } from "./plan/plan-schema";
 import {
     assertSafeIdentifier,
+    describeHelperFunction,
     diffPlanAgainstCatalogue,
+    helperFunctionKey,
+    HELPER_FUNCTIONS,
     type ConstraintPolicy,
     type DiffOptions,
     type EnsureAction,
@@ -215,13 +218,21 @@ export async function readExistingSchema(
     // Restricted to ordinary and partitioned tables: `information_schema.columns`
     // also lists views and materialized views, and probing those runs whatever
     // query defines them.
+    //
+    // Indexes come back from the same read: an index already in the catalogue
+    // under its planned name is not planned again (see `diffPlanAgainstCatalogue`).
     const populatedTables = new Set<string>();
-    const { rows: realTables } = await client.query<{ schema: string; name: string }>(
-        `SELECT n.nspname AS schema, c.relname AS name
+    const indexes = new Set<string>();
+    const { rows: relations } = await client.query<{ schema: string; name: string; kind: string }>(
+        `SELECT n.nspname AS schema, c.relname AS name, c.relkind::text AS kind
          FROM pg_class c
          JOIN pg_namespace n ON c.relnamespace = n.oid
-         WHERE c.relkind IN ('r', 'p') AND n.nspname IN (${inList})`
+         WHERE c.relkind IN ('r', 'p', 'i', 'I') AND n.nspname IN (${inList})`
     );
+    const realTables = relations.filter(row => row.kind === "r" || row.kind === "p");
+    for (const row of relations) {
+        if (row.kind === "i" || row.kind === "I") indexes.add(`${row.schema}.${row.name}`);
+    }
     // The names come from `pg_class`, not from the configuration, so on an
     // adopted database they include tables nobody declared — `2024_archive`,
     // `order-items`, `Sales Data`. Those are quoted, not refused: refusing a
@@ -307,9 +318,62 @@ export async function readExistingSchema(
         columnComments.set(`${row.schema}.${row.table}.${row.column}`, row.comment);
     }
 
+    // The helper functions the plan `CREATE OR REPLACE`s, as the catalogue has
+    // them, so an unchanged one is not rewritten on every boot. Looked up by
+    // qualified name rather than by the schemas read above: `set_updated_at`
+    // lives in `rebase`, which is auth's schema and not in that list.
+    const functions = new Map<string, string>();
+    const helperNames = HELPER_FUNCTIONS
+        .map(qualified => qualified.split("."))
+        .map(([schema, name]) => `(${quoteSqlLiteral(schema)}, ${quoteSqlLiteral(name)})`)
+        .join(", ");
+    const { rows: functionRows } = await client.query<{
+        schema: string;
+        name: string;
+        args: string;
+        returns: string;
+        language: string;
+        volatility: string;
+        strict: boolean;
+        parallel: string;
+        security_definer: boolean;
+        leakproof: boolean;
+        cost: number | string;
+        has_config: boolean;
+        body: string;
+    }>(
+        `SELECT n.nspname AS schema, p.proname AS name, pg_get_function_identity_arguments(p.oid) AS args,
+                format_type(p.prorettype, NULL) AS returns, l.lanname AS language,
+                p.provolatile::text AS volatility, p.proisstrict AS strict, p.proparallel::text AS parallel,
+                p.prosecdef AS security_definer, p.proleakproof AS leakproof, p.procost AS cost,
+                p.proconfig IS NOT NULL AS has_config, p.prosrc AS body
+         FROM pg_proc p
+         JOIN pg_namespace n ON p.pronamespace = n.oid
+         JOIN pg_language l ON p.prolang = l.oid
+         WHERE (n.nspname, p.proname) IN (${helperNames})`
+    );
+    for (const row of functionRows) {
+        functions.set(helperFunctionKey(row.schema, row.name, row.args), describeHelperFunction({
+            returns: row.returns,
+            language: row.language,
+            volatility: row.volatility,
+            strict: row.strict,
+            parallel: row.parallel,
+            securityDefiner: row.security_definer,
+            leakproof: row.leakproof,
+            cost: Number(row.cost),
+            hasConfig: row.has_config,
+            body: row.body
+        }));
+    }
+
+    const extensions = new Set<string>();
+    const { rows: extensionRows } = await client.query<{ name: string }>("SELECT extname AS name FROM pg_extension");
+    for (const row of extensionRows) extensions.add(row.name);
+
     return {
         tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables, columnTypes,
-        columnDefaults, triggers
+        columnDefaults, triggers, indexes, extensions, functions
     };
 }
 
