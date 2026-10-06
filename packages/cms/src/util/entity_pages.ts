@@ -1,8 +1,22 @@
-import { Entity, FindParams, FindResponse } from "@rebasepro/types";
+import { Entity, FindParams } from "@rebasepro/types";
+
+/**
+ * One page as a walk reads it. A collection accessor's `FindResponse` is one;
+ * `nextCursor` is what the REST listing adds whenever another page follows
+ * (`PaginationMeta.nextCursor`), and the admin's data client passes it through.
+ */
+export interface EntityPage<M extends Record<string, unknown>> {
+    data: Entity<M>[];
+    meta?: {
+        total?: number;
+        hasMore?: boolean;
+        nextCursor?: string;
+    };
+}
 
 /** The slice of a collection accessor a page walk needs. */
 export interface EntityPageAccessor<M extends Record<string, unknown>> {
-    find(params?: FindParams<M>): Promise<FindResponse<M>>;
+    find(params?: FindParams<M>): Promise<EntityPage<M>>;
 }
 
 export interface WalkEntityPagesParams<M extends Record<string, unknown>> {
@@ -31,6 +45,15 @@ export interface WalkEntityPagesParams<M extends Record<string, unknown>> {
  * requested limit, since a final page that happens to be exactly full is
  * indistinguishable that way and a walk that stops there drops rows.
  *
+ * Each page after the first continues from the server's `meta.nextCursor`
+ * (sent back as `after`) whenever the previous page carried one. Paging by
+ * `offset` made the database skip every row already read on every request, so
+ * a walk cost the square of the collection; a seek reads only the next page,
+ * and rows written mid-walk no longer shift it. Where no cursor comes —
+ * relevance ordering, a server that predates cursors — or one stops advancing,
+ * it pages by `offset` from the rows it has read. `after` and `offset` are
+ * never sent together (the server refuses that, `CURSOR_WITH_OFFSET`).
+ *
  * @throws When more than `maxRows` rows match. A truncated answer is worse than
  * no answer: it is indistinguishable from a complete one.
  */
@@ -46,6 +69,7 @@ export async function walkEntityPages<M extends Record<string, unknown>>({
 
     const rows: Entity<M>[] = [];
     let offset = 0;
+    let after: string | undefined;
 
     for (; ;) {
         if (signal?.aborted) break;
@@ -53,7 +77,7 @@ export async function walkEntityPages<M extends Record<string, unknown>>({
         const res = await accessor.find({
             ...params,
             limit: pageSize,
-            offset
+            ...(after ? { after } : { offset })
         } as FindParams<M>);
 
         const page = res?.data ?? [];
@@ -70,7 +94,13 @@ export async function walkEntityPages<M extends Record<string, unknown>>({
 
         // By rows received, not by `pageSize`: a server whose ceiling is lower
         // than the page we asked for would otherwise skip everything it clamped.
+        // Counted on seeked pages too, so a fall back to offset resumes where
+        // the walk has got to.
         offset += page.length;
+        // A cursor equal to the one just sent cannot advance the walk; offset
+        // still can.
+        const next = res?.meta?.nextCursor;
+        after = next && next !== after ? next : undefined;
     }
 
     return rows;
