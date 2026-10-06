@@ -16,9 +16,11 @@
  *
  * ## Why this is safe to run on every boot
  *
- * Every statement is idempotent: `ENABLE ROW LEVEL SECURITY` is a no-op once
- * enabled, and each policy is a `DROP POLICY IF EXISTS` immediately followed by
- * a `CREATE POLICY`, so re-applying asserts exactly the declared state. It adds
+ * Every statement is idempotent: `ENABLE ROW LEVEL SECURITY` is only issued for
+ * a table the catalogue reports RLS-off (on one that has it, it changes nothing
+ * and still queues for an ACCESS EXCLUSIVE lock), and each policy is a `DROP
+ * POLICY IF EXISTS` immediately followed by a `CREATE POLICY`, so re-applying
+ * asserts exactly the declared state. It adds
  * and replaces; it never drops data. (It does not *reconcile* — a policy a
  * previous push left behind under an old name is not removed here; that stays a
  * `db push` / `db migrate` concern, alongside destructive schema changes.)
@@ -34,7 +36,9 @@
 import { type CollectionConfig } from "@rebasepro/types";
 import { planCollectionPolicies, type CollectionPolicyPlan } from "./generate-postgres-ddl-logic";
 import { isGeneratedPolicyName } from "../security/policy-drift";
-import { describeDriverError, readExistingSchema, type Queryable } from "./ensure-collection-tables";
+import { describeDriverError, type Queryable } from "./ensure-collection-tables";
+import { assertSafeIdentifier } from "./plan/diff-plan";
+import { quoteSqlLiteral } from "./generate-postgres-ddl-logic";
 import { revokeUserRoleSql } from "../security/rls-enforcement";
 
 export interface PolicyEnsureResult {
@@ -120,6 +124,49 @@ async function dropOrphanedPoliciesOn(client: Queryable, plan: CollectionPolicyP
     return dropped;
 }
 
+/**
+ * Every declared schema's tables, and whether each has row-level security on.
+ *
+ * One catalogue read for the whole step. It replaced a full `readExistingSchema`
+ * — eight catalogue queries and a row probe of every table, of which only the
+ * table names were used — and it carries the one fact that lets a boot leave an
+ * already-locked table alone: `relrowsecurity`.
+ *
+ * Presence is still decided by `information_schema.columns`, as it was: the
+ * same relations (views included, which have no RLS and are closed by revoking,
+ * exactly as before) and the same privilege filter.
+ */
+async function readTableSecurity(client: Queryable, schemas: string[]): Promise<Map<string, { rls: boolean }>> {
+    const tables = new Map<string, { rls: boolean }>();
+    if (schemas.length === 0) return tables;
+    const inList = schemas.map(schema => `'${assertSafeIdentifier(schema, "schema name")}'`).join(", ");
+    const { rows } = await client.query<{ table_schema: string; table_name: string; rls: boolean | null }>(
+        `SELECT t.table_schema, t.table_name, c.relrowsecurity AS rls
+         FROM (SELECT DISTINCT table_schema, table_name FROM information_schema.columns
+               WHERE table_schema IN (${inList})) t
+         JOIN pg_namespace n ON n.nspname = t.table_schema
+         JOIN pg_class c ON c.relnamespace = n.oid AND c.relname = t.table_name`
+    );
+    for (const row of rows) tables.set(`${row.table_schema}.${row.table_name}`, { rls: row.rls === true });
+    return tables;
+}
+
+/**
+ * Whether the catalogue says RLS is on for one table, read fresh. `false` when
+ * it cannot be read, which sends the caller down the fail-closed path.
+ */
+async function rlsIsOn(client: Queryable, plan: CollectionPolicyPlan): Promise<boolean> {
+    try {
+        const { rows } = await client.query<{ rls: boolean }>(
+            `SELECT c.relrowsecurity AS rls FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = ${quoteSqlLiteral(plan.schema)} AND c.relname = ${quoteSqlLiteral(plan.table)}`
+        );
+        return rows[0]?.rls === true;
+    } catch {
+        return false;
+    }
+}
+
 /** What one table's `ENABLE ROW LEVEL SECURITY` came to. */
 type TableLock =
     | { locked: true }
@@ -129,8 +176,17 @@ type TableLock =
  * Switch RLS on for one table, or — when Postgres refuses — take the user
  * role's privileges on it back, so the table is unreachable rather than
  * unprotected.
+ *
+ * A table the catalogue already reports RLS-on is left alone. `ENABLE` on it
+ * changes nothing, and it is not free: it queues for an `ACCESS EXCLUSIVE` lock,
+ * so a boot that met a long reader held every live query on that table behind
+ * it — and when the wait ended in a timeout, the catch below revoked the user
+ * role's privileges on a table that had been protected all along. Every
+ * replica shares the grants, so one boot during a `pg_dump` closed the
+ * collection for the whole deployment until the next clean boot.
  */
-async function lockTable(client: Queryable, plan: CollectionPolicyPlan): Promise<TableLock> {
+async function lockTable(client: Queryable, plan: CollectionPolicyPlan, rlsOn: boolean): Promise<TableLock> {
+    if (rlsOn) return { locked: true };
     try {
         await client.query(plan.enableRls);
         return { locked: true };
@@ -141,6 +197,11 @@ async function lockTable(client: Queryable, plan: CollectionPolicyPlan): Promise
         // denying every request, and `Failed query: <the statement>` told
         // them nothing they did not already have.
         const error = describeDriverError(err);
+        // A failed statement says nothing about the state it meant to reach: a
+        // lock or statement timeout, a cancelled query, a peer that enabled it
+        // first. Ask the catalogue. Only a table that really is RLS-off is
+        // revoked — that safety is unchanged; a read that fails counts as off.
+        if (await rlsIsOn(client, plan)) return { locked: true };
         // Take the privilege back rather than serve an unprotected table.
         // This is the fail-closed step the old code assumed it already had:
         // per-table, so one collection cannot take the rest of the
@@ -192,10 +253,11 @@ export async function lockCollectionTables(
     const plans = planCollectionPolicies(collections);
     if (plans.length === 0) return result;
 
-    const existing = await readExistingSchema(client, Array.from(new Set(plans.map(p => p.schema))));
+    const tables = await readTableSecurity(client, Array.from(new Set(plans.map(p => p.schema))));
     for (const plan of plans) {
-        if (!existing.tables.has(plan.qualified)) continue;
-        const lock = await lockTable(client, plan);
+        const table = tables.get(plan.qualified);
+        if (!table) continue;
+        const lock = await lockTable(client, plan, table.rls);
         if (lock.locked) {
             result.locked++;
         } else {
@@ -216,10 +278,11 @@ export async function ensureCollectionPolicies(
     if (plans.length === 0) return result;
 
     const schemas = Array.from(new Set(plans.map(p => p.schema)));
-    const existing = await readExistingSchema(client, schemas);
+    const tables = await readTableSecurity(client, schemas);
 
     for (const plan of plans) {
-        if (!existing.tables.has(plan.qualified)) {
+        const table = tables.get(plan.qualified);
+        if (!table) {
             result.skipped.push({
                 table: plan.qualified,
                 reason: "table is not present in the database; create it with `rebase db push` / `rebase db migrate`"
@@ -232,7 +295,7 @@ export async function ensureCollectionPolicies(
         // afterwards leaves the table denying; while it is off, the grant made
         // earlier in boot leaves the table wide open. Sharing one `try` meant
         // the dangerous case was reported in the safe case's words.
-        const lock = await lockTable(client, plan);
+        const lock = await lockTable(client, plan, table.rls);
         if (!lock.locked) {
             result.unsecured.push({ table: plan.qualified, error: lock.error, grantWithdrawn: lock.grantWithdrawn });
             continue;

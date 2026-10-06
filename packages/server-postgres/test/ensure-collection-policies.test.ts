@@ -1,8 +1,9 @@
 import { PGlite } from "@electric-sql/pglite";
 import { CollectionConfig } from "@rebasepro/types";
 import { planCollectionPolicies } from "../src/schema/generate-postgres-ddl-logic";
-import { ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
+import { ensureCollectionPolicies, lockCollectionTables } from "../src/schema/ensure-collection-policies";
 import type { Queryable } from "../src/schema/ensure-collection-tables";
+import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 
 /**
  * The boot-time RLS applier and the plan behind it.
@@ -220,4 +221,108 @@ describe("ensureCollectionPolicies", () => {
             }
         }, 30_000);
     });
+});
+
+/**
+ * A boot that changes nothing takes no lock to find that out, and never closes
+ * a table that was protected all along.
+ *
+ * `ENABLE ROW LEVEL SECURITY` on a table that already has it is a no-op that
+ * still queues for an ACCESS EXCLUSIVE lock. Measured on Postgres 18 with a
+ * reader holding every table (a `pg_dump`): each ENABLE waited out the
+ * statement timeout, and the catch below it REVOKEd the user role's privileges
+ * — 12 of 12 tables unreadable afterwards, on every replica, until the next
+ * clean boot.
+ */
+describe("a table whose RLS is already on", () => {
+    /** Tables with their RLS state; the second read (after a failed ENABLE) answers `recheck`. */
+    function catalogueDb(tables: Record<string, boolean>, options: { enableError?: Error; recheck?: boolean } = {}) {
+        const ran: string[] = [];
+        const queryable: Queryable = {
+            async query<T>(text: string): Promise<{ rows: T[] }> {
+                if (/information_schema\.columns/i.test(text)) {
+                    const rows = Object.entries(tables).map(([qualified, rls]) => {
+                        const [table_schema, table_name] = qualified.split(".");
+                        return { table_schema, table_name, rls };
+                    });
+                    return { rows: rows as unknown as T[] };
+                }
+                if (/relrowsecurity/i.test(text)) return { rows: [{ rls: options.recheck === true }] as unknown as T[] };
+                if (/FROM pg_policies/i.test(text)) return { rows: [] };
+                ran.push(text);
+                if (options.enableError && /ENABLE ROW LEVEL SECURITY/.test(text)) throw options.enableError;
+                return { rows: [] };
+            }
+        };
+        return { queryable, ran };
+    }
+
+    const lockTimeout = (): Error => Object.assign(new Error("canceling statement due to lock timeout"), { code: "55P03" });
+
+    it("is not re-enabled and not revoked on a boot that changes nothing", async () => {
+        const { queryable, ran } = catalogueDb({ "public.tiers": true, "public.customers": true });
+        const result = await ensureCollectionPolicies(queryable, [tiers, customers]);
+
+        expect(ran.filter(t => /ENABLE ROW LEVEL SECURITY/.test(t))).toEqual([]);
+        expect(ran.filter(t => /^REVOKE/.test(t))).toEqual([]);
+        expect(result.tablesSecured).toBe(2);
+        expect(result.unsecured).toEqual([]);
+    });
+
+    it("is not revoked when its ENABLE times out but the catalogue says RLS is on", async () => {
+        // The first read says off (a peer is enabling it right now); the ENABLE
+        // then loses a lock wait; the catalogue, asked again, says on.
+        const { queryable, ran } = catalogueDb({ "public.customers": false }, { enableError: lockTimeout(), recheck: true });
+        const result = await ensureCollectionPolicies(queryable, [customers]);
+
+        expect(ran.filter(t => /^REVOKE/.test(t))).toEqual([]);
+        expect(result.unsecured).toEqual([]);
+        expect(result.tablesSecured).toBe(1);
+    });
+
+    it("is still revoked when its ENABLE times out and RLS really is off", async () => {
+        // The safety the skip must not weaken: RLS off over the schema-wide
+        // grant is an open table, whatever the reason the ENABLE failed.
+        const { queryable, ran } = catalogueDb({ "public.customers": false }, { enableError: lockTimeout(), recheck: false });
+        const result = await ensureCollectionPolicies(queryable, [customers]);
+
+        expect(ran.some(t => /^REVOKE ALL PRIVILEGES ON "public"\."customers" FROM /.test(t))).toBe(true);
+        expect(result.unsecured.map(u => [u.table, u.grantWithdrawn])).toEqual([["public.customers", true]]);
+    });
+
+    it("is not re-enabled by `db push`'s lock step either", async () => {
+        const { queryable, ran } = catalogueDb({ "public.tiers": true, "public.customers": false });
+        const result = await lockCollectionTables(queryable, [tiers, customers]);
+
+        expect(ran).toEqual(['ALTER TABLE "public"."customers" ENABLE ROW LEVEL SECURITY;']);
+        expect(result).toEqual({ locked: 2, unsecured: [] });
+    });
+
+    it("is left alone by a second boot against a real database", async () => {
+        const db = new PGlite();
+        try {
+            await db.exec(
+                'CREATE TABLE "public"."tiers" ("id" TEXT PRIMARY KEY, "label" TEXT);' +
+                'CREATE TABLE "public"."customers" ("id" TEXT PRIMARY KEY, "owner_id" TEXT);'
+            );
+            for (const statement of RLS_BOOTSTRAP_STATEMENTS) await db.exec(statement);
+            const ran: string[] = [];
+            const queryable: Queryable = {
+                async query<T>(text: string): Promise<{ rows: T[] }> {
+                    ran.push(text);
+                    return db.query<T>(text);
+                }
+            };
+            await ensureCollectionPolicies(queryable, [tiers, customers]);
+            expect(ran.filter(t => /ENABLE ROW LEVEL SECURITY/.test(t))).toHaveLength(2);
+
+            ran.length = 0;
+            const second = await ensureCollectionPolicies(queryable, [tiers, customers]);
+            expect(ran.filter(t => /ENABLE ROW LEVEL SECURITY|^REVOKE/.test(t))).toEqual([]);
+            expect(second.tablesSecured).toBe(2);
+            expect(second.failures).toEqual([]);
+        } finally {
+            await db.close();
+        }
+    }, 30_000);
 });
