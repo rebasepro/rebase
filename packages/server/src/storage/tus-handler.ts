@@ -10,7 +10,7 @@
 
 import { randomUUID } from "crypto";
 import { writeFile, unlink, stat, mkdir, open } from "fs/promises";
-import { existsSync } from "fs";
+import { existsSync, openAsBlob } from "fs";
 import { join } from "path";
 import type { Context } from "hono";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
@@ -658,20 +658,13 @@ export class TusHandler {
 
         try {
             // `openAsBlob` hands back a Blob backed by the file on disk rather
-            // than a copy of it in the heap. `readFile` was the whole upload in
-            // memory at once — up to the protocol's 5 GB ceiling, on a process
-            // whose container limit is a fraction of that, and the peak arrives
-            // at finalize where nothing is watching. Available since Node 19.8;
-            // the fallback keeps an older runtime working rather than failing
-            // the upload it just received.
-            let blob: Blob;
-            const fsPromises = await import("fs/promises");
-            const openAsBlob = (fsPromises as { openAsBlob?: (p: string) => Promise<Blob> }).openAsBlob;
-            if (typeof openAsBlob === "function") {
-                blob = await openAsBlob(upload.filePath);
-            } else {
-                blob = new Blob([new Uint8Array(await fsPromises.readFile(upload.filePath))]);
-            }
+            // than a copy of it in the heap, and the built-in controllers write
+            // from it a chunk (or a multipart part) at a time. `readFile` was
+            // the whole upload in memory at once — up to the protocol's 5 GB
+            // ceiling, on a process whose container limit is a fraction of
+            // that. It lives on `fs`, not `fs/promises`: looked up there it was
+            // never found, and every finalize took the `readFile` fallback.
+            const blob = await openAsBlob(upload.filePath);
             // `upload.key` and nothing else. The fallback chain that used to
             // live here (`|| metadata.filename || id`) is what let the write
             // land somewhere the hook was never asked about; the destination is

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -95,6 +95,27 @@ describe("a TUS upload that cannot be stored", () => {
         expect(res.status).toBe(204);
         expect(stored.map(s => s.key)).toEqual(["note.txt"]);
         expect(tempFiles()).toEqual([]);
+    });
+
+    it("hands the store a file backed by the upload on disk, never a copy read into memory", async () => {
+        // The lookup used to ask `fs/promises` for `openAsBlob`, which lives on
+        // `fs`: it was never found, and every finalize read the whole upload
+        // into memory through the `readFile` fallback.
+        const readFile = jest.spyOn(fs.promises, "readFile");
+        let given: File | undefined;
+        const ctrl = {
+            putObject: async ({ file, key }: { file: File; key: string }) => {
+                given = file;
+                return { key };
+            }
+        } as unknown as StorageController;
+        const { patch } = await upload(new TusHandler(scratch, ctrl), "x".repeat(4096));
+
+        expect((await patch()).status).toBe(204);
+
+        expect(readFile).not.toHaveBeenCalled();
+        expect(given!.size).toBe(4096);
+        readFile.mockRestore();
     });
 
     it("refuses the PATCH when the store rejects it, rather than reporting success", async () => {

@@ -4,6 +4,9 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { randomUUID } from "crypto";
+import { Readable } from "stream";
+import { pipeline } from "stream/promises";
 import { promisify } from "util";
 import {
     StorageController,
@@ -40,6 +43,24 @@ const access = promisify(fs.access);
  * bare key lives.
  */
 export const DEFAULT_BUCKET = "default";
+
+/** What a write in progress is named: `.<name>.<uuid>.partial`, beside its target. */
+const PARTIAL_SUFFIX = ".partial";
+const isPartialWrite = (name: string) => /^\..+\.[0-9a-f-]{36}\.partial$/.test(name);
+
+/** A file's bytes, a chunk at a time. */
+async function* blobChunks(file: Blob): AsyncGenerator<Uint8Array> {
+    const reader = file.stream().getReader();
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) return;
+            yield value;
+        }
+    } finally {
+        reader.releaseLock();
+    }
+}
 
 /**
  * Remove initial and trailing slashes from a path.
@@ -196,10 +217,18 @@ export class LocalStorageController implements StorageController {
         // Ensure parent directory exists
         await this.ensureDir(path.dirname(fullPath));
 
-        // Convert File to Buffer and write
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        await writeFile(fullPath, buffer);
+        // Streamed to disk a chunk at a time — read whole, the file was held
+        // twice in memory (the read, then a copy). Written beside the target
+        // and renamed over it, so a write that fails part-way leaves the old
+        // object (or none), never a truncated one.
+        const partial = path.join(path.dirname(fullPath), `.${path.basename(fullPath)}.${randomUUID()}${PARTIAL_SUFFIX}`);
+        try {
+            await pipeline(Readable.from(blobChunks(file)), fs.createWriteStream(partial));
+            await fs.promises.rename(partial, fullPath);
+        } catch (error: unknown) {
+            await fs.promises.rm(partial, { force: true });
+            throw error;
+        }
 
         // Always save metadata file with at least contentType (required for preview)
         const metadataPath = `${fullPath}.metadata.json`;
@@ -491,8 +520,8 @@ export class LocalStorageController implements StorageController {
                 const entry = entries[i];
                 scanned = i + 1;
 
-                // Skip metadata files
-                if (entry.name.endsWith(".metadata.json")) {
+                // Skip metadata files, and writes still in progress
+                if (entry.name.endsWith(".metadata.json") || isPartialWrite(entry.name)) {
                     continue;
                 }
 

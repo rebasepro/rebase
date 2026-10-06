@@ -107,11 +107,11 @@ export class GCSStorageController implements StorageController {
         const client = await this.getClient();
         const gcsFile = client.bucket(usedBucket).file(key);
 
-        // Convert File to Buffer
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        await gcsFile.save(buffer, {
+        // Streamed from the file a chunk at a time. Read into one buffer first,
+        // it was held whole (twice, with the copy) for the length of the
+        // upload. Handed over as a function so the client can open it again to
+        // retry, which it does not do for a stream it was given once.
+        await gcsFile.save(() => byteChunks(file), {
             contentType: file.type,
             metadata: metadata ? { metadata: this.flattenMetadata(metadata) } : undefined
         });
@@ -476,6 +476,20 @@ export class GCSStorageController implements StorageController {
 // ---------------------------------------------------------------------------
 // Error helpers
 // ---------------------------------------------------------------------------
+
+/** A file's bytes, a chunk at a time — what `File.save` pipes from. */
+async function* byteChunks(file: Blob): AsyncGenerator<Uint8Array> {
+    const reader = file.stream().getReader();
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) return;
+            yield value;
+        }
+    } finally {
+        reader.releaseLock();
+    }
+}
 
 /** What `statObject` reports, from an object's metadata. */
 function storedObjectInfo(meta: FileMetadata): StoredObjectInfo {

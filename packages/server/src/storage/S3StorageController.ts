@@ -54,6 +54,11 @@ async function loadPresigner() {
     return _presignerModule;
 }
 
+/** Files up to this size are one `PutObject`; larger ones are uploaded in parts of (at least) this size. */
+const MULTIPART_PART_SIZE = 8 * 1024 * 1024;
+/** S3's limit on the parts of one upload. */
+const MAX_MULTIPART_PARTS = 10_000;
+
 /**
  * S3-compatible storage implementation
  * Works with AWS S3 and MinIO (with forcePathStyle option)
@@ -148,29 +153,64 @@ export class S3StorageController implements StorageController {
         this.validateFile(file);
 
         const usedBucket = this.getBucket(bucket);
-
-        // Convert File to Buffer
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
         const s3 = await loadS3();
         const client = await this.getClient();
-
-        const command = new s3.PutObjectCommand({
+        const target = {
             Bucket: usedBucket,
             Key: key,
-            Body: buffer,
             ContentType: file.type,
             Metadata: metadata ? this.flattenMetadata(metadata) : undefined
-        });
+        };
 
-        await client.send(command);
+        if (file.size <= MULTIPART_PART_SIZE) {
+            // One request from one buffer, as always: a small file is no bigger
+            // than a part. `Buffer.from(arrayBuffer)` is a view, not a copy.
+            await client.send(new s3.PutObjectCommand({ ...target, Body: Buffer.from(await file.arrayBuffer()) }));
+        } else {
+            await this.putMultipart(target, file);
+        }
 
         return {
             key,
             bucket: usedBucket,
             storageUrl: `s3://${usedBucket}/${key}`
         };
+    }
+
+    /**
+     * Upload a large file in parts, one part in memory at a time.
+     *
+     * Reading the whole file into one buffer held it twice over (the
+     * `arrayBuffer()`, then the SDK's view and the multipart parser's copy
+     * before it), and `PutObject` stops at 5 GB regardless. A slice of a
+     * `File` reads only that range — from disk, for the disk-backed files TUS
+     * and backups hand over — so memory is one part whatever the file's size.
+     * A failure aborts the upload: no partial object appears at the key, and
+     * no orphaned parts are kept (and billed).
+     */
+    private async putMultipart(
+        target: { Bucket: string; Key: string; ContentType: string; Metadata?: Record<string, string> },
+        file: Blob
+    ): Promise<void> {
+        const s3 = await loadS3();
+        const client = await this.getClient();
+        // At most 10,000 parts: a part grows past 8 MiB only beyond 80 GB.
+        const partSize = Math.max(MULTIPART_PART_SIZE, Math.ceil(file.size / MAX_MULTIPART_PARTS));
+        const { UploadId } = await client.send(new s3.CreateMultipartUploadCommand(target));
+        if (!UploadId) throw new Error(`S3 did not start a multipart upload for ${target.Key}.`);
+        const { Bucket, Key } = target;
+        try {
+            const parts: { ETag?: string; PartNumber: number }[] = [];
+            for (let offset = 0, PartNumber = 1; offset < file.size; offset += partSize, PartNumber++) {
+                const Body = Buffer.from(await file.slice(offset, Math.min(offset + partSize, file.size)).arrayBuffer());
+                const { ETag } = await client.send(new s3.UploadPartCommand({ Bucket, Key, UploadId, PartNumber, Body }));
+                parts.push({ ETag, PartNumber });
+            }
+            await client.send(new s3.CompleteMultipartUploadCommand({ Bucket, Key, UploadId, MultipartUpload: { Parts: parts } }));
+        } catch (error: unknown) {
+            await client.send(new s3.AbortMultipartUploadCommand({ Bucket, Key, UploadId })).catch(() => undefined);
+            throw error;
+        }
     }
 
     /**
