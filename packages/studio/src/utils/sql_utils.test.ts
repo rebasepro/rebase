@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "@jest/globals";
-import { acceptsAutoLimit, buildExplainSql, formatSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, withAutoLimit, type ResultProvenance } from "./sql_utils";
+import { acceptsAutoLimit, buildExplainSql, formatSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type ResultProvenance } from "./sql_utils";
 import type { SqlScriptColumn, SqlScriptTable } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -371,5 +371,66 @@ describe("withAutoLimit", () => {
         expect(withAutoLimit("SELECT * FROM posts LIMIT 5", 1000)).toBeNull();
         expect(withAutoLimit("INSERT INTO archive SELECT * FROM posts", 1000)).toBeNull();
         expect(withAutoLimit("SELECT 1; DELETE FROM posts WHERE id = 1", 1000)).toBeNull();
+    });
+});
+
+/**
+ * "Export CSV" quoted a value only when it held a comma, and never doubled a
+ * quote or quoted a line break: `say "hi"` and a two-line note each broke the
+ * row they were in, and a spreadsheet read the file with columns shifted.
+ */
+describe("resultsToCsv", () => {
+    const parseCsv = (text: string): string[][] => {
+        // RFC 4180, as a spreadsheet reads it: quoted fields may hold commas,
+        // doubled quotes and line breaks.
+        const records: string[][] = [];
+        let record: string[] = [];
+        let field = "";
+        let quoted = false;
+        for (let index = 0; index < text.length; index++) {
+            const char = text[index];
+            if (quoted) {
+                if (char === "\"" && text[index + 1] === "\"") { field += "\""; index++; }
+                else if (char === "\"") quoted = false;
+                else field += char;
+            } else if (char === "\"") quoted = true;
+            else if (char === ",") { record.push(field); field = ""; }
+            else if (char === "\n") { record.push(field); records.push(record); record = []; field = ""; }
+            else if (char !== "\r") field += char;
+        }
+        record.push(field);
+        records.push(record);
+        return records;
+    };
+
+    it("reads back as the values it was given, quotes, commas and line breaks included", () => {
+        const rows = [
+            { id: "1", note: "say \"hi\"", tags: "a,b" },
+            { id: "2", note: "line one\nline two", tags: "\"" },
+            { id: "3", note: "plain", tags: "carriage\r\nreturn" }
+        ];
+
+        expect(parseCsv(resultsToCsv(rows))).toEqual([
+            ["id", "note", "tags"],
+            ["1", "say \"hi\"", "a,b"],
+            ["2", "line one\nline two", "\""],
+            ["3", "plain", "carriage\r\nreturn"]
+        ]);
+    });
+
+    it("writes SQL NULL as an empty field, not the word null", () => {
+        expect(parseCsv(resultsToCsv([{ a: null, b: "null" }]))).toEqual([["a", "b"], ["", "null"]]);
+    });
+
+    it("quotes a column name that needs it", () => {
+        expect(parseCsv(resultsToCsv([{ "a,b": "1", "say \"x\"": "2" }]))[0]).toEqual(["a,b", "say \"x\""]);
+    });
+
+    it("puts each value under its own column whatever order a row lists its keys in", () => {
+        expect(parseCsv(resultsToCsv([{ a: "1", b: "2" }, { b: "4", a: "3" }]))).toEqual([["a", "b"], ["1", "2"], ["3", "4"]]);
+    });
+
+    it("writes an object value as JSON", () => {
+        expect(parseCsv(resultsToCsv([{ plan: { Plan: { "Node Type": "Seq Scan" } } }]))[1]).toEqual(["{\"Plan\":{\"Node Type\":\"Seq Scan\"}}"]);
     });
 });

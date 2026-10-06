@@ -431,3 +431,29 @@ export function withAutoLimit(sqlText: string, limit: number): string | null {
     const before = segments.slice(0, last).map(segment => segment.text).join("");
     return `${before}${head} LIMIT ${limit};${tail.trimEnd()}`;
 }
+
+/**
+ * One CSV field (RFC 4180): quoted when it holds a comma, a quote or a line
+ * break, with each quote doubled. SQL NULL is an empty field, as `COPY … CSV`
+ * writes it; an object (a plan, a parsed `jsonb`) is its JSON.
+ */
+function csvField(value: unknown): string {
+    if (value === null || value === undefined) return "";
+    const text = typeof value === "object" ? JSON.stringify(value) : String(value);
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
+}
+
+/**
+ * The rows on screen as CSV text: a header line of column names, then one
+ * line per row, each value under its own column.
+ *
+ * A value was quoted only when it held a comma, and a quote in it was never
+ * doubled nor a line break quoted, so `say "hi"` or a two-line note broke the
+ * row it was in.
+ */
+export function resultsToCsv(rows: Record<string, unknown>[]): string {
+    if (rows.length === 0) return "";
+    const columns = Object.keys(rows[0]);
+    const lines = rows.map(row => columns.map(column => csvField(row[column])).join(","));
+    return [columns.map(csvField).join(","), ...lines].join("\n");
+}

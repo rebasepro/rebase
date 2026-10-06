@@ -47,7 +47,7 @@ import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView,
 import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeStoredJson, writeStoredString } from "@rebasepro/utils";
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
-import { buildExplainSql, formatSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, withAutoLimit, type CellEditResolution, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
+import { buildExplainSql, formatSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type CellEditResolution, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
@@ -1026,15 +1026,7 @@ truncatedFrom: null });
     const handleExportCSV = () => {
         if (!results || results.length === 0) return;
 
-        const headers = Object.keys(results[0]).join(",");
-        const rows = results.map(row =>
-            Object.values(row).map(val => {
-                const str = String(val);
-                return str.includes(",") ? `"${str}"` : str;
-            }).join(",")
-        );
-        const csv = [headers, ...rows].join("\n");
-        const blob = new Blob([csv], { type: "text/csv" });
+        const blob = new Blob([resultsToCsv(results)], { type: "text/csv" });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
