@@ -1,5 +1,6 @@
-import { WebhookDispatcher, WebhookConfig } from "../src/services/webhook-service";
+import { WebhookDispatcher, WebhookConfig, type WebhookDeliveryResult } from "../src/services/webhook-service";
 import { createHmac } from "crypto";
+import { logger } from "../src/utils/logger";
 
 // Mock global fetch
 const mockFetch = jest.fn();
@@ -609,6 +610,82 @@ url: "https://b.com/hook" })
                 await expect(dispatcher.flush(5_000)).resolves.toBe(true);
                 expect(delivered).toEqual(["wh_ok:1", "wh_dead:1"]);
             });
+
+            it("holds at most 10,000 waiting deliveries for it, and reports each one it refuses", async () => {
+                // Unbounded, the dead receiver's lane kept every change queued
+                // — each holding the row it describes — until the process ran
+                // out of memory: about 7,000 an hour at one write a second.
+                const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+                try {
+                    const delivered: string[] = [];
+                    const refused: WebhookDeliveryResult[] = [];
+                    const dispatcher = makeDispatcher({
+                        onDelivery: r => {
+                            if (r.responseBody === "queue full") refused.push(r);
+                            else delivered.push((r.payload.record as { id: string }).id);
+                        }
+                    });
+                    dispatcher.setWebhooks([makeWebhook({ id: "wh_dead", url: "https://dead.example.com/hook" })]);
+                    let release: () => void = () => undefined;
+                    const outage = new Promise<void>(resolve => {
+                        release = resolve;
+                    });
+                    mockFetch.mockImplementation(async () => {
+                        await outage;
+                        return respond(200);
+                    });
+
+                    // One in flight, 10,000 waiting, then 5 over.
+                    for (let i = 0; i < 10_006; i++) dispatcher.enqueueEntityChange("users", "INSERT", String(i), { id: String(i) });
+
+                    expect(refused).toHaveLength(5);
+                    expect(refused.map(r => (r.payload.record as { id: string }).id))
+                        .toEqual(["10001", "10002", "10003", "10004", "10005"]);
+                    expect(refused.every(r => r.webhookId === "wh_dead" && !r.success
+                        && r.statusCode === 0 && r.attemptNumber === 0)).toBe(true);
+                    // Said once for the burst, not once per refusal.
+                    expect(warn.mock.calls.filter(([m]) => String(m).includes("refusing new ones"))).toHaveLength(1);
+
+                    // Once it answers and drains, it takes deliveries again.
+                    release();
+                    await expect(dispatcher.flush(30_000)).resolves.toBe(true);
+                    expect(delivered).toHaveLength(10_001);
+                    expect(warn.mock.calls.filter(([m]) => String(m).includes("5 were refused"))).toHaveLength(1);
+                    dispatcher.enqueueEntityChange("users", "INSERT", "late", { id: "late" });
+                    await dispatcher.flush(5_000);
+                    expect(delivered.at(-1)).toBe("late");
+                    expect(refused).toHaveLength(5);
+                } finally {
+                    warn.mockRestore();
+                }
+            }, 60_000);
+
+            it("does not let a throwing onDelivery reach the caller of enqueueEntityChange", async () => {
+                jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+                const error = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+                try {
+                    const dispatcher = makeDispatcher({
+                        onDelivery: r => { if (r.responseBody === "queue full") throw new Error("bad hook"); }
+                    });
+                    dispatcher.setWebhooks([makeWebhook()]);
+                    let release: () => void = () => undefined;
+                    const outage = new Promise<void>(resolve => {
+                        release = resolve;
+                    });
+                    mockFetch.mockImplementation(async () => {
+                        await outage;
+                        return respond(200);
+                    });
+                    expect(() => {
+                        for (let i = 0; i < 10_002; i++) dispatcher.enqueueEntityChange("users", "INSERT", String(i), { id: String(i) });
+                    }).not.toThrow();
+                    expect(error).toHaveBeenCalledTimes(1);
+                    release();
+                    await dispatcher.flush(30_000);
+                } finally {
+                    jest.restoreAllMocks();
+                }
+            }, 60_000);
         });
     });
 });

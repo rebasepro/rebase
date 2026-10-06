@@ -31,6 +31,11 @@ export interface WebhookDeliveryResult {
     statusCode: number;
     responseBody: string;
     success: boolean;
+    /**
+     * The attempt this result is from, counting from 1. `0` for a delivery
+     * refused before any attempt: an in-process queue that was full, with
+     * `statusCode: 0` and `responseBody: "queue full"`.
+     */
     attemptNumber: number;
 }
 
@@ -96,10 +101,24 @@ interface QueuedDelivery {
 interface DeliveryLane {
     queue: QueuedDelivery[];
     running: Promise<void>;
+    /** Deliveries refused since the lane last had room, while it is full. */
+    refused: number;
 }
 
 /** Read at most this much of a response before cancelling the rest. */
 const MAX_RESPONSE_BYTES = 64 * 1024;
+
+/**
+ * Deliveries one webhook's in-process lane holds waiting, beside the one in
+ * flight. Past it, a new delivery is refused and reported through
+ * `onDelivery` rather than queued.
+ *
+ * Without a bound, a receiver that stayed down kept every change queued for it
+ * — each holding the row it describes — and at one write a second that is
+ * about 7,000 deliveries an hour, until the process ran out of memory. The
+ * `jobQueue` path has no such limit: its queue is rows.
+ */
+const MAX_QUEUED_DELIVERIES_PER_WEBHOOK = 10_000;
 
 export class WebhookDispatcher {
     private webhooks: WebhookConfig[] = [];
@@ -234,12 +253,47 @@ export class WebhookDispatcher {
             const id = job.webhook.id;
             const lane = this.lanes.get(id);
             if (lane) {
+                if (lane.queue.length >= MAX_QUEUED_DELIVERIES_PER_WEBHOOK) {
+                    this.refuse(lane, job);
+                    continue;
+                }
                 lane.queue.push(job);
                 continue;
             }
-            const started: DeliveryLane = { queue: [job], running: Promise.resolve() };
+            const started: DeliveryLane = { queue: [job], running: Promise.resolve(), refused: 0 };
             this.lanes.set(id, started);
             started.running = this.drainLane(id, started);
+        }
+    }
+
+    /**
+     * Turn a delivery away from a full lane, and say so: through `onDelivery`
+     * for each one — the hook a caller of {@link enqueueEntityChange} already
+     * watches for failures — and in the server log once per burst.
+     */
+    private refuse(lane: DeliveryLane, job: QueuedDelivery): void {
+        if (lane.refused === 0) {
+            logger.warn(
+                `[webhooks] Webhook "${job.webhook.id}" has ${MAX_QUEUED_DELIVERIES_PER_WEBHOOK} deliveries ` +
+                "waiting in this process; refusing new ones until it drains. Each is reported to onDelivery " +
+                "as \"queue full\". Pass a jobQueue to keep deliveries as rows instead."
+            );
+        }
+        lane.refused++;
+        try {
+            this.options.onDelivery?.({
+                webhookId: job.webhook.id,
+                event: job.event,
+                payload: job.payload,
+                statusCode: 0,
+                responseBody: "queue full",
+                success: false,
+                attemptNumber: 0
+            });
+        } catch (error) {
+            // This runs inside the caller's `enqueueEntityChange` — a
+            // collection callback, or a commit hook — which must not throw.
+            logger.error("[webhooks] onDelivery threw while reporting a refused delivery", { error });
         }
     }
 
@@ -324,6 +378,13 @@ export class WebhookDispatcher {
         try {
             while (lane.queue.length > 0) {
                 const job = lane.queue.shift() as QueuedDelivery;
+                if (lane.refused > 0) {
+                    logger.warn(
+                        `[webhooks] Webhook "${id}" is taking deliveries again; ${lane.refused} were refused ` +
+                        "while its queue was full."
+                    );
+                    lane.refused = 0;
+                }
                 try {
                     const result = await this.deliverWithRetry(job.webhook, job.event, job.payload);
                     this.options.onDelivery?.(result);

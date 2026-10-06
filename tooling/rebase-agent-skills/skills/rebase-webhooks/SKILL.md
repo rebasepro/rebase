@@ -618,7 +618,7 @@ Checks all registered webhooks for matching `table` + `event`, and dispatches to
 
 Same matching and same payload, queued instead of awaited. Returns `void` immediately. Called inside a write (from a callback), the deliveries are held until that write commits and dropped if it rolls back; then they run on an in-process drain loop — one per webhook, so a receiver that is down delays only its own deliveries — so a collection callback does not hold its transaction open on HTTP and a receiver's outage cannot roll a write back. Results are reported through the `onDelivery` option.
 
-By default the queue is **in memory**: a crash or a deploy between the commit and the delivery drops the event.
+By default the queue is **in memory**: a crash or a deploy between the commit and the delivery drops the event. Each webhook's in-memory queue holds at most **10,000** deliveries waiting; past that a new delivery is refused and reported to `onDelivery` as `success: false`, `statusCode: 0`, `attemptNumber: 0`, `responseBody: "queue full"`. **Prefer the job queue below for anything that matters** — it is the recipe's primary example.
 
 #### Durable delivery
 
@@ -716,7 +716,7 @@ afterSave: async ({ id, values, collection }) => {
 | **`onEntityChange` is async** | The entire retry sequence is awaited: up to 10s per attempt plus 1s and 5s of backoff, so **~36s** worst case for the slowest matching webhook — not the ~6s the backoffs alone suggest. Inside a collection callback that is transaction time; use `enqueueEntityChange`. |
 | **`enqueueEntityChange` returns `void`** | Deliveries run after the caller returns. Nothing awaits them but `flush()`, and results arrive only through `onDelivery`. |
 | **Process exits with deliveries queued** | They are lost. `await dispatcher.flush(10_000)` on shutdown. |
-| **One receiver is down** | Each webhook has its own in-process queue: its deliveries wait out their retries, every other webhook's go out as usual. Order is kept per webhook. |
+| **One receiver is down** | Each webhook has its own in-process queue: its deliveries wait out their retries, every other webhook's go out as usual. Order is kept per webhook. Past 10,000 waiting, new ones are refused as `"queue full"` through `onDelivery`; with `jobQueue` they are rows instead, with no such bound. |
 
 ## References
 
