@@ -58,7 +58,7 @@ import { applyAuthContext } from "./security/rls-enforcement";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
-import { onOwnSession, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
+import { onOwnSession, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
 
 /**
  * Has an operator opted out of database role switching entirely?
@@ -2430,19 +2430,21 @@ export class PostgresBackendDriver implements DataDriver {
         database?: string,
         role?: string,
         params?: unknown[],
-        isolateSession?: boolean
+        isolateSession?: boolean,
+        maxResultBytes?: number
     }): Promise<Record<string, unknown>[]> {
         if (options?.isolateSession) {
             return this.onIsolatedSession(
                 await this.getTargetDb(options.database),
                 options.role,
-                (db, role) => this.executeSqlOn(db, sqlText, { ...options, role })
+                (db, role) => this.executeSqlOn(db, sqlText, { ...options, role }),
+                options.maxResultBytes
             );
         }
-        if (!options?.database && !options?.role) {
-            return this.dataService.executeSql(sqlText, options?.params);
-        }
-        return this.executeSqlOn(await this.getTargetDb(options?.database), sqlText, options);
+        const rows = !options?.database && !options?.role
+            ? await this.dataService.executeSql(sqlText, options?.params)
+            : await this.executeSqlOn(await this.getTargetDb(options?.database), sqlText, options);
+        return options?.maxResultBytes === undefined ? rows : refuseOversizedRows(rows, options.maxResultBytes);
     }
 
     /**
@@ -2520,16 +2522,24 @@ export class PostgresBackendDriver implements DataDriver {
      * `onOwnSession`. `fn` is then handed no role: there is nothing left to
      * switch. A handle that is already one session (PGlite in process, a
      * single client) is reset in place, and `fn` switches the role itself.
+     *
+     * With `maxResultBytes`, a result past it is refused — see
+     * `readWithinBudget`: on a pool the read stops there, in process the rows
+     * are measured once read.
      */
-    private async onIsolatedSession<T>(
+    private async onIsolatedSession(
         targetDb: DrizzleClient,
         role: string | undefined,
-        fn: (db: DrizzleClient, role: string | undefined) => Promise<T>
-    ): Promise<T> {
+        fn: (db: DrizzleClient, role: string | undefined) => Promise<Record<string, unknown>[]>,
+        maxResultBytes?: number
+    ): Promise<Record<string, unknown>[]> {
         const pool = "$client" in targetDb ? targetDb.$client : undefined;
         if (!(pool instanceof Pool)) {
             try {
-                return await fn(targetDb, role);
+                // One session in process: the rows are read whole before
+                // anything could stop them, and refused afterwards all the same.
+                const rows = await fn(targetDb, role);
+                return maxResultBytes === undefined ? rows : refuseOversizedRows(rows, maxResultBytes);
             } finally {
                 for (const statement of RESET_SESSION_STATEMENTS) {
                     await targetDb.execute(drizzleSql.raw(statement)).catch((error: unknown) =>
@@ -2540,7 +2550,9 @@ export class PostgresBackendDriver implements DataDriver {
         return onOwnSession(
             pool,
             { assumeRole: role ? (connection) => this.assumeSessionRole(connection, role) : undefined },
-            (connection) => fn(drizzle(connection), undefined)
+            (connection) => maxResultBytes === undefined
+                ? fn(drizzle(connection), undefined)
+                : readWithinBudget(connection, maxResultBytes, () => fn(drizzle(connection), undefined))
         );
     }
 

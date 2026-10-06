@@ -1,4 +1,4 @@
-import type { Connection, Pool, PoolClient, Submittable } from "pg";
+import { Client, type Connection, type Pool, type PoolClient, type Submittable } from "pg";
 import type { SqlScriptColumn, SqlScriptNotice, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 
@@ -511,4 +511,135 @@ function valueAsText(value: unknown): string | null {
     if (value instanceof Uint8Array) return `\\x${Buffer.from(value).toString("hex")}`;
     if (typeof value === "object") return JSON.stringify(value);
     return String(value);
+}
+
+/**
+ * How many bytes of rows one answer of the admin `executeSql` door — the
+ * WebSocket `EXECUTE_SQL` without `mode: "script"` — may carry: 128 MiB.
+ *
+ * That door had no limit at all. A million-row `SELECT` held every row parsed
+ * (432 MB of heap on the console's door before it was capped), then built the
+ * frame from them, and a server with 1 GiB died of it — with every other
+ * user's connection. Unlike the console's script door it does not keep a
+ * prefix: a program reading rows through it would take a prefix for the whole
+ * answer, so past the budget the answer is refused, {@link SqlResultTooLargeError}.
+ *
+ * Generous on purpose. The catalogue reads the admin UI makes through this door
+ * are far below it — the SQL console's schema browser reads one
+ * `information_schema.columns` row per column, 7 MB for the 100,000 columns of
+ * 5,000 tables — and anything near it is a result no browser tab should hold.
+ */
+export const SQL_RESULT_BYTE_BUDGET = 128 * 1024 * 1024;
+
+/**
+ * A result larger than the bytes its caller allowed, refused rather than
+ * returned in part. Its message is for the person who wrote the SQL.
+ */
+export class SqlResultTooLargeError extends Error {
+    readonly code = "RESULT_TOO_LARGE";
+
+    constructor(readonly limitBytes: number) {
+        super(
+            `This result is larger than ${describeBytes(limitBytes)} of rows, so none of it was sent. ` +
+            "Add a LIMIT, or select fewer columns, to read it in parts."
+        );
+        this.name = "SqlResultTooLargeError";
+    }
+}
+
+function describeBytes(bytes: number): string {
+    const mib = bytes / (1024 * 1024);
+    return mib >= 1 ? `${Number.isInteger(mib) ? mib : mib.toFixed(1)} MB` : `${bytes} bytes`;
+}
+
+/**
+ * The bytes a row takes as the database sends it: each value's text and four
+ * bytes of length. For rows that come back parsed, where there is no message
+ * to measure — PGlite, a client that is not node-postgres's own.
+ */
+function rowBytes(row: Record<string, unknown>): number {
+    let bytes = 6;
+    for (const value of Object.values(row)) bytes += 4 + textBytes(value);
+    return bytes;
+}
+
+function textBytes(value: unknown): number {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === "string") return value.length;
+    if (value instanceof Date) return 24;
+    if (value instanceof Uint8Array) return 2 + value.byteLength * 2;
+    if (typeof value === "object") return JSON.stringify(value).length;
+    return String(value).length;
+}
+
+/**
+ * Refuse rows that came back whole and are past `maxBytes`.
+ *
+ * Where nothing could watch the read, it is measured once done — and the
+ * answer still refused rather than sent.
+ */
+export function refuseOversizedRows<T extends Record<string, unknown>>(rows: T[], maxBytes: number): T[] {
+    let bytes = 0;
+    for (const row of rows) {
+        bytes += rowBytes(row);
+        if (bytes > maxBytes) throw new SqlResultTooLargeError(maxBytes);
+    }
+    return rows;
+}
+
+/** A `DataRow` message's length, as node-postgres's parser hands it over. */
+function messageLength(message: unknown): number {
+    return typeof message === "object" && message !== null && "length" in message && typeof message.length === "number"
+        ? message.length
+        : 0;
+}
+
+/**
+ * Run `work` — one query on `connection` — and stop reading once its rows pass
+ * `maxBytes`.
+ *
+ * node-postgres keeps every row of a query until the query completes, and a
+ * simple query cannot be stopped short of its end, so the only way to stop
+ * holding rows is to stop receiving them: the socket is closed. Postgres sees
+ * its client gone and abandons the statement; the session — and anything it
+ * held — goes with it, and `onOwnSession` destroys the connection rather than
+ * return it to the pool. What the caller gets is {@link SqlResultTooLargeError},
+ * never the rows read so far.
+ *
+ * Counted from the wire, message by message, as they arrive: what is held when
+ * it stops is the budget plus one network read.
+ */
+export async function readWithinBudget<T extends Record<string, unknown>>(
+    connection: PoolClient,
+    maxBytes: number,
+    work: () => Promise<T[]>
+): Promise<T[]> {
+    if (!(connection instanceof Client)) return refuseOversizedRows(await work(), maxBytes);
+    const wire = connection.connection;
+    let received = 0;
+    let exceeded = false;
+    const count = (message: unknown) => {
+        if (exceeded) return;
+        received += messageLength(message);
+        if (received <= maxBytes) return;
+        exceeded = true;
+        wire.stream.destroy();
+    };
+    // A checked-out client has no pool listener, and node-postgres emits the
+    // closed socket as an `error` on the client: unheard, that ends the process.
+    const ignore = () => undefined;
+    connection.on("error", ignore);
+    wire.on("dataRow", count);
+    try {
+        const rows = await work();
+        if (exceeded) throw new SqlResultTooLargeError(maxBytes);
+        return rows;
+    } catch (error: unknown) {
+        if (exceeded) throw new SqlResultTooLargeError(maxBytes);
+        throw error;
+    } finally {
+        wire.removeListener("dataRow", count);
+        // A closed connection may still say so; it is discarded, not reused.
+        if (!exceeded) connection.removeListener("error", ignore);
+    }
 }

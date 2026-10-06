@@ -54,6 +54,7 @@ import { resolveRequireAuth } from "../../server/src/auth/require-auth";
 import { createPostgresWebSocket, ADMIN_PLANE_TYPES, PUBLIC_TYPES } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { SQL_RESULT_BYTE_BUDGET, SqlResultTooLargeError } from "../src/services/sql-script";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -293,7 +294,7 @@ describe("WebSocket Server authorization", () => {
             // On a session of its own, reset before the pool reuses it: a
             // `SET ROLE` typed into the editor must not outlive the statement.
             expect(mockDriver.admin.executeSql).toHaveBeenCalledWith(
-                "SELECT * FROM users", { role: "postgres", isolateSession: true });
+                "SELECT * FROM users", { role: "postgres", isolateSession: true, maxResultBytes: SQL_RESULT_BYTE_BUDGET });
         });
 
         it("re-reads what the socket holds open as the identity it signs in as again", async () => {
@@ -328,7 +329,7 @@ describe("WebSocket Server authorization", () => {
                 payload: { sql: "SET ROLE rebase_user", options: { isolateSession: false } }
             });
 
-            expect(mockDriver.admin.executeSql).toHaveBeenCalledWith("SET ROLE rebase_user", { isolateSession: true });
+            expect(mockDriver.admin.executeSql).toHaveBeenCalledWith("SET ROLE rebase_user", { isolateSession: true, maxResultBytes: SQL_RESULT_BYTE_BUDGET });
         });
     });
 
@@ -514,7 +515,7 @@ describe("WebSocket Server SQL error handling", () => {
         );
 
         // Verify executeSql was called
-        expect(mockDriver.admin.executeSql).toHaveBeenCalledWith("SELECT * FROM orders", { role: "demo", isolateSession: true });
+        expect(mockDriver.admin.executeSql).toHaveBeenCalledWith("SELECT * FROM orders", { role: "demo", isolateSession: true, maxResultBytes: SQL_RESULT_BYTE_BUDGET });
 
         // Verify the client received a clean ERROR payload rather than crashing the socket
         expect(mockWs.send).toHaveBeenCalled();
@@ -1047,6 +1048,45 @@ describe("WebSocket Server SQL console scripts", () => {
 
         const answer = JSON.parse(mockWs.send.mock.calls[mockWs.send.mock.calls.length - 1][0]);
         expect(answer.payload).toEqual({ result: [{ id: 1 }] });
+    });
+
+    /**
+     * A frame without `mode: "script"` is `admin.executeSql`, which had no
+     * limit: a million-row SELECT held every row and built one frame of them.
+     * The door now gives every such run a byte budget and refuses a result past
+     * it — never a part of one, which a program would take for the whole.
+     */
+    describe("the byte budget of a plain statement", () => {
+        it("is set by the door, after the frame's options, so a frame cannot lift it", async () => {
+            const { send } = await signedIn();
+
+            await send({
+                type: "EXECUTE_SQL",
+                requestId: "req-budget",
+                payload: { sql: "SELECT * FROM events", options: { database: "app", maxResultBytes: 1e15 } }
+            });
+
+            const admin = mockDriver.admin as unknown as { executeSql: jest.Mock };
+            expect(admin.executeSql).toHaveBeenCalledWith("SELECT * FROM events", {
+                database: "app",
+                isolateSession: true,
+                maxResultBytes: SQL_RESULT_BYTE_BUDGET
+            });
+        });
+
+        it("answers a result past it with RESULT_TOO_LARGE, naming the limit and LIMIT", async () => {
+            const admin = mockDriver.admin as unknown as { executeSql: jest.Mock };
+            admin.executeSql.mockImplementationOnce(async () => { throw new SqlResultTooLargeError(SQL_RESULT_BYTE_BUDGET); });
+            const { mockWs, send } = await signedIn();
+
+            await send({ type: "EXECUTE_SQL", requestId: "req-too-large", payload: { sql: "TABLE events" } });
+
+            const answer = JSON.parse(mockWs.send.mock.calls[mockWs.send.mock.calls.length - 1][0]);
+            expect(answer.type).toBe("ERROR");
+            expect(answer.requestId).toBe("req-too-large");
+            expect(answer.payload.error.code).toBe("RESULT_TOO_LARGE");
+            expect(answer.payload.error.message).toMatch(/128 MB.*LIMIT/);
+        });
     });
 });
 

@@ -1,5 +1,6 @@
 import type { SubscriptionAuthContext } from "./services/realtimeService";
 import { BranchingUnsupportedError } from "./services/BranchService";
+import { SQL_RESULT_BYTE_BUDGET, SqlResultTooLargeError } from "./services/sql-script";
 import { PostgresBackendDriver, effectiveSqlRole, sqlRoleRanAs } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
@@ -1317,9 +1318,13 @@ colors: true }));
                             // A session of its own, reset before it goes back
                             // to the pool: what a person types may `SET ROLE`,
                             // and that must not reach the next request on
-                            // that connection. Set here, after the client's
-                            // options, so a frame cannot turn it off.
-                            const result = script ? script.rows : await admin.executeSql(sql, { ...options, isolateSession: true });
+                            // that connection. And a result past the byte
+                            // budget refused, never sent in part. Both set
+                            // here, after the client's options, so a frame
+                            // cannot turn them off.
+                            const result = script
+                                ? script.rows
+                                : await admin.executeSql(sql, { ...options, isolateSession: true, maxResultBytes: SQL_RESULT_BYTE_BUDGET });
                             // Which role the rows were read as, said beside them:
                             // the role picked, unless the server runs every
                             // statement as the connection owner.
@@ -1382,6 +1387,17 @@ colors: true }));
                             };
                             ws.send(JSON.stringify(response));
                         } catch (sqlError: unknown) {
+                            // A refusal, not a failure of the SQL: its own code,
+                            // and a message that names the limit and the way
+                            // round it.
+                            if (sqlError instanceof SqlResultTooLargeError) {
+                                ws.send(JSON.stringify({
+                                    type: "ERROR",
+                                    requestId,
+                                    payload: { error: { message: sqlError.message, code: "RESULT_TOO_LARGE" } }
+                                }));
+                                break;
+                            }
                             // This is a query execution error (e.g., syntax error, permission denied).
                             // We return it cleanly to the client without logging a server stack trace.
                             const errMsg = extractErrorMessage(sqlError);

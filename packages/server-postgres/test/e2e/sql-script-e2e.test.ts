@@ -22,6 +22,7 @@ import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
+import { SqlResultTooLargeError } from "../../src/services/sql-script.js";
 
 let container: PgContainer;
 let pool: pg.Pool;
@@ -271,5 +272,49 @@ describe("executeSql on a session of its own", () => {
             .rejects.toMatchObject({ cause: expect.objectContaining({ message: expect.stringMatching(/permission denied/) }) });
         await expect(driver.executeSql("BEGIN; SELECT 1/0", { isolateSession: true }))
             .rejects.toMatchObject({ cause: expect.objectContaining({ message: expect.stringMatching(/division by zero[\s\S]*rolled back/) }) });
+    });
+});
+
+/**
+ * The admin `executeSql` door's byte budget — what the socket sets for a frame
+ * that is not a script. It refuses a result past the budget, and on a pool it
+ * stops reading there: the rows read so far are the budget, not the result.
+ */
+describe("executeSql with a byte budget", () => {
+    /** Data rows node-postgres received on this pool's connections, from now on. */
+    function countReceivedRows(): () => number {
+        let received = 0;
+        const counted = new WeakSet<pg.PoolClient>();
+        pool.on("acquire", (client) => {
+            if (counted.has(client) || !(client instanceof pg.Client)) return;
+            counted.add(client);
+            client.connection.on("dataRow", () => { received++; });
+        });
+        return () => received;
+    }
+
+    it("stops reading a result past it, refuses it, and the pool goes on", async () => {
+        const received = countReceivedRows();
+        // 200,000 rows of about 220 bytes on the wire: 44 MB, against a 4 MiB budget.
+        const run = driver.executeSql("SELECT g, repeat('x', 200) AS pad FROM generate_series(1, 200000) g", {
+            isolateSession: true,
+            maxResultBytes: 4 * 1024 * 1024
+        });
+
+        await expect(run).rejects.toBeInstanceOf(SqlResultTooLargeError);
+        await expect(run).rejects.toMatchObject({ code: "RESULT_TOO_LARGE" });
+        // About 19,000 rows fill the budget; the rest were never read.
+        expect(received()).toBeGreaterThan(15_000);
+        expect(received()).toBeLessThan(40_000);
+
+        expect(await driver.executeSql("SELECT balance FROM accounts WHERE id = 1", { isolateSession: true })).toEqual([{ balance: 100 }]);
+        expect(pool.totalCount).toBeLessThanOrEqual(3);
+    });
+
+    it("returns a result under it whole, values parsed as before", async () => {
+        const rows = await driver.executeSql("SELECT g FROM generate_series(1, 5000) g", { isolateSession: true, maxResultBytes: 4 * 1024 * 1024 });
+
+        expect(rows).toHaveLength(5000);
+        expect(rows[4999]).toEqual({ g: 5000 });
     });
 });

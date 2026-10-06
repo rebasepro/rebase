@@ -619,8 +619,14 @@ export interface SQLAdmin {
      * before it is reused. For SQL a person wrote (the Studio editor), which
      * may `SET ROLE` and must not leave that on a pooled connection the
      * server's own queries use next.
+     *
+     * `maxResultBytes` refuses a result whose rows take more than that many
+     * bytes, with an error whose `code` is `RESULT_TOO_LARGE`, rather than
+     * return it — never a part of it. On a session of its own the read stops
+     * there; elsewhere the rows are measured once read. The WebSocket
+     * `EXECUTE_SQL` door sets it for every caller.
      */
-    executeSql(sql: string, options?: { database?: string; role?: string; params?: unknown[]; isolateSession?: boolean }): Promise<Record<string, unknown>[]>;
+    executeSql(sql: string, options?: { database?: string; role?: string; params?: unknown[]; isolateSession?: boolean; maxResultBytes?: number }): Promise<Record<string, unknown>[]>;
 
     /**
      * Run a script a person wrote — the Studio SQL console — and describe what
