@@ -13,6 +13,39 @@ import {
 } from "./schema-version";
 
 
+/** A string literal for a catalogue lookup. The names come from config, never from a request. */
+const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`;
+
+/**
+ * Every index name in these schemas, as `schema.name`.
+ *
+ * `CREATE INDEX IF NOT EXISTS` is not free when the index exists: Postgres
+ * takes the table's SHARE lock — which blocks writers, and queues behind any
+ * open write transaction — before it looks the name up. So the names are read
+ * once and only a missing index is created. Read before anything is created:
+ * this function never drops an index, so present then means present now.
+ */
+async function readIndexNames(db: NodePgDatabase, schemas: string[]): Promise<Set<string>> {
+    const names = new Set<string>();
+    const list = [...new Set(schemas)];
+    if (list.length === 0) return names;
+    const result = await db.execute(sql.raw(
+        "SELECT n.nspname AS schema, c.relname AS name FROM pg_class c " +
+        "JOIN pg_namespace n ON n.oid = c.relnamespace " +
+        `WHERE c.relkind IN ('i', 'I') AND n.nspname IN (${list.map(literal).join(", ")})`
+    ));
+    for (const row of result.rows as { schema: string; name: string }[]) names.add(`${row.schema}.${row.name}`);
+    return names;
+}
+
+/**
+ * A column default as `information_schema` reports it, reduced to what decides
+ * equality: `(gen_random_uuid())::text` and `gen_random_uuid()::text` are the
+ * same default, written two ways.
+ */
+const sameDefault = (actual: string | null, expected: string): boolean =>
+    actual !== null && actual.toLowerCase().replace(/[\s()]/g, "") === expected.toLowerCase().replace(/[\s()]/g, "");
+
 /**
  * Auto-create auth tables if they don't exist.
  *
@@ -103,6 +136,12 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         await db.execute(sql`CREATE SCHEMA IF NOT EXISTS rebase`);
 
         const authSchema = usersSchema === "public" ? "rebase" : usersSchema;
+        const indexNames = await readIndexNames(db, [usersSchema, authSchema]);
+        /** Create an index only when it is missing — see {@link readIndexNames}. */
+        const ensureIndex = async (schema: string, name: string, statement: ReturnType<typeof sql>): Promise<void> => {
+            if (indexNames.has(`${schema}.${name}`)) return;
+            await db.execute(statement);
+        };
         const userIdentitiesTable = `"${authSchema}"."user_identities"`;
         const refreshTokensTableName = `"${authSchema}"."refresh_tokens"`;
         const passwordResetTokensTableName = `"${authSchema}"."password_reset_tokens"`;
@@ -280,8 +319,8 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         `);
 
         // Create indexes on user_identities
-        await db.execute(sql`
-            CREATE INDEX IF NOT EXISTS idx_user_identities_user 
+        await ensureIndex(authSchema, "idx_user_identities_user", sql`
+            CREATE INDEX IF NOT EXISTS idx_user_identities_user
             ON ${sql.raw(userIdentitiesTable)}(uid)
         `);
 
@@ -307,14 +346,14 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         `);
 
         // Create index on token_hash for faster lookups
-        await db.execute(sql`
-            CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash 
+        await ensureIndex(authSchema, "idx_refresh_tokens_hash", sql`
+            CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash
             ON ${sql.raw(refreshTokensTableName)}(token_hash)
         `);
 
         // Create index on uid for cleanup operations
-        await db.execute(sql`
-            CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user 
+        await ensureIndex(authSchema, "idx_refresh_tokens_user", sql`
+            CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user
             ON ${sql.raw(refreshTokensTableName)}(uid)
         `);
 
@@ -331,14 +370,14 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         `);
 
         // Create index on token_hash for password reset lookups
-        await db.execute(sql`
-            CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash 
+        await ensureIndex(authSchema, "idx_password_reset_tokens_hash", sql`
+            CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash
             ON ${sql.raw(passwordResetTokensTableName)}(token_hash)
         `);
 
         // Create index on uid for password reset cleanup
-        await db.execute(sql`
-            CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user 
+        await ensureIndex(authSchema, "idx_password_reset_tokens_user", sql`
+            CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user
             ON ${sql.raw(passwordResetTokensTableName)}(uid)
         `);
 
@@ -356,14 +395,14 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         `);
 
         // Create index on token_hash for magic link lookups
-        await db.execute(sql`
-            CREATE INDEX IF NOT EXISTS idx_magic_link_tokens_hash 
+        await ensureIndex(authSchema, "idx_magic_link_tokens_hash", sql`
+            CREATE INDEX IF NOT EXISTS idx_magic_link_tokens_hash
             ON ${sql.raw(magicLinkTokensTableName)}(token_hash)
         `);
 
         // Create index on uid for magic link cleanup
-        await db.execute(sql`
-            CREATE INDEX IF NOT EXISTS idx_magic_link_tokens_user 
+        await ensureIndex(authSchema, "idx_magic_link_tokens_user", sql`
+            CREATE INDEX IF NOT EXISTS idx_magic_link_tokens_user
             ON ${sql.raw(magicLinkTokensTableName)}(uid)
         `);
 
@@ -406,31 +445,40 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // `email` is skipped: it has existed since the first era, so it is never
         // the missing one, and `ADD COLUMN … NOT NULL` with no default fails on
         // a table with rows.
-        for (const spec of AUTH_USERS_COLUMNS) {
-            if (spec.column === "email") continue;
-            await db.execute(sql`
-                ALTER TABLE ${sql.raw(usersTableName)}
-                ADD COLUMN IF NOT EXISTS ${sql.raw(`${spec.column} ${authUsersColumnSql(spec)}`)}
-            `);
-        }
-
-        // Which of the columns below the table actually has. An adopted table —
-        // one this framework did not create, which the column-name resolution in
-        // `services.ts` exists to support — may be missing any of them, and every
-        // statement past this point has to tolerate that rather than abort the
-        // whole migration block.
-        const usersColumns = await db.execute(sql`
-            SELECT column_name, data_type, is_nullable, column_default
-            FROM information_schema.columns
-            WHERE table_schema = ${usersSchema} AND table_name = ${resolvedTable}
-        `);
+        //
+        // Only the columns the table is missing are added. `ADD COLUMN IF NOT
+        // EXISTS` on a column that exists changes nothing and still queues for
+        // the table's ACCESS EXCLUSIVE lock — on the table every sign-in reads —
+        // and it ran for every column on every boot.
         type UsersColumnRow = {
             column_name: string;
             data_type: string;
             is_nullable: "YES" | "NO";
             column_default: string | null;
         };
-        const usersColumnRows = usersColumns.rows as UsersColumnRow[];
+        // Which of the columns the table actually has. An adopted table — one
+        // this framework did not create, which the column-name resolution in
+        // `services.ts` exists to support — may be missing any of them, and every
+        // statement past this point has to tolerate that rather than abort the
+        // whole migration block.
+        const readUsersColumns = async (): Promise<UsersColumnRow[]> => (await db.execute(sql`
+            SELECT column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns
+            WHERE table_schema = ${usersSchema} AND table_name = ${resolvedTable}
+        `)).rows as UsersColumnRow[];
+        let usersColumnRows = await readUsersColumns();
+        const usersColumnsBefore = new Set(usersColumnRows.map(row => row.column_name));
+        let usersColumnsAdded = false;
+        for (const spec of AUTH_USERS_COLUMNS) {
+            if (spec.column === "email") continue;
+            if (usersColumnsBefore.has(spec.column)) continue;
+            await db.execute(sql`
+                ALTER TABLE ${sql.raw(usersTableName)}
+                ADD COLUMN IF NOT EXISTS ${sql.raw(`${spec.column} ${authUsersColumnSql(spec)}`)}
+            `);
+            usersColumnsAdded = true;
+        }
+        if (usersColumnsAdded) usersColumnRows = await readUsersColumns();
         const usersColumnTypes = new Map(usersColumnRows.map(row => [row.column_name, row.data_type]));
         const usersColumnState = new Map(usersColumnRows.map(row => [row.column_name, row]));
 
@@ -518,12 +566,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // write paths already lower-cased), which is exactly the additive case
         // the version stamp is documented not to cover.
         if (usersColumnTypes.has("email")) {
-            const indexPresent = await db.execute(sql`
-                SELECT 1 FROM pg_class c
-                JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE n.nspname = ${usersSchema} AND c.relname = ${emailLowerUniqueIndex} AND c.relkind = 'i'
-            `);
-            if (indexPresent.rows.length === 0) {
+            if (!indexNames.has(`${usersSchema}.${emailLowerUniqueIndex}`)) {
                 // Case-collisions already in the table would make the unique
                 // index impossible to build. Report them and leave the table
                 // alone: the next boot retries, so fixing the rows is all the
@@ -595,7 +638,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // the whole users table. Partial, because the column is NULL for every
         // user who is not mid-verification, which is nearly all of them.
         if (usersColumnTypes.has("email_verification_token")) {
-            await db.execute(sql`
+            await ensureIndex(usersSchema, verificationTokenIndex, sql`
                 CREATE INDEX IF NOT EXISTS ${sql.raw(`"${verificationTokenIndex}"`)}
                 ON ${sql.raw(usersTableName)} (email_verification_token)
                 WHERE email_verification_token IS NOT NULL
@@ -603,7 +646,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         }
         // The same for the address-change link, which is looked up the same way.
         if (usersColumnTypes.has("email_change_token")) {
-            await db.execute(sql`
+            await ensureIndex(usersSchema, emailChangeTokenIndex, sql`
                 CREATE INDEX IF NOT EXISTS ${sql.raw(`"${emailChangeTokenIndex}"`)}
                 ON ${sql.raw(usersTableName)} (email_change_token)
                 WHERE email_change_token IS NOT NULL
@@ -638,60 +681,102 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             `);
             const found = (rtTables.rows as { table_schema: string; table_name: string }[]);
             logger.debug(`🔍 refresh_tokens reconcile: found ${found.length} table(s): ${found.map(r => `"${r.table_schema}"."${r.table_name}"`).join(", ") || "(none)"}`);
+            // What each of those tables already has, read once, so a table that
+            // is already session-scoped gets no statement at all. Each step
+            // below used to run on every boot: six `ADD COLUMN IF NOT EXISTS`,
+            // two `SET DEFAULT`, two `SET NOT NULL` and a `DROP CONSTRAINT IF
+            // EXISTS` — eleven waits for the ACCESS EXCLUSIVE lock on the table
+            // every token refresh writes — and two `UPDATE … WHERE … IS NULL`
+            // back-fills that scan the whole table, since nothing indexes them.
+            const rtSchemas = found.map(r => r.table_schema);
+            const rtColumnRows = rtSchemas.length === 0 ? [] : (await db.execute(sql.raw(
+                "SELECT table_schema, column_name, is_nullable, column_default FROM information_schema.columns " +
+                `WHERE table_name = 'refresh_tokens' AND table_schema IN (${rtSchemas.map(literal).join(", ")})`
+            ))).rows as { table_schema: string; column_name: string; is_nullable: "YES" | "NO"; column_default: string | null }[];
+            const rtDeviceConstraint = new Set(rtSchemas.length === 0 ? [] : ((await db.execute(sql.raw(
+                "SELECT n.nspname AS schema FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid " +
+                "JOIN pg_namespace n ON n.oid = t.relnamespace " +
+                "WHERE t.relname = 'refresh_tokens' AND c.conname = 'unique_device_session' " +
+                `AND n.nspname IN (${rtSchemas.map(literal).join(", ")})`
+            ))).rows as { schema: string }[]).map(row => row.schema));
+            const rtIndexNames = await readIndexNames(db, rtSchemas);
             for (const { table_schema } of found) {
                 const qualified = `"${table_schema}"."refresh_tokens"`;
+                const columns = new Map(rtColumnRows.filter(row => row.table_schema === table_schema).map(row => [row.column_name, row]));
+                /** Missing, or present and nullable: a column the back-fill and SET NOT NULL still have to reach. */
+                const nullable = (column: string) => columns.get(column)?.is_nullable !== "NO";
+                const addColumn = async (column: string, statement: ReturnType<typeof sql>) => {
+                    if (!columns.has(column)) await db.execute(statement);
+                };
                 try {
                     // Added nullable, then back-filled, then constrained: adding
                     // `session_id NOT NULL DEFAULT gen_random_uuid()` in one step
                     // would stamp every existing row with the SAME uuid on some
                     // Postgres versions, silently merging every live session into
                     // one that a single logout would then wipe.
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS session_id TEXT`);
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS revoked BOOLEAN DEFAULT FALSE NOT NULL`);
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS rotated_at TIMESTAMP WITH TIME ZONE`);
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS session_started_at TIMESTAMP WITH TIME ZONE`);
+                    await addColumn("session_id", sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS session_id TEXT`);
+                    await addColumn("revoked", sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS revoked BOOLEAN DEFAULT FALSE NOT NULL`);
+                    await addColumn("rotated_at", sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS rotated_at TIMESTAMP WITH TIME ZONE`);
+                    await addColumn("session_started_at", sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS session_started_at TIMESTAMP WITH TIME ZONE`);
                     // Nullable with no default and no back-fill: a row written
                     // before this column existed says nothing about whether a
                     // second factor was presented, and the reader treats "says
                     // nothing" as `aal1` — the restrictive answer. Stamping
                     // every existing row would be inventing evidence.
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS aal TEXT`);
+                    await addColumn("aal", sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS aal TEXT`);
                     // How the sign-in happened, carried across rotations like
                     // `aal`. Nullable and not back-filled for the same reason:
                     // an older row reads as a password sign-in, which is what
                     // every refresh answered before the column existed.
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS method TEXT`);
+                    await addColumn("method", sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS method TEXT`);
 
                     // One session per pre-existing row: under the old model a row
                     // WAS a device session, and there is no record of which rows
-                    // descended from the same sign-in.
-                    await db.execute(sql`
-                        UPDATE ${sql.raw(qualified)}
-                        SET session_id = gen_random_uuid()::text
-                        WHERE session_id IS NULL
-                    `);
-                    await db.execute(sql`
-                        UPDATE ${sql.raw(qualified)}
-                        SET session_started_at = COALESCE(created_at, NOW())
-                        WHERE session_started_at IS NULL
-                    `);
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ALTER COLUMN session_id SET DEFAULT gen_random_uuid()::text`);
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ALTER COLUMN session_started_at SET DEFAULT NOW()`);
+                    // descended from the same sign-in. A NOT NULL column holds no
+                    // NULL to back-fill.
+                    if (nullable("session_id")) {
+                        await db.execute(sql`
+                            UPDATE ${sql.raw(qualified)}
+                            SET session_id = gen_random_uuid()::text
+                            WHERE session_id IS NULL
+                        `);
+                    }
+                    if (nullable("session_started_at")) {
+                        await db.execute(sql`
+                            UPDATE ${sql.raw(qualified)}
+                            SET session_started_at = COALESCE(created_at, NOW())
+                            WHERE session_started_at IS NULL
+                        `);
+                    }
+                    if (!sameDefault(columns.get("session_id")?.column_default ?? null, "gen_random_uuid()::text")) {
+                        await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ALTER COLUMN session_id SET DEFAULT gen_random_uuid()::text`);
+                    }
+                    if (!sameDefault(columns.get("session_started_at")?.column_default ?? null, "now()")) {
+                        await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ALTER COLUMN session_started_at SET DEFAULT NOW()`);
+                    }
                     // SET NOT NULL only once the back-fill above has definitely
                     // run; on a table that somehow still holds a NULL this throws
                     // and is caught below rather than failing the boot.
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ALTER COLUMN session_id SET NOT NULL`);
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ALTER COLUMN session_started_at SET NOT NULL`);
+                    if (nullable("session_id")) {
+                        await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ALTER COLUMN session_id SET NOT NULL`);
+                    }
+                    if (nullable("session_started_at")) {
+                        await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ALTER COLUMN session_started_at SET NOT NULL`);
+                    }
 
-                    await db.execute(sql`
-                        CREATE INDEX IF NOT EXISTS idx_refresh_tokens_session
-                        ON ${sql.raw(qualified)}(session_id)
-                    `);
+                    if (!rtIndexNames.has(`${table_schema}.idx_refresh_tokens_session`)) {
+                        await db.execute(sql`
+                            CREATE INDEX IF NOT EXISTS idx_refresh_tokens_session
+                            ON ${sql.raw(qualified)}(session_id)
+                        `);
+                    }
 
                     // The device-session constraint is now actively harmful: two
                     // live tokens of one session (a rotation in flight) share a
                     // uid, and usually a user agent and IP too.
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} DROP CONSTRAINT IF EXISTS unique_device_session`);
+                    if (rtDeviceConstraint.has(table_schema)) {
+                        await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} DROP CONSTRAINT IF EXISTS unique_device_session`);
+                    }
                     logger.debug(`✅ refresh_tokens reconciled for session-scoped rotation: ${qualified}`);
                 } catch (perTableError: unknown) {
                     logger.warn(`⚠️  refresh_tokens reconcile failed for ${qualified}: ${perTableError instanceof Error ? perTableError.message : String(perTableError)}`);
@@ -757,7 +842,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         `);
 
         // Create indexes on mfa_factors
-        await db.execute(sql`
+        await ensureIndex(authSchema, "idx_mfa_factors_user", sql`
             CREATE INDEX IF NOT EXISTS idx_mfa_factors_user
             ON ${sql.raw(mfaFactorsTableName)}(uid)
         `);
@@ -776,7 +861,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         `);
 
         // Create indexes on mfa_challenges
-        await db.execute(sql`
+        await ensureIndex(authSchema, "idx_mfa_challenges_factor", sql`
             CREATE INDEX IF NOT EXISTS idx_mfa_challenges_factor
             ON ${sql.raw(mfaChallengesTableName)}(factor_id)
         `);
@@ -788,9 +873,22 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // bounds how many guesses one challenge will take before it is dead.
         // Without them the code paths degrade to "no replay protection, rate
         // limiters only" rather than failing, which is why this is a warn.
+        // Read first, like the columns above: each was an ACCESS EXCLUSIVE wait
+        // on every boot.
         try {
-            await db.execute(sql`ALTER TABLE ${sql.raw(mfaFactorsTableName)} ADD COLUMN IF NOT EXISTS last_used_counter BIGINT`);
-            await db.execute(sql`ALTER TABLE ${sql.raw(mfaChallengesTableName)} ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0`);
+            const mfaColumns = new Set(((await db.execute(sql`
+                SELECT table_name || '.' || column_name AS key
+                FROM information_schema.columns
+                WHERE table_schema = ${authSchema}
+                  AND table_name IN ('mfa_factors', 'mfa_challenges')
+                  AND column_name IN ('last_used_counter', 'attempts')
+            `)).rows as { key: string }[]).map(row => row.key));
+            if (!mfaColumns.has("mfa_factors.last_used_counter")) {
+                await db.execute(sql`ALTER TABLE ${sql.raw(mfaFactorsTableName)} ADD COLUMN IF NOT EXISTS last_used_counter BIGINT`);
+            }
+            if (!mfaColumns.has("mfa_challenges.attempts")) {
+                await db.execute(sql`ALTER TABLE ${sql.raw(mfaChallengesTableName)} ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0`);
+            }
         } catch (mfaMigrationError: unknown) {
             logger.warn(`⚠️  MFA hardening columns skipped: ${mfaMigrationError instanceof Error ? mfaMigrationError.message : String(mfaMigrationError)}`);
         }
@@ -807,7 +905,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         `);
 
         // Create indexes on recovery_codes
-        await db.execute(sql`
+        await ensureIndex(authSchema, "idx_recovery_codes_user", sql`
             CREATE INDEX IF NOT EXISTS idx_recovery_codes_user
             ON ${sql.raw(recoveryCodesTableName)}(uid)
         `);
@@ -837,16 +935,16 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                 [authSchema, "recovery_codes"],
                 [authSchema, "schema_meta"]
             ];
+            // One catalogue read for all of them, not one per table.
+            const forced = new Set(((await db.execute(sql.raw(
+                "SELECT n.nspname AS schema, c.relname AS name FROM pg_class c " +
+                "JOIN pg_namespace n ON n.oid = c.relnamespace " +
+                "WHERE c.relforcerowsecurity AND (n.nspname, c.relname) IN (" +
+                authTablePairs.map(([schemaName, tableName]) => `(${literal(schemaName)}, ${literal(tableName)})`).join(", ") +
+                ")"
+            ))).rows as { schema: string; name: string }[]).map(row => `${row.schema}.${row.name}`));
             for (const [schemaName, tableName] of authTablePairs) {
-                const forced = await db.execute(sql`
-                    SELECT 1
-                    FROM pg_class c
-                    JOIN pg_namespace n ON n.oid = c.relnamespace
-                    WHERE n.nspname = ${schemaName}
-                      AND c.relname = ${tableName}
-                      AND c.relforcerowsecurity
-                `);
-                if (forced.rows.length > 0) {
+                if (forced.has(`${schemaName}.${tableName}`)) {
                     await db.execute(sql`
                         ALTER TABLE ${sql.raw(`"${schemaName}"."${tableName}"`)}
                         NO FORCE ROW LEVEL SECURITY
