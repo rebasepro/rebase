@@ -907,6 +907,8 @@ export const hi: RebaseTranslations = {
     studio_sql_cannot_edit_other_connection: "ये पंक्तियाँ किसी अन्य डेटाबेस से या किसी अन्य भूमिका के रूप में पढ़ी गई थीं। इन्हें संपादित करने के लिए क्वेरी फिर से चलाएँ।",
     studio_sql_update_failed: "अपडेट विफल: {{message}}",
     studio_sql_update_no_row: "कोई पंक्ति अपडेट नहीं हुई: पढ़े जाने के बाद पंक्ति बदल दी गई या हटा दी गई, या चुनी गई भूमिका इसे अपडेट नहीं कर सकती। जो संग्रहीत है उसे देखने के लिए क्वेरी फिर से चलाएँ।",
+    studio_sql_ran_as_other_role: "ये पंक्तियाँ {{role}} के रूप में नहीं, {{ranAs}} के रूप में पढ़ी गईं: इस सर्वर पर भूमिका बदलना बंद है (DISABLE_DB_ROLE_SWITCHING), इसलिए हर स्टेटमेंट कनेक्शन के स्वामी के रूप में चलता है।",
+    studio_sql_role_switching_disabled: "इस सर्वर पर भूमिका बदलना बंद है: यहाँ कोई भी भूमिका चुनी जाए, हर स्टेटमेंट {{role}} के रूप में चलता है।",
     studio_sql_execution_not_supported: "वर्तमान डेटा स्रोत SQL निष्पादन का समर्थन नहीं करता।",
     studio_sql_error_executing: "क्वेरी चलाते समय एक त्रुटि हुई।",
     studio_sql_error_explaining: "क्वेरी का विश्लेषण करते समय एक त्रुटि हुई।",

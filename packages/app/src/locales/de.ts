@@ -907,6 +907,8 @@ export const de: RebaseTranslations = {
     studio_sql_cannot_edit_other_connection: "Diese Zeilen wurden aus einer anderen Datenbank oder mit einer anderen Rolle gelesen. Führen Sie die Abfrage erneut aus, um sie zu bearbeiten.",
     studio_sql_update_failed: "Aktualisierung fehlgeschlagen: {{message}}",
     studio_sql_update_no_row: "Es wurde keine Zeile aktualisiert: Die Zeile wurde seit dem Lesen geändert oder gelöscht, oder die gewählte Rolle darf sie nicht aktualisieren. Führen Sie die Abfrage erneut aus, um den gespeicherten Wert zu sehen.",
+    studio_sql_ran_as_other_role: "Diese Zeilen wurden als {{ranAs}} gelesen, nicht als {{role}}: Auf diesem Server ist der Rollenwechsel ausgeschaltet (DISABLE_DB_ROLE_SWITCHING), daher läuft jede Anweisung als Eigentümer der Verbindung.",
+    studio_sql_role_switching_disabled: "Der Rollenwechsel ist auf diesem Server ausgeschaltet: Jede Anweisung läuft als {{role}}, egal welche Rolle hier gewählt ist.",
     studio_sql_execution_not_supported: "Die aktuelle Datenquelle unterstützt keine SQL-Ausführung.",
     studio_sql_error_executing: "Beim Ausführen der Abfrage ist ein Fehler aufgetreten.",
     studio_sql_error_explaining: "Beim Erklären der Abfrage ist ein Fehler aufgetreten.",

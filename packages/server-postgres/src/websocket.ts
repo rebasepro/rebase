@@ -1,6 +1,6 @@
 import type { SubscriptionAuthContext } from "./services/realtimeService";
 import { BranchingUnsupportedError } from "./services/BranchService";
-import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
+import { PostgresBackendDriver, effectiveSqlRole, sqlRoleRanAs } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
 import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketOptions, WebSocketMessage } from "@rebasepro/types";
@@ -1320,6 +1320,12 @@ colors: true }));
                             // that connection. Set here, after the client's
                             // options, so a frame cannot turn it off.
                             const result = script ? script.rows : await admin.executeSql(sql, { ...options, isolateSession: true });
+                            // Which role the rows were read as, said beside them:
+                            // the role picked, unless the server runs every
+                            // statement as the connection owner.
+                            const ranAs = typeof options?.role === "string" && options.role
+                                ? await sqlRoleRanAs(admin, options.role, typeof options?.database === "string" ? options.database : undefined)
+                                : undefined;
                             if (process.env.NODE_ENV !== "production") {
                                 wsDebug(`⚡ [WebSocket Server] SQL executed. Returned ${Array.isArray(result) ? result.length : "non-array"} rows.`);
                             }
@@ -1368,7 +1374,10 @@ colors: true }));
                                 type: "EXECUTE_SQL_SUCCESS",
                                 // The rows once, as `result`; the rest of the
                                 // script's description beside them.
-                                payload: script ? { ...scriptDescription(script), result } : { result },
+                                payload: {
+                                    ...(script ? { ...scriptDescription(script), result } : { result }),
+                                    ...(ranAs ? { effectiveRole: ranAs } : {})
+                                },
                                 requestId
                             };
                             ws.send(JSON.stringify(response));

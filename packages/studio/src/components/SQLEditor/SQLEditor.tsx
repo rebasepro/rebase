@@ -264,6 +264,12 @@ export const SQLEditor = () => {
      */
     const [appDatabase, setAppDatabase] = useState<string | undefined>(undefined);
     const [availableRoles, setAvailableRoles] = useState<string[]>([]);
+    /**
+     * Who every statement runs as, once a run has shown that the server does
+     * not switch roles (`DISABLE_DB_ROLE_SWITCHING`): the role picker then
+     * changes nothing, and says so.
+     */
+    const [connectionOwner, setConnectionOwner] = useState<string | null>(null);
     const [isLoadingConfig, setIsLoadingConfig] = useState(true);
     const [connectionConfigError, setConnectionConfigError] = useState<string | null>(null);
 
@@ -284,6 +290,12 @@ export const SQLEditor = () => {
          * were read there, and an edit of one is written there or not at all.
          */
         lastExecutedConnection: SQLConnection | null,
+        /**
+         * The role the server says the rows on screen were read as — the
+         * role picked, unless the server runs every statement as the
+         * connection owner. `null` when it did not say.
+         */
+        ranAs: string | null,
         /**
          * What the database said about the rows on screen: each column's
          * name, and the table column it was read from. An edit is written
@@ -316,6 +328,7 @@ export const SQLEditor = () => {
             execTime: null,
             lastExecutedSql: null,
             lastExecutedConnection: null,
+            ranAs: null,
             lastProvenance: null,
             notices: []
         }));
@@ -332,6 +345,7 @@ export const SQLEditor = () => {
             execTime: null,
             lastExecutedSql: null,
             lastExecutedConnection: null,
+            ranAs: null,
             lastProvenance: null,
             notices: []
         }];
@@ -809,6 +823,7 @@ role: connection.role });
             execTime: null,
             lastExecutedSql: null,
             lastExecutedConnection: null,
+            ranAs: null,
             lastProvenance: null,
             notices: []
         }]);
@@ -869,6 +884,7 @@ error: null,
 results: null,
 lastExecutedSql: null,
 lastExecutedConnection: null,
+ranAs: null,
 lastProvenance: null,
 notices: [] });
         const start = performance.now();
@@ -912,11 +928,17 @@ notices: [] });
                     execTime: Math.round(performance.now() - start),
                     lastExecutedSql: sqlToRun,
                     lastExecutedConnection: connection,
+                    ranAs: run?.effectiveRole ?? null,
                     lastProvenance: run
                         ? { columns: run.columns, tables: run.tables }
                         : { columns: Object.keys(rows[0] ?? {}).map(name => ({ name })), tables: [] },
                     notices: run?.notices ?? []
                 });
+                // A server that ran the script as someone other than the role
+                // picked runs every statement that way: the picker is moot.
+                if (run?.effectiveRole && connection.role) {
+                    setConnectionOwner(run.effectiveRole !== connection.role ? run.effectiveRole : null);
+                }
 
                 if (history[history.length - 1] !== activeTab.sql) {
                     saveHistory([...history, activeTab.sql]);
@@ -1490,7 +1512,7 @@ isFavorite: !s.isFavorite } : s));
                                             <span className="max-w-[160px] truncate">
                                                 {isLoadingConfig
                                                     ? "..."
-                                                    : `${selectedDatabase || t("studio_sql_select_db")}${selectedRole ? ` (${selectedRole})` : ""}`}
+                                                    : `${selectedDatabase || t("studio_sql_select_db")}${(connectionOwner ?? selectedRole) ? ` (${connectionOwner ?? selectedRole})` : ""}`}
                                             </span>
                                         </Button>
                                     }
@@ -1518,8 +1540,13 @@ isFavorite: !s.isFavorite } : s));
                                                 <div className="px-3 py-1.5 border-y border-hairline mb-1 mt-1">
                                                     <Typography variant="caption" className="font-semibold uppercase tracking-wider text-[9px] text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_role")}</Typography>
                                                 </div>
+                                                {connectionOwner && (
+                                                    <div className="px-3 py-1.5 text-xs text-text-secondary dark:text-text-secondary-dark max-w-[240px] break-words">
+                                                        {t("studio_sql_role_switching_disabled", { role: connectionOwner })}
+                                                    </div>
+                                                )}
                                                 {availableRoles.map(role => (
-                                                    <MenuItem key={role} dense onClick={() => handleRoleChange(role)} className={cls("text-xs", selectedRole === role && "text-primary dark:text-primary-dark")}>
+                                                    <MenuItem key={role} dense disabled={connectionOwner !== null} onClick={() => handleRoleChange(role)} className={cls("text-xs", selectedRole === role && "text-primary dark:text-primary-dark")}>
                                                         {role}{role === "postgres" ? " " + t("studio_sql_collections_label") : ""}
                                                     </MenuItem>
                                                 ))}
@@ -1561,6 +1588,13 @@ isFavorite: !s.isFavorite } : s));
                                     <div className={cls("p-2 px-4 bg-surface-raised border-b shrink-0 flex items-center", defaultBorderMixin)}>
                                         <Typography variant="caption" className="font-semibold text-text-disabled dark:text-text-disabled-dark uppercase tracking-widest text-[10px]">{t("studio_sql_query_results")}</Typography>
                                     </div>
+                                    {!loading && results && activeTab.ranAs && activeTab.lastExecutedConnection?.role && activeTab.ranAs !== activeTab.lastExecutedConnection.role && (
+                                        <div className="px-4 pt-2 shrink-0">
+                                            <Alert color="warning" size="small">
+                                                {t("studio_sql_ran_as_other_role", { ranAs: activeTab.ranAs, role: activeTab.lastExecutedConnection.role })}
+                                            </Alert>
+                                        </div>
+                                    )}
                                     {!loading && activeTab.notices.length > 0 && (
                                         <div className="px-4 pt-2 flex flex-col gap-1 shrink-0">
                                             {activeTab.notices.map((notice, index) => (

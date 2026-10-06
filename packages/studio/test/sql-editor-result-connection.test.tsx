@@ -30,8 +30,15 @@ const executeSql = jest.fn(async (sql: string, _options?: ExecuteOptions): Promi
     if (sql.includes("current_user")) return [{ role: "postgres" }];
     return [];
 });
-const runSqlScript = jest.fn(async (sql: string, _options?: ExecuteOptions): Promise<SqlScriptResult> =>
-    sql.startsWith(ORDERS) ? orders : { rows: [], columns: [], tables: [], notices: [] });
+/**
+ * The role the server says each script ran as: the one asked for, or — with
+ * role switching turned off on the server — this connection owner.
+ */
+let connectionOwner: string | undefined;
+const runSqlScript = jest.fn(async (sql: string, options?: ExecuteOptions): Promise<SqlScriptResult> => ({
+    ...(sql.startsWith(ORDERS) ? orders : { rows: [], columns: [], tables: [], notices: [] }),
+    ...(options?.role ? { effectiveRole: connectionOwner ?? options.role } : {})
+}));
 const databaseAdmin: Record<string, unknown> = {
     executeSql,
     runSqlScript,
@@ -118,6 +125,7 @@ async function runOn(database: string, query: string): Promise<void> {
 const OPEN_ORDER_7 = "Open Orders #7";
 
 beforeEach(() => {
+    connectionOwner = undefined;
     executeSql.mockClear();
     runSqlScript.mockClear();
     sidePanelOpen.mockClear();
@@ -146,5 +154,32 @@ describe("opening a result row as a record", () => {
 
         expect(screen.queryByRole("button", { name: OPEN_ORDER_7 })).toBeNull();
         expect(screen.queryByText(label("studio_sql_collections_label"))).toBeNull();
+    });
+});
+
+/**
+ * With `DISABLE_DB_ROLE_SWITCHING` on the server, every statement runs as the
+ * connection owner. The console still offered every role and labelled the
+ * owner's rows with the one picked, so a table `rebase_user` cannot read
+ * looked readable to it.
+ */
+describe("the role the rows were read as", () => {
+    jest.setTimeout(20000);
+
+    it("says so when the server ran the query as someone other than the role picked", async () => {
+        connectionOwner = "app_owner";
+        await runOn("app_prod", ORDERS);
+
+        expect(screen.getByText(translation.t("studio_sql_ran_as_other_role", { ranAs: "app_owner", role: "postgres" }))).toBeTruthy();
+        expect(screen.getByText(translation.t("studio_sql_role_switching_disabled", { role: "app_owner" }))).toBeTruthy();
+        expect((screen.getByRole("menuitem", { name: /^reader/ }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("adds nothing when the rows were read as the role picked", async () => {
+        await runOn("app_prod", ORDERS);
+
+        expect(screen.queryByText(translation.t("studio_sql_ran_as_other_role", { ranAs: "postgres", role: "postgres" }))).toBeNull();
+        expect(screen.queryByText(/role switching/i)).toBeNull();
+        expect((screen.getByRole("menuitem", { name: /^reader/ }) as HTMLButtonElement).disabled).toBe(false);
     });
 });

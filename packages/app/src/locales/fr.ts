@@ -907,6 +907,8 @@ export const fr: RebaseTranslations = {
     studio_sql_cannot_edit_other_connection: "Ces lignes ont été lues dans une autre base de données ou avec un autre rôle. Exécutez à nouveau la requête pour les modifier.",
     studio_sql_update_failed: "Échec de la mise à jour : {{message}}",
     studio_sql_update_no_row: "Aucune ligne n'a été mise à jour : la ligne a été modifiée ou supprimée depuis sa lecture, ou le rôle sélectionné ne peut pas la modifier. Exécutez à nouveau la requête pour voir ce qui est enregistré.",
+    studio_sql_ran_as_other_role: "Ces lignes ont été lues en tant que {{ranAs}}, et non {{role}} : le changement de rôle est désactivé sur ce serveur (DISABLE_DB_ROLE_SWITCHING), donc chaque instruction s'exécute en tant que propriétaire de la connexion.",
+    studio_sql_role_switching_disabled: "Le changement de rôle est désactivé sur ce serveur : chaque instruction s'exécute en tant que {{role}}, quel que soit le rôle choisi ici.",
     studio_sql_execution_not_supported: "La source de données actuelle ne prend pas en charge l'exécution de SQL.",
     studio_sql_error_executing: "Une erreur s'est produite lors de l'exécution de la requête.",
     studio_sql_error_explaining: "Une erreur s'est produite lors de l'analyse de la requête.",

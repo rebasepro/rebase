@@ -912,6 +912,8 @@ export const pt: RebaseTranslations = {
     studio_sql_cannot_edit_other_connection: "Estas linhas foram lidas de outra base de dados ou com outra função. Execute a consulta novamente para editá-las.",
     studio_sql_update_failed: "Falha ao atualizar: {{message}}",
     studio_sql_update_no_row: "Nenhuma linha foi atualizada: a linha foi alterada ou eliminada desde que foi lida, ou a função selecionada não a pode atualizar. Execute a consulta novamente para ver o que está guardado.",
+    studio_sql_ran_as_other_role: "Estas linhas foram lidas como {{ranAs}}, não como {{role}}: a troca de função está desativada neste servidor (DISABLE_DB_ROLE_SWITCHING), por isso cada instrução é executada como o proprietário da ligação.",
+    studio_sql_role_switching_disabled: "A troca de função está desativada neste servidor: cada instrução é executada como {{role}}, seja qual for a função escolhida aqui.",
     studio_sql_execution_not_supported: "A fonte de dados atual não suporta a execução de SQL.",
     studio_sql_error_executing: "Ocorreu um erro ao executar a consulta.",
     studio_sql_error_explaining: "Ocorreu um erro ao explicar a consulta.",

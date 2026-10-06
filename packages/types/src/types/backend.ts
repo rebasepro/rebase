@@ -584,6 +584,13 @@ export interface SqlScriptResult {
     rowCount?: number;
     /** What the database said while the script ran, in order. */
     notices: SqlScriptNotice[];
+    /**
+     * The database role the script ran as, when it asked for one — said by
+     * the transport that ran it. The role asked for, unless the server has
+     * role switching turned off (`DISABLE_DB_ROLE_SWITCHING`) and runs every
+     * statement as the connection owner, who is named here instead.
+     */
+    effectiveRole?: string;
 }
 
 /**

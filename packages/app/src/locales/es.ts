@@ -915,6 +915,8 @@ export const es: RebaseTranslations = {
     studio_sql_cannot_edit_other_connection: "Estas filas se leyeron de otra base de datos o con otro rol. Vuelve a ejecutar la consulta para editarlas.",
     studio_sql_update_failed: "Error al actualizar: {{message}}",
     studio_sql_update_no_row: "No se actualizó ninguna fila: la fila cambió o se eliminó desde que se leyó, o el rol seleccionado no puede actualizarla. Vuelve a ejecutar la consulta para ver lo que está guardado.",
+    studio_sql_ran_as_other_role: "Estas filas se leyeron como {{ranAs}}, no como {{role}}: el cambio de rol está desactivado en este servidor (DISABLE_DB_ROLE_SWITCHING), así que cada sentencia se ejecuta como el propietario de la conexión.",
+    studio_sql_role_switching_disabled: "El cambio de rol está desactivado en este servidor: cada sentencia se ejecuta como {{role}}, sea cual sea el rol elegido aquí.",
     studio_sql_execution_not_supported: "La fuente de datos actual no admite la ejecución de SQL.",
     studio_sql_error_executing: "Se produjo un error al ejecutar la consulta.",
     studio_sql_error_explaining: "Se produjo un error al explicar la consulta.",

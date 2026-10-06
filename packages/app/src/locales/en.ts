@@ -915,6 +915,8 @@ export const en: RebaseTranslations = {
     studio_sql_cannot_edit_other_connection: "These rows were read from another database or as another role. Run the query again to edit them.",
     studio_sql_update_failed: "Failed to update: {{message}}",
     studio_sql_update_no_row: "No row was updated: the row has changed or been deleted since it was read, or the selected role may not update it. Run the query again to see what is stored.",
+    studio_sql_ran_as_other_role: "These rows were read as {{ranAs}}, not as {{role}}: role switching is turned off on this server (DISABLE_DB_ROLE_SWITCHING), so every statement runs as the connection owner.",
+    studio_sql_role_switching_disabled: "Role switching is turned off on this server: every statement runs as {{role}}, whichever role is picked here.",
     studio_sql_execution_not_supported: "SQL execution is not supported by the current data source.",
     studio_sql_error_executing: "An error occurred while executing the query.",
     studio_sql_error_explaining: "An error occurred while explaining the query.",

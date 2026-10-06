@@ -19,6 +19,7 @@ export function readSqlScriptResult(payload: unknown): SqlScriptResult {
     const result: SqlScriptResult = { rows, columns, tables, notices };
     if (typeof record?.command === "string") result.command = record.command;
     if (typeof record?.rowCount === "number") result.rowCount = record.rowCount;
+    if (typeof record?.effectiveRole === "string") result.effectiveRole = record.effectiveRole;
     return result;
 }
 

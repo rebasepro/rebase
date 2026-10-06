@@ -7,6 +7,7 @@ import { DrizzleClient } from "./interfaces";
 import {
     ANONYMOUS_USER_ID,
     DatabaseAdmin,
+    SQLAdmin,
     DataDriver,
     DeleteProps,
     CollectionConfig,
@@ -91,6 +92,31 @@ export function effectiveSqlRole(requestedRole?: string): string {
 
 /** How {@link effectiveSqlRole} names "whatever role the connection holds". */
 export const CONNECTION_OWNER = "<connection owner>";
+
+/**
+ * The role a console statement ran as, given the role it asked for — said to
+ * the console with its rows, so it can say when that is not the role picked.
+ *
+ * The requested role whenever role switching is on: a statement that cannot
+ * assume its role is refused, never run as anyone else. With
+ * `DISABLE_DB_ROLE_SWITCHING`, every statement runs as the connection owner,
+ * named by asking a session of its own on the same database — a role the
+ * session already held is then still the one requested.
+ */
+export async function sqlRoleRanAs(
+    admin: Pick<SQLAdmin, "executeSql">,
+    requestedRole: string,
+    database: string | undefined
+): Promise<string> {
+    if (!isRoleSwitchingOptedOut()) return requestedRole;
+    try {
+        const rows = await admin.executeSql("SELECT current_user AS role", { database, isolateSession: true });
+        const owner = rows[0]?.role;
+        return typeof owner === "string" ? owner : CONNECTION_OWNER;
+    } catch {
+        return CONNECTION_OWNER;
+    }
+}
 
 /**
  * A statement named a database role the connection cannot assume.

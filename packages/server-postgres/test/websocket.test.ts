@@ -989,8 +989,54 @@ describe("WebSocket Server SQL console scripts", () => {
                 columns: script.columns,
                 tables: script.tables,
                 command: "SELECT",
-                rowCount: 1
+                rowCount: 1,
+                effectiveRole: "reader"
             }
+        });
+    });
+
+    /**
+     * With `DISABLE_DB_ROLE_SWITCHING` every statement runs as the connection
+     * owner, whatever role the console asked for. The answer said nothing of
+     * it, so the console labelled owner rows with the role picked — a table
+     * the role cannot read looked readable.
+     */
+    describe("with role switching turned off", () => {
+        const previous = process.env.DISABLE_DB_ROLE_SWITCHING;
+        beforeEach(() => {
+            process.env.DISABLE_DB_ROLE_SWITCHING = "true";
+            const admin = mockDriver.admin as unknown as { executeSql: jest.Mock };
+            admin.executeSql.mockImplementation(async (sql: unknown) =>
+                String(sql).includes("current_user") ? [{ role: "app_owner" }] : [{ id: 1 }]);
+        });
+        afterEach(() => {
+            if (previous === undefined) delete process.env.DISABLE_DB_ROLE_SWITCHING;
+            else process.env.DISABLE_DB_ROLE_SWITCHING = previous;
+        });
+
+        it("names the connection owner as the role a script ran as", async () => {
+            const { mockWs, send } = await signedIn();
+
+            await send({
+                type: "EXECUTE_SQL",
+                requestId: "req-owner",
+                payload: { sql: "SELECT * FROM notes", options: { database: "app", role: "rebase_user" }, mode: "script" }
+            });
+
+            const admin = mockDriver.admin as unknown as { executeSql: jest.Mock };
+            expect(admin.executeSql).toHaveBeenCalledWith("SELECT current_user AS role", { database: "app", isolateSession: true });
+            const answer = JSON.parse(mockWs.send.mock.calls[mockWs.send.mock.calls.length - 1][0]);
+            expect(answer.type).toBe("EXECUTE_SQL_SUCCESS");
+            expect(answer.payload.effectiveRole).toBe("app_owner");
+        });
+
+        it("names it for a plain statement too", async () => {
+            const { mockWs, send } = await signedIn();
+
+            await send({ type: "EXECUTE_SQL", requestId: "req-owner-plain", payload: { sql: "SELECT 1", options: { role: "rebase_user" } } });
+
+            const answer = JSON.parse(mockWs.send.mock.calls[mockWs.send.mock.calls.length - 1][0]);
+            expect(answer.payload).toEqual({ result: [{ id: 1 }], effectiveRole: "app_owner" });
         });
     });
 

@@ -132,6 +132,12 @@ describe("readSqlScriptResult", () => {
         expect(result.notices).toEqual([]);
     });
 
+    it("reads the role the server says the script ran as", () => {
+        expect(readSqlScriptResult({ result: [], effectiveRole: "app_owner" }).effectiveRole).toBe("app_owner");
+        expect(readSqlScriptResult({ result: [] }).effectiveRole).toBeUndefined();
+        expect(readSqlScriptResult({ result: [], effectiveRole: 7 }).effectiveRole).toBeUndefined();
+    });
+
     it("drops a source it cannot read, and reads an unknown inheritance as the unsafe answer", () => {
         const result = readSqlScriptResult({
             result: [],
