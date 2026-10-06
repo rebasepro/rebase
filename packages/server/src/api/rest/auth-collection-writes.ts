@@ -85,13 +85,51 @@ export async function prepareUserCreations(
     collection: CollectionConfig,
     bodies: readonly Record<string, unknown>[]
 ): Promise<UserCreationPrepareResult[]> {
+    const auth = collectionAuthConfig(collection);
+    const prepare = (body: Record<string, unknown>) => adapter.prepareUserCreation(body, auth);
+    // Several at a time when the adapter says each preparation touches only
+    // its own result: the built-in one hashes a password (scrypt, ~30 ms, on
+    // libuv's thread pool), and a 1,000-row bulk did that one after another
+    // for about half a minute. As many as the pool runs at once, and no more,
+    // so the hashing does not queue every file and DNS call behind it.
+    if (adapter.describeUserCreationContract?.(auth)?.independent && bodies.length > 1) {
+        return mapInOrder(bodies, threadPoolWidth(), prepare);
+    }
     const prepared: UserCreationPrepareResult[] = [];
-    // One at a time: a create hook may send an email or write elsewhere, and
-    // its side effects should happen in the order the rows were given.
+    // Otherwise one at a time: a create hook may send an email or write
+    // elsewhere, and its side effects should happen in the order the rows
+    // were given.
     for (const body of bodies) {
-        prepared.push(await adapter.prepareUserCreation(body, collectionAuthConfig(collection)));
+        prepared.push(await prepare(body));
     }
     return prepared;
+}
+
+/** libuv's thread pool size: how many hashes can actually run at once. */
+function threadPoolWidth(): number {
+    const configured = Number(process.env.UV_THREADPOOL_SIZE);
+    return Number.isInteger(configured) && configured > 0 ? configured : 4;
+}
+
+/** `items` through `fn`, at most `limit` at a time, answered in the order given. */
+async function mapInOrder<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let next = 0;
+    // One failure fails the batch; the other workers stop taking rows.
+    let failed = false;
+    const worker = async () => {
+        while (!failed && next < items.length) {
+            const index = next++;
+            try {
+                results[index] = await fn(items[index]);
+            } catch (error) {
+                failed = true;
+                throw error;
+            }
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+    return results;
 }
 
 /**

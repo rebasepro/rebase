@@ -421,7 +421,9 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             // not declare: `password`, which it hashes into `passwordHash` and
             // deletes. Everything else it spreads through untouched, so
             // everything else has to be a real column.
-            return { validate: true, extraFields: ["password"] };
+            // No hook runs, so creations may be prepared at once — unless the
+            // hash is the application's, which may not be reentrant.
+            return { validate: true, extraFields: ["password"], independent: !authHooks?.hashPassword };
         },
 
         async finalizeUserCreation(entity, clearPassword) {
