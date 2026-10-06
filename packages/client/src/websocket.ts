@@ -117,6 +117,11 @@ export interface RebaseWebSocketConfig {
     WebSocket?: typeof WebSocket;
     /** Callback to handle unauthorized requests or token expiration (refreshes auth session) */
     onUnauthorized?: () => Promise<boolean>;
+    /**
+     * Sign in as this user rather than as the token's own — the socket half of
+     * `RebaseClientConfig.impersonate`. Sent with every `AUTHENTICATE`.
+     */
+    impersonate?: string;
 }
 
 
@@ -446,11 +451,13 @@ export class RebaseWebSocketClient {
     private WebSocketConstructor: typeof WebSocket | undefined;
     public onUnauthorized?: () => Promise<boolean>;
     private refreshInProgress: Promise<boolean> | null = null;
+    private readonly impersonate?: string;
 
     constructor(config: RebaseWebSocketConfig) {
         this.websocketUrl = config.websocketUrl;
         this.getAuthToken = config.getAuthToken;
         this.onUnauthorized = config.onUnauthorized;
+        this.impersonate = config.impersonate;
         this.WebSocketConstructor = config.WebSocket || (typeof WebSocket !== "undefined" ? WebSocket : undefined);
 
         // Deliberately does NOT dial here. Constructing the client is not a
@@ -585,7 +592,7 @@ export class RebaseWebSocketClient {
             const message = {
                 type: "AUTHENTICATE",
                 requestId,
-                payload: { token }
+                payload: this.impersonate !== undefined ? { token, impersonate: this.impersonate } : { token }
             };
 
             if (!this.isConnected || !this.ws) {

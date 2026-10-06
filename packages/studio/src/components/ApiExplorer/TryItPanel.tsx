@@ -12,23 +12,11 @@ import {
     Typography,
     XIcon
 } from "@rebasepro/ui";
-import { useRebaseClient, useRebaseContext, SelectableUser } from "@rebasepro/app";
+import type { SelectableUser } from "@rebasepro/app";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
+import { useRunAsUsers } from "../useRunAsUsers";
 import type { ParsedEndpoint } from "./types";
-import { hasAdminRole, IMPERSONATE_HEADER, type AdminUser, type RebaseClient, type User } from "@rebasepro/types";
-
-/** How many users one search of the "Run as" picker lists. */
-const USER_PAGE_SIZE = 50;
-
-function toSelectableUser(user: AdminUser): SelectableUser {
-    return {
-        uid: user.uid,
-        displayName: user.displayName,
-        email: user.email,
-        photoURL: user.photoURL,
-        roles: user.roles
-    };
-}
+import { IMPERSONATE_HEADER, type User } from "@rebasepro/types";
 
 interface TryItPanelProps {
     endpoint: ParsedEndpoint;
@@ -74,62 +62,9 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
     const [authMode, setAuthMode] = useState<"jwt" | "none">("jwt");
     const [validationError, setValidationError] = useState<string | null>(null);
 
-    const rebaseContext = useRebaseContext();
-    const currentUser = rebaseContext.authController?.user;
-    const client = useRebaseClient<RebaseClient>();
-
-    // Only an administrator's session may run a request as someone else, so
-    // only an administrator is offered anyone else to pick.
-    const adminApi = hasAdminRole(currentUser?.roles) ? client?.admin : undefined;
-    const [userSearch, setUserSearch] = useState("");
-    const [listedUsers, setListedUsers] = useState<SelectableUser[]>([]);
-    const [usersLoading, setUsersLoading] = useState(false);
-
-    useEffect(() => {
-        if (!adminApi) return;
-        let cancelled = false;
-        setUsersLoading(true);
-        adminApi.listUsersPaginated({ search: userSearch || undefined, limit: USER_PAGE_SIZE })
-            // A disabled account cannot be run as; the server refuses it.
-            .then(({ users }) => {
-                if (!cancelled) setListedUsers(users.filter((u) => !u.disabled).map(toSelectableUser));
-            })
-            .catch((err: unknown) => {
-                console.warn("Could not list users for the \"Run as\" picker", err);
-                if (!cancelled) setListedUsers([]);
-            })
-            .finally(() => {
-                if (!cancelled) setUsersLoading(false);
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [adminApi, userSearch]);
-
-    const users = useMemo((): SelectableUser[] => {
-        const managed: SelectableUser[] = [];
-        if (currentUser) {
-            managed.push({
-                uid: currentUser.uid,
-                displayName: currentUser.displayName,
-                email: currentUser.email,
-                photoURL: currentUser.photoURL,
-                roles: currentUser.roles
-            });
-        }
-        return [...managed, ...listedUsers.filter((u) => u.uid !== currentUser?.uid)];
-    }, [currentUser, listedUsers]);
-
-    const currentSelectableUser = useMemo((): SelectableUser | null => {
-        if (!currentUser) return null;
-        return {
-            uid: currentUser.uid,
-            displayName: currentUser.displayName,
-            email: currentUser.email,
-            photoURL: currentUser.photoURL,
-            roles: currentUser.roles
-        };
-    }, [currentUser]);
+    // An administrator is offered the project's users; anyone else, only
+    // themselves — the server lets nobody else run a request as someone.
+    const { users, currentUser, loading: usersLoading, onSearchTextChange } = useRunAsUsers();
 
     const [selectedUser, setSelectedUser] = useState<SelectableUser | null>(null);
 
@@ -235,8 +170,8 @@ time: elapsed });
                     setSelectedUser={setSelectedUser}
                     users={users}
                     loading={usersLoading}
-                    onUserSearchTextChange={setUserSearch}
-                    currentUser={currentSelectableUser}
+                    onUserSearchTextChange={onSearchTextChange}
+                    currentUser={currentUser}
                 />
 
                 {/* Path Params */}

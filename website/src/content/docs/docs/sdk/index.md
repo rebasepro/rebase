@@ -59,6 +59,7 @@ const client = createRebaseClient({
 | `realtime` | `boolean` | Open the WebSocket (default `true`) — set `false` in one-shot scripts |
 | `collections` | `Record<string, string>` | Maps accessor names to collection slugs |
 | `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
+| `impersonate` | `string` | <span class="since-badge" data-since="0.24">Since 0.24</span> Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
 
 ## Typed SDK Generation
 

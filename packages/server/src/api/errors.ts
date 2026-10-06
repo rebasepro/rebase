@@ -131,6 +131,18 @@ function extractDbError(error: unknown, depth = 0): PgLikeError | null {
 }
 
 /**
+ * Did the database refuse a value as unreadable for its column's type —
+ * SQLSTATE class 22, anywhere down the cause chain?
+ *
+ * For a lookup by an id the caller supplied, that is an answer rather than a
+ * failure: `abc` against a UUID key names no row, exactly as a well-formed id
+ * nobody has does.
+ */
+export function isDataException(error: unknown): boolean {
+    return extractDbError(error)?.code?.startsWith("22") === true;
+}
+
+/**
  * The two ways a request fails before it ever reaches the database, read off
  * the cause chain by pg-pool's own wording (it sets no code on either).
  *

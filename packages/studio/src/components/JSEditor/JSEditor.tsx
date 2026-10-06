@@ -42,6 +42,7 @@ import { createRebaseClient } from "@rebasepro/client";
 import { JSMonacoEditor } from "./JSMonacoEditor";
 import { JSEditorSidebar, JSSnippet } from "./JSEditorSidebar";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
+import { useRunAsUsers } from "../useRunAsUsers";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -287,33 +288,9 @@ code: seeded } : tab));
         });
     }, [firstSlug]);
 
-    // Users list for the picker — mapped to SelectableUser shape
-    const users = useMemo((): SelectableUser[] => {
-        const managed: SelectableUser[] = [];
-        // Ensure the current user is in the list
-        if (currentUser) {
-            managed.push({
-                uid: currentUser.uid,
-                displayName: currentUser.displayName,
-                email: currentUser.email,
-                photoURL: currentUser.photoURL,
-                roles: currentUser.roles
-            });
-        }
-        return managed;
-    }, [currentUser]);
-
-    // Current user as SelectableUser for the popover
-    const currentSelectableUser = useMemo((): SelectableUser | null => {
-        if (!currentUser) return null;
-        return {
-            uid: currentUser.uid,
-            displayName: currentUser.displayName,
-            email: currentUser.email,
-            photoURL: currentUser.photoURL,
-            roles: currentUser.roles
-        };
-    }, [currentUser]);
+    // The "Run as" picker: the project's users for an administrator, only
+    // themselves for anyone else.
+    const { users, currentUser: currentSelectableUser, loading: usersLoading, onSearchTextChange: onUserSearchTextChange } = useRunAsUsers();
 
     // ─── Persistence ─────────────────────────────────────────────
 
@@ -401,11 +378,14 @@ isScoped: false };
             throw new Error("No auth token available. Please sign in first.");
         }
 
-        // Create a fresh 'scoped' client. This enables us to attach custom auth later for this specific execution
-        // without mutating the global client.
+        // A fresh client that runs every request as the selected user: the
+        // administrator's own token, and `impersonate` naming who to run as.
+        // The server runs data, functions and realtime as that user, and
+        // refuses every other route rather than answer as the administrator.
         const client = createRebaseClient({
             baseUrl: apiUrl,
-            token
+            token,
+            impersonate: selectedUser.uid
         });
 
         return { client,
@@ -758,7 +738,8 @@ message: t("studio_sql_markdown_copy_failed") });
                                                     selectedUser={selectedUser}
                                                     setSelectedUser={setSelectedUser}
                                                     users={users}
-                                                    loading={false}
+                                                    loading={usersLoading}
+                                                    onUserSearchTextChange={onUserSearchTextChange}
                                                     currentUser={currentSelectableUser}
                                                 />
                                             </div>

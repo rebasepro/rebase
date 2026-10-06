@@ -352,6 +352,13 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 #### Realtime
 
+- **The realtime socket honours `impersonate`,** sent with the socket's
+  `AUTHENTICATE`, under the same rules as `x-rebase-impersonate`: an
+  administrator's session only, never an API key or the service key. The
+  decision is re-checked before every frame like the rest of the identity, so
+  demoting the administrator or disabling the user ends the session. Each
+  grant is logged as `[Security Audit]`.
+
 - **`client.ws.state` and `client.ws.onStateChange()`
   (`RealtimeConnectionState`).** After an outage of about 15 seconds,
   `CONNECTION_LOST` is reported once to every live subscription's and joined
@@ -494,6 +501,14 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   every `rpt_` token with `401 PLATFORM_TOKENS_OFF`.
 
 #### Client SDK
+
+- **`impersonate`** on `createRebaseClient` runs every request as another
+  user, named by uid. It is sent as `x-rebase-impersonate` on each HTTP
+  request and as `impersonate` on the realtime socket's `AUTHENTICATE`. Only
+  an administrator's own session may use it. The data API, custom functions
+  and realtime run as that user, and every other route refuses the request
+  with `400 IMPERSONATION_UNSUPPORTED` rather than answer as the
+  administrator.
 
 - `client.offline.pending({ orphaned: true })` and
   `client.offline.clear({ orphaned: true })` (`OfflineQueueOptions`). Writes
@@ -1028,6 +1043,13 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 #### Studio
 
+- **The JS editor's "Run as" runs the script as the user you pick.** It built
+  a client with your own token and nothing naming the user, so a script run
+  "as" someone ran as you. The picker also offered only you. It now lists your
+  users, and a run as one of them uses `impersonate`: data, functions and
+  `listen()` run as that user, and calls to other routes (`client.admin`,
+  storage, auth) are refused instead of answered as you.
+
 - **The API explorer's "Run as" runs the request as the user you pick.** It
   sent `x-rebase-impersonate`, which no server code read, so the request ran
   with your own session and the response showed what an administrator sees,
@@ -1037,8 +1059,9 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   Each such request is logged as a `[Security Audit]` event, and its request
   log line carries `impersonatedBy`. An API key, the service key or a
   non-administrator gets `403 IMPERSONATION_FORBIDDEN`. A uid with no active
-  user gets `404 IMPERSONATION_TARGET_NOT_FOUND`. Neither runs as the caller.
-  The picker also lists your users now; before, it offered only you.
+  user gets `404 IMPERSONATION_TARGET_NOT_FOUND`. Every other route refuses
+  the header with `400 IMPERSONATION_UNSUPPORTED`. None of these runs as the
+  caller. The picker also lists your users now; before, it offered only you.
 
 - **The source-only schema editor no longer overwrites edits made on disk
   since the server started;** it re-reads every file before each edit.

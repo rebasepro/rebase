@@ -14,6 +14,7 @@ import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { createAuthMiddleware } from "../src/auth/middleware";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
+import { refuseUnhonouredImpersonation } from "../src/auth/impersonation";
 import { configureAccess } from "../src/auth/access";
 import { sha256Hex } from "../src/utils/portable-crypto";
 import type { HonoEnv } from "../src/api/types";
@@ -193,5 +194,43 @@ describe("x-rebase-impersonate", () => {
         expect(res.status).toBe(403);
         expect(await errorCode(res)).toBe("IMPERSONATION_FORBIDDEN");
         expect(lookups).toBe(0);
+    });
+
+    it("lets the header through to the data and functions mounts only, and refuses it everywhere else", async () => {
+        const app = new Hono<HonoEnv>();
+        app.use("/api/*", refuseUnhonouredImpersonation(["/api/data", "/api/functions"]));
+        app.all("/api/*", (c) => c.json({ reached: true }));
+        const ask = async (path: string, impersonating = true) => {
+            const res = await app.request(path, impersonating ? { headers: { [IMPERSONATE_HEADER]: MEMBER } } : undefined);
+            return { status: res.status, code: res.status === 200 ? undefined : await errorCode(res) };
+        };
+
+        for (const honoured of ["/api/data/posts", "/api/data/posts/1", "/api/functions", "/api/functions/sync"]) {
+            expect({ path: honoured, ...(await ask(honoured)) }).toEqual({ path: honoured, status: 200, code: undefined });
+        }
+        for (const refused of ["/api/storage/file/a.png", "/api/admin/users", "/api/auth/me", "/api/functions-admin", "/api/datastore"]) {
+            expect({ path: refused, ...(await ask(refused)) }).toEqual({ path: refused, status: 400, code: "IMPERSONATION_UNSUPPORTED" });
+        }
+        expect((await ask("/api/admin/users", false)).status).toBe(200);
+    });
+
+    it("answers a uid the id column cannot hold as nobody, not as a failure", async () => {
+        const uuidKeyed = {
+            getUserById: async () => {
+                throw Object.assign(new Error("Failed query"), {
+                    cause: Object.assign(new Error('invalid input syntax for type uuid: "abc"'), { code: "22P02" })
+                });
+            },
+            getUserRoleIds: async () => []
+        } as unknown as AuthRepository;
+        const unreachable = {
+            getUserById: async () => {
+                throw new Error("connection refused");
+            },
+            getUserRoleIds: async () => []
+        } as unknown as AuthRepository;
+
+        expect(await createBuiltinAuthAdapter({ authRepository: uuidKeyed }).resolveUser!("abc")).toBeNull();
+        await expect(createBuiltinAuthAdapter({ authRepository: unreachable }).resolveUser!("abc")).rejects.toThrow("connection refused");
     });
 });

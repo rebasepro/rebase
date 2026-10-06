@@ -1,4 +1,4 @@
-import { AggregateParams, FindParams as TypesFindParams, FindResponse as TypesFindResponse, type IncludeSpec, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
+import { AggregateParams, FindParams as TypesFindParams, FindResponse as TypesFindResponse, IMPERSONATE_HEADER, type IncludeSpec, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
 import { RESERVED_QUERY_KEYS, serializeFilter, serializeInclude, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
 import { rebaseReviver } from "./reviver";
 
@@ -103,6 +103,19 @@ export interface RebaseClientConfig {
      * is not settable here; it always comes from the token.
      */
     headers?: Record<string, string>;
+    /**
+     * Run every request as this user, named by uid: sent as
+     * `x-rebase-impersonate` on each HTTP request, and with the realtime
+     * socket's sign-in.
+     *
+     * For checking what one user can see and do against the real row-level
+     * security, as Studio's API explorer and JS editor do. Only an
+     * administrator's own session may — the server refuses it for anyone
+     * else, and always for an API key or the service key. The data API,
+     * custom functions and realtime run as the named user; every other route
+     * refuses the request rather than answer as the administrator.
+     */
+    impersonate?: string;
 }
 
 /**
@@ -506,7 +519,8 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
     // authentication bug.
     const defaultHeaders: Record<string, string> = {
         ...(config.headers ?? {}),
-        ...(config.schemaVersion ? { [SCHEMA_VERSION_HEADER]: config.schemaVersion } : {})
+        ...(config.schemaVersion ? { [SCHEMA_VERSION_HEADER]: config.schemaVersion } : {}),
+        ...(config.impersonate !== undefined ? { [IMPERSONATE_HEADER]: config.impersonate } : {})
     };
 
     function getHeaders(activeToken: string | undefined, init?: RequestInit): Record<string, string> {

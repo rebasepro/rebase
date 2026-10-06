@@ -493,7 +493,8 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 }
                 return session?.accessToken || options.token || "";
             },
-            onUnauthorized: wsOnUnauthorized
+            onUnauthorized: wsOnUnauthorized,
+            impersonate: options.impersonate
         });
 
         // The account the socket's server-side state belongs to. The server

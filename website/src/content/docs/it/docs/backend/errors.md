@@ -1,5 +1,5 @@
 ---
-sourceHash: 87457f19450dd976
+sourceHash: db255f48e87ed15b
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con il rispettivo stato HTTP, il significato e come gestirli — oltre all'envelope di risposta, X-Request-ID e le regole di details.
@@ -106,6 +106,7 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `IMPERSONATION_INVALID` | 400 | <span class="since-badge" data-since="0.24">Da 0.24</span> `x-rebase-impersonate` è stato inviato vuoto. | Invia l'uid dell'utente per conto del quale agire, oppure togli l'header. |
 | `IMPERSONATION_TARGET_NOT_FOUND` | 404 | <span class="since-badge" data-since="0.24">Da 0.24</span> `x-rebase-impersonate` non indica nessun utente attivo: nessun account ha quell'uid, oppure è disattivato. | Controlla l'uid. |
 | `IMPERSONATION_UNAVAILABLE` | 501 | <span class="since-badge" data-since="0.24">Da 0.24</span> L'autenticazione di questo backend non può eseguire una richiesta come un altro utente, perché il suo `AuthAdapter` non ha `resolveUser`. | Implementa `resolveUser` nell'adapter, oppure togli l'header. |
+| `IMPERSONATION_UNSUPPORTED` | 400 | <span class="since-badge" data-since="0.24">Da 0.24</span> `x-rebase-impersonate` è stato inviato a una route che non può essere eseguita come un altro utente. Lo rispettano solo l'API dati e le funzioni personalizzate, e il socket realtime rispetta `impersonate` in `AUTHENTICATE`. | Invia la richiesta senza l'header. |
 | `INVALID_ACCOUNT` | 400 | L'account si trova in uno stato su cui questa operazione non può agire. | Consulta il messaggio. |
 | `INVALID_CHALLENGE` | 400 | La verifica MFA è sconosciuta o scaduta. | Avviane una nuova. |
 | `INVALID_CODE` | 400 / 401 | Il codice OTP o MFA non è corretto: 400 dall'accesso con codice email (`/auth/otp/verify`), 401 da una registrazione o da un challenge MFA. | Riprova con il codice attuale. |

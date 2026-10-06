@@ -104,6 +104,7 @@ the ID you got. Read the response header.
 | `IMPERSONATION_INVALID` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> `x-rebase-impersonate` was sent empty. | Send the uid of the user to act as, or leave the header out. |
 | `IMPERSONATION_TARGET_NOT_FOUND` | 404 | <span class="since-badge" data-since="0.24">Since 0.24</span> `x-rebase-impersonate` names no active user: no account has that uid, or it is disabled. | Check the uid. |
 | `IMPERSONATION_UNAVAILABLE` | 501 | <span class="since-badge" data-since="0.24">Since 0.24</span> This backend's auth cannot run a request as another user, because its `AuthAdapter` has no `resolveUser`. | Implement `resolveUser` in the adapter, or leave the header out. |
+| `IMPERSONATION_UNSUPPORTED` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> `x-rebase-impersonate` was sent to a route that cannot run as another user. Only the data API and custom functions honour it, and the realtime socket honours `impersonate` on `AUTHENTICATE`. | Send the request without the header. |
 | `INVALID_ACCOUNT` | 400 | The account is in a state this operation cannot act on. | See the message. |
 | `INVALID_CHALLENGE` | 400 | The MFA challenge is unknown or expired. | Start a new one. |
 | `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |

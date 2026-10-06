@@ -175,6 +175,10 @@ export type {
 // The other request boundaries — the realtime socket and `/mcp` — resolve keys
 // and person scopes with the same functions the HTTP middlewares use.
 export { resolveApiKey, getAccessModel } from "./auth";
+// The realtime socket runs a session as another user by the same decision the
+// data API takes for `x-rebase-impersonate`.
+export { decideImpersonation } from "./auth/impersonation";
+export type { ImpersonationCredential, ImpersonationDecision, ImpersonationRequest, ImpersonationUserResolver } from "./auth/impersonation";
 // For an app's own socket or tunnel: a session token or an API key, as one
 // identity with scopes.
 export { verifyCredential } from "./auth/verify-credential";

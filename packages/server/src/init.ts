@@ -46,6 +46,7 @@ import { Server } from "http";
 
 import { RestApiGenerator } from "./api/rest/api-generator";
 import { createAuthMiddleware } from "./auth/middleware";
+import { refuseUnhonouredImpersonation } from "./auth/impersonation";
 import { createAdapterAuthMiddleware } from "./auth/adapter-middleware";
 import { scopeDataDriver, SERVICE_IDENTITY } from "./auth/rls-scope";
 import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
@@ -1150,6 +1151,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     // Configure Hono middlewares (Request ID, body limit, CSRF, CORS warning, logging)
     const middlewares = configureMiddlewares(config.app, basePath, isProduction, config);
+
+    // Before any route is mounted, so it runs ahead of all of them, and after
+    // the request id and the request logger, so a refusal is logged like any
+    // other: a request asking to act as another user is honoured by the data
+    // and functions auth middlewares and refused everywhere else, never
+    // answered as the administrator who sent it. See `auth/impersonation.ts`.
+    config.app.use(`${basePath}/*`, refuseUnhonouredImpersonation([`${basePath}/data`, `${basePath}/functions`]));
 
     const collectionRegistry = new BackendCollectionRegistry();
     // Declared data sources — drives engine resolution (capabilities) and the

@@ -122,6 +122,7 @@ function createUnconfiguredEmailService
 function createUploadConstraintResolver
 function createUploadPathResolver
 function createUserThroughAuthCollection
+function decideImpersonation
 function declaredErrorAnswer
 function declaredUniqueTargets
 function defaultBackoff
@@ -170,6 +171,7 @@ function isApiKeyToken
 function isAuthAdapter
 function isAuthenticated
 function isConcurrentDdlRace
+function isDataException
 function isDatabaseAdapter
 function isDuplicateObjectRace
 function isLocalhostOrigin
@@ -301,6 +303,7 @@ interface FunctionUser { email, roles, uid }
 interface GCSStorageConfig { allowedMimeTypes, bucket, credentials, keyFilename, maxFileSize, projectId, signedUrlExpiration, type }
 interface GoogleProviderConfig { clientId, clientSecret }
 interface ImageTransformOptions { fit, format, height, quality, width }
+interface ImpersonationRequest { audit, caller, credential, requestedUid, resolveUser }
 interface InitializedDataSource { bootstrapper, connection, driverPackage, driverVersion, engine, key }
 interface JobClaim { attempt, workerId }
 interface JobContext { attempt, id, maxAttempts, payload, task }
@@ -317,7 +320,7 @@ interface LoadedBundle { collectionsDir, cronsDir, dir, functionsDir, isSource, 
 interface LoadedCronJob { definition, id }
 interface LoadedFunction { app, name }
 interface LoadedFunctions { functions, problems }
-interface LocalStorageConfig { allowedMimeTypes, basePath, baseUrl, maxFileSize, standsInFor, type }
+interface LocalStorageConfig { allowedMimeTypes, basePath, baseUrl, implicit, maxFileSize, standsInFor, type }
 interface Logger { child, debug, error, info, warn }
 interface MagicLinkTokenInfo { expiresAt, uid }
 interface MetricsHandle { middleware, registry, setKnownCollections }
@@ -398,6 +401,9 @@ type EmailVerificationTemplateFunction
 type EnvBag
 type FieldOperator
 type HonoEnv { Variables }
+type ImpersonationCredential
+type ImpersonationDecision
+type ImpersonationUserResolver
 type JobHandler
 type JobStatus
 type JwtSigningAlgorithm
@@ -461,6 +467,7 @@ const DEFAULT_VECTOR_LIST_LIMIT
 const EMPTY_ACCESS_MODEL { roles, scopes }
 const FIELD_OPERATORS
 const FIREBASE_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
+const IMPERSONATE_HEADER
 const JUNCTION_PIVOT_KEY
 const KEY_MANAGEMENT_SCOPES
 const LEGACY_RLS_JWT_SQL
@@ -616,7 +623,7 @@ interface ApiKeysAPI { createKey, getKey, listKeys, revokeKey, updateKey }
 interface AppAddress { host, path }
 interface ArrayProperty { access, callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, of, oneOf, propertyConfig, type, validation }
 interface ArrayPropertyValidationSchema { max, min, required, requiredMessage, unique, uniqueInArray }
-interface AuthAdapter { createAdminRoutes, createAuthRoutes, describeUserCreationContract, destroy, finalizeUserCreation, finalizeUserDeletions, getCapabilities, id, initialize, prepareUserCreation, prepareUserDeletions, prepareUserUpdates, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
+interface AuthAdapter { createAdminRoutes, createAuthRoutes, describeUserCreationContract, destroy, finalizeUserCreation, finalizeUserDeletions, getCapabilities, id, initialize, prepareUserCreation, prepareUserDeletions, prepareUserUpdates, resolveUser, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
 interface AuthAdapterCapabilities { adminPasswordReset, anonymousLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, registrationEnabled, sessionManagement }
 interface AuthClaimPolicyOperand { kind, name }
 interface AuthClient { canRestoreSession, getSession, getSessions, getUser, isInitialized, onAuthStateChange, refreshSession, revokeAllSessions, revokeSession, signOut }
@@ -624,6 +631,7 @@ interface AuthCollectionConfig { actions, enabled, onCreateUser, onResetPassword
 interface AuthCollectionContext { appName, emailConfigured, hashPassword, resetPasswordUrl, sendEmail }
 interface AuthCollectionCreateResult { invitationSent, temporaryPassword, values }
 interface AuthCollectionResetResult { invitationSent, temporaryPassword }
+interface AuthConfigDocument { adminPasswordReset, anonymousLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, registrationEnabled, sessionManagement, storage }
 interface AuthCreateUserData { displayName, email, emailVerified, metadata, password, photoUrl }
 interface AuthResponsePayload { tokens, user }
 interface AuthRolesPolicyOperand { kind }
@@ -1090,7 +1098,7 @@ interface CreateBackupsOptions { backupsPath }
 interface CreateCronOptions { cronPath }
 interface CreatePersonalKeyRequest { expires_at, name, scopes }
 interface CreatePersonalKeysOptions { personalKeysPath, scopesPath }
-interface CreateRebaseClientOptions { admin, anonymous, apiKeys, apiPath, auth, baseUrl, collections, cron, fetch, headers, offline, onUnauthorized, personalKeys, realtime, schemaVersion, storageSources, storageUrlOrigin, token, websocketUrl }
+interface CreateRebaseClientOptions { admin, anonymous, apiKeys, apiPath, auth, baseUrl, collections, cron, fetch, headers, impersonate, offline, onUnauthorized, personalKeys, realtime, schemaVersion, storageSources, storageUrlOrigin, token, websocketUrl }
 interface DeviceSession { createdAt, id, ipAddress, isCurrentSession, userAgent }
 interface FindResult { data, meta }
 interface FunctionInvokeOptions { headers, method, path }
@@ -1110,7 +1118,7 @@ interface PageWalkOptions { cursor, maxPages, pageSize }
 interface PaginationMeta { hasMore, limit, nextCursor, offset, total }
 interface PendingMutation { attempts, collection, data, generatedId, id, ids, lastError, mutationId, parts, queuedAt, rollback, sent, type, updates, upsert }
 interface PresenceDiff { joins, leaves }
-interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, headers, onUnauthorized, realtime, schemaVersion, storageUrlOrigin, token, websocketUrl }
+interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, headers, impersonate, onUnauthorized, realtime, schemaVersion, storageUrlOrigin, token, websocketUrl }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
 interface RowSnapshotMeta { fromCache, hasPendingWrites }
 interface SDKCollectionClient { after, aggregate, count, create, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, update, updateMany, upsert, upsert, vectorSearch, where, where, where }

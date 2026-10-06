@@ -43,7 +43,7 @@ import type { HonoEnv } from "../api/types";
 import { safeCompare } from "./crypto-utils";
 import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
-import { ApiError } from "../api/errors";
+import { ApiError, isDataException } from "../api/errors";
 
 /**
  * Configuration for the built-in Rebase auth adapter.
@@ -301,11 +301,16 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         },
 
         async resolveUser(uid: string): Promise<AuthenticatedUser | null> {
-            // Not wrapped: a uid the id column cannot hold (`abc` against a
-            // UUID key) fails here as the database's data exception, which the
-            // error handler answers as a 400 naming the value — the answer
-            // `GET /admin/users/abc` already gives.
-            const user = await authRepository.getUserById(uid);
+            let user: Awaited<ReturnType<typeof authRepository.getUserById>>;
+            try {
+                user = await authRepository.getUserById(uid);
+            } catch (error: unknown) {
+                // A uid the id column cannot hold (`abc` against a UUID key)
+                // names no account. Any other failure is the store's, and is
+                // not an answer about anyone.
+                if (isDataException(error)) return null;
+                throw error;
+            }
             // A disabled account signs in nowhere, so nothing runs as it.
             if (!user || user.disabled) return null;
 

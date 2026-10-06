@@ -1,5 +1,5 @@
 ---
-sourceHash: 43864c4dc229db0b
+sourceHash: b7e862286c030911
 title: SDK typé — Prise en main
 sidebar_label: Prise en main
 description: Installez et configurez le SDK typé de Rebase pour interagir avec votre backend depuis n'importe quelle application JavaScript ou TypeScript.
@@ -57,6 +57,7 @@ const client = createRebaseClient({
 | `realtime` | `boolean` | Ouvre la WebSocket (par défaut `true`) — définissez sur `false` dans les scripts ponctuels |
 | `collections` | `Record<string, string>` | Associe les noms d'accesseurs aux slugs des collections |
 | `offline` | `boolean \| OfflineConfig` | [Synchronisation local-first](/docs/sdk/offline) — désactivée par défaut |
+| `impersonate` | `string` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Exécute chaque requête en tant que cet utilisateur (par uid), pour vérifier ce qu'un utilisateur voit. Uniquement avec la session d'un administrateur : l'API de données, les fonctions et le temps réel s'exécutent en son nom, toute autre route refuse |
 
 ## Génération du SDK typé
 

@@ -12,7 +12,9 @@
  * policies said.
  *
  * Everything here goes through what the server mounts: the real boot, the
- * built-in auth adapter, the data router's auth middleware and Postgres RLS.
+ * built-in auth adapter, the data router's auth middleware, the realtime
+ * socket the boot attaches, the guard every other route sits behind, and
+ * Postgres RLS.
  * The policies are owner checks, so "B's rows and not A's" can only come from
  * the statement running as `rebase_user` with B's uid; the admin arm of the
  * default policies would hand the administrator both.
@@ -22,6 +24,8 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { WebSocket as NodeWebSocket } from "ws";
 import pg from "pg";
 import { Hono } from "hono";
 import { IMPERSONATE_HEADER, type CollectionConfig } from "@rebasepro/types";
@@ -60,6 +64,16 @@ const B_NOTE = "22222222-2222-4222-8222-222222222222";
 
 type NoteRow = { id: string; ownerId: string; title: string };
 
+/** A realtime frame, as much of one as these tests read. */
+type Frame = {
+    type: string;
+    requestId?: string;
+    subscriptionId?: string;
+    payload?: { uid?: string; rows?: Array<{ id: string }>; error?: { code?: string } };
+    /** A subscription's update carries its rows here rather than in `payload`. */
+    rows?: Array<{ id: string }>;
+};
+
 describe("x-rebase-impersonate on the data API (E2E)", () => {
     let container: PgContainer;
     let admin: pg.Client;
@@ -68,7 +82,10 @@ describe("x-rebase-impersonate on the data API (E2E)", () => {
     const app = new Hono<HonoEnv>();
     const originalNodeEnv = process.env.NODE_ENV;
 
-    const uid = { admin: "", a: "", b: "", disabled: "" };
+    const uid = { admin: "", a: "", b: "", c: "", disabled: "" };
+    const server = createServer();
+    const sockets: NodeWebSocket[] = [];
+    let repo: AuthRepository;
     const token = { admin: "", a: "" };
     let apiKey = "";
 
@@ -107,6 +124,47 @@ describe("x-rebase-impersonate on the data API (E2E)", () => {
         return rows[0];
     }
 
+    /**
+     * A socket to the booted server. `send` resolves with the frame answering
+     * it; `next` with the next frame the predicate matches, whatever sent it.
+     */
+    async function openSocket() {
+        const ws = new NodeWebSocket(`ws://127.0.0.1:${(server.address() as AddressInfo).port}`);
+        sockets.push(ws);
+        await new Promise<void>((resolve, reject) => {
+            ws.once("open", () => resolve());
+            ws.once("error", reject);
+        });
+        const waiters: Array<{ match: (frame: Frame) => boolean; resolve: (frame: Frame) => void }> = [];
+        ws.on("message", (data) => {
+            const frame = JSON.parse(String(data)) as Frame;
+            const waiter = waiters.find(w => w.match(frame));
+            if (waiter) {
+                waiters.splice(waiters.indexOf(waiter), 1);
+                waiter.resolve(frame);
+            }
+        });
+        const next = (match: (frame: Frame) => boolean): Promise<Frame> => new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error("No matching frame")), 5_000);
+            waiters.push({ match, resolve: (frame) => {
+                clearTimeout(timer);
+                resolve(frame);
+            } });
+        });
+        let seq = 0;
+        const send = (type: string, payload: Record<string, unknown>): Promise<Frame> => {
+            const key = `${type}-${++seq}`;
+            const answer = next(frame => frame.requestId === key || frame.subscriptionId === key);
+            ws.send(JSON.stringify(type.startsWith("subscribe_")
+                ? { type, payload: { ...payload, subscriptionId: key } }
+                : { type, requestId: key, payload }));
+            return answer;
+        };
+        return { send, next };
+    }
+
+    const noteIds = (frame: Frame) => (frame.payload?.rows ?? frame.rows ?? []).map(row => row.id).sort();
+
     beforeAll(async () => {
         process.env.NODE_ENV = "test";
         container = await startPgContainer();
@@ -124,8 +182,8 @@ describe("x-rebase-impersonate on the data API (E2E)", () => {
         connection = createPostgresDatabaseConnection(container.connectionString);
         backend = await initializeRebaseBackend({
             app,
-            // Never listening: its `close` is all the shutdown needs.
-            server: createServer(),
+            // The realtime socket is attached to it; it listens below.
+            server,
             collections: [notesCollection],
             database: createPostgresAdapter({
                 connection: connection.db,
@@ -134,8 +192,9 @@ describe("x-rebase-impersonate on the data API (E2E)", () => {
             auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY }
         });
 
-        const repo = backend.auth?.authRepository as AuthRepository | undefined;
-        if (!repo) throw new Error("the boot set up no auth repository");
+        const bootedRepo = backend.auth?.authRepository as AuthRepository | undefined;
+        if (!bootedRepo) throw new Error("the boot set up no auth repository");
+        repo = bootedRepo;
         const account = async (email: string, roles: string[]) => {
             const user = await repo.createUser({ email, emailVerified: true });
             await repo.setUserRoles(user.id, roles);
@@ -144,6 +203,7 @@ describe("x-rebase-impersonate on the data API (E2E)", () => {
         uid.admin = await account("admin@impersonation.test", ["admin"]);
         uid.a = await account("a@impersonation.test", []);
         uid.b = await account("b@impersonation.test", []);
+        uid.c = await account("c@impersonation.test", []);
         uid.disabled = await account("gone@impersonation.test", []);
         if (!repo.setUserDisabled) throw new Error("the repository cannot disable an account");
         await repo.setUserDisabled(uid.disabled, true);
@@ -168,9 +228,12 @@ describe("x-rebase-impersonate on the data API (E2E)", () => {
         const key = (minted.json as { key?: { key?: unknown } }).key?.key;
         if (typeof key !== "string") throw new Error(`no key in ${JSON.stringify(minted.json)}`);
         apiKey = key;
+
+        await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
     }, 180_000);
 
     afterAll(async () => {
+        for (const ws of sockets) ws.terminate();
         await backend?.shutdown(1_000).catch(() => {});
         _resetRebaseMock();
         process.env.NODE_ENV = originalNodeEnv;
@@ -271,5 +334,64 @@ describe("x-rebase-impersonate on the data API (E2E)", () => {
         const empty = await call("/api/data/notes", asAdminImpersonating("  "));
         expect(empty.status).toBe(400);
         expect(errorCodeOf(empty.json)).toBe("IMPERSONATION_INVALID");
+    });
+
+    it("refuses the header on a route that cannot honour it, rather than answer as the administrator", async () => {
+        const { status, json } = await call("/api/admin/users", asAdminImpersonating(uid.b));
+        expect(status).toBe(400);
+        expect(errorCodeOf(json)).toBe("IMPERSONATION_UNSUPPORTED");
+        expect(JSON.stringify(json)).not.toContain("admin@impersonation.test");
+
+        // The same route answers the administrator who leaves the header out.
+        const plain = await call("/api/admin/users", bearer(token.admin));
+        expect(plain.status).toBe(200);
+    });
+
+    describe("over the realtime socket", () => {
+        it("signs a socket in as B when the administrator's AUTHENTICATE names B: B's notes, and not A's", async () => {
+            const { send } = await openSocket();
+            const auth = await send("AUTHENTICATE", { token: token.admin, impersonate: uid.b });
+            expect(auth.type).toBe("AUTH_SUCCESS");
+            expect(auth.payload?.uid).toBe(uid.b);
+
+            const fetched = await send("FETCH_COLLECTION", { path: "notes" });
+            expect(fetched.type).toBe("FETCH_COLLECTION_SUCCESS");
+            expect(noteIds(fetched)).toEqual([B_NOTE]);
+
+            const subscribed = await send("subscribe_collection", { path: "notes" });
+            expect(subscribed.type).toBe("collection_update");
+            expect(noteIds(subscribed)).toEqual([B_NOTE]);
+        });
+
+        it("refuses impersonate from an API key, a non-administrator and for an unknown uid — and stays signed out", async () => {
+            const refusals: Array<[string, string, string]> = [
+                [apiKey, uid.b, "IMPERSONATION_FORBIDDEN"],
+                [token.a, uid.b, "IMPERSONATION_FORBIDDEN"],
+                [token.admin, "no-such-user", "IMPERSONATION_TARGET_NOT_FOUND"]
+            ];
+            for (const [credential, target, code] of refusals) {
+                const { send } = await openSocket();
+                const auth = await send("AUTHENTICATE", { token: credential, impersonate: target });
+                expect(auth.type).toBe("AUTH_ERROR");
+                expect(auth.payload?.error?.code).toBe(code);
+
+                // Not signed in as the caller either.
+                const fetched = await send("FETCH_COLLECTION", { path: "notes" });
+                expect(fetched.type).not.toBe("FETCH_COLLECTION_SUCCESS");
+            }
+        });
+
+        it("ends an impersonated session when the user it runs as is disabled", async () => {
+            const { send, next } = await openSocket();
+            const auth = await send("AUTHENTICATE", { token: token.admin, impersonate: uid.c });
+            expect(auth.type).toBe("AUTH_SUCCESS");
+
+            if (!repo.setUserDisabled) throw new Error("the repository cannot disable an account");
+            await repo.setUserDisabled(uid.c, true);
+
+            const ended = next(frame => frame.type === "AUTH_ERROR" && frame.requestId === undefined);
+            void send("FETCH_COLLECTION", { path: "notes" }).catch(() => undefined);
+            expect((await ended).payload?.error?.code).toBe("IMPERSONATION_TARGET_NOT_FOUND");
+        });
     });
 });

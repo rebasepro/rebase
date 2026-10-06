@@ -14,7 +14,7 @@ import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
 import { inspect } from "util";
 import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertUserCreationBodyValid, createUserThroughAuthCollection, type NestedWriteKind } from "@rebasepro/server";
-import { logger, getAccessModel } from "@rebasepro/server";
+import { logger, getAccessModel, decideImpersonation, type ImpersonationCredential } from "@rebasepro/server";
 
 /**
  * What this socket calls on the realtime side, and all of it.
@@ -96,7 +96,19 @@ interface WsUserIdentity {
      * A tenancy policy reads a claim.
      */
     claims?: Record<string, unknown>;
+    /**
+     * The administrator this session acts for, when it authenticated with
+     * `impersonate`: every other field is then the impersonated user's.
+     */
+    impersonator?: string;
 }
+
+/**
+ * The uid the service key authenticates as, here and through the built-in
+ * auth adapter — which is how the socket tells that credential apart from a
+ * person's session.
+ */
+const SERVICE_KEY_UID = "service";
 
 interface ClientSession {
     ws: WebSocket;
@@ -108,6 +120,12 @@ interface ClientSession {
      * that only listens. See `recheckIdentity`.
      */
     credential?: string;
+    /**
+     * The uid `AUTHENTICATE` asked to act as, kept beside the credential so
+     * every re-check decides the impersonation again — a demoted
+     * administrator, or a disabled target, ends the session.
+     */
+    impersonate?: string;
     /** When `user` was last confirmed against the credential, in ms. */
     checkedAt: number;
     /** Ends the session the instant the credential expires. */
@@ -438,7 +456,7 @@ export function createPostgresWebSocket(
      * re-asking it later answers what signing in would answer. A refusal is a
      * value; a store that cannot answer throws.
      */
-    async function resolveIdentity(token: string): Promise<{ user: WsUserIdentity } | { refused: string; apiKey?: true }> {
+    async function resolveCaller(token: string): Promise<{ user: WsUserIdentity; credential: ImpersonationCredential } | { refused: string; apiKey?: true }> {
         if (token.startsWith("rk_")) {
             // An API key: the same verification the HTTP middlewares run, so a
             // key means one thing on both — revoked or expired included.
@@ -447,6 +465,7 @@ export function createPostgresWebSocket(
                 return { refused: resolved?.message ?? "API keys are not enabled on this server", apiKey: true };
             }
             return {
+                credential: "api-key",
                 user: {
                     uid: resolved.uid,
                     roles: resolved.roles,
@@ -469,6 +488,9 @@ export function createPostgresWebSocket(
                 }));
             if (!adapterUser) return { refused: "Invalid or expired token" };
             return {
+                // The built-in adapter verifies the service key as its own
+                // identity rather than as a person.
+                credential: adapterUser.uid === SERVICE_KEY_UID ? "service-key" : "session",
                 user: {
                     uid: adapterUser.uid,
                     roles: adapterUser.roles,
@@ -490,7 +512,7 @@ export function createPostgresWebSocket(
             // Service key: a static secret, not a JWT. Checked before
             // verification, mirroring the HTTP middleware — verifying it as a
             // JWT can only ever fail.
-            return { user: { uid: "service", roles: ["admin"], isAdmin: true, isAnonymous: false } };
+            return { credential: "service-key", user: { uid: SERVICE_KEY_UID, roles: ["admin"], isAdmin: true, isAnonymous: false } };
         }
 
         // Standard JWT path: the signature and the expiry, nothing more —
@@ -498,12 +520,50 @@ export function createPostgresWebSocket(
         const jwtPayload = await extractUserFromToken(token);
         if (!jwtPayload) return { refused: "Invalid or expired token" };
         return {
+            credential: "session",
             user: {
                 uid: jwtPayload.uid,
                 roles: jwtPayload.roles ?? [],
                 isAdmin: hasAdminRole(jwtPayload.roles ?? []),
                 isAnonymous: jwtPayload.isAnonymous === true,
                 claims: jwtPayload.claims
+            }
+        };
+    }
+
+    /**
+     * Who this socket runs as: its caller, or — when it asked to `impersonate`
+     * — the user it named, by the same decision the data API takes for
+     * `x-rebase-impersonate`. A refusal carries the code to answer with.
+     *
+     * `audit` is passed by `AUTHENTICATE` only: the re-check before every frame
+     * decides again without writing a security event each time.
+     */
+    async function resolveIdentity(
+        token: string,
+        impersonate?: string,
+        audit?: Record<string, unknown>
+    ): Promise<{ user: WsUserIdentity } | { refused: string; apiKey?: true; code?: string }> {
+        const caller = await resolveCaller(token);
+        if (!("user" in caller) || impersonate === undefined) return caller;
+
+        const decision = await decideImpersonation({
+            requestedUid: impersonate,
+            credential: caller.credential,
+            caller: caller.user,
+            resolveUser: authAdapter?.resolveUser ? authAdapter.resolveUser.bind(authAdapter) : undefined,
+            audit
+        });
+        if ("refused" in decision) return { refused: decision.refused.message, code: decision.refused.code };
+        const target = decision.granted;
+        return {
+            user: {
+                uid: target.uid,
+                roles: target.roles,
+                isAdmin: hasAdminRole(target.roles),
+                isAnonymous: target.isAnonymous === true,
+                ...(target.claims ? { claims: target.claims } : {}),
+                impersonator: decision.impersonator
             }
         };
     }
@@ -578,7 +638,7 @@ export function createPostgresWebSocket(
         if (!session?.user || !credential) return "live";
         let outcome: Awaited<ReturnType<typeof resolveIdentity>>;
         try {
-            outcome = await resolveIdentity(credential);
+            outcome = await resolveIdentity(credential, session.impersonate);
         } catch {
             return "unavailable";
         }
@@ -586,7 +646,11 @@ export function createPostgresWebSocket(
         if (session.credential !== credential || !session.user) return session.user ? "live" : "ended";
         session.checkedAt = Date.now();
         if (!("user" in outcome)) {
-            endSession(clientId, "SESSION_ENDED", "This session has ended: it was signed out, revoked, or its account changed. Authenticate again.");
+            // An impersonation that no longer holds — the administrator was
+            // demoted, the user disabled — says which; anything else is the
+            // credential itself.
+            if (outcome.code) endSession(clientId, outcome.code, outcome.refused);
+            else endSession(clientId, "SESSION_ENDED", "This session has ended: it was signed out, revoked, or its account changed. Authenticate again.");
             return "ended";
         }
         if (identityFingerprint(outcome.user) !== identityFingerprint(session.user)) {
@@ -724,24 +788,35 @@ channelWindowStart: Date.now() });
                 }
 
                 if (type === "AUTHENTICATE") {
-                    const { token } = payload || {};
+                    const { token, impersonate } = payload || {};
                     if (!token) {
                         sendError("AUTH_ERROR", "INVALID_INPUT", "Token is required");
+                        return;
+                    }
+                    if (impersonate !== undefined && typeof impersonate !== "string") {
+                        sendError("AUTH_ERROR", "INVALID_INPUT", "impersonate must be the uid of the user to act as");
                         return;
                     }
 
                     // An adapter that throws (its store unreachable) is an
                     // invalid token here, as it always was: there is no
-                    // session yet to keep.
+                    // session yet to keep. A lookup for an impersonation that
+                    // throws is refused with the answer it carries when it
+                    // has one, and is never authenticated as the caller.
                     let resolved: Awaited<ReturnType<typeof resolveIdentity>>;
                     try {
-                        resolved = await resolveIdentity(token);
+                        resolved = await resolveIdentity(token, impersonate, impersonate === undefined ? undefined : { door: "socket", clientId });
                     } catch (error) {
+                        const answer = impersonate === undefined ? undefined : declaredErrorAnswer(error);
+                        if (answer) {
+                            sendError("AUTH_ERROR", answer.code, answer.message);
+                            return;
+                        }
                         if (token.startsWith("rk_") || !authAdapter) throw error;
                         resolved = { refused: "Invalid or expired token" };
                     }
-                    if ("refused" in resolved && resolved.apiKey) {
-                        sendError("AUTH_ERROR", "INVALID_TOKEN", resolved.refused);
+                    if ("refused" in resolved && (resolved.apiKey || resolved.code)) {
+                        sendError("AUTH_ERROR", resolved.code ?? "INVALID_TOKEN", resolved.refused);
                         return;
                     }
                     const verifiedUser = "user" in resolved ? resolved.user : null;
@@ -755,6 +830,7 @@ channelWindowStart: Date.now() });
                             // the sweep, and — for a token that expires — at
                             // the instant it does.
                             session.credential = token;
+                            session.impersonate = impersonate;
                             session.checkedAt = Date.now();
                             scheduleExpiry(clientId, token);
                             // What this socket already holds open — a session
@@ -1277,6 +1353,7 @@ colors: true }));
                                 uid: auditSession?.user?.uid ?? "unknown",
                                 roles: auditSession?.user?.roles ?? [],
                                 isAdmin: auditSession?.user?.isAdmin ?? false,
+                                ...(auditSession?.user?.impersonator ? { impersonatedBy: auditSession.user.impersonator } : {}),
                                 requestId
                             });
                             const response = {
