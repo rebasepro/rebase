@@ -35,8 +35,10 @@ const executeSql = jest.fn(async (sql: string, _options?: ExecuteOptions): Promi
  * role switching turned off on the server — this connection owner.
  */
 let connectionOwner: string | undefined;
+/** What the server says of the rows it did not send, when it cut a result short. */
+let cutShort: Pick<SqlScriptResult, "truncated" | "rowCount"> = {};
 const runSqlScript = jest.fn(async (sql: string, options?: ExecuteOptions): Promise<SqlScriptResult> => ({
-    ...(sql.startsWith(ORDERS) ? orders : { rows: [], columns: [], tables: [], notices: [] }),
+    ...(sql.startsWith(ORDERS) ? { ...orders, ...cutShort } : { rows: [], columns: [], tables: [], notices: [] }),
     ...(options?.role ? { effectiveRole: connectionOwner ?? options.role } : {})
 }));
 const databaseAdmin: Record<string, unknown> = {
@@ -126,6 +128,7 @@ const OPEN_ORDER_7 = "Open Orders #7";
 
 beforeEach(() => {
     connectionOwner = undefined;
+    cutShort = {};
     executeSql.mockClear();
     runSqlScript.mockClear();
     sidePanelOpen.mockClear();
@@ -181,5 +184,31 @@ describe("the role the rows were read as", () => {
         expect(screen.queryByText(translation.t("studio_sql_ran_as_other_role", { ranAs: "postgres", role: "postgres" }))).toBeNull();
         expect(screen.queryByText(/role switching/i)).toBeNull();
         expect((screen.getByRole("menuitem", { name: /^reader/ }) as HTMLButtonElement).disabled).toBe(false);
+    });
+});
+
+/**
+ * The server keeps at most 10,000 rows of a result (`SQL_CONSOLE_RESULT_LIMITS`
+ * in server-postgres): a run that held every row of a million-row table took
+ * the server down. The console says when the rows on screen are not all of
+ * them, and how many there were.
+ */
+describe("a result the server cut short", () => {
+    jest.setTimeout(20000);
+
+    it("says how many rows there were, and that only the first are shown", async () => {
+        cutShort = { truncated: true, rowCount: 50_000 };
+        await runOn("app_prod", ORDERS);
+
+        expect(screen.getByText(translation.t("studio_sql_result_truncated", {
+            shown: (1).toLocaleString(),
+            total: (50_000).toLocaleString()
+        }))).toBeTruthy();
+    });
+
+    it("says nothing when the rows on screen are all of them", async () => {
+        await runOn("app_prod", ORDERS);
+
+        expect(screen.queryByText(/Showing the first/)).toBeNull();
     });
 });

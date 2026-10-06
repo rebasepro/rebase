@@ -580,8 +580,19 @@ export interface SqlScriptResult {
     tables: SqlScriptTable[];
     /** The last statement's command: `SELECT`, `UPDATE`, `CREATE TABLE` … */
     command?: string;
-    /** How many rows the last statement returned or changed, when its command reports a count. */
+    /**
+     * How many rows the last statement returned or changed, when its command
+     * reports a count — or, for a {@link truncated} result, how many it
+     * returned, of which {@link rows} holds the first.
+     */
     rowCount?: number;
+    /**
+     * The last statement returned more than a run keeps, and {@link rows}
+     * holds only its first rows. The Studio console's door keeps at most
+     * 10,000 rows, or 32 Mi characters of values, of one result: a run that
+     * held every row of a million-row table took the server down with it.
+     */
+    truncated?: boolean;
     /** What the database said while the script ran, in order. */
     notices: SqlScriptNotice[];
     /**

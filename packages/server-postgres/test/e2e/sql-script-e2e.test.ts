@@ -179,6 +179,30 @@ describe("what a script returns", () => {
  * on its own, and the ROLLBACK's "there is no transaction in progress" was a
  * warning nobody showed.
  */
+describe("how much of a result a run keeps", () => {
+    // A run kept every row of every statement and sent them in one frame: a
+    // million-row `TABLE events` took a 1 GiB server down. See
+    // `SQL_CONSOLE_RESULT_LIMITS`.
+    it("keeps the first 10,000 rows of 50,000, and says how many there were", async () => {
+        const result = await driver.runSqlScript("SELECT g FROM generate_series(1, 50000) g");
+
+        expect(result.rows).toHaveLength(10_000);
+        expect(result.rows[0]).toEqual({ g: "1" });
+        expect(result.rows[9_999]).toEqual({ g: "10000" });
+        expect(result.truncated).toBe(true);
+        expect(result.command).toBe("SELECT");
+        expect(result.rowCount).toBe(50_000);
+    });
+
+    it("shows the last statement whole after a large one before it", async () => {
+        const result = await driver.runSqlScript("SELECT g FROM generate_series(1, 50000) g; SELECT 1 AS one");
+
+        expect(result.rows).toEqual([{ one: "1" }]);
+        expect(result.truncated).toBeUndefined();
+        expect(result.rowCount).toBe(1);
+    });
+});
+
 describe("a transaction and the run it began in", () => {
     const balance = async () => (await pool.query("SELECT balance FROM accounts WHERE id = 1")).rows[0].balance;
 

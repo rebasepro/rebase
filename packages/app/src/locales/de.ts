@@ -908,6 +908,7 @@ export const de: RebaseTranslations = {
     studio_sql_update_failed: "Aktualisierung fehlgeschlagen: {{message}}",
     studio_sql_update_no_row: "Es wurde keine Zeile aktualisiert: Die Zeile wurde seit dem Lesen geändert oder gelöscht, oder die gewählte Rolle darf sie nicht aktualisieren. Führen Sie die Abfrage erneut aus, um den gespeicherten Wert zu sehen.",
     studio_sql_ran_as_other_role: "Diese Zeilen wurden als {{ranAs}} gelesen, nicht als {{role}}: Auf diesem Server ist der Rollenwechsel ausgeschaltet (DISABLE_DB_ROLE_SWITCHING), daher läuft jede Anweisung als Eigentümer der Verbindung.",
+    studio_sql_result_truncated: "Angezeigt werden die ersten {{shown}} von {{total}} Zeilen: Die Konsole behält höchstens 10.000 Zeilen oder 32 MB an Werten eines Ergebnisses. Schränken Sie die Abfrage ein oder blättern Sie mit LIMIT und OFFSET, um den Rest zu sehen. Kopieren und Exportieren umfassen nur die angezeigten Zeilen.",
     studio_sql_role_switching_disabled: "Der Rollenwechsel ist auf diesem Server ausgeschaltet: Jede Anweisung läuft als {{role}}, egal welche Rolle hier gewählt ist.",
     studio_sql_execution_not_supported: "Die aktuelle Datenquelle unterstützt keine SQL-Ausführung.",
     studio_sql_error_executing: "Beim Ausführen der Abfrage ist ein Fehler aufgetreten.",

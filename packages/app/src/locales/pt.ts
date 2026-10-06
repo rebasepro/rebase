@@ -913,6 +913,7 @@ export const pt: RebaseTranslations = {
     studio_sql_update_failed: "Falha ao atualizar: {{message}}",
     studio_sql_update_no_row: "Nenhuma linha foi atualizada: a linha foi alterada ou eliminada desde que foi lida, ou a função selecionada não a pode atualizar. Execute a consulta novamente para ver o que está guardado.",
     studio_sql_ran_as_other_role: "Estas linhas foram lidas como {{ranAs}}, não como {{role}}: a troca de função está desativada neste servidor (DISABLE_DB_ROLE_SWITCHING), por isso cada instrução é executada como o proprietário da ligação.",
+    studio_sql_result_truncated: "A mostrar as primeiras {{shown}} de {{total}} linhas: a consola guarda no máximo 10 000 linhas, ou 32 MB de valores, de um resultado. Restrinja a consulta, ou percorra-a por páginas com LIMIT e OFFSET, para ver o resto. Copiar e exportar incluem apenas as linhas mostradas.",
     studio_sql_role_switching_disabled: "A troca de função está desativada neste servidor: cada instrução é executada como {{role}}, seja qual for a função escolhida aqui.",
     studio_sql_execution_not_supported: "A fonte de dados atual não suporta a execução de SQL.",
     studio_sql_error_executing: "Ocorreu um erro ao executar a consulta.",

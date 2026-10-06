@@ -307,7 +307,13 @@ export const SQLEditor = () => {
          * transaction in progress` for a ROLLBACK that ended nothing, which
          * otherwise reads as a plain success.
          */
-        notices: SqlScriptNotice[]
+        notices: SqlScriptNotice[],
+        /**
+         * How many rows the last statement returned, when the server sent
+         * only its first ones — see `SqlScriptResult.truncated`. `null` when
+         * the rows on screen are all of them.
+         */
+        truncatedFrom: number | null
     }>>(() => {
         const projectPrefixSync = getStoragePrefix(client?.baseUrl);
         // This runs during the first render, so anything it throws takes the
@@ -330,7 +336,8 @@ export const SQLEditor = () => {
             lastExecutedConnection: null,
             ranAs: null,
             lastProvenance: null,
-            notices: []
+            notices: [],
+            truncatedFrom: null
         }));
         if (restored.length > 0) return restored;
         return [{
@@ -347,7 +354,8 @@ export const SQLEditor = () => {
             lastExecutedConnection: null,
             ranAs: null,
             lastProvenance: null,
-            notices: []
+            notices: [],
+            truncatedFrom: null
         }];
     });
     const [activeTabId, setActiveTabId] = useState<string>(() => {
@@ -825,7 +833,8 @@ role: connection.role });
             lastExecutedConnection: null,
             ranAs: null,
             lastProvenance: null,
-            notices: []
+            notices: [],
+            truncatedFrom: null
         }]);
         setActiveTabId(newId);
     };
@@ -886,7 +895,8 @@ lastExecutedSql: null,
 lastExecutedConnection: null,
 ranAs: null,
 lastProvenance: null,
-notices: [] });
+notices: [],
+truncatedFrom: null });
         const start = performance.now();
         try {
             if (databaseAdmin?.executeSql) {
@@ -910,7 +920,8 @@ execTime: Math.round(performance.now() - start) });
         updateActiveTab({ loading: true,
 error: null,
 results: null,
-notices: [] });
+notices: [],
+truncatedFrom: null });
         const start = performance.now();
 
         try {
@@ -932,7 +943,8 @@ notices: [] });
                     lastProvenance: run
                         ? { columns: run.columns, tables: run.tables }
                         : { columns: Object.keys(rows[0] ?? {}).map(name => ({ name })), tables: [] },
-                    notices: run?.notices ?? []
+                    notices: run?.notices ?? [],
+                    truncatedFrom: run?.truncated ? run.rowCount ?? null : null
                 });
                 // A server that ran the script as someone other than the role
                 // picked runs every statement that way: the picker is moot.
@@ -1592,6 +1604,16 @@ isFavorite: !s.isFavorite } : s));
                                         <div className="px-4 pt-2 shrink-0">
                                             <Alert color="warning" size="small">
                                                 {t("studio_sql_ran_as_other_role", { ranAs: activeTab.ranAs, role: activeTab.lastExecutedConnection.role })}
+                                            </Alert>
+                                        </div>
+                                    )}
+                                    {!loading && results && activeTab.truncatedFrom !== null && (
+                                        <div className="px-4 pt-2 shrink-0">
+                                            <Alert color="info" size="small">
+                                                {t("studio_sql_result_truncated", {
+                                                    shown: results.length.toLocaleString(),
+                                                    total: activeTab.truncatedFrom.toLocaleString()
+                                                })}
                                             </Alert>
                                         </div>
                                     )}

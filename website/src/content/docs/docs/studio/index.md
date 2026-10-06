@@ -78,7 +78,7 @@ open costs nothing.
 
 | Tab | Slug | Group | What it does |
 |-----|------|-------|--------------|
-| SQL Console | `sql` | Database | Run raw SQL against your PostgreSQL database and read results in a table |
+| SQL Console | `sql` | Database | Run raw SQL against your PostgreSQL database and read results in a table. The table shows the last statement's result, up to its first 10,000 rows or 32 MB of values; a longer result says how many rows there were, and copy and export include only the rows shown |
 | RLS Policies | `rls` | Database | Inspect and manage Row Level Security policies for your tables. <span class="since-badge" data-since="0.24">Since 0.24</span> A policy is listed as the database holds it, badged **Differs from code** where that is not what the project declares. A policy Rebase generates cannot be edited straight in the database, and on a table Rebase manages a banner says that each server start and `rebase db push` re-apply the declared policies |
 | Schema Visualizer | `schema-visualizer` | Database | Entity diagram of your collections and their relations, drawn from the collection definitions: tables, columns, types and relations are as the collections declare them. Only the RLS markers are read from the database |
 | Branches | `branches` | Database | Create and manage [database branches](/docs/backend/branching) |

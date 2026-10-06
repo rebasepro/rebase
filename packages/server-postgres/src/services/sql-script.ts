@@ -32,11 +32,63 @@ interface WireField {
 }
 
 /** One statement of the script, as it came back. */
-interface StatementOutcome {
+export interface StatementOutcome {
     fields: WireField[];
     rows: Record<string, string | null>[];
+    /** How many rows the database sent for it, kept or not. */
+    received: number;
+    /** Rows past the {@link SqlResultLimits} were counted and not kept. */
+    truncated: boolean;
     /** The command tag, e.g. `SELECT 3`, `INSERT 0 1`, `CREATE TABLE`. */
     tag?: string;
+}
+
+/** How much of one statement's result a run keeps. */
+export interface SqlResultLimits {
+    /** Rows kept; the rest are counted and let go. */
+    maxRows: number;
+    /** Characters of values kept, summed over the kept rows. */
+    maxTextLength: number;
+}
+
+/**
+ * What the Studio console keeps of a result: its first 10,000 rows, or its
+ * first 32 Mi characters of values, whichever ends first.
+ *
+ * Every row used to be kept. `TABLE events` on a million rows held 418 MB of
+ * row objects and built a 475 MB frame, and a server with 1 GiB died of it —
+ * every other user's connection with it. Ten times the console's own
+ * `LIMIT 1000`, so a run that asked for a page always gets it whole; the text
+ * budget is for the rows a count does not bound — a document column, a
+ * `jsonb` blob — and keeps the frame, the string it is built from and the
+ * socket's copy of it around 100 MB at worst.
+ *
+ * Postgres still sends every row (a simple query cannot be stopped short of
+ * cancelling it, which would abort the statements after it); they are counted,
+ * so the result says how many there were.
+ */
+export const SQL_CONSOLE_RESULT_LIMITS: SqlResultLimits = { maxRows: 10_000, maxTextLength: 32 * 1024 * 1024 };
+
+/** The rows of one result kept so far, against {@link SqlResultLimits}. */
+class ResultBudget {
+    private rows = 0;
+    private textLength = 0;
+
+    constructor(private readonly limits: SqlResultLimits) {}
+
+    /** Whether a row with `textLength` characters of values is kept; counted when it is. */
+    admit(textLength: number): boolean {
+        if (this.rows >= this.limits.maxRows || this.textLength + textLength > this.limits.maxTextLength) return false;
+        this.rows++;
+        this.textLength += textLength;
+        return true;
+    }
+}
+
+function textLengthOf(values: readonly (string | null)[]): number {
+    let length = 0;
+    for (const value of values) if (value !== null) length += value.length;
+    return length;
 }
 
 /**
@@ -48,7 +100,7 @@ interface StatementOutcome {
  * result with no rows. The message handlers below are the ones node-postgres
  * calls on the active query — the same protocol `pg-cursor` implements.
  */
-class ScriptRun implements Submittable {
+export class ScriptRun implements Submittable {
     /**
      * Set by node-postgres when the pool has a `query_timeout`: a wrapper that
      * clears its read timer. Called on every outcome, so the timer never
@@ -56,16 +108,25 @@ class ScriptRun implements Submittable {
      */
     callback?: (error: Error | null) => void;
 
+    /**
+     * Every statement of the script, as it came back. Only the last holds its
+     * rows: the console shows the last, and a statement's rows are let go when
+     * the next one begins — `SELECT * FROM big; SELECT 1` held every row of
+     * `big` to the end, to show one.
+     */
     readonly statements: StatementOutcome[] = [];
     readonly done: Promise<StatementOutcome[]>;
 
     /** The statement whose row description arrived and whose command has not completed. */
     private open?: StatementOutcome;
+    /** What {@link open} has kept of its rows. */
+    private budget: ResultBudget;
     private settled = false;
     private resolveRun: (statements: StatementOutcome[]) => void = () => undefined;
     private rejectRun: (error: Error) => void = () => undefined;
 
-    constructor(private readonly text: string) {
+    constructor(private readonly text: string, private readonly limits: SqlResultLimits = SQL_CONSOLE_RESULT_LIMITS) {
+        this.budget = new ResultBudget(limits);
         this.done = new Promise((resolve, reject) => {
             this.resolveRun = resolve;
             this.rejectRun = reject;
@@ -77,9 +138,13 @@ class ScriptRun implements Submittable {
     }
 
     handleRowDescription(message: { fields: WireField[] }): void {
+        this.releaseRows();
+        this.budget = new ResultBudget(this.limits);
         this.open = {
             fields: message.fields.map(({ name, tableID, columnID, dataTypeID }) => ({ name, tableID, columnID, dataTypeID })),
-            rows: []
+            rows: [],
+            received: 0,
+            truncated: false
         };
         this.statements.push(this.open);
     }
@@ -87,6 +152,12 @@ class ScriptRun implements Submittable {
     handleDataRow(message: { fields: (string | null)[] }): void {
         const statement = this.open;
         if (!statement) return;
+        statement.received++;
+        if (statement.truncated) return;
+        if (!this.budget.admit(textLengthOf(message.fields))) {
+            statement.truncated = true;
+            return;
+        }
         const row: Record<string, string | null> = {};
         statement.fields.forEach((field, index) => {
             row[field.name] = message.fields[index] ?? null;
@@ -95,8 +166,11 @@ class ScriptRun implements Submittable {
     }
 
     handleCommandComplete(message: { text: string }): void {
-        const statement = this.open ?? { fields: [], rows: [] };
-        if (!this.open) this.statements.push(statement);
+        const statement = this.open ?? { fields: [], rows: [], received: 0, truncated: false };
+        if (!this.open) {
+            this.releaseRows();
+            this.statements.push(statement);
+        }
         this.open = undefined;
         statement.tag = message.text;
     }
@@ -129,6 +203,12 @@ class ScriptRun implements Submittable {
 
     handleReadyForQuery(): void {
         this.settle(null);
+    }
+
+    /** Let go of the rows of the statement before the one beginning: only the last is shown. */
+    private releaseRows(): void {
+        const previous = this.statements[this.statements.length - 1];
+        if (previous) previous.rows = [];
     }
 
     private settle(error: Error | null): void {
@@ -381,18 +461,22 @@ export async function runSqlScriptOnPool(pool: Pool, sql: string, options: OwnSe
             const script = new ScriptRun(sql);
             connection.query(script);
             const statements = await script.done;
-            const last: StatementOutcome = statements[statements.length - 1] ?? { fields: [], rows: [] };
+            const last: StatementOutcome = statements[statements.length - 1] ?? { fields: [], rows: [], received: 0, truncated: false };
             return { last, described: { columns: last.fields.map((field): SqlScriptColumn => ({ name: field.name })), tables: [] as SqlScriptTable[] } };
         } finally {
             connection.removeListener("notice", listen);
         }
     }, async (connection, value) => ({ ...value, described: await describeColumns(connection, value.last.fields) }));
 
+    const tag = parseCommandTag(run.last.tag);
     return {
         rows: run.last.rows,
         columns: run.described.columns,
         tables: run.described.tables,
-        ...parseCommandTag(run.last.tag),
+        ...tag,
+        // The tag counts every row the statement returned; a command whose
+        // tag carries no count was counted here.
+        ...(run.last.truncated ? { truncated: true, rowCount: tag.rowCount ?? run.last.received } : {}),
         notices
     };
 }
@@ -402,12 +486,20 @@ export async function runSqlScriptOnPool(pool: Pool, sql: string, options: OwnSe
  * pool (PGlite in process): every value as text, and no column with a source —
  * nothing to say where a value came from, so nothing the console will edit.
  */
-export function sqlScriptResultFromRows(rows: Record<string, unknown>[]): SqlScriptResult {
+export function sqlScriptResultFromRows(rows: Record<string, unknown>[], limits: SqlResultLimits = SQL_CONSOLE_RESULT_LIMITS): SqlScriptResult {
     const names = rows.length > 0 ? Object.keys(rows[0]) : [];
+    const budget = new ResultBudget(limits);
+    const kept: Record<string, string | null>[] = [];
+    for (const row of rows) {
+        const entries = Object.entries(row).map(([key, value]): [string, string | null] => [key, valueAsText(value)]);
+        if (!budget.admit(textLengthOf(entries.map(([, value]) => value)))) break;
+        kept.push(Object.fromEntries(entries));
+    }
     return {
-        rows: rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, valueAsText(value)]))),
+        rows: kept,
         columns: names.map(name => ({ name })),
         tables: [],
+        ...(kept.length < rows.length ? { truncated: true, rowCount: rows.length } : {}),
         notices: []
     };
 }
