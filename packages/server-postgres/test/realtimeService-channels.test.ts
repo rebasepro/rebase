@@ -265,6 +265,28 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             expect(diff.leaves).toEqual({});
         });
 
+        it("a heartbeat with an unchanged state sends nobody a presence_diff", () => {
+            // Every client re-sends its state every ~20 s. Each of those used
+            // to reach every member as a diff saying nothing: n² frames per
+            // round (2,500 for a room of 50, a million for a room of 1,000).
+            const sockets = Array.from({ length: 50 }, (_, i) => createClient(service, `p${i}`));
+            for (let i = 0; i < 50; i++) {
+                service.joinChannel(`p${i}`, "room:collab");
+                service.trackPresence(`p${i}`, "room:collab", { name: `user${i}` });
+            }
+            const diffs = () => sockets
+                .flatMap(ws => ws.send.mock.calls.map(([frame]) => JSON.parse(frame as string) as { type: string }))
+                .filter(frame => frame.type === "presence_diff").length;
+            for (const ws of sockets) ws.send.mockClear();
+
+            for (let i = 0; i < 50; i++) service.trackPresence(`p${i}`, "room:collab", { name: `user${i}` });
+            expect(diffs()).toBe(0);
+
+            // A state that did change still reaches every member, once.
+            service.trackPresence("p7", "room:collab", { name: "user7", typing: true });
+            expect(diffs()).toBe(50);
+        });
+
         it("trackPresence() via handleClientMessage auto-joins the channel", async () => {
             const ws1 = createClient(service, "c1");
 

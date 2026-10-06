@@ -399,7 +399,7 @@ Presence tracks which users are currently online in a channel and lets each user
 | `presence_state`  | Server → Client | Full entity of all presences in a channel          |
 | `presence_diff`   | Server → Client | Incremental update (joins and leaves)                |
 
-When a client sends `presence_track`, the server automatically joins them to the channel (no separate `join_channel` needed) and broadcasts a `presence_diff` to all channel members.
+When a client sends `presence_track`, the server automatically joins them to the channel (no separate `join_channel` needed) and broadcasts a `presence_diff` to all channel members. The SDK re-sends its state every ~20 seconds as a heartbeat; a heartbeat whose state is unchanged only refreshes the client's timeout and sends no `presence_diff`.
 
 ```typescript
 // Track presence

@@ -2727,9 +2727,12 @@ lastSeen: Date.now() });
         // tells other instances this client is still here.
         void this.presenceStoreOp(() => this.presenceStore!.track(channel, clientId, state), "track");
 
-        // Broadcast join / state update to channel
-        this.deliverPresenceDiff(channel, { [clientId]: state }, {});
+        // Announce a join or a state change, here and to the other instances —
+        // and nothing else. An unchanged heartbeat used to be delivered to
+        // every local member regardless: n² frames per heartbeat round, each
+        // copying the roster on the client, to change no roster anywhere.
         if (changed) {
+            this.deliverPresenceDiff(channel, { [clientId]: state }, {});
             this.publishPresenceDiff(channel, { [clientId]: state }, {});
         }
 
