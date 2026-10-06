@@ -195,8 +195,7 @@ export const FORBIDDEN_IN_EAGER = [
     {
         test: /node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?markdown-it\//,
         label: "markdown-it",
-        why: "only markdown cells and previews render it",
-        pending: "the kit's Markdown component still imports it statically (ui-kit sweep, UI-3)"
+        why: "only markdown cells and previews render it; the kit's Markdown component imports it on first render"
     }
 ];
 

@@ -3,8 +3,8 @@
         "app/frontend/dist": {
             "chunks": {
                 "rebase-core": 489960,
-                "rebase-ui": 349271,
-                "index": 312774,
+                "index": 312758,
+                "rebase-ui": 247128,
                 "vendor-react-dom": 178415,
                 "vendor-dnd": 49884,
                 "vendor-fuse": 26336,
@@ -16,8 +16,8 @@
                 "useSidePanel": 663,
                 "vendor-react-router": 358
             },
-            "totalBytes": 1433236,
-            "totalGzipBytes": 459411
+            "totalBytes": 1331077,
+            "totalGzipBytes": 414861
         }
     }
 }
