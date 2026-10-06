@@ -232,9 +232,11 @@ export async function readBackupBytes(
  * buffer for object storage — and a file over 2 GiB never downloaded at all:
  * `readFileSync` throws `ERR_FS_FILE_TOO_LARGE` there.
  *
- * A local file is read from disk as the response is written. Object storage
- * still arrives through {@link StorageController.getObject}, which is a
- * buffered `File` by contract; streaming that avoids the second copy.
+ * A local file is read from disk as the response is written, and so is an
+ * object through a controller with `getObjectStream` (the built-in S3 and GCS
+ * ones). A custom controller without it still arrives through
+ * {@link StorageController.getObject}, a buffered `File` by contract;
+ * streaming that avoids the second copy.
  */
 export async function openBackupStream(
     dest: BackupDestination,
@@ -250,9 +252,14 @@ export async function openBackupStream(
 
     if (!storage) throw new Error(noControllerFor(dest));
     if (!isObjectBackupKey(dest, key)) return null;
+    const name = key.split("/").pop() || key;
+    if (storage.getObjectStream) {
+        const object = await storage.getObjectStream(key, { bucket: dest.bucket });
+        return object ? { stream: object.stream, size: object.size, name } : null;
+    }
     const file = await storage.getObject(key, dest.bucket);
     if (!file) return null;
-    return { stream: file.stream(), size: file.size, name: key.split("/").pop() || key };
+    return { stream: file.stream(), size: file.size, name };
 }
 
 /** A file on disk as a web stream, read a chunk at a time as the response is written. */

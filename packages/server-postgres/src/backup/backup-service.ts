@@ -403,8 +403,12 @@ export async function uploadBackup(
 ): Promise<{ key: string; storageUrl: string }> {
     const fileName = path.basename(localFile);
     const key = joinStorageKey(dest.prefix, fileName);
-    const buffer = fs.readFileSync(localFile);
-    const file = new File([buffer], fileName, { type: "application/octet-stream" });
+    // Backed by the dump on disk, not read into memory: the built-in
+    // controllers write it a chunk (S3: a multipart part) at a time. Read with
+    // `readFileSync` and copied into a `File`, a dump was held three or four
+    // times over in the process running the cron, and one over 2 GiB could
+    // not be read at all (`ERR_FS_FILE_TOO_LARGE`), so it never uploaded.
+    const file = new File([await fs.openAsBlob(localFile)], fileName, { type: "application/octet-stream" });
     const result = await storage.putObject({
         file,
         key,

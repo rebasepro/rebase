@@ -8,6 +8,8 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import readline from "readline";
+import { Readable } from "stream";
+import { pipeline } from "stream/promises";
 import chalk from "chalk";
 // Aliased: `out` is already a local in two of the commands below (the `--out`
 // backup destination).
@@ -41,6 +43,20 @@ function formatBytes(bytes: number): string {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+/** A web stream's chunks, for piping into a file. */
+async function* webChunks(stream: ReadableStream<Uint8Array>): AsyncGenerator<Uint8Array> {
+    const reader = stream.getReader();
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) return;
+            yield value;
+        }
+    } finally {
+        reader.releaseLock();
+    }
 }
 
 /**
@@ -274,12 +290,16 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
             if (!storage) throw new BackupToolError("Could not resolve storage for the given URL.");
             const key = backupArg.replace(/^(s3|gs):\/\/[^/]+\//, "");
             const bucket = backupArg.replace(/^(s3|gs):\/\/([^/]+)\/.*$/, "$2");
-            const file = await storage.getObject(key, bucket);
-            if (!file) throw new BackupToolError(`Backup not found in storage: ${backupArg}`);
             const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-restore-"));
             localFile = path.join(tmpDir, path.basename(key));
-            fs.writeFileSync(localFile, Buffer.from(await file.arrayBuffer()));
             cleanupTemp = true;
+            // Streamed to disk: buffered, a dump was held twice in memory and
+            // one over 2 GiB could not be written in one call at all.
+            const object = storage.getObjectStream
+                ? await storage.getObjectStream(key, { bucket })
+                : await storage.getObject(key, bucket).then((file) => file && { stream: file.stream() });
+            if (!object) throw new BackupToolError(`Backup not found in storage: ${backupArg}`);
+            await pipeline(Readable.from(webChunks(object.stream)), fs.createWriteStream(localFile));
             const globalsObj = await storage.getObject(globalsFileForDump(key), bucket);
             if (globalsObj) globalsSql = Buffer.from(await globalsObj.arrayBuffer()).toString("utf-8");
         } else {
