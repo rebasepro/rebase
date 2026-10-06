@@ -589,7 +589,9 @@ target });
         const out: { key: string; node: IncludeNode; relation: ResolvedRelation }[] = [];
 
         if (wildcard) {
-            // `*` is "every relation, one hop" — the admin panel's shape. A
+            // `*` is "every relation, one hop", tab-only relations included.
+            // The admin panel names the relations its properties render and
+            // sends `*` only when it cannot resolve them in the browser. A
             // relation also named explicitly keeps its options.
             for (const [key, relation] of Object.entries(resolvedRelations)) {
                 out.push({ key, node: tree[key] ?? { children: {} }, relation });

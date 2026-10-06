@@ -146,7 +146,11 @@ export interface IncludeOptions {
  * - `["author", "comments.author"]` — a dotted path is the same thing as the
  *   nested object form, spelled flat. It is what the REST `?include=` parameter
  *   carries, and the two forms compile to the same request.
- * - `["*"]` — every relation, one hop deep. The admin panel's shape.
+ * - `["*"]` — every relation the collection declares, one hop deep, those
+ *   declared only for a record's tabs included — so on a list it can embed
+ *   every row of a to-many relation no column shows. Name the relations the
+ *   view renders instead; the admin panel does, and sends `*` only when it
+ *   cannot resolve a collection's relations in the browser.
  * - `{ comments: { limit: 5, include: { author: true } } }` — the parametrised
  *   form.
  *
