@@ -187,13 +187,13 @@ describe("the command words the failure telemetry records", () => {
         expect(JSON.stringify(properties)).not.toContain("acme");
     });
 
-    it("does not send a mistyped subcommand or command, which are free text", () => {
+    it("does not send a mistyped subcommand or command, which are free text", async () => {
         // These two exit through `unknownCommand` today, before the catch that
         // records — but the mapping is what makes that an accident of routing
         // rather than the only thing standing between a typo and the payload.
-        expect(telemetryCommandWords("db", "acme-payroll-internal")).toEqual({ command: "db", subcommand: "other" });
-        expect(telemetryCommandWords("acme-payroll-internal", undefined)).toEqual({ command: "other", subcommand: "none" });
-        expect(telemetryCommandWords("acme-payroll-internal", "push")).toEqual({ command: "other", subcommand: "other" });
+        expect(await telemetryCommandWords("db", "acme-payroll-internal")).toEqual({ command: "db", subcommand: "other" });
+        expect(await telemetryCommandWords("acme-payroll-internal", undefined)).toEqual({ command: "other", subcommand: "none" });
+        expect(await telemetryCommandWords("acme-payroll-internal", "push")).toEqual({ command: "other", subcommand: "other" });
     });
 
     it("still names a subcommand the command dispatches", async () => {
@@ -204,7 +204,7 @@ describe("the command words the failure telemetry records", () => {
         await expect(entry(["node", "rebase", "status"])).rejects.toThrow(UsageError);
         expect(telemetry.recorded.at(-1)?.properties).toMatchObject({ command: "status", subcommand: "none" });
 
-        expect(telemetryCommandWords("db", "push")).toEqual({ command: "db", subcommand: "push" });
-        expect(telemetryCommandWords("schema", "--help")).toEqual({ command: "schema", subcommand: "--help" });
+        expect(await telemetryCommandWords("db", "push")).toEqual({ command: "db", subcommand: "push" });
+        expect(await telemetryCommandWords("schema", "--help")).toEqual({ command: "schema", subcommand: "--help" });
     });
 });

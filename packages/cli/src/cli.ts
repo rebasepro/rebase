@@ -1,25 +1,6 @@
 import chalk from "chalk";
 import arg from "arg";
-import { createRebaseApp } from "./commands/init";
-import { generateSdkCommand } from "./commands/generate_sdk";
-import { SCHEMA_SUBCOMMANDS, schemaCommand } from "./commands/schema";
-import { DB_SUBCOMMANDS, dbCommand } from "./commands/db";
-import { devCommand } from "./commands/dev";
-import { buildCommand } from "./commands/build";
-import { ejectCommand } from "./commands/eject";
-import { startCommand } from "./commands/start";
-import { AUTH_SUBCOMMANDS, authCommand } from "./commands/auth";
-import { doctorCommand } from "./commands/doctor";
-import { resourcesCommand } from "./commands/resources";
-import { statusCommand } from "./commands/status";
-import { normalizeImportsCommand } from "./commands/normalize-imports";
-import { SKILLS_SUBCOMMANDS, skillsCommand } from "./commands/skills";
-import { API_KEYS_SUBCOMMANDS, apiKeysCommand } from "./commands/api-keys";
-import { TELEMETRY_SUBCOMMANDS, telemetryCommand } from "./commands/telemetry";
 import { errorClass, isEnabled, recordEvent } from "./telemetry";
-import { CLOUD_GROUP_NAMES, GROUP_ALIASES, cloudCommand } from "./commands/cloud";
-import { APPS_SUBCOMMANDS, appsCommand } from "./commands/apps";
-import { upgradeCommand } from "./commands/upgrade";
 import { requireProjectRoot } from "./utils/project";
 import { parseCommandArgs } from "./utils/args";
 import { unknownCommand } from "./utils/unknown-command";
@@ -74,21 +55,37 @@ export const ROOT_FLAGS = {
  */
 const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade", "normalize-imports"];
 
+/** The words a command group dispatches, and the other spellings it accepts for them. */
+interface CommandVocabulary {
+    subcommands: readonly string[];
+    aliases: Readonly<Record<string, string>>;
+}
+
+const NO_VOCABULARY: CommandVocabulary = { subcommands: [], aliases: {} };
+
 /**
  * The subcommands each command group dispatches, from the lists those groups
  * dispatch on. A command absent from here takes no subcommand.
+ *
+ * Read from the group's own module, which is loaded here rather than at
+ * startup: every command module is imported when its command runs (see
+ * {@link dispatch}), and this is only ever asked about the command being run,
+ * whose module the dispatch is about to load anyway.
  */
-function knownSubcommands(command: string): readonly string[] {
+async function commandVocabulary(command: string): Promise<CommandVocabulary> {
     switch (command) {
-        case "schema": return SCHEMA_SUBCOMMANDS;
-        case "db": return DB_SUBCOMMANDS;
-        case "auth": return AUTH_SUBCOMMANDS;
-        case "skills": return SKILLS_SUBCOMMANDS;
-        case "api-keys": return API_KEYS_SUBCOMMANDS;
-        case "apps": return APPS_SUBCOMMANDS;
-        case "telemetry": return TELEMETRY_SUBCOMMANDS;
-        case "cloud": return CLOUD_GROUP_NAMES;
-        default: return [];
+        case "schema": return { subcommands: (await import("./commands/schema")).SCHEMA_SUBCOMMANDS, aliases: {} };
+        case "db": return { subcommands: (await import("./commands/db")).DB_SUBCOMMANDS, aliases: {} };
+        case "auth": return { subcommands: (await import("./commands/auth")).AUTH_SUBCOMMANDS, aliases: {} };
+        case "skills": return { subcommands: (await import("./commands/skills")).SKILLS_SUBCOMMANDS, aliases: {} };
+        case "api-keys": return { subcommands: (await import("./commands/api-keys")).API_KEYS_SUBCOMMANDS, aliases: {} };
+        case "apps": return { subcommands: (await import("./commands/apps")).APPS_SUBCOMMANDS, aliases: {} };
+        case "telemetry": return { subcommands: (await import("./commands/telemetry")).TELEMETRY_SUBCOMMANDS, aliases: {} };
+        case "cloud": {
+            const cloud = await import("./commands/cloud");
+            return { subcommands: cloud.CLOUD_GROUP_NAMES, aliases: cloud.GROUP_ALIASES };
+        }
+        default: return NO_VOCABULARY;
     }
 }
 
@@ -140,18 +137,19 @@ export function resolveSubcommand(after: readonly string[], known: readonly stri
  *
  * Exported for `cli.test.ts`.
  */
-export function telemetryCommandWords(
+export async function telemetryCommandWords(
     command: string | undefined,
     subcommand: string | undefined
-): { command: string; subcommand: string } {
+): Promise<{ command: string; subcommand: string }> {
     if (!command) return { command: "none", subcommand: "none" };
     const dispatched = namespacedCommands.includes(command) || command === "__dev-db-daemon";
     if (!dispatched) return { command: "other", subcommand: subcommand ? "other" : "none" };
 
     if (!subcommand) return { command, subcommand: "none" };
     if (subcommand === "--help") return { command, subcommand };
-    const canonical = command === "cloud" ? GROUP_ALIASES[subcommand] ?? subcommand : subcommand;
-    return { command, subcommand: knownSubcommands(command).includes(canonical) ? canonical : "other" };
+    const { subcommands, aliases } = await commandVocabulary(command);
+    const canonical = aliases[subcommand] ?? subcommand;
+    return { command, subcommand: subcommands.includes(canonical) ? canonical : "other" };
 }
 
 export async function entry(args: string[]) {
@@ -187,7 +185,7 @@ export async function entry(args: string[]) {
     const command = commandAt === -1 ? undefined : parsedArgs._[commandAt];
     const subcommand = command === undefined
         ? undefined
-        : resolveSubcommand(parsedArgs._.slice(commandAt + 1), knownSubcommands(command));
+        : resolveSubcommand(parsedArgs._.slice(commandAt + 1), (await commandVocabulary(command)).subcommands);
 
     // Show global help only when no command given, or --help with no recognized command
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {
@@ -237,7 +235,7 @@ export async function entry(args: string[]) {
         // word typed after a command is as often a project name or a typo as a
         // subcommand, and neither has a separator for `sanitize` to catch.
         await recordEvent("cli.error", {
-            ...telemetryCommandWords(command, effectiveSubcommand),
+            ...(await telemetryCommandWords(command, effectiveSubcommand)),
             error_type: errorClass(error),
             usage: Boolean(error && typeof error === "object" && (error as { isUsageError?: unknown }).isUsageError)
         }, { projectRoot: process.cwd() });
@@ -249,6 +247,12 @@ export async function entry(args: string[]) {
  * The dispatch, lifted out of {@link entry} so the whole of it sits inside one
  * `try`. Inlining the switch there would have put the `catch` around the flag
  * parsing too, which throws its own usage errors before a command is even named.
+ *
+ * Each command's module is imported here, when its command runs. Imported at
+ * the top of this file, every invocation (`rebase --version` and `--help`
+ * included, and the CLI `rebase dev` re-runs for itself) loaded all of them:
+ * inquirer, execa, the SDK client, the code generator and the server
+ * packages, 231 modules and 125–144 ms before the first line of output.
  */
 async function dispatch(
     command: string | undefined,
@@ -271,9 +275,11 @@ async function dispatch(
             return;
         }
 
-        case "init":
+        case "init": {
+            const { createRebaseApp } = await import("./commands/init");
             await createRebaseApp(args);
             break;
+        }
 
         case "generate-sdk": {
             // Strict, and parsed from the whole line rather than `slice(3)`.
@@ -314,6 +320,7 @@ async function dispatch(
             // them. An explicitly passed path still resolves against the cwd,
             // which is where the person typing it means it.
             const sdkRoot = sdkHelp ? process.cwd() : requireProjectRoot();
+            const { generateSdkCommand } = await import("./commands/generate_sdk");
             await generateSdkCommand({
                 collectionsDir: sdkArgs["--collections"] || path.join(sdkRoot, "config/collections"),
                 output: sdkArgs["--output"] || path.join(sdkRoot, "generated/sdk"),
@@ -325,70 +332,104 @@ async function dispatch(
             break;
         }
 
-        case "schema":
+        case "schema": {
+            const { schemaCommand } = await import("./commands/schema");
             await schemaCommand(effectiveSubcommand, args);
             break;
+        }
 
-        case "db":
+        case "db": {
+            const { dbCommand } = await import("./commands/db");
             await dbCommand(effectiveSubcommand, args);
             break;
+        }
 
-        case "dev":
+        case "dev": {
+            const { devCommand } = await import("./commands/dev");
             await devCommand(args);
             break;
+        }
 
-        case "normalize-imports":
+        case "normalize-imports": {
+            const { normalizeImportsCommand } = await import("./commands/normalize-imports");
             await normalizeImportsCommand(args);
             break;
-        case "build":
+        }
+        case "build": {
+            const { buildCommand } = await import("./commands/build");
             await buildCommand(args);
             break;
+        }
 
-        case "start":
+        case "start": {
+            const { startCommand } = await import("./commands/start");
             await startCommand(args);
             break;
+        }
 
-        case "upgrade":
+        case "upgrade": {
+            const { upgradeCommand } = await import("./commands/upgrade");
             await upgradeCommand(args);
             break;
+        }
 
-        case "apps":
+        case "apps": {
+            const { appsCommand } = await import("./commands/apps");
             await appsCommand(effectiveSubcommand, args);
             break;
+        }
 
-        case "eject":
+        case "eject": {
+            const { ejectCommand } = await import("./commands/eject");
             await ejectCommand(args);
             break;
+        }
 
-        case "auth":
+        case "auth": {
+            const { authCommand } = await import("./commands/auth");
             await authCommand(effectiveSubcommand, args);
             break;
+        }
 
-        case "status":
+        case "status": {
+            const { statusCommand } = await import("./commands/status");
             await statusCommand(args);
             break;
-        case "resources":
+        }
+        case "resources": {
+            const { resourcesCommand } = await import("./commands/resources");
             await resourcesCommand(args);
             break;
-        case "doctor":
+        }
+        case "doctor": {
+            const { doctorCommand } = await import("./commands/doctor");
             await doctorCommand(args);
             break;
+        }
 
-        case "skills":
+        case "skills": {
+            const { skillsCommand } = await import("./commands/skills");
             await skillsCommand(effectiveSubcommand, args);
             break;
+        }
 
-        case "api-keys":
+        case "api-keys": {
+            const { apiKeysCommand } = await import("./commands/api-keys");
             await apiKeysCommand(effectiveSubcommand, args);
             break;
+        }
 
-        case "cloud":
+        case "cloud": {
+            const { cloudCommand } = await import("./commands/cloud");
             await cloudCommand(effectiveSubcommand, args);
             break;
+        }
 
-        case "telemetry":
+        case "telemetry": {
+            const { telemetryCommand } = await import("./commands/telemetry");
             await telemetryCommand(args);
             break;
+        }
 
         default:
             // One line, with the correction, and no screen of help after it: the

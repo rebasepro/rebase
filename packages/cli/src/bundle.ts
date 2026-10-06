@@ -17,7 +17,6 @@ import fs from "fs";
 import path from "path";
 import { createRequire } from "module";
 import { spawnSync } from "child_process";
-import { execa } from "execa";
 import chalk from "chalk";
 import {
     BUNDLE_FORMAT_VERSION,
@@ -1150,6 +1149,9 @@ async function regenerateSchema(
     }
 
     const collectionsPath = path.join("..", configDir, "collections");
+    // Imported here, not at the top: this module is part of the package's
+    // entry, which every `rebase` invocation loads, and execa is ~100 modules.
+    const { execa } = await import("execa");
     try {
         await execa(
             runner,
@@ -1360,6 +1362,7 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
         );
     }
 
+    const { execa } = await import("execa");
     try {
         await execa(tsc, ["-p", tsconfigPath], { cwd: projectRoot,
 stdio: toolStdio(options.quietStdout) });
