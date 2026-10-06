@@ -2,6 +2,7 @@ import type { Properties } from "@rebasepro/types";
 import type { ArrayProperty, MapProperty, NumberProperty, Property, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, StringProperty, StringPropertyValidationSchema, VectorProperty, BinaryProperty } from "@rebasepro/types";
 ;
 import { z, ZodTypeAny } from "zod";
+import { deepEqual as isDeepEqual } from "fast-equals";
 import { enumToObjectEntries, isPropertyBuilder } from "@rebasepro/common";
 import { getValueInPath, hydrateRegExp, isPlainObject, prettifyIdentifier } from "@rebasepro/utils";
 
@@ -44,6 +45,46 @@ interface PropertyContext<P extends Property> {
     entityId?: string | number,
     customFieldValidator?: CustomFieldValidator,
     name?: string
+}
+
+/**
+ * `validation.unique`, for the top-level properties that declare it: whether
+ * another record already holds the value, asked of the data source through
+ * `validator`. One error per field that fails, keyed like the schema's.
+ *
+ * Asked only for a value worth asking about — set (not empty), changed from
+ * `storedValues` when there are any (a value the edit left alone is the stored
+ * record's business, and it may predate the rule), and without an error of its
+ * own already in `errors` — so a save makes one lookup per unique field it
+ * actually changes, and typing makes none: this runs where validation runs, on
+ * submit.
+ */
+export async function uniqueValueErrors({
+    properties,
+    values,
+    storedValues,
+    entityId,
+    errors,
+    validator
+}: {
+    properties: Properties,
+    values: Record<string, unknown>,
+    storedValues?: Record<string, unknown>,
+    entityId?: string | number,
+    errors?: Record<string, unknown>,
+    validator: CustomFieldValidator
+}): Promise<Record<string, string>> {
+    const found: Record<string, string> = {};
+    await Promise.all(Object.entries(properties as Record<string, Property>).map(async ([name, property]) => {
+        if (!property?.validation?.unique) return;
+        if (errors && name in errors) return;
+        const value = values[name];
+        if (value === undefined || value === null || value === "") return;
+        if (storedValues && isDeepEqual(value, storedValues[name])) return;
+        const unique = await validator({ name, value, property, entityId });
+        if (!unique) found[name] = `${fieldLabel(property, name)} must be unique: another record already has this value`;
+    }));
+    return found;
 }
 
 export function getEntitySchema<M extends Record<string, unknown>>(

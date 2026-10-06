@@ -26,7 +26,7 @@ import { useRailVisible } from "./components/useRailVisible";
 import { PropertyFieldBinding } from "./PropertyFieldBinding";
 import { flattenKeys } from "@rebasepro/app";
 import { ErrorFocus } from "./components/ErrorFocus";
-import { applyValueTransforms, CustomFieldValidator, getEntitySchema } from "./validation";
+import { applyValueTransforms, CustomFieldValidator, getEntitySchema, uniqueValueErrors } from "./validation";
 import { resolveFormProperty, resolvePropertiesForValidation } from "./resolve_form_properties";
 import { EntityFormActions } from "./EntityFormActions";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
@@ -467,8 +467,21 @@ export function EntityForm<M extends Record<string, unknown>>({
     const { t } = useTranslation();
 
     async function validationErrorsFor(values: M): Promise<Record<string, string>> {
-        const result = await validationSchemaFor(values).safeParseAsync(values);
-        return result.success ? {} : zodToFormErrors(result.error);
+        const properties = validationPropertiesFor(values);
+        const result = await getEntitySchema(entityId, properties, uniqueFieldValidator).safeParseAsync(values);
+        const errors: Record<string, string> = result.success ? {} : zodToFormErrors(result.error);
+        // `validation.unique` asks the data source, so it runs here — on
+        // submit — and only for values this edit changed that are otherwise
+        // valid. It was built and threaded through, and never called.
+        const notUnique = await uniqueValueErrors({
+            properties,
+            values,
+            storedValues: status === "existing" ? entity?.values : undefined,
+            entityId,
+            errors,
+            validator: uniqueFieldValidator
+        });
+        return { ...errors, ...notUnique };
     }
 
     /**
@@ -477,20 +490,17 @@ export function EntityForm<M extends Record<string, unknown>>({
      * the ones the user can change. Built per call because both depend on the
      * values being judged.
      */
-    function validationSchemaFor(values: M) {
-        return getEntitySchema(
+    function validationPropertiesFor(values: M) {
+        return resolvePropertiesForValidation<M>({
+            properties: collection.properties,
+            isNew: status === "new" || status === "copy",
+            values,
+            previousValues: baseInitialValues as Partial<M>,
+            path,
             entityId,
-            resolvePropertiesForValidation<M>({
-                properties: collection.properties,
-                isNew: status === "new" || status === "copy",
-                values,
-                previousValues: baseInitialValues as Partial<M>,
-                path,
-                entityId,
-                propertyConfigs: customizationController.propertyConfigs,
-                authController
-            }),
-            uniqueFieldValidator);
+            propertyConfigs: customizationController.propertyConfigs,
+            authController
+        });
     }
 
     useOnAutoSave(autoSave, formex, lastSavedValues, save);

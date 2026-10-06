@@ -77,7 +77,7 @@ the code that writes it.
 |------|------|-------------|
 | `required` | `boolean` | The value must be present |
 | `requiredMessage` | `string` | What the form says when it is not. **Admin form only — not enforced by the API or the database.** |
-| `unique` | `boolean` | Only one row in the table may hold this value |
+| `unique` | `boolean` | Only one row in the table may hold this value. The admin form also checks it when saving a value the edit changed, so a duplicate is named on its field before the write |
 | `uniqueInArray` | `boolean` | Only one entry *per array* may hold it. Applies to a direct child of an `array` property, or a first-level child of a `map` inside one. **Admin form only — not enforced by the API or the database.** |
 
 ### Strings
