@@ -330,12 +330,13 @@ values: { ...e.values,
             });
 
             // Always filter in memory to only show entities that belong to this specific column.
-            // This is required because text search returns all matches, and collection_entity_patch
-            // may contain entities that have just been moved out of this column.
+            // This is required because text search returns all matches, and the overlay above
+            // moves a card dragged out of this column to its new one before the server has.
             let processed = mergedEntities.filter(e => e.values?.[currentColumnProperty] === column);
 
-            // Sort locally if orderProperty is defined. This ensures that collection_entity_patch
-            // insertions (which prepend by default in websocket.ts) are correctly placed.
+            // Sort locally if orderProperty is defined: pending cards are appended above, and
+            // the overlay can change a card's order key, so the order the rows arrived in is
+            // not the order to show.
             if (currentOrderProperty) {
                 processed = [...processed].sort((a, b) => {
                     const valA = a.values?.[currentOrderProperty] as string | undefined | null;
