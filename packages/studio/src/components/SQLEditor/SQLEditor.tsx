@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import {
     Alert,
     Button,
+    type CellRendererParams,
     Checkbox,
     Chip,
     CircularProgress,
@@ -376,6 +377,12 @@ export const SQLEditor = () => {
     const loading = activeTab.loading;
     const error = activeTab.error;
     const execTime = activeTab.execTime;
+    /**
+     * The SQL whose rows are on screen, which their column widths are kept
+     * under. Not the text being typed: keyed by that, every keystroke handed
+     * the grid other widths, and every visible cell was drawn again.
+     */
+    const resultSql = activeTab.lastExecutedSql ?? "";
 
     const setSql = (newSql: string) => updateActiveTab({ sql: newSql });
     const setResults = (newResults: Record<string, unknown>[] | null) => updateActiveTab({ results: newResults });
@@ -840,15 +847,15 @@ role: connection.role });
         setColumnWidths(prev => {
             const newWidths = {
                 ...prev,
-                [activeTab.sql]: {
-                    ...(prev[activeTab.sql] || {}),
+                [resultSql]: {
+                    ...(prev[resultSql] || {}),
                     [key]: width
                 }
             };
             writeStoredJson(`rebase_sql_column_widths_${projectPrefix}`, newWidths);
             return newWidths;
         });
-    }, [activeTab.sql, projectPrefix]);
+    }, [resultSql, projectPrefix]);
 
     const handlePrettify = () => {
         setSql(formatSql(activeTab.sql));
@@ -1111,6 +1118,154 @@ truncatedFrom: null });
         });
     };
 
+    // What the result grid is handed, kept the same object while only the
+    // editor's text changes: `VirtualTable` compares its props, and a new
+    // column list or cell renderer on every keystroke redrew every visible
+    // cell of the result for each character typed.
+    const savedWidths = columnWidths[resultSql];
+    const resultColumnKeys = useMemo(() => results && results.length > 0 ? Object.keys(results[0]) : [], [results]);
+
+    // Compute matched collections for this query, including PK column detection
+    // Only collections whose key the database says is in the result can be opened,
+    // and only from rows read on the app's own database: the record the CMS
+    // opens is that database's row with the key, whatever database the
+    // rows on screen came from.
+    const readFromAppDatabase = activeTab.lastExecutedConnection !== null &&
+        (activeTab.lastExecutedConnection.database === undefined || activeTab.lastExecutedConnection.database === appDatabase);
+    const lastProvenance = activeTab.lastProvenance;
+    const registryCollections = collectionRegistry.collections;
+    const actionableCollections = useMemo((): ResolvedQueryCollection[] => lastProvenance && registryCollections && readFromAppDatabase
+        ? resolveQueryCollections(lastProvenance, registryCollections)
+            .filter(mc => resultColumnKeys.includes(mc.pkColumn))
+        : [], [lastProvenance, registryCollections, readFromAppDatabase, resultColumnKeys]);
+
+    // For each row, determine which entities can be opened
+    const getRowEntityActions = useCallback((rowData: Record<string, unknown>): { collection: ResolvedQueryCollection, entityId: string | number }[] => {
+        if (!rowData) return [];
+        return actionableCollections
+            .filter(mc => rowData[mc.pkColumn] != null)
+            .map(mc => ({
+                collection: mc,
+                entityId: rowData[mc.pkColumn] as string | number
+            }));
+    }, [actionableCollections]);
+
+    // Build the columns array. If we have actionable collections, prepend a dedicated action column.
+    const hasRowActions = actionableCollections.length > 0;
+    const resultColumns = useMemo((): VirtualTableColumn[] => {
+        const dataColumns: VirtualTableColumn[] = resultColumnKeys.map(key => ({
+            key,
+            title: key,
+            width: savedWidths?.[key] ?? 150,
+            sortable: false,
+            resizable: true
+        }));
+        return hasRowActions
+            ? [{ key: "__cms_action__",
+title: "",
+width: 36,
+sortable: false,
+resizable: false }, ...dataColumns]
+            : dataColumns;
+    }, [resultColumnKeys, savedWidths, hasRowActions]);
+
+    const renderResultCell = useCallback(({ rowData, column, rowIndex }: CellRendererParams<Record<string, unknown>>) => {
+        // Dedicated collection action column
+        if (column.key === "__cms_action__") {
+            const rowActions = getRowEntityActions(rowData ?? {});
+            if (rowActions.length === 0) {
+                return <div className="h-full w-full"/>;
+            }
+            if (rowActions.length === 1) {
+                const ra = rowActions[0];
+                return (
+                    <div className="h-full flex items-center justify-center">
+                        <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}>
+                            <IconButton
+                                size="small"
+                                aria-label={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}
+                                className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    sidePanelController?.open({
+                                        path: ra.collection.collection.slug,
+                                        entityId: ra.entityId,
+                                        collection: ra.collection.collection,
+                                        updateUrl: false
+                                    });
+                                }}
+                            >
+                                <PencilIcon size={iconSize.smallest}/>
+                            </IconButton>
+                        </Tooltip>
+                    </div>
+                );
+            }
+            // Multiple matched collections (JOIN) — show a dropdown
+            return (
+                <div className="h-full flex items-center justify-center">
+                    <Menu
+                        trigger={
+                            <IconButton
+                                size="small"
+                                className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <MoreVerticalIcon size={iconSize.smallest}/>
+                            </IconButton>
+                        }
+                    >
+                        {rowActions.map(ra => (
+                            <MenuItem
+                                key={ra.collection.tableName}
+                                dense
+                                onClick={() => {
+                                    sidePanelController?.open({
+                                        path: ra.collection.collection.slug,
+                                        entityId: ra.entityId,
+                                        collection: ra.collection.collection,
+                                        updateUrl: false
+                                    });
+                                }}
+                            >
+                                {t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}
+                            </MenuItem>
+                        ))}
+                    </Menu>
+                </div>
+            );
+        }
+
+        // Regular data cell
+        const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.columnKey === column.key;
+        const value = rowData ? rowData[column.key] : null;
+        const displayValue = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value ?? "");
+
+        if (isEditing) {
+            return (
+                <FixedEditorOverlay
+                    displayValue={displayValue}
+                    onSave={(val) => handleCellSave(val, rowData ?? {}, column.key, rowIndex)}
+                    onCancel={() => setEditingCell(null)}
+                />
+            );
+        }
+
+        return (
+            <div
+                className="px-4 py-1.5 h-full flex items-center whitespace-nowrap text-[13px] text-text-primary dark:text-text-primary-dark font-mono cursor-text group/cell"
+                onDoubleClick={() => handleDoubleClick(rowIndex, column.key, displayValue, rowData ?? {})}
+            >
+                <div className="truncate flex-grow" title={displayValue}>
+                    {value === null || value === undefined ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-[11px]">NULL</span> : displayValue}
+                </div>
+            </div>
+        );
+    }, [getRowEntityActions, editingCell, handleCellSave, handleDoubleClick, sidePanelController, t]);
+
     const renderResults = () => {
         if (loading) {
             return (
@@ -1170,49 +1325,6 @@ truncatedFrom: null });
             );
         }
 
-        const savedWidths = columnWidths[activeTab.sql] || {};
-        const resultColumnKeys = Object.keys(results[0]);
-
-        // Compute matched collections for this query, including PK column detection
-        // Only collections whose key the database says is in the result can be opened,
-        // and only from rows read on the app's own database: the record the CMS
-        // opens is that database's row with the key, whatever database the
-        // rows on screen came from.
-        const readFromAppDatabase = activeTab.lastExecutedConnection !== null &&
-            (activeTab.lastExecutedConnection.database === undefined || activeTab.lastExecutedConnection.database === appDatabase);
-        const actionableCollections: ResolvedQueryCollection[] = activeTab.lastProvenance && collectionRegistry.collections && readFromAppDatabase
-            ? resolveQueryCollections(activeTab.lastProvenance, collectionRegistry.collections)
-                .filter(mc => resultColumnKeys.includes(mc.pkColumn))
-            : [];
-
-        // For each row, determine which entities can be opened
-        const getRowEntityActions = (rowData: Record<string, unknown>): { collection: ResolvedQueryCollection, entityId: string | number }[] => {
-            if (!rowData) return [];
-            return actionableCollections
-                .filter(mc => rowData[mc.pkColumn] != null)
-                .map(mc => ({
-                    collection: mc,
-                    entityId: rowData[mc.pkColumn] as string | number
-                }));
-        };
-
-        // Build the columns array. If we have actionable collections, prepend a dedicated action column.
-        const dataColumns: VirtualTableColumn[] = resultColumnKeys.map(key => ({
-            key,
-            title: key,
-            width: savedWidths[key] ?? 150,
-            sortable: false,
-            resizable: true
-        }));
-
-        const columns: VirtualTableColumn[] = actionableCollections.length > 0
-            ? [{ key: "__cms_action__",
-title: "",
-width: 36,
-sortable: false,
-resizable: false }, ...dataColumns]
-            : dataColumns;
-
         return (
             <div className="flex-grow flex flex-col overflow-hidden min-h-0">
                 {/* Collection Badges Bar */}
@@ -1238,107 +1350,12 @@ resizable: false }, ...dataColumns]
                 <div className="flex-grow relative h-full min-h-0 min-w-0">
                     <VirtualTable
                         data={results}
-                        columns={columns}
+                        columns={resultColumns}
                         rowHeight={32}
                         headerHeight={32}
                         extraData={editingCell}
                         onColumnResizeEnd={handleColumnResize}
-                        cellRenderer={({ rowData, column, rowIndex }) => {
-                            // Dedicated collection action column
-                            if (column.key === "__cms_action__") {
-                                const rowActions = getRowEntityActions(rowData ?? {});
-                                if (rowActions.length === 0) {
-                                    return <div className="h-full w-full"/>;
-                                }
-                                if (rowActions.length === 1) {
-                                    const ra = rowActions[0];
-                                    return (
-                                        <div className="h-full flex items-center justify-center">
-                                            <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
-id: String(ra.entityId) })}>
-                                                <IconButton
-                                                    size="small"
-                                                    aria-label={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
-id: String(ra.entityId) })}
-                                                    className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        sidePanelController?.open({
-                                                            path: ra.collection.collection.slug,
-                                                            entityId: ra.entityId,
-                                                            collection: ra.collection.collection,
-                                                            updateUrl: false
-                                                        });
-                                                    }}
-                                                >
-                                                    <PencilIcon size={iconSize.smallest}/>
-                                                </IconButton>
-                                            </Tooltip>
-                                        </div>
-                                    );
-                                }
-                                // Multiple matched collections (JOIN) — show a dropdown
-                                return (
-                                    <div className="h-full flex items-center justify-center">
-                                        <Menu
-                                            trigger={
-                                                <IconButton
-                                                    size="small"
-                                                    className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <MoreVerticalIcon size={iconSize.smallest}/>
-                                                </IconButton>
-                                            }
-                                        >
-                                            {rowActions.map(ra => (
-                                                <MenuItem
-                                                    key={ra.collection.tableName}
-                                                    dense
-                                                    onClick={() => {
-                                                        sidePanelController?.open({
-                                                            path: ra.collection.collection.slug,
-                                                            entityId: ra.entityId,
-                                                            collection: ra.collection.collection,
-                                                            updateUrl: false
-                                                        });
-                                                    }}
-                                                >
-                                                    {t("studio_sql_edit_entity", { name: ra.collection.collection.name,
-id: String(ra.entityId) })}
-                                                </MenuItem>
-                                            ))}
-                                        </Menu>
-                                    </div>
-                                );
-                            }
-
-                            // Regular data cell
-                            const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.columnKey === column.key;
-                            const value = rowData ? rowData[column.key] : null;
-                            const displayValue = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value ?? "");
-
-                            if (isEditing) {
-                                return (
-                                    <FixedEditorOverlay
-                                        displayValue={displayValue}
-                                        onSave={(val) => handleCellSave(val, rowData ?? {}, column.key, rowIndex)}
-                                        onCancel={() => setEditingCell(null)}
-                                    />
-                                );
-                            }
-
-                            return (
-                                <div
-                                    className="px-4 py-1.5 h-full flex items-center whitespace-nowrap text-[13px] text-text-primary dark:text-text-primary-dark font-mono cursor-text group/cell"
-                                    onDoubleClick={() => handleDoubleClick(rowIndex, column.key, displayValue, rowData ?? {})}
-                                >
-                                    <div className="truncate flex-grow" title={displayValue}>
-                                        {value === null || value === undefined ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-[11px]">NULL</span> : displayValue}
-                                    </div>
-                                </div>
-                            );
-                        }}
+                        cellRenderer={renderResultCell}
                     />
                 </div>
 

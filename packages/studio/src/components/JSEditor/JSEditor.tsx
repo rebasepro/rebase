@@ -629,6 +629,96 @@ data: rows };
             }));
     }, [matchedCollections]);
 
+    // What the result table is handed, kept the same object while only the
+    // script's text changes: `VirtualTable` compares its props, and a new
+    // column list or cell renderer per keystroke redrew every visible cell.
+    const resultColumns = useMemo((): VirtualTableColumn[] => matchedCollections.length > 0
+        ? [{ key: "__entity_action__",
+title: "",
+width: 36,
+sortable: false,
+resizable: false }, ...tableData.columns]
+        : tableData.columns, [matchedCollections.length, tableData.columns]);
+
+    const renderResultCell = useCallback(({ rowData, column }: CellRendererParams<Record<string, unknown>>) => {
+        // Entity action column
+        if (column.key === "__entity_action__") {
+            const rowActions = getRowEntityActions(rowData ?? {});
+            if (rowActions.length === 0) return <div className="h-full w-full"/>;
+            if (rowActions.length === 1) {
+                const ra = rowActions[0];
+                return (
+                    <div className="h-full flex items-center justify-center">
+                        <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}>
+                            <IconButton aria-label={t("studio_sql_edit_entity", { name: ra.collection.collection.name, id: String(ra.entityId) })}
+                                size="small"
+                                className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    sidePanelController.open({
+                                        path: ra.collection.collectionSlug,
+                                        entityId: ra.entityId,
+                                        collection: ra.collection.collection,
+                                        updateUrl: false
+                                    });
+                                }}
+                            >
+                                <PencilIcon size={iconSize.smallest}/>
+                            </IconButton>
+                        </Tooltip>
+                    </div>
+                );
+            }
+            // Multiple matched collections
+            return (
+                <div className="h-full flex items-center justify-center">
+                    <Menu
+                        trigger={
+                            <IconButton
+                                size={"small"}
+                                className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <MoreVerticalIcon size={iconSize.smallest}/>
+                            </IconButton>
+                        }
+                    >
+                        {rowActions.map(ra => (
+                            <MenuItem
+                                key={ra.collection.collectionSlug}
+                                dense
+                                onClick={() => {
+                                    sidePanelController.open({
+                                        path: ra.collection.collectionSlug,
+                                        entityId: ra.entityId,
+                                        collection: ra.collection.collection,
+                                        updateUrl: false
+                                    });
+                                }}
+                            >
+                                {t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}
+                            </MenuItem>
+                        ))}
+                    </Menu>
+                </div>
+            );
+        }
+
+        // Regular data cell
+        if (!rowData) return null;
+        const val = rowData[column.key];
+        const displayValue = typeof val === "object" && val !== null ? JSON.stringify(val) : String(val ?? "");
+        return (
+            <div className="px-4 py-1.5 h-full flex items-center whitespace-nowrap text-[13px] text-text-primary dark:text-text-primary-dark font-mono">
+                <div className="truncate flex-grow" title={displayValue}>
+                    {displayValue === "" ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-[11px]">NULL</span> : displayValue}
+                </div>
+            </div>
+        );
+    }, [getRowEntityActions, sidePanelController, t]);
+
     // ─── Export handlers ─────────────────────────────────────────
 
     const handleExportCSV = useCallback(() => {
@@ -886,95 +976,10 @@ message: t("studio_sql_markdown_copy_failed") });
                                                         <div className="flex-grow relative h-full min-h-0 min-w-0">
                                                             <VirtualTable
                                                                 data={tableData.data}
-                                                                columns={
-                                                                    matchedCollections.length > 0
-                                                                        ? [{ key: "__entity_action__",
-title: "",
-width: 36,
-sortable: false,
-resizable: false }, ...tableData.columns]
-                                                                        : tableData.columns
-                                                                }
+                                                                columns={resultColumns}
                                                                 rowHeight={32}
                                                                 headerHeight={32}
-                                                                cellRenderer={({ rowData, column, rowIndex }: CellRendererParams<Record<string, unknown>>) => {
-                                                                    // Entity action column
-                                                                    if (column.key === "__entity_action__") {
-                                                                        const rowActions = getRowEntityActions(rowData ?? {});
-                                                                        if (rowActions.length === 0) return <div className="h-full w-full"/>;
-                                                                        if (rowActions.length === 1) {
-                                                                            const ra = rowActions[0];
-                                                                            return (
-                                                                                <div className="h-full flex items-center justify-center">
-                                                                                    <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
-id: String(ra.entityId) })}>
-                                                                                        <IconButton aria-label={t("studio_sql_edit_entity", { name: ra.collection.collection.name, id: String(ra.entityId) })}
-                                                                                            size="small"
-                                                                                            className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation();
-                                                                                                sidePanelController.open({
-                                                                                                    path: ra.collection.collectionSlug,
-                                                                                                    entityId: ra.entityId,
-                                                                                                    collection: ra.collection.collection,
-                                                                                                    updateUrl: false
-                                                                                                });
-                                                                                            }}
-                                                                                        >
-                                                                                            <PencilIcon size={iconSize.smallest}/>
-                                                                                        </IconButton>
-                                                                                    </Tooltip>
-                                                                                </div>
-                                                                            );
-                                                                        }
-                                                                        // Multiple matched collections
-                                                                        return (
-                                                                            <div className="h-full flex items-center justify-center">
-                                                                                <Menu
-                                                                                    trigger={
-                                                                                        <IconButton
-                                                                                            size={"small"}
-                                                                                            className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
-                                                                                            onClick={(e) => e.stopPropagation()}
-                                                                                        >
-                                                                                            <MoreVerticalIcon size={iconSize.smallest}/>
-                                                                                        </IconButton>
-                                                                                    }
-                                                                                >
-                                                                                    {rowActions.map(ra => (
-                                                                                        <MenuItem
-                                                                                            key={ra.collection.collectionSlug}
-                                                                                            dense
-                                                                                            onClick={() => {
-                                                                                                sidePanelController.open({
-                                                                                                    path: ra.collection.collectionSlug,
-                                                                                                    entityId: ra.entityId,
-                                                                                                    collection: ra.collection.collection,
-                                                                                                    updateUrl: false
-                                                                                                });
-                                                                                            }}
-                                                                                        >
-                                                                                            {t("studio_sql_edit_entity", { name: ra.collection.collection.name,
-id: String(ra.entityId) })}
-                                                                                        </MenuItem>
-                                                                                    ))}
-                                                                                </Menu>
-                                                                            </div>
-                                                                        );
-                                                                    }
-
-                                                                    // Regular data cell
-                                                                    if (!rowData) return null;
-                                                                    const val = rowData[column.key];
-                                                                    const displayValue = typeof val === "object" && val !== null ? JSON.stringify(val) : String(val ?? "");
-                                                                    return (
-                                                                        <div className="px-4 py-1.5 h-full flex items-center whitespace-nowrap text-[13px] text-text-primary dark:text-text-primary-dark font-mono">
-                                                                            <div className="truncate flex-grow" title={displayValue}>
-                                                                                {displayValue === "" ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-[11px]">NULL</span> : displayValue}
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                }}
+                                                                cellRenderer={renderResultCell}
                                                             />
                                                         </div>
                                                     </div>
@@ -1010,7 +1015,7 @@ id: String(ra.entityId) })}
                                                             <div className={cls("px-2 py-1 mt-2 border-t pt-2", defaultBorderMixin)}>
                                                                 <Typography variant="caption" className="text-text-disabled text-[10px] uppercase tracking-wider mb-1 block">Return Value</Typography>
                                                                 <pre className="text-text-primary dark:text-text-primary-dark whitespace-pre-wrap break-words text-[12px]">
-                                                                    {formatJSON(result.value)}
+                                                                    <FormattedJSON value={result.value}/>
                                                                 </pre>
                                                             </div>
                                                         )}
@@ -1094,7 +1099,11 @@ id: String(ra.entityId) })}
 
 // ─── JSON Syntax Highlighting ────────────────────────────────────────
 
-function JSONHighlight({ value }: { value: unknown }) {
+/**
+ * Memoised on the value: tokenising a large result is the costliest thing
+ * this pane draws, and it used to run again for every keystroke in the editor.
+ */
+const JSONHighlight = React.memo(function JSONHighlight({ value }: { value: unknown }) {
     const json = formatJSON(value);
     const { mode } = useModeController();
 
@@ -1118,4 +1127,9 @@ backgroundColor: "transparent" }}>
             )}
         </Highlight>
     );
-}
+});
+
+/** A value as indented JSON, formatted again only when the value changes. */
+const FormattedJSON = React.memo(function FormattedJSON({ value }: { value: unknown }) {
+    return <>{formatJSON(value)}</>;
+});
