@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import useMeasure from "react-use-measure";
-
 import { cls, Tooltip, iconSize } from "@rebasepro/ui";
 import { ErrorBoundary, MinusCircleIcon } from "@rebasepro/ui";
 import { getRowHeight, TableSize } from "@rebasepro/app";
@@ -58,6 +56,76 @@ interface EntityTableCellProps {
     isDragging?: boolean;
     isDraggable?: boolean;
     frozen?: boolean;
+}
+
+/**
+ * One ResizeObserver for every table cell, instead of one per cell.
+ *
+ * A cell measures its content only to know whether it overflows the row (to
+ * fade it, or let it scroll). Each cell ran `react-use-measure` for that: a
+ * ResizeObserver, two window listeners, a `getComputedStyle` walk up every
+ * ancestor and an extra render once the first measurement landed — ~460 of
+ * each for one screen of a 20-column table, and more with every row scrolled
+ * in. The observer is created on first use and lives for the page; a cell
+ * registers on mount and unregisters on unmount, so nothing is retained for
+ * a cell that is gone.
+ */
+let sharedHeightObserver: ResizeObserver | undefined;
+const heightListeners = new Map<Element, (height: number) => void>();
+
+function observeHeight(element: Element, onHeight: (height: number) => void): () => void {
+    if (typeof ResizeObserver === "undefined") return () => undefined;
+    if (!sharedHeightObserver) {
+        sharedHeightObserver = new ResizeObserver((entries) => {
+            for (const entry of entries)
+                heightListeners.get(entry.target)?.(entry.contentRect.height);
+        });
+    }
+    heightListeners.set(element, onHeight);
+    sharedHeightObserver.observe(element);
+    return () => {
+        heightListeners.delete(element);
+        sharedHeightObserver?.unobserve(element);
+    };
+}
+
+/** How many cells are being measured right now — for tests. */
+export function measuredTableCellCount(): number {
+    return heightListeners.size;
+}
+
+/**
+ * Whether the element given to the returned ref is taller than `maxHeight`.
+ * State changes only when the answer does, so a cell whose content fits is
+ * never drawn again by its measurement.
+ */
+function useOverflowsHeight(maxHeight: number): [(element: HTMLDivElement | null) => void, boolean] {
+    const [overflowing, setOverflowing] = useState(false);
+    const heightRef = useRef(0);
+    const maxHeightRef = useRef(maxHeight);
+    const stopRef = useRef<(() => void) | undefined>(undefined);
+
+    useEffect(() => {
+        maxHeightRef.current = maxHeight;
+        setOverflowing(heightRef.current > maxHeight);
+    }, [maxHeight]);
+
+    useEffect(() => () => {
+        stopRef.current?.();
+        stopRef.current = undefined;
+    }, []);
+
+    const ref = useCallback((element: HTMLDivElement | null) => {
+        stopRef.current?.();
+        stopRef.current = undefined;
+        if (!element) return;
+        stopRef.current = observeHeight(element, (height) => {
+            heightRef.current = height;
+            setOverflowing(height > maxHeightRef.current);
+        });
+    }, []);
+
+    return [ref, overflowing];
 }
 
 type TableCellInnerProps = {
@@ -125,11 +193,11 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
         frozen
     }: EntityTableCellProps) {
 
-        const [measureRef, bounds] = useMeasure();
         const internalRef = useRef<HTMLDivElement>(null);
         const ref = cellRef ?? internalRef;
 
         const maxHeight = useMemo(() => getRowHeight(size), [size]);
+        const [measureRef, isOverflowing] = useOverflowsHeight(maxHeight);
 
         const [onHover, setOnHover] = useState(false);
         const [showSaved, setShowSaved] = useState(false);
@@ -207,13 +275,6 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
             event.preventDefault();
             onSelectCallback();
         }, [onSelectCallback]);
-
-        const isOverflowing = useMemo(() => {
-            if (bounds) {
-                return bounds.height > maxHeight;
-            }
-            return false;
-        }, [bounds, maxHeight]);
 
         const isSelected = !showError && selected;
 

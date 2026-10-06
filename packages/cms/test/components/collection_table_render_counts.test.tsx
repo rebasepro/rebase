@@ -207,6 +207,7 @@ describe("the collection table draws again only what changed", () => {
         mockState.controller = undefined;
         mockState.tick = 0;
         mockState.listeners.clear();
+        mockResetCounts();
     });
 
     it("a render of the collection view that changes nothing in the table draws no cell", async () => {
@@ -311,5 +312,52 @@ describe("the collection table draws again only what changed", () => {
         });
         expect(editableCells(view.container)).toBe(0);
         view.unmount();
+    });
+
+    /**
+     * Each cell measured its own content to tell whether it overflows the row
+     * (to fade it, or let it scroll): a ResizeObserver, two window listeners
+     * and a `getComputedStyle` walk up every ancestor, per cell — ~460 of each
+     * for one screen of rows.
+     */
+    it("drawing a screen of rows creates a fixed number of observers and listeners, not some per cell", async () => {
+        const realObserver = globalThis.ResizeObserver;
+        const realAdd = window.addEventListener;
+        const realGetComputedStyle = window.getComputedStyle;
+        let observersCreated = 0;
+        let resizeListeners = 0;
+        let computedStyleCalls = 0;
+        class CountingResizeObserver {
+            constructor() { observersCreated++; }
+            observe() { /* jsdom lays nothing out */ }
+            unobserve() { /* jsdom lays nothing out */ }
+            disconnect() { /* jsdom lays nothing out */ }
+        }
+        Object.defineProperty(globalThis, "ResizeObserver", { value: CountingResizeObserver, configurable: true, writable: true });
+        window.addEventListener = ((type: string, ...rest: unknown[]) => {
+            if (type === "resize") resizeListeners++;
+            return (realAdd as (...a: unknown[]) => void).call(window, type, ...rest);
+        }) as typeof window.addEventListener;
+        window.getComputedStyle = ((el: Element, pseudo?: string | null) => {
+            computedStyleCalls++;
+            return realGetComputedStyle.call(window, el, pseudo);
+        }) as typeof window.getComputedStyle;
+        try {
+            let view!: ReturnType<typeof render>;
+            await act(async () => {
+                view = render(<View/>);
+            });
+            expect(mockState.propertyCellRenders).toBeGreaterThan(200);
+            // The table's own measurement, the column drag-and-drop context's
+            // and the cells' shared one: a handful, whatever the row count.
+            expect(observersCreated).toBeLessThanOrEqual(10);
+            expect(resizeListeners).toBeLessThanOrEqual(5);
+            expect(computedStyleCalls).toBeLessThanOrEqual(50);
+            view.unmount();
+        } finally {
+            Object.defineProperty(globalThis, "ResizeObserver", { value: realObserver, configurable: true, writable: true });
+            window.addEventListener = realAdd;
+            window.getComputedStyle = realGetComputedStyle;
+        }
     });
 });
