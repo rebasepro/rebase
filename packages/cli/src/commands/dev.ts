@@ -272,6 +272,13 @@ export function devRestartTrigger(projectRoot: string): string | null {
 }
 
 /**
+ * tsx's built-in watch ignores (tsx 4's `watch` command), which it applies
+ * relative to its cwd only. {@link devWatchArgs} repeats them under every
+ * directory it includes from outside that cwd.
+ */
+const TSX_DEFAULT_IGNORES = ["**/.*/**", "**/.*", "**/{node_modules,bower_components,vendor}/**"] as const;
+
+/**
  * The `tsx watch` argument list for the backend (unquoted).
  *
  * One save of a collection file must restart the backend once. The runtime
@@ -284,6 +291,16 @@ export function devRestartTrigger(projectRoot: string): string | null {
  * collections directory alone (`--exclude` wins over its dependency tracking),
  * and dev restarts the backend itself, once, after the regeneration — through
  * `restartTrigger`, which tsx watches.
+ *
+ * Every included directory also gets tsx's own default ignores, made absolute.
+ * tsx resolves those defaults (`**\/node_modules/**`, `**\/.*`, …) against its
+ * cwd, which is `backend/`, so they never reached `config/`, a sibling: chokidar
+ * walked `config/node_modules` — following symlinks — before tsx spawned the
+ * backend at all, and kept every file in it watched. In the monorepo's example
+ * app that was 17 s before the first backend line and 1,400 open files, and any
+ * install (or another checkout's Vite build writing `.vite-temp` deep inside
+ * that tree) restarted the backend. A `.DS_Store` or an editor swap file in
+ * `config/` restarted it too.
  */
 export function devWatchArgs(
     projectRoot: string,
@@ -295,11 +312,15 @@ export function devWatchArgs(
     // not know (`--conditions` is Node's) and hands the rest to Node, which
     // then refuses `--include` as a bad option.
     const args = ["watch"];
-    for (const dir of devWatchIncludes(projectRoot, paths)) args.push("--include", dir);
+    // Globs, so forward slashes whatever the platform's separator is.
+    const glob = (dir: string) => dir.split(path.sep).join("/");
+    for (const dir of devWatchIncludes(projectRoot, paths)) {
+        args.push("--include", dir);
+        for (const ignored of TSX_DEFAULT_IGNORES) args.push("--exclude", `${glob(dir)}/${ignored}`);
+    }
     if (restartTrigger) {
         args.push("--include", restartTrigger);
-        // A glob, so forward slashes whatever the platform's separator is.
-        args.push("--exclude", `${devCollectionsDir(projectRoot).split(path.sep).join("/")}/**`);
+        args.push("--exclude", `${glob(devCollectionsDir(projectRoot))}/**`);
     }
     args.push("--conditions", "development", entryTarget);
     return args;
