@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "@jest/globals";
-import { acceptsAutoLimit, buildExplainSql, formatSql, groupSchemaRows, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type ResultProvenance } from "./sql_utils";
+import { acceptsAutoLimit, buildExplainSql, COLUMN_WIDTHS_REMEMBERED, formatSql, groupSchemaRows, keepLatestColumnWidths, rememberColumnWidth, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type ResultProvenance } from "./sql_utils";
 import type { SqlScriptColumn, SqlScriptTable } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -379,6 +379,43 @@ describe("withAutoLimit", () => {
  * quote or quoted a line break: `say "hi"` and a two-line note each broke the
  * row they were in, and a spreadsheet read the file with columns shifted.
  */
+/**
+ * Column widths are kept per query text in localStorage, and used to be kept
+ * forever: every query anybody resized a column of stayed in the origin's
+ * storage, which the console's tabs, snippets and history share.
+ */
+describe("the column widths the console remembers", () => {
+    it("keeps the 50 queries most recently resized, and forgets the oldest", () => {
+        let widths = {};
+        for (let index = 0; index < 60; index++) widths = rememberColumnWidth(widths, `SELECT ${index}`, "a", 100 + index);
+
+        expect(Object.keys(widths)).toHaveLength(COLUMN_WIDTHS_REMEMBERED);
+        expect(Object.keys(widths)[0]).toBe("SELECT 10");
+        expect(widths).toMatchObject({ "SELECT 59": { a: 159 } });
+        expect(widths).not.toHaveProperty("SELECT 9");
+    });
+
+    it("makes a query resized again the newest, keeping its other columns", () => {
+        let widths = rememberColumnWidth({}, "SELECT old", "a", 120);
+        for (let index = 0; index < 49; index++) widths = rememberColumnWidth(widths, `SELECT ${index}`, "a", 100);
+        widths = rememberColumnWidth(widths, "SELECT old", "b", 80);
+        widths = rememberColumnWidth(widths, "SELECT new", "a", 90);
+
+        expect(widths["SELECT old"]).toEqual({ a: 120, b: 80 });
+        expect(widths).not.toHaveProperty("SELECT 0");
+    });
+
+    it("trims a store written before the bound, and drops what is not a width", () => {
+        const stored: Record<string, unknown> = { broken: "x", list: [1], odd: { a: "wide", b: 70 } };
+        for (let index = 0; index < 500; index++) stored[`SELECT ${index}`] = { a: index };
+
+        const kept = keepLatestColumnWidths(stored);
+        expect(Object.keys(kept)).toHaveLength(COLUMN_WIDTHS_REMEMBERED);
+        expect(kept["SELECT 499"]).toEqual({ a: 499 });
+        expect(keepLatestColumnWidths({ broken: "x", list: [1], odd: { a: "wide", b: 70 } })).toEqual({ odd: { b: 70 } });
+    });
+});
+
 describe("resultsToCsv", () => {
     const parseCsv = (text: string): string[][] => {
         // RFC 4180, as a spreadsheet reads it: quoted fields may hold commas,

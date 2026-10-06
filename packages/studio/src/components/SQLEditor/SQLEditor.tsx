@@ -48,7 +48,7 @@ import { useApiBase, useApiConfig, useRebaseContext, useSnackbarController, Conf
 import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeStoredJson, writeStoredString } from "@rebasepro/utils";
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
-import { buildExplainSql, formatSql, needsDestructiveConfirmation, quoteIdentifier, groupSchemaRows, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type CellEditResolution, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
+import { buildExplainSql, formatSql, keepLatestColumnWidths, needsDestructiveConfirmation, quoteIdentifier, groupSchemaRows, quoteTableName, rememberColumnWidth, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type CellEditResolution, type ColumnWidthsByQuery, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
@@ -736,12 +736,14 @@ role: connection.role });
         }
     }, [editingCell, resolveEdit, activeTab.lastExecutedSql, activeTab.lastExecutedConnection, activeTab.results, isCurrentConnection, databaseAdmin, updateActiveTab, snackbarController, t]);
 
-    const [columnWidths, setColumnWidths] = useState<Record<string, Record<string, number>>>(() => {
+    const [columnWidths, setColumnWidths] = useState<ColumnWidthsByQuery>(() => {
         const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
-        return readStoredJson<Record<string, Record<string, number>>>(
+        // Trimmed on the way in too: a store written before the bound may
+        // hold every query ever resized.
+        return keepLatestColumnWidths(readStoredJson<Record<string, unknown>>(
             `rebase_sql_column_widths_${projectPrefixSync}`,
             { fallback: {}, accept: isRecordValue }
-        );
+        ));
     });
     const [snippets, setSnippets] = useState<Snippet[]>([]);
     const [history, setHistory] = useState<string[]>([]);
@@ -845,13 +847,7 @@ role: connection.role });
 
     const handleColumnResize = useCallback(({ key, width }: { key: string, width: number }) => {
         setColumnWidths(prev => {
-            const newWidths = {
-                ...prev,
-                [resultSql]: {
-                    ...(prev[resultSql] || {}),
-                    [key]: width
-                }
-            };
+            const newWidths = rememberColumnWidth(prev, resultSql, key, width);
             writeStoredJson(`rebase_sql_column_widths_${projectPrefix}`, newWidths);
             return newWidths;
         });

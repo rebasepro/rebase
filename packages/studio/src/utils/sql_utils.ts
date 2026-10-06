@@ -448,6 +448,50 @@ export function resultsToCsv(rows: Record<string, unknown>[]): string {
     return [csvRecord(columns), ...lines].join("\n");
 }
 
+/** Column widths per query, as the console keeps them: SQL text → column → width. */
+export type ColumnWidthsByQuery = Record<string, Record<string, number>>;
+
+/** How many queries' column widths the console remembers. */
+export const COLUMN_WIDTHS_REMEMBERED = 50;
+
+/**
+ * The widths kept, at most `limit` queries' worth, the most recently resized
+ * last.
+ *
+ * They are kept per query text, in `localStorage`, and used to be kept
+ * forever: every query anybody ever resized a column of stayed, whole SQL
+ * text and all, in an origin's storage — which the console's tabs, snippets
+ * and history share, and which a full store refuses to write at all. The
+ * oldest go first; resizing a query's column again makes it the newest.
+ */
+export function rememberColumnWidth(
+    widths: ColumnWidthsByQuery,
+    sql: string,
+    column: string,
+    width: number,
+    limit: number = COLUMN_WIDTHS_REMEMBERED
+): ColumnWidthsByQuery {
+    const { [sql]: current, ...others } = widths;
+    return keepLatestColumnWidths({ ...others, [sql]: { ...current, [column]: width } }, limit);
+}
+
+/**
+ * The `limit` most recent queries' widths — the last ones in insertion
+ * order — and only entries that are a column → width record.
+ */
+export function keepLatestColumnWidths(widths: Record<string, unknown>, limit: number = COLUMN_WIDTHS_REMEMBERED): ColumnWidthsByQuery {
+    const kept: ColumnWidthsByQuery = {};
+    for (const [sql, value] of Object.entries(widths).slice(-limit)) {
+        if (typeof value !== "object" || value === null || Array.isArray(value)) continue;
+        const columns: Record<string, number> = {};
+        for (const [column, width] of Object.entries(value)) {
+            if (typeof width === "number" && Number.isFinite(width)) columns[column] = width;
+        }
+        kept[sql] = columns;
+    }
+    return kept;
+}
+
 /**
  * The schema browser's tables, by schema, from `information_schema.columns`
  * rows: each table in the order it first appears, its columns in row order.
