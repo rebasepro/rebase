@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { en } from "../../app/src/locales/en";
 import type { SqlScriptColumn, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
 
@@ -30,6 +30,7 @@ const schemaColumns = [
 ];
 
 const ORDERS = "SELECT * FROM orders";
+const NOTES = "SELECT * FROM notes";
 const POSTS_WITH_AUTHORS = "SELECT p.id, a.name FROM posts p JOIN authors a ON a.id = p.author_id";
 
 const tableOf = (table: string): SqlScriptTable => ({ schema: "public", table, kind: "table", primaryKey: ["id"], hasInheritors: false });
@@ -41,6 +42,12 @@ const scripts: Record<string, SqlScriptResult> = {
         rows: [{ id: "7", status: "new" }],
         columns: [readFrom("id", "orders"), readFrom("status", "orders")],
         tables: [tableOf("orders")],
+        notices: []
+    },
+    [NOTES]: {
+        rows: [{ id: "3", title: "new", body: "", tag: null }],
+        columns: [readFrom("id", "notes"), readFrom("title", "notes"), readFrom("body", "notes"), readFrom("tag", "notes")],
+        tables: [tableOf("notes")],
         notices: []
     },
     [POSTS_WITH_AUTHORS]: {
@@ -261,5 +268,57 @@ describe("inline editing a joined table", () => {
 
         expect(updates()).toEqual([]);
         expect(snackbarOpen).toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
+    });
+});
+
+/**
+ * An empty string was drawn as NULL, and the cell editor saved an empty box
+ * as NULL — so opening a cell holding '' and clicking away compared NULL with
+ * "" and ran `UPDATE … SET body = NULL`, reported as "Row updated", on a cell
+ * nobody had edited.
+ */
+describe("empty and NULL cells", () => {
+    jest.setTimeout(20000);
+
+    /** The cells of the one result row, in column order: id, title, body, tag. */
+    function noteCells(): HTMLElement[] {
+        return within(screen.getAllByRole("row")[0]).getAllByRole("gridcell");
+    }
+
+    async function openAndLeave(cell: HTMLElement): Promise<void> {
+        const target = cell.firstElementChild;
+        if (!target) throw new Error("the cell renders nothing to double-click");
+        fireEvent.doubleClick(target);
+        const editor = await screen.findByLabelText("cell editor");
+        fireEvent.blur(editor);
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        });
+    }
+
+    it("draws an empty string as empty, and only NULL as NULL", async () => {
+        await runQuery(NOTES);
+
+        const [, , body, tag] = noteCells();
+        expect(body.textContent).toBe("");
+        expect(tag.textContent).toBe("NULL");
+    });
+
+    it("writes nothing when an empty-string cell is opened and left unchanged", async () => {
+        await runQuery(NOTES);
+
+        await openAndLeave(noteCells()[2]);
+
+        expect(updates()).toEqual([]);
+        expect(snackbarOpen).not.toHaveBeenCalled();
+    });
+
+    it("writes nothing when a NULL cell is opened and left unchanged", async () => {
+        await runQuery(NOTES);
+
+        await openAndLeave(noteCells()[3]);
+
+        expect(updates()).toEqual([]);
+        expect(snackbarOpen).not.toHaveBeenCalled();
     });
 });

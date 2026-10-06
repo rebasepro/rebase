@@ -111,7 +111,8 @@ const FixedEditorOverlay = ({
     onCancel
 }: {
     displayValue: string,
-    onSave: (val: string | null) => void,
+    /** What the box holds when it closes — the text as typed. */
+    onSave: (val: string) => void,
     onCancel: () => void
 }) => {
     const [rect, setRect] = useState<DOMRect | null>(null);
@@ -181,13 +182,13 @@ maxHeight: resolvedMaxHeight }}
                             e.target.value = val;
                         }}
                         onBlur={(e) => {
-                            onSave(e.target.value || null);
+                            onSave(e.target.value);
                             onCancel();
                         }}
                         onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault();
-                                onSave((e.currentTarget as HTMLTextAreaElement).value || null);
+                                onSave(e.currentTarget.value);
                                 onCancel();
                             }
                             if (e.key === "Escape") onCancel();
@@ -574,7 +575,11 @@ isPrimaryKey });
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
     // Inline editing state
-    const [editingCell, setEditingCell] = useState<{ rowIndex: number, columnKey: string, initialValue: unknown } | null>(null);
+    /**
+     * The cell being edited, and the text its editor opened with — what
+     * closing the editor unchanged is compared against.
+     */
+    const [editingCell, setEditingCell] = useState<{ rowIndex: number, columnKey: string, initialValue: string } | null>(null);
 
     const isCurrentConnection = useCallback((connection: SQLConnection | null): connection is SQLConnection =>
         connection !== null && connection.database === selectedDatabase && connection.role === selectedRole,
@@ -591,7 +596,7 @@ isPrimaryKey });
         return resolveCellEdit(activeTab.lastExecutedSql, activeTab.lastProvenance, columnKey);
     }, [activeTab.lastExecutedSql, activeTab.lastProvenance]);
 
-    const handleDoubleClick = useCallback((rowIndex: number, columnKey: string, initialValue: unknown, rowData: Record<string, unknown>) => {
+    const handleDoubleClick = useCallback((rowIndex: number, columnKey: string, initialValue: string, rowData: Record<string, unknown>) => {
         if (!activeTab.lastExecutedSql) {
             snackbarController.open({
                 type: "error",
@@ -636,12 +641,18 @@ columnKey,
 initialValue });
     }, [activeTab.lastExecutedSql, activeTab.lastExecutedConnection, isCurrentConnection, resolveEdit, snackbarController, t]);
 
-    const handleCellSave = useCallback(async (newValue: string | null, rowData: Record<string, unknown>, columnKey: string, rowIndex: number) => {
+    const handleCellSave = useCallback(async (text: string, rowData: Record<string, unknown>, columnKey: string, rowIndex: number) => {
         if (!editingCell || !activeTab.lastExecutedSql) return;
 
         setEditingCell(null); // Optimistically close
 
-        if (newValue === editingCell.initialValue) return;
+        // Compared as text, against the text the editor opened with: a cell
+        // holding '' and a NULL one both open empty, and closing either
+        // untouched is not an edit.
+        if (text === editingCell.initialValue) return;
+        // A box emptied by hand stores NULL, which the grid then draws as
+        // NULL — what is on screen is what was stored.
+        const newValue = text === "" ? null : text;
 
         const connection = activeTab.lastExecutedConnection;
         if (!isCurrentConnection(connection)) {
@@ -1240,7 +1251,7 @@ id: String(ra.entityId) })}
                                     onDoubleClick={() => handleDoubleClick(rowIndex, column.key, displayValue, rowData ?? {})}
                                 >
                                     <div className="truncate flex-grow" title={displayValue}>
-                                        {displayValue === "" ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-[11px]">NULL</span> : displayValue}
+                                        {value === null || value === undefined ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-[11px]">NULL</span> : displayValue}
                                     </div>
                                 </div>
                             );
