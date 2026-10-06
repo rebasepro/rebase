@@ -106,13 +106,16 @@ export const isMultiStatementRefusal = (err: unknown): boolean => {
  * transaction. See the module comment for why this and not `BEGIN … COMMIT`.
  */
 export const atomicBatch = (statements: readonly string[], lockTimeoutMs: number): string =>
-    [
-        `SET LOCAL lock_timeout = '${Math.max(1, Math.round(lockTimeoutMs))}ms';`,
-        ...statements.map(statement => {
+    `SET LOCAL lock_timeout = '${Math.max(1, Math.round(lockTimeoutMs))}ms';\n${joinStatements(statements)}`;
+
+/** Statements as one multi-statement string — one implicit transaction — each `;`-terminated. */
+export const joinStatements = (statements: readonly string[]): string =>
+    statements
+        .map(statement => {
             const trimmed = statement.trim();
             return trimmed.endsWith(";") ? trimmed : `${trimmed};`;
         })
-    ].join("\n");
+        .join("\n");
 
 export const sleep = (ms: number): Promise<void> =>
     ms > 0 ? new Promise(resolve => setTimeout(resolve, ms)) : Promise.resolve();

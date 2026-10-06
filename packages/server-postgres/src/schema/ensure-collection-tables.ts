@@ -50,7 +50,7 @@ import {
     type WithheldConstraint
 } from "./plan/diff-plan";
 import { extractCauseMessage, extractPgError } from "../utils/pg-error-utils";
-import { atomicBatch, isLockTimeout, isMultiStatementRefusal, sleep } from "./boot-ddl";
+import { atomicBatch, isLockTimeout, isMultiStatementRefusal, joinStatements, sleep } from "./boot-ddl";
 import { columnTypeDriftMessage, type ColumnTypeDrift } from "./column-type-drift";
 
 export type {
@@ -98,7 +98,21 @@ export interface EnsureOptions extends DiffOptions {
      * editor's confirmed changes do.
      */
     lockTimeoutMs?: number;
+    /**
+     * Apply the statements that build tables this run creates — and the enum
+     * types they use — in transactions of up to {@link NEW_TABLE_BATCH}
+     * statements instead of one autocommit each. The boot sets it; see
+     * `ensureCollectionTables`.
+     */
+    batchNewTables?: boolean;
 }
+
+/**
+ * Most statements in one new-table transaction. Bounds how many locks one
+ * transaction holds — each new table is several relations (the heap, its TOAST
+ * table, its key index) — well inside the default `max_locks_per_transaction`.
+ */
+const NEW_TABLE_BATCH = 100;
 
 export interface EnsureOutcome extends EnsurePlan {
     /**
@@ -582,7 +596,44 @@ export async function ensureCollectionTables(
     const lockBudget = options.lockTimeoutMs !== undefined
         ? { lockTimeoutMs: options.lockTimeoutMs, atomic: true }
         : undefined;
-    for (const action of plan.actions) {
+    // Whether the handle takes a multi-statement string; shared with the lock
+    // budget, which needs the same thing.
+    const multi = lockBudget ?? { atomic: true };
+
+    // A table this run creates has no rows, no readers and no writers, so its
+    // statements — the CREATE, the ENABLE, every column, its triggers, the
+    // indexes on it — can share a transaction: one commit instead of one per
+    // statement. A first deploy of 200 collections was 3,767 autocommits, 11.7 s
+    // on a disk that really flushes. If a batch fails for any reason, its
+    // statements are applied again one at a time below, exactly as before, so
+    // the races and survivable failures that path handles end the same way.
+    const createdTables = new Set(plan.actions.filter(a => a.kind === "create-table").map(a => a.target));
+    const batchable = (action: EnsureAction): boolean =>
+        options.batchNewTables === true &&
+        multi.atomic &&
+        (action.kind === "create-enum" || createdTables.has(action.target.split(".").slice(0, 2).join("."))) &&
+        action.kind !== "add-enum-value" &&
+        !CONCURRENTLY_RE.test(action.sql);
+
+    const applyBatch = async (group: EnsureAction[]): Promise<boolean> => {
+        const statements = group.map(action => action.sql);
+        try {
+            await client.query(lockBudget
+                ? atomicBatch(statements, lockBudget.lockTimeoutMs)
+                : joinStatements(statements));
+            return true;
+        } catch (err) {
+            if (isMultiStatementRefusal(err)) {
+                multi.atomic = false;
+            } else {
+                log?.(`${group.length} statement(s) for new tables failed as one transaction ` +
+                    `(${describeDriverError(err).split("\n")[0]}); applying them one at a time`);
+            }
+            return false;
+        }
+    };
+
+    const applyOne = async (action: EnsureAction): Promise<void> => {
         try {
             if (await applyAction(client, action, lockBudget)) {
                 log?.(`${action.kind}: ${action.target}`);
@@ -619,7 +670,7 @@ export async function ensureCollectionTables(
                 (action.kind === "create-index" && !/CREATE\s+UNIQUE\s+INDEX/i.test(action.sql));
             if (survivable) {
                 failures.push({ kind: action.kind, target: action.target, error: message });
-                continue;
+                return;
             }
             const lockHint = isLockTimeout(err)
                 ? "\n  hint: another session held this table's lock for every attempt (a long transaction, a " +
@@ -629,6 +680,18 @@ export async function ensureCollectionTables(
                 `Failed to ${action.kind} ${action.target}: ${message}${vectorExtensionHint(message)}${lockHint}\n  ${action.sql}`
             );
         }
+    };
+
+    for (let i = 0; i < plan.actions.length;) {
+        let end = i;
+        while (end < plan.actions.length && end - i < NEW_TABLE_BATCH && batchable(plan.actions[end])) end++;
+        if (end - i > 1 && await applyBatch(plan.actions.slice(i, end))) {
+            for (const action of plan.actions.slice(i, end)) log?.(`${action.kind}: ${action.target}`);
+            i = end;
+            continue;
+        }
+        const last = Math.max(end, i + 1);
+        for (; i < last; i++) await applyOne(plan.actions[i]);
     }
     return { ...plan, failures };
 }

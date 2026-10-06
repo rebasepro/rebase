@@ -1373,8 +1373,10 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 log,
                 // A change to a table a long reader holds waits in one-second
                 // slices, so live queries on it are never held behind the boot
-                // for longer than that. See `schema/boot-ddl`.
-                { lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS }
+                // for longer than that. See `schema/boot-ddl`. And a table this
+                // boot creates is built in a few transactions, not one commit
+                // per column.
+                { lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS, batchNewTables: true }
             );
             for (const failure of plan.failures) {
                 logger.warn(describeEnsureFailure(failure));
