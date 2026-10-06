@@ -1433,6 +1433,8 @@ export const es: RebaseTranslations = {
     studio_storage_folder_deleted: "Carpeta «{{name}}» eliminada",
     studio_storage_items_deleted: "{{count}} elementos eliminados",
     studio_storage_items_deleted_one: "{{count}} elemento eliminado",
+    studio_storage_delete_incomplete: "{{count}} elementos siguen ahí después de eliminarlos: {{names}}",
+    studio_storage_delete_incomplete_one: "«{{names}}» sigue ahí después de eliminarlo",
     studio_storage_new_folder_title: "Nueva carpeta",
     studio_storage_folder_name: "Nombre de la carpeta",
     studio_storage_folder_name_placeholder: "Introduce el nombre de la carpeta",

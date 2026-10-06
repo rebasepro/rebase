@@ -1425,6 +1425,8 @@ export const de: RebaseTranslations = {
     studio_storage_folder_deleted: "Ordner „{{name}}“ gelöscht",
     studio_storage_items_deleted: "{{count}} Elemente gelöscht",
     studio_storage_items_deleted_one: "{{count}} Element gelöscht",
+    studio_storage_delete_incomplete: "{{count}} Elemente sind nach dem Löschen noch vorhanden: {{names}}",
+    studio_storage_delete_incomplete_one: "„{{names}}“ ist nach dem Löschen noch vorhanden",
     studio_storage_new_folder_title: "Neuer Ordner",
     studio_storage_folder_name: "Ordnername",
     studio_storage_folder_name_placeholder: "Ordnernamen eingeben",

@@ -43,7 +43,7 @@ import {
     isKeyHandled
 } from "@rebasepro/ui";
 import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiBase, useApiConfig, useTranslation } from "@rebasepro/app";
-import { DEFAULT_STORAGE_SOURCE_KEY, type StorageListResult } from "@rebasepro/types";
+import { DEFAULT_STORAGE_SOURCE_KEY, type StorageReference, type StorageSource } from "@rebasepro/types";
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 import { useSearchParams } from "react-router";
 import { useDropzone } from "react-dropzone";
@@ -108,6 +108,53 @@ path: "" }];
 path: accumulated });
     }
     return segments;
+}
+
+/**
+ * Everything directly under `prefix`, across every page.
+ *
+ * A listing answers a page at a time — a thousand entries on the built-in
+ * controllers — and hands back a token for the next. Reading only the first
+ * showed a large folder cut short, and deleted the first page of it.
+ */
+async function listAllPages(
+    source: StorageSource,
+    prefix: string
+): Promise<{ items: StorageReference[]; prefixes: StorageReference[] }> {
+    const items: StorageReference[] = [];
+    const prefixes: StorageReference[] = [];
+    let pageToken: string | undefined;
+    do {
+        const page = pageToken
+            ? await source.listObjects(prefix, { pageToken })
+            : await source.listObjects(prefix);
+        items.push(...(page.items ?? []));
+        prefixes.push(...(page.prefixes ?? []));
+        pageToken = page.nextPageToken;
+    } while (pageToken);
+    return { items, prefixes };
+}
+
+/**
+ * Delete a folder: every file in it, every folder below it, and the folder
+ * itself — the directory on local disk, or the zero-byte `name/` marker that
+ * "New folder" writes on S3 and GCS, which no listing shows as an entry.
+ */
+async function deleteFolderRecursive(source: StorageSource, prefix: string): Promise<void> {
+    const { items, prefixes } = await listAllPages(source, prefix);
+    for (const item of items) {
+        await source.deleteObject(item.fullPath);
+    }
+    for (const sub of prefixes) {
+        await deleteFolderRecursive(source, sub.fullPath);
+    }
+    try {
+        await source.deleteObject(prefix.endsWith("/") ? prefix : `${prefix}/`);
+    } catch {
+        // A folder with no object of its own (most object-store folders) has
+        // nothing to delete here. Whether it is gone is read back by the
+        // caller from the folder that held it.
+    }
 }
 
 // ──────────────────────────────────────────────
@@ -565,9 +612,9 @@ export const StorageView = () => {
         setLoading(true);
         setFailure(null);
         try {
-            const result: StorageListResult = await source.listObjects(path);
+            const result = await listAllPages(source, path);
 
-            const folderItems: StorageFile[] = (result.prefixes ?? []).map(ref => ({
+            const folderItems: StorageFile[] = result.prefixes.map(ref => ({
                 name: ref.name,
                 fullPath: ref.fullPath,
                 isFolder: true
@@ -575,7 +622,7 @@ export const StorageView = () => {
 
             // Build file items and fetch metadata for each
             const fileItems: StorageFile[] = await Promise.all(
-                (result.items ?? []).map(async (ref) => {
+                result.items.map(async (ref) => {
                     try {
                         const downloadConfig = await source.getSignedUrl(ref.fullPath);
                         return {
@@ -830,35 +877,51 @@ key });
         noDragEventsBubbling: true
     });
 
-    // ── Recursive folder delete helper ──
-    const deleteFolderRecursive = useCallback(async (prefix: string) => {
-        const result = await storageSourceRef.current.listObjects(prefix);
-        // Delete all files in this level
-        for (const item of result.items ?? []) {
-            await storageSourceRef.current.deleteObject(item.fullPath);
+    /**
+     * Delete files and folders from the source being browsed, then read back
+     * the folder they were listed in and return the ones still there.
+     *
+     * Nothing is reported deleted on the strength of the requests alone: a
+     * delete can answer success and leave the object behind — a directory that
+     * is not empty yet, a folder marker, a hook — and the folder listing is
+     * what the user sees next. One source for the whole operation, taken when
+     * it starts.
+     */
+    const deleteItems = useCallback(async (items: StorageFile[], folder: string): Promise<StorageFile[]> => {
+        const source = storageSourceRef.current;
+        for (const item of items) {
+            if (item.isFolder) {
+                await deleteFolderRecursive(source, item.fullPath);
+            } else {
+                await source.deleteObject(item.fullPath);
+            }
         }
-        // Recurse into sub-folders
-        for (const sub of result.prefixes ?? []) {
-            await deleteFolderRecursive(sub.fullPath);
-        }
-        // Delete the folder entry itself (needed for local filesystem)
-        try {
-            await storageSourceRef.current.deleteObject(prefix);
-        } catch {
-            // Ignore — S3 folders are virtual and may not exist as objects
-        }
+        const listed = await listAllPages(source, folder);
+        const stillListed = new Set([...listed.items, ...listed.prefixes].map(ref => ref.fullPath));
+        return items.filter(item => stillListed.has(item.fullPath));
     }, []);
+
+    /** What a delete left behind, said as the error it is rather than a success. */
+    const reportStillThere = useCallback((remaining: StorageFile[]) => {
+        snackbarController.open({
+            type: "error",
+            message: t("studio_storage_delete_incomplete", {
+                count: remaining.length,
+                names: remaining.map(item => item.name).join(", ")
+            })
+        });
+    }, [snackbarController, t]);
 
     // Delete a single file
     const handleDeleteFile = useCallback(async (file: StorageFile) => {
         try {
-            if (file.isFolder) {
-                await deleteFolderRecursive(file.fullPath);
+            const remaining = await deleteItems([file], currentPath);
+            if (remaining.length > 0) {
+                reportStillThere(remaining);
             } else {
-                await storageSourceRef.current.deleteObject(file.fullPath);
-            }
-            snackbarController.open({ type: "success",
+                snackbarController.open({ type: "success",
 message: t("studio_storage_file_deleted", { name: file.name }) });
+            }
             setSelectedFile(null);
             setSelectedDownloadUrl(null);
             setSelectedPaths(prev => {
@@ -871,22 +934,20 @@ message: t("studio_storage_file_deleted", { name: file.name }) });
             snackbarController.open({ type: "error",
 message: e instanceof Error ? e.message : String(e) });
         }
-    }, [currentPath, snackbarController, fetchContents, deleteFolderRecursive, t]);
+    }, [currentPath, snackbarController, fetchContents, deleteItems, reportStillThere, t]);
 
     // Bulk delete (selected items)
     const handleBulkDelete = useCallback(async () => {
         setDeleting(true);
         try {
             const items = allItems.filter(i => selectedPaths.has(i.fullPath));
-            for (const item of items) {
-                if (item.isFolder) {
-                    await deleteFolderRecursive(item.fullPath);
-                } else {
-                    await storageSourceRef.current.deleteObject(item.fullPath);
-                }
-            }
-            snackbarController.open({ type: "success",
+            const remaining = await deleteItems(items, currentPath);
+            if (remaining.length > 0) {
+                reportStillThere(remaining);
+            } else {
+                snackbarController.open({ type: "success",
 message: t("studio_storage_items_deleted", { count: items.length }) });
+            }
             setSelectedPaths(new Set());
             setSelectedFile(null);
             setSelectedDownloadUrl(null);
@@ -899,22 +960,22 @@ message: e instanceof Error ? e.message : String(e) });
             setDeleteDialogOpen(false);
             setDeleteDialogTarget(null);
         }
-    }, [allItems, selectedPaths, currentPath, snackbarController, fetchContents, deleteFolderRecursive, t]);
+    }, [allItems, selectedPaths, currentPath, snackbarController, fetchContents, deleteItems, reportStillThere, t]);
 
     // Confirm delete for a single file or folder
     const handleConfirmDeleteItem = useCallback(async () => {
         if (!deleteDialogTarget || deleteDialogTarget === "selection") return;
         setDeleting(true);
         try {
-            if (deleteDialogTarget.isFolder) {
-                await deleteFolderRecursive(deleteDialogTarget.fullPath);
+            const remaining = await deleteItems([deleteDialogTarget], currentPath);
+            if (remaining.length > 0) {
+                reportStillThere(remaining);
             } else {
-                await storageSourceRef.current.deleteObject(deleteDialogTarget.fullPath);
-            }
-            snackbarController.open({ type: "success",
+                snackbarController.open({ type: "success",
 message: deleteDialogTarget.isFolder
     ? t("studio_storage_folder_deleted", { name: deleteDialogTarget.name })
     : t("studio_storage_file_deleted", { name: deleteDialogTarget.name }) });
+            }
             if (!deleteDialogTarget.isFolder && selectedFile?.fullPath === deleteDialogTarget.fullPath) {
                 setSelectedFile(null);
                 setSelectedDownloadUrl(null);
@@ -933,7 +994,7 @@ message: e instanceof Error ? e.message : String(e) });
             setDeleteDialogOpen(false);
             setDeleteDialogTarget(null);
         }
-    }, [deleteDialogTarget, selectedFile, currentPath, snackbarController, fetchContents, deleteFolderRecursive, t]);
+    }, [deleteDialogTarget, selectedFile, currentPath, snackbarController, fetchContents, deleteItems, reportStillThere, t]);
 
     // Select all / deselect
     const handleSelectAll = useCallback(() => {

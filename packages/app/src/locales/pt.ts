@@ -1430,6 +1430,8 @@ export const pt: RebaseTranslations = {
     studio_storage_folder_deleted: "Pasta «{{name}}» eliminada",
     studio_storage_items_deleted: "{{count}} itens eliminados",
     studio_storage_items_deleted_one: "{{count}} item eliminado",
+    studio_storage_delete_incomplete: "{{count}} itens continuam lá depois de eliminados: {{names}}",
+    studio_storage_delete_incomplete_one: "«{{names}}» continua lá depois de eliminado",
     studio_storage_new_folder_title: "Nova pasta",
     studio_storage_folder_name: "Nome da pasta",
     studio_storage_folder_name_placeholder: "Introduza o nome da pasta",

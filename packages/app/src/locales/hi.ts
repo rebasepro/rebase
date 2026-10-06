@@ -1425,6 +1425,8 @@ export const hi: RebaseTranslations = {
     studio_storage_folder_deleted: "फ़ोल्डर “{{name}}” हटाया गया",
     studio_storage_items_deleted: "{{count}} आइटम हटाए गए",
     studio_storage_items_deleted_one: "{{count}} आइटम हटाया गया",
+    studio_storage_delete_incomplete: "हटाने के बाद भी {{count}} आइटम मौजूद हैं: {{names}}",
+    studio_storage_delete_incomplete_one: "हटाने के बाद भी “{{names}}” मौजूद है",
     studio_storage_new_folder_title: "नया फ़ोल्डर",
     studio_storage_folder_name: "फ़ोल्डर का नाम",
     studio_storage_folder_name_placeholder: "फ़ोल्डर का नाम दर्ज करें",

@@ -1537,6 +1537,8 @@ export interface RebaseTranslations {
     studio_storage_folder_deleted?: string;
     studio_storage_items_deleted?: string;
     studio_storage_items_deleted_one?: string;
+    studio_storage_delete_incomplete?: string;
+    studio_storage_delete_incomplete_one?: string;
     studio_storage_new_folder_title?: string;
     studio_storage_folder_name?: string;
     studio_storage_folder_name_placeholder?: string;
