@@ -17,7 +17,7 @@ import {
     type RealtimeConnectionState
 } from "@rebasepro/types";
 import { buildCompositeId, COMPOSITE_ID_SEPARATOR, type PrimaryKeyInfo } from "@rebasepro/common";
-import { rebaseReviver } from "./reviver";
+import { parseRebaseJson } from "./reviver";
 import { readSqlScriptResult } from "./sql-script";
 import type { SqlScriptResult } from "@rebasepro/types";
 
@@ -741,7 +741,9 @@ export class RebaseWebSocketClient {
 
             this.ws!.onmessage = (event) => {
                 try {
-                    const message = JSON.parse(event.data, rebaseReviver);
+                    // A reviver parse calls back for every key and value of the
+                    // frame; most frames have nothing to revive. Same result.
+                    const message = parseRebaseJson(event.data);
                     this.handleWebSocketMessage(message);
                 } catch (error) {
                     console.error("Error parsing WebSocket message:", error);

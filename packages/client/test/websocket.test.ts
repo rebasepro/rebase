@@ -1,6 +1,7 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
 import { RebaseWebSocketClient } from "../src/websocket";
 import { RebaseRealtimeChannel } from "../src/realtime-channel";
+import { rebaseReviver } from "../src/reviver";
 // The WS client now throws the unified RebaseApiError. Aliased to `ApiError`
 // so the existing instanceof/code assertions below read unchanged.
 import { RebaseApiError as ApiError } from "@rebasepro/types";
@@ -366,6 +367,57 @@ payload: { token: "new-token" } })
 
             const result = await fetchPromise;
             expect(result).toEqual([{ id: "1" }]);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Frame decoding
+    // -----------------------------------------------------------------------
+    describe("Frame decoding", () => {
+        /** Send FETCH_COLLECTION, answer it with `rows`, and return the frame text and what the call resolved to. */
+        async function fetchAnsweredWith(rows: unknown[]) {
+            const client = createClient();
+            const fetchPromise = client.fetchCollection({ path: "posts" });
+            jest.advanceTimersByTime(10);
+            await Promise.resolve();
+            const ws = getWs();
+            const sent = JSON.parse(ws.sentMessages[0]);
+            const text = JSON.stringify({ type: "FETCH_COLLECTION", requestId: sent.requestId, payload: { rows } });
+            ws.onmessage!({ data: text });
+            return { text, result: await fetchPromise };
+        }
+
+        it("revives typed values exactly as a reviver parse does", async () => {
+            const rows = [{
+                id: "1",
+                created: { __type: "date", value: "2026-01-02T03:04:05.000Z" },
+                editor: { __type: "reference", id: 7, path: "users", driver: "postgres" },
+                home: { __type: "GeoPoint", latitude: 51.5, longitude: -0.1 },
+                broken: { __type: "date", value: "not a date" },
+                tags: ["a", { __type: "date", value: "2026-02-03T00:00:00.000Z" }],
+                title: "caf\u00e9"
+            }];
+            const { text, result } = await fetchAnsweredWith(rows);
+            const expected = (JSON.parse(text, rebaseReviver) as { payload: { rows: unknown[] } }).payload.rows;
+            expect(result).toStrictEqual(expected);
+            expect((result as Array<{ created: unknown }>)[0].created).toBeInstanceOf(Date);
+        });
+
+        it("parses a frame with no typed values without the reviver's per-value callback", async () => {
+            // A reviver takes JSON.parse off V8's fast path for every key and
+            // value in the frame — ~7x a plain parse on a 1,000-row page, for
+            // frames that have nothing to revive.
+            const parse = jest.spyOn(JSON, "parse");
+            try {
+                const rows = Array.from({ length: 20 }, (_, i) => ({ id: String(i), title: `Row ${i}`, n: i }));
+                const { text, result } = await fetchAnsweredWith(rows);
+                const frameParses = parse.mock.calls.filter(([arg]) => arg === text);
+                expect(frameParses.length).toBeGreaterThan(0);
+                for (const call of frameParses) expect(call[1]).toBeUndefined();
+                expect(result).toStrictEqual(rows);
+            } finally {
+                parse.mockRestore();
+            }
         });
     });
 
