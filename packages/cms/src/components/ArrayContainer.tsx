@@ -60,18 +60,20 @@ export interface ArrayContainerProps<T> {
     max?: number;
 }
 
-const buildIdsMap = (value: unknown[]) =>
-    value && Array.isArray(value) && value.length > 0
-        ? value
-            .map((v, index) => {
-                if (!v) return {};
-                return {
-                    [getHashValue(v) ?? String(index) + index]: getRandomId()
-                };
-            })
-            .reduce((a, b) => ({ ...a,
-...b }), {})
-        : {};
+/**
+ * One internal id per item, keyed by the item's hash. Built once, at mount
+ * (see the lazy initialiser below): it hashes every item, object-hash for
+ * anything without an `id`.
+ */
+const buildIdsMap = (value: unknown[]): Record<string, number> => {
+    const ids: Record<string, number> = {};
+    if (!value || !Array.isArray(value)) return ids;
+    value.forEach((v, index) => {
+        if (!v) return;
+        ids[getHashValue(v) ?? String(index) + index] = getRandomId();
+    });
+    return ids;
+};
 
 type SortableItemProps = {
     id: number;
@@ -353,9 +355,12 @@ export function ArrayContainer<T>({
     const canAddElements = canAddElementsProp;
 
     const hasValue = value && Array.isArray(value) && value.length > 0;
-    const internalIdsRef = useRef<Record<string, number>>(buildIdsMap(value));
+    // Built by a lazy initialiser: `useRef(buildIdsMap(value))` evaluated its
+    // argument on every render and discarded it, hashing every item each time.
+    const [initialIdsMap] = useState(() => buildIdsMap(value));
+    const internalIdsRef = useRef<Record<string, number>>(initialIdsMap);
     const [internalIds, setInternalIds] = useState<number[]>(
-        hasValue ? Object.values(internalIdsRef.current) : []
+        () => hasValue ? Object.values(initialIdsMap) : []
     );
     const itemCustomPropsRef = useRef<Record<number, object>>({});
 
