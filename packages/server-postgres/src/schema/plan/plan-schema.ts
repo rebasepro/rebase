@@ -51,17 +51,15 @@ import {
     getTableName,
     type JunctionSpec,
     getTableVarName,
-    policyToPostgres,
+    compileRulePolicies,
     relationalCollections,
     resolveCollectionRelations,
     resolveJunctionSpecs,
     assertBeforeQueryIsPostgresOnly,
-    resolveStringColumnLength,
-    securityRuleToConditions
+    resolveStringColumnLength
 } from "@rebasepro/common";
 import {
     generateForeignKeyName,
-    getPolicyNamesForRule,
     legacyForeignKeyName,
     toPostgresIdentifier,
     toSnakeCase
@@ -516,12 +514,11 @@ const columnDefault = (
 /**
  * One security rule, compiled to the clauses a policy is made of.
  *
- * The desugaring (`access` / `ownerField` / `roles` / structured condition /
- * raw SQL → `PolicyExpression`) and the SQL compilation are `@rebasepro/common`'s,
- * which is what the client-side evaluator uses too — so the UI, the DDL and the
- * database agree about who can read a row. What lives here is only the shape:
- * which operations a rule expands to, which clauses each operation takes, and
- * the deny-all fallback for a clause that compiled to nothing.
+ * The compilation is `compileRulePolicies` in `@rebasepro/common`, which the
+ * Studio's RLS editor also compares the live database against — so the UI, the
+ * DDL and the database agree about who can read a row. What this adds is only
+ * the planner's bookkeeping: which rule a policy came from, and whether Rebase
+ * injected it.
  */
 export const compileSecurityRule = (
     collection: CollectionConfig,
@@ -529,32 +526,9 @@ export const compileSecurityRule = (
     resolveCollection: ResolveCollection,
     injected: boolean,
     ruleKey = rule.name ?? "(unnamed)"
-): PolicyPlan[] => {
-    const tableName = getTableName(collection);
-    const ops = rule.operations && rule.operations.length > 0 ? rule.operations : [rule.operation ?? "all"];
-    const policyNames = getPolicyNamesForRule(rule, tableName);
-    const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
-
-    return ops.map((operation, index) => {
-        const needsUsing = operation !== "insert";
-        const needsWithCheck = operation !== "select" && operation !== "delete";
-        let using = needsUsing && usingExpr ? policyToPostgres(usingExpr, collection, { resolveCollection }) : null;
-        let withCheck = needsWithCheck && withCheckExpr ? policyToPostgres(withCheckExpr, collection, { resolveCollection }) : null;
-        // A clause that compiled to nothing denies rather than opens.
-        if (!using && needsUsing) using = "false";
-        if (!withCheck && needsWithCheck) withCheck = "false";
-        return {
-            name: policyNames[index],
-            ruleKey,
-            operation,
-            mode: rule.mode ?? "permissive",
-            roles: rule.pgRoles ? [...rule.pgRoles].sort() : ["public"],
-            using,
-            withCheck,
-            injected
-        };
-    });
-};
+): PolicyPlan[] =>
+    compileRulePolicies(collection, rule, { resolveCollection })
+        .map(policy => ({ ...policy, ruleKey, injected }));
 
 // ── The planner ──────────────────────────────────────────────────────────────
 

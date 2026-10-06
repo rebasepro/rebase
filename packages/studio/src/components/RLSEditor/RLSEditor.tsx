@@ -29,11 +29,12 @@ import {
 import { useRebaseContext, useSnackbarController, ErrorView, useTranslation, ConfirmationDialog } from "@rebasepro/app";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL, getTableName } from "@rebasepro/common";
-import { getPolicyNamesForRule, getPolicyNamesForRules, getPolicyOperations } from "@rebasepro/utils";
+import { getPolicyNamesForRules } from "@rebasepro/utils";
 import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRules, policyToSecurityRule } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
 import { saveRules, isCancellation } from "./saveRules";
 import { applyPolicyEdit, type PolicyEditRefusal } from "./policyRules";
+import { listPolicies, type ListedPolicy } from "./policyListing";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
 
@@ -222,7 +223,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
             message: e instanceof Error ? e.message : String(e) });
     }, [snackbarController]);
 
-    const [editingPolicy, setEditingPolicy] = useState<PostgresPolicy | "new" | null>(null);
+    const [editingPolicy, setEditingPolicy] = useState<ListedPolicy | "new" | null>(null);
 
     /**
      * The two destructive actions used `window.confirm`, which is the browser's
@@ -230,7 +231,13 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
      * is suppressed outright in a sandboxed iframe — where the click then did
      * the thing silently, with no confirmation at all.
      */
-    const [confirmToggleRls, setConfirmToggleRls] = useState<{ table: string; schema: string; enabled: boolean } | null>(null);
+    const [confirmToggleRls, setConfirmToggleRls] = useState<{
+        table: string;
+        schema: string;
+        enabled: boolean;
+        /** The server re-asserts this table's RLS on every start, so a disable here does not last. */
+        managed: boolean;
+    } | null>(null);
     const [confirmDropPolicy, setConfirmDropPolicy] = useState<{ policyName: string; table: string; schema: string } | null>(null);
     const [confirming, setConfirming] = useState(false);
 
@@ -498,85 +505,64 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
         return classifyTableClient(activeTableData.tableName, activeTableData.schemaName, junctionTableNames, isMapped);
     }, [activeTableData, activeCollection, junctionTableNames]);
 
-    const mergedPolicies = useMemo(() => {
+    /**
+     * The junction a relation derives this table as, when it is one. Its
+     * policies are Rebase's — derived from the endpoints' relations — and the
+     * server re-creates them on every start, like a collection's. `null` when
+     * the registry's collections carry no resolvable relations (serialized
+     * configs without relation closures).
+     */
+    const activeJunctionSpec = useMemo(() => {
+        if (!activeTableData || activeCollection) return null;
+        try {
+            const registryCollections = (collectionRegistry.collections ?? []) as Parameters<typeof resolveJunctionSpecs>[0];
+            return resolveJunctionSpecs(registryCollections).get(activeTableData.tableName) ?? null;
+        } catch {
+            return null;
+        }
+    }, [activeTableData, activeCollection, collectionRegistry.collections]);
+
+    /**
+     * Whether the server re-asserts this table's RLS on every start: it switches
+     * RLS back on and re-creates every policy the project declares for it.
+     */
+    const activeTableManaged = Boolean(activeCollection || activeJunctionSpec);
+
+    /**
+     * What Postgres enforces on the selected table, and what the code declares
+     * that it does not have yet.
+     *
+     * A policy in both is listed with the *database's* fields, and the
+     * declaration rides beside it with where the two differ (`listPolicies`).
+     * The declaration's fields in their place would make a policy changed in
+     * SQL look exactly like its declaration, and would show every rule written
+     * as a structured condition — all of Rebase's own policies — with no USING.
+     */
+    const mergedPolicies = useMemo((): ListedPolicy[] => {
         if (!activeTableData) return [];
 
-        const policiesMap: Record<string, PostgresPolicy> = {};
-
-        // Load live policies
-        (activeTableData.policies || []).forEach(p => {
-            policiesMap[p.policyname] = { ...p,
-status: "live" };
-        });
-
-        // Merge code-based policies.
-        //
-        // A rule without an explicit `name` still produces policies — Postgres gets
-        // `<table>_<op>_<hash>`, one per operation. Skipping those rules left their
-        // live policies looking like hand-written SQL ("DB Only"), so derive the
-        // names the generator would emit and match on those.
-        //
-        // `getEffectiveSecurityRules` rather than `securityRules`, for the same
-        // reason one step further out: the generator also injects the
-        // safe-by-default baseline (`<table>_default_admin_read` and the three
-        // `_default_admin_write_*`), which appears in no collection's
-        // `securityRules`. Reading the declared rules alone made four policies
-        // *Rebase itself wrote* look like drift on every table in the project —
-        // badged "DB Only" and offered for import back into the codebase that
-        // produced them. The admin panel's own RLS tab already derived them this
-        // way; this view, its sibling, did not. Both start from
-        // `getEffectiveSecurityRules` now — this one needs the rule bodies to
-        // render a policy row, the other only the names it compiles to
-        // (`getGeneratedPolicyNames`).
-        if (activeCollection && isPostgresCollectionConfig(activeCollection)) {
-            getEffectiveSecurityRules(activeCollection as CollectionConfig).forEach((rule) => {
-                const ops = getPolicyOperations(rule);
-                const policyNames = getPolicyNamesForRule(rule, activeTableData.tableName);
-
-                policyNames.forEach((policyName, opIdx) => {
-                    policiesMap[policyName] = {
-                        policyname: policyName,
-                        tablename: activeTableData.tableName,
-                        permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
-                        cmd: (ops[opIdx] ?? rule.operation ?? "ALL").toUpperCase() as PostgresPolicy["cmd"],
-                        // `pgRoles`, not `roles`. This is a policy's `TO` list —
-                        // database roles — while `SecurityRule.roles` holds
-                        // *application* roles, which the generator compiles into
-                        // the USING clause via `rebase.roles()` and never puts in
-                        // the `TO` list. Reading the wrong field made every rule
-                        // scoped `roles: ["admin"]` render as `TO admin`, a
-                        // policy the framework has never written.
-                        roles: [...(rule.pgRoles ?? ["public"])],
-                        qual: rule.using || null,
-                        with_check: rule.withCheck || null,
-                        // "both" = defined in code and live in Postgres (potentially edited)
-                        status: policiesMap[policyName] ? "both" : "code_only"
-                    };
-                });
-            });
-        }
+        const listed = listPolicies(
+            activeTableData.policies || [],
+            activeCollection,
+            activeTableData.tableName,
+            collectionRegistry.collections ?? []
+        );
 
         // Junction tables have no collection, but their policies are generated
         // too — derived from the endpoints' relations. Recognise them so they
-        // don't show as hand-written SQL ("DB Only"). If the registry's
-        // collections don't carry resolvable relations, they simply stay "live".
-        if (!activeCollection) {
-            try {
-                const registryCollections = (collectionRegistry.collections ?? []) as Parameters<typeof resolveJunctionSpecs>[0];
-                const spec = resolveJunctionSpecs(registryCollections).get(activeTableData.tableName);
-                if (spec) {
-                    const generatedNames = getPolicyNamesForRules(getJunctionSecurityRules(spec), spec.table);
-                    for (const p of Object.values(policiesMap)) {
-                        if (generatedNames.has(p.policyname)) p.status = "both";
-                    }
+        // don't show as hand-written SQL ("DB Only").
+        if (activeJunctionSpec) {
+            const generatedNames = getPolicyNamesForRules(getJunctionSecurityRules(activeJunctionSpec), activeJunctionSpec.table);
+            for (const p of listed) {
+                if (generatedNames.has(p.policyname)) {
+                    p.status = "both";
+                    p.generated = true;
                 }
-            } catch {
-                /* serialized configs without relation closures — leave as live */
             }
         }
 
-        return Object.values(policiesMap).sort((a, b) => a.policyname.localeCompare(b.policyname));
-    }, [activeTableData, activeCollection, collectionRegistry.collections]);
+        return listed.sort((a, b) => a.policyname.localeCompare(b.policyname));
+    }, [activeTableData, activeCollection, activeJunctionSpec, collectionRegistry.collections]);
 
     // Stats for the info tab
     const rlsStats = useMemo(() => {
@@ -816,7 +802,8 @@ totalPolicies };
                                             onClick={() => setConfirmToggleRls({
                                                 table: activeTableData.tableName,
                                                 schema: activeTableData.schemaName,
-                                                enabled: activeTableData.rlsEnabled
+                                                enabled: activeTableData.rlsEnabled,
+                                                managed: activeTableManaged
                                             })}
                                         >
                                             {activeTableData.rlsEnabled ? t("studio_rls_disable_rls") : t("studio_rls_enable_rls")}
@@ -938,6 +925,20 @@ message: "Policy saved successfully" });
                                         // No codebase to write to (hosted console), or an
                                         // unmapped table (internal/junction/other): apply
                                         // the policy to the database directly.
+                                        //
+                                        // Except a policy Rebase generates. The server
+                                        // re-creates it on its next start, and what the
+                                        // database holds for it is a compiled condition
+                                        // the form only shows as text: rewriting it here
+                                        // is a change that cannot last, and one slip in
+                                        // that text drops the condition — on a restrictive
+                                        // tenancy or auth-write gate, every restriction.
+                                        // The source path refuses the same edit.
+                                        if (editingPolicy !== "new" && editingPolicy.generated) {
+                                            snackbarController.open({ type: "error",
+                                                message: t(POLICY_EDIT_REFUSALS.generated, { policy: editingPolicy.policyname }) });
+                                            return;
+                                        }
                                         try {
                                             const qualifiedTable = `${sanitizeSqlIdentifier(activeTableData.schemaName)}.${sanitizeSqlIdentifier(activeTableData.tableName)}`;
                                             const policyName = sanitizeSqlIdentifier(newPolicy.policyname || "unnamed_policy");
@@ -990,6 +991,21 @@ message: e instanceof Error ? e.message : String(e) });
                             <div className="flex-grow flex flex-col overflow-hidden">
                                 <div className="p-6 pt-4 flex-grow overflow-auto bg-surface-sheet">
                                     <div className="max-w-4xl mx-auto flex flex-col gap-6">
+                                    {/* A table the server re-asserts on every start, where
+                                        this editor writes straight to the database: what is
+                                        changed here does not outlive the next start. Where
+                                        saves go to the source instead, the source is what
+                                        the next start applies. */}
+                                    {activeTableData && activeTableManaged && !(activeCollection && hasCodebase) && (
+                                        <Alert color="info">
+                                            <div className="flex items-start gap-2">
+                                                <RefreshCwIcon size={16} className="shrink-0 mt-0.5"/>
+                                                <Typography variant="caption">
+                                                    {t("studio_rls_reapplied_on_start", { table: activeTableData.tableName })}
+                                                </Typography>
+                                            </div>
+                                        </Alert>
+                                    )}
                                     {/* Context-aware banner based on table category */}
                                     {activeTableData && activeTableCategory === "internal" && (
                                         <Alert color="info">
@@ -1084,6 +1100,18 @@ message: e instanceof Error ? e.message : String(e) });
                                                                 <Tooltip title={t("studio_rls_unapplied_tooltip")}>
                                                                     <div className="px-1.5 py-0.5 rounded text-[10px] uppercase bg-primary/10 text-primary border border-primary/20 shrink-0">
                                                                         {t("studio_rls_unapplied")}
+                                                                    </div>
+                                                                </Tooltip>
+                                                            )}
+                                                            {/* The database holds this policy differently from
+                                                                its declaration. Compared as `rebase doctor`
+                                                                compares: TO list, command, mode, and whether
+                                                                each clause is there — never the clause text,
+                                                                which Postgres rewrites. */}
+                                                            {policy.drift && policy.drift.length > 0 && (
+                                                                <Tooltip title={t("studio_rls_drift_tooltip", { fields: policy.drift.join(", ") })}>
+                                                                    <div className="px-1.5 py-0.5 rounded text-[10px] bg-orange-500/10 text-orange-600 border border-orange-500/20 shrink-0">
+                                                                        {`${t("studio_rls_drift")}: ${policy.drift.join(", ")}`}
                                                                     </div>
                                                                 </Tooltip>
                                                             )}
@@ -1215,7 +1243,12 @@ message: "Policy imported successfully" });
                     ? t("studio_rls_disable_confirm_title")
                     : t("studio_rls_enable_confirm_title")}
                 body={confirmToggleRls?.enabled
-                    ? t("studio_rls_disable_confirm_body", { table: confirmToggleRls?.table ?? "" })
+                    ? [
+                        t("studio_rls_disable_confirm_body", { table: confirmToggleRls.table }),
+                        // The server switches a managed table's RLS back on at
+                        // its next start, so a disable here is temporary.
+                        confirmToggleRls.managed ? t("studio_rls_disable_reapplied", { table: confirmToggleRls.table }) : ""
+                    ].filter(Boolean).join(" ")
                     : t("studio_rls_enable_confirm_body", { table: confirmToggleRls?.table ?? "" })}
             />
 

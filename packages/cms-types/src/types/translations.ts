@@ -1457,6 +1457,10 @@ export interface RebaseTranslations {
     studio_rls_drop_policy_body?: string;
     studio_rls_unapplied?: string;
     studio_rls_unapplied_tooltip?: string;
+    studio_rls_drift?: string;
+    studio_rls_drift_tooltip?: string;
+    studio_rls_reapplied_on_start?: string;
+    studio_rls_disable_reapplied?: string;
 
 
     // ─── Studio: empty states that name a remedy ────────────────

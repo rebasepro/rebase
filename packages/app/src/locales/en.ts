@@ -1353,6 +1353,10 @@ export const en: RebaseTranslations = {
     studio_rls_drop_policy_body: "{{policy}} is removed from {{table}} in the database. Nothing is written to your code, so a deploy can restore it.",
     studio_rls_unapplied: "Unapplied",
     studio_rls_unapplied_tooltip: "Declared in your code, not yet in the database. Save it here to plan and apply the change, or run `rebase db push`.",
+    studio_rls_drift: "Differs from code",
+    studio_rls_drift_tooltip: "The database's {{fields}} differ from what the project declares for this policy. The declared version comes back the next time the server starts or `rebase db push` runs.",
+    studio_rls_reapplied_on_start: "Rebase manages the policies on {{table}}. Each time the server starts, and on every `rebase db push`, it switches row-level security back on for this table and re-creates every policy the project declares for it. A change made here to one of those policies, or to the RLS switch, lasts until then. A policy you add under a name of your own is kept.",
+    studio_rls_disable_reapplied: "Rebase manages {{table}}, so row-level security is switched back on the next time the server starts or `rebase db push` runs.",
 
 
     // ─── Studio: empty states that name a remedy ────────────────

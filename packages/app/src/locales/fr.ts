@@ -1345,6 +1345,10 @@ export const fr: RebaseTranslations = {
     studio_rls_drop_policy_body: "{{policy}} est retirée de {{table}} dans la base de données. Rien n'est écrit dans votre code, un déploiement peut donc la rétablir.",
     studio_rls_unapplied: "Non appliquée",
     studio_rls_unapplied_tooltip: "Déclarée dans votre code, pas encore dans la base de données. Enregistrez-la ici pour planifier et appliquer le changement, ou lancez `rebase db push`.",
+    studio_rls_drift: "Diffère du code",
+    studio_rls_drift_tooltip: "Dans la base de données, {{fields}} diffèrent de ce que le projet déclare pour cette politique. La version déclarée revient au prochain démarrage du serveur ou au prochain `rebase db push`.",
+    studio_rls_reapplied_on_start: "Rebase gère les politiques de {{table}}. À chaque démarrage du serveur, et à chaque `rebase db push`, il réactive la sécurité au niveau des lignes sur cette table et recrée chaque politique que le projet déclare pour elle. Une modification faite ici à l'une de ces politiques, ou à l'interrupteur RLS, ne dure que jusque-là. Une politique que vous ajoutez sous un nom à vous est conservée.",
+    studio_rls_disable_reapplied: "Rebase gère {{table}} : la sécurité au niveau des lignes est réactivée au prochain démarrage du serveur ou au prochain `rebase db push`.",
 
 
     // ─── Studio: empty states that name a remedy ────────────────
