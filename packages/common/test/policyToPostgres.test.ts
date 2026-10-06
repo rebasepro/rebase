@@ -95,6 +95,35 @@ describe("policyToPostgres — raw escape hatch", () => {
         const expr = policy.raw("rebase.uid() IS NOT NULL");
         expect(policyToPostgres(expr, documents)).toBe("rebase.uid() IS NOT NULL");
     });
+
+    it("does not read a regex quantifier in a string literal as a placeholder", () => {
+        // The shape a stored claim-tenancy policy on a uuid column imports as:
+        // its guard regex has `{8}` and `{12}`, which became
+        // `"public"."documents"."8"`, so the guard never matched and the
+        // imported policy denied every tenant.
+        const guard = "'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'";
+        const claim = "NULLIF((rebase.jwt() ->> 'org'::text), ''::text)";
+        const sql = `{team_id} = CASE WHEN (${claim} ~ ${guard}::text) THEN (${claim})::uuid ELSE NULL::uuid END`;
+
+        expect(policyToPostgres(policy.raw(sql), documents)).toBe(`"public"."documents".team_id${sql.slice("{team_id}".length)}`);
+    });
+
+    it("substitutes only outside literals, quoted identifiers and comments", () => {
+        const cases: [string, string][] = [
+            ["{team_id} = 'it''s {team_id}'", `"public"."documents".team_id = 'it''s {team_id}'`],
+            ["{team_id} = E'it\\'s {team_id}'", `"public"."documents".team_id = E'it\\'s {team_id}'`],
+            ["{team_id} = $$ {team_id} $$", `"public"."documents".team_id = $$ {team_id} $$`],
+            ["{team_id} = $q$ {team_id} $q$", `"public"."documents".team_id = $q$ {team_id} $q$`],
+            [`"{team_id}" = {team_id}`, `"{team_id}" = "public"."documents".team_id`],
+            ["{team_id} IS NULL -- don't {team_id}\nOR {team_id} = '1'", `"public"."documents".team_id IS NULL -- don't {team_id}\nOR "public"."documents".team_id = '1'`],
+            ["/* it's {team_id} */ {team_id} = '1'", `/* it's {team_id} */ "public"."documents".team_id = '1'`],
+            // `$1` is a parameter, not a dollar quote; `x$y$` an identifier.
+            ["{team_id} = $1 AND x$y$ = {team_id}", `"public"."documents".team_id = $1 AND x$y$ = "public"."documents".team_id`]
+        ];
+        for (const [raw, compiled] of cases) {
+            expect([raw, policyToPostgres(policy.raw(raw), documents)]).toEqual([raw, compiled]);
+        }
+    });
 });
 
 describe("policy.authenticated()", () => {

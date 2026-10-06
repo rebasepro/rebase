@@ -249,10 +249,113 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
             // RLS row. It must be table-qualified, not bare: raw SQL may open its
             // own subquery over the same table, and there a bare name binds to the
             // inner scope, collapsing `m.x = {x}` into the tautology `m.x = m.x`.
-            return sqlText.replace(/\{(\w+)\}/g, (_, col) =>
+            return substituteRawPlaceholders(sqlText, (col) =>
                 `${outerQualifier(scope)}${resolveColumnName(col, scope.outerCollection)}`);
         }
     }
+}
+
+/**
+ * Replace each `{column}` placeholder in raw SQL with `replace(column)`, but
+ * only in the SQL itself: not inside a string literal (`'…'`, `E'…'` with its
+ * backslash escapes, `$$…$$`, `$tag$…$tag$`), a quoted identifier (`"…"`) or a
+ * comment (`--` to the end of the line, or a block comment, which nests).
+ *
+ * A placeholder inside a literal is never meant: it would put the column's
+ * *name* into the text. A regex quantifier is, and it has the same shape. A
+ * stored claim-tenancy policy on a uuid column guards its cast with
+ * `'^[0-9a-fA-F]{8}-…{12}$'`, so imported through "Import from table" or the
+ * Studio's "Import to codebase" (which keep it as `raw`), its `{8}` became
+ * `"public"."projects"."8"`, the guard never matched, and the policy denied
+ * every tenant.
+ */
+function substituteRawPlaceholders(sql: string, replace: (column: string) => string): string {
+    let out = "";
+    let i = 0;
+    while (i < sql.length) {
+        const c = sql[i];
+        let end = i + 1;
+        if (c === "'") {
+            end = skipQuoted(sql, i, "'", isEscapeStringPrefix(sql, i));
+        } else if (c === "\"") {
+            end = skipQuoted(sql, i, "\"", false);
+        } else if (c === "-" && sql[i + 1] === "-") {
+            const newline = sql.indexOf("\n", i);
+            end = newline === -1 ? sql.length : newline;
+        } else if (c === "/" && sql[i + 1] === "*") {
+            end = skipBlockComment(sql, i);
+        } else if (c === "$") {
+            const tag = dollarQuoteTagAt(sql, i);
+            if (tag) {
+                const close = sql.indexOf(tag, i + tag.length);
+                end = close === -1 ? sql.length : close + tag.length;
+            }
+        } else if (c === "{") {
+            const placeholder = /^\{(\w+)\}/.exec(sql.slice(i));
+            if (placeholder) {
+                out += replace(placeholder[1]);
+                i += placeholder[0].length;
+                continue;
+            }
+        }
+        out += sql.slice(i, end);
+        i = end;
+    }
+    return out;
+}
+
+/** A character that continues an identifier, `$` included (`a$b` is one name). */
+const IDENTIFIER_CHAR = /[A-Za-z0-9_$\u0080-\uffff]/;
+
+/** The end of the `quote`-quoted span opening at `start`; a doubled quote stays inside. */
+function skipQuoted(sql: string, start: number, quote: string, backslashEscapes: boolean): number {
+    let i = start + 1;
+    while (i < sql.length) {
+        if (backslashEscapes && sql[i] === "\\") {
+            i += 2;
+        } else if (sql[i] === quote) {
+            if (sql[i + 1] !== quote) return i + 1;
+            i += 2;
+        } else {
+            i++;
+        }
+    }
+    return sql.length;
+}
+
+/** Whether the `'` at `quote` opens an `E'…'` string, where `\'` escapes a quote. */
+function isEscapeStringPrefix(sql: string, quote: number): boolean {
+    const prefix = sql[quote - 1];
+    return (prefix === "E" || prefix === "e") && !IDENTIFIER_CHAR.test(sql[quote - 2] ?? "");
+}
+
+/** The end of the block comment opening at `start`. Postgres nests them. */
+function skipBlockComment(sql: string, start: number): number {
+    let depth = 0;
+    let i = start;
+    while (i < sql.length) {
+        if (sql[i] === "/" && sql[i + 1] === "*") {
+            depth++;
+            i += 2;
+        } else if (sql[i] === "*" && sql[i + 1] === "/") {
+            depth--;
+            i += 2;
+            if (depth === 0) return i;
+        } else {
+            i++;
+        }
+    }
+    return sql.length;
+}
+
+/**
+ * The dollar-quote tag (`$$`, `$tag$`) opening at `at`, or undefined. Not one
+ * after an identifier character (`a$b$` is a name), nor `$1` (a parameter: a
+ * tag cannot start with a digit).
+ */
+function dollarQuoteTagAt(sql: string, at: number): string | undefined {
+    if (at > 0 && IDENTIFIER_CHAR.test(sql[at - 1])) return undefined;
+    return /^\$(?:[A-Za-z_\u0080-\uffff][A-Za-z0-9_\u0080-\uffff]*)?\$/.exec(sql.slice(at))?.[0];
 }
 
 /**

@@ -257,12 +257,8 @@ describe("hoisting row-independent policy predicates into initPlans", () => {
      * through the importer and the compiler here, in both spellings, and the
      * new one has to come back admitting what the old one did.
      *
-     * Compared with the old spelling's import rather than with the policies
-     * themselves, because the importer already changes one of them on the way:
-     * a uuid claim's guard regex contains `{8}`, which the `raw` compiler reads
-     * as a `{column}` placeholder, so an imported claim-tenancy policy denies
-     * every tenant — in both spellings alike. That is not what this file is
-     * about; agreeing with the old import is.
+     * Compared with the old spelling's import here; the next test compares the
+     * import with the policies themselves.
      */
     it("imports its own stored policies back into rules that admit what the old spelling's did", async () => {
         await replacePolicies(db, Object.values(RECORDED).flat());
@@ -274,6 +270,22 @@ describe("hoisting row-independent policy predicates into initPlans", () => {
         const importedNew = await outcomeMatrix(db);
 
         expect(importedNew).toEqual(importedOld);
+    });
+
+    /**
+     * And the import changes nothing: every stored policy, imported and
+     * compiled back, admits exactly what it did. The claim-tenancy policy on
+     * a uuid column is the one that did not, because the `raw` compiler read
+     * the `{8}` and `{12}` in its guard regex as `{column}` placeholders.
+     */
+    it("imports its own stored policies back into rules that admit exactly what they did", async () => {
+        await replacePolicies(db, currentPlans().flatMap(p => p.policyStatements));
+        const stored = await outcomeMatrix(db);
+
+        await replacePolicies(db, await importedFromDatabase(db));
+        const imported = await outcomeMatrix(db);
+
+        expect(imported).toEqual(stored);
     });
 
     it("compiles the row-independent part of the injected baseline to an initPlan", async () => {
