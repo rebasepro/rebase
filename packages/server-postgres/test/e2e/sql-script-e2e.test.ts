@@ -318,3 +318,85 @@ describe("executeSql with a byte budget", () => {
         expect(rows[4999]).toEqual({ g: 5000 });
     });
 });
+
+/**
+ * The SQL console's "Download full result as CSV": one query's whole result,
+ * through a server-side cursor in a read-only transaction, a batch at a time.
+ */
+describe("openSqlCursor", () => {
+    async function readAll(cursor: { read(): Promise<(string | null)[][] | null>; close(): Promise<void> }) {
+        const batches: number[] = [];
+        let last: (string | null)[] | undefined;
+        try {
+            for (let rows = await cursor.read(); rows; rows = await cursor.read()) {
+                batches.push(rows.length);
+                last = rows[rows.length - 1];
+            }
+        } finally {
+            await cursor.close();
+        }
+        return { batches, last };
+    }
+
+    it("reads 100,000 rows a batch of 1,000 at a time, every value as text, and gives the session back", async () => {
+        const cursor = await driver.openSqlCursor("SELECT g AS n, g::text || 'x' AS n, NULL::int AS empty FROM generate_series(1, 100000) g");
+
+        expect(cursor.columns).toEqual(["n", "n", "empty"]);
+        const { batches, last } = await readAll(cursor);
+        expect(batches).toHaveLength(100);
+        expect(Math.max(...batches)).toBe(1000);
+        expect(last).toEqual(["100000", "100000x", null]);
+
+        const after = await pool.query("SELECT current_user AS who, current_setting('transaction_read_only') AS ro");
+        expect(after.rows[0]).toEqual({ who: expect.not.stringMatching(/console_reader/), ro: "off" });
+        expect(pool.idleCount).toBeGreaterThan(0);
+    });
+
+    it("refuses a write, and says what can be downloaded", async () => {
+        await expect(driver.openSqlCursor("INSERT INTO accounts VALUES (9, 9) RETURNING *"))
+            .rejects.toMatchObject({ code: "SQL_ERROR", message: expect.stringMatching(/returns rows/) });
+        await expect(driver.openSqlCursor("WITH d AS (DELETE FROM accounts RETURNING *) SELECT * FROM d"))
+            .rejects.toMatchObject({ code: "SQL_ERROR" });
+        // A function that writes, called from a plain SELECT.
+        await pool.query("CREATE SEQUENCE IF NOT EXISTS export_seq");
+        await expect(driver.openSqlCursor("SELECT nextval('export_seq')"))
+            .rejects.toMatchObject({ code: "SQL_ERROR", message: expect.stringMatching(/read-only/) });
+
+        expect((await pool.query("SELECT count(*)::int AS n FROM accounts")).rows[0].n).toBe(1);
+    });
+
+    it("runs one statement: a second one riding along is refused, not run", async () => {
+        await expect(driver.openSqlCursor("SELECT 1; DROP TABLE accounts"))
+            .rejects.toMatchObject({ code: "SQL_ERROR", message: expect.stringMatching(/one query/) });
+
+        expect((await pool.query("SELECT count(*)::int AS n FROM accounts")).rows[0].n).toBe(1);
+    });
+
+    it("takes a query ending in a semicolon", async () => {
+        const { batches } = await readAll(await driver.openSqlCursor("SELECT 1 AS one;  "));
+        expect(batches).toEqual([1]);
+    });
+
+    it("reads as the role picked, which the database then holds to its grants", async () => {
+        await pool.query("CREATE TABLE IF NOT EXISTS secrets (v text); REVOKE ALL ON secrets FROM console_reader");
+        const { last } = await readAll(await driver.openSqlCursor("SELECT current_user AS who", { role: "console_reader" }));
+        expect(last).toEqual(["console_reader"]);
+
+        await expect(driver.openSqlCursor("SELECT * FROM secrets", { role: "console_reader" }))
+            .rejects.toMatchObject({ code: "SQL_ERROR", message: expect.stringMatching(/permission denied/) });
+    });
+
+    it("runs every read under the session's statement_timeout", async () => {
+        const timed = new pg.Pool({ connectionString: container.connectionString, max: 1, statement_timeout: 300 });
+        try {
+            const timedDb = drizzle(timed);
+            const registry = new PostgresCollectionRegistry();
+            const timedDriver = new PostgresBackendDriver(timedDb, new RealtimeService(timedDb, registry), registry);
+
+            await expect(timedDriver.openSqlCursor("SELECT pg_sleep(2)"))
+                .rejects.toMatchObject({ code: "SQL_ERROR", message: expect.stringMatching(/statement timeout/) });
+        } finally {
+            await timed.end();
+        }
+    });
+});

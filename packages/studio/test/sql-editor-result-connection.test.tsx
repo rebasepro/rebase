@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
-import { describe, expect, it, jest, beforeEach } from "@jest/globals";
+import { describe, expect, it, jest, beforeEach, afterEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { en } from "../../app/src/locales/en";
 import type { SqlScriptResult } from "@rebasepro/types";
@@ -62,13 +62,14 @@ const translation = {
 
 const ordersCollection = { slug: "orders", name: "Orders", table: "orders", properties: {} };
 const sidePanelOpen = jest.fn((_props: Record<string, unknown>) => undefined);
+const snackbarOpen = jest.fn((_props: Record<string, unknown>) => undefined);
 
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useRebaseContext: () => ({ databaseAdmin }),
     useStudioCollectionRegistry: () => ({ collections: [ordersCollection], getCollection: () => undefined }),
     useStudioSidePanelController: () => ({ open: sidePanelOpen, close: jest.fn() }),
-    useSnackbarController: () => ({ open: jest.fn() }),
+    useSnackbarController: () => ({ open: snackbarOpen }),
     useModeController: () => ({ mode: "light", setMode: jest.fn() }),
     useApiBase: () => "http://api.test/api",
     useApiConfig: () => ({ getAuthToken: async () => "token" }),
@@ -92,7 +93,9 @@ jest.mock("@rebasepro/ui", () => {
             </div>)}
         </div>,
         MenuItem: ({ children, onClick, disabled }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) =>
-            <button type="button" role="menuitem" onClick={onClick} disabled={disabled}>{children}</button>
+            <button type="button" role="menuitem" onClick={onClick} disabled={disabled}>{children}</button>,
+        Alert: ({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) =>
+            <div role="status">{children}{action}</div>
     };
     return new Proxy(overrides, {
         get: (target, key: string | symbol) => typeof key === "string" && key in target ? target[key] : stub[key as string],
@@ -132,6 +135,7 @@ beforeEach(() => {
     executeSql.mockClear();
     runSqlScript.mockClear();
     sidePanelOpen.mockClear();
+    snackbarOpen.mockClear();
     localStorage.clear();
 });
 
@@ -210,5 +214,72 @@ describe("a result the server cut short", () => {
         await runOn("app_prod", ORDERS);
 
         expect(screen.queryByText(/Showing the first/)).toBeNull();
+        expect(screen.queryByRole("button", { name: label("studio_sql_download_full_csv") })).toBeNull();
+    });
+
+    /**
+     * The 10,000-row cap left no way to the rest of a result. The server streams
+     * the whole of it through a read-only cursor (`POST /admin/sql/csv`); the
+     * console offers it on a result it cut short.
+     */
+    describe("downloading the whole result", () => {
+        const realFetch = global.fetch;
+        const realCreateObjectURL = URL.createObjectURL;
+        const realRevokeObjectURL = URL.revokeObjectURL;
+        /** What `fetch` answers: jsdom has no `Response`, so the parts the console reads. */
+        type Answer = { ok: boolean; status: number; blob: () => Promise<Blob>; json: () => Promise<unknown> };
+        let requests: { url: string; init: RequestInit }[];
+        let answer: () => Answer;
+        const csv = (): Answer => ({ ok: true, status: 200, blob: async () => new Blob(["id,status\r\n7,new\r\n"]), json: async () => null });
+
+        beforeEach(() => {
+            requests = [];
+            answer = csv;
+            global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+                requests.push({ url: String(url), init: init ?? {} });
+                return answer();
+            }) as never;
+            URL.createObjectURL = jest.fn(() => "blob:download");
+            URL.revokeObjectURL = jest.fn();
+        });
+
+        afterEach(() => {
+            global.fetch = realFetch;
+            URL.createObjectURL = realCreateObjectURL;
+            URL.revokeObjectURL = realRevokeObjectURL;
+        });
+
+        it("asks the server for the query on screen, on its database, as its role", async () => {
+            cutShort = { truncated: true, rowCount: 50_000 };
+            await runOn("app_prod", ORDERS);
+
+            fireEvent.click(screen.getByRole("button", { name: label("studio_sql_download_full_csv") }));
+
+            await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
+            expect(requests).toHaveLength(1);
+            expect(requests[0].url).toBe("http://api.test/api/admin/sql/csv");
+            expect(requests[0].init.method).toBe("POST");
+            expect((requests[0].init.headers as Record<string, string>).Authorization).toBe("Bearer token");
+            expect(JSON.parse(String(requests[0].init.body))).toEqual({ sql: expect.stringMatching(/^SELECT \* FROM orders/), database: "app_prod", role: "postgres" });
+        });
+
+        it("says why when the server refuses", async () => {
+            answer = () => ({
+                ok: false,
+                status: 501,
+                blob: async () => new Blob([]),
+                json: async () => ({ error: { code: "SQL_EXPORT_UNSUPPORTED", message: "needs a Postgres server" } })
+            });
+            cutShort = { truncated: true, rowCount: 50_000 };
+            await runOn("app_prod", ORDERS);
+
+            fireEvent.click(screen.getByRole("button", { name: label("studio_sql_download_full_csv") }));
+
+            await waitFor(() => expect(snackbarOpen).toHaveBeenCalledWith(expect.objectContaining({
+                type: "error",
+                message: expect.stringMatching(/needs a Postgres server/)
+            })));
+            expect(URL.createObjectURL).not.toHaveBeenCalled();
+        });
     });
 });

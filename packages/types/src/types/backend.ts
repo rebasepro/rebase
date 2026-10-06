@@ -605,6 +605,23 @@ export interface SqlScriptResult {
 }
 
 /**
+ * A query's result being read a batch at a time — see `SQLAdmin.openSqlCursor`.
+ *
+ * @group Admin
+ */
+export interface SqlCursor {
+    /** The result's column names, in order. */
+    readonly columns: string[];
+    /**
+     * The next rows, each value the text the database wrote for it and `null`
+     * for NULL — `null` once there are none left.
+     */
+    read(): Promise<(string | null)[][] | null>;
+    /** End the read and give the session back. Safe to call more than once. */
+    close(): Promise<void>;
+}
+
+/**
  * Administrative operations for SQL-based databases (PostgreSQL, MySQL, etc.).
  * Used by the SQL Editor, RLS Editor, and schema browser.
  *
@@ -641,6 +658,21 @@ export interface SQLAdmin {
      * rolled back by a later one.
      */
     runSqlScript?(sql: string, options?: { database?: string; role?: string }): Promise<SqlScriptResult>;
+
+    /**
+     * Read the whole result of ONE query a person wrote, a batch at a time —
+     * the Studio SQL console's "Download full result as CSV", which the
+     * console's 10,000-row cap would otherwise leave no way to get.
+     *
+     * Through a server-side cursor, in a read-only transaction, on a session
+     * of its own, as `role`: a write is refused by the database, and a second
+     * statement by the protocol. Each batch is read when the previous one has
+     * been consumed, so memory holds one batch whatever the result's size;
+     * every read runs under the session's `statement_timeout`. The session is
+     * reset and returned when the cursor is closed — which the caller must do,
+     * on success, failure or a reader that went away.
+     */
+    openSqlCursor?(sql: string, options?: { database?: string; role?: string; batchSize?: number }): Promise<SqlCursor>;
 
     /**
      * Fetch the available databases on the server.

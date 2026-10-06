@@ -110,6 +110,7 @@ const MOUNTS = new Map([
     ["packages/server/src/api/live-schema-routes.ts#router", "/api/admin/schema"],
     ["packages/server/src/api/logs-routes.ts#app", "/api/admin/logs"],
     ["packages/server/src/api/contract-routes.ts#router", "/api/meta"],
+    ["packages/server/src/api/sql-export-routes.ts#router", "/api/admin/sql"],
     // These four build no router of their own: `createAuthRoutes` passes them
     // its own, so they register on the caller's `router` and share its prefix.
     ["packages/server/src/auth/mfa-routes.ts#router", "/api/auth"],
@@ -153,6 +154,7 @@ const MOUNTS = new Map([
     ["packages/server/src/init.ts#cronRouter", "/api/admin/cron"],
     ["packages/server/src/init.ts#backupRouter", "/api/admin/backups"],
     ["packages/server/src/init.ts#rlsAuditRouter", "/api/admin/rls-audit"],
+    ["packages/server/src/init.ts#sqlExportRouter", "/api/admin/sql"],
     ["packages/server/src/init.ts#devMailRouter", "/api/admin/dev/emails"],
     ["packages/server/src/init.ts#logsRouter", "/api/admin/logs"],
     ["packages/server/src/init.ts#contractRouter", "/api/meta"],

@@ -43,7 +43,7 @@ import {
     XIcon
 } from "@rebasepro/ui";
 
-import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView, useTranslation } from "@rebasepro/app";
+import { useApiBase, useApiConfig, useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView, useTranslation } from "@rebasepro/app";
 import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeStoredJson, writeStoredString } from "@rebasepro/utils";
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
@@ -1015,6 +1015,59 @@ truncatedFrom: null });
         window.URL.revokeObjectURL(url);
     };
 
+    const apiConfig = useApiConfig();
+    const apiBase = useApiBase();
+    const [downloadingFullResult, setDownloadingFullResult] = useState(false);
+
+    /**
+     * The whole result of the last run, past the rows the console keeps:
+     * streamed by the server through a read-only cursor (`POST
+     * /admin/sql/csv`), on the database and as the role the rows on screen
+     * were read with.
+     */
+    const handleDownloadFullCsv = async () => {
+        const query = activeTab.lastExecutedSql;
+        const connection = activeTab.lastExecutedConnection;
+        if (!query || !apiBase) return;
+        setDownloadingFullResult(true);
+        try {
+            const token = apiConfig?.getAuthToken ? await apiConfig.getAuthToken() : null;
+            const response = await fetch(`${apiBase}/admin/sql/csv`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ sql: query, database: connection?.database, role: connection?.role })
+            });
+            if (!response.ok) {
+                const failure: unknown = await response.json().catch(() => null);
+                const reason = typeof failure === "object" && failure !== null && "error" in failure
+                    && typeof failure.error === "object" && failure.error !== null
+                    && "message" in failure.error && typeof failure.error.message === "string"
+                    ? failure.error.message
+                    : `HTTP ${response.status}`;
+                throw new Error(reason);
+            }
+            // A download cut off part-way fails here rather than saving a file
+            // that looks whole: the server errors the stream.
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `query_results_${new Date().toISOString().slice(0, 19)}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        } catch (e: unknown) {
+            snackbarController.open({
+                type: "error",
+                message: t("studio_sql_download_full_failed", { message: e instanceof Error ? e.message : String(e) })
+            });
+        } finally {
+            setDownloadingFullResult(false);
+        }
+    };
+
     const handleExportJSON = () => {
         if (!results || results.length === 0) return;
 
@@ -1581,7 +1634,20 @@ isFavorite: !s.isFavorite } : s));
                                     )}
                                     {!loading && results && activeTab.truncatedFrom !== null && (
                                         <div className="px-4 pt-2 shrink-0">
-                                            <Alert color="info" size="small">
+                                            <Alert
+                                                color="info"
+                                                size="small"
+                                                action={activeTab.lastExecutedSql && apiBase
+                                                    ? <Button
+                                                        size="small"
+                                                        variant="text"
+                                                        disabled={downloadingFullResult}
+                                                        onClick={handleDownloadFullCsv}
+                                                    >
+                                                        {downloadingFullResult ? t("studio_sql_downloading_full_csv") : t("studio_sql_download_full_csv")}
+                                                    </Button>
+                                                    : undefined}
+                                            >
                                                 {t("studio_sql_result_truncated", {
                                                     shown: results.length.toLocaleString(),
                                                     total: activeTab.truncatedFrom.toLocaleString()

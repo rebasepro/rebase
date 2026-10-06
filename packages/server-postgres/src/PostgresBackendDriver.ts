@@ -24,6 +24,7 @@ import {
     BatchWriteProps,
     SaveManyProps,
     SaveProps,
+    SqlCursor,
     SqlScriptResult,
     StorageSource,
     UpdateManyProps,
@@ -43,7 +44,7 @@ import {
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool, type PoolClient } from "pg";
+import { DatabaseError, Pool, type PoolClient } from "pg";
 import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, hasFieldAccessRules, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
@@ -58,7 +59,7 @@ import { applyAuthContext } from "./security/rls-enforcement";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
-import { onOwnSession, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
+import { onOwnSession, openSqlCursorOnPool, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
 
 /**
  * Has an operator opted out of database role switching entirely?
@@ -468,6 +469,7 @@ export class PostgresBackendDriver implements DataDriver {
         return {
             executeSql: (...args: Parameters<NonNullable<DatabaseAdmin["executeSql"]>>) => this.executeSql(...args),
             runSqlScript: (...args: Parameters<NonNullable<DatabaseAdmin["runSqlScript"]>>) => this.runSqlScript(...args),
+            openSqlCursor: (...args: Parameters<NonNullable<DatabaseAdmin["openSqlCursor"]>>) => this.openSqlCursor(...args),
             fetchAvailableDatabases: () => this.fetchAvailableDatabases(),
             fetchAvailableRoles: () => this.fetchAvailableRoles(),
             fetchApplicationRoles: () => this.fetchApplicationRoles(),
@@ -2470,6 +2472,41 @@ export class PostgresBackendDriver implements DataDriver {
         return runSqlScriptOnPool(pool, sqlText, {
             assumeRole: role ? (connection) => this.assumeSessionRole(connection, role) : undefined
         });
+    }
+
+    /**
+     * Read the whole result of one query a person wrote, a batch at a time —
+     * see `SQLAdmin.openSqlCursor` and `openSqlCursorOnPool`. The database's
+     * refusal of the query (a write, a second statement, a syntax error, a
+     * role it may not take) is the caller's to read, as on the socket.
+     */
+    async openSqlCursor(sqlText: string, options?: {
+        database?: string,
+        role?: string,
+        batchSize?: number
+    }): Promise<SqlCursor> {
+        const targetDb = await this.getTargetDb(options?.database);
+        const pool = "$client" in targetDb ? targetDb.$client : undefined;
+        if (!(pool instanceof Pool)) {
+            // One session in process: a cursor held open across a download
+            // would hold every other query of the app behind it.
+            throw new ApiError(501, "SQL_EXPORT_UNSUPPORTED",
+                "Downloading a whole result reads it through a cursor on a connection of its own, and the " +
+                "in-process development database has one connection. Point DATABASE_URL at a Postgres of your " +
+                "own (`rebase dev --docker` starts one), or add a LIMIT and export the rows on screen.");
+        }
+        const role = options?.role;
+        try {
+            return await openSqlCursorOnPool(pool, sqlText, {
+                assumeRole: role ? (connection) => this.assumeSessionRole(connection, role) : undefined,
+                batchRows: options?.batchSize
+            });
+        } catch (error: unknown) {
+            if (error instanceof DatabaseError || error instanceof RoleSwitchUnavailableError) {
+                throw new ApiError(400, "SQL_ERROR", error.message);
+            }
+            throw error;
+        }
     }
 
     /**

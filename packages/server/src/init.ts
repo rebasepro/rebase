@@ -3585,6 +3585,20 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         logger.debug("RLS audit admin routes mounted", { path: `${basePath}/admin/rls-audit` });
     }
 
+    // 6b-ii-a. The SQL console's "Download full result as CSV".
+    //
+    // `database:write`: the scope the socket's `EXECUTE_SQL` asks of the same
+    // console, so whoever may run the query may download its whole result,
+    // and nobody else.
+    if (surfaces.admin) {
+        const { createSqlExportRoutes } = await import("./api/sql-export-routes");
+        const sqlExportRouter = new Hono<HonoEnv>();
+        applyAdminGate(sqlExportRouter, "SQL export", "database:write");
+        sqlExportRouter.route("/", createSqlExportRoutes({ getAdmin: () => defaultDriver.admin }));
+        config.app.route(`${basePath}/admin/sql`, sqlExportRouter);
+        logger.debug("SQL export admin routes mounted", { path: `${basePath}/admin/sql` });
+    }
+
     // 6b-iii. The development mailbox.
     //
     // When no SMTP is configured outside production, auth mail is captured

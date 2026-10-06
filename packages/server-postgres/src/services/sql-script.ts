@@ -1,5 +1,5 @@
-import { Client, type Connection, type Pool, type PoolClient, type Submittable } from "pg";
-import type { SqlScriptColumn, SqlScriptNotice, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
+import { Client, DatabaseError, type Connection, type Pool, type PoolClient, type Submittable } from "pg";
+import type { SqlCursor, SqlScriptColumn, SqlScriptNotice, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 
 /**
@@ -641,5 +641,202 @@ export async function readWithinBudget<T extends Record<string, unknown>>(
         wire.removeListener("dataRow", count);
         // A closed connection may still say so; it is discarded, not reused.
         if (!exceeded) connection.removeListener("error", ignore);
+    }
+}
+
+/** Rows one read of a {@link SqlCursor} fetches. */
+export const SQL_CURSOR_BATCH_ROWS = 1000;
+
+/**
+ * How long a cursor's session may sit between reads before Postgres ends it.
+ * A download whose reader stopped reading holds a connection and an open
+ * transaction; this is the most it holds them for.
+ */
+const SQL_CURSOR_IDLE_TIMEOUT_MS = 60_000;
+
+const SQL_CURSOR_NAME = "rebase_sql_export";
+
+/**
+ * One `FETCH`, read message by message as {@link ScriptRun} reads a script:
+ * every value the text the database wrote, each row an array — so two columns
+ * of one name stay two columns.
+ */
+class FetchRun implements Submittable {
+    /** Set by node-postgres when the pool has a `query_timeout`; see {@link ScriptRun.callback}. */
+    callback?: (error: Error | null) => void;
+    columns?: string[];
+    readonly rows: (string | null)[][] = [];
+    readonly done: Promise<void>;
+    private settled = false;
+    private resolveRun: () => void = () => undefined;
+    private rejectRun: (error: Error) => void = () => undefined;
+
+    constructor(private readonly text: string) {
+        this.done = new Promise((resolve, reject) => {
+            this.resolveRun = resolve;
+            this.rejectRun = reject;
+        });
+    }
+
+    submit(connection: Connection): void {
+        connection.query(this.text);
+    }
+
+    handleRowDescription(message: { fields: WireField[] }): void {
+        this.columns = message.fields.map(field => field.name);
+    }
+
+    handleDataRow(message: { fields: (string | null)[] }): void {
+        this.rows.push(message.fields);
+    }
+
+    handleCommandComplete(): void {
+        // The rows are counted by the caller; the tag says nothing more.
+    }
+
+    handleEmptyQuery(): void {
+        // A FETCH is never empty.
+    }
+
+    handlePortalSuspended(): void {
+        // Only the extended protocol suspends a portal.
+    }
+
+    handleError(error: Error): void {
+        this.settle(error);
+    }
+
+    handleReadyForQuery(): void {
+        this.settle(null);
+    }
+
+    private settle(error: Error | null): void {
+        if (this.settled) return;
+        this.settled = true;
+        this.callback?.(error);
+        if (error) this.rejectRun(error);
+        else this.resolveRun();
+    }
+}
+
+/** A cursor on a pooled session of its own. See {@link openSqlCursorOnPool}. */
+class PoolSqlCursor implements SqlCursor {
+    columns: string[] = [];
+    /** The first batch, read when the cursor was opened. */
+    pending: (string | null)[][] | null = null;
+    private exhausted = false;
+    private closed = false;
+    /**
+     * What the session said when it died between reads — the idle timeout, a
+     * restart. Heard here because a checked-out client has no pool listener,
+     * and an unheard `error` event ends the process.
+     */
+    private failure?: Error;
+    private readonly listen = (error: Error) => { this.failure = error; };
+
+    constructor(private readonly connection: PoolClient, private readonly batchRows: number) {
+        connection.on("error", this.listen);
+    }
+
+    /** The next batch from Postgres; the last one is shorter than a batch. */
+    async fetch(): Promise<(string | null)[][]> {
+        if (this.failure) throw this.failure;
+        const run = new FetchRun(`FETCH FORWARD ${this.batchRows} FROM ${SQL_CURSOR_NAME}`);
+        this.connection.query(run);
+        await run.done;
+        if (run.columns) this.columns = run.columns;
+        if (run.rows.length < this.batchRows) this.exhausted = true;
+        return run.rows;
+    }
+
+    async read(): Promise<(string | null)[][] | null> {
+        if (this.closed) return null;
+        const pending = this.pending;
+        this.pending = null;
+        const rows = pending ?? (this.exhausted ? [] : await this.fetch());
+        return rows.length > 0 ? rows : null;
+    }
+
+    /**
+     * Roll the read-only transaction back, reset the session and give it back;
+     * destroyed instead when it cannot be reset.
+     */
+    async close(): Promise<void> {
+        if (this.closed) return;
+        this.closed = true;
+        let reusable = !this.failure;
+        if (reusable) {
+            try {
+                await this.connection.query("ROLLBACK");
+                for (const statement of RESET_SESSION_STATEMENTS) await this.connection.query(statement);
+            } catch {
+                reusable = false;
+            }
+        }
+        // A dead session may still say so once more; it is discarded, so keep listening.
+        if (reusable) this.connection.removeListener("error", this.listen);
+        this.connection.release(reusable ? undefined : true);
+    }
+}
+
+/**
+ * The query refused before a row was read, with what to do about it: Postgres
+ * answers `DECLARE … CURSOR FOR INSERT …` with a syntax error at `INSERT`,
+ * which says nothing to a person who never wrote `DECLARE`.
+ */
+function explainCursorRefusal(error: unknown, prefixLength: number): unknown {
+    if (!(error instanceof DatabaseError)) return error;
+    if (error.code === "42601" && Number(error.position) === prefixLength + 1) {
+        error.message = "Only a query that returns rows can be downloaded — SELECT, WITH … SELECT, TABLE or VALUES. " +
+            "Run any other statement in the console.";
+    } else if (error.code === "42601" && /multiple commands/.test(error.message)) {
+        error.message = "A download runs one query, and this SQL holds more than one statement. Run the query on its own, then download it.";
+    } else if (error.code === "25006") {
+        error.message = `A download runs read-only: ${error.message}.`;
+    }
+    return error;
+}
+
+/**
+ * Open a cursor over ONE query a person wrote — the SQL console's "Download
+ * full result as CSV".
+ *
+ * On a connection of its own, in the role asked for, inside
+ * `BEGIN TRANSACTION READ ONLY`: the database refuses a write, a
+ * data-modifying `WITH` and a function that writes. The query is declared over
+ * the extended protocol, which refuses a second statement — `SELECT 1; DROP
+ * TABLE t` cannot ride along. Rows are then fetched {@link SQL_CURSOR_BATCH_ROWS}
+ * at a time, each `FETCH` under the session's `statement_timeout`; nothing
+ * fetches ahead of the reader, so memory holds one batch. The first batch is
+ * read here, so a query that fails on its first rows fails before anything has
+ * been sent.
+ *
+ * The caller closes the cursor — always. A reader that stops reading without
+ * closing is ended by `idle_in_transaction_session_timeout` after
+ * {@link SQL_CURSOR_IDLE_TIMEOUT_MS}.
+ */
+export async function openSqlCursorOnPool(
+    pool: Pool,
+    sql: string,
+    options: OwnSessionOptions & { batchRows?: number } = {}
+): Promise<SqlCursor> {
+    const connection = await pool.connect();
+    const cursor = new PoolSqlCursor(connection, options.batchRows ?? SQL_CURSOR_BATCH_ROWS);
+    const prefix = `DECLARE ${SQL_CURSOR_NAME} NO SCROLL CURSOR FOR `;
+    try {
+        await options.assumeRole?.(connection);
+        await connection.query("BEGIN TRANSACTION READ ONLY");
+        await connection.query(`SET LOCAL idle_in_transaction_session_timeout = ${SQL_CURSOR_IDLE_TIMEOUT_MS}`);
+        // `queryMode` is node-postgres's switch to the extended protocol; the
+        // typings do not declare it.
+        const declare = { text: prefix + sql.trim().replace(/;\s*$/, ""), queryMode: "extended" };
+        await connection.query(declare).catch((error: unknown) => {
+            throw explainCursorRefusal(error, prefix.length);
+        });
+        cursor.pending = await cursor.fetch();
+        return cursor;
+    } catch (error: unknown) {
+        await cursor.close();
+        throw error;
     }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
-import { redactSqlLiterals } from "../src/utils/sql-redaction";
+import { redactSqlLiterals } from "@rebasepro/common";
 
 /**
  * The SQL console's audit line kept the statement verbatim, so a password set

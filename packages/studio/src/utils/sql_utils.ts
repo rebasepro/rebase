@@ -1,5 +1,5 @@
 import { astVisitor, parse, type Statement } from "pgsql-ast-parser";
-import { toSnakeCase } from "@rebasepro/utils";
+import { csvRecord, toSnakeCase } from "@rebasepro/utils";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import type { SqlScriptResult } from "@rebasepro/types";
 import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
@@ -434,17 +434,6 @@ export function withAutoLimit(sqlText: string, limit: number): string | null {
 }
 
 /**
- * One CSV field (RFC 4180): quoted when it holds a comma, a quote or a line
- * break, with each quote doubled. SQL NULL is an empty field, as `COPY … CSV`
- * writes it; an object (a plan, a parsed `jsonb`) is its JSON.
- */
-function csvField(value: unknown): string {
-    if (value === null || value === undefined) return "";
-    const text = typeof value === "object" ? JSON.stringify(value) : String(value);
-    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
-}
-
-/**
  * The rows on screen as CSV text: a header line of column names, then one
  * line per row, each value under its own column.
  *
@@ -455,8 +444,8 @@ function csvField(value: unknown): string {
 export function resultsToCsv(rows: Record<string, unknown>[]): string {
     if (rows.length === 0) return "";
     const columns = Object.keys(rows[0]);
-    const lines = rows.map(row => columns.map(column => csvField(row[column])).join(","));
-    return [columns.map(csvField).join(","), ...lines].join("\n");
+    const lines = rows.map(row => csvRecord(columns.map(column => row[column])));
+    return [csvRecord(columns), ...lines].join("\n");
 }
 
 /**

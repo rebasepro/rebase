@@ -6,7 +6,7 @@ import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
 import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketOptions, WebSocketMessage } from "@rebasepro/types";
 import type { SqlScriptResult } from "@rebasepro/types";
-import { redactSqlLiterals } from "./utils/sql-redaction";
+import { redactSqlLiterals } from "@rebasepro/common";
 import { reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
 import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AdminScope } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
