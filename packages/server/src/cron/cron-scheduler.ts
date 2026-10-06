@@ -686,11 +686,11 @@ export class CronScheduler {
      * {@link listJobs}, as the fleet sees it rather than this process alone.
      *
      * Reads the store: every job's enabled state — a pause another replica
-     * made — and whether another process holds its run lease. On a process
-     * whose scheduler is not started (the `api` role) it also reads each job's
-     * run count and last run from `cron_logs`, since that process runs nothing
-     * and its own counters would say 0 runs for a job the worker has run a
-     * thousand times.
+     * made — whether another process holds its run lease, and each job's run
+     * count and last run from `cron_logs`. The counters in this process's
+     * memory count only the runs it made: the `api` role runs nothing and
+     * would say 0 runs for a job the worker has run a thousand times, and one
+     * of two scheduling replicas never sees the slots the other one claimed.
      *
      * A store that cannot answer leaves this process's own view, with a
      * warning: a listing is not worth failing.
@@ -980,7 +980,7 @@ export class CronScheduler {
         }
 
         // Only where nothing is scheduled: a started scheduler has its own next
-        // slots, and counts its own runs, seeded from the same table at start.
+        // slots.
         if (!this.started) {
             const now = new Date();
             for (const job of jobs) {
@@ -990,13 +990,18 @@ export class CronScheduler {
                     // A schedule with no reachable slot has no next run to show.
                 }
             }
-            if (store?.fetchRunSummaries && ids.length > 0) {
-                try {
-                    const summaries = await store.fetchRunSummaries(ids);
-                    for (const [id, summary] of summaries) viewOf(id).summary = summary;
-                } catch (err) {
-                    logger.warn("[cron] Could not read the jobs' run history — listing what this process knows", { error: err });
-                }
+        }
+        // Wherever this process stands. Its own counters are seeded from
+        // `cron_logs` once, at start, and after that count only its own runs:
+        // with two replicas scheduling, a slot the other one claimed never
+        // reached them, and the card said "idle, 0 runs" over a history that
+        // listed the failure.
+        if (store?.fetchRunSummaries && ids.length > 0) {
+            try {
+                const summaries = await store.fetchRunSummaries(ids);
+                for (const [id, summary] of summaries) viewOf(id).summary = summary;
+            } catch (err) {
+                logger.warn("[cron] Could not read the jobs' run history — listing what this process knows", { error: err });
             }
         }
         return views;

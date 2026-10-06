@@ -80,6 +80,28 @@ function makeFleetStore() {
     return { store, overrides, leases, claims, logs };
 }
 
+/** What `fetchRunSummaries` reads from `cron_logs`, over the fleet store's log rows. */
+function summariesOf(logs: readonly CronJobLogEntry[], jobIds: readonly string[]): Map<string, CronJobRunSummary> {
+    const summaries = new Map<string, CronJobRunSummary>();
+    for (const id of jobIds) {
+        const runs = logs.filter(entry => entry.jobId === id)
+            .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+        const summary: CronJobRunSummary = {
+            totalRuns: runs.length,
+            totalFailures: runs.filter(entry => !entry.success).length
+        };
+        const last = runs[0];
+        if (last) {
+            summary.lastRunAt = last.startedAt;
+            summary.lastDurationMs = last.durationMs;
+            summary.lastSuccess = last.success;
+            if (last.error) summary.lastError = last.error;
+        }
+        summaries.set(id, summary);
+    }
+    return summaries;
+}
+
 /** Wait until `check` holds, on real timers — for a run on another scheduler to get going. */
 async function until(check: () => boolean): Promise<void> {
     for (let i = 0; i < 200 && !check(); i++) await new Promise(r => setTimeout(r, 5));
@@ -1915,8 +1937,41 @@ catchUpWindowSeconds: 3600,
             expect(fleet.store.fetchRunSummaries).toHaveBeenCalledWith(["nightly"]);
         });
 
-        it("keeps its own counters when its scheduler is started", async () => {
+        it("shows a run another replica made, though its own scheduler is started too", async () => {
+            // Two replicas, both scheduling. The run the other one claimed never
+            // touched this one's counters, which were seeded once at boot — so
+            // its card said 0 runs and idle while the history underneath,
+            // read from `cron_logs`, listed the failure.
             const fleet = makeFleetStore();
+            fleet.store.fetchRunSummaries.mockImplementation(async (ids) => summariesOf(fleet.logs, ids));
+            const replica = new CronScheduler();
+            try {
+                scheduler.setStore(fleet.store);
+                replica.setStore(fleet.store);
+                scheduler.registerJobs([makeFailingJob("sync", "upstream 502")]);
+                replica.registerJobs([makeFailingJob("sync", "upstream 502")]);
+                scheduler.start();
+                replica.start();
+                await replica.triggerJob("sync");
+
+                const job = await scheduler.fetchJob("sync");
+
+                expect(job).toMatchObject({
+                    totalRuns: 1,
+                    totalFailures: 1,
+                    state: "error",
+                    lastError: expect.stringContaining("upstream 502"),
+                    lastRunAt: fleet.logs[0].startedAt
+                });
+            } finally {
+                replica.stop();
+            }
+        });
+
+        it("keeps its own counters when its scheduler is started and the store cannot answer", async () => {
+            const fleet = makeFleetStore();
+            jest.spyOn(logger, "warn").mockImplementation(() => { /* silence */ });
+            fleet.store.fetchRunSummaries.mockRejectedValue(new Error("connection terminated unexpectedly"));
             scheduler.setStore(fleet.store);
             scheduler.registerJobs([makeJob("local")]);
             scheduler.start();
@@ -1925,7 +1980,6 @@ catchUpWindowSeconds: 3600,
             const [job] = await scheduler.fetchJobs();
 
             expect(job.totalRuns).toBe(1);
-            expect(fleet.store.fetchRunSummaries).not.toHaveBeenCalled();
         });
 
         it("shows a pause another process made", async () => {

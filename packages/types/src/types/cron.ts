@@ -220,10 +220,13 @@ export interface CronJobStatus {
     /** Error message from the last failed run. */
     lastError?: string;
 
-    /** Total number of executions since server start. */
+    /**
+     * Executions in the run history: every process's, read from `cron_logs`
+     * where runs are persisted, and this process's own otherwise.
+     */
     totalRuns: number;
 
-    /** Total number of failed executions since server start. */
+    /** How many of {@link totalRuns} failed. */
     totalFailures: number;
 }
 

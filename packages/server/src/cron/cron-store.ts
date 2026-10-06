@@ -106,8 +106,8 @@ export interface CronStore {
 
     /**
      * Run count, failure count and last run of each job, read from
-     * `cron_logs` — for a process whose scheduler is not started (the `api`
-     * role), which runs nothing and so counts nothing of its own.
+     * `cron_logs` — every process's runs, where the scheduler's own counters
+     * hold only the ones it made.
      */
     fetchRunSummaries?(jobIds: readonly string[]): Promise<Map<string, CronJobRunSummary>>;
 }
