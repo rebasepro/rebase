@@ -577,7 +577,22 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
         return token !== undefined && safeCompare(token, config.serviceKey);
     };
 
-    const bucketOf = async (c: Parameters<MiddlewareHandler<HonoEnv>>[0]): Promise<DataRateLimitBucket | null> => {
+    // `createRateLimiter` asks for the key and for the limit separately, and
+    // with no auth middleware ahead of it each answer verified the token again.
+    // Remembered per request (keyed by the request's own Context, so it dies
+    // with it), and only here: nothing is written to the context — see
+    // `identify` for why that would change authorization.
+    const bucketsByRequest = new WeakMap<object, Promise<DataRateLimitBucket | null>>();
+    const bucketOf = (c: Parameters<MiddlewareHandler<HonoEnv>>[0]): Promise<DataRateLimitBucket | null> => {
+        let bucket = bucketsByRequest.get(c);
+        if (!bucket) {
+            bucket = resolveBucket(c);
+            bucketsByRequest.set(c, bucket);
+        }
+        return bucket;
+    };
+
+    const resolveBucket = async (c: Parameters<MiddlewareHandler<HonoEnv>>[0]): Promise<DataRateLimitBucket | null> => {
         // The service key is not a caller to bound — see `dataRateLimitBuckets`.
         // Read off the context, where the auth middleware put it — or, where no
         // auth middleware has run yet, off the request itself. It is not a JWT,
