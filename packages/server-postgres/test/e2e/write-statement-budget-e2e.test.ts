@@ -446,6 +446,36 @@ describe("a write's statements (E2E)", () => {
         });
     });
 
+    describe("an upsert that meets a stored row", () => {
+        it("reads the row once before writing it, and hands the hooks and history the same previous values", async () => {
+            const patched = await newPost("twin");
+            const upserted = await newPost("twin");
+
+            const patch = await http("PATCH", `/posts/${patched}`, { body: { title: "twin 2" } });
+            expect(patch.status).toBe(200);
+            const { result, statements } = await statementsOf(() =>
+                http("POST", "/posts?on_conflict=id", { body: { id: upserted, title: "twin 2" } }));
+            expect(result.status).toBeLessThan(300);
+            expect(result.json.title).toBe("twin 2");
+            // One read to find the row, one read back after the write: not a
+            // second read of the row the first one already found.
+            expect(reads(statements, "posts")).toHaveLength(2);
+
+            const { rows } = await admin.query<{ entity_id: string; previous_values: Record<string, unknown> }>(
+                `SELECT entity_id, previous_values FROM rebase.entity_history
+                  WHERE table_name = 'posts' AND entity_id = ANY($1) AND action = 'update'`,
+                [[String(patched), String(upserted)]]
+            );
+            // The two rows differ only in their key and in the instant each
+            // was stamped; the rendering of every column must be the same.
+            const previous = (id: number) => {
+                const { id: _id, updatedAt, ...rest } = rows.find(row => row.entity_id === String(id))!.previous_values;
+                return { ...rest, updatedAt: typeof updatedAt };
+            };
+            expect(previous(upserted)).toEqual(previous(patched));
+        });
+    });
+
     describe("the answers stay the same", () => {
         it("a missing row is the route's 404, on PATCH and DELETE", async () => {
             for (const method of ["PATCH", "DELETE"]) {

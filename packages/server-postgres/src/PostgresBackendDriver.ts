@@ -44,7 +44,7 @@ import {
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, type PoolClient } from "pg";
-import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
+import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, hasFieldAccessRules, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath } from "./services/nested-path";
@@ -1137,7 +1137,7 @@ export class PostgresBackendDriver implements DataDriver {
         values: Partial<EntityValues<M>>,
         id: string | number | undefined,
         onConflict: readonly string[] | undefined
-    ): Promise<{ id: string; values: Partial<EntityValues<M>> } | undefined> {
+    ): Promise<{ id: string; values: Partial<EntityValues<M>>; row: Record<string, unknown> } | undefined> {
         const primaryKeys = getPrimaryKeys(collection, this.registry);
         const key: Record<string, unknown> = { ...values };
         if (isPresentKey(id)) Object.assign(key, parseIdValues(id, primaryKeys));
@@ -1173,7 +1173,8 @@ export class PostgresBackendDriver implements DataDriver {
         for (const field of [...primaryKeys.map(info => info.fieldName), ...targetFields]) delete rest[field];
         return {
             id: deriveRowAddress(row, collection, this.registry),
-            values: rest as Partial<EntityValues<M>>
+            values: rest as Partial<EntityValues<M>>,
+            row
         };
     }
 
@@ -1193,7 +1194,12 @@ export class PostgresBackendDriver implements DataDriver {
                                                             upsert,
                                                             onConflict,
                                                             precondition
-                                                        }: SaveProps<M>, frame: WriteFrame): Promise<Record<string, unknown>> {
+                                                        }: SaveProps<M>, frame: WriteFrame,
+                                                        /**
+                                                         * The stored row, when this write already read it in
+                                                         * this transaction (an upsert continuing as an update).
+                                                         */
+                                                        knownStored?: Record<string, unknown>): Promise<Record<string, unknown>> {
 
         const {
             collection: resolvedCollection,
@@ -1233,8 +1239,20 @@ export class PostgresBackendDriver implements DataDriver {
                 path, resolvedCollection as CollectionConfig, values, id, onConflict
             );
             if (stored) {
-                // The same write, continued as an update: the same frame.
-                return this.saveInFrame<M>({ path, id: stored.id, values: stored.values, collection, status: "existing" }, frame);
+                // The same write, continued as an update: the same frame. The
+                // row the key named was just read, in this transaction, and is
+                // the update's previous values rather than a second read of
+                // it — unless the two reads could differ: a `beforeQuery` may
+                // narrow the "list" that found it differently from a "get", the
+                // find ran on the trusted plane for per-field read access, and a
+                // nested path reads the row from elsewhere.
+                const reusable = !callbacks?.beforeQuery && !globalCallbacks?.beforeQuery
+                    && !hasFieldAccessRules(resolvedCollection as CollectionConfig) && !isNestedPath(path);
+                return this.saveInFrame<M>(
+                    { path, id: stored.id, values: stored.values, collection, status: "existing" },
+                    frame,
+                    reusable ? stored.row : undefined
+                );
             }
         }
 
@@ -1299,9 +1317,11 @@ export class PostgresBackendDriver implements DataDriver {
                 ) ? true : undefined;
                 if (precondition?.lock) await this.dataService.getPersistService().lockRow(path, id);
                 const storedPath = this.storedRowPath(path);
-                const existing = await this.dataService.getFetchService().fetchOneForRest(
-                    storedPath, id, undefined, resolvedCollection?.databaseId, { withDeleted }
-                );
+                const existing = knownStored && !precondition
+                    ? knownStored
+                    : await this.dataService.getFetchService().fetchOneForRest(
+                        storedPath, id, undefined, resolvedCollection?.databaseId, { withDeleted }
+                    );
                 if (precondition) {
                     // Judged at the address written: through a many-to-many
                     // path that is the row as a member of the parent's set, which
