@@ -32,6 +32,7 @@ import {
     type Property,
     type ReferenceProperty,
     type RelationProperty,
+    type ResolvedForeignKeyOnTarget,
     type ResolvedRelation,
     type SecurityRule,
     type StringProperty,
@@ -545,8 +546,16 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
     // would then report the store the collection actually reads from as drift.
     const collections = relationalCollections(allCollections);
 
-    const resolveCollection: ResolveCollection = (slug) =>
-        collections.find(c => c.slug === slug || getTableName(c) === slug);
+    // The first collection, in declaration order, whose slug or table name is
+    // the key — what `collections.find(...)` answered, from a map built once
+    // rather than a scan per lookup.
+    const firstBySlugOrTable = new Map<string, CollectionConfig>();
+    for (const c of collections) {
+        for (const key of [c.slug, getTableName(c)]) {
+            if (!firstBySlugOrTable.has(key)) firstBySlugOrTable.set(key, c);
+        }
+    }
+    const resolveCollection: ResolveCollection = (slug) => firstBySlugOrTable.get(slug);
 
     const declaredSchemas = Array.from(new Set(
         collections.map(c => (isPostgresCollectionConfig(c) ? c.schema : undefined)).filter(Boolean) as string[]
@@ -1508,6 +1517,27 @@ function planRelations(
 ): RelationPlan[] {
     const plans: RelationPlan[] = [];
 
+    // Every relation whose foreign key lives on its target's table, grouped by
+    // that target's slug, in the order the scan below used to meet them —
+    // collections in declaration order, each one's relations in order. Built
+    // once: the scan ran once per collection over every other collection's
+    // relations, N² in the collection count (24 ms at 200, 204 ms at 1,000).
+    const fkOnTargetBySlug = new Map<string, Array<{ other: CollectionConfig; otherRel: ResolvedForeignKeyOnTarget }>>();
+    for (const other of collections) {
+        for (const otherRel of Object.values(resolveCollectionRelations(other))) {
+            if (!hasForeignKeyOnTarget(otherRel)) continue;
+            let otherTarget: CollectionConfig;
+            try {
+                otherTarget = otherRel.target();
+            } catch {
+                continue;
+            }
+            const list = fkOnTargetBySlug.get(otherTarget.slug) ?? [];
+            list.push({ other, otherRel });
+            fkOnTargetBySlug.set(otherTarget.slug, list);
+        }
+    }
+
     for (const [tableName, entry] of tableEntries) {
         const tableVar = getTableVarName(tableName);
 
@@ -1641,37 +1671,27 @@ function planRelations(
 
         // Reciprocals the far side declares and this one does not. Drizzle
         // needs both halves of a pair to exist for a relational query to work.
-        for (const other of collections) {
+        for (const { other, otherRel } of fkOnTargetBySlug.get(collection.slug) ?? []) {
             if (other.slug === collection.slug) continue;
-            for (const otherRel of Object.values(resolveCollectionRelations(other))) {
-                if (!hasForeignKeyOnTarget(otherRel)) continue;
-                let otherTarget: CollectionConfig;
-                try {
-                    otherTarget = otherRel.target();
-                } catch {
-                    continue;
-                }
-                if (otherTarget.slug !== collection.slug) continue;
-                const relationName = sharedRelationName(otherRel, other);
-                const dedupe = `${relationName}::belongsTo`;
-                if (emitted.has(dedupe)) continue;
-                emitted.add(dedupe);
-                const otherVar = getTableVarName(getTableName(other));
-                const fieldKey = fieldKeyForColumn(collection, otherRel.foreignKeyOnTarget);
-                plans.push({
-                    tableVar,
-                    key: `_synth_${otherVar}_${fieldKey}`,
-                    kind: "one",
-                    targetVar: otherVar,
-                    relationName,
-                    fields: [fieldKey],
-                    // The column the far side points at: its primary key,
-                    // unless the link names another one with `sourceKey`.
-                    references: [otherRel.sourceKey
-                        ? fieldKeyForColumn(other, otherRel.sourceKey)
-                        : getPrimaryKeyName(other, linkLabel("relation", other, otherRel.relationName))]
-                });
-            }
+            const relationName = sharedRelationName(otherRel, other);
+            const dedupe = `${relationName}::belongsTo`;
+            if (emitted.has(dedupe)) continue;
+            emitted.add(dedupe);
+            const otherVar = getTableVarName(getTableName(other));
+            const fieldKey = fieldKeyForColumn(collection, otherRel.foreignKeyOnTarget);
+            plans.push({
+                tableVar,
+                key: `_synth_${otherVar}_${fieldKey}`,
+                kind: "one",
+                targetVar: otherVar,
+                relationName,
+                fields: [fieldKey],
+                // The column the far side points at: its primary key,
+                // unless the link names another one with `sourceKey`.
+                references: [otherRel.sourceKey
+                    ? fieldKeyForColumn(other, otherRel.sourceKey)
+                    : getPrimaryKeyName(other, linkLabel("relation", other, otherRel.relationName))]
+            });
         }
     }
 
