@@ -19,7 +19,7 @@
  * swallows and logs failures rather than throwing, so a broken CREATE would
  * otherwise produce a green boot, a mounted surface, and a 500 on every call.
  */
-import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
+import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import type { DataDriver } from "@rebasepro/types";
 
@@ -118,6 +118,51 @@ describe("ensureTables", () => {
             `SELECT indexname FROM pg_indexes WHERE schemaname = 'rebase' AND indexname = 'oauth_refresh_family_idx'`
         );
         expect(res.rows).toHaveLength(1);
+    });
+
+    // A connected client rotates its refresh token hourly and rows live 30 +
+    // 30 days: ~1,440 rows per connection. "Connected apps" counts live tokens
+    // per consent, and revoking a grant updates by (uid, client_id) — each a
+    // scan of the whole table without this index.
+    it("creates the (uid, client_id) index the grant list and revocation read through", async () => {
+        const res = await db.query(
+            `SELECT indexname FROM pg_indexes WHERE schemaname = 'rebase' AND indexname = 'oauth_refresh_uid_client_idx'`
+        );
+        expect(res.rows).toHaveLength(1);
+
+        await db.exec("SET enable_seqscan = off");
+        const plan = await db.query<{ "QUERY PLAN": string }>(
+            `EXPLAIN UPDATE rebase.oauth_refresh_tokens SET revoked_at = now()
+              WHERE uid = 'user-1' AND client_id = 'mcp_abc' AND revoked_at IS NULL`
+        );
+        expect(plan.rows.map(r => r["QUERY PLAN"]).join("\n")).toContain("oauth_refresh_uid_client_idx");
+    });
+});
+
+describe("expired rows", () => {
+    async function count(table: string): Promise<number> {
+        return Number((await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n);
+    }
+
+    it("are swept while the server runs, not only at boot", async () => {
+        const longAgo = new Date(Date.now() - 31 * 24 * 3_600_000);
+        await store.saveRefreshToken("old", { ...REFRESH_RECORD, family: "fam-old" }, longAgo);
+        await store.saveAuthorizationCode("old-code", CODE_RECORD, new Date(Date.now() - 2 * 3_600_000));
+        expect(await count("rebase.oauth_refresh_tokens")).toBe(1);
+
+        // Two hours on, a token is issued: the sweep is due, and runs.
+        const later = Date.now() + 2 * 3_600_000;
+        const now = jest.spyOn(Date, "now").mockReturnValue(later);
+        try {
+            await store.saveRefreshToken("new", REFRESH_RECORD, new Date(later + 60_000));
+            for (let i = 0; i < 50 && await count("rebase.oauth_refresh_tokens") > 1; i++) {
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+        } finally {
+            now.mockRestore();
+        }
+        expect(await count("rebase.oauth_refresh_tokens")).toBe(1);
+        expect(await count("rebase.oauth_authorization_codes")).toBe(0);
     });
 });
 
