@@ -389,6 +389,9 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         // answer and then carries whatever token the transport holds: the
         // restored session's, or none when there was nothing to restore.
         if (!session) return cookieRestore?.then(() => undefined);
+        // An expiry nobody stated is not one that has passed (see
+        // `scheduleRefresh`): read as spent, it refreshed before every request.
+        if (!Number.isFinite(session.expiresAt)) return undefined;
         if (session.expiresAt > Date.now() + SPENT_TOKEN_MARGIN_MS) return undefined;
         if (authFlowMode !== "cookie" && !session.refreshToken) return undefined;
         const epoch = sessionEpoch;
@@ -442,6 +445,12 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     function scheduleRefresh(expiresAt: number) {
         if (refreshTimeout) clearTimeout(refreshTimeout);
         if (!autoRefresh) return;
+        // No stated expiry — a backend that left `accessTokenExpiresAt` out.
+        // `delay` would be NaN, which `setTimeout` runs at once, and every
+        // refresh would re-arm the next with no gap. Nothing to schedule: the
+        // token is used until the server refuses it, and the 401 path
+        // refreshes it then.
+        if (!Number.isFinite(expiresAt)) return;
 
         const delay = (expiresAt - REFRESH_BUFFER_MS) - Date.now();
 
