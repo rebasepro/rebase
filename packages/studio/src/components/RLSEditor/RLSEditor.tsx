@@ -444,14 +444,14 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                 // Junction detection is best-effort
             }
 
-            if (sortedTables.length > 0 && !selectedTable) {
-                // Auto-select first public/collection table, skip internal
-                const firstUserTable = sortedTables.find(t => !REBASE_INTERNAL_SCHEMAS.includes(t.schemaName));
-                if (firstUserTable) {
-                    setSelectedTable(`${firstUserTable.schemaName}.${firstUserTable.tableName}`);
-                } else {
-                    setSelectedTable(`${sortedTables[0].schemaName}.${sortedTables[0].tableName}`);
-                }
+            if (sortedTables.length > 0) {
+                // Auto-select first public/collection table, skip internal —
+                // when nothing is selected yet. Read through the updater, not
+                // a dependency: depending on the selection made picking a
+                // table re-read the whole catalogue, and the first load (which
+                // picks one) run twice.
+                const firstUserTable = sortedTables.find(t => !REBASE_INTERNAL_SCHEMAS.includes(t.schemaName)) ?? sortedTables[0];
+                setSelectedTable(previous => previous ?? `${firstUserTable.schemaName}.${firstUserTable.tableName}`);
             }
 
         } catch (e: unknown) {
@@ -460,7 +460,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
         } finally {
             setIsLoading(false);
         }
-    }, [databaseAdmin, selectedTable]);
+    }, [databaseAdmin]);
 
     useEffect(() => {
         setEditingPolicy(null);
