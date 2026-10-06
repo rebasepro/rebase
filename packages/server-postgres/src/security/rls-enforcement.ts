@@ -40,8 +40,9 @@ import { logger } from "@rebasepro/server";
  *     SELECT/INSERT/UPDATE/DELETE grants (+ default privileges so future
  *     tables stay covered).
  *  3. {@link applyAuthContext} — per-transaction: set the `app.*` GUCs the
- *     policies read (`rebase.uid()` etc.) and `SET LOCAL ROLE rebase_user` so
- *     RLS binds. Transaction-scoped, so it composes with poolers.
+ *     policies read (`rebase.uid()` etc.) and the transaction-local role
+ *     `rebase_user` so RLS binds, in one statement. Transaction-scoped, so it
+ *     composes with poolers.
  *
  * Provisioning runs from the framework's own bootstrap/migrate (which already
  * self-creates the `auth` schema and functions) — enforcement is default-on,
@@ -382,8 +383,8 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
 /**
  * Apply the authenticated context to a transaction: the `app.*` GUCs that RLS
  * policies read via `rebase.uid()` / `rebase.roles()` / `rebase.jwt()`, and — when
- * `userRole` is set — `SET LOCAL ROLE` so RLS binds every statement in this
- * transaction (reads *and* writes).
+ * `userRole` is set — the `LOCAL` role switch, in the same statement, so RLS
+ * binds every statement in this transaction (reads *and* writes).
  *
  * GUCs are set with `is_local = true` and the role switch is `LOCAL`: both
  * reset at commit/rollback, so pooled connections are never polluted.
@@ -437,11 +438,21 @@ export async function applyAuthContext(tx: SqlTx, auth: AuthContext, userRole?: 
         // same fact as `rebase.is_anonymous()`. Two sources that could
         // disagree would be worse than one.
         is_anonymous: auth.isAnonymous === true
-    })}, true)
+    })}, true)${userRole
+        // The role switch, in the same statement rather than a `SET LOCAL ROLE`
+        // round trip of its own on every transaction. Postgres implements
+        // `SET ROLE` as the `role` setting: `set_config('role', name, true)`
+        // runs the same membership check, fails with the same SQLSTATE and
+        // message (42501 "permission denied to set role", 22023 for an unknown
+        // role — `isRoleSwitchingPermissionError` still reads it), takes the
+        // name verbatim as the quoted identifier did, and resets at COMMIT and
+        // ROLLBACK like `LOCAL`. Last in the list, after the GUCs; a refusal
+        // fails the whole statement, so the transaction aborts rather than
+        // running on as the connection owner. auth-context-one-statement.test.ts.
+        ? drizzleSql`,
+            set_config('role', ${userRole}, true)`
+        : drizzleSql``}
     `);
-    if (userRole) {
-        await tx.execute(drizzleSql.raw(`SET LOCAL ROLE ${quoteIdent(userRole)}`));
-    }
 }
 
 /** Role names from other BaaS platforms that people reach for out of habit. */
