@@ -48,9 +48,16 @@ a diferença entre um player funcional e um com defeito.
 - A revalidação tem precedência sobre o range: uma requisição contendo tanto `If-None-Match` quanto
   `Range` recebe o `304`.
 
-No armazenamento local, apenas o trecho solicitado é lido do disco. No S3 e GCS, o
-objeto ainda é buscado por inteiro — um `StorageController` não possui leitura particionada —, portanto
-a economia acontece na resposta, e não no tráfego upstream.
+Apenas os bytes solicitados são lidos — do disco no armazenamento local, e com uma
+leitura particionada (ranged read) no S3 e GCS — e todo objeto é enviado ao cliente em streaming
+conforme é lido, em vez de ser mantido antes na memória, de modo que servir um vídeo grande custa
+ao servidor a mesma memória que servir uma miniatura. Uma revalidação que termina em um
+`304`, um `HEAD`, um `416` e uma versão redimensionada de imagem em cache são respondidos a partir dos
+metadados do objeto, sem ler os seus bytes.
+
+Um `StorageController` personalizado obtém o mesmo implementando os métodos opcionais
+`statObject` e `getObjectStream`. Um que não os tenha é servido por meio de
+`getObject`, que lê o objeto inteiro a cada requisição, ranges incluídos.
 
 ## Colocando uma CDN na frente
 

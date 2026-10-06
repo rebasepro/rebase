@@ -75,7 +75,10 @@ const { url } = await client.storage.getSignedUrl(
 );
 ```
 
-O SDK armazena em cache as URLs assinadas para evitar chamadas redundantes ao servidor.
+O SDK armazena em cache as URLs assinadas para evitar chamadas redundantes ao servidor, até que o
+token de download de cada uma expire. O cache pertence à credencial que o pediu: quando
+o token de acesso muda — um logout, outro usuário entrando, uma renovação — ele
+recomeça do zero, de modo que um usuário nunca recebe uma URL emitida para outro.
 
 ### URLs privadas vs. públicas
 

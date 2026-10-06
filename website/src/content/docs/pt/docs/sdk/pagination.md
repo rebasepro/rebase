@@ -94,6 +94,23 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100
 GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 ```
 
+#### Ignorando a contagem
+
+`meta.total` é um `COUNT(*)` sobre todas as linhas que a consulta encontra, executado ao lado da
+página — e numa tabela grande custa mais do que a própria página. Uma leitura que só pagina para a frente nunca precisa dele, porque
+`meta.hasMore` não depende dele: passe `count: "none"` e a leitura pede uma linha além da página.
+
+```typescript
+const { data, meta } = await client.data.orders.find({ limit: 100, count: "none" });
+meta.hasMore; // exact
+```
+
+Sem contagem não há total a informar: via HTTP, `meta.total` está ausente,
+e no mesmo processo ele são as linhas até o fim da página (`offset` mais a
+página). Via HTTP é `?count=none`; `?count=exact` é o padrão, e qualquer
+outro valor resulta em um 400 `INVALID_COUNT`. `iterate()` e `findAll()` o enviam
+em cada página por conta própria, já que um percurso não informa total.
+
 #### Quais leituras são envelopadas e quais não são
 
 Dois formatos e uma regra: **uma janela é envelopada, uma resposta completa não é.**
@@ -146,24 +163,30 @@ Três opções moldam o percurso:
 | Opção | Padrão | O que faz |
 |-------|--------|-----------|
 | `pageSize` | 200 | Linhas por requisição. |
-| `cursor` | — | Busca em uma coluna em vez de paginar por offset. Veja abaixo. |
+| `cursor` | — | Exige a busca: lança um erro em vez de recorrer ao offset. Veja abaixo. |
 | `maxPages` | 10 000 | Teto de requisições, para que um servidor que nunca para de retornar `hasMore` não fique em loop infinito. |
 | `maxRows` | 10 000 | Apenas `findAll()`. Exceder esse valor **lança um erro** em vez de retornar um array truncado como se fosse a resposta completa. Passe `Infinity` para desativar, ou use `iterate()`. |
 
-**Prefira `cursor` sempre que a coleção tiver uma coluna única e ordenável.**
-A paginação por offset reconta as linhas a cada requisição, portanto uma linha inserida ou excluída
-*enquanto a iteração é executada* desloca a janela e o percurso pula ou repete
-linhas silenciosamente. A busca solicita linhas estritamente após a última visualizada, as quais
-gravações simultâneas antes do cursor não podem mover:
+**O percurso faz a busca por conta própria.** Depois da primeira página, ele devolve
+[o cursor do servidor](#paginação-por-cursor) — `meta.nextCursor` — como `after`,
+de modo que cada requisição pede linhas estritamente após a última visualizada. Gravações
+simultâneas antes dessa linha não podem deslocar a janela, e o banco de dados nunca precisa
+pular linhas por contagem, que era o que tornava lentos os percursos longos por offset: cada página custava
+mais do que a anterior.
+
+Onde o servidor não emite cursor — uma busca ordenada por relevância, uma busca
+vetorial, uma leitura com `distinct`, uma projeção de `fields` que deixa de fora um campo
+de ordenação — o percurso pagina por offset, e uma linha
+inserida ou excluída *enquanto o percurso é executado* pode fazê-lo pular ou repetir uma linha.
+Passe `cursor` para tornar a busca uma exigência em vez de uma preferência:
 
 ```typescript
 for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
 ```
 
-`cursor` aqui significa "buscar em vez de paginar por offset" e define a coluna pela
-qual ordenar quando a consulta ainda não especificar. A busca em si é
-[o cursor do servidor](#paginação-por-cursor): a iteração repassa `meta.nextCursor` de volta
-como `after` e não constrói nenhuma comparação própria, razão pela qual uma ordenação por múltiplas chaves
+`cursor` define a coluna pela qual ordenar quando a consulta ainda não especificar, e
+transforma o recurso ao offset em um erro. O percurso não constrói nenhuma comparação
+própria, razão pela qual uma ordenação por múltiplas chaves
 funciona —
 
 ```typescript
@@ -176,10 +199,10 @@ for await (const job of client.data.jobs.iterate({
 — e por que uma chave de ordenação que aceita nulos também funciona.
 
 A ordenação ainda precisa ser **total**, o que na prática significa única: o id da linha
-desempata no final, de modo que qualquer coluna funciona como critério de desempate, mas um percurso cujo
-cursor para de avançar lança `cursor-stalled` em vez de entrar em loop infinito. Uma
-consulta que nenhum cursor consegue descrever (relevância) lança `cursor-missing`;
-remova `cursor` e pagine por offset.
+desempata no final, de modo que qualquer coluna funciona como critério de desempate. Com `cursor`, um
+percurso cujo cursor para de avançar lança `cursor-stalled` em vez de entrar em loop
+infinito, e uma consulta que nenhum cursor consegue descrever (relevância) lança
+`cursor-missing`; remova `cursor` e o percurso as pagina por offset.
 
 ## Veja também
 

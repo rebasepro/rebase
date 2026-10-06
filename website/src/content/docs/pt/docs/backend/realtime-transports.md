@@ -30,8 +30,19 @@ Quando um registro é modificado na Instância A, ele transmite uma notificaçã
 
 *Nota: `sid` representa o ID aleatório exclusivo da instância do servidor gerado na inicialização, `p` é o slug da coleção (caminho) e `eid` é o ID da entidade de destino.*
 
+As alterações feitas no mesmo instante — um salvamento em lote anuncia cada linha que gravou — saem juntas, em tantas notificações quantas couberem no limite de 8000 bytes do NOTIFY do Postgres, cada uma listando as suas alterações como triplas `[p, eid, db]`:
+
+```json
+{
+  "sid": "inst_7a9c1b",
+  "c": [["posts", "45", null], ["posts", "46", null]]
+}
+```
+
+Uma única alteração mantém o formato acima, de modo que uma instância mais antiga ainda a lê durante um rolling deploy.
+
 - **Autofiltragem**: Ao receber uma mensagem, cada instância lê o `sid`. Se ele coincidir com o seu próprio ID de instância, o servidor descarta a notificação para evitar loops infinitos de roteamento.
-- **Retransmissão e Fan-out**: Se a notificação veio de outra instância, o servidor agenda uma nova busca com debounce e retransmite a atualização para seus assinantes WebSocket conectados localmente.
+- **Retransmissão e Fan-out**: Se a notificação veio de outra instância, o servidor agenda uma nova busca com debounce para os seus assinantes conectados localmente a cada alteração. Ele não lê nada ao receber: cada frame é uma nova busca sob o escopo do próprio assinante.
 - **Loop de reconexão do supervisor**: Se a conexão com o banco de dados cair, um supervisor de conexão em segundo plano monitora o estado e dispara uma sequência de reconexão automática após um atraso fixo de **3 segundos**, restaurando o loop do `LISTEN` sem afetar o ciclo de vida principal da aplicação Hono. Em seguida, cada assinatura ativa da instância é consultada de novo, porque o que foi publicado enquanto a conexão estava caída não chegou a ninguém. Se o banco de dados estiver inacessível na inicialização, a conexão é tentada de novo da mesma forma.
 - **Heartbeat**: Uma conexão `LISTEN` fica ociosa por natureza, e o tempo limite de ociosidade de um balanceador de carga ou de um NAT pode derrubá-la sem erro em nenhum dos lados (uma conexão semiaberta). Por isso ela usa TCP keepalive e precisa responder a um `SELECT 1` a cada 30 segundos, em até 10 segundos. Uma conexão que não responde é substituída como acima. Enquanto a conexão está caída, `/health` a lista como `cross-instance`, e depois de 60 segundos caída a verificação falha.
 

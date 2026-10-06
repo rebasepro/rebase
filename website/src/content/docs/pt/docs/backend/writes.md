@@ -94,6 +94,10 @@ declara uma — essa coluna já *é* uma versão — e a partir de um hash está
 contrário. `If-Match: *` afirma apenas que a linha existe. Nada é escrito quando a pré-condição
 falha.
 
+A tag é comparada dentro da própria transação da gravação, depois de a linha ser
+bloqueada. Duas gravações com a mesma tag não podem passar ambas: a segunda espera
+que a primeira faça commit, lê o que ela gravou e é recusada com `412`.
+
 ### Operações de campo
 
 O valor de uma propriedade no corpo de um `PATCH` pode ser uma operação sobre o valor

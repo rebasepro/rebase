@@ -69,7 +69,9 @@ FROM rebase.jobs WHERE status = 'failed'
 ORDER BY updated_at DESC;
 ```
 
-Linhas com falha são mantidas por 30 dias; as bem-sucedidas, por 3.
+Linhas com falha são mantidas por 30 dias; as bem-sucedidas, por 3. Cada worker apaga
+as linhas expiradas ao iniciar e depois a cada hora, em lotes, fora do caminho da
+requisição.
 
 ## O que acontece quando um worker morre
 

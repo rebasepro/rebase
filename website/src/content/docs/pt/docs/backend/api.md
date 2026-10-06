@@ -278,6 +278,15 @@ identifica a si próprio: `INVALID_LIMIT`, `INVALID_OFFSET` (um número inteiro 
 diferente da solicitada não pode ser diferenciada de ter chegado ao final da coleção,
 razão pela qual nenhum deles é ajustado ou ignorado.
 
+### Ignorando a contagem
+
+`meta.total` é um `COUNT(*)` sobre todas as linhas correspondentes — numa tabela
+grande, a maior parte do custo de uma requisição de listagem. `?count=none`
+(`GET /api/data/orders?count=none`) a dispensa: sem `meta.total`, enquanto
+`meta.hasMore` continua exato (a leitura pede uma linha além da página).
+`?count=exact` é o padrão; qualquer outro valor resulta em um 400
+`INVALID_COUNT`. Uma leitura com `?distinct=true` nunca é contada.
+
 ### Paginação por cursor
 
 O `offset` reconta as linhas a cada requisição, portanto, uma linha inserida ou excluída
@@ -481,10 +490,10 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 
 | Chave | Significado |
 |-----|---------|
-| `limit` | Linhas **por linha pai**, não em toda a página |
+| `limit` | Linhas **por linha pai**, não em toda a página. Aplicado pela própria consulta, portanto as linhas além dele nunca são lidas do banco de dados |
 | `where` | O mesmo dialeto de filtro que o `where` de nível superior usa |
 | `logical` | Um grupo `or`/`and`/`not` sobre as linhas relacionadas |
-| `orderBy` | A mesma grafia de ordenação, incluindo o posicionamento de NULL |
+| `orderBy` | A mesma grafia de ordenação, incluindo o posicionamento de NULL. Os empates, e um `limit` sem `orderBy`, seguem a chave da linha relacionada, em ordem ascendente |
 | `fields` | Colunas da linha *relacionada*; sua chave primária sempre permanece |
 | `include` | Relações da linha relacionada, por sua vez |
 
@@ -504,10 +513,14 @@ As relações incluídas são incorporadas diretamente na resposta:
     "author": {
         "id": 42,
         "name": "Jane Doe",
-        "email": "jane@example.com"
+        "email": "jane@example.com",
+        "companyId": 7
     }
 }
 ```
+
+Uma linha incluída é o que a rota do próprio alvo (`GET /api/data/authors/42`)
+serve: as mesmas colunas e codificações, chaves estrangeiras como colunas, sem objetos de referência.
 
 ## Escrita
 
