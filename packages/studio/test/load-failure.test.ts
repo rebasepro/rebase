@@ -21,8 +21,27 @@ describe("classifyLoadFailure", () => {
         expect(classifyLoadFailure(new Error("Forbidden")).kind).toBe("denied");
     });
 
-    it("treats a 401 the same way — it is the same conversation", () => {
-        expect(classifyLoadFailure(Object.assign(new Error("no"), { status: 401 })).kind).toBe("denied");
+    it("does not read a 401 as a refusal: the session ended, the caller still holds their scopes", () => {
+        // A 401 is "who are you" — a revoked or expired session — not "your
+        // role may not". Read as denied, the API keys pane told an administrator
+        // they lack keys:read, and hid Retry.
+        const f = classifyLoadFailure(Object.assign(new Error("Invalid or expired token"), { status: 401 }));
+        expect(f.kind).toBe("unavailable");
+        expect(f.retryable).toBe(true);
+        expect(f.detail).toBe("Invalid or expired token");
+    });
+
+    it("does not read a server fault as a refusal because its message says 'permission denied'", () => {
+        // The server's answer to a missing GRANT (`DB_PERMISSION_DENIED`, a 500).
+        // It is the platform's fault, and the pane must not blame the caller's
+        // scopes or take Retry away.
+        const message = "Permission denied by the database: the role this request runs as has no privilege on table "
+            + "\"rebase.api_keys\". That is a missing GRANT to that role, not a row-level security policy.";
+        const f = classifyLoadFailure(Object.assign(new Error(message), { status: 500, code: "DB_PERMISSION_DENIED" }));
+        expect(f.kind).toBe("unavailable");
+        expect(f.retryable).toBe(true);
+
+        expect(classifyLoadFailure(Object.assign(new Error("Forbidden"), { status: 502 })).kind).toBe("unavailable");
     });
 
     it("still reports a real failure as a real failure", () => {

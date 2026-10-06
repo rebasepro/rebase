@@ -36,7 +36,7 @@
 export type LoadFailureKind =
     /** The project's own rules, or the caller's own role, said no. Not an error. */
     | "denied"
-    /** We could not reach or read the source. */
+    /** We could not reach or read the source — including a session the server no longer accepts. */
     | "unavailable";
 
 export interface LoadFailure {
@@ -61,14 +61,18 @@ export function classifyLoadFailure(err: unknown): LoadFailure {
     const detail = err instanceof Error ? err.message : String(err);
     const status = statusOf(err);
 
-    // 403 is the rule's answer; 401 means the caller is not signed in as anyone
-    // a rule can evaluate, which is the same conversation from the other end.
-    // The message match is the fallback, because an SDK that flattens an error
-    // to a string is exactly how this reached the screen unclassified.
-    const denied =
-        status === 403 ||
-        status === 401 ||
-        /\bnot authori[sz]ed\b|\bforbidden\b|\bpermission denied\b/i.test(detail);
+    // 403 is the rule's answer, and the only status that is. A 401 is the
+    // session — expired, revoked, signed out elsewhere — and says nothing about
+    // what the caller's role may do; a 5xx is the platform, even when its
+    // message says "permission denied" (a missing GRANT is answered that way).
+    // Both are failures to read, with Retry.
+    //
+    // The message match is only for an error that carries no status at all: an
+    // SDK that flattens an error to a string is how a refusal reached the
+    // screen unclassified.
+    const denied = status !== null
+        ? status === 403
+        : /\bnot authori[sz]ed\b|\bforbidden\b|\bpermission denied\b/i.test(detail);
 
     return denied
         ? { kind: "denied", detail, retryable: false }
