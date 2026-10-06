@@ -52,6 +52,11 @@
  *   4. It shrank a lot, which means the baseline now describes a build that no
  *      longer exists. Bank it: a stale budget is a gate that has stopped
  *      measuring anything.
+ *   5. A module that is meant to load on demand sits in the eager set — see
+ *      FORBIDDEN_IN_EAGER below. Bytes alone cannot say this: the lucide map,
+ *      six translations and the /debug/ui reference all rode in `rebase-core`
+ *      for months, banked as its baseline, because a budget only knows sizes.
+ *      This reads the eager chunks' sourcemaps and names the module.
  *
  * Chunk file names carry a content hash, which changes on every build. Budgets
  * are keyed on the name with the hash stripped, so an unrelated edit does not
@@ -148,12 +153,108 @@ export function eagerChunks(distDir) {
         const raw = fs.readFileSync(file);
         chunks.push({
             key: chunkKey(file),
+            file,
             bytes: raw.length,
             gzipBytes: zlib.gzipSync(raw, { level: 9 }).length
         });
     }
     chunks.sort((a, b) => b.bytes - a.bytes);
     return chunks;
+}
+
+/**
+ * Source modules that must never be in the eager set, whatever it weighs.
+ *
+ * Each one is loaded on demand on purpose, and each one came back to the login
+ * screen at least once through a change that broke no test: a static import, a
+ * barrel re-export, a `manualChunks` name that welded a lazy module to a
+ * static one. `pending` marks a rule whose fix has not landed yet: reported,
+ * not failed, until it does — then delete the flag.
+ */
+export const FORBIDDEN_IN_EAGER = [
+    {
+        test: /packages\/app\/src\/locales\/(?!en\.ts)[^/]+$/,
+        label: "a translation other than English",
+        why: "RebaseI18nProvider fetches the other six when their language is picked"
+    },
+    {
+        test: /packages\/app\/src\/debug\//,
+        label: "the /debug/ui design reference",
+        why: "a hidden dev route; the app lazy-loads @rebasepro/app/debug"
+    },
+    {
+        test: /packages\/cms\/src\/(form\/EntityForm\.tsx|components\/CollectionViewBinding\/CollectionViewBinding\.tsx|components\/(Edit|Detail)ViewBinding\.tsx|components\/SidePanelBinding\.tsx)$/,
+        label: "the collection table, record views or entity form",
+        why: "loaded when a collection opens (cms components/lazy_record_views.ts)"
+    },
+    {
+        test: /node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?prism-react-renderer\//,
+        label: "prism-react-renderer",
+        why: "syntax highlighting is only used by lazy Studio and editor views"
+    },
+    {
+        test: /node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?markdown-it\//,
+        label: "markdown-it",
+        why: "only markdown cells and previews render it",
+        pending: "the kit's Markdown component still imports it statically (ui-kit sweep, UI-3)"
+    }
+];
+
+/** Chunks the bundler writes itself, with no source modules and so no sourcemap. */
+const BUNDLER_RUNTIME_CHUNKS = /^(rolldown-runtime|preload-helper|commonjsHelpers)$/;
+
+/** More lucide icon modules than this in the eager set means the whole by-name map is there. */
+export const MAX_EAGER_LUCIDE_ICONS = 400;
+
+/**
+ * Which FORBIDDEN_IN_EAGER modules, and how many lucide icons, the eager
+ * chunks carry — read from their sourcemaps' `sources`. A chunk without a map
+ * is reported rather than skipped: a check that cannot see is not a pass.
+ */
+export function forbiddenInEager(chunks) {
+    const hits = new Map();
+    const unmapped = [];
+    let lucideIcons = 0;
+    for (const chunk of chunks) {
+        const mapFile = `${chunk.file}.map`;
+        if (!fs.existsSync(mapFile)) {
+            // The bundler's own runtime has no sources to map.
+            if (!BUNDLER_RUNTIME_CHUNKS.test(chunk.key)) unmapped.push(chunk.key);
+            continue;
+        }
+        const { sources = [] } = JSON.parse(fs.readFileSync(mapFile, "utf-8"));
+        for (const source of sources) {
+            const normalized = source.replace(/\\/g, "/");
+            if (/lucide-react\/dist\/esm\/icons\//.test(normalized)) lucideIcons++;
+            for (const rule of FORBIDDEN_IN_EAGER) {
+                if (!rule.test.test(normalized)) continue;
+                if (!hits.has(rule)) hits.set(rule, new Set());
+                hits.get(rule).add(chunk.key);
+            }
+        }
+    }
+    return { hits, unmapped, lucideIcons };
+}
+
+/** Failure and warning lines for the check above. */
+function forbiddenReport(chunks) {
+    const { hits, unmapped, lucideIcons } = forbiddenInEager(chunks);
+    const failures = [];
+    const warnings = [];
+    for (const [rule, keys] of hits) {
+        const line = `${bold(rule.label)} is in the eager set (${[...keys].join(", ")}): ${rule.why}.`;
+        if (rule.pending) warnings.push(`${line} Pending: ${rule.pending}.`);
+        else failures.push(line);
+    }
+    if (lucideIcons > MAX_EAGER_LUCIDE_ICONS) {
+        failures.push(`${bold(`${lucideIcons} lucide icon modules`)} are in the eager set — that is the whole ` +
+            `by-name map, which loadLucideIcons() fetches on demand (more than ${MAX_EAGER_LUCIDE_ICONS} fails).`);
+    }
+    if (unmapped.length > 0) {
+        failures.push(`no sourcemap for ${unmapped.join(", ")}, so the forbidden-module check cannot read ` +
+            `${unmapped.length === 1 ? "it" : "them"}. Build with \`build.sourcemap: true\`.`);
+    }
+    return { failures, warnings };
 }
 
 function measure(distDir) {
@@ -164,16 +265,23 @@ function measure(distDir) {
         // normal state; summing keeps the total honest either way.
         byKey[chunk.key] = (byKey[chunk.key] ?? 0) + chunk.bytes;
     }
-    return {
+    const measured = {
         chunks: byKey,
         totalBytes: chunks.reduce((sum, c) => sum + c.bytes, 0),
         totalGzipBytes: chunks.reduce((sum, c) => sum + c.gzipBytes, 0)
     };
+    // Not banked: the files behind the numbers, for the forbidden-module check.
+    Object.defineProperty(measured, "files", { value: chunks, enumerable: false });
+    return measured;
 }
 
 function report(target, measured, budget) {
     const failures = [];
     const notes = [];
+
+    const forbidden = forbiddenReport(measured.files);
+    failures.push(...forbidden.failures);
+    for (const warning of forbidden.warnings) console.warn(yellow(`! ${target}: ${warning}`));
 
     const budgetFor = (bytes) => Math.round(bytes * (1 + HEADROOM));
 
@@ -242,7 +350,13 @@ function report(target, measured, budget) {
 if (adHocDist) {
     const measured = measure(path.resolve(ROOT, adHocDist));
     console.log(JSON.stringify(measured, null, 4));
-    process.exit(0);
+    // The forbidden-module check holds for any build of the admin — a
+    // scaffolded project's included — so it runs here too, on stderr, and
+    // fails the command; the JSON on stdout is unchanged.
+    const forbidden = forbiddenReport(measured.files);
+    for (const warning of forbidden.warnings) console.error(yellow(`! ${warning}`));
+    for (const failure of forbidden.failures) console.error(red(`✖ ${failure}`));
+    process.exit(forbidden.failures.length > 0 ? 1 : 0);
 }
 
 const baseline = JSON.parse(fs.readFileSync(BASELINE, "utf-8"));
