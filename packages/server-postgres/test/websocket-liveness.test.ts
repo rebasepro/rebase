@@ -147,12 +147,17 @@ describe("a socket that stops answering pings", () => {
         expect(service.subscriptions.size).toBe(2);
 
         // Both re-track inside the presence timeout, as the SDK does, so a
-        // departure announced later can only be the socket's own.
+        // departure announced later can only be the socket's own. Each beat
+        // carries a new state: a heartbeat that repeats its state announces
+        // nothing, and the diff a changed one sends is how this test knows the
+        // server has handled it.
+        let beat = 0;
         const retrack = async () => {
             const diffs = () => watcher.frames.filter(f => f.type === "presence_diff").length;
             const seen = diffs();
-            watcher.send({ type: "presence_track", payload: { channel: "room", state: { name: "watcher" } } });
-            zombie.send({ type: "presence_track", payload: { channel: "room", state: { name: "zombie" } } });
+            beat++;
+            watcher.send({ type: "presence_track", payload: { channel: "room", state: { name: "watcher", beat } } });
+            zombie.send({ type: "presence_track", payload: { channel: "room", state: { name: "zombie", beat } } });
             await until(() => diffs() >= seen + 2, "both re-tracked");
         };
 
