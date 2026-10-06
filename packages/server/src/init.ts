@@ -139,7 +139,7 @@ import { createApiKeyPreAuth, createFunctionScopeGuard, createTusScopeGuard, res
 import type { KeyTargets } from "./auth/api-keys/key-grant";
 import { createPlatformTokenPreAuth, platformTokensFromEnv } from "./auth/platform-token";
 import { createRequireAuth } from "./auth/middleware";
-import { accessModelFromCollections, callerScopes, configureAccess, requireScope, requireScopeByMethod } from "./auth/access";
+import { accessModelFromCollections, callerScopes, configureAccess, keyOwnerResolverFor, requireScope, requireScopeByMethod } from "./auth/access";
 import { createScopeRoutes } from "./auth/scope-routes";
 import { configureCredentialStore } from "./auth/verify-credential";
 import { createDataRateLimiter, createDataRateLimitCheck, defaultAuthLimiter, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, setSharedRateLimitStore, type DataRateLimitConfig } from "./auth/rate-limiter";
@@ -1750,15 +1750,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // does to the keys already minted.
     if (personalKeysEnabled) {
         if (typeof adminIdentityRepo?.getUserById === "function" && typeof adminIdentityRepo.getUserRoleIds === "function") {
-            const ownerRepo = adminIdentityRepo;
             configureAccess({
                 model: accessModel,
-                resolveKeyOwner: async (uid) => {
-                    const user = await ownerRepo.getUserById(uid);
-                    // A disabled owner's keys stop with them.
-                    if (!user || user.disabled) return null;
-                    return { roles: await ownerRepo.getUserRoleIds(uid) };
-                }
+                // One read of the owner per request: exists, not disabled, roles.
+                resolveKeyOwner: keyOwnerResolverFor(adminIdentityRepo)
             });
         } else {
             logger.warn(
