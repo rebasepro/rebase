@@ -261,6 +261,7 @@ export class BranchService {
 
         return {
             name,
+            database: dbName,
             parentDatabase: sourceDb,
             createdAt: now
         };
@@ -466,6 +467,7 @@ export class BranchService {
         const result = await this.db.execute(sql.raw(`
             SELECT 
                 b.name,
+                b.db_name,
                 b.parent_db,
                 b.created_at,
                 pg_database_size(b.db_name) as size_bytes
@@ -476,6 +478,7 @@ export class BranchService {
 
         return (result.rows as Record<string, unknown>[]).map((row) => ({
             name: row.name as string,
+            database: row.db_name as string,
             parentDatabase: row.parent_db as string,
             createdAt: new Date(row.created_at as string),
             sizeBytes: row.size_bytes != null ? Number(row.size_bytes) : undefined
@@ -522,6 +525,7 @@ export class BranchService {
 
         return {
             name: row.name as string,
+            database: row.db_name as string,
             parentDatabase: row.parent_db as string,
             createdAt: new Date(row.created_at as string),
             sizeBytes

@@ -70,7 +70,11 @@ export function BranchesView() {
     // Create dialog
     const [createOpen, setCreateOpen] = useState(false);
     const [newBranchName, setNewBranchName] = useState("");
-    const [sourceBranch, setSourceBranch] = useState<string | undefined>(undefined);
+    /**
+     * The database to copy, when it is not the main one: a branch's own
+     * database, which is not its name.
+     */
+    const [sourceDatabase, setSourceDatabase] = useState<string | undefined>(undefined);
     const [creating, setCreating] = useState(false);
     /**
      * Why the last create attempt was refused, kept on screen.
@@ -124,14 +128,14 @@ export function BranchesView() {
         setCreating(true);
         setCreateError(null);
         try {
-            await branchAdmin.createBranch(newBranchName.trim(), sourceBranch ? { source: sourceBranch } : undefined);
+            await branchAdmin.createBranch(newBranchName.trim(), sourceDatabase ? { source: sourceDatabase } : undefined);
             snackbarRef.current.open({
                 type: "success",
                 message: `Branch "${newBranchName.trim()}" created successfully`
             });
             setCreateOpen(false);
             setNewBranchName("");
-            setSourceBranch(undefined);
+            setSourceDatabase(undefined);
             await loadBranches();
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : String(e);
@@ -391,14 +395,14 @@ export function BranchesView() {
                         <div>
                             <Select
                                 label="Source Database"
-                                value={sourceBranch ?? "__main__"}
-                                onValueChange={(v) => setSourceBranch(v === "__main__" ? undefined : v)}
+                                value={sourceDatabase ?? "__main__"}
+                                onValueChange={(v) => setSourceDatabase(v === "__main__" ? undefined : v)}
                                 placeholder="Default (main database)"
                                 size="small"
                             >
                                 <SelectItem value="__main__">Default (main database)</SelectItem>
                                 {branches.map(b => (
-                                    <SelectItem key={b.name} value={b.name}>{b.name}</SelectItem>
+                                    <SelectItem key={b.name} value={b.database}>{b.name}</SelectItem>
                                 ))}
                             </Select>
                         </div>

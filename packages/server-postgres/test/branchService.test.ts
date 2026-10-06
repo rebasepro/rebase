@@ -165,6 +165,7 @@ describe("BranchService", () => {
             const result = await service.createBranch("staging");
 
             expect(result.name).toBe("staging");
+            expect(result.database).toBe("rb_staging");
             expect(result.parentDatabase).toBe("my_app_db");
             expect(result.createdAt).toBeInstanceOf(Date);
 
@@ -389,10 +390,12 @@ describe("BranchService", () => {
             db.execute.mockResolvedValueOnce({
                 rows: [
                     { name: "staging",
+db_name: "rb_staging",
 parent_db: "my_app_db",
 created_at: now,
 size_bytes: 1048576 },
                     { name: "preview",
+db_name: "rb_preview",
 parent_db: "my_app_db",
 created_at: now,
 size_bytes: null }
@@ -404,12 +407,30 @@ size_bytes: null }
             expect(result).toHaveLength(2);
 
             expect(result[0].name).toBe("staging");
+            expect(result[0].database).toBe("rb_staging");
             expect(result[0].parentDatabase).toBe("my_app_db");
             expect(result[0].createdAt).toBeInstanceOf(Date);
             expect(result[0].sizeBytes).toBe(1048576);
 
             expect(result[1].name).toBe("preview");
             expect(result[1].sizeBytes).toBeUndefined();
+        });
+
+        /**
+         * A branch's database is the one its row names, not one derived from
+         * its name again: Studio copies a branch by sending this as the
+         * source, and a row written before names stopped being stripped says
+         * `rb_myfeature` for `my-feature`.
+         */
+        it("says which database each branch is, as its row records it", async () => {
+            db.execute.mockResolvedValueOnce({
+                rows: [{ name: "my-feature", db_name: "rb_myfeature", parent_db: "my_app_db", created_at: new Date().toISOString(), size_bytes: 1 }]
+            } as never);
+
+            const [branch] = await service.listBranches();
+
+            expect(statementAt(db, 0).sql).toContain("b.db_name");
+            expect(branch.database).toBe("rb_myfeature");
         });
     });
 
@@ -422,6 +443,7 @@ size_bytes: null }
             db.execute
                 .mockResolvedValueOnce({
                     rows: [{ name: "staging",
+db_name: "rb_staging",
 parent_db: "my_app_db",
 created_at: now }]
                 } as never)
@@ -433,6 +455,7 @@ created_at: now }]
 
             expect(result).toBeDefined();
             expect(result!.name).toBe("staging");
+            expect(result!.database).toBe("rb_staging");
             expect(result!.parentDatabase).toBe("my_app_db");
             expect(result!.sizeBytes).toBe(2097152);
             expect(result!.createdAt).toBeInstanceOf(Date);

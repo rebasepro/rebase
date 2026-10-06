@@ -700,6 +700,12 @@ export interface SchemaAdmin {
 export interface BranchInfo {
     /** Branch name (without prefix). */
     name: string;
+    /**
+     * The PostgreSQL database the branch is — what to connect to, and what to
+     * name as the source when copying it. As the branch's record says, never
+     * derived from `name` again.
+     */
+    database: string;
     /** The database this branch was created from. */
     parentDatabase: string;
     /** When the branch was created. */
