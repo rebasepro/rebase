@@ -279,6 +279,11 @@ type SubscriptionGroup = {
     pending: Set<string> | "all";
     /** When the last change arrived; the refetch waits for a quiet debounce window. */
     lastChangeAt: number;
+    /**
+     * When the oldest change the next refetch answers arrived, or `undefined`
+     * with nothing pending. Bounds the debounce: see `REFETCH_MAX_WAIT_MS`.
+     */
+    firstPendingAt?: number;
     timer?: ReturnType<typeof setTimeout>;
 };
 
@@ -485,6 +490,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private broadcasting = false;
     /** Debounce window (ms) for coalescing rapid row updates into a single correctness refetch. */
     private static readonly REFETCH_DEBOUNCE_MS = 300;
+    /**
+     * The longest a change waits for its refetch, quiet window or not.
+     *
+     * A pure debounce waits for 300 ms without a change, and a collection
+     * written more often than that — an orders, events or chat table at a few
+     * writes a second — never went quiet: its subscribers received nothing for
+     * as long as the writes continued. Under a steady stream a group now
+     * refetches once per this interval, which is the whole cost.
+     */
+    private static readonly REFETCH_MAX_WAIT_MS = 1000;
 
     // ── Database-level Change Data Capture (CDC) ──
     /** Dedicated LISTEN client for DB-level change events (undefined unless CDC is enabled). */
@@ -679,7 +694,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
     /**
      * Ask for a refetch of `group` once changes have been quiet for the
-     * debounce window — for every member, or only for `member`.
+     * debounce window — for every member, or only for `member` — and in any
+     * case no later than {@link REFETCH_MAX_WAIT_MS} after the first of them.
      *
      * The window is measured from the last change, as a debounce is, but the
      * timer is not re-armed per change: a 10k-row statement is 10k changes,
@@ -690,7 +706,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private scheduleGroupRefetch(group: SubscriptionGroup, member?: string): void {
         if (member === undefined) group.pending = "all";
         else if (group.pending !== "all") group.pending.add(member);
-        group.lastChangeAt = Date.now();
+        const now = Date.now();
+        group.lastChangeAt = now;
+        group.firstPendingAt ??= now;
         if (!group.timer) this.armGroupTimer(group, RealtimeService.REFETCH_DEBOUNCE_MS);
     }
 
@@ -698,9 +716,14 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         group.timer = setTimeout(() => {
             group.timer = undefined;
             if (this.groups.get(group.key) !== group) return;
-            const quietFor = Date.now() - group.lastChangeAt;
-            if (quietFor < RealtimeService.REFETCH_DEBOUNCE_MS) {
-                this.armGroupTimer(group, RealtimeService.REFETCH_DEBOUNCE_MS - quietFor);
+            const now = Date.now();
+            const quietFor = now - group.lastChangeAt;
+            const waitedFor = now - (group.firstPendingAt ?? now);
+            if (quietFor < RealtimeService.REFETCH_DEBOUNCE_MS && waitedFor < RealtimeService.REFETCH_MAX_WAIT_MS) {
+                this.armGroupTimer(group, Math.min(
+                    RealtimeService.REFETCH_DEBOUNCE_MS - quietFor,
+                    RealtimeService.REFETCH_MAX_WAIT_MS - waitedFor
+                ));
                 return;
             }
             void this.refetchGroup(group);
@@ -719,6 +742,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private async refetchGroup(group: SubscriptionGroup): Promise<void> {
         const keys = group.pending === "all" ? [...group.members] : [...group.pending];
         group.pending = new Set();
+        group.firstPendingAt = undefined;
 
         const targets: Array<{ key: string; subscription: Subscription; canDeliver: DeliveryCheck; callback?: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void }> = [];
         for (const key of keys) {

@@ -288,3 +288,32 @@ describe("a statement that changes many rows", () => {
         expect(elapsed).toBeLessThan(1500);
     });
 });
+
+describe("a steady stream of writes", () => {
+    it("still reaches the subscribers, at least once a second", async () => {
+        // The refetch waits for 300 ms without a change. A collection written
+        // more often than that — an orders or events table at a few writes a
+        // second — never went quiet, so its subscribers got nothing for as
+        // long as the writes went on (measured: 0 frames during a 3 s stream
+        // of one write per 100 ms; the first one after the writes stopped).
+        const ws = connect("a");
+        await subscribeList("a", "s", ALICE);
+        await flush();
+        ws.send.mockClear();
+
+        const start = Date.now();
+        const deliveredAt: number[] = [];
+        for (let i = 0; i < 30; i++) {
+            await service.notifyUpdate("posts", String(i), { _rebase_invalidated: true });
+            jest.advanceTimersByTime(100);
+            await flush();
+            const updates = frames(ws).filter(f => f.type === "collection_update").length;
+            while (deliveredAt.length < updates) deliveredAt.push(Date.now() - start);
+        }
+
+        // 3 s of writes: a frame at least every ~1 s, from the first write on.
+        expect(deliveredAt.length).toBeGreaterThanOrEqual(3);
+        const gaps = deliveredAt.map((at, i) => at - (i === 0 ? 0 : deliveredAt[i - 1]));
+        expect(Math.max(...gaps, 3000 - deliveredAt[deliveredAt.length - 1])).toBeLessThanOrEqual(1100);
+    });
+});

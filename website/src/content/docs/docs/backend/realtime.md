@@ -158,7 +158,10 @@ query run as them:
    `app.user_roles` from the subscriber's `SubscriptionAuthContext`, so Postgres
    evaluates Row-Level Security under that client's identity and only the rows
    they are authorized to see are sent in the `collection_update`. The debounce
-   also coalesces a burst of writes into one query.
+   also coalesces a burst of writes into one query. It waits for 300 ms without
+   a further change, but never more than **1 s** (`REFETCH_MAX_WAIT_MS`) after
+   the first one, so a collection written several times a second still sends
+   its subscribers a frame at least once a second.
 
 Earlier versions sent an immediate `collection_patch` carrying the written row
 before this refetch, for sub-millisecond cross-tab feedback. That row had been
