@@ -352,7 +352,9 @@ werden beim Lesen von Policies erkannt, sodass eine Rebase-Datenbank während de
 Die korrigierte Form der obigen Prüfung – `rebase.uid() IS NOT NULL AND rebase.uid() <> 'anonymous'` –
 und die Stelle, an der viele aufhören. Sie schließt abgemeldete Aufrufer aus. Was sie jedoch nicht tut,
 ist das Eingrenzen von Zeilen: Was übrig bleibt, ist *jedes registrierte Konto darf jede Zeile dieser
-Tabelle lesen*, was eine andere Aussage ist als die, die normalerweise beabsichtigt war.
+Tabelle lesen*, was eine andere Aussage ist als die, die normalerweise beabsichtigt war. Auf einem
+Rebase-Projekt ist das eine Regel, deren `condition` `policy.authenticated()` ist und sonst nichts,
+die die Datenbank als `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])` speichert.
 
 Das ist das Muster, das eine `users`-Tabelle in ein Verzeichnis aller Adressen auf der Plattform verwandelt,
 lesbar für jeden, der sich registriert hat – und wo die Registrierung offen ist, ist "jeder, der sich

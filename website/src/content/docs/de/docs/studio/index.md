@@ -73,7 +73,7 @@ Sie gehören zu Studio und werden **von `RebaseStudio` lazy geladen** — jedes 
 
 | Tab | Slug | Gruppe | Funktion |
 |-----|------|--------|----------|
-| SQL-Konsole | `sql` | Datenbank | Rohes SQL gegen Ihre PostgreSQL-Datenbank ausführen und Ergebnisse als Tabelle lesen |
+| SQL-Konsole | `sql` | Datenbank | Rohes SQL gegen Ihre PostgreSQL-Datenbank ausführen und Ergebnisse als Tabelle lesen. Die Tabelle zeigt das Ergebnis der letzten Anweisung, bis zu den ersten 10.000 Zeilen oder 32 MB an Werten; ein längeres Ergebnis nennt die Anzahl der Zeilen, und Kopieren und Export enthalten nur die angezeigten Zeilen |
 | RLS-Richtlinien | `rls` | Datenbank | Row-Level-Security-Richtlinien Ihrer Tabellen prüfen und verwalten. <span class="since-badge" data-since="0.24">Seit 0.24</span> Eine Richtlinie wird so aufgeführt, wie die Datenbank sie hält, und mit **Differs from code** markiert, wo das nicht dem entspricht, was das Projekt deklariert. Eine Richtlinie, die Rebase generiert, lässt sich nicht direkt in der Datenbank bearbeiten, und auf einer Tabelle, die Rebase verwaltet, weist ein Banner darauf hin, dass jeder Serverstart und `rebase db push` die deklarierten Richtlinien erneut anwenden |
 | Schema-Visualizer | `schema-visualizer` | Datenbank | Entity-Diagramm Ihrer Sammlungen und ihrer Beziehungen, gezeichnet aus den Sammlungsdefinitionen: Tabellen, Spalten, Typen und Beziehungen sind so, wie die Sammlungen sie deklarieren. Nur die RLS-Markierungen werden aus der Datenbank gelesen |
 | Branches | `branches` | Datenbank | [Datenbank-Branches](/docs/backend/branching) anlegen und verwalten |

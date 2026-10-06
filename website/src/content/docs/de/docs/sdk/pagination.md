@@ -92,6 +92,24 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100
 GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 ```
 
+#### Die Zählung überspringen
+
+`meta.total` ist ein `COUNT(*)` über jede Zeile, die die Abfrage trifft, neben der Seite
+ausgeführt — und bei einer großen Tabelle kostet es mehr als die Seite selbst. Ein Read, der nur
+vorwärts paginiert, braucht es nie, denn `meta.hasMore` hängt nicht davon ab: Übergeben Sie
+`count: "none"`, und der Read fragt stattdessen eine Zeile über die Seite hinaus ab.
+
+```typescript
+const { data, meta } = await client.data.orders.find({ limit: 100, count: "none" });
+meta.hasMore; // exakt
+```
+
+Ohne Zählung gibt es keine Gesamtzahl zu melden: Über HTTP fehlt `meta.total`, und im Prozess
+sind es die Zeilen bis zum Ende der Seite (`offset` plus die Seite). Über HTTP lautet es
+`?count=none`; `?count=exact` ist der Standard, und jeder andere Wert ist ein 400
+`INVALID_COUNT`. `iterate()` und `findAll()` senden es auf jeder Seite von selbst, da ein
+Durchlauf keine Gesamtzahl meldet.
+
 #### Welche Leseoperationen gewrappt sind und welche nicht
 
 Zwei Formen und eine Regel: **Ein Ausschnitt ist gewrappt, eine vollständige Antwort nicht.**
@@ -144,24 +162,30 @@ Drei Optionen steuern den Durchlauf:
 | Option | Standard | Was sie bewirkt |
 |--------|----------|-----------------|
 | `pageSize` | 200 | Zeilen pro Anfrage. |
-| `cursor` | — | Sucht über eine Spalte, anstatt per Offset zu paginieren. Siehe unten. |
+| `cursor` | — | Seeking verlangen: einen Fehler werfen, statt auf Offset zurückzufallen. Siehe unten. |
 | `maxPages` | 10 000 | Obergrenze für Anfragen, damit ein Server, der nie aufhört, `hasMore` zu melden, nicht endlos läuft. |
 | `maxRows` | 10 000 | Nur `findAll()`. Ein Überschreiten **wirft einen Fehler**, anstatt ein abgeschnittenes Array zurückzugeben, als wäre es das vollständige Ergebnis. Übergeben Sie `Infinity`, um dies zu deaktivieren, oder verwenden Sie `iterate()`. |
 
-**Bevorzugen Sie `cursor`, wann immer die Collection eine eindeutige, sortierbare Spalte hat.**
-Offset-Paginierung zählt Zeilen bei jeder Anfrage neu, sodass eine Zeile, die *während des Durchlaufs*
-eingefügt oder gelöscht wird, das Fenster verschiebt und der Durchlauf stillschweigend Zeilen überspringt
-oder wiederholt. Beim Seeking werden Zeilen strikt nach der zuletzt gesehenen angefordert, was durch
-gleichzeitige Schreibvorgänge vor dem Cursor nicht verschoben werden kann:
+**Der Durchlauf arbeitet von selbst per Seek.** Nach der ersten Seite gibt er
+[den Cursor des Servers](#cursor-paginierung) — `meta.nextCursor` — als `after` zurück, sodass
+jede Anfrage Zeilen strikt nach der zuletzt gesehenen anfordert. Gleichzeitige Schreibvorgänge
+vor dieser Zeile können das Fenster nicht verschieben, und die Datenbank muss nie Zeilen nach
+Anzahl überspringen, was lange Offset-Durchläufe langsam gemacht hat: Jede Seite kostete mehr als
+die vorherige.
+
+Wo der Server keinen Cursor ausstellt — eine nach Relevanz sortierte Suche, eine Vektorsuche, ein
+`distinct`-Read, eine `fields`-Projektion, die ein Sortierfeld auslässt —, paginiert der Durchlauf
+stattdessen per Offset, und eine Zeile, die *während des Durchlaufs* eingefügt oder gelöscht wird,
+kann dazu führen, dass er eine Zeile überspringt oder wiederholt. Übergeben Sie `cursor`, um das
+Seeking von einer Präferenz zu einer Anforderung zu machen:
 
 ```typescript
 for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
 ```
 
-`cursor` bedeutet hier „Seek statt Paginierung per Offset“ und gibt die Spalte an, nach der sortiert
-werden soll, wenn die Abfrage dies nicht bereits definiert. Das Seeking selbst ist
-[der Cursor des Servers](#cursor-paginierung): Der Durchlauf gibt `meta.nextCursor` als `after` zurück
-und baut keinen eigenen Vergleich auf, weshalb auch eine Sortierung über mehrere Schlüssel funktioniert –
+`cursor` gibt die Spalte an, nach der sortiert werden soll, wenn die Abfrage dies nicht bereits
+definiert, und macht den Offset-Fallback zu einem Fehler. Der Durchlauf baut keinen eigenen
+Vergleich auf, weshalb auch eine Sortierung über mehrere Schlüssel funktioniert –
 
 ```typescript
 for await (const job of client.data.jobs.iterate({
@@ -173,10 +197,10 @@ for await (const job of client.data.jobs.iterate({
 — und warum auch ein null-fähiger Sortierschlüssel funktioniert.
 
 Die Sortierung muss dennoch **total** sein, was in der Praxis eindeutig bedeutet: Die Zeilen-ID
-löst den finalen Gleichstand auf, sodass jede Spalte als Tie-Breaker funktioniert. Ein Durchlauf, dessen
-Cursor nicht mehr voranschreitet, wirft jedoch `cursor-stalled`, anstatt in einer Endlosschleife zu
-verharren. Eine Abfrage, die kein Cursor beschreiben kann (Relevanz), wirft `cursor-missing`; entfernen
-Sie `cursor` und paginieren Sie per Offset.
+löst den finalen Gleichstand auf, sodass jede Spalte als Tie-Breaker funktioniert. Mit `cursor` wirft ein
+Durchlauf, dessen Cursor nicht mehr voranschreitet, `cursor-stalled`, anstatt in einer Endlosschleife
+zu verharren, und eine Abfrage, die kein Cursor beschreiben kann (Relevanz), wirft `cursor-missing`;
+entfernen Sie `cursor`, und der Durchlauf paginiert diese per Offset.
 
 ## Siehe auch
 

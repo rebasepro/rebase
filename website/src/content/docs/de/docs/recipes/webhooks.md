@@ -75,8 +75,12 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
 ```
 
 Die Warteschlange liegt im Prozess und im Speicher: ein Absturz oder ein Deploy zwischen dem
-Commit und der Zustellung verliert das Ereignis. Rufen Sie beim Herunterfahren
-`await dispatcher.flush()` auf. Sollen Zustellungen einen Neustart überleben, schreiben Sie eine
+Commit und der Zustellung verliert das Ereignis. Jeder Webhook hat seine eigene Warteschlange,
+sodass ein ausgefallener Empfänger nur seine eigenen Zustellungen verzögert, nie die eines anderen
+Webhooks. Rufen Sie beim Herunterfahren `await dispatcher.flush(10_000)` auf: Es wartet auf das,
+was in der Warteschlange steht, und liefert `false`, wenn das Budget zuvor aufgebraucht ist, weil
+ein ausgefallener Empfänger jede seiner Zustellungen bis zu ~36 Sekunden lang mit Wiederholungen
+festhalten kann. Sollen Zustellungen einen Neustart überleben, schreiben Sie eine
 Outbox-Zeile in derselben Transaktion und leeren Sie sie aus einem Job.
 
 ### Einen Endpunkt direkt aufrufen

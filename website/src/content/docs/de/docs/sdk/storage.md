@@ -75,7 +75,11 @@ const { url } = await client.storage.getSignedUrl(
 );
 ```
 
-Das SDK speichert signierte URLs im Cache, um redundante Serveraufrufe zu vermeiden.
+Das SDK speichert signierte URLs im Cache, um redundante Serveraufrufe zu vermeiden, bis das
+Download-Token der jeweiligen URL abläuft. Der Cache gehört zu den Zugangsdaten, die ihn befüllt
+haben: Ändert sich das Access-Token — bei einer Abmeldung, wenn sich ein anderer Benutzer anmeldet
+oder bei einer Aktualisierung —, beginnt er von vorn, sodass nie ein Benutzer eine URL erhält, die
+für einen anderen erzeugt wurde.
 
 ### Private vs. öffentliche URLs
 

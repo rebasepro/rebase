@@ -69,7 +69,9 @@ FROM rebase.jobs WHERE status = 'failed'
 ORDER BY updated_at DESC;
 ```
 
-Fehlgeschlagene Zeilen werden 30 Tage aufbewahrt; erfolgreiche 3 Tage.
+Fehlgeschlagene Zeilen werden 30 Tage aufbewahrt; erfolgreiche 3 Tage. Jeder Worker löscht
+die abgelaufenen Zeilen beim Start und danach jede Stunde, in Batches und abseits des
+Request-Pfads.
 
 ## Was passiert, wenn ein Worker abstürzt
 

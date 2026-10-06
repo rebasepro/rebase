@@ -385,6 +385,9 @@ vorzeitig beenden und den nachfolgenden Text nach außen verlagern kann.
 Der [Remote-Endpunkt](#der-remote-endpunkt) umschließt seine Tool-Ergebnisse auf
 dieselbe Weise und teilt dies dem Client mit; dessen `structuredContent` enthält
 das reine Ergebnis.
+<span class="since-badge" data-since="0.24">Seit 0.24</span> `list_collections` ist
+die Ausnahme: Nur ein Modell liest seine Auflistung, daher wird sie einmal gesendet,
+im Text. Vor 0.24 trug es zusätzlich eine Kopie in `structuredContent`.
 
 Es handelt sich um eine Kennzeichnung, nicht um eine Sandbox. Ein Assistent mit
 diesen Tools ist nur so sicher wie die Inhalte, die Sie ihn lesen lassen.

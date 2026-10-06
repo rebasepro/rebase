@@ -78,7 +78,7 @@ der es schreibt.
 |-------|-----|--------------|
 | `required` | `boolean` | Der Wert muss vorhanden sein |
 | `requiredMessage` | `string` | Was das Formular anzeigt, wenn er fehlt. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
-| `unique` | `boolean` | Nur eine Zeile in der Tabelle darf diesen Wert enthalten |
+| `unique` | `boolean` | Nur eine Zeile in der Tabelle darf diesen Wert enthalten. Das Admin-Formular prüft dies auch beim Speichern eines Werts, den die Bearbeitung geändert hat, sodass ein Duplikat vor dem Schreibvorgang an seinem Feld benannt wird |
 | `uniqueInArray` | `boolean` | Nur ein Eintrag *pro Array* darf ihn enthalten. Gilt für ein direktes Kind einer `array`-Eigenschaft oder ein Kind der ersten Ebene einer `map` darin. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
 
 ### Strings

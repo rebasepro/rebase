@@ -96,7 +96,7 @@ Das ist der Schritt, der einen korrekt mit Scopes versehenen Schlüssel defekt w
 die Rebase standardmäßig jeder Collection hinzufügt, kompiliert zu:
 
 ```sql
-rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
+(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))
 ```
 
 Das ist der Serverkontext oder ein Admin. Ein Service-Schlüssel ohne die Rolle `admin` erfüllt

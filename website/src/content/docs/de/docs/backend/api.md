@@ -285,6 +285,15 @@ selbst: `INVALID_LIMIT`, `INVALID_OFFSET` (eine ganze Zahl von 0 oder mehr) und
 von dem angeforderten unterscheidet, lässt sich nicht vom Erreichen des Endes der Collection
 unterscheiden, weshalb keines davon gekappt oder ignoriert wird.
 
+### Die Zählung überspringen
+
+`meta.total` ist ein `COUNT(*)` über alle passenden Zeilen — bei einer großen Tabelle
+der größte Teil dessen, was eine Listenanfrage kostet. `?count=none`
+(`GET /api/data/orders?count=none`) überspringt sie: kein `meta.total`, während
+`meta.hasMore` exakt bleibt (der Read fragt eine Zeile über die Seite hinaus ab).
+`?count=exact` ist der Standard; jeder andere Wert ist ein 400 `INVALID_COUNT`. Ein
+`?distinct=true`-Read wird nie gezählt.
+
 ### Cursor-Paginierung
 
 `offset` zählt Zeilen bei jeder Anfrage neu, sodass eine zwischen zwei Seiten eingefügte
@@ -498,10 +507,10 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 
 | Schlüssel | Bedeutung |
 |-----------|-----------|
-| `limit` | Zeilen **pro übergeordneter Zeile**, nicht über die gesamte Seite |
+| `limit` | Zeilen **pro übergeordneter Zeile**, nicht über die gesamte Seite. Wird von der Abfrage angewendet, sodass die Zeilen darüber hinaus nie aus der Datenbank gelesen werden |
 | `where` | Derselbe Filterdialekt, den auch das Top-Level-`where` verwendet |
 | `logical` | Eine `or`/`and`/`not`-Gruppe über die verknüpften Zeilen |
-| `orderBy` | Dieselbe Sortierschreibweise, einschließlich der NULL-Platzierung |
+| `orderBy` | Dieselbe Sortierschreibweise, einschließlich der NULL-Platzierung. Gleichstände sowie ein `limit` ohne `orderBy` richten sich nach dem Schlüssel der verknüpften Zeile, aufsteigend |
 | `fields` | Spalten der *verknüpften* Zeile; ihr Primärschlüssel bleibt immer erhalten |
 | `include` | Relationen der verknüpften Zeile wiederum |
 
@@ -521,10 +530,14 @@ Eingebundene Relationen werden direkt in die Antwort eingebettet:
     "author": {
         "id": 42,
         "name": "Jane Doe",
-        "email": "jane@example.com"
+        "email": "jane@example.com",
+        "companyId": 7
     }
 }
 ```
+
+Eine eingebundene Zeile ist das, was die eigene Route des Ziels (`GET /api/data/authors/42`)
+liefert: dieselben Spalten und Kodierungen, Fremdschlüssel als Spalten, keine Referenzobjekte.
 
 ## Schreiboperationen
 

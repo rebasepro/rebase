@@ -55,10 +55,18 @@ entscheidet dies also über einen funktionierenden oder defekten Player.
 - Revalidierung hat Vorrang vor einem Bereich: Eine Anfrage, die sowohl
   `If-None-Match` als auch `Range` enthält, erhält den `304`-Status.
 
-Bei lokalem Speicher wird nur der angeforderte Ausschnitt von der Festplatte
-gelesen. Bei S3 und GCS wird das Objekt weiterhin vollständig abgerufen — ein
-`StorageController` verfügt über keinen Bereichslesezugriff —, sodass die
-Einsparung bei der Antwort und nicht Upstream erzielt wird.
+Es werden nur die angeforderten Bytes gelesen — bei lokalem Speicher von der
+Festplatte, bei S3 und GCS mit einem Bereichslesezugriff —, und jedes Objekt wird
+beim Lesen an den Client gestreamt, statt zuerst im Speicher gehalten zu werden;
+die Auslieferung eines großen Videos kostet den Server also genauso viel
+Arbeitsspeicher wie die eines Vorschaubilds. Eine Revalidierung, die mit einem
+`304` endet, ein `HEAD`, ein `416` und eine gecachte Bild-Rendition werden aus
+den Metadaten des Objekts beantwortet, ohne dessen Bytes überhaupt zu lesen.
+
+Ein eigener `StorageController` erhält dasselbe, indem er die optionalen
+Methoden `statObject` und `getObjectStream` implementiert. Einer ohne sie wird
+über `getObject` bedient, das für jede Anfrage das gesamte Objekt liest, auch
+bei Bereichsanfragen.
 
 ## Ein CDN vorschalten
 

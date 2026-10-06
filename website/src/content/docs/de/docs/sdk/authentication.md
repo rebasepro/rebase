@@ -304,6 +304,11 @@ Die Token-Aktualisierung erfolgt automatisch, Sie können sie jedoch auch manuel
 const session = await client.auth.refreshSession();
 ```
 
+Eine Anfrage geht nie mit einem Token hinaus, von dem der Client weiß, dass es abgelaufen ist:
+Anfragen teilen sich eine Aktualisierung und werden einmal mit dem neuen Token gesendet. Ein Token,
+das der Server vorzeitig ablehnt, erhält trotzdem eine Aktualisierung, danach einen Wiederholungsversuch
+pro Anfrage.
+
 ## Wo die Sitzung gespeichert wird: `authFlowMode`
 
 ```typescript
@@ -364,7 +369,7 @@ function useCurrentUser() {
 }
 ```
 
-`useRebaseAuthController` in `@rebasepro/app` erledigt dies bereits, sodass eine auf der generierten Vorlage aufbauende App dies automatisch mitbringt.
+`useRebaseAuthController` in `@rebasepro/app` erledigt dies bereits, sodass eine auf der generierten Vorlage aufbauende App dies automatisch mitbringt. Datenanfragen müssen nicht warten: Eine mitten in der Wiederherstellung gestellte wird gesendet, sobald diese abgeschlossen ist — als der wiederhergestellte Benutzer oder anonym —, sodass ein erstes Rendern nie eine öffentliche Auflistung anstelle der eigenen des Benutzers liest.
 
 Eine erfolgreiche Wiederherstellung erreicht `onAuthStateChange` auch als `TOKEN_REFRESHED` — es *ist* eine Aktualisierung —, aber ein Listener allein kann Ihnen nicht sagen, ob die Wiederherstellung abgeschlossen ist: Ein Start ohne Sitzung löst gar nichts aus, was von einem noch laufenden Vorgang nicht zu unterscheiden ist. Warten Sie für diese Prüfung `isInitialized()` ab und nutzen Sie den Listener für spätere Änderungen.
 
