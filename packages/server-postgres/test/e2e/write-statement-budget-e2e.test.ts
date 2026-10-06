@@ -287,6 +287,33 @@ describe("a write's statements (E2E)", () => {
         });
     });
 
+    describe("a write with no hook pays for no hook", () => {
+        const savepoints = (statements: string[]) => statements.filter(s => /^savepoint/i.test(s));
+        const commitChecks = (statements: string[]) => statements.filter(s => /^select 1$/i.test(s));
+
+        it("a create runs no savepoint and no pre-commit check", async () => {
+            const { result, statements } = await statementsOf(() => http("POST", "/authors", { body: { name: "Grace" } }));
+            expect(result.status).toBe(201);
+            expect(savepoints(statements)).toEqual([]);
+            expect(commitChecks(statements)).toEqual([]);
+        });
+
+        it("a bulk create of 50 rows opens one savepoint for the batch, not one per row", async () => {
+            const rows = Array.from({ length: 50 }, (_, i) => ({ name: `bulk ${i}` }));
+            const { result, statements } = await statementsOf(() => http("POST", "/authors/bulk", { body: { rows } }));
+            expect(result.status).toBe(200);
+            expect(savepoints(statements).length).toBeLessThanOrEqual(1);
+            expect(commitChecks(statements)).toEqual([]);
+        });
+
+        it("a write whose collection has a hook still asks the transaction before committing", async () => {
+            const id = await newPost("hooked");
+            const { result, statements } = await statementsOf(() => http("PATCH", `/posts/${id}`, { body: { title: "hooked 2" } }));
+            expect(result.status).toBe(200);
+            expect(commitChecks(statements)).toHaveLength(1);
+        });
+    });
+
     describe("the answers stay the same", () => {
         it("a missing row is the route's 404, on PATCH and DELETE", async () => {
             for (const method of ["PATCH", "DELETE"]) {

@@ -33,6 +33,8 @@ export class WriteTransactionScope implements AmbientTransaction {
     /** The first tracked statement that failed, whether or not its caller caught it. */
     private failure?: unknown;
     private readonly settledHooks: Array<(context: RebaseCallContext) => Promise<void>> = [];
+    /** Whether application code (a hook) has run on this transaction. See {@link noteApplicationCode}. */
+    private applicationCodeRan = false;
     private settledContext?: RebaseCallContext;
 
     /** The transaction handle, for statements in this package that are already written against drizzle. */
@@ -114,6 +116,12 @@ export class WriteTransactionScope implements AmbientTransaction {
      */
     async assertCommittable(): Promise<void> {
         if (!this.tx) return;
+        // Only application code can catch a failed statement and carry on:
+        // the framework's own catches rethrow anything that reached the
+        // database. With no hook run and no tracked statement failed, the
+        // transaction cannot be aborted, and asking it costs a round trip on
+        // every write for nothing.
+        if (!this.applicationCodeRan && this.failure === undefined) return;
         try {
             await this.tx.execute(sql`SELECT 1`);
         } catch (error) {
@@ -134,6 +142,16 @@ export class WriteTransactionScope implements AmbientTransaction {
             refusal.cause = this.failure ?? error;
             throw refusal;
         }
+    }
+
+    /**
+     * Application code — a collection, global or property hook, a
+     * `beforeQuery` — is about to run on this transaction, so it may catch a
+     * failed statement and leave the transaction aborted: the commit then has
+     * to ask ({@link assertCommittable}).
+     */
+    noteApplicationCode(): void {
+        this.applicationCodeRan = true;
     }
 
     /**

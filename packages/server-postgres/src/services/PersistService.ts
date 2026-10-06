@@ -33,6 +33,8 @@ import { ApiError, logger, splitFieldOps } from "@rebasepro/server";
 import { brokenFieldOpBounds, compileFieldOpBounds, compileFieldOps, fieldOpBoundsError } from "./field-op-sql";
 import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, isRowLevelSecurityDenial } from "../utils/pg-error-utils";
 import { explainZeroRowWrite } from "./write-denial";
+import { currentWriteDepth } from "./write-depth";
+import { currentWriteScope } from "./write-transaction-scope";
 import { resolveSoftDelete, rowInTrashError, softDeleteColumn } from "./soft-delete";
 
 /**
@@ -71,6 +73,26 @@ export interface PersistSaveOptions {
      * without being named here.
      */
     insertOnlyKeys?: readonly string[];
+}
+
+/**
+ * Run `write` in a transaction of its own — a SAVEPOINT inside a write — or,
+ * when nothing could catch its failure and carry on, straight on `db`.
+ *
+ * The savepoint exists for a write a hook started (`context.data`): a hook may
+ * catch the database refusing it, and the write it runs inside must stay
+ * usable. A write a caller started directly inside a request's transaction
+ * (frame depth 1, an open write scope) has no such catcher — the REST route,
+ * the socket handler and the bulk and batch loops all rethrow, and the
+ * request's transaction rolls back whole — so its savepoint only cost two
+ * round trips per row: 2,000 of a 1,000-row bulk's statements. Outside a
+ * request's transaction (`db` is the pool) a real transaction is still opened,
+ * so the row and its relation writes land together.
+ */
+function inOwnTransactionUnlessTopLevel<T>(db: DrizzleClient, write: (tx: DrizzleClient) => Promise<T>): Promise<T> {
+    // `rollback` is what a transaction handle has and the pool does not.
+    if ("rollback" in db && currentWriteDepth() === 1 && currentWriteScope()?.tx !== undefined) return write(db);
+    return db.transaction(tx => write(tx));
 }
 
 /**
@@ -234,7 +256,7 @@ export class PersistService {
         // TRANSACTION_ABORTED (or a 25P02 from the history entry after it).
         let result;
         try {
-            result = await this.db.transaction(tx => tx
+            result = await inOwnTransactionUnlessTopLevel(this.db, tx => tx
                 .delete(table)
                 .where(condition));
         } catch (error: unknown) {
@@ -481,7 +503,7 @@ export class PersistService {
                 );
             }
 
-            savedId = await this.db.transaction(async (tx) => {
+            savedId = await inOwnTransactionUnlessTopLevel(this.db, async (tx) => {
                 let currentId: string | number;
 
                 if (id && !options?.upsert) {

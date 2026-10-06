@@ -350,6 +350,15 @@ function authContextOf(user: User | undefined): SubscriptionAuthContext {
 }
 
 /**
+ * Whether any tier declares a hook — application code that runs inside the
+ * write, and so may catch a failed statement (see
+ * `WriteTransactionScope.noteApplicationCode`).
+ */
+function declaresAnyHook(...tiers: (object | undefined)[]): boolean {
+    return tiers.some(tier => tier !== undefined && Object.values(tier).some(value => typeof value === "function"));
+}
+
+/**
  * A bulk or batch update's answer for an id that names no row this caller can
  * see: a 404 naming the id, which the entry's own label then wraps.
  */
@@ -736,6 +745,8 @@ export class PostgresBackendDriver implements DataDriver {
         const relKeys = Object.keys(relationTargets);
 
         if (!hasOwn && relKeys.length === 0) return rows;
+        // `afterRead` is application code; see `noteApplicationCode`.
+        currentWriteScope()?.noteApplicationCode();
 
         const maskEmbedded = async (value: unknown, target: { path: string; resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]> }): Promise<unknown> => {
             if (Array.isArray(value)) {
@@ -1190,6 +1201,7 @@ export class PostgresBackendDriver implements DataDriver {
             globalCallbacks,
             propertyCallbacks
         } = this.resolveCollectionCallbacks(collection, path);
+        if (declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) currentWriteScope()?.noteApplicationCode();
 
         // An upsert that finds its row is an update of that row, and runs as
         // one: the update gate, `beforeSave` told "existing" with the stored
@@ -1702,7 +1714,11 @@ export class PostgresBackendDriver implements DataDriver {
         const txDriver = new PostgresBackendDriver(
             tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
         );
-        txDriver.dataService = new DataService(tx, this.registry, () => txDriver.buildCallContext());
+        txDriver.dataService = new DataService(tx, this.registry, () => {
+            // Asked for by a `beforeQuery` about to run: application code.
+            currentWriteScope()?.noteApplicationCode();
+            return txDriver.buildCallContext();
+        });
         txDriver.client = this.client;
         // Carry the caller's notification batching through, so a bulk write
         // nested in an outer transaction still holds its events until commit.
@@ -1729,7 +1745,11 @@ export class PostgresBackendDriver implements DataDriver {
         const txDriver = new PostgresBackendDriver(
             tx, this.realtimeService, this.registry, user, this.poolManager, this.historyService
         );
-        txDriver.dataService = new DataService(tx, this.registry, () => txDriver.buildCallContext());
+        txDriver.dataService = new DataService(tx, this.registry, () => {
+            // Asked for by a `beforeQuery` about to run: application code.
+            currentWriteScope()?.noteApplicationCode();
+            return txDriver.buildCallContext();
+        });
         txDriver.client = this.client;
         return txDriver.buildCallContext();
     }
@@ -2017,6 +2037,7 @@ export class PostgresBackendDriver implements DataDriver {
             globalCallbacks,
             propertyCallbacks
         } = this.resolveCollectionCallbacks(collection, targetPath);
+        if (declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) currentWriteScope()?.noteApplicationCode();
 
         // The row being deleted is read here, from the database, by this
         // driver — which on a user request is bound to that user's
@@ -2947,7 +2968,11 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 let hookContext: RebaseCallContext | undefined;
                 const txEntityService = new DataService(
                     tx, this.delegate.registry,
-                    () => (hookContext ??= this.delegate.callContextWithin(tx, this.user))
+                    () => {
+                        // Asked for by a `beforeQuery` about to run: application code.
+                        writeScope?.noteApplicationCode();
+                        return (hookContext ??= this.delegate.callContextWithin(tx, this.user));
+                    }
                 );
                 const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
 
