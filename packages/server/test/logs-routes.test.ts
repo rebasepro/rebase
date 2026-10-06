@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { Hono } from "hono";
-import logsRoutes, { logMiddleware, addLog, logBuffer } from "../src/api/logs-routes";
+import logsRoutes, { logMiddleware, addLog, logBuffer, sourceForRequestPath } from "../src/api/logs-routes";
 
 /**
  * The Logs Explorer reads `/api/logs`. Both halves of that were dead: the router
@@ -57,6 +57,62 @@ total: 0 });
         expect(ping!.source).toBe("api");
         expect(ping!.level).toBe("info");
         expect(ping!.message).toMatch(/^GET \/api\/ping 200 \d+ms$/);
+    });
+
+    it("files a request under the subsystem its path addresses, so the Source filter finds it", async () => {
+        // Every request was filed as `api`, so choosing Source = Auth in the
+        // Logs Explorer hid every sign-in, and Storage every upload.
+        const app = new Hono();
+        app.use("/api/*", logMiddleware({ basePath: "/api", ignorePaths: ["/api/logs/stream"] }));
+        app.post("/api/auth/login", (c) => c.json({ error: "no" }, 401));
+        app.post("/api/oauth/token", (c) => c.json({ ok: true }));
+        app.post("/api/storage/upload", (c) => c.json({ ok: true }));
+        app.get("/api/data/posts", (c) => c.json({ ok: true }));
+        app.get("/api/authors", (c) => c.json({ ok: true }));
+        app.route("/api/logs", logsRoutes);
+
+        await app.request("/api/auth/login", { method: "POST" });
+        await app.request("/api/oauth/token", { method: "POST" });
+        await app.request("/api/storage/upload", { method: "POST" });
+        await app.request("/api/data/posts");
+        await app.request("/api/authors");
+
+        const sourceOf = async (path: string) => {
+            const body = await (await app.request("/api/logs")).json() as { entries: { message: string; source: string }[] };
+            return body.entries.find(e => e.message.includes(` ${path} `))?.source;
+        };
+        expect(await sourceOf("/api/auth/login")).toBe("auth");
+        expect(await sourceOf("/api/oauth/token")).toBe("auth");
+        expect(await sourceOf("/api/storage/upload")).toBe("storage");
+        expect(await sourceOf("/api/data/posts")).toBe("api");
+        // A segment that only starts like one is not it.
+        expect(await sourceOf("/api/authors")).toBe("api");
+
+        const auth = await (await app.request("/api/logs?source=auth")).json() as { entries: { message: string }[] };
+        expect(auth.entries.map(e => e.message)).toEqual([
+            expect.stringMatching(/^POST \/api\/oauth\/token 200/),
+            expect.stringMatching(/^POST \/api\/auth\/login 401/)
+        ]);
+    });
+
+    it("is told the base path by the middleware wiring production runs", async () => {
+        const { configureMiddlewares } = await import("../src/init/middlewares");
+        const app = new Hono();
+        configureMiddlewares(app as never, "/v1", false, { corsHandled: true, compression: false });
+        app.post("/v1/auth/login", (c) => c.json({ error: "no" }, 401));
+
+        await app.request("/v1/auth/login", { method: "POST" });
+
+        const entry = logBuffer.query({ limit: 100 }).entries.find(e => e.message.startsWith("POST /v1/auth/login"));
+        expect(entry?.source).toBe("auth");
+    });
+
+    it("reads the subsystem after the base path, wherever the API is mounted", () => {
+        expect(sourceForRequestPath("/v2/auth/session", "/v2")).toBe("auth");
+        expect(sourceForRequestPath("/storage/file/a.png", "")).toBe("storage");
+        // Outside the base path, nothing is assumed about the first segment.
+        expect(sourceForRequestPath("/auth/session", "/api")).toBe("api");
+        expect(sourceForRequestPath("/apiauth/x", "/api")).toBe("api");
     });
 
     it("filters by level, source and search text", async () => {

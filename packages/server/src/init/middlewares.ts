@@ -134,7 +134,7 @@ export function configureMiddlewares(
     // recorded duration would be the time until the client disconnected, and it
     // is already subscribed by the time this line runs — so the first thing every
     // reader would see is itself connecting.
-    app.use(`${basePath}/*`, logMiddleware({ ignorePaths: [`${basePath}/logs/stream`] }));
+    app.use(`${basePath}/*`, logMiddleware({ basePath, ignorePaths: [`${basePath}/logs/stream`] }));
 
     return {
         exemptFromBodyLimit: (path) => {

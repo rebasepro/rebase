@@ -151,6 +151,39 @@ export interface LogMiddlewareOptions {
      * server it is also the thing evicting real entries out of the ring.
      */
     ignorePaths?: string[];
+    /**
+     * Where the API is mounted (`/api`). The segment after it names the
+     * subsystem a request is filed under — see {@link sourceForRequestPath}.
+     * Unset, the first segment of the path is read.
+     */
+    basePath?: string;
+}
+
+/** The first path segment under the base path that files a request under a source other than `api`. */
+const SOURCE_BY_SEGMENT: Readonly<Record<string, LogEntry["source"]>> = {
+    auth: "auth",
+    oauth: "auth",
+    storage: "storage"
+};
+
+/**
+ * The `source` of a request entry: the subsystem its path addresses.
+ *
+ * `/api/auth/*` and the MCP authorization server under `/api/oauth/*` are
+ * `auth`, `/api/storage/*` is `storage`, and everything else is `api`. The
+ * Logs Explorer's Source filter matches this field, so a sign-in filed as
+ * `api` was invisible under Auth. The realtime socket is not an HTTP request
+ * and is not recorded here.
+ *
+ * Exported for its test.
+ */
+export function sourceForRequestPath(path: string, basePath = ""): LogEntry["source"] {
+    const base = basePath.replace(/\/+$/, "");
+    if (base && path !== base && !path.startsWith(`${base}/`)) return "api";
+    const segment = path.slice(base.length).split("/").find(part => part !== "")?.toLowerCase();
+    return (segment !== undefined && Object.prototype.hasOwnProperty.call(SOURCE_BY_SEGMENT, segment))
+        ? SOURCE_BY_SEGMENT[segment]
+        : "api";
 }
 
 /** Hono middleware to log API requests */
@@ -173,7 +206,7 @@ export function logMiddleware(options: LogMiddlewareOptions = {}): MiddlewareHan
         const failure = c.get("errorSummary");
         addLog(
             level,
-            "api",
+            sourceForRequestPath(c.req.path, options.basePath),
             `${c.req.method} ${c.req.path} ${status} ${duration}ms`
                 + (failure ? ` — ${failure.code}: ${failure.message}` : ""),
             {
