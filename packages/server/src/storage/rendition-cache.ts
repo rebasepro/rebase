@@ -83,11 +83,19 @@ export interface DurableRendition {
 }
 
 export interface DurableRenditionCache {
-    /** The stored rendition for this cache key, or null. Never throws. */
+    /**
+     * The stored rendition for this cache key, or null. Never throws.
+     *
+     * `contentType` is the type the transform produces
+     * (`transformContentType(options)`). The cache key carries the options,
+     * format included, so a key only ever holds a rendition of that type, and
+     * one read of that one object key answers the question.
+     */
     get(
         controller: StorageController,
         cacheKey: string,
-        bucket: string | undefined
+        bucket: string | undefined,
+        contentType: string
     ): Promise<DurableRendition | null>;
     /** Store a rendition. Never throws: a failed write is a slower cache. */
     put(
@@ -127,29 +135,6 @@ export function renditionKey(cacheKey: string, contentType: string): string {
     return `${RENDITION_PREFIX}${digest}${extension ? `.${extension}` : ""}`;
 }
 
-/**
- * A rendition's key when reading, where the content type is not yet known.
- *
- * Reads try the known extensions rather than storing an index: four `getObject`
- * calls at worst is still one round trip in the common case — the first
- * candidate is the format the request asked for — and an index is a second
- * thing to keep consistent with the objects it describes.
- */
-export function renditionKeyCandidates(cacheKey: string, preferred?: string): string[] {
-    const digest = createHash("sha256").update(cacheKey).digest("hex");
-    const extensions = Object.values(EXTENSIONS);
-    const ordered = preferred && EXTENSIONS[preferred]
-        ? [EXTENSIONS[preferred], ...extensions.filter(e => e !== EXTENSIONS[preferred])]
-        : extensions;
-    return ordered.map(extension => `${RENDITION_PREFIX}${digest}.${extension}`);
-}
-
-/** The content type a rendition key's extension names, or undefined. */
-function contentTypeForRenditionKey(key: string): string | undefined {
-    const extension = key.slice(key.lastIndexOf(".") + 1);
-    return Object.keys(EXTENSIONS).find(type => EXTENSIONS[type] === extension);
-}
-
 export function createDurableRenditionCache(): DurableRenditionCache {
     // Said once per process, not per request. A read-only bucket fails every
     // write, and a warning per transform would bury the log it is trying to be
@@ -157,32 +142,32 @@ export function createDurableRenditionCache(): DurableRenditionCache {
     let writeFailureAnnounced = false;
 
     return {
-        async get(controller, cacheKey, bucket) {
-            for (const key of renditionKeyCandidates(cacheKey)) {
-                try {
-                    const object = await controller.getObject(key, bucket);
-                    if (!object) continue;
-                    // The response to a transform URL is whatever this returns,
-                    // served inline under the source object's address. So only
-                    // what `put` could have written counts as a hit: the image
-                    // type the key's own extension names. Anything else at a
-                    // rendition key was put there by something other than this
-                    // cache, and serving its stored type would let it choose
-                    // what the API origin renders — `text/html` included.
-                    const contentType = (object.type || "").split(";")[0].trim().toLowerCase();
-                    if (contentType !== contentTypeForRenditionKey(key)) continue;
-                    return {
-                        data: Buffer.from(await object.arrayBuffer()),
-                        contentType
-                    };
-                } catch {
-                    // A miss and an unreachable bucket are the same answer here:
-                    // compute it. The source read that follows will report a
-                    // genuinely broken source for itself.
-                    continue;
-                }
+        async get(controller, cacheKey, bucket, contentType) {
+            // One key: the rendition of the format asked for. Probing every
+            // extension cost a cold variant four bucket round trips.
+            const key = renditionKey(cacheKey, contentType);
+            try {
+                const object = await controller.getObject(key, bucket);
+                if (!object) return null;
+                // The response to a transform URL is whatever this returns,
+                // served inline under the source object's address. So only
+                // what `put` could have written counts as a hit: the image
+                // type the key was read for. Anything else at a rendition key
+                // was put there by something other than this cache, and
+                // serving its stored type would let it choose what the API
+                // origin renders — `text/html` included.
+                const storedType = (object.type || "").split(";")[0].trim().toLowerCase();
+                if (storedType !== contentType) return null;
+                return {
+                    data: Buffer.from(await object.arrayBuffer()),
+                    contentType
+                };
+            } catch {
+                // A miss and an unreachable bucket are the same answer here:
+                // compute it. The source read that follows will report a
+                // genuinely broken source for itself.
+                return null;
             }
-            return null;
         },
 
         async put(controller, cacheKey, bucket, rendition) {

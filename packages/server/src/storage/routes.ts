@@ -36,7 +36,7 @@ import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTo
 import { generateDownloadToken } from "../auth";
 import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
-import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
+import { parseTransformOptions, transformImage, transformContentType, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
 import { storageRequestWildcard } from "./requested-object";
 import { canonicalStorageId, InvalidListOptionsError } from "./keys";
@@ -111,7 +111,7 @@ async function transformOnce(
             // does, so a burst of requests for one cold variant makes one
             // round trip to the bucket rather than one each.
             if (durable) {
-                const stored = await durable.cache.get(durable.controller, cacheKey, durable.bucket);
+                const stored = await durable.cache.get(durable.controller, cacheKey, durable.bucket, transformContentType(options));
                 if (stored) {
                     memory.cache.set(cacheKey, stored.data, stored.contentType);
                     return stored;

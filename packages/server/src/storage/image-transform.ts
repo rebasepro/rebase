@@ -190,6 +190,14 @@ const FORMAT_CONTENT_TYPES: Record<string, string> = {
     png: "image/png"
 };
 
+/**
+ * The content type a transform with these options produces: its `format`, or
+ * WebP when it names none, as {@link transformImage} encodes it.
+ */
+export function transformContentType(options: ImageTransformOptions): string {
+    return FORMAT_CONTENT_TYPES[options.format || "webp"];
+}
+
 /** Check whether a content type is a transformable image. */
 export function isTransformableImage(contentType: string): boolean {
     return (
@@ -356,8 +364,7 @@ async function runTransform(
     }
 
     const data = await pipeline.toBuffer();
-    return { data,
-contentType: FORMAT_CONTENT_TYPES[format] };
+    return { data, contentType: transformContentType(options) };
 }
 
 // ---------------------------------------------------------------------------

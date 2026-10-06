@@ -31,7 +31,6 @@ import {
     RENDITION_PREFIX,
     isRenditionKey,
     renditionKey,
-    renditionKeyCandidates,
     createDurableRenditionCache
 } from "../src/storage/rendition-cache";
 import type { StorageController } from "../src/storage/types";
@@ -52,13 +51,8 @@ describe("rendition keys", () => {
         expect(renditionKey("a", "image/webp")).not.toBe(renditionKey("b", "image/webp"));
     });
 
-    it("tries the requested format first when reading", () => {
-        const [first] = renditionKeyCandidates("k", "image/avif");
-        expect(first.endsWith(".avif")).toBe(true);
-    });
-
     it("does not read a key from outside the reserved space", () => {
-        expect(renditionKeyCandidates("../../etc/passwd").every(isRenditionKey)).toBe(true);
+        expect(isRenditionKey(renditionKey("../../etc/passwd", "image/webp"))).toBe(true);
     });
 
     it("names the reserved space in any case, and with either separator", () => {
@@ -103,7 +97,7 @@ describe("createDurableRenditionCache", () => {
                 new File(["<script>alert(1)</script>"], key.split("/").pop()!, { type: "text/html" })
         } as unknown as StorageController;
 
-        await expect(cache.get(planted, "k", undefined)).resolves.toBeNull();
+        await expect(cache.get(planted, "k", undefined, "image/webp")).resolves.toBeNull();
     });
 
     it("treats an unreachable bucket as a miss, not an error", async () => {
@@ -112,7 +106,7 @@ describe("createDurableRenditionCache", () => {
             getObject: async () => { throw new Error("connection reset"); }
         } as unknown as StorageController;
 
-        await expect(cache.get(broken, "k", undefined)).resolves.toBeNull();
+        await expect(cache.get(broken, "k", undefined, "image/webp")).resolves.toBeNull();
     });
 });
 
@@ -172,6 +166,24 @@ describe("GET /file/* with a durable rendition cache", () => {
         expect(response.status).toBe(200);
         expect(response.headers.get("Content-Type")).toBe("image/webp");
         expect(spy).not.toHaveBeenCalled();
+    });
+
+    it("reads one rendition key per request, the requested format's, on a miss and on a hit", async () => {
+        // The cache key carries the transform options, format included, so one
+        // key can only ever hold one format. Reading all four extensions made a
+        // cold PNG variant four bucket round trips, and a warm one four too.
+        const getObject = jest.spyOn(controller, "getObject");
+        const renditionReads = () => getObject.mock.calls.map(([key]) => String(key)).filter(isRenditionKey);
+
+        await routerOn(true).fetch(new Request(url("?width=22&format=png")));
+        expect(renditionReads()).toHaveLength(1);
+        expect(renditionReads()[0].endsWith(".png")).toBe(true);
+
+        getObject.mockClear();
+        const response = await routerOn(true).fetch(new Request(url("?width=22&format=png")));
+        expect(response.status).toBe(200);
+        expect(response.headers.get("Content-Type")).toBe("image/png");
+        expect(renditionReads()).toHaveLength(1);
     });
 
     it("without it, the second instance does the work again", async () => {
