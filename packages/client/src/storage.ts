@@ -1,4 +1,5 @@
 import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, isPublicStoragePath, storageObjectPath } from "@rebasepro/types";
+import { DOWNLOAD_URL_CONCURRENCY, createConcurrencyLimit, createDownloadUrlCache, type ResolvedDownload } from "@rebasepro/common";
 import { Transport } from "./transport";
 
 /**
@@ -32,7 +33,14 @@ export function encodeStorageKey(key: string): string {
 }
 
 export function createStorage(transport: Transport, storageId?: string): StorageSource {
-    const urlsCache = new Map<string, { config: DownloadConfig; expiresAt?: number }>();
+    // Keyed by `[bucket/]keyOrUrl`; an entry lives until its download token
+    // expires (public URLs: until evicted), is dropped by `deleteObject`, and
+    // is bounded LRU. One per source instance, i.e. per client — so it is
+    // never shared with another session's tokens. Concurrent lookups of one
+    // key share one `/metadata` request, and at most
+    // DOWNLOAD_URL_CONCURRENCY of those are open at once.
+    const urlsCache = createDownloadUrlCache();
+    const limitMetadata = createConcurrencyLimit(DOWNLOAD_URL_CONCURRENCY);
 
     /**
      * Base for URLs the *browser* will fetch on its own (file downloads,
@@ -113,23 +121,22 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         return result.data;
     }
 
-    async function getSignedUrl(
+    function getSignedUrl(
         keyOrUrl: string,
         bucket?: string
     ): Promise<DownloadConfig> {
         const cacheKey = bucket ? `${bucket}/${keyOrUrl}` : keyOrUrl;
-        const cachedEntry = urlsCache.get(cacheKey);
-        if (cachedEntry) {
-            if (!cachedEntry.expiresAt || cachedEntry.expiresAt > Date.now()) {
-                return cachedEntry.config;
-            }
-            urlsCache.delete(cacheKey);
-        }
+        return urlsCache.get(cacheKey, () => resolveDownload(keyOrUrl, bucket));
+    }
 
+    async function resolveDownload(
+        keyOrUrl: string,
+        bucket?: string
+    ): Promise<ResolvedDownload> {
         const filePath = storageObjectPath(keyOrUrl, bucket);
 
         if (!filePath || filePath.trim() === "" || filePath === "/") {
-            return { url: null, fileNotFound: true };
+            return { config: { url: null, fileNotFound: true }, noStore: true };
         }
 
         // ── Public objects ────────────────────────────────────────────────
@@ -137,24 +144,25 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         // stable, permanent, CDN-cacheable URL. No metadata round-trip and no
         // token are needed — build the URL directly and cache it forever.
         if (isPublicStoragePath(filePath)) {
-            const publicConfig: DownloadConfig = {
-                url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}`)
+            return {
+                config: { url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}`) }
+                // no expiry
             };
-            urlsCache.set(cacheKey, { config: publicConfig }); // no expiry
-            return publicConfig;
         }
 
         try {
-            const result = await transport.request<{ data: DownloadMetadata }>(withStorageId(`/storage/metadata/${encodeStorageKey(filePath)}`));
+            const result = await limitMetadata(() =>
+                transport.request<{ data: DownloadMetadata }>(withStorageId(`/storage/metadata/${encodeStorageKey(filePath)}`)));
 
             // Public object (server-confirmed): token-less permanent URL.
             if (result.data.public) {
-                const publicConfig: DownloadConfig = {
-                    url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}`),
-                    metadata: result.data
+                return {
+                    config: {
+                        url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}`),
+                        metadata: result.data
+                    }
+                    // no expiry
                 };
-                urlsCache.set(cacheKey, { config: publicConfig }); // no expiry
-                return publicConfig;
             }
 
             // Private object: use the short-lived, file-scoped download token
@@ -176,11 +184,10 @@ export function createStorage(transport: Transport, storageId?: string): Storage
                 ? Date.now() + (result.data.tokenExpiresIn - 10) * 1000 // subtract 10s buffer
                 : undefined;
 
-            urlsCache.set(cacheKey, { config: downloadConfig, expiresAt });
-            return downloadConfig;
+            return { config: downloadConfig, expiresAt };
         } catch (e: unknown) {
             if (e instanceof Error && "status" in e && (e as { status: number }).status === 404) {
-                return { url: null, fileNotFound: true };
+                return { config: { url: null, fileNotFound: true }, noStore: true };
             }
             throw e;
         }

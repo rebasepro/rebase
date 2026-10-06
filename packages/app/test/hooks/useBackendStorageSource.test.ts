@@ -158,4 +158,64 @@ describe("useBackendStorageSource", () => {
         await source.getSignedUrl("photos/cat.png");
         expect(calls.filter(c => c.url.includes("/metadata/"))).toHaveLength(2);
     });
+
+    // A collection view mounts one preview per row in the same tick, and rows
+    // share files; each `/metadata` call spends the user's rate-limit budget.
+    describe("many previews at once", () => {
+        /** A backend whose metadata requests stay open until drained. */
+        function slowBackend() {
+            const open: (() => void)[] = [];
+            let metadataCalls = 0;
+            let inFlight = 0;
+            let peak = 0;
+            Object.defineProperty(global, "fetch", {
+                configurable: true,
+                writable: true,
+                value: (input: RequestInfo | URL) => new Promise(resolve => {
+                    metadataCalls += String(input).includes("/storage/metadata/") ? 1 : 0;
+                    inFlight++;
+                    peak = Math.max(peak, inFlight);
+                    open.push(() => {
+                        inFlight--;
+                        resolve(reply(200, { json: { data: { token: "scoped-token", tokenExpiresIn: 300 } } }));
+                    });
+                })
+            });
+            return {
+                get metadataCalls() { return metadataCalls; },
+                get peak() { return peak; },
+                async drain() {
+                    while (open.length) {
+                        open.splice(0).forEach(answer => answer());
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                    }
+                }
+            };
+        }
+
+        it("asks once for a file that 50 previews ask for together", async () => {
+            const backend = slowBackend();
+            const source = storage();
+
+            const all = Promise.all(Array.from({ length: 50 }, () => source.getSignedUrl("photos/cat.png")));
+            await new Promise(resolve => setTimeout(resolve, 0));
+            await backend.drain();
+            await all;
+
+            expect(backend.metadataCalls).toBe(1);
+        });
+
+        it("keeps a bounded number of metadata requests open at once", async () => {
+            const backend = slowBackend();
+            const source = storage();
+
+            const all = Promise.all(Array.from({ length: 100 }, (_, i) => source.getSignedUrl(`photos/${i}.png`)));
+            await new Promise(resolve => setTimeout(resolve, 0));
+            await backend.drain();
+            await all;
+
+            expect(backend.metadataCalls).toBe(100);
+            expect(backend.peak).toBeLessThanOrEqual(8);
+        });
+    });
 });

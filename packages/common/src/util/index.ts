@@ -10,6 +10,7 @@ export * from "./policy";
 export * from "./permissions";
 export * from "./builders";
 export * from "./storage";
+export * from "./download-url-cache";
 export * from "./callbacks";
 export * from "./callback-errors";
 export * from "./relations";

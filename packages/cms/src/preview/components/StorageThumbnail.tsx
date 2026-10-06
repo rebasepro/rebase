@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 import { renderSkeletonImageThumbnail } from "../property_previews/SkeletonPropertyComponent";
 import { UrlComponentPreview } from "./UrlComponentPreview";
 import { useStorageSource, useStorageSources, useTranslation } from "@rebasepro/app";
-import { resolveStorageSource } from "@rebasepro/common";
+import { createDownloadUrlCache, resolveStorageSource } from "@rebasepro/common";
 import { DownloadConfig, FileType } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { cls, ImageOffIcon, iconSize, Skeleton, Tooltip, Typography } from "@rebasepro/ui";
@@ -32,7 +32,13 @@ function areEqual(prevProps: StorageThumbnailProps, nextProps: StorageThumbnailP
         prevProps.storageSourceKey === nextProps.storageSourceKey;
 }
 
-const URL_CACHE: Record<string, DownloadConfig> = {};
+/**
+ * The config each thumbnail last resolved, keyed by `<sourceKey>::<path>`, so a
+ * remount draws at once instead of a skeleton; the effect still asks the
+ * source again, which owns validity. Bounded (least recently used dropped past
+ * 2,000), so a long session browsing thousands of files does not keep them all.
+ */
+const URL_CACHE = createDownloadUrlCache();
 
 /**
  * The signed-URL request currently in flight for a given cache key.
@@ -93,7 +99,7 @@ export function StorageThumbnailInternal({
     // does not collide.
     const cacheKey = `${storageSourceKey ?? ""}::${storagePathOrDownloadUrl}`;
 
-    const [downloadConfig, setDownloadConfig] = React.useState<DownloadConfig>(URL_CACHE[cacheKey]);
+    const [downloadConfig, setDownloadConfig] = React.useState<DownloadConfig | undefined>(() => URL_CACHE.peek(cacheKey));
 
     useEffect(() => {
         if (!storagePathOrDownloadUrl)
@@ -103,7 +109,7 @@ export function StorageThumbnailInternal({
             .then(function (downloadConfig) {
                 if (!unmounted) {
                     setDownloadConfig(downloadConfig);
-                    URL_CACHE[cacheKey] = downloadConfig;
+                    URL_CACHE.set(cacheKey, { config: downloadConfig });
                 }
             }).catch(setError);
         return () => {

@@ -13,6 +13,12 @@ import {
     isPublicStoragePath,
     storageObjectPath
 } from "@rebasepro/types";
+import {
+    DOWNLOAD_URL_CONCURRENCY,
+    createConcurrencyLimit,
+    createDownloadUrlCache,
+    type ResolvedDownload
+} from "@rebasepro/common";
 import { DEFAULT_API_PATH } from "./ApiConfigContext";
 
 /**
@@ -63,9 +69,13 @@ export function useBackendStorageSource({
 
     const storageBasePath = `${apiUrl.replace(/\/+$/, "")}${apiPath}/storage`;
 
-    // Cache for download URLs to avoid redundant API calls. A private file's
-    // URL carries a download token that expires, and the entry with it.
-    const urlsCache = useMemo(() => new Map<string, { config: DownloadConfig; expiresAt?: number }>(), []);
+    // Cache for download URLs to avoid redundant API calls, keyed by
+    // `[bucket/]keyOrUrl`. A private file's URL carries a download token that
+    // expires, and the entry with it; `deleteObject` drops it; bounded LRU.
+    // Concurrent lookups of one key share one `/metadata` request, and at most
+    // DOWNLOAD_URL_CONCURRENCY of those are open at once.
+    const urlsCache = useMemo(() => createDownloadUrlCache(), []);
+    const limitMetadata = useMemo(() => createConcurrencyLimit(DOWNLOAD_URL_CONCURRENCY), []);
 
     /**
      * Make an authenticated request to the storage API
@@ -130,43 +140,31 @@ export function useBackendStorageSource({
     }, [fetchWithAuth, storageBasePath]);
 
     /**
-     * Get download URL for a file
+     * Resolve a file's download URL: the network half of `getSignedUrl`.
      */
-    const getSignedUrl = useCallback(async (
+    const resolveDownload = useCallback(async (
         keyOrUrl: string,
         bucket?: string
-    ): Promise<DownloadConfig> => {
-        // Check cache first
-        const cacheKey = bucket ? `${bucket}/${keyOrUrl}` : keyOrUrl;
-        const cached = urlsCache.get(cacheKey);
-        if (cached && (cached.expiresAt === undefined || cached.expiresAt > Date.now())) {
-            return cached.config;
-        }
-
+    ): Promise<ResolvedDownload> => {
         // The path the storage routes address the object by — the SDK's rule.
         const filePath = storageObjectPath(keyOrUrl, bucket);
 
         if (!filePath || filePath.trim() === "" || filePath === "/") {
-            return { url: null,
-fileNotFound: true };
+            return { config: { url: null, fileNotFound: true }, noStore: true };
         }
 
         const fileUrl = `${storageBasePath}/file/${encodeStorageKey(filePath)}`;
 
         // A public file is served token-less at a permanent URL.
         if (isPublicStoragePath(filePath)) {
-            const publicConfig: DownloadConfig = { url: fileUrl };
-            urlsCache.set(cacheKey, { config: publicConfig });
-            return publicConfig;
+            return { config: { url: fileUrl } };
         }
 
-        const response = await fetchWithAuth(`${storageBasePath}/metadata/${encodeStorageKey(filePath)}`);
+        const response = await limitMetadata(() =>
+            fetchWithAuth(`${storageBasePath}/metadata/${encodeStorageKey(filePath)}`));
 
         if (response.status === 404) {
-            return {
-                url: null,
-                fileNotFound: true
-            };
+            return { config: { url: null, fileNotFound: true }, noStore: true };
         }
 
         if (!response.ok) {
@@ -177,9 +175,7 @@ fileNotFound: true };
         const result: { data: DownloadMetadata } = await response.json();
 
         if (result.data.public) {
-            const publicConfig: DownloadConfig = { url: fileUrl, metadata: result.data };
-            urlsCache.set(cacheKey, { config: publicConfig });
-            return publicConfig;
+            return { config: { url: fileUrl, metadata: result.data } };
         }
 
         // A private file is read with the short-lived download token the
@@ -192,16 +188,25 @@ fileNotFound: true };
             metadata: result.data
         };
 
-        urlsCache.set(cacheKey, {
+        return {
             config: downloadConfig,
             // Ten seconds early, so a URL handed out is still good when used.
             expiresAt: result.data.tokenExpiresIn
                 ? Date.now() + (result.data.tokenExpiresIn - 10) * 1000
                 : undefined
-        });
+        };
+    }, [fetchWithAuth, limitMetadata, storageBasePath]);
 
-        return downloadConfig;
-    }, [fetchWithAuth, storageBasePath, urlsCache]);
+    /**
+     * Get download URL for a file
+     */
+    const getSignedUrl = useCallback((
+        keyOrUrl: string,
+        bucket?: string
+    ): Promise<DownloadConfig> => {
+        const cacheKey = bucket ? `${bucket}/${keyOrUrl}` : keyOrUrl;
+        return urlsCache.get(cacheKey, () => resolveDownload(keyOrUrl, bucket));
+    }, [resolveDownload, urlsCache]);
 
     /**
      * Get file as a File object

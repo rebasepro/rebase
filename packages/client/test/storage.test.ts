@@ -306,6 +306,87 @@ alsoNope: null } as any
             expect(mockTransport.request).toHaveBeenCalledTimes(2);
         });
 
+        // A collection view mounts one preview per row, all in the same tick,
+        // and rows share files. Each `/storage/metadata` call is a request
+        // against the user's rate-limit budget.
+        describe("many previews at once", () => {
+            /** A transport whose metadata requests stay open until released, counting them. */
+            function deferredTransport() {
+                const open: { path: string; resolve: () => void }[] = [];
+                let peak = 0;
+                mockTransport.request.mockImplementation(((path: string) => new Promise(resolve => {
+                    open.push({ path, resolve: () => resolve({ data: { token: "t", tokenExpiresIn: 300 } }) });
+                    peak = Math.max(peak, open.filter(r => r.path !== "done").length);
+                })) as unknown as typeof mockTransport.request);
+                return {
+                    open,
+                    get peak() { return peak; },
+                    /** Answer every open request; return how many were answered. */
+                    async drain() {
+                        let answered = 0;
+                        while (open.some(r => r.path !== "done")) {
+                            for (const r of open.filter(r => r.path !== "done")) {
+                                r.resolve();
+                                r.path = "done";
+                                answered++;
+                            }
+                            await new Promise(resolve => setTimeout(resolve, 0));
+                        }
+                        return answered;
+                    }
+                };
+            }
+
+            it("asks once for a file that 50 previews ask for together", async () => {
+                const storage = createStorage(mockTransport);
+                const backend = deferredTransport();
+
+                const all = Promise.all(Array.from({ length: 50 }, () => storage.getSignedUrl("photos/cat.png")));
+                await backend.drain();
+                const configs = await all;
+
+                expect(mockTransport.request).toHaveBeenCalledTimes(1);
+                expect(new Set(configs.map(c => c.url)).size).toBe(1);
+            });
+
+            it("keeps a bounded number of metadata requests open at once", async () => {
+                const storage = createStorage(mockTransport);
+                const backend = deferredTransport();
+
+                const all = Promise.all(Array.from({ length: 100 }, (_, i) => storage.getSignedUrl(`photos/${i}.png`)));
+                await new Promise(resolve => setTimeout(resolve, 0));
+                expect(backend.peak).toBeLessThanOrEqual(8);
+                expect(await backend.drain()).toBe(100);
+                await all;
+                expect(backend.peak).toBeLessThanOrEqual(8);
+            });
+
+            it("forgets the least recently used URL past its cap, so a long session does not grow without bound", async () => {
+                const storage = createStorage(mockTransport);
+                mockTransport.request.mockResolvedValue({ data: { token: "t", tokenExpiresIn: 300 } });
+
+                await storage.getSignedUrl("photos/first.png");
+                for (let i = 0; i < 2_000; i++) await storage.getSignedUrl(`photos/${i}.png`);
+                expect(mockTransport.request).toHaveBeenCalledTimes(2_001);
+
+                // The most recent are still cached; the first was evicted.
+                await storage.getSignedUrl("photos/1999.png");
+                expect(mockTransport.request).toHaveBeenCalledTimes(2_001);
+                await storage.getSignedUrl("photos/first.png");
+                expect(mockTransport.request).toHaveBeenCalledTimes(2_002);
+            });
+
+            it("does not keep a failed lookup: the next call asks again", async () => {
+                const storage = createStorage(mockTransport);
+                const error = Object.assign(new Error("Server Error"), { status: 500 });
+                mockTransport.request.mockRejectedValueOnce(error);
+                await expect(storage.getSignedUrl("photos/flaky.png")).rejects.toThrow("Server Error");
+
+                mockTransport.request.mockResolvedValueOnce({ data: { token: "t", tokenExpiresIn: 300 } });
+                await expect(storage.getSignedUrl("photos/flaky.png")).resolves.toMatchObject({ url: expect.stringContaining("token=t") });
+            });
+        });
+
         it("handles 404 cleanly", async () => {
             const storage = createStorage(mockTransport);
 
