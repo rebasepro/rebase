@@ -10,6 +10,7 @@ import { getTableBindingForProperty } from "./table_bindings";
 import { PropertyPreview } from "../../preview";
 import { getPreviewSizeFrom } from "../../preview/util";
 
+import type { ZodTypeAny } from "zod";
 import { applyValueTransforms, CustomFieldValidator, mapPropertyToZod } from "../../form/validation";
 
 import { EntityTableCell } from "./internal/EntityTableCell";
@@ -44,6 +45,43 @@ export interface PropertyTableCellProps<T> {
     frozen?: boolean;
 }
 
+
+/**
+ * One validation schema per column: keyed by the property object, the
+ * property key and the field validator, and held as long as the property
+ * object is (a WeakMap — a collection that changes brings new property objects
+ * and so new schemas; nothing outlives the collection it was built for).
+ *
+ * The row id is deliberately not part of the key: `mapPropertyToZod` only
+ * threads `entityId` through to nested properties and reads it nowhere, so the
+ * schema built for one row is the schema of every row. It was built per cell
+ * — 600 schemas, 15-28 ms, for a 30-row screen of 20 columns. A rule that
+ * needs the row would have to read it at validation time, not at build time.
+ */
+const columnSchemas = new WeakMap<Property, Map<string, Map<CustomFieldValidator | undefined, ZodTypeAny>>>();
+
+function getColumnSchema(property: Property, propertyKey: string, customFieldValidator?: CustomFieldValidator): ZodTypeAny {
+    let byKey = columnSchemas.get(property);
+    if (!byKey) {
+        byKey = new Map();
+        columnSchemas.set(property, byKey);
+    }
+    let byValidator = byKey.get(propertyKey);
+    if (!byValidator) {
+        byValidator = new Map();
+        byKey.set(propertyKey, byValidator);
+    }
+    let schema = byValidator.get(customFieldValidator);
+    if (!schema) {
+        schema = mapPropertyToZod({
+            property,
+            customFieldValidator,
+            name: propertyKey
+        });
+        byValidator.set(customFieldValidator, schema);
+    }
+    return schema;
+}
 
 export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
     function PropertyTableCell<T, M extends Record<string, any>>({
@@ -97,12 +135,9 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
         const disabledTooltip: string | undefined = typeof property.admin?.disabled === "object" ? property.admin?.disabled.disabledMessage : undefined;
         const disabled = readonly || disabledProp || isDisabled(property);
 
-        const validation = useMemo(() => mapPropertyToZod({
-            property,
-            entityId: entity.id,
-            customFieldValidator,
-            name: propertyKey
-        }), [entity.id, property, propertyKey]);
+        const validation = useMemo(
+            () => getColumnSchema(property, propertyKey, customFieldValidator),
+            [property, propertyKey, customFieldValidator]);
 
         useEffect(
             () => {
@@ -163,6 +198,9 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             }
         };
 
+        // What the cell holds, judged by its column's schema — the only two
+        // things the result depends on. It also re-ran for every new row
+        // object a realtime frame brought, changed or not.
         useEffect(() => {
             validation
                 .safeParseAsync(internalValue)
@@ -173,7 +211,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
                         setValidationError(result.error);
                     }
                 });
-        }, [internalValue, validation, propertyKey, property, entity]);
+        }, [internalValue, validation]);
 
         // Saves the row at once, so only an edit may call it. The table shows
         // what is stored: a disabled property's `clearOnDisabled` belongs to

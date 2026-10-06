@@ -39,12 +39,14 @@ const mockState: {
     cellRendererRuns: number;
     propertyCellRenders: number;
     rowActionRenders: number;
-} = { rows: [], tick: 0, listeners: new Set(), controller: undefined, cellRendererRuns: 0, propertyCellRenders: 0, rowActionRenders: 0 };
+    schemasBuilt: number;
+} = { rows: [], tick: 0, listeners: new Set(), controller: undefined, cellRendererRuns: 0, propertyCellRenders: 0, rowActionRenders: 0, schemasBuilt: 0 };
 
 function mockResetCounts() {
     mockState.cellRendererRuns = 0;
     mockState.propertyCellRenders = 0;
     mockState.rowActionRenders = 0;
+    mockState.schemasBuilt = 0;
 }
 
 /** Re-render the collection view with every value it reads unchanged. */
@@ -157,6 +159,17 @@ const mockUrlController = {
     buildUrlCollectionPath: (path: string) => `/c/${path}`,
     navigate: () => undefined
 };
+jest.mock("../../src/form/validation", () => {
+    const actual = jest.requireActual("../../src/form/validation") as Record<string, unknown>;
+    const mapPropertyToZod = actual.mapPropertyToZod as (...args: unknown[]) => unknown;
+    return {
+        ...actual,
+        mapPropertyToZod: (...args: unknown[]) => {
+            mockState.schemasBuilt++;
+            return mapPropertyToZod(...args);
+        }
+    };
+});
 jest.mock("../../src/hooks/useAdminContext", () => ({ useAdminContext: () => mockAdminContext }));
 jest.mock("../../src/hooks/useSidePanel", () => ({ useSidePanel: () => mockSidePanel }));
 jest.mock("../../src/hooks/useChildViewSource", () => ({ useChildViewSource: () => undefined }));
@@ -359,5 +372,19 @@ describe("the collection table draws again only what changed", () => {
             window.addEventListener = realAdd;
             window.getComputedStyle = realGetComputedStyle;
         }
+    });
+
+    /**
+     * A cell's validation schema depends on its property, not on its row: it
+     * was built once per cell, ~0.5 ms per row scrolled in.
+     */
+    it("a screen of rows builds one validation schema per column, not one per cell", async () => {
+        let view!: ReturnType<typeof render>;
+        await act(async () => {
+            view = render(<View/>);
+        });
+        expect(mockState.propertyCellRenders).toBeGreaterThan(200);
+        expect(mockState.schemasBuilt).toBeLessThanOrEqual(Object.keys(properties).length);
+        view.unmount();
     });
 });
