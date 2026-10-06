@@ -72,6 +72,13 @@ interface MultiSelectProps<T extends MultiSelectValue = string> {
      * the cell that clips it, and the list belongs under what can be seen.
      */
     anchorRef?: React.RefObject<HTMLElement | null>,
+    /**
+     * Replaces everything the trigger draws — the values, the box, its
+     * padding, its height and the chevron — with this node. For a caller that
+     * frames the select itself: a table cell passes the preview it shows at
+     * rest, so selecting the cell moves nothing.
+     */
+    triggerContent?: React.ReactNode,
     children: React.ReactNode;
     renderValues?: (values: T[]) => React.ReactNode;
     portalContainer?: HTMLElement | null;
@@ -121,6 +128,7 @@ export const MultiSelect = React.forwardRef<
             invisible,
             chevron = true,
             anchorRef,
+            triggerContent,
             disabled,
             placeholder,
             modalPopover = true,
@@ -255,6 +263,8 @@ export const MultiSelect = React.forwardRef<
             onItemClick
         }), [selectedValues, onItemClick]);
 
+        const bare = triggerContent !== undefined;
+
         return (
             <MultiSelectContext.Provider value={contextValue}>
 
@@ -271,7 +281,9 @@ export const MultiSelect = React.forwardRef<
                             disabled={disabled}
                             aria-label={ariaLabel ?? (typeof label === "string" ? label : undefined)}
                             onClick={handleTogglePopover}
-                            className={cls(
+                            className={bare
+                                ? cls("relative flex items-center w-full text-start select-none outline-none focus:outline-none focus-visible:outline-none", className, inputClassName)
+                                : cls(
                                 // The control height, plus the 1px hairline on
                                 // each side when the field has one. `TextField`,
                                 // `Select` and `DateTimeField` set the height on
@@ -310,7 +322,7 @@ export const MultiSelect = React.forwardRef<
                                 inputClassName
                             )}
                         >
-                            {selectedValues.length > 0 ? (
+                            {bare ? triggerContent : selectedValues.length > 0 ? (
                                 <div className="flex justify-between items-center w-full">
                                     <div className="flex flex-wrap items-center gap-1.5 text-start">
                                         {renderValues && renderValues(selectedValues)}

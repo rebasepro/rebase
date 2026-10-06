@@ -196,10 +196,11 @@ export function getTableBindingForProperty(
                 opener: "dropdown"
             };
         } else if (stringProperty.admin?.markdown || !stringProperty.storage) {
-            const multiline = Boolean(stringProperty.admin?.multiline) || Boolean(stringProperty.admin?.markdown);
+            const markdown = Boolean(stringProperty.admin?.markdown);
+            const multiline = Boolean(stringProperty.admin?.multiline) || markdown;
             return {
-                Component: ({ error, validationError, disabled, selected, internalValue, updateValue }: TableFieldBindingProps) => (
-                    <VirtualTableInput
+                Component: ({ error, validationError, disabled, selected, internalValue, updateValue }: TableFieldBindingProps) => {
+                    const input = <VirtualTableInput
                         error={validationError ?? error}
                         disabled={disabled}
                         multiline={multiline}
@@ -207,8 +208,12 @@ export function getTableBindingForProperty(
                         value={internalValue as string}
                         // An emptied cell is NULL, as an emptied form field is.
                         updateValue={(value) => updateValue(value === "" ? null : value)}
-                    />
-                ),
+                    />;
+                    // A cell draws markdown as `prose-sm`, on a 24px line. The
+                    // source is edited on that line too, so a paragraph stays
+                    // where it was when the cell is selected.
+                    return markdown ? <div className={"flex w-full leading-6"}>{input}</div> : input;
+                },
                 allowScroll: true
             };
         }

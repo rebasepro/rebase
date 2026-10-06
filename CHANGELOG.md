@@ -369,6 +369,11 @@
   `onCloseAutoFocus`; `BooleanSwitch` accepts `aria-label`, `aria-labelledby`
   and `id`.
 
+- **`Select` and `MultiSelect` accept `triggerContent`,** a node that replaces
+  everything the trigger draws: the value, the box, its padding, its height
+  and the chevron. It is for a caller that frames the select itself, as a
+  table cell does. `RelationSelector` and `UserSelector` already took it.
+
 #### Server & REST
 
 - **`REBASE_HSTS_INCLUDE_SUBDOMAINS`** opts back into the old
@@ -897,6 +902,16 @@
   ignores as a whole, it walks every directory.
 
 #### Admin (CMS & app)
+
+- **Selecting a table cell no longer moves its value.** An enum's chip
+  dropped 3px when its cell was selected, and an enum array's chips 2.5px,
+  because the select inside the cell kept the height of a form field, which
+  is taller than a row's line. A number jumped 4px and switched from the mono,
+  tabular figures it shows at rest to the text font. A markdown paragraph
+  moved 2px, because its source was edited on a shorter line than the one it
+  is drawn on. All four now stay exactly where they were, at every row
+  height. Markdown with headings or lists still shows its source while it is
+  edited.
 
 - **The admin panel no longer sends requests on page load that it knows
   will be refused.** For a user without the `schema:read` scope, every load

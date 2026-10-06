@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { useDebouncedCallback } from "../../../hooks/useDebouncedCallback";
 import { cls } from "../../../util";
 import { focusedDisabled } from "../../../styles";
-import { TextField } from "../../TextField";
 
 export function VirtualTableNumberInput(props: {
     error?: Error;
@@ -53,15 +52,16 @@ export function VirtualTableNumberInput(props: {
 
     const regexp = /^-?[0-9]+[,.]?[0-9]*$/;
 
+    // A bare input, not a `TextField`: the cell frames it, and a field's box
+    // is taller than a row's line, so the value jumped as the cell was
+    // selected. The number at rest is a line of mono, tabular figures in the
+    // cell's type; this is that same line, so selecting the cell moves nothing.
     return (
-        <TextField
-            inputRef={inputRef}
-            invisible={true}
+        <input
+            ref={inputRef}
             disabled={disabled}
-            size="small"
-            className="w-full"
-            inputClassName={cls("p-0 m-0 bg-transparent border-none outline-hidden font-normal leading-normal text-unset", focusedDisabled)}
-            inputStyle={{ textAlign: align }}
+            className={cls("w-full p-0 m-0 bg-transparent border-none outline-none font-mono tabular-nums", focusedDisabled)}
+            style={{ textAlign: align }}
             value={internalValue ?? ""}
             onChange={(evt) => {
                 const newValue = evt.target.value.replace(",", ".");

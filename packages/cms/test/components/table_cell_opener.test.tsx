@@ -4,7 +4,7 @@
 import React from "react";
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { BooleanProperty, DateProperty, Entity, Property, StringProperty } from "@rebasepro/types";
+import type { ArrayProperty, BooleanProperty, DateProperty, Entity, NumberProperty, Property, StringProperty } from "@rebasepro/types";
 import type { SelectedCellProps } from "@rebasepro/cms-types";
 import type { DataCollectionTableController } from "@rebasepro/app";
 
@@ -168,6 +168,53 @@ describe("a picker cell", () => {
         // The trigger inside draws none of its own: the opener is the chevron.
         expect(container.querySelectorAll("svg.lucide-chevron-down")).toHaveLength(1);
         expect(container.querySelector("[data-table-cell-opener]")?.className).toContain("opacity-100");
+    });
+});
+
+describe("a selected cell", () => {
+
+    // A field's box is taller than a row's line, and the cell had to fit it:
+    // selecting an enum dropped its chip 3px, and a number jumped 4px and
+    // changed font. The editors in a cell bring no control height of their own.
+    function controlHeights(container: HTMLElement): string[] {
+        return Array.from(container.querySelectorAll("[class*='min-h-']"))
+            .filter((element) => !element.closest("[data-table-cell-opener]"))
+            .map((element) => element.getAttribute("class") ?? "");
+    }
+
+    const tagsProperty: ArrayProperty = { type: "array", name: "Tags", of: statusProperty };
+    const priceProperty: NumberProperty = { type: "number", name: "Price" };
+
+    it.each<[string, Property, unknown]>([
+        ["an enum", statusProperty, "draft"],
+        ["an enum array", tagsProperty, ["draft", "published"]],
+        ["a number", priceProperty, 12]
+    ])("of %s mounts an editor with no height of its own", (_, property, value) => {
+        const { container, select } = renderCell(property, value);
+        select();
+        expect(container.querySelector("button, input")).toBeTruthy();
+        expect(controlHeights(container)).toEqual([]);
+    });
+
+    it("of an enum shows its chip in a block of its own, not on the value slot's text line", () => {
+        const { select } = renderCell(statusProperty, "draft");
+        select();
+        // Radix's value slot is an inline span: a chip placed in it straight
+        // sits on a baseline, and the slot stands a pixel taller than the chip.
+        const chip = screen.getByText("Draft");
+        const slot = chip.closest("button span");
+        expect(slot?.firstElementChild?.tagName).toBe("DIV");
+        expect(slot?.firstElementChild?.className).toContain("flex");
+    });
+
+    it("of a number edits it in the mono, tabular figures it shows at rest", () => {
+        const { container, select } = renderCell(priceProperty, 12);
+        expect(container.querySelector(".font-mono.tabular-nums")?.textContent).toBe("12");
+        select();
+        const input = container.querySelector("input");
+        expect(input?.value).toBe("12");
+        expect(input?.className).toContain("font-mono");
+        expect(input?.className).toContain("tabular-nums");
     });
 });
 

@@ -47,6 +47,13 @@ export type SelectProps<T extends SelectValue = string> = {
      * the cell draws one opener for every kind of editor, in the same place.
      */
     chevron?: boolean,
+    /**
+     * Replaces everything the trigger draws — the value, the box, its padding,
+     * its height and the chevron — with this node. For a caller that frames
+     * the select itself: a table cell passes the preview it shows at rest, so
+     * selecting the cell moves nothing.
+     */
+    triggerContent?: React.ReactNode,
     children?: React.ReactNode;
     dataType?: "string" | "number" | "boolean";
     portalContainer?: HTMLElement | null; // Explicitly added to props type if missing
@@ -85,6 +92,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
     endAdornment,
     invisible,
     chevron = true,
+    triggerContent,
     children,
     dataType = "string",
     portalContainer: manualContainer, // Rename to avoid confusion
@@ -153,6 +161,19 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
         return value !== undefined && renderValue ? renderValue(value) : emptyItem.props.children;
     }, [children, renderValue, stringValue, value]);
 
+    const bare = triggerContent !== undefined;
+    // Radix's value slot is an inline `span` that drops the class it is
+    // given, so a chip inside it sits on a text baseline and the slot stands
+    // a pixel taller than the chip. A block of its own takes it off the line.
+    const bareContent = bare ? <div className={"flex w-full"}>{triggerContent}</div> : undefined;
+
+    const controlHeight = {
+        "min-h-[28px]": size === "smallest",
+        "min-h-[32px]": size === "small",
+        "min-h-[40px]": size === "medium",
+        "min-h-[48px]": size === "large"
+    };
+
     return (
         <SelectPrimitive.Root
             name={name}
@@ -167,17 +188,15 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
             {...props}>
             {typeof label === "string" ? <SelectInputLabel error={error}>{label}</SelectInputLabel> : label}
             <div className={cls(
-                "select-none rounded-lg text-sm",
-                invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
+                "select-none",
+                !bare && "rounded-lg text-sm",
+                !bare && (invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin),
                 // An invisible field has no hover fill of its own: whatever frames it (a table cell) carries the hover.
-                disabled ? fieldBackgroundDisabledMixin : (invisible ? "" : fieldBackgroundHoverMixin),
+                !bare && (disabled ? fieldBackgroundDisabledMixin : (invisible ? "" : fieldBackgroundHoverMixin)),
                 "relative flex items-center",
                 className,
+                !bare && controlHeight,
                 {
-                    "min-h-[28px]": size === "smallest",
-                    "min-h-[32px]": size === "small",
-                    "min-h-[40px]": size === "medium",
-                    "min-h-[48px]": size === "large",
                     "w-fit": !fullWidth,
                     "w-full": fullWidth
                 }
@@ -198,23 +217,23 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                     aria-invalid={error || undefined}
                     className={cls(
                         "h-full",
-                        padding ? {
+                        padding && !bare ? {
                             "px-4": size === "large",
                             "px-3": size === "medium",
                             "px-2": size === "small" || size === "smallest"
                         } : "",
                         "outline-hidden focus:outline-hidden",
                         "outline-none focus:outline-none",
-                        "select-none rounded-lg text-sm",
-                        error ? "text-red-500 dark:text-red-600" : "focus:text-text-primary dark:focus:text-text-primary-dark",
-                        error ? "border border-red-500 dark:border-red-600" : "",
-                        disabled ? "text-surface-accent-600 dark:text-surface-accent-400" : "text-surface-accent-800 dark:text-white",
+                        "select-none",
+                        !bare && [
+                            "rounded-lg text-sm",
+                            error ? "text-red-500 dark:text-red-600" : "focus:text-text-primary dark:focus:text-text-primary-dark",
+                            error ? "border border-red-500 dark:border-red-600" : "",
+                            disabled ? "text-surface-accent-600 dark:text-surface-accent-400" : "text-surface-accent-800 dark:text-white",
+                            controlHeight
+                        ],
                         "relative flex flex-row items-center",
                         {
-                            "min-h-[28px]": size === "smallest",
-                            "min-h-[32px]": size === "small",
-                            "min-h-[40px]": size === "medium",
-                            "min-h-[48px]": size === "large",
                             "w-full": fullWidth,
                             "w-fit": !fullWidth
                         },
@@ -226,30 +245,25 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                         className={cls(
                             "flex-grow max-w-full flex flex-row gap-2 items-center",
                             "overflow-visible",
-                            {
-                                "min-h-[28px]": size === "smallest",
-                                "min-h-[32px]": size === "small",
-                                "min-h-[40px]": size === "medium",
-                                "min-h-[48px]": size === "large"
-                            }
+                            !bare && controlHeight
                         )}>
                         <SelectPrimitive.Value
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
                             }}
-                            placeholder={emptyItemDisplay ?? placeholder}
+                            placeholder={bareContent ?? emptyItemDisplay ?? placeholder}
                             className={"w-full"}>
 
-                            {hasValue && value !== undefined && renderValue
+                            {bareContent ?? (hasValue && value !== undefined && renderValue
                                 ? renderValue(value)
                                 : (displayChildren || placeholder)
-                            }
+                            )}
 
                         </SelectPrimitive.Value>
                     </div>
 
-                    {chevron && <SelectPrimitive.Icon asChild>
+                    {chevron && !bare && <SelectPrimitive.Icon asChild>
                         <ChevronDownIcon size={size === "large" ? iconSize.medium : iconSize.small}
                             className={cls("transition", open ? "rotate-180" : "", {
                                 "px-2": size === "large",

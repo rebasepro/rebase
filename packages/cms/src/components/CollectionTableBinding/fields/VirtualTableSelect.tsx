@@ -73,14 +73,11 @@ export function VirtualTableSelect(props: {
 
     const resolvedEnumValues = resolveEnumValues(enumValues);
 
-    const renderValue = (enumKey?: string | number) => {
-        if (preview !== undefined) return preview;
-        return <EnumValuesChip
-            key={`${enumKey}`}
-            enumKey={String(enumKey)}
-            enumValues={enumValues}
-            size={small ? "small" : "medium"}/>;
-    };
+    const renderValue = (enumKey?: string | number) => <EnumValuesChip
+        key={`${enumKey}`}
+        enumKey={String(enumKey)}
+        enumValues={enumValues}
+        size={small ? "small" : "medium"}/>;
 
     // When the dropdown closes (including on escape), restore focus to the trigger
     const handleOpenChange = useCallback((nextOpen: boolean) => {
@@ -98,20 +95,18 @@ export function VirtualTableSelect(props: {
             ? <MultiSelect
                 invisible={true}
                 inputRef={ref}
-                // No padding and no chevron of its own: the cell pads it and
-                // draws the opener, so the chips sit where they sit at rest.
-                // The smallest control height, so it fits a text row's cell.
+                // The trigger is the preview the cell shows at rest, with no
+                // box, padding, height or chevron of its own: the cell pads it
+                // and draws the opener, so the chips sit where they sit at rest.
+                triggerContent={preview}
                 size={"smallest"}
                 className="w-full h-full p-0 bg-transparent outline-none"
                 position={"item-aligned"}
                 disabled={disabled}
                 includeClear={false}
-                chevron={preview === undefined}
                 anchorRef={anchorRef}
                 useChips={false}
                 open={open}
-                renderValues={preview !== undefined ? () => preview : undefined}
-                placeholder={preview}
                 value={validValue
                     ? ((internalValue as (string | number)[]).map(v => v.toString()))
                     : ([])}
@@ -139,14 +134,14 @@ export function VirtualTableSelect(props: {
                 inputClassName="ring-0 ring-offset-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-offset-0"
                 position={"item-aligned"}
                 disabled={disabled}
+                // As above: the preview, exactly where it sits at rest.
+                triggerContent={preview}
                 padding={false}
                 size={"smallest"}
-                chevron={preview === undefined}
                 open={open}
                 value={validValue
                     ? internalValue?.toString()
                     : ""}
-                placeholder={preview}
                 onValueChange={onChange}
                 onOpenChange={handleOpenChange}
                 renderValue={renderValue}>
