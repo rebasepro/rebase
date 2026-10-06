@@ -95,6 +95,23 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100
 GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 ```
 
+#### Saltare il conteggio
+
+`meta.total` è un `COUNT(*)` su ogni riga che la query trova, eseguito accanto alla pagina — e su una
+tabella grande costa più della pagina stessa. Una lettura che si limita a procedere in avanti non ne ha
+mai bisogno, perché `meta.hasMore` non ne dipende: passa `count: "none"` e la lettura chiede invece una
+riga oltre la pagina.
+
+```typescript
+const { data, meta } = await client.data.orders.find({ limit: 100, count: "none" });
+meta.hasMore; // exact
+```
+
+Senza conteggio non c'è alcun totale da riportare: su HTTP `meta.total` è assente, e in-process corrisponde
+alle righe fino alla fine della pagina (`offset` più la pagina). Su HTTP si usa `?count=none`;
+`?count=exact` è il valore predefinito, e qualsiasi altro valore è un 400 `INVALID_COUNT`. `iterate()` e
+`findAll()` lo inviano da soli a ogni pagina, dato che uno scorrimento non riporta alcun totale.
+
 #### Quali letture sono incapsulate e quali no
 
 Due strutture e una regola: **una finestra è incapsulata, una risposta completa no.**
@@ -147,25 +164,29 @@ Tre opzioni configurano lo scorrimento:
 | Opzione | Predefinito | Cosa fa |
 |---------|-------------|---------|
 | `pageSize` | 200 | Righe per richiesta. |
-| `cursor` | — | Cerca su una colonna invece di paginare tramite offset. Vedi sotto. |
+| `cursor` | — | Richiede la ricerca: genera un errore invece di ripiegare sull'offset. Vedi sotto. |
 | `maxPages` | 10 000 | Limite massimo di richieste, per evitare che un server che restituisce continuamente `hasMore` rimanga bloccato in un ciclo infinito. |
 | `maxRows` | 10 000 | Solo per `findAll()`. Il superamento del limite **genera un errore** invece di restituire un array troncato come se fosse la risposta completa. Passa `Infinity` per disattivarlo, oppure usa `iterate()`. |
 
-**Preferisci `cursor` ogni volta che la collezione ha una colonna univoca e ordinabile.**
-La paginazione basata su offset ricalcola le righe a ogni richiesta, quindi una riga inserita o eliminata
-*durante l'esecuzione dello scorrimento* sposta la finestra e lo scorrimento salta o ripete
-silenziosamente delle righe. La ricerca richiede righe strettamente successive all'ultima visualizzata,
-che le scritture concorrenti precedenti al cursore non possono spostare:
+**Lo scorrimento cerca da solo.** Dopo la prima pagina restituisce
+[il cursore del server](#paginazione-con-cursore) — `meta.nextCursor` — come `after`, quindi ogni richiesta
+chiede righe strettamente successive all'ultima visualizzata. Le scritture concorrenti precedenti a quella
+riga non possono spostare la finestra, e il database non deve mai saltare righe per conteggio, ed è questo
+che rendeva lenti i lunghi scorrimenti con offset: ogni pagina costava più della precedente.
+
+Dove il server non emette alcun cursore — una ricerca ordinata per rilevanza, una ricerca vettoriale, una
+lettura `distinct`, una proiezione `fields` che esclude un campo di ordinamento — lo scorrimento pagina
+invece tramite offset, e una riga inserita o eliminata *durante l'esecuzione dello scorrimento* può
+causarne il salto o la ripetizione. Passa `cursor` per rendere la ricerca un requisito anziché una
+preferenza:
 
 ```typescript
 for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
 ```
 
-In questo contesto, `cursor` significa "cerca invece di paginare tramite offset" e specifica la colonna in base alla quale
-ordinare quando la query non lo dichiara già. La ricerca stessa è
-[il cursore del server](#paginazione-con-cursore): lo scorrimento restituisce `meta.nextCursor` come
-`after` e non costruisce alcun confronto autonomamente, motivo per cui funziona anche un ordinamento
-a più chiavi —
+`cursor` specifica la colonna in base alla quale ordinare quando la query non lo dichiara già, e trasforma
+il ripiego sull'offset in un errore. Lo scorrimento non costruisce alcun confronto autonomamente, motivo
+per cui funziona anche un ordinamento a più chiavi —
 
 ```typescript
 for await (const job of client.data.jobs.iterate({
@@ -177,10 +198,10 @@ for await (const job of client.data.jobs.iterate({
 — e per cui funziona anche una chiave di ordinamento nullable.
 
 L'ordinamento deve comunque essere **totale**, il che in pratica significa univoco: l'ID di riga
-risolve l'eventuale parità finale, quindi qualsiasi colonna funziona come criterio di spareggio, ma uno scorrimento il cui
-cursore smette di avanzare genera l'errore `cursor-stalled` invece di andare in loop infinito. Una
-query che nessun cursore può descrivere (rilevanza) genera `cursor-missing`; rimuovi `cursor`
-e pagina tramite offset.
+risolve l'eventuale parità finale, quindi qualsiasi colonna funziona come criterio di spareggio. Dato
+`cursor`, uno scorrimento il cui cursore smette di avanzare genera l'errore `cursor-stalled` invece di
+andare in loop infinito, e una query che nessun cursore può descrivere (rilevanza) genera
+`cursor-missing`; rimuovi `cursor` e lo scorrimento pagina queste tramite offset.
 
 ## Vedi anche
 

@@ -364,6 +364,9 @@ all'esterno.
 
 L'[endpoint remoto](#lendpoint-remoto) racchiude allo stesso modo i risultati dei
 suoi tool e lo comunica al client; il suo `structuredContent` trasporta il risultato puro.
+<span class="since-badge" data-since="0.24">Da 0.24</span> `list_collections` fa eccezione:
+il suo elenco lo legge solo un modello, quindi viene inviato una sola volta, nel testo.
+Prima della 0.24 portava anche una copia in `structuredContent`.
 
 Si tratta di un marcatore, non di una sandbox. Un assistente provvisto di questi tool è sicuro
 tanto quanto i contenuti che gli viene consentito di leggere.

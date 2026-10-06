@@ -77,7 +77,7 @@ cosa scritta dal tuo codice server va controllata nel codice che la scrive.
 |------|------|-------------|
 | `required` | `boolean` | Il valore deve essere presente |
 | `requiredMessage` | `string` | Cosa mostra il modulo quando non è presente. **Solo modulo di amministrazione — non applicato dall'API o dal database.** |
-| `unique` | `boolean` | Solo una riga nella tabella può contenere questo valore |
+| `unique` | `boolean` | Solo una riga nella tabella può contenere questo valore. Il modulo di amministrazione lo controlla anche quando salva un valore che la modifica ha cambiato, così un duplicato viene segnalato sul suo campo prima della scrittura |
 | `uniqueInArray` | `boolean` | Solo una voce *per array* può contenerlo. Si applica a un figlio diretto di una proprietà `array`, o a un figlio di primo livello di una `map` al suo interno. **Solo modulo di amministrazione — non applicato dall'API o dal database.** |
 
 ### Stringhe

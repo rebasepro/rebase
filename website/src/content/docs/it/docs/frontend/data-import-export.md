@@ -61,7 +61,7 @@ Un file esportato da una collezione si reimporta con gli stessi valori, in CSV c
 
 L'anteprima elenca ogni cella che non si converte, per colonna, con il numero di celle e le prime per riga e motivo. Quelle celle vengono lasciate vuote nelle righe importate; nulla viene trasformato in `0`, `false` o un valore vuoto senza essere elencato. Torna indietro per mappare la colonna su un'altra proprietà, oppure correggi il file e caricalo di nuovo.
 
-Le regole della collezione stessa — campi obbligatori, opzioni enum, valori unici — vengono verificate dal server mentre le righe vengono scritte, 25 righe alla volta. Se una riga viene rifiutata, l'importazione si interrompe e la indica; le righe precedenti sono già salvate, e **Retry** riprende dalla riga rifiutata.
+Le regole della collezione stessa — campi obbligatori, opzioni enum, valori unici — vengono verificate dal server mentre le righe vengono scritte, in lotti fino a 500 righe (meno quando le righe sono larghe, così una richiesta resta sotto circa 1 MB). Un lotto viene salvato per intero o per nulla. Se una riga viene rifiutata, l'importazione si interrompe e la indica; i lotti precedenti sono già salvati, e **Retry** riprende dalla prima riga del lotto della riga rifiutata.
 
 ### Creare una collezione da un file
 

@@ -69,7 +69,8 @@ FROM rebase.jobs WHERE status = 'failed'
 ORDER BY updated_at DESC;
 ```
 
-Le righe con esito negativo vengono conservate per 30 giorni; quelle riuscite per 3.
+Le righe con esito negativo vengono conservate per 30 giorni; quelle riuscite per 3. Ogni worker elimina
+le righe scadute quando si avvia e poi ogni ora, a lotti, fuori dal percorso delle richieste.
 
 ## Cosa succede quando un worker si arresta
 

@@ -344,7 +344,9 @@ schema `auth` precedente alla 1.0 viene comunque verificato.
 La forma corretta del controllo precedente — `rebase.uid() IS NOT NULL AND rebase.uid() <>
 'anonymous'` — e il punto in cui molti si fermano. Esclude i chiamanti non autenticati, ma
 non circoscrive le righe: il risultato è che *ogni account registrato può leggere ogni riga di
-questa tabella*, che è un'affermazione diversa da quella solitamente intesa.
+questa tabella*, che è un'affermazione diversa da quella solitamente intesa. In un progetto Rebase è una regola
+la cui `condition` è `policy.authenticated()` e nient'altro, che il database memorizza come
+`rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])`.
 
 Questo è il pattern che trasforma una tabella `users` in un elenco di tutti gli indirizzi della
 piattaforma, leggibile da chiunque si sia registrato — e nei casi in cui la registrazione è aperta, "chiunque si sia

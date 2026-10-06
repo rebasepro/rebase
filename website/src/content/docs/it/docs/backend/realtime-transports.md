@@ -30,8 +30,19 @@ Quando un record viene modificato sull'Istanza A, trasmette una notifica sul can
 
 *Nota: `sid` rappresenta l'ID istanza casuale univoco del server generato all'avvio, `p` è lo slug (path) della collection ed `eid` è l'ID dell'entità di destinazione.*
 
+Le modifiche fatte nello stesso istante — un salvataggio in blocco annuncia ogni riga che ha scritto — partono insieme, in tante notifiche quante ne entrano nel limite di 8000 byte di NOTIFY di Postgres, ciascuna con l'elenco delle sue modifiche come triple `[p, eid, db]`:
+
+```json
+{
+  "sid": "inst_7a9c1b",
+  "c": [["posts", "45", null], ["posts", "46", null]]
+}
+```
+
+Una singola modifica mantiene la forma qui sopra, così un'istanza più vecchia la legge ancora durante un rolling deploy.
+
 - **Auto-filtraggio**: Alla ricezione di un messaggio, ciascuna istanza legge il `sid`. Se corrisponde al proprio ID istanza, il server scarta la notifica per evitare loop infiniti di routing.
-- **Relay e Fan-out**: Se la notifica proviene da un'altra istanza, il server pianifica un refetch con debounce e trasmette l'aggiornamento ai suoi sottoscrittori WebSocket connessi localmente.
+- **Relay e Fan-out**: Se la notifica proviene da un'altra istanza, il server pianifica un refetch con debounce per i suoi sottoscrittori connessi localmente a ciascuna modifica. Alla ricezione non legge nulla: ogni frame è un refetch nell'ambito del proprio sottoscrittore.
 - **Ciclo di riconnessione del supervisore**: Se la connessione al database si interrompe, un supervisore della connessione in background monitora lo stato e attiva una sequenza di riconnessione automatica dopo un ritardo fisso di **3 secondi**, ripristinando il loop di `LISTEN` senza influire sul ciclo di vita dell'applicazione Hono principale. Poi ogni sottoscrizione attiva dell'istanza viene riletta, perché ciò che è stato pubblicato mentre la connessione era caduta non ha raggiunto nessuno. Se il database non è raggiungibile all'avvio, la connessione viene ritentata nello stesso modo.
 - **Heartbeat**: Una connessione `LISTEN` è inattiva per natura, e il timeout di inattività di un load balancer o di un NAT può interromperla senza errori da nessuna delle due parti (una connessione semiaperta). Per questo funziona con il keepalive TCP e deve rispondere a un `SELECT 1` ogni 30 secondi, entro 10 secondi. Una connessione che non risponde viene sostituita come sopra. Finché la connessione è caduta, `/health` la elenca come `cross-instance`, e dopo 60 secondi di interruzione il controllo fallisce.
 

@@ -148,7 +148,7 @@ Una modifica non viaggia mai verso un sottoscrittore sotto forma di dati. Viaggi
 
 1. **Invalidazione.** Quando un'entità cambia (creata, aggiornata, eliminata), il server contrassegna i percorsi interessati. La riga che è stata scritta non viene inoltrata — è stata letta con l'autorizzazione di chi scrive, che non dice nulla su ciò che un qualsiasi sottoscrittore è autorizzato a visualizzare.
 
-2. **Refetch RLS con debounce.** Dopo **300ms** (`REFETCH_DEBOUNCE_MS`), il server riesegue il fetch della collezione con i filtri e l'ordinamento originali. La query viene eseguita all'interno di una transazione che imposta `app.user_id` e `app.user_roles` a livello di transazione in base al `SubscriptionAuthContext` del sottoscrittore, in modo che Postgres valuti la Row-Level Security sotto l'identità di quel client e solo le righe che è autorizzato a visualizzare vengano inviate nel `collection_update`. Il debounce unifica inoltre una raffica di scritture in un'unica query.
+2. **Refetch RLS con debounce.** Dopo **300ms** (`REFETCH_DEBOUNCE_MS`), il server riesegue il fetch della collezione con i filtri e l'ordinamento originali. La query viene eseguita all'interno di una transazione che imposta `app.user_id` e `app.user_roles` a livello di transazione in base al `SubscriptionAuthContext` del sottoscrittore, in modo che Postgres valuti la Row-Level Security sotto l'identità di quel client e solo le righe che è autorizzato a visualizzare vengano inviate nel `collection_update`. Il debounce unifica inoltre una raffica di scritture in un'unica query. Attende 300 ms senza ulteriori modifiche, ma mai più di **1 s** (`REFETCH_MAX_WAIT_MS`) dopo la prima, così una collection scritta più volte al secondo invia comunque ai suoi sottoscrittori un frame almeno una volta al secondo.
 
 Le versioni precedenti inviavano un `collection_patch` immediato contenente la riga scritta prima di questo refetch, per un feedback cross-tab inferiore al millisecondo. Quella riga era stata letta nell'ambito dei permessi di chi scriveva, quindi poteva — ed è successo — raggiungere sottoscrittori le cui policy l'avrebbero vietata, e neanche il filtro `where` della sottoscrizione stessa veniva applicato ad essa. La patch è stata rimossa: la latenza percepita per un aggiornamento è ora la finestra di debounce.
 
@@ -188,30 +188,34 @@ aperti:
 - Le sottoscrizioni che pongono la stessa domanda (stesso percorso, filtri,
   ordinamento, pagina, `include`, `fields`, ricerca) come lo stesso principal
   (stesso id utente, ruoli, flag guest e claim) condividono un unico refetch.
-  Una scrittura su un elenco costa **una lettura e un conteggio per ciascun
-  gruppo di questo tipo**, indipendentemente da quanti socket lo mantengano;
-  ogni membro riceve comunque un frame costruito da righe lette sotto quella
-  identità.
+  Una scrittura su un elenco costa **una transazione per ciascun gruppo di
+  questo tipo** — la lettura e il suo conteggio — indipendentemente da quanti
+  socket lo mantengano; ogni membro riceve comunque un frame costruito da righe
+  lette sotto quella identità. Una prima pagina che torna più corta del proprio
+  `limit` è l'intero insieme, quindi non viene conteggiata affatto.
 - Una sottoscrizione a un singolo record viene interrogata solo quando il suo
   stesso record cambia.
 - Principal diversi non condividono mai una lettura — è questo che impedisce
   a un frame di trasportare una riga che il suo lettore non può vedere. Un
   elenco osservato da mille utenti autenticati diversi corrisponde a mille
-  letture e mille conteggi per ogni scrittura su di esso.
+  letture e mille conteggi per ogni scrittura su di esso, in mille transazioni.
 
 Misurato su un laptop rispetto a un PostgreSQL locale con un pool di 20
 connessioni, una scrittura su un elenco:
 
 | Sottoscrittori | Transazioni per la scrittura | Ultimo frame dopo la scrittura |
 |-------------|----------------------------|----------------------------|
-| 1.000, un solo principal | 4 | ~350 ms |
-| 1.000, ciascuno un principal diverso | ~2.000 | ~700 ms |
+| 1.000, un solo principal | 2 | ~310 ms |
+| 1.000, ciascuno un principal diverso | ~1.000 | ~600 ms |
 
 300 ms di ciascuno sono il debounce. La seconda riga è il limite massimo da
-pianificare: i refetch si accodano sullo stesso pool del tuo traffico REST,
-quindi una collection scritta più volte al secondo mentre **centinaia di
-utenti diversi** osservano lo stesso elenco è il punto in cui il realtime
-comincia a competere con le richieste. Oltre quella soglia, preferisci
+pianificare. I refetch girano sullo stesso pool del tuo traffico REST, ma al
+massimo su un quarto delle sue connessioni alla volta (5 delle 20 predefinite,
+mai meno di 2); le altre attendono il proprio turno nel server, quindi il
+fan-out di una scrittura ritarda i propri frame anziché le tue richieste. Una
+collection scritta più volte al secondo mentre **centinaia di utenti diversi**
+osservano lo stesso elenco è il punto in cui quei frame cominciano ad
+accumulare ritardo. Oltre quella soglia, preferisci
 sottoscrizioni più ristrette (una pagina, un filtro sulle righe proprie
 dell'utente) oppure un [canale di broadcast](#canali-di-broadcast) che
 trasporta la modifica, lasciando che i client eseguano il refetch secondo i
@@ -372,7 +376,7 @@ La presence tiene traccia di quali utenti sono attualmente online in un canale e
 | `presence_state`  | Server → Client | Entità completa di tutte le presenze in un canale    |
 | `presence_diff`   | Server → Client | Aggiornamento incrementale (ingressi e uscite)       |
 
-Quando un client invia `presence_track`, il server lo unisce automaticamente al canale (senza necessità di una chiamata separata a `join_channel`) e trasmette in broadcast un `presence_diff` a tutti i membri del canale.
+Quando un client invia `presence_track`, il server lo unisce automaticamente al canale (senza necessità di una chiamata separata a `join_channel`) e trasmette in broadcast un `presence_diff` a tutti i membri del canale. L'SDK rinvia il proprio stato ogni ~20 secondi come heartbeat; un heartbeat il cui stato è invariato aggiorna soltanto il timeout del client e non invia alcun `presence_diff`.
 
 ```typescript
 // Track presence

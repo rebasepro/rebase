@@ -53,10 +53,18 @@ player funzionante e uno non funzionante.
 - La riconvalida ha la priorità su un range: una richiesta contenente sia
   `If-None-Match` sia `Range` riceve un `304`.
 
-Nello storage locale viene letta da disco solo la porzione richiesta. Su S3 e
-GCS l'oggetto viene comunque recuperato per intero — un `StorageController`
-non dispone di lettura a intervalli — pertanto il risparmio riguarda la
-risposta, non l'upstream.
+Vengono letti solo i byte richiesti — da disco nello storage locale, e con una
+lettura a intervalli da S3 e GCS — e ogni oggetto viene inviato al client in
+streaming man mano che viene letto, anziché essere prima tenuto in memoria,
+quindi servire un video di grandi dimensioni costa al server la stessa memoria
+che costa servire una miniatura. Una rivalidazione che si conclude con un
+`304`, una `HEAD`, un `416` e una rendition di immagine in cache vengono
+risposte dai metadati dell'oggetto, senza leggerne affatto i byte.
+
+Un `StorageController` personalizzato ottiene lo stesso implementando i metodi
+facoltativi `statObject` e `getObjectStream`. Uno che ne è privo viene servito
+tramite `getObject`, che a ogni richiesta legge l'intero oggetto, intervalli
+compresi.
 
 ## Inserire una CDN davanti
 
