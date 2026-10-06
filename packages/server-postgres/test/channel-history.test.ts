@@ -136,6 +136,52 @@ describe("ChannelHistoryStore — gating", () => {
         expect(store.retentionFor("cursors:9")).toBeUndefined();
     });
 
+    it("keeps no per-channel memory that a client can grow by inventing channel names", async () => {
+        // Every distinct name a client joined and asked history for, or
+        // retained a message on, stayed in two maps for the life of the
+        // process — 3,600 new names a minute is within one socket's channel
+        // rate limit (~0.5 MB/min).
+        jest.useFakeTimers();
+        try {
+            const store = new ChannelHistoryStore(createDb(), [{ match: "doc:*", limit: 10 }]);
+            const perChannelEntries = () => Object.values(store)
+                .filter((value): value is Map<unknown, unknown> | Set<unknown> => value instanceof Map || value instanceof Set)
+                .reduce((n, collection) => n + collection.size, 0);
+
+            for (let i = 0; i < 20_000; i++) {
+                const retention = store.retentionFor(`doc:${i}`);
+                expect(retention).toEqual({ limit: 10, ttlMs: undefined });
+                await store.prune(`doc:${i}`, retention!);
+                // A client inventing 3,600 names a minute.
+                if (i % 60 === 59) jest.advanceTimersByTime(1000);
+            }
+
+            // What is held is the prune throttle of the channels pruned in the
+            // last throttle window or so, not every name ever seen.
+            expect(perChannelEntries()).toBeLessThan(6_000);
+            expect(store.retentionFor("cursors:1")).toBeUndefined();
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
+    it("still prunes a channel at most once per throttle window", async () => {
+        jest.useFakeTimers();
+        try {
+            const db = createDb();
+            const store = new ChannelHistoryStore(db, [{ match: "doc:*", limit: 10 }]);
+            await store.prune("doc:1", { limit: 10 });
+            await store.prune("doc:1", { limit: 10 });
+            expect(db.execute).toHaveBeenCalledTimes(1);
+            jest.advanceTimersByTime(30_001);
+            await store.prune("doc:2", { limit: 10 });
+            await store.prune("doc:1", { limit: 10 });
+            expect(db.execute).toHaveBeenCalledTimes(3);
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
     it("creates no schema when nothing retains", async () => {
         const db = createDb();
         const store = new ChannelHistoryStore(db, []);

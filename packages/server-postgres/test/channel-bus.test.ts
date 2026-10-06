@@ -301,6 +301,20 @@ describe("Channel bus — cross-instance broadcast & presence", () => {
         expect(error).toMatchObject({ payload: { error: { code: "CHANNEL_BUS_PAYLOAD_TOO_LARGE" } } });
     });
 
+    it("forgets that it warned about a channel once the channel is gone", async () => {
+        // The once-per-channel warning was remembered for every channel name
+        // ever broadcast on, for the life of the process.
+        for (let i = 0; i < 50; i++) {
+            connect(a, `a${i}`, `doc:${i}`);
+            a.broadcastToChannel(`a${i}`, `doc:${i}`, "op", { blob: "x".repeat(PG_NOTIFY_MAX_PAYLOAD_BYTES) });
+        }
+        await flush();
+        expect(a["oversizedBroadcastWarned"].size).toBe(50);
+
+        for (let i = 0; i < 50; i++) a.leaveChannel(`a${i}`, `doc:${i}`);
+        expect(a["oversizedBroadcastWarned"].size).toBe(0);
+    });
+
     it("a retained message that has since been pruned is dropped, not delivered empty", async () => {
         const remote = connect(b, "b1", "snap:1");
 

@@ -441,6 +441,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     /**
      * Channels whose oversized ephemeral broadcasts have already been reported,
      * so a hot channel logs the problem once rather than once per message.
+     * Forgotten with the channel, so it holds live channels only — not every
+     * name a client ever broadcast on.
      */
     private oversizedBroadcastWarned = new Set<string>();
 
@@ -1131,7 +1133,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             if (members.has(clientId)) {
                 members.delete(clientId);
                 this.removePresence(clientId, channel, { skipStore: true });
-                if (members.size === 0) this.channels.delete(channel);
+                if (members.size === 0) this.forgetChannel(channel);
             }
         }
 
@@ -2412,11 +2414,17 @@ roles: ["anon"] };
     }
 
     /** Leave a broadcast channel */
+    /** Drop a channel its last local member left, and what was kept per channel for it. */
+    private forgetChannel(channel: string): void {
+        this.channels.delete(channel);
+        this.oversizedBroadcastWarned.delete(channel);
+    }
+
     leaveChannel(clientId: string, channel: string): void {
         const members = this.channels.get(channel);
         if (members) {
             members.delete(clientId);
-            if (members.size === 0) this.channels.delete(channel);
+            if (members.size === 0) this.forgetChannel(channel);
         }
         // Also remove presence
         this.removePresence(clientId, channel);

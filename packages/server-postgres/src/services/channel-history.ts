@@ -127,10 +127,21 @@ export interface RetainedAnnouncement {
  */
 export class ChannelHistoryStore {
     private rules: ChannelRetentionRule[];
-    /** Resolved rule per channel name, so the match runs once per channel. */
-    private resolved = new Map<string, ResolvedRetention | null>();
-    /** Channel → timestamp of its last prune, for {@link PRUNE_THROTTLE_MS}. */
+    /**
+     * Each rule with its retention resolved, once. Matched per call rather
+     * than cached per channel name: a cache keyed by the names clients invent
+     * grew by every one of them for the life of the process, and matching a
+     * handful of prefixes costs less than the hashing a lookup does.
+     */
+    private resolvedRules: Array<{ rule: ChannelRetentionRule; retention: ResolvedRetention }>;
+    /**
+     * Channel → timestamp of its last prune, for {@link PRUNE_THROTTLE_MS}.
+     * An entry older than the window throttles nothing, so they are swept once
+     * a window: the map holds the channels pruned recently, not every channel
+     * ever pruned.
+     */
     private lastPruned = new Map<string, number>();
+    private nextPruneSweepAt = 0;
     private tablesReady = false;
 
     constructor(private db: NodePgDatabase<Record<string, unknown>>, rules: ChannelRetentionRule[] = []) {
@@ -149,6 +160,7 @@ export class ChannelHistoryStore {
             }
             return true;
         });
+        this.resolvedRules = this.rules.map(rule => ({ rule, retention: { limit: rule.limit, ttlMs: parseTtlMs(rule.ttl) } }));
     }
 
     /** Whether any channel retains anything at all. */
@@ -163,19 +175,7 @@ export class ChannelHistoryStore {
      */
     retentionFor(channel: string): ResolvedRetention | undefined {
         if (!this.enabled || !channel) return undefined;
-
-        const cached = this.resolved.get(channel);
-        if (cached !== undefined) return cached ?? undefined;
-
-        const rule = this.rules.find(r => channelMatchesRule(channel, r));
-        const resolved: ResolvedRetention | null = rule
-            ? { limit: rule.limit, ttlMs: parseTtlMs(rule.ttl) }
-            : null;
-
-        // Bounded by the number of distinct channel names seen, which is the
-        // same thing the in-memory channel and presence maps are bounded by.
-        this.resolved.set(channel, resolved);
-        return resolved ?? undefined;
+        return this.resolvedRules.find(({ rule }) => channelMatchesRule(channel, rule))?.retention;
     }
 
     /**
@@ -428,6 +428,12 @@ export class ChannelHistoryStore {
      */
     async prune(channel: string, retention: ResolvedRetention): Promise<number> {
         const now = Date.now();
+        if (now >= this.nextPruneSweepAt) {
+            for (const [name, at] of this.lastPruned) {
+                if (now - at >= PRUNE_THROTTLE_MS) this.lastPruned.delete(name);
+            }
+            this.nextPruneSweepAt = now + PRUNE_THROTTLE_MS;
+        }
         const last = this.lastPruned.get(channel) ?? 0;
         if (now - last < PRUNE_THROTTLE_MS) return 0;
         this.lastPruned.set(channel, now);
@@ -464,9 +470,8 @@ export class ChannelHistoryStore {
         return deleted;
     }
 
-    /** Forget throttle and match caches. Called on shutdown. */
+    /** Forget the prune throttle. Called on shutdown. */
     clear(): void {
-        this.resolved.clear();
         this.lastPruned.clear();
     }
 }
