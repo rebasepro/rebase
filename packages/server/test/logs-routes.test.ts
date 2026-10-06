@@ -255,6 +255,25 @@ describe("logs stream", () => {
         expect(body.entries.map(e => e.message)).toEqual(["first", "second"]);
     });
 
+    it("names the instance whose log it is", async () => {
+        // The ring is this process's memory. With more than one replica the
+        // view has to say whose log it shows.
+        const previous = process.env.HOSTNAME;
+        process.env.HOSTNAME = "api-7d9f-xk2";
+        try {
+            const app = buildApp();
+            const controller = new AbortController();
+            const res = await app.request("/api/logs/stream", { signal: controller.signal });
+            const [snapshot] = await readFrames(res, 1);
+            controller.abort();
+
+            expect((snapshot.data as { instance?: string }).instance).toBe("api-7d9f-xk2");
+        } finally {
+            if (previous === undefined) delete process.env.HOSTNAME;
+            else process.env.HOSTNAME = previous;
+        }
+    });
+
     it("appends entries logged after the connection opened", async () => {
         const app = buildApp();
         const controller = new AbortController();

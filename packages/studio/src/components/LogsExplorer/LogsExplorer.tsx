@@ -32,9 +32,14 @@ const TRANSPORT_DOTS: Record<LogTransport, string> = {
 
 const TRANSPORT_TITLES: Record<LogTransport, string> = {
     connecting: "Reconnecting to the log stream.",
-    live: "Streaming — entries appear as the server writes them.",
+    live: "Streaming — entries appear as this instance writes them.",
     polling: "This server has no log stream; falling back to a refresh every 3 seconds."
 };
+
+// The log lives in each server process's memory and nothing gathers the others,
+// so the view says whose it is.
+const INSTANCE_TITLE = "Each server process keeps its own log in memory. With more than one instance, "
+    + "you see only the one serving this view, and a reconnect can land on another.";
 
 // How close to the bottom edge still counts as "at the bottom".
 const STICK_THRESHOLD = 40;
@@ -60,15 +65,18 @@ export function LogsExplorer() {
         return () => clearTimeout(t);
     }, [searchInput]);
 
-    const { logs, error, transport, dropped } = useLogTail({ level,
+    const { logs, error, transport, dropped, instance } = useLogTail({ level,
         source,
         search });
 
     // A filter change replaces the window wholesale — "new since you looked
-    // away" stops meaning anything, so the counter starts over.
+    // away" stops meaning anything, so the counter starts over. So does a
+    // reconnect that lands on another instance: its ids come from its own
+    // counter, and comparing them with this one's counts nothing true.
     useEffect(() => {
         setNewCount(0);
-    }, [level, source, search]);
+        lastMaxIdRef.current = null;
+    }, [level, source, search, instance]);
 
     // Count what arrived while the user was reading further up. Driven off the
     // rendered window rather than off the transport, so it means the same thing
@@ -182,6 +190,11 @@ export function LogsExplorer() {
                             {TRANSPORT_LABELS[transport]}
                         </Typography>
                     </div>
+                    <div className="min-w-0" title={INSTANCE_TITLE}>
+                        <Typography variant="caption" color="secondary" className="block truncate max-w-[18rem]">
+                            {instance ? `This instance: ${instance}` : "This instance only"}
+                        </Typography>
+                    </div>
                     <Typography variant="caption" color="secondary">
                         {logs.length} entries
                     </Typography>
@@ -252,7 +265,7 @@ export function LogsExplorer() {
                                 className={error ? "text-red-600 dark:text-red-500" : undefined}
                                 color={error ? undefined : "secondary"}
                             >
-                                {error ?? "No log entries yet. Logs will appear here as requests come in."}
+                                {error ?? "No log entries yet. Logs will appear here as this instance serves requests."}
                             </Typography>
                         </div>
                     )}

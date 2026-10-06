@@ -126,6 +126,18 @@ class LogRingBuffer {
 // Global singleton
 export const logBuffer = new LogRingBuffer();
 
+/**
+ * Which process this log belongs to.
+ *
+ * The ring is this process's memory, and nothing gathers the rings of a
+ * deployment's other replicas or of its split runtime roles. So a reader is
+ * told whose log it is: `HOSTNAME` is the pod name on Kubernetes and the
+ * container id under Docker; the pid tells two local processes apart.
+ */
+export function logInstanceName(): string {
+    return process.env.HOSTNAME?.trim() || `pid-${process.pid}`;
+}
+
 /** Add a log entry */
 export function addLog(
     level: LogEntry["level"],
@@ -439,7 +451,9 @@ export function createLogsRoutes(timing: LogStreamTiming = {}, options: LogsRout
     // idle socket.
     //
     // Events:
-    //   snapshot  {entries, total}   the filtered window, oldest-first, at open
+    //   snapshot  {entries, total, instance}
+    //                                the filtered window, oldest-first, at open,
+    //                                and the process whose ring it is
     //   append    {entries, dropped} entries since the last frame, oldest-first
     //   `: ping`                     comment, keepalive only
     //
@@ -512,7 +526,8 @@ export function createLogsRoutes(timing: LogStreamTiming = {}, options: LogsRout
                     // so the client only ever appends.
                     data: JSON.stringify({
                         entries: snapshot.entries.slice().reverse(),
-                        total: snapshot.total
+                        total: snapshot.total,
+                        instance: logInstanceName()
                     })
                 });
 

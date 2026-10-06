@@ -156,6 +156,15 @@ export interface LogTail {
      * a tail with a hole in it that says so beats one that silently lies.
      */
     dropped: number;
+    /**
+     * The server process whose log this is, as its stream names it — `null`
+     * until the stream says, and against a server that does not.
+     *
+     * Each process keeps its own log in memory, so with several replicas (or
+     * split runtime roles) this view shows one of them, and a reconnect can
+     * land on another.
+     */
+    instance: string | null;
 }
 
 /**
@@ -176,6 +185,9 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
     const [error, setError] = useState<string | null>(null);
     const [transport, setTransport] = useState<LogTransport>("connecting");
     const [dropped, setDropped] = useState(0);
+    const [instance, setInstance] = useState<string | null>(null);
+    // Read inside the stream loop, which outlives renders.
+    const instanceRef = useRef<string | null>(null);
     const apiConfig = useApiConfig();
     const apiBase = useApiBase();
 
@@ -276,6 +288,9 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
         const startPolling = () => {
             if (cancelled) return;
             setTransport("polling");
+            // The query route does not say whose log it is.
+            instanceRef.current = null;
+            setInstance(null);
             poll();
         };
 
@@ -313,8 +328,15 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
                 for await (const frame of readSSEFrames(resp.body)) {
                     if (cancelled) return;
                     if (frame.event === "snapshot") {
-                        const { entries } = JSON.parse(frame.data) as { entries: LogEntry[] };
-                        setLogs(prev => sameLogs(prev, entries) ? prev : capped(entries));
+                        const parsed = JSON.parse(frame.data) as { entries: LogEntry[]; instance?: string };
+                        const entries = parsed.entries;
+                        const from = typeof parsed.instance === "string" && parsed.instance ? parsed.instance : null;
+                        // Ids are per process: another instance's window can
+                        // share its first and last id with this one's.
+                        const sameSource = from === instanceRef.current;
+                        instanceRef.current = from;
+                        setInstance(from);
+                        setLogs(prev => sameSource && sameLogs(prev, entries) ? prev : capped(entries));
                     } else if (frame.event === "append") {
                         const parsed = JSON.parse(frame.data) as { entries: LogEntry[]; dropped?: number };
                         if (parsed.entries.length > 0) {
@@ -352,5 +374,6 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
     return { logs,
         error,
         transport,
-        dropped };
+        dropped,
+        instance };
 }

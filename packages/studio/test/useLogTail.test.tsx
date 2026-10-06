@@ -413,6 +413,35 @@ describe("useLogTail over a live connection", () => {
         expect(result.current.logs.map(l => l.message)).toEqual(["before restart", "after restart"]);
     });
 
+    it("says which instance it is reading, and swaps the window when a reconnect lands on another", async () => {
+        // Each server process keeps its own log. Behind a load balancer a
+        // reconnect can land on a sibling whose ids run from the same counter,
+        // so a window that only compared ids kept the first instance's lines
+        // under the second instance's name.
+        const first = controllableStream();
+        const second = controllableStream();
+        const bodies = [first, second];
+        const fetchMock = jest.fn(async () => ({ ok: true,
+            status: 200,
+            body: bodies.shift()!.body }));
+        global.fetch = fetchMock as unknown as typeof fetch;
+
+        const { result } = renderHook(() => useLogTail(allLevels) as TailResult & { instance: string | null });
+        first.push(frame("snapshot", { entries: [entry(1, "from pod a")],
+            total: 1,
+            instance: "pod-a" }));
+        await waitFor(() => expect(result.current.instance).toBe("pod-a"));
+
+        first.end();
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2), { timeout: 4000 });
+        second.push(frame("snapshot", { entries: [entry(1, "from pod b")],
+            total: 1,
+            instance: "pod-b" }));
+
+        await waitFor(() => expect(result.current.instance).toBe("pod-b"));
+        expect(result.current.logs.map(l => l.message)).toEqual(["from pod b"]);
+    });
+
     it("reads the token again on every reconnect", async () => {
         // A token that rotates. Caching the first one means the tail dies for good
         // the moment the original expires, and looks like a permissions problem.

@@ -120,6 +120,19 @@ describe("LogsExplorer", () => {
         expect(screen.getByText(/No log entries yet/)).toBeTruthy();
     });
 
+    it("says it shows only the instance serving it, and names that instance", async () => {
+        // The log lives in each server process's memory. With two replicas,
+        // "Live" alone read as the whole backend's log.
+        const { stream } = renderStreaming();
+        stream.push(frame("snapshot", { entries: [],
+            total: 0,
+            instance: "api-7d9f-xk2" }));
+
+        expect(await screen.findByText("This instance: api-7d9f-xk2")).toBeTruthy();
+        expect(screen.getByTitle(/only the one serving this view/)).toBeTruthy();
+        expect(screen.getByText(/as this instance serves requests/)).toBeTruthy();
+    });
+
     it("says when it has fallen back to polling an older server", async () => {
         global.fetch = jest.fn(async (input: unknown) => {
             if (String(input).includes("/logs/stream")) {
