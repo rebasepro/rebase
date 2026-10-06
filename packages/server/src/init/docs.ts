@@ -67,8 +67,26 @@ export async function mountOpenApiDocs(
     // console is asking on behalf of.
     const isPublic = enableSwagger !== false;
 
-    const spec = (c: { json: (v: unknown) => Response }) =>
-        c.json(generateOpenApiSpecFn!(serverCollections, { basePath, requireAuth }));
+    /**
+     * The document, generated and encoded on the first request and served
+     * as those bytes after: generating it took 39 ms of CPU and a 10.8 MB
+     * string at 200 collections, per request, on a route that is public
+     * whenever Swagger is on.
+     *
+     * Key: this mount — `serverCollections`, `basePath`, `requireAuth`. The
+     * document says nothing about the caller, so one copy serves every
+     * request; whether a caller may read it is still the gate's question,
+     * asked per request. Invalidation: none within the mount, because nothing
+     * changes what it was given — every request already read the collections
+     * the server booted with, and a live schema edit builds new collection
+     * objects (copy-on-write, `applyCollectionPatch`) that reach `/api/docs`
+     * through the restart that mounts it again.
+     */
+    let serialized: Uint8Array<ArrayBuffer> | undefined;
+    const spec = (c: { body: (data: Uint8Array<ArrayBuffer>, status: 200, headers: Record<string, string>) => Response }) => {
+        serialized ??= new TextEncoder().encode(JSON.stringify(generateOpenApiSpecFn!(serverCollections, { basePath, requireAuth })));
+        return c.body(serialized, 200, { "Content-Type": "application/json" });
+    };
 
     const { generateOpenApiSpec } = await import("../api/openapi-generator");
     generateOpenApiSpecFn = generateOpenApiSpec;
