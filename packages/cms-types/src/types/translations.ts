@@ -997,6 +997,7 @@ export interface RebaseTranslations {
     studio_sql_missing_pk?: string;
     studio_sql_cannot_edit_other_connection?: string;
     studio_sql_update_failed?: string;
+    studio_sql_update_no_row?: string;
     studio_sql_execution_not_supported?: string;
     studio_sql_error_executing?: string;
     studio_sql_error_explaining?: string;

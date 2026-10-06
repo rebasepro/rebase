@@ -906,6 +906,7 @@ export const hi: RebaseTranslations = {
     studio_sql_missing_pk: "पंक्ति में प्राथमिक कुंजी स्तंभ अनुपलब्ध हैं: {{columns}}। सुरक्षित रूप से अपडेट नहीं किया जा सकता।",
     studio_sql_cannot_edit_other_connection: "ये पंक्तियाँ किसी अन्य डेटाबेस से या किसी अन्य भूमिका के रूप में पढ़ी गई थीं। इन्हें संपादित करने के लिए क्वेरी फिर से चलाएँ।",
     studio_sql_update_failed: "अपडेट विफल: {{message}}",
+    studio_sql_update_no_row: "कोई पंक्ति अपडेट नहीं हुई: पढ़े जाने के बाद पंक्ति बदल दी गई या हटा दी गई, या चुनी गई भूमिका इसे अपडेट नहीं कर सकती। जो संग्रहीत है उसे देखने के लिए क्वेरी फिर से चलाएँ।",
     studio_sql_execution_not_supported: "वर्तमान डेटा स्रोत SQL निष्पादन का समर्थन नहीं करता।",
     studio_sql_error_executing: "क्वेरी चलाते समय एक त्रुटि हुई।",
     studio_sql_error_explaining: "क्वेरी का विश्लेषण करते समय एक त्रुटि हुई।",

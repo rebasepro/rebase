@@ -686,22 +686,33 @@ message: t(resolution.refusal.key, resolution.refusal.params) });
         const updateSql = `UPDATE ${quoteTableName(target.table, target.schema)} SET ${quoteIdentifier(target.column)} = ${formatValue(newValue)} WHERE ${whereConditions};`;
 
         try {
-            if (databaseAdmin?.executeSql) {
-                await databaseAdmin.executeSql(updateSql, { database: connection.database,
+            // Through the script door, for the row count its answer carries.
+            // An UPDATE that matches no row succeeds as far as the database
+            // is concerned — a policy that lets the role read the row but not
+            // update it, a row changed or deleted since it was read — and is
+            // not an edit. Only a backend that describes its results reaches
+            // here at all: without that, no cell resolves to a table column.
+            const run = await databaseAdmin?.runSqlScript?.(updateSql, { database: connection.database,
 role: connection.role });
-
-                const newResults = [...(activeTab.results || [])];
-                if (newResults[rowIndex]) {
-                    newResults[rowIndex] = { ...newResults[rowIndex],
-[columnKey]: newValue };
-                }
-                updateActiveTab({ results: newResults });
-
+            if (!run?.rowCount) {
                 snackbarController.open({
-                    type: "success",
-                    message: t("studio_sql_row_updated")
+                    type: "error",
+                    message: t("studio_sql_update_no_row")
                 });
+                return;
             }
+
+            const newResults = [...(activeTab.results || [])];
+            if (newResults[rowIndex]) {
+                newResults[rowIndex] = { ...newResults[rowIndex],
+[columnKey]: newValue };
+            }
+            updateActiveTab({ results: newResults });
+
+            snackbarController.open({
+                type: "success",
+                message: t("studio_sql_row_updated")
+            });
         } catch (e: unknown) {
             snackbarController.open({
                 type: "error",

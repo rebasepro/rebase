@@ -911,6 +911,7 @@ export const pt: RebaseTranslations = {
     studio_sql_missing_pk: "Faltam colunas de chave primária na linha: {{columns}}. Não é possível atualizar em segurança.",
     studio_sql_cannot_edit_other_connection: "Estas linhas foram lidas de outra base de dados ou com outra função. Execute a consulta novamente para editá-las.",
     studio_sql_update_failed: "Falha ao atualizar: {{message}}",
+    studio_sql_update_no_row: "Nenhuma linha foi atualizada: a linha foi alterada ou eliminada desde que foi lida, ou a função selecionada não a pode atualizar. Execute a consulta novamente para ver o que está guardado.",
     studio_sql_execution_not_supported: "A fonte de dados atual não suporta a execução de SQL.",
     studio_sql_error_executing: "Ocorreu um erro ao executar a consulta.",
     studio_sql_error_explaining: "Ocorreu um erro ao explicar a consulta.",

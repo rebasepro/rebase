@@ -906,6 +906,7 @@ export const it: RebaseTranslations = {
     studio_sql_missing_pk: "Alla riga mancano le colonne della chiave primaria: {{columns}}. Impossibile aggiornarla in sicurezza.",
     studio_sql_cannot_edit_other_connection: "Queste righe sono state lette da un altro database o con un altro ruolo. Esegui di nuovo la query per modificarle.",
     studio_sql_update_failed: "Aggiornamento non riuscito: {{message}}",
+    studio_sql_update_no_row: "Nessuna riga è stata aggiornata: la riga è stata modificata o eliminata dopo la lettura, oppure il ruolo selezionato non può aggiornarla. Esegui di nuovo la query per vedere cosa è memorizzato.",
     studio_sql_execution_not_supported: "L'origine dati attuale non supporta l'esecuzione di SQL.",
     studio_sql_error_executing: "Si è verificato un errore durante l'esecuzione della query.",
     studio_sql_error_explaining: "Si è verificato un errore durante l'analisi della query.",

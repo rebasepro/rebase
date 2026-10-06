@@ -66,8 +66,12 @@ const executeSql = jest.fn(async (sql: string, _options?: ExecuteOptions): Promi
     if (sql.includes("current_user")) return [{ role: "postgres" }];
     return scriptFor(sql)?.rows ?? [];
 });
+/** How many rows the next UPDATE reports it changed. */
+let updatedRows = 1;
 const runSqlScript = jest.fn(async (sql: string, _options?: ExecuteOptions): Promise<SqlScriptResult> =>
-    scriptFor(sql) ?? { rows: [], columns: [], tables: [], notices: [] });
+    sql.startsWith("UPDATE")
+        ? { rows: [], columns: [], tables: [], notices: [], command: "UPDATE", rowCount: updatedRows }
+        : scriptFor(sql) ?? { rows: [], columns: [], tables: [], notices: [] });
 const databaseAdmin: Record<string, unknown> = {
     executeSql,
     runSqlScript,
@@ -190,6 +194,7 @@ async function tryToEditStatus(): Promise<void> {
 }
 
 beforeEach(() => {
+    updatedRows = 1;
     executeSql.mockClear();
     runSqlScript.mockClear();
     databaseAdmin.runSqlScript = runSqlScript;
@@ -208,6 +213,31 @@ describe("inline editing a result row", () => {
             "UPDATE \"public\".\"orders\" SET \"status\" = 'shipped' WHERE \"id\" = '7';",
             { database: "app_prod", role: "postgres" }
         ]);
+    });
+
+    it("says the row was updated, and shows the new value, when the database changed it", async () => {
+        await selectOrders();
+        await editStatus("shipped");
+
+        await waitFor(() => expect(snackbarOpen).toHaveBeenCalledWith({ type: "success", message: label("studio_sql_row_updated") }));
+        expect(screen.getByText("shipped")).toBeTruthy();
+    });
+
+    /**
+     * An UPDATE that matches no row succeeds as far as the database is
+     * concerned: a policy that lets the role read the row but not update it,
+     * or a row changed or deleted since it was read. The console said "Row
+     * updated successfully" and drew the new value over the old one.
+     */
+    it("does not report an edit that changed no row, and keeps the value that is stored", async () => {
+        updatedRows = 0;
+        await selectOrders();
+        await editStatus("shipped");
+
+        await waitFor(() => expect(snackbarOpen).toHaveBeenCalledWith({ type: "error", message: label("studio_sql_update_no_row") }));
+        expect(snackbarOpen).not.toHaveBeenCalledWith(expect.objectContaining({ type: "success" }));
+        expect(screen.queryByText("shipped")).toBeNull();
+        expect(screen.getByText("new")).toBeTruthy();
     });
 
     it("does not edit a row read from another database than the one selected", async () => {
