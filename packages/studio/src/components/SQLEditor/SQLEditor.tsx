@@ -47,7 +47,7 @@ import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView,
 import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeStoredJson, writeStoredString } from "@rebasepro/utils";
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
-import { buildExplainSql, formatSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type CellEditResolution, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
+import { buildExplainSql, formatSql, needsDestructiveConfirmation, quoteIdentifier, groupSchemaRows, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type CellEditResolution, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
@@ -544,27 +544,7 @@ role: selectedRole } : t));
             const result = await databaseAdmin!.executeSql!(sql, { database: selectedDatabase });
 
             const processGrouped = (data: Record<string, unknown>[]) => {
-                const grouped = data.reduce((acc: Record<string, TableInfo[]>, curr: Record<string, unknown>) => {
-                    const schema = (curr.schema || curr.SCHEMA || curr.table_schema || "public") as string;
-                    const table = (curr.table || curr.TABLE || curr.table_name) as string;
-                    const column = (curr.column || curr.COLUMN || curr.column_name) as string;
-                    const dataType = (curr.data_type || curr.DATA_TYPE || "") as string;
-                    const isPrimaryKey = curr.is_pk === true || curr.is_pk === "true";
-
-                    if (!acc[schema]) acc[schema] = [];
-                    let tableInfo = acc[schema].find(t => t.tableName === table);
-                    if (!tableInfo) {
-                        tableInfo = { schemaName: schema,
-tableName: table,
-columns: [] };
-                        acc[schema].push(tableInfo);
-                    }
-                    tableInfo.columns.push({ name: column,
-dataType,
-isPrimaryKey });
-                    return acc;
-                }, {});
-                setSchemas(grouped);
+                setSchemas(groupSchemaRows(data));
             };
 
             if (!result || !Array.isArray(result)) {

@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "@jest/globals";
-import { acceptsAutoLimit, buildExplainSql, formatSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type ResultProvenance } from "./sql_utils";
+import { acceptsAutoLimit, buildExplainSql, formatSql, groupSchemaRows, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type ResultProvenance } from "./sql_utils";
 import type { SqlScriptColumn, SqlScriptTable } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -432,5 +432,67 @@ describe("resultsToCsv", () => {
 
     it("writes an object value as JSON", () => {
         expect(parseCsv(resultsToCsv([{ plan: { Plan: { "Node Type": "Seq Scan" } } }]))[1]).toEqual(["{\"Plan\":{\"Node Type\":\"Seq Scan\"}}"]);
+    });
+});
+
+/**
+ * The SQL console's schema browser groups `information_schema.columns` rows
+ * into tables. Each row looked its table up with `find` over every table of
+ * its schema, and the rows come in table order, so the match was always the
+ * last: 142 ms of main thread at 2,000 tables, 923 ms at 5,000, on every
+ * open and every database switch.
+ */
+describe("groupSchemaRows", () => {
+    const rowsFor = (tables: number, columns = 20) => {
+        const rows: Record<string, unknown>[] = [];
+        for (let table = 0; table < tables; table++) {
+            for (let column = 0; column < columns; column++) {
+                rows.push({ schema: "public", table: `t${table}`, column: `c${column}`, data_type: "integer", is_pk: column === 0 });
+            }
+        }
+        return rows;
+    };
+
+    it("groups columns under their table and schema, in order", () => {
+        const grouped = groupSchemaRows([
+            { schema: "public", table: "posts", column: "id", data_type: "integer", is_pk: true },
+            { schema: "public", table: "posts", column: "title", data_type: "text", is_pk: false },
+            { schema: "archive", table: "posts", column: "id", data_type: "bigint", is_pk: "true" },
+            { schema: "public", table: "tags", column: "name", data_type: "text", is_pk: false }
+        ]);
+
+        expect(grouped).toEqual({
+            public: [
+                { schemaName: "public", tableName: "posts", columns: [{ name: "id", dataType: "integer", isPrimaryKey: true }, { name: "title", dataType: "text", isPrimaryKey: false }] },
+                { schemaName: "public", tableName: "tags", columns: [{ name: "name", dataType: "text", isPrimaryKey: false }] }
+            ],
+            archive: [
+                { schemaName: "archive", tableName: "posts", columns: [{ name: "id", dataType: "bigint", isPrimaryKey: true }] }
+            ]
+        });
+    });
+
+    it("keeps a table's columns together when its rows are not adjacent", () => {
+        const grouped = groupSchemaRows([
+            { schema: "public", table: "a", column: "x", data_type: "int", is_pk: false },
+            { schema: "public", table: "b", column: "y", data_type: "int", is_pk: false },
+            { schema: "public", table: "a", column: "z", data_type: "int", is_pk: false }
+        ]);
+        expect(grouped.public.map(table => [table.tableName, table.columns.map(column => column.name)])).toEqual([["a", ["x", "z"]], ["b", ["y"]]]);
+    });
+
+    it("grows linearly with the number of tables, not with its square", () => {
+        // Best of three, so a collection or a JIT tier change lands in one run
+        // and not in the answer. Linear is ~10x for 10x the tables; the old
+        // lookup was ~100x.
+        const best = (rows: Record<string, unknown>[]) => Math.min(...[0, 1, 2].map(() => {
+            const start = performance.now();
+            groupSchemaRows(rows);
+            return performance.now() - start;
+        }));
+        const small = rowsFor(500);
+        const large = rowsFor(5_000);
+        best(small);
+        expect(best(large) / Math.max(best(small), 0.5)).toBeLessThan(30);
     });
 });
