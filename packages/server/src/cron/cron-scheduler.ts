@@ -147,6 +147,7 @@ export function isValidTimeZone(zone: string): boolean {
 
 /** Wall-clock parts of an instant, in a zone, as the cron fields see them. */
 interface WallClock {
+    year: number;
     minute: number;
     hour: number;
     dom: number;
@@ -164,6 +165,7 @@ function wallClockIn(candidate: Date, zone: string): WallClock {
             timeZone: zone,
             hourCycle: "h23",
             weekday: "short",
+            year: "numeric",
             month: "numeric",
             day: "numeric",
             hour: "numeric",
@@ -174,6 +176,7 @@ function wallClockIn(candidate: Date, zone: string): WallClock {
     const parts: Record<string, string> = {};
     for (const part of formatter.formatToParts(candidate)) parts[part.type] = part.value;
     return {
+        year: Number(parts.year),
         minute: Number(parts.minute),
         hour: Number(parts.hour),
         dom: Number(parts.day),
@@ -183,27 +186,79 @@ function wallClockIn(candidate: Date, zone: string): WallClock {
 }
 
 /**
- * Whether a minute-precision instant matches every field of the expression.
- *
- * Read in `zone` when one is named, else in the process's own zone — which is
- * whatever the host is set to, UTC in nearly every container. A schedule that
- * names its zone means the same wall-clock hour on every host it runs on.
+ * The wall clock an instant reads in `zone` when one is named, else in the
+ * process's own zone — which is whatever the host is set to, UTC in nearly
+ * every container. A schedule that names its zone means the same wall-clock
+ * hour on every host it runs on.
  */
-function matchesCronFields(candidate: Date, fields: CronFields, zone?: string): boolean {
-    const wall: WallClock = zone
-        ? wallClockIn(candidate, zone)
-        : {
-            minute: candidate.getMinutes(),
-            hour: candidate.getHours(),
-            dom: candidate.getDate(),
-            month: candidate.getMonth() + 1, // getMonth is 0-11
-            dow: candidate.getDay()
-        };
+function wallClockOf(instantMs: number, zone?: string): WallClock {
+    const candidate = new Date(instantMs);
+    if (zone) return wallClockIn(candidate, zone);
+    return {
+        year: candidate.getFullYear(),
+        minute: candidate.getMinutes(),
+        hour: candidate.getHours(),
+        dom: candidate.getDate(),
+        month: candidate.getMonth() + 1, // getMonth is 0-11
+        dow: candidate.getDay()
+    };
+}
+
+/**
+ * The zone's offset from UTC at an instant: its wall clock read back as UTC,
+ * minus the instant. Two instants with the same offset have wall clocks
+ * exactly as far apart as the instants themselves.
+ */
+function offsetAt(instantMs: number, wall: WallClock): number {
+    return Date.UTC(wall.year, wall.month - 1, wall.dom, wall.hour, wall.minute) - instantMs;
+}
+
+/** Whether a wall-clock day — month, day of month, weekday — can hold a slot. */
+function dayMatches(wall: WallClock, fields: CronFields): boolean {
     return fields.months.includes(wall.month)
         && fields.doms.includes(wall.dom)
-        && fields.dows.includes(wall.dow)
+        && fields.dows.includes(wall.dow);
+}
+
+/** Whether a wall-clock minute matches every field of the expression. */
+function wallMatches(wall: WallClock, fields: CronFields): boolean {
+    return dayMatches(wall, fields)
         && fields.hours.includes(wall.hour)
         && fields.minutes.includes(wall.minute);
+}
+
+const MINUTES_PER_DAY = 1440;
+
+/**
+ * How many wall-clock minutes from a non-matching `wall` to the first later
+ * wall minute that could match. Never past the next wall midnight, so the
+ * minutes in between share `wall`'s day and every one of them is a miss.
+ */
+function wallMinutesToNextCandidate(wall: WallClock, fields: CronFields): number {
+    const minuteOfDay = wall.hour * 60 + wall.minute;
+    if (!dayMatches(wall, fields)) return MINUTES_PER_DAY - minuteOfDay;
+    if (!fields.hours.includes(wall.hour)) {
+        const nextHour = fields.hours.find(hour => hour > wall.hour);
+        return nextHour === undefined ? MINUTES_PER_DAY - minuteOfDay : nextHour * 60 - minuteOfDay;
+    }
+    const nextMinute = fields.minutes.find(minute => minute > wall.minute);
+    return nextMinute === undefined ? 60 - wall.minute : nextMinute - wall.minute;
+}
+
+/**
+ * The mirror of {@link wallMinutesToNextCandidate}: how many wall-clock
+ * minutes back from a non-matching `wall` to the latest earlier wall minute
+ * that could match. Never before 23:59 of the previous wall day.
+ */
+function wallMinutesToPreviousCandidate(wall: WallClock, fields: CronFields): number {
+    const minuteOfDay = wall.hour * 60 + wall.minute;
+    if (!dayMatches(wall, fields)) return minuteOfDay + 1;
+    if (!fields.hours.includes(wall.hour)) {
+        const previousHour = [...fields.hours].reverse().find(hour => hour < wall.hour);
+        return previousHour === undefined ? minuteOfDay + 1 : minuteOfDay - (previousHour * 60 + 59);
+    }
+    const previousMinute = [...fields.minutes].reverse().find(minute => minute < wall.minute);
+    return previousMinute === undefined ? wall.minute + 1 : wall.minute - previousMinute;
 }
 
 /**
@@ -218,28 +273,92 @@ const MAX_SLOT_SEARCH_MINUTES = 4 * 525960 + 1440;
 const MINUTE_MS = 60_000;
 
 /**
+ * The first real minute in `[startMs, endMs)`, stepping in `direction`, whose
+ * wall clock matches `fields` — the same answer as testing every minute in
+ * turn, without testing every minute.
+ *
+ * The search moves through *real* minutes and only reads the wall clock, never
+ * steps it: across a daylight-saving change a wall-clock minute is not a real
+ * one. Falling back, a wall-clock step from 02:59 summer time lands on 03:00
+ * winter time and skips the repeated hour; inside it, the "next" minute can be
+ * an hour in the past. That is why this used to test one real minute at a
+ * time — and a yearly job named in a zone cost half a million `Intl` calls,
+ * blocking the event loop for a third of a second on every re-arm, and two
+ * seconds for 29 February.
+ *
+ * Now it hops. From a miss, {@link wallMinutesToNextCandidate} says how many
+ * wall minutes cannot match (the rest of a day that is the wrong date, the
+ * rest of an hour that is the wrong hour, the minutes before the next listed
+ * one). While the zone's offset holds, that many wall minutes are exactly
+ * that many real minutes, so the hop is taken when the offset at both ends is
+ * the same. When it differs, a transition lies inside the hop: the search
+ * bisects for the first minute on the new offset and resumes there — every
+ * minute before it is on the old offset, so its wall clock is inside the
+ * stretch already known to miss. A hop is at most a day, and the one thing
+ * this assumes is that no zone changes its offset and changes it back within
+ * a single day, which none in the tz database does. Each day costs one
+ * wall-clock read, plus about a dozen for each transition crossed.
+ *
+ * `direction: -1` walks back from `startMs` to `endMs` (inclusive) with the
+ * mirror of the same hop, for {@link findMostRecentSlot}.
+ */
+function searchSlot(
+    fields: CronFields,
+    startMs: number,
+    endMs: number,
+    direction: 1 | -1,
+    zone?: string
+): number | undefined {
+    const inWindow = (instantMs: number) => direction === 1 ? instantMs < endMs : instantMs >= endMs;
+    let current = startMs;
+    let wall = wallClockOf(current, zone);
+    while (inWindow(current)) {
+        if (wallMatches(wall, fields)) return current;
+        const skip = direction === 1
+            ? wallMinutesToNextCandidate(wall, fields)
+            : wallMinutesToPreviousCandidate(wall, fields);
+        const target = current + direction * skip * MINUTE_MS;
+        const targetWall = wallClockOf(target, zone);
+        const offset = offsetAt(current, wall);
+        if (skip === 1 || offsetAt(target, targetWall) === offset) {
+            current = target;
+            wall = targetWall;
+            continue;
+        }
+        // The offset changes inside the hop. Bisect for the first minute, in
+        // the direction of travel, that is no longer on `offset`.
+        let held = current;
+        let changed = target;
+        let changedWall = targetWall;
+        while (Math.abs(changed - held) > MINUTE_MS) {
+            const middle = held + direction * Math.floor(Math.abs(changed - held) / MINUTE_MS / 2) * MINUTE_MS;
+            const middleWall = wallClockOf(middle, zone);
+            if (offsetAt(middle, middleWall) === offset) {
+                held = middle;
+            } else {
+                changed = middle;
+                changedWall = middleWall;
+            }
+        }
+        current = changed;
+        wall = changedWall;
+    }
+    return undefined;
+}
+
+/**
  * Calculate the next Date after `after` that matches the cron expression.
  * Throws on invalid expressions.
  */
 export function parseCronExpression(expression: string, after: Date, timezone?: string): Date {
     const fields = parseCronFields(expression);
 
-    // Forward-search from `after + 1 minute`, stepping real minutes. The local
-    // setters step wall-clock minutes, and across a daylight-saving change
-    // those are not the same: falling back, `setMinutes(+1)` from 02:59 summer
-    // time lands on 03:00 winter time, skipping the repeated hour, and inside
-    // it the result can be an hour in the past. Only the matching reads the
-    // wall clock.
-    const candidate = new Date(after);
-    candidate.setUTCSeconds(0, 0);
-    candidate.setTime(candidate.getTime() + MINUTE_MS);
-
-    for (let i = 0; i < MAX_SLOT_SEARCH_MINUTES; i++) {
-        if (matchesCronFields(candidate, fields, timezone)) {
-            return candidate;
-        }
-        candidate.setTime(candidate.getTime() + MINUTE_MS);
-    }
+    // From `after + 1 minute`, in real minutes — see `searchSlot`.
+    const start = new Date(after);
+    start.setUTCSeconds(0, 0);
+    const startMs = start.getTime() + MINUTE_MS;
+    const slot = searchSlot(fields, startMs, startMs + MAX_SLOT_SEARCH_MINUTES * MINUTE_MS, 1, timezone);
+    if (slot !== undefined) return new Date(slot);
 
     // No slot inside the window. Refuse rather than invent one.
     //
@@ -263,9 +382,9 @@ export function parseCronExpression(expression: string, after: Date, timezone?: 
  * The latest slot matching `expression` within the inclusive window
  * `[from, to]`, or `undefined` when the expression has no slot in it.
  *
- * Walks backwards a minute at a time from `to`, so the first hit is already
- * the answer — in the common case (a job that ran normally moments ago) that
- * is a handful of iterations, not a scan of the whole window.
+ * Walks backwards from `to`, so the first hit is already the answer — in the
+ * common case (a job that ran normally moments ago) that is a handful of
+ * steps, not a scan of the whole window.
  *
  * `to`'s own minute is included: an instance booting at 06:00:30 has *not* run
  * the 06:00 slot — `parseCronExpression` already skipped past it to tomorrow —
@@ -281,17 +400,12 @@ export function findMostRecentSlot(expression: string, from: Date, to: Date, tim
     // Real minutes, as in `parseCronExpression`: a local-time step back from
     // 02:00 winter time lands on 01:59 summer time and walks over the repeated
     // hour.
-    const candidate = new Date(to);
-    candidate.setUTCSeconds(0, 0);
-
-    for (let i = 0; i < MAX_SLOT_SEARCH_MINUTES && candidate.getTime() >= from.getTime(); i++) {
-        if (matchesCronFields(candidate, fields, timezone)) {
-            return candidate;
-        }
-        candidate.setTime(candidate.getTime() - MINUTE_MS);
-    }
-
-    return undefined;
+    const start = new Date(to);
+    start.setUTCSeconds(0, 0);
+    const startMs = start.getTime();
+    const floorMs = Math.max(from.getTime(), startMs - (MAX_SLOT_SEARCH_MINUTES - 1) * MINUTE_MS);
+    const slot = searchSlot(fields, startMs, floorMs, -1, timezone);
+    return slot === undefined ? undefined : new Date(slot);
 }
 
 // ─── In-memory ring buffer for logs ──────────────────────────────────
@@ -396,6 +510,22 @@ interface RegisteredJob {
     logs: CronJobLogEntry[];
     /** True while a handler is actively executing (prevents concurrent runs). */
     executing: boolean;
+    /**
+     * The next slot a listing showed, on a process whose scheduler is not
+     * started — see {@link CronScheduler.listedNextRun}.
+     */
+    listedSlot?: ListedSlot;
+}
+
+/**
+ * A next slot computed for a listing, with what it was computed from: the
+ * schedule, the zone, and the instant it was computed at.
+ */
+interface ListedSlot {
+    schedule: string;
+    timezone?: string;
+    computedAt: number;
+    slot: Date;
 }
 
 /**
@@ -990,7 +1120,7 @@ export class CronScheduler {
             const now = new Date();
             for (const job of jobs) {
                 try {
-                    viewOf(job.id).nextRunAt = parseCronExpression(job.definition.schedule, now, job.definition.timezone);
+                    viewOf(job.id).nextRunAt = this.listedNextRun(job, now);
                 } catch {
                     // A schedule with no reachable slot has no next run to show.
                 }
@@ -1010,6 +1140,38 @@ export class CronScheduler {
             }
         }
         return views;
+    }
+
+    /**
+     * The next slot of `job` after `now`, for a listing on a process whose
+     * scheduler is not started — the `api` role, which Studio's Cron panel
+     * polls every 15 seconds.
+     *
+     * Cached on the job. The key is the job's schedule and zone (a re-register
+     * replaces the job, and with it the cache); the entry holds while
+     * `computedAt <= now < slot`. That is the same answer, not an
+     * approximation: the search found no matching minute between
+     * `computedAt`'s next minute and `slot`, so from any later instant before
+     * `slot` it lands on `slot` again. A clock that moves back, or reaching the
+     * slot, recomputes. The cache holds a pure function of the schedule, so
+     * there is nothing user- or role-scoped in it.
+     */
+    private listedNextRun(job: RegisteredJob, now: Date): Date {
+        const { schedule, timezone } = job.definition;
+        const nowMs = now.getTime();
+        const cached = job.listedSlot;
+        if (
+            cached
+            && cached.schedule === schedule
+            && cached.timezone === timezone
+            && cached.computedAt <= nowMs
+            && nowMs < cached.slot.getTime()
+        ) {
+            return cached.slot;
+        }
+        const slot = parseCronExpression(schedule, now, timezone);
+        job.listedSlot = { schedule, timezone, computedAt: nowMs, slot };
+        return slot;
     }
 
     /**
