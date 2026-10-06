@@ -166,8 +166,37 @@ const projectsCollection = {
     name: "Project", type: "relation", relation: { kind: "belongsTo", target: () => projectsCollection, localKey: "project_id" }
 };
 
+/** A many-to-many whose links carry columns of their own. */
+const membersCollection = {
+    name: "Members", slug: "members", table: "members",
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        name: { name: "Name", type: "string" }
+    }
+};
+const teamsCollection = {
+    name: "Teams", slug: "teams", table: "teams",
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        name: { name: "Name", type: "string" },
+        members: {
+            name: "Members", type: "relation", relation: {
+                kind: "manyToMany", target: () => membersCollection,
+                through: {
+                    table: "team_members", sourceColumn: "team_id", targetColumn: "member_id",
+                    properties: {
+                        role: { name: "Role", type: "string" },
+                        rank: { name: "Rank", type: "number" }
+                    }
+                }
+            }
+        }
+    }
+};
+
 const collections = [
-    authorsCollection, tagsCollection, commentsCollection, postsCollection, notesCollection, tasksCollection, projectsCollection
+    authorsCollection, tagsCollection, commentsCollection, postsCollection, notesCollection, tasksCollection, projectsCollection,
+    membersCollection, teamsCollection
 ] as unknown as CollectionConfig[];
 
 const ADMIN = { uid: "admin-1", roles: ["admin"] };
@@ -384,6 +413,36 @@ describe("a write's statements (E2E)", () => {
             expect(answer.status).toBe(200);
             const { rows } = await admin.query("SELECT id, project_id FROM public.tasks ORDER BY id");
             expect(rows).toEqual([{ id: open, project_id: mine }, { id: secret, project_id: theirs }]);
+        });
+    });
+
+    describe("a many-to-many write whose links carry columns", () => {
+        const junctionUpdates = (statements: string[]) => statements.filter(s => /^update "?team_members"?/i.test(s));
+
+        it("updates only the links whose columns changed", async () => {
+            const { rows: teams } = await admin.query<{ id: number }>("INSERT INTO public.teams (name) VALUES ('core') RETURNING id");
+            const team = teams[0].id;
+            const { rows: members } = await admin.query<{ id: number }>(
+                "INSERT INTO public.members (name) SELECT 'm' || g FROM generate_series(1, 20) g RETURNING id"
+            );
+            await admin.query(
+                "INSERT INTO public.team_members (team_id, member_id, role, rank) SELECT $1, id, 'member', id FROM public.members WHERE id = ANY($2)",
+                [team, members.map(row => row.id)]
+            );
+            const links = members.map(row => ({ id: row.id, _pivot: { role: "member", rank: row.id } }));
+
+            const unchanged = await statementsOf(() => http("PATCH", `/teams/${team}`, { body: { members: links } }));
+            expect(unchanged.result.status).toBe(200);
+            expect(junctionUpdates(unchanged.statements)).toEqual([]);
+
+            const promoted = links.map((link, i) => i === 3 ? { ...link, _pivot: { role: "admin", rank: link._pivot.rank } } : link);
+            const oneChanged = await statementsOf(() => http("PATCH", `/teams/${team}`, { body: { members: promoted } }));
+            expect(oneChanged.result.status).toBe(200);
+            expect(junctionUpdates(oneChanged.statements)).toHaveLength(1);
+            const { rows } = await admin.query(
+                "SELECT member_id, role FROM public.team_members WHERE team_id = $1 AND role <> 'member'", [team]
+            );
+            expect(rows).toEqual([{ member_id: members[3].id, role: "admin" }]);
         });
     });
 
