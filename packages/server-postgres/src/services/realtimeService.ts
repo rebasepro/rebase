@@ -2413,13 +2413,13 @@ roles: ["anon"] };
         );
     }
 
-    /** Leave a broadcast channel */
     /** Drop a channel its last local member left, and what was kept per channel for it. */
     private forgetChannel(channel: string): void {
         this.channels.delete(channel);
         this.oversizedBroadcastWarned.delete(channel);
     }
 
+    /** Leave a broadcast channel */
     leaveChannel(clientId: string, channel: string): void {
         const members = this.channels.get(channel);
         if (members) {
