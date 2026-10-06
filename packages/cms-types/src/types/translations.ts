@@ -1461,6 +1461,7 @@ export interface RebaseTranslations {
     studio_rls_drift_tooltip?: string;
     studio_rls_reapplied_on_start?: string;
     studio_rls_disable_reapplied?: string;
+    studio_rls_nothing_changed?: string;
 
 
     // ─── Studio: empty states that name a remedy ────────────────

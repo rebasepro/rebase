@@ -228,3 +228,32 @@ describe("a table whose policies the deployment owns", () => {
         expect(dialog.textContent).toContain(label("studio_rls_disable_reapplied").replace("{{table}}", "authors"));
     });
 });
+
+describe("saving a declared policy with nothing changed", () => {
+
+    it("does not say it was saved", async () => {
+        declaredRules = [{ name: "public_read", operation: "select", using: "true" }];
+        render(<RLSEditor/>);
+
+        fireEvent.click(within(await rowOf("public_read"))
+            .getByRole("button", { name: label("studio_rls_edit") }));
+        fireEvent.click(await screen.findByRole("button", { name: label("studio_policy_save") }));
+
+        await waitFor(() => expect(snackbarOpen).toHaveBeenCalled());
+        expect(snackbarOpen.mock.calls.map(([o]) => o.type)).not.toContain("success");
+        expect(snackbarOpen.mock.calls[0][0].message).toBe(label("studio_rls_nothing_changed"));
+        expect(updateCollection).not.toHaveBeenCalled();
+    });
+
+    it("is still saved once something has changed", async () => {
+        declaredRules = [{ name: "public_read", operation: "select", using: "true" }];
+        render(<RLSEditor/>);
+
+        fireEvent.click(within(await rowOf("public_read"))
+            .getByRole("button", { name: label("studio_rls_edit") }));
+        fireEvent.change(await screen.findByLabelText(label("studio_policy_name")), { target: { value: "everyone_reads" } });
+        fireEvent.click(screen.getByRole("button", { name: label("studio_policy_save") }));
+
+        await waitFor(() => expect(updateCollection).toHaveBeenCalled());
+    });
+});

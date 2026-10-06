@@ -901,6 +901,14 @@ totalPolicies };
                                                 return;
                                             }
                                             newRules = edit.rules;
+                                            // Nothing the form changed reaches the rule. Saving
+                                            // it would plan an empty change, apply nothing, and
+                                            // still report "saved".
+                                            if (JSON.stringify(newRules) === JSON.stringify(existingRules)) {
+                                                snackbarController.open({ type: "info",
+                                                    message: t("studio_rls_nothing_changed") });
+                                                return;
+                                            }
                                         }
 
                                         try {
