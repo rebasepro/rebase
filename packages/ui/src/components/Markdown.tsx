@@ -34,7 +34,20 @@ const proseWeightOverrides = [
     "prose-a:font-normal"
 ].join(" ");
 
-const md = new MarkdownIt({ html: false });
+let md: MarkdownIt | undefined;
+
+/**
+ * The parser, built the first time a `Markdown` renders and shared after that.
+ *
+ * Not at module scope: every admin evaluates this module on boot, the login
+ * screen included, and most sessions never render markdown. A constructor
+ * call at the top of a module is also a side effect no bundler may drop.
+ */
+function parser(): MarkdownIt {
+    md ??= new MarkdownIt({ html: false });
+    return md;
+}
+
 /**
  * @group Preview components
  */
@@ -44,7 +57,7 @@ export const Markdown = React.memo<MarkdownProps>(function Markdown({
                                                                         size = "medium"
                                                                     }: MarkdownProps) {
         const html = useMemo(() => {
-            return md.render(typeof source === "string" ? source : "");
+            return parser().render(typeof source === "string" ? source : "");
         }, [source]);
 
         return <div
