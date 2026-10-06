@@ -19,6 +19,7 @@ import { SelectableTable } from "../SelectableTable/SelectableTable";
 import { cls } from "@rebasepro/ui";
 import { getRowHeight, isDisabled } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
+import { deepEqual as equal } from "fast-equals";
 
 /**
  * This component is in charge of rendering a collection table with a high
@@ -294,6 +295,15 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         return [...columnsResult, ...additionalTableColumns];
     }, [properties, sortable, fixedFilter, engine, AdditionalHeaderWidget, additionalFields]);
 
+    // Held by value: the widget is an element, and a caller that builds it
+    // inline hands over a new one on every render. Each new one rebuilt the
+    // id column, so the table's columns, so every cell on screen.
+    const idHeaderWidgetRef = useRef(additionalIDHeaderWidget);
+    if (idHeaderWidgetRef.current !== additionalIDHeaderWidget && !equal(idHeaderWidgetRef.current, additionalIDHeaderWidget)) {
+        idHeaderWidgetRef.current = additionalIDHeaderWidget;
+    }
+    const stableIdHeaderWidget = idHeaderWidgetRef.current;
+
     const idColumn: VirtualTableColumn = useMemo(() => ({
         key: "id_ewcfedcswdf3",
         width: getIdColumnWidth?.() ?? (largeLayout ? 140 : 120),
@@ -302,8 +312,8 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         frozen: largeLayout,
         headerAlign: "center",
         align: "center",
-        AdditionalHeaderWidget: () => additionalIDHeaderWidget
-    }), [getIdColumnWidth, largeLayout, additionalIDHeaderWidget]);
+        AdditionalHeaderWidget: () => stableIdHeaderWidget
+    }), [getIdColumnWidth, largeLayout, stableIdHeaderWidget]);
 
     const columns: VirtualTableColumn[] = useMemo(() => [
         idColumn,

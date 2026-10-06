@@ -90,6 +90,18 @@ import { resolveComponentRef, saveEntityWithCallbacks } from "@rebasepro/app";
 
 const EMPTY_ARRAY: never[] = [];
 
+/** What the plugins contributed to the table's add-column slot, for {@link PluginAddColumnComponents}. */
+const PluginAddColumnsContext = React.createContext<React.ReactNode[]>(EMPTY_ARRAY);
+
+function PluginAddColumnComponents() {
+    const components = React.useContext(PluginAddColumnsContext);
+    return (
+        <div className="flex flex-row items-center gap-2">
+            {components}
+        </div>
+    );
+}
+
 /**
  * @group Components
  */
@@ -908,6 +920,20 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
 
         }, [updateLastDeleteTimestamp, usedSelectionController]);
 
+        // Built once per change rather than once per render: each of these is a
+        // prop of the table (and of the other views), and a new array or a new
+        // element on every render of this component re-rendered every row of the
+        // table — twice, the second time for the columns the id header widget
+        // rebuilt — on each window emit, count arrival and popover toggle.
+        const highlightedEntities = useMemo(
+            () => highlightedEntity ? [highlightedEntity] : EMPTY_ARRAY,
+            [highlightedEntity]);
+        const idHeaderWidget = useMemo(() => <EntityIdHeaderWidget
+            path={path}
+            idPath={path}
+            collection={collection}
+            openEntityMode={openEntityMode}/>, [path, collection, openEntityMode]);
+
         // EntitiesCount fetches the count and reports it — the toolbar renders it
         const countFetcher = <EntitiesCount
             path={path}
@@ -976,14 +1002,13 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
             ))}</>;
         }, [headerActionContributions, path, parentCollectionSlugs]);
 
+        // One component type for the life of the view: the plugins' controls
+        // reach it through context. A function declared here was a new
+        // component type on every render — the table's columns changed with
+        // it, and the header remounted whatever the plugins had drawn, closing
+        // anything they had open, on every row update.
         const addColumnComponentInternal = pluginAddColumnComponents.length > 0
-            ? function () {
-                return (
-                    <div className="flex flex-row items-center gap-2">
-                        {pluginAddColumnComponents}
-                    </div>
-                );
-            }
+            ? PluginAddColumnComponents
             : undefined;
 
         const onColumnsOrderChange = useCallback((newColumns: VirtualTableColumn[]) => {
@@ -1145,7 +1170,7 @@ parentEntityIds,
                     canCreate={canCreateEntities}
                     selectionController={usedSelectionController}
                     selectionEnabled={selectionEnabled}
-                    highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                    highlightedEntities={highlightedEntities}
                     deletedEntities={deletedEntities}
                     emptyComponent={emptyComponent}
                     size={activeCustomView!.sizeable ? customViewSize : undefined}
@@ -1163,7 +1188,7 @@ parentEntityIds,
                 onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
-                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                highlightedEntities={highlightedEntities}
                 deletedEntities={deletedEntities}
                 emptyComponent={emptyComponent}
             />
@@ -1175,7 +1200,7 @@ parentEntityIds,
                 onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
-                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                highlightedEntities={highlightedEntities}
                 onScroll={tableController.onScroll}
                 initialScroll={tableController.initialScroll}
                 size={cardSize}
@@ -1189,7 +1214,7 @@ parentEntityIds,
                 onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
-                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                highlightedEntities={highlightedEntities}
                 size={listSize}
                 emptyComponent={emptyComponent}
                 selectedEntityId={selectedEntityIdProp}
@@ -1198,6 +1223,7 @@ parentEntityIds,
                 openEntityMode={openEntityMode}
             />
         ) : (
+            <PluginAddColumnsContext.Provider value={pluginAddColumnComponents}>
             <ResolvedCollectionTable
                 key={`collection_table_${path}`}
                 hideToolbar={true}
@@ -1213,7 +1239,7 @@ parentEntityIds,
                 tableRowActionsBuilder={tableRowActionsBuilder}
                 uniqueFieldValidator={uniqueFieldValidator}
                 selectionController={usedSelectionController}
-                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                highlightedEntities={highlightedEntities}
                 defaultSize={tableSize}
                 properties={resolvedCollection.properties}
                 getPropertyFor={getPropertyFor}
@@ -1225,14 +1251,11 @@ parentEntityIds,
                 AdditionalHeaderWidget={buildAdditionalHeaderWidget}
                 AddColumnComponent={addColumnComponentInternal}
                 getIdColumnWidth={getIdColumnWidth}
-                additionalIDHeaderWidget={<EntityIdHeaderWidget
-                    path={path}
-                    idPath={path}
-                    collection={collection}
-                    openEntityMode={openEntityMode}/>}
+                additionalIDHeaderWidget={idHeaderWidget}
                 openEntityMode={openEntityMode}
                 onColumnsOrderChange={onColumnsOrderChange}
             />
+            </PluginAddColumnsContext.Provider>
         );
 
         const detailOpen = selectedEntityIdProp !== undefined;
@@ -1313,7 +1336,7 @@ parentEntityIds,
                         onNewClick={onNewClick}
                         selectionController={usedSelectionController}
                         selectionEnabled={selectionEnabled}
-                        highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                        highlightedEntities={highlightedEntities}
                         onScroll={tableController.onScroll}
                         initialScroll={tableController.initialScroll}
                         size={listSize}
