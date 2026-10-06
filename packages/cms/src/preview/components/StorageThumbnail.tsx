@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 
 import { renderSkeletonImageThumbnail } from "../property_previews/SkeletonPropertyComponent";
 import { UrlComponentPreview } from "./UrlComponentPreview";
+import { knownStorageRenditionUrl, storageRenditionUrl } from "./storageRenditions";
 import { useStorageSource, useStorageSources, useTranslation } from "@rebasepro/app";
 import { createDownloadUrlCache, resolveStorageSource } from "@rebasepro/common";
 import { DownloadConfig, FileType } from "@rebasepro/types";
@@ -99,23 +100,34 @@ export function StorageThumbnailInternal({
     // does not collide.
     const cacheKey = `${storageSourceKey ?? ""}::${storagePathOrDownloadUrl}`;
 
-    const [downloadConfig, setDownloadConfig] = React.useState<DownloadConfig | undefined>(() => URL_CACHE.peek(cacheKey));
+    // What is drawn: the signed config, and the resized rendition to show in
+    // its place when the server makes them (see `storageRenditions`).
+    const [shown, setShown] = React.useState<{ config: DownloadConfig; previewUrl?: string } | undefined>(() => {
+        const cached = URL_CACHE.peek(cacheKey);
+        if (!cached) return undefined;
+        const previewUrl = knownStorageRenditionUrl(cached, size, fill);
+        // Not yet known whether this server resizes: wait for the effect
+        // rather than start downloading the original.
+        return previewUrl === null ? undefined : { config: cached, previewUrl };
+    });
+    const downloadConfig = shown?.config;
 
     useEffect(() => {
         if (!storagePathOrDownloadUrl)
             return;
         let unmounted = false;
         getSignedUrlOnce(storage, storagePathOrDownloadUrl, cacheKey)
-            .then(function (downloadConfig) {
+            .then(async function (downloadConfig) {
+                const previewUrl = await storageRenditionUrl(downloadConfig, size, fill);
                 if (!unmounted) {
-                    setDownloadConfig(downloadConfig);
+                    setShown({ config: downloadConfig, previewUrl });
                     URL_CACHE.set(cacheKey, { config: downloadConfig });
                 }
             }).catch(setError);
         return () => {
             unmounted = true;
         };
-    }, [storagePathOrDownloadUrl, cacheKey]);
+    }, [storagePathOrDownloadUrl, cacheKey, size, fill]);
 
     if (!storagePathOrDownloadUrl) return null;
 
@@ -136,6 +148,7 @@ export function StorageThumbnailInternal({
     return downloadConfig?.url
         ? <UrlComponentPreview previewType={previewType}
             url={downloadConfig.url}
+            previewUrl={shown?.previewUrl}
             interactive={interactive}
             size={size}
             fill={fill}

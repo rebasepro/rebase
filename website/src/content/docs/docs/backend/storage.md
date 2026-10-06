@@ -167,6 +167,13 @@ A parameter outside these bounds is a **400**, not a silently clamped value —
 `?width=99999` used to return a 4096px image and `?format=tiff` a webp one, and
 neither said so.
 
+The admin panel's thumbnails of stored images use this endpoint: a table or card
+preview asks for a webp rendition about twice its rendered size (96–800px)
+rather than the original. `sharp` is an optional dependency; without it the
+transform answers 500, so the panel checks once per page load, with a single
+rendition request, and shows originals if the server cannot resize. SVG and GIF
+files are always shown as they are.
+
 ### Performance & LRU Caching
 
 Transforming is CPU- and memory-heavy, and on a public object the endpoint is
