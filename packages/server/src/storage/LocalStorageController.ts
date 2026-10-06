@@ -33,7 +33,6 @@ const mkdir = promisify(fs.mkdir);
 const writeFile = promisify(fs.writeFile);
 const readFile = promisify(fs.readFile);
 const unlink = promisify(fs.unlink);
-const readdir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
 const access = promisify(fs.access);
 
@@ -47,6 +46,29 @@ export const DEFAULT_BUCKET = "default";
 
 /** What a write in progress is named: `.<name>.<uuid>.partial`, beside its target. */
 const PARTIAL_SUFFIX = ".partial";
+
+/**
+ * How long a folder's entries, read for a paged listing, serve its
+ * continuation pages. See {@link LocalStorageController.listingEntries}.
+ */
+const LISTING_SNAPSHOT_TTL_MS = 30_000;
+/**
+ * A folder changed less than this long before it was read is not kept. Two
+ * changes inside one mtime tick (a second on HFS+ and ext3, two on FAT) leave
+ * one mtime, so the later change would not invalidate the read.
+ */
+const LISTING_SNAPSHOT_RACY_MS = 2_000;
+/** Folders kept at once, and entries across them, before the oldest goes. */
+const LISTING_SNAPSHOT_MAX_DIRS = 16;
+const LISTING_SNAPSHOT_MAX_ENTRIES = 100_000;
+
+interface ListingSnapshot {
+    entries: fs.Dirent[];
+    /** The folder's mtime when it was read. */
+    mtimeMs: number;
+    /** When it was read, by `Date.now()`. */
+    readAt: number;
+}
 const isPartialWrite = (name: string) => /^\..+\.[0-9a-f-]{36}\.partial$/.test(name);
 
 /** A file's bytes, a chunk at a time. */
@@ -85,6 +107,14 @@ function normalizeStoragePath(s: string): string {
 export class LocalStorageController implements StorageController {
     private config: LocalStorageConfig;
     private basePath: string;
+    /**
+     * Folder entries read by a listing's first page, for its continuation
+     * pages. Keyed by the folder's absolute path (bucket included). Not
+     * caller-scoped, because the entries are not: every caller of this method
+     * gets the same names, and the routes authorize the prefix before calling
+     * it. Insertion-ordered, so the first key is the oldest.
+     */
+    private readonly listingSnapshots = new Map<string, ListingSnapshot>();
 
     constructor(config: LocalStorageConfig) {
         this.config = config;
@@ -506,8 +536,7 @@ export class LocalStorageController implements StorageController {
         const prefixes: StorageReference[] = [];
 
         try {
-            await access(fullPath, fs.constants.R_OK);
-            const entries = await readdir(fullPath, { withFileTypes: true });
+            const entries = await this.listingEntries(fullPath, startIndex > 0);
 
             let count = 0;
             // Cursor over `entries`, not over emitted results. Every stored
@@ -553,6 +582,8 @@ export class LocalStorageController implements StorageController {
             }
 
             const nextPageToken = scanned < entries.length ? String(scanned) : undefined;
+            // The last page of a walk frees the folder's read.
+            if (!nextPageToken) this.listingSnapshots.delete(fullPath);
 
             return {
                 items,
@@ -567,6 +598,49 @@ prefixes: [] };
             }
             throw error;
         }
+    }
+
+    /**
+     * A folder's entries for a listing page.
+     *
+     * A page token is an index into these entries, and every continuation
+     * page used to read the whole folder again to find its place: a folder of
+     * n entries listed in pages of p cost n/p full reads. A first page reads
+     * the folder and, when there is a next page, keeps the read; a
+     * continuation page indexes into it while all of these hold:
+     *
+     *  - the folder's mtime is the one read with it. Adding, removing or
+     *    renaming an entry changes it, which is the invalidation;
+     *  - it is under {@link LISTING_SNAPSHOT_TTL_MS} old;
+     *  - the folder had not changed in the {@link LISTING_SNAPSHOT_RACY_MS}
+     *    before the read. Otherwise it is not kept at all.
+     *
+     * A first page always reads the folder as it is.
+     */
+    private async listingEntries(fullPath: string, continuation: boolean): Promise<fs.Dirent[]> {
+        const readAt = Date.now();
+        // A stat rather than `access`: the same ENOENT/ENOTDIR for a missing
+        // folder, and the mtime the kept read is checked against. A folder
+        // this process cannot read still fails at `readdir`, as it did.
+        const { mtimeMs } = await fs.promises.stat(fullPath);
+        const kept = this.listingSnapshots.get(fullPath);
+        if (continuation && kept && kept.mtimeMs === mtimeMs && readAt - kept.readAt < LISTING_SNAPSHOT_TTL_MS) {
+            return kept.entries;
+        }
+        this.listingSnapshots.delete(fullPath);
+
+        const entries = await fs.promises.readdir(fullPath, { withFileTypes: true });
+        if (readAt - mtimeMs > LISTING_SNAPSHOT_RACY_MS && entries.length <= LISTING_SNAPSHOT_MAX_ENTRIES) {
+            this.listingSnapshots.set(fullPath, { entries, mtimeMs, readAt });
+            let total = 0;
+            for (const snapshot of this.listingSnapshots.values()) total += snapshot.entries.length;
+            for (const [key, snapshot] of this.listingSnapshots) {
+                if (this.listingSnapshots.size <= LISTING_SNAPSHOT_MAX_DIRS && total <= LISTING_SNAPSHOT_MAX_ENTRIES) break;
+                this.listingSnapshots.delete(key);
+                total -= snapshot.entries.length;
+            }
+        }
+        return entries;
     }
 
     /**
