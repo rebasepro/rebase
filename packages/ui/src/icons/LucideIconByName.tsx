@@ -37,7 +37,10 @@ let pending: Promise<IconsMap> | undefined;
  */
 export function loadLucideIcons(): Promise<IconsMap> {
     if (loaded) return Promise.resolve(loaded);
-    pending ??= import("lucide-react").then(({ icons }) => {
+    // A local module, not `import("lucide-react")`: lucide-react is statically
+    // imported too, so importing IT dynamically cannot split anything off and
+    // the map lands in the static chunk. See `lucide_icon_map.ts`.
+    pending ??= import("./lucide_icon_map").then(({ icons }) => {
         loaded = icons as IconsMap;
         return loaded;
     });

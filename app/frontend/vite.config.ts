@@ -60,7 +60,6 @@ export default defineConfig({
         rollupOptions: {
             onwarn(warning, warn) {
                 if (warning.code === "MISSING_GLOBAL_NAME") return;
-                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
                 warn(warning);
             },
             output: {
@@ -117,6 +116,13 @@ export default defineConfig({
                     // and naming it welded 822 kB of icons into the preload set.
                     // Left to Rollup, the named icons land in the entry and the
                     // map gets its own async chunk.
+                    //
+                    // The map is reached through one module of the kit,
+                    // `icons/lucide_icon_map.ts`, that only `import()` reaches.
+                    // It must not fall under the `rebase-ui` name below: a named
+                    // group takes a module's dependencies with it, so naming the
+                    // map module put all ~1,700 icons back in a preloaded chunk.
+                    if (id.includes("packages/ui/src/icons/lucide_icon_map")) return undefined;
 
                     if (id.includes("packages/ui/")) return "rebase-ui";
                     if (id.includes("packages/app/")) return "rebase-core";
