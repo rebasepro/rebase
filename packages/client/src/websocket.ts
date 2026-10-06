@@ -743,7 +743,7 @@ export class RebaseWebSocketClient {
                 try {
                     // A reviver parse calls back for every key and value of the
                     // frame; most frames have nothing to revive. Same result.
-                    const message = parseRebaseJson(event.data);
+                    const message = parseRebaseJson<WebSocketMessage>(event.data);
                     this.handleWebSocketMessage(message);
                 } catch (error) {
                     console.error("Error parsing WebSocket message:", error);
