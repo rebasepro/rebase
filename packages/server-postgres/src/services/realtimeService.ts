@@ -499,6 +499,19 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private collectionGroupsByPath = new Map<string, Set<SubscriptionGroup>>();
     private singleGroupsByAddress = new Map<string, Set<SubscriptionGroup>>();
     /**
+     * When something on each path a list group reads last changed: the
+     * debounce clock those groups share, moved once per changed row instead
+     * of once per row per group. See {@link notifyPathUpdate}.
+     */
+    private listPathChangedAt = new Map<string, number>();
+    /**
+     * The list groups on each path that a change still has to schedule: new
+     * ones, and those whose last refetch has started. The rest already have a
+     * refetch for every member pending, which the next change only has to
+     * keep waiting — the clock above does that.
+     */
+    private unscheduledListGroups = new Map<string, Set<SubscriptionGroup>>();
+    /**
      * Every path a subscription holds, with the collection it lands on and how
      * many hold it — the candidates `aliasPaths` considers, resolved once.
      */
@@ -682,6 +695,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             let bucket = index.get(address);
             if (!bucket) index.set(address, bucket = new Set());
             bucket.add(group);
+            if (group.type === "collection") this.markListGroupUnscheduled(group);
         }
         group.members.add(key);
 
@@ -723,6 +737,20 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         const bucket = index.get(address);
         bucket?.delete(group);
         if (bucket?.size === 0) index.delete(address);
+        if (group.type === "collection") {
+            this.unscheduledListGroups.get(group.path)?.delete(group);
+            if (!this.collectionGroupsByPath.has(group.path)) {
+                this.unscheduledListGroups.delete(group.path);
+                this.listPathChangedAt.delete(group.path);
+            }
+        }
+    }
+
+    /** See {@link unscheduledListGroups}. */
+    private markListGroupUnscheduled(group: SubscriptionGroup): void {
+        let unscheduled = this.unscheduledListGroups.get(group.path);
+        if (!unscheduled) this.unscheduledListGroups.set(group.path, unscheduled = new Set());
+        unscheduled.add(group);
     }
 
     /**
@@ -752,7 +780,10 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             group.timer = undefined;
             if (this.groups.get(group.key) !== group) return;
             const now = Date.now();
-            const quietFor = now - group.lastChangeAt;
+            const lastChangeAt = group.type === "collection"
+                ? Math.max(group.lastChangeAt, this.listPathChangedAt.get(group.path) ?? 0)
+                : group.lastChangeAt;
+            const quietFor = now - lastChangeAt;
             const waitedFor = now - (group.firstPendingAt ?? now);
             if (quietFor < RealtimeService.REFETCH_DEBOUNCE_MS && waitedFor < RealtimeService.REFETCH_MAX_WAIT_MS) {
                 this.armGroupTimer(group, Math.min(
@@ -800,6 +831,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         const keys = group.pending === "all" ? [...group.members] : [...group.pending];
         group.pending = new Set();
         group.firstPendingAt = undefined;
+        // A change from here on is one this read may not have seen.
+        if (group.type === "collection" && this.groups.get(group.key) === group) this.markListGroupUnscheduled(group);
 
         const targets: Array<{ key: string; subscription: Subscription; canDeliver: DeliveryCheck; callback?: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void }> = [];
         for (const key of keys) {
@@ -1585,12 +1618,24 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private notifyPathUpdate(notifyPath: string, originalPath: string, id: string) {
         this.debugLog(`📡 [RealtimeService] Notifying path: ${notifyPath} (original: ${originalPath})`);
 
-        // Every list on the path may have changed. A single-row subscription
-        // is asked only at the written path, and only for its own row: a
-        // parent path is a different record.
-        for (const group of this.collectionGroupsByPath.get(notifyPath) ?? []) {
-            this.scheduleGroupRefetch(group);
+        // Every list on the path may have changed — but every changed row of a
+        // statement says so, and the lists' answer is one refetch each however
+        // many rows asked. A row only moves the path's debounce clock and
+        // schedules the groups that have no refetch pending yet; it used to
+        // visit every group on the path, so a 100k-row UPDATE on a list open
+        // as 1,000 principals was 100M visits, ~3.9 s of event loop no socket
+        // or request on this instance got past.
+        if (this.collectionGroupsByPath.has(notifyPath)) {
+            this.listPathChangedAt.set(notifyPath, Date.now());
+            const unscheduled = this.unscheduledListGroups.get(notifyPath);
+            if (unscheduled?.size) {
+                for (const group of unscheduled) this.scheduleGroupRefetch(group);
+                unscheduled.clear();
+            }
         }
+        // A single-row subscription is asked only at the written path, and
+        // only for its own row: a parent path is a different record. Its
+        // bucket is per row already.
         if (notifyPath !== originalPath) return;
         for (const group of this.singleGroupsByAddress.get(`${notifyPath}\u0000${id}`) ?? []) {
             this.scheduleGroupRefetch(group);
@@ -2992,6 +3037,8 @@ lastSeen: Date.now() });
         }
 
         // 2. Clear subscriptions, callbacks and the groups and indexes over them
+        this.unscheduledListGroups.clear();
+        this.listPathChangedAt.clear();
         this.refetchQueue.clear();
         this._subscriptions.clear();
         this.subscriptionCallbacks.clear();

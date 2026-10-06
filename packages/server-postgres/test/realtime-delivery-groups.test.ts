@@ -290,6 +290,38 @@ describe("a statement that changes many rows", () => {
         // the walk it replaced.
         expect(elapsed).toBeLessThan(1500);
     });
+
+    it("costs the same per row however many principals watch the list", async () => {
+        // Every changed row used to visit every list group on its path: a
+        // 100k-row UPDATE on a list open as 1,000 principals was 100M visits,
+        // ~3.9 s of event loop no socket or request on the instance got
+        // past. The groups are visited once per burst now. Two sizes, the
+        // same 10,000 changes: the time must not grow with the groups.
+        jest.useRealTimers();
+        const timeFor = async (principals: number) => {
+            await service.destroy();
+            service = new RealtimeService(service["db"], service["registry"]);
+            service.setDataDriver({ callContextWithin: () => ({}) } as never);
+            for (let i = 0; i < principals; i++) {
+                connect(`c${i}`);
+                await subscribeList(`c${i}`, "s", { uid: `user${i}`, roles: ["editor"] });
+            }
+            await flush();
+            const started = performance.now();
+            for (let i = 0; i < 10_000; i++) {
+                await service.notifyUpdate("posts", String(i), { _rebase_invalidated: true }, undefined, false, "cdc");
+            }
+            await new Promise((resolve) => setImmediate(resolve));
+            return performance.now() - started;
+        };
+        await timeFor(10);
+        const few = Math.min(await timeFor(10), await timeFor(10));
+        const many = Math.min(await timeFor(2000), await timeFor(2000));
+
+        // Measured on a laptop: 2,000 groups took 44x as long as 10 before,
+        // about as long now.
+        expect(many / few).toBeLessThan(4);
+    });
 });
 
 describe("a steady stream of writes", () => {
