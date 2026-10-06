@@ -4,7 +4,8 @@ import nodemailer from "nodemailer";
 jest.mock("nodemailer", () => {
     const mockTransporter = {
         verify: jest.fn().mockResolvedValue(true),
-        sendMail: jest.fn().mockResolvedValue(true)
+        sendMail: jest.fn().mockResolvedValue(true),
+        close: jest.fn()
     };
     return {
         createTransport: jest.fn().mockReturnValue(mockTransporter)
@@ -220,5 +221,64 @@ describe("SMTPEmailService", () => {
         await expect(service.send(mail)).rejects.toThrow(/transport exploded/);
         await expect(service.send(mail)).resolves.toBeDefined();
         expect(mockTransporter.sendMail).toHaveBeenCalledTimes(1);
+    });
+
+    describe("the connection pool", () => {
+        const smtp = { host: "smtp.example.com", port: 587 };
+        const mail = { to: "a@example.com", subject: "s", text: "t" };
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it("asks nodemailer for a pool, five connections unless told otherwise", async () => {
+            await new SMTPEmailService({ from: "test@example.com", smtp }).verifyConnection();
+            await new SMTPEmailService({ from: "test@example.com", smtp: { ...smtp, maxConnections: 3 } }).verifyConnection();
+
+            expect(mockCreateTransport).toHaveBeenNthCalledWith(1, expect.objectContaining({ pool: true, maxConnections: 5 }));
+            expect(mockCreateTransport).toHaveBeenNthCalledWith(2, expect.objectContaining({ pool: true, maxConnections: 3 }));
+        });
+
+        it("is closed a few seconds after the last send, and rebuilt for the next", async () => {
+            // A pooled connection left open holds the process for the ten
+            // minutes nodemailer waits on an idle socket.
+            jest.useFakeTimers();
+            const service = new SMTPEmailService({ from: "test@example.com", smtp });
+            await service.send(mail);
+            await service.send(mail);
+            expect(mockTransporter.close).not.toHaveBeenCalled();
+
+            jest.advanceTimersByTime(5_000);
+            expect(mockTransporter.close).toHaveBeenCalledTimes(1);
+            expect(mockCreateTransport).toHaveBeenCalledTimes(1);
+
+            await service.send(mail);
+            expect(mockCreateTransport).toHaveBeenCalledTimes(2);
+        });
+
+        it("is not closed under a send still in flight", async () => {
+            jest.useFakeTimers();
+            const service = new SMTPEmailService({ from: "test@example.com", smtp });
+            await service.send(mail);
+            let finish: (value: unknown) => void = () => undefined;
+            mockTransporter.sendMail.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+            const slow = service.send(mail);
+            await Promise.resolve();
+
+            jest.advanceTimersByTime(60_000);
+            expect(mockTransporter.close).not.toHaveBeenCalled();
+
+            finish(true);
+            await slow;
+            jest.advanceTimersByTime(5_000);
+            expect(mockTransporter.close).toHaveBeenCalledTimes(1);
+        });
+
+        it("closes at once on close()", async () => {
+            const service = new SMTPEmailService({ from: "test@example.com", smtp });
+            await service.send(mail);
+            service.close();
+            expect(mockTransporter.close).toHaveBeenCalledTimes(1);
+        });
     });
 });

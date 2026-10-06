@@ -60,6 +60,20 @@ function assertSafeHeaders(headers: Record<string, string> | undefined): void {
     }
 }
 
+/** Connections a burst of mail may hold open at once, unless `smtp.maxConnections` says otherwise. */
+const DEFAULT_MAX_CONNECTIONS = 5;
+
+/**
+ * How long the connection pool may sit unused before it is closed.
+ *
+ * Long enough that a burst — a team invited at once, a `Promise.all` over
+ * `email.send` — reuses its connections; short enough that a quiet server
+ * holds no socket open to the provider, and that a script which sends one
+ * message and finishes is not kept alive by an idle connection for the ten
+ * minutes nodemailer would otherwise wait.
+ */
+const POOL_IDLE_CLOSE_MS = 5_000;
+
 /** `<abc@host>` → `abc@host`. See EmailSendResult.messageId for why. */
 function normalizeMessageId(value: unknown): string | undefined {
     if (typeof value !== "string") return undefined;
@@ -85,6 +99,10 @@ export class SMTPEmailService implements EmailService {
      * life of the process.
      */
     private transporterReady: Promise<void> | null = null;
+    /** Sends between their start and their end — the pool is never closed under one. */
+    private sending = 0;
+    /** Closes the pool once it has been unused for {@link POOL_IDLE_CLOSE_MS}. */
+    private idleTimer: ReturnType<typeof setTimeout> | undefined;
 
     constructor(config: EmailConfig) {
         this.config = config;
@@ -125,7 +143,15 @@ export class SMTPEmailService implements EmailService {
                 }
             }
 
+            // Pooled. Without it nodemailer opens a new connection for every
+            // message — TCP, greeting, EHLO, STARTTLS and AUTH again each time —
+            // and a burst of fifty opens fifty at once, which a provider that
+            // caps connections per mailbox answers with 4xx refusals the
+            // caller sees as failed sends. The pool queues past
+            // `maxConnections` instead, and is closed when idle.
             this.transporter = nodemailer.createTransport({
+                pool: true,
+                maxConnections: this.config.smtp.maxConnections ?? DEFAULT_MAX_CONNECTIONS,
                 name: smtpName,
                 host: this.config.smtp.host,
                 port: this.config.smtp.port,
@@ -162,7 +188,19 @@ export class SMTPEmailService implements EmailService {
             return result ?? {};
         }
 
-        // Use SMTP transporter
+        // Use SMTP transporter. Counted from before the transporter is built,
+        // so the idle close can never land between building it and using it.
+        this.sending++;
+        clearTimeout(this.idleTimer);
+        try {
+            return await this.sendOverSmtp(options);
+        } finally {
+            this.sending--;
+            this.closeWhenIdle();
+        }
+    }
+
+    private async sendOverSmtp(options: EmailSendOptions): Promise<EmailSendResult> {
         await this.ensureTransporter();
 
         if (!this.transporter) {
@@ -195,6 +233,38 @@ export class SMTPEmailService implements EmailService {
             logger.error("Failed to send email", { detail: message });
             throw new Error(`Failed to send email: ${message}`);
         }
+    }
+
+    /** Arm the idle close once nothing is sending. */
+    private closeWhenIdle(): void {
+        if (this.sending > 0 || !this.transporter) return;
+        clearTimeout(this.idleTimer);
+        this.idleTimer = setTimeout(() => {
+            this.idleTimer = undefined;
+            if (this.sending === 0) this.releaseTransporter();
+        }, POOL_IDLE_CLOSE_MS);
+        this.idleTimer.unref?.();
+    }
+
+    /**
+     * Close the pool and forget it; the next send builds a fresh one. A closed
+     * nodemailer pool accepts nothing more, so it cannot be kept and reused.
+     */
+    private releaseTransporter(): void {
+        const transporter = this.transporter;
+        this.transporter = null;
+        this.transporterReady = null;
+        transporter?.close?.();
+    }
+
+    /**
+     * Close the connection pool now, rather than when it next goes idle — for
+     * a shutdown. A send after this opens a new pool.
+     */
+    close(): void {
+        clearTimeout(this.idleTimer);
+        this.idleTimer = undefined;
+        if (this.sending === 0) this.releaseTransporter();
     }
 
     /**
