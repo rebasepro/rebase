@@ -24,6 +24,12 @@ export interface RunAsUsers {
     loading: boolean;
     /** Search the project's users on the server. */
     onSearchTextChange: (searchText: string) => void;
+    /**
+     * How many users the latest search matched on the server, set only when
+     * that is more than the one page listed — so the picker can say so rather
+     * than present the page as everyone.
+     */
+    totalCount?: number;
 }
 
 /**
@@ -41,6 +47,7 @@ export function useRunAsUsers(): RunAsUsers {
 
     const [search, setSearch] = useState("");
     const [listed, setListed] = useState<SelectableUser[]>([]);
+    const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -48,12 +55,17 @@ export function useRunAsUsers(): RunAsUsers {
         let cancelled = false;
         setLoading(true);
         adminApi.listUsersPaginated({ search: search || undefined, limit: USER_PAGE_SIZE })
-            .then(({ users }) => {
-                if (!cancelled) setListed(users.filter((u) => !u.disabled).map(toSelectableUser));
+            .then(({ users, total }) => {
+                if (cancelled) return;
+                setListed(users.filter((u) => !u.disabled).map(toSelectableUser));
+                setTotalCount(total > users.length ? total : undefined);
             })
             .catch((err: unknown) => {
                 console.warn("Could not list users for the \"Run as\" picker", err);
-                if (!cancelled) setListed([]);
+                if (!cancelled) {
+                    setListed([]);
+                    setTotalCount(undefined);
+                }
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -70,5 +82,5 @@ export function useRunAsUsers(): RunAsUsers {
         [currentUser, listed]
     );
 
-    return { users, currentUser, loading, onSearchTextChange: setSearch };
+    return { users, currentUser, loading, onSearchTextChange: setSearch, totalCount };
 }

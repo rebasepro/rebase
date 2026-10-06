@@ -64,7 +64,7 @@ export function TryItPanel({ endpoint, apiUrl, getAuthToken, user, basePath = ""
 
     // An administrator is offered the project's users; anyone else, only
     // themselves — the server lets nobody else run a request as someone.
-    const { users, currentUser, loading: usersLoading, onSearchTextChange } = useRunAsUsers();
+    const { users, currentUser, loading: usersLoading, onSearchTextChange, totalCount: userTotalCount } = useRunAsUsers();
 
     const [selectedUser, setSelectedUser] = useState<SelectableUser | null>(null);
 
@@ -171,6 +171,7 @@ time: elapsed });
                     users={users}
                     loading={usersLoading}
                     onUserSearchTextChange={onSearchTextChange}
+                    userTotalCount={userTotalCount}
                     currentUser={currentUser}
                 />
 

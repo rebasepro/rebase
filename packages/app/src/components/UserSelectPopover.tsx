@@ -52,6 +52,13 @@ export interface UserSelectPopoverProps {
      */
     onSearchTextChange?: (searchText: string) => void;
     /**
+     * For a parent that lists only the first page of a server search: how many
+     * users that search matched in all. Leave it out when `users` holds every
+     * match. When set, the header counts the listed users against it and a
+     * notice says the others are not listed.
+     */
+    totalCount?: number;
+    /**
      * The current user (displayed as the "self" option at the top).
      */
     currentUser?: SelectableUser | null;
@@ -93,6 +100,7 @@ export function UserSelectPopover({
     users,
     loading = false,
     onSearchTextChange,
+    totalCount,
     currentUser,
     defaultLabel = "Current user",
     renderLimit = 100,
@@ -241,7 +249,9 @@ export function UserSelectPopover({
                             variant="caption"
                             className="text-[9px] text-text-disabled dark:text-text-disabled-dark tabular-nums"
                         >
-                            {totalFilterable} user{totalFilterable !== 1 ? "s" : ""}
+                            {totalCount !== undefined
+                                ? `${filteredUsers.length} of ${totalCount} users`
+                                : `${totalFilterable} user${totalFilterable !== 1 ? "s" : ""}`}
                         </Typography>
                     )}
                 </div>
@@ -301,8 +311,20 @@ export function UserSelectPopover({
                         />
                     ))}
 
+                    {/* The parent listed only the first page of its server search */}
+                    {!loading && totalCount !== undefined && (
+                        <div className={cls("px-3 py-2 border-t text-center", defaultBorderMixin)}>
+                            <Typography
+                                variant="caption"
+                                className="text-[10px] text-text-disabled dark:text-text-disabled-dark"
+                            >
+                                Showing the first {filteredUsers.length} of {totalCount} users. Search to find the others.
+                            </Typography>
+                        </div>
+                    )}
+
                     {/* Truncation notice */}
-                    {!loading && totalFilterable > renderLimit && (
+                    {!loading && totalCount === undefined && totalFilterable > renderLimit && (
                         <div className={cls("px-3 py-2 border-t text-center", defaultBorderMixin)}>
                             <Typography
                                 variant="caption"

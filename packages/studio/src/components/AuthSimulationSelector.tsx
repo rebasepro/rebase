@@ -11,6 +11,8 @@ export interface AuthSimulationSelectorProps {
     loading?: boolean;
     /** For a caller that searches `users` on the server — see `UserSelectPopover`. */
     onUserSearchTextChange?: (searchText: string) => void;
+    /** How many users that search matched, when `users` is only its first page — see `UserSelectPopover`. */
+    userTotalCount?: number;
     currentUser: SelectableUser | null;
 }
 
@@ -22,6 +24,7 @@ export function AuthSimulationSelector({
     users,
     loading,
     onUserSearchTextChange,
+    userTotalCount,
     currentUser
 }: AuthSimulationSelectorProps) {
     return (
@@ -67,6 +70,7 @@ export function AuthSimulationSelector({
                         users={users}
                         loading={loading}
                         onSearchTextChange={onUserSearchTextChange}
+                        totalCount={userTotalCount}
                         currentUser={currentUser}
                     />
                 </>

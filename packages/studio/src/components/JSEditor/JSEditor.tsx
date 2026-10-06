@@ -319,7 +319,7 @@ code: seeded } : tab));
 
     // The "Run as" picker: the project's users for an administrator, only
     // themselves for anyone else.
-    const { users, currentUser: currentSelectableUser, loading: usersLoading, onSearchTextChange: onUserSearchTextChange } = useRunAsUsers();
+    const { users, currentUser: currentSelectableUser, loading: usersLoading, onSearchTextChange: onUserSearchTextChange, totalCount: userTotalCount } = useRunAsUsers();
 
     // ─── Persistence ─────────────────────────────────────────────
 
@@ -779,6 +779,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                                     users={users}
                                                     loading={usersLoading}
                                                     onUserSearchTextChange={onUserSearchTextChange}
+                                                    userTotalCount={userTotalCount}
                                                     currentUser={currentSelectableUser}
                                                 />
                                             </div>
