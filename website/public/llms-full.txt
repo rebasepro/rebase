@@ -630,8 +630,9 @@ All configuration is done via environment variables in your `.env` file at the p
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |
 | `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS, in both environments. | — |
-| `ADMIN_CONNECTION_STRING` | Admin-level database connection string (used for schema introspection and admin operations). | `DATABASE_URL` |
-| `DISABLE_DB_ROLE_SWITCHING` | Disable PostgreSQL role-switching in SQL Editor (useful for custom authentication where DB roles are not mapped). | `false` |
+| `ADMIN_CONNECTION_STRING` | Admin-level database connection string (used for schema introspection and admin operations). <span class="since-badge" data-since="0.24">Since 0.24</span> The database it names is not the one the SQL console calls current, nor what a new branch copies by default: both are the database the app's own connection is on (see `REBASE_BRANCH_PARENT_DATABASE` for a server on a branch). | `DATABASE_URL` |
+| `DISABLE_DB_ROLE_SWITCHING` | Disable PostgreSQL role-switching in SQL Editor (useful for custom authentication where DB roles are not mapped). <span class="since-badge" data-since="0.24">Since 0.24</span> Studio's SQL console then says that the rows were read as the connection owner, names it, and greys out its role picker. | `false` |
+| `REBASE_BRANCH_PARENT_DATABASE` | <span class="since-badge" data-since="0.24">Since 0.24</span> The database the branch this server runs on was copied from. `rebase dev` sets it on a checkout [switched to a branch](/docs/backend/branching/#cli-integration). A server with it keeps the branch registry on that database and copies new branches from it by default, so Studio's Branches pane shows the main database's branches. | — |
 
 ##### CORS in development
 
@@ -1042,7 +1043,7 @@ function Widget() {
 
 * **Symptoms:** Custom queries executed in Rebase Studio's SQL editor fail with `cause: error: permission denied for table <name>`, even though the spreadsheet CMS view loads data successfully.
 * **Cause:** By default, Rebase attempts to execute SQL Editor queries by temporarily switching database roles to match the active user's application role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom authentication where roles exist only in database tables rather than actual PostgreSQL roles, the role switch fails or database privileges are missing. The CMS spreadsheet view executes under the default connection owner user and bypasses this.
-* **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This forces Rebase to run SQL Editor queries using the connection owner's privileges (typically a superuser/owner).
+* **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This forces Rebase to run SQL Editor queries using the connection owner's privileges (typically a superuser/owner). <span class="since-badge" data-since="0.24">Since 0.24</span> The SQL Editor then says, above the results, that they were read as the connection owner, and greys out its role picker.
 
 #### SQL Editor Schema Fetch Failed (`Cross-database execution requires adminConnectionString`)
 
@@ -13999,6 +14000,12 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 
 The OpenAPI spec is auto-generated from your collection definitions: it describes the list, read, create, update, delete and bulk endpoints of every collection the backend serves, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> For a [`softDelete`](/docs/collections/soft-delete/) collection the spec says
+that a delete, single or bulk, moves the row to the trash, and documents
+`?hard=true` on both deletes and `?deleted=include|only` on the list, the single
+read, the count and the aggregate. Studio's API explorer sends only the
+parameters the spec names, so this is what lets it purge a row or list the trash.
+
 Machine callers authenticate with a scoped key rather than a session:
 [API keys](/docs/backend/api-keys/).
 
@@ -19747,6 +19754,12 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 
 The OpenAPI spec is auto-generated from your collection definitions: it describes the list, read, create, update, delete and bulk endpoints of every collection the backend serves, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> For a [`softDelete`](/docs/collections/soft-delete/) collection the spec says
+that a delete, single or bulk, moves the row to the trash, and documents
+`?hard=true` on both deletes and `?deleted=include|only` on the list, the single
+read, the count and the aggregate. Studio's API explorer sends only the
+parameters the spec names, so this is what lets it purge a row or list the trash.
+
 Machine callers authenticate with a scoped key rather than a session:
 [API keys](/docs/backend/api-keys/).
 
@@ -20118,7 +20131,7 @@ Store it immediately.
 | `name` | `string` | A label for people |
 | `scopes` | `string[]` | What the key may do. At least one |
 | `roles` | `string[]` | RLS roles the key runs as, beside `service`. Optional |
-| `rate_limit` | `number \| null` | Requests per 15-minute window. `null` or absent uses the server's API-key default, 1000 |
+| `rate_limit` | `number \| null` | Requests per 15-minute window. `null` or absent uses the server's API-key default, 1000. See [Rate limit](#rate-limit) |
 | `expires_at` | `string \| null` | ISO-8601 expiry. Absent means it never expires |
 
 #### Scopes and RLS: two independent gates
@@ -20170,9 +20183,14 @@ securityRules: [
 ##### The `admin` role
 
 `roles: ["admin"]` (`--roles admin` on the CLI) makes the key run as the `admin`
-RLS role too, so it clears the default admin policies and reads every row of
-every collection that keeps them. That is a statement about rows. It grants no
-scope: the key still reaches only what its `scopes` list.
+RLS role too, so it clears the default admin policies of every collection that
+keeps them. Those policies cover `SELECT`, `INSERT`, `UPDATE` and `DELETE`, so
+row-level security does not limit the key's reads, writes or deletes: it can
+read, change and delete every row its scopes reach. The role also passes the
+admin checks outside the database: `requireAdmin` in
+[custom functions](/docs/backend/custom-functions/), and the writes storage
+leaves to admins. It grants no scope: the key still reaches only what its
+`scopes` list.
 
 A creator can give a key only roles they hold themselves, unless they are an
 admin.
@@ -20181,8 +20199,8 @@ admin.
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> `--full-access` gives the key every scope its creator holds, less `keys:read` and
 `keys:write`, which no key may hold. Through the CLI, which uses the service key,
-that is every data-plane and admin-plane scope. Add `--roles admin` and the key
-also reads every row:
+that is every data-plane and admin-plane scope. Add `--roles admin` and
+row-level security no longer limits which rows it reads, changes or deletes:
 
 ```bash
 rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
@@ -20190,6 +20208,23 @@ rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
 
 That is the right shape for CI, migrations and trusted first-party tooling. It is
 not the right shape for an agent.
+
+#### Rate limit
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A key's `rate_limit` is how many requests it may make in a 15-minute
+window, and every door counts against it in one bucket, `api-key:<id>`:
+
+- its HTTP requests to the data, storage and functions APIs;
+- its data frames on the realtime socket: fetches, counts, saves and deletes;
+- its requests to [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+
+Without a `rate_limit` the bucket holds the server's API-key default, 1000. A
+personal key has no `rate_limit` of its own, and counts in its own bucket at that
+default. Past the limit an HTTP request answers `429` and a socket frame
+`RATE_LIMITED`.
+
+The admin routes under `/api/admin`, and the socket's admin messages such as the
+SQL editor's, are not rate limited.
 
 ### Personal keys
 
@@ -22373,7 +22408,7 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/admin/users` | List users (paginated) |
+| `GET` | `/api/admin/users` | List users (paginated). `?search=` matches a case-insensitive part of the email or display name. <span class="since-badge" data-since="0.24">Since 0.24</span> On Postgres it also matches any role the user holds, and the uid; on MongoDB it still matches email and display name only |
 | `POST` | `/api/admin/users` | Create a user |
 | `GET` | `/api/admin/users/:uid` | Read one user |
 | `PUT` | `/api/admin/users/:uid` | Update one user. `{ disabled: true }` switches the account off without deleting it: every sign-in and refresh is refused (`ACCOUNT_DISABLED`), its sessions end and every token it holds is refused; `false` switches it back on |
@@ -25733,7 +25768,7 @@ See [Roles and scopes](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | List all registered cron jobs |
 | `GET` | `/api/admin/cron/:id` | Get a single job's status |
 | `POST` | `/api/admin/cron/:id/trigger` | Manually trigger a job — `409` while it is already running |
-| `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`) |
+| `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`). <span class="since-badge" data-since="0.24">Since 0.24</span> `503` when `rebase.cron_logs` cannot be read, rather than an empty history |
 | `PUT` | `/api/admin/cron/:id` | Pause or resume a job everywhere (`{ "enabled": false }`); `null` follows the code again |
 
 #### Example: List All Jobs
@@ -25823,8 +25858,8 @@ import { createRebaseClient } from "@rebasepro/client";
 
 const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
 
-// List all jobs
-const { jobs } = await client.cron.listJobs();
+// List all jobs, and the ones that did not register
+const { jobs, rejected } = await client.cron.listJobs();
 
 // Get a single job
 const { job } = await client.cron.getJob("health-check");
@@ -25840,6 +25875,9 @@ await client.cron.toggleJob("health-check", false); // pause
 await client.cron.toggleJob("health-check", true);  // resume
 ```
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> `listJobs()` is typed `CronJobListing`: `jobs`, plus the `skipped`,
+`rejected` and `note` fields described under [Jobs that are not there](#jobs-that-are-not-there).
+
 ### Studio Dashboard
 
 When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio under **Compute**, beside the JS console. The dashboard provides:
@@ -25847,16 +25885,21 @@ When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio und
 - **Job list** — All registered jobs with live status indicators
 - **Detail panel** — Schedule, next/last run, duration, and error information
 - **Execution history** — Expandable log entries with captured output and results
-- **Manual trigger** — Run any job on demand with one click
+- **Manual trigger** — Run any job on demand with one click. <span class="since-badge" data-since="0.24">Since 0.24</span> The panel waits for the run to end and says how it went: a run that failed shows its error
 - **Enable/disable** — Pause and resume jobs without restarting the server, for every process at once; a pause stays in place across restarts and deploys
+- **Jobs that are not there** — <span class="since-badge" data-since="0.24">Since 0.24</span> each job the scheduler refused, with its schedule and the reason, and how many cron files failed to load. None of them is scheduled; see [Jobs that are not there](#jobs-that-are-not-there)
 
 The dashboard auto-refreshes every 15 seconds.
 
 The panel shows the same thing whichever process serves it. A job another
-process is running shows as running, and on a process whose scheduler is not
-started — the `api` role beside a worker — the run count, the failure count and
-the last run are read from `rebase.cron_logs`, one query bounded to each job's
-own rows, rather than from a process that runs nothing.
+process is running shows as running.
+<span class="since-badge" data-since="0.24">Since 0.24</span> On every process that has a store, the run count, the failure count and the
+last run are read from `rebase.cron_logs`, one query bounded to each job's own
+rows. A process's own counters hold only the runs it made: the `api` role
+beside a worker runs nothing, and of two replicas that both schedule, neither
+sees the slots the other one claimed. Only when `cron_logs` cannot be read does
+the card fall back to this process's own counters, with a warning in the server
+log.
 
 ### Schedule Validation & AST Parsing
 
@@ -27422,6 +27465,15 @@ CREATE TABLE IF NOT EXISTS rebase.branches (
 );
 ```
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> A server running on a branch keeps branches in the database the branch was
+copied from. The branch's own `rebase.branches` is only a snapshot, taken before
+its row was written. So `rebase dev` on a [switched](#cli-integration) checkout
+sets `REBASE_BRANCH_PARENT_DATABASE` to the database `.env` names, and a server
+with that variable reads and writes the registry there, and copies new branches
+from it by default. Studio's Branches pane on a branch lists the main database's
+branches, the current one included, and a branch created there is one
+`rebase db branch list` shows.
+
 ---
 
 ### Programmatic API
@@ -27431,6 +27483,10 @@ The branching API is exposed via the backend's `BranchService`. Below is a refer
 #### Create a Database Branch
 
 Generates a new branch database from the default database or an explicit source template.
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> The default is the database the server's own connection is on, or
+`REBASE_BRANCH_PARENT_DATABASE` when the server runs on a branch. It is never
+the database `ADMIN_CONNECTION_STRING` names, when that is another one.
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -27458,6 +27514,7 @@ Output:
 [
   {
     name: "feature_oauth",
+    database: "rb_feature_oauth",
     parentDatabase: "rebase",
     createdAt: 2026-06-20T22:00:00.000Z,
     sizeBytes: 83886080 // 80 MB
@@ -27465,6 +27522,10 @@ Output:
 ]
 */
 ```
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> `database` is the PostgreSQL database the branch is, as its record says:
+what to connect to, and what to pass as `source` to copy the branch. It is not
+the branch's name (`staging` is the database `rb_staging`).
 
 #### Get Branch Information
 
@@ -27483,7 +27544,7 @@ await admin.deleteBranch("feature_oauth");
 ```
 
 > [!CAUTION]
-> Safety Guard: The main database (default database name configured in connection strings) is protected. If you attempt to delete the parent database, the `BranchService` throws a `"Cannot delete the main database"` error and aborts.
+> Safety Guard: The main database (default database name configured in connection strings) is protected. <span class="since-badge" data-since="0.24">Since 0.24</span> That is the database the server's own connection is on, or `REBASE_BRANCH_PARENT_DATABASE` on a branch. If you attempt to delete the parent database, the `BranchService` throws a `"Cannot delete the main database"` error and aborts.
 
 ---
 
@@ -31087,8 +31148,8 @@ open costs nothing.
 | Tab | Slug | Group | What it does |
 |-----|------|-------|--------------|
 | SQL Console | `sql` | Database | Run raw SQL against your PostgreSQL database and read results in a table |
-| RLS Policies | `rls` | Database | Inspect and manage Row Level Security policies for your tables |
-| Schema Visualizer | `schema-visualizer` | Database | Interactive ERD of tables and relations |
+| RLS Policies | `rls` | Database | Inspect and manage Row Level Security policies for your tables. <span class="since-badge" data-since="0.24">Since 0.24</span> A policy is listed as the database holds it, badged **Differs from code** where that is not what the project declares. A policy Rebase generates cannot be edited straight in the database, and on a table Rebase manages a banner says that each server start and `rebase db push` re-apply the declared policies |
+| Schema Visualizer | `schema-visualizer` | Database | Entity diagram of your collections and their relations, drawn from the collection definitions: tables, columns, types and relations are as the collections declare them. Only the RLS markers are read from the database |
 | Branches | `branches` | Database | Create and manage [database branches](/docs/backend/branching) |
 | Backups | `backups` | Database | Browse and download database backups |
 | Logs Explorer | `logs` | Database | Live request log, plus everything the server reports at warn or error — see below |
@@ -31106,6 +31167,9 @@ Two streams into one in-memory ring, held on the server process:
   collection when the request was about one, and, when the request failed, the
   error `code` and message the client received. A failed request is recorded at
   `warn` (4xx) or `error` (5xx), so the level filter finds it.
+  <span class="since-badge" data-since="0.24">Since 0.24</span> Its `source` comes from the path: `/api/auth/*` and `/api/oauth/*` are
+  `auth`, `/api/storage/*` is `storage`, and everything else is `api`, so the
+  Source filter finds sign-ins under Auth and uploads under Storage.
 - **Everything the server reports at warn or error** — a schema warning, an
   auth refusal, a driver diagnosis, a boot failure. `source` comes from the
   message's own prefix (`[API]`, `[Auth]`, `[storage]`, `[realtime]`), and
@@ -31120,6 +31184,14 @@ request that called it — the case this exists for.
 The ring is per process and per boot: it is not durable, it is not shared
 between replicas, and a restart empties it. For anything you need to keep, read
 the process's stdout, which carries the same lines and more.
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> The explorer says so. It shows the log of the one server instance serving
+it and names that instance: the `snapshot` event of
+`GET /api/admin/logs/stream` carries `instance`, the process's `HOSTNAME` (the
+pod name on Kubernetes, the container id under Docker) or else `pid-<n>`. There
+is no view across replicas, nor of the `functions` and `worker` processes of a
+[split deployment](/docs/deployment/split-processes/). A reconnect that lands on
+another instance replaces the window instead of mixing the two logs.
 
 The **Collection Editor** is a Studio tool too, but it is not in this list because
 it is registered differently: `RebaseStudio` does not lazy-load it. The panel mounts
@@ -44659,8 +44731,9 @@ bucket, which is why it is off unless asked for. See
 
 Studio's Logs Explorer reads a ring of the last 10,000 log lines kept by the
 process that serves the request. Behind a load balancer each refresh may show a
-different instance's lines, and none of them shows the whole deployment. There
-is no setting that shares it: the runtime writes one JSON line per event to
+different instance's lines, and none of them shows the whole deployment.
+<span class="since-badge" data-since="0.24">Since 0.24</span> The explorer names the instance it is showing.
+There is no setting that shares the ring: the runtime writes one JSON line per event to
 stdout in production, and that is what to collect — your platform's log
 service, Loki, or anything that reads container output.
 
@@ -44945,6 +45018,39 @@ recreate its roles by hand before restoring it into a new Postgres.
 reports the scheduled backup job and its last run. A failed run is shown as an
 error with its message, so a nightly backup that cannot run is visible where
 the backups are listed, not only in the Cron Jobs panel.
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> what it says about the job:
+
+- **Last scheduled backup** is the last run the schedule made. A run started
+  by hand since then (**Run Now** in Cron Jobs) gets a line of its own, so a
+  test run that worked cannot hide a failed nightly, and one that failed is not
+  reported as the nightly.
+- A job declared `enabled: false` reads as scheduled backups being **off**.
+  That is what the cron file above exports while `BACKUP_SCHEDULE` is unset, and
+  setting `BACKUP_SCHEDULE` turns them on. **Paused** means an admin paused the
+  job in Cron Jobs, and resuming it there turns it back on.
+- A job the scheduler refused, for an invalid schedule, timezone or timeout,
+  is reported with the reason. It never runs until its cron file is fixed.
+- When the run history in `rebase.cron_logs` cannot be read, the panel says
+  so, rather than that the backup has not run yet.
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> the list is read
+by the server process that answers `GET /api/admin/backups`, and that is not
+always the process that runs the schedule:
+
+- An `s3://` destination is listed and downloaded through a client for that
+  bucket, built from the same `S3_*` variables the backup cron uses. A `gs://`
+  one uses application default credentials. Give them to **every** process that
+  serves `/api/admin`, the `api` role of a
+  [split deployment](/docs/deployment/split-processes/) included, not only the
+  one that runs the cron. A destination the process cannot read answers `503`
+  with the destination and the reason, and the panel shows that instead of an
+  empty list.
+- A local path is that process's own disk. When the schedule runs in another
+  process (an `api` with `REBASE_CRON_SCHEDULER=false` beside a `worker`), the
+  panel says it is listing this process's disk: the scheduled backups appear
+  there only if both processes mount the same directory. A split deployment
+  should back up to object storage.
 
 Downloads stream through `GET /api/admin/backups/download?key=…`, admin-only,
 so the bucket never has to be public; a key outside the destination's prefix is
