@@ -277,16 +277,15 @@ const CollectionViewBindingInner = React.memo(
             }, 2400);
         }, [highlightedEntity]);
 
-        const checkInlineEditing = useCallback((entity?: Entity<M>): boolean => {
-            const collection = collectionRef.current;
-            if (!canEdit(collection, path, entity ?? null)) {
-                return false;
-            }
-            return collection.inlineEditing === undefined || collection.inlineEditing;
-        }, [canEdit, path]);
+        // From this render's collection. It was read from `collectionRef`,
+        // which an effect updates after the render that reads it, so a change
+        // to `inlineEditing` (or to what the user may edit) reached the table
+        // one render late — or never, if nothing rendered again.
+        const inlineEditingEnabled = canEdit(collection, path, null) &&
+            (collection.inlineEditing === undefined || collection.inlineEditing);
 
         const selectionEnabled = collection.selectionEnabled === undefined || collection.selectionEnabled;
-        const hoverRow = !checkInlineEditing();
+        const hoverRow = !inlineEditingEnabled;
 
         const [popOverOpen, setPopOverOpen] = useState(false);
 
@@ -1252,7 +1251,7 @@ parentEntityIds,
                 initialScroll={tableController.initialScroll}
                 emptyComponent={emptyComponent}
                 hoverRow={hoverRow}
-                inlineEditing={checkInlineEditing()}
+                inlineEditing={inlineEditingEnabled}
                 AdditionalHeaderWidget={buildAdditionalHeaderWidget}
                 AddColumnComponent={addColumnComponentInternal}
                 getIdColumnWidth={getIdColumnWidth}

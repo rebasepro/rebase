@@ -179,8 +179,9 @@ function buildRow(i: number): Entity<Record<string, unknown>> {
     return { id: `id_${i}`, path: "products", values };
 }
 
-function View({ selectionEnabled = true, additionalFields }: {
+function View({ selectionEnabled = true, inlineEditing, additionalFields }: {
     selectionEnabled?: boolean;
+    inlineEditing?: boolean;
     additionalFields?: { key: string; name: string; Builder: React.ComponentType<{ entity: Entity }> }[];
 }) {
     return <MemoryRouter>
@@ -189,6 +190,7 @@ function View({ selectionEnabled = true, additionalFields }: {
             path={"products"}
             defaultViewMode={"table"}
             selectionEnabled={selectionEnabled}
+            inlineEditing={inlineEditing}
             additionalFields={additionalFields as never}
             properties={properties as never}/>
     </MemoryRouter>;
@@ -271,6 +273,43 @@ describe("the collection table draws again only what changed", () => {
             view.rerender(<View selectionEnabled={false}/>);
         });
         expect(rowCheckboxes(view.container)).toHaveLength(0);
+        view.unmount();
+    });
+
+    it("an additional column drawn before its field changed shows the field it has now", async () => {
+        const first = [{ key: "extra", name: "Extra", Builder: ({ entity }: { entity: Entity }) => <span data-testid={`extra-${entity.id}`}>first</span> }];
+        const second = [{ key: "extra", name: "Extra", Builder: ({ entity }: { entity: Entity }) => <span data-testid={`extra-${entity.id}`}>second</span> }];
+        let view!: ReturnType<typeof render>;
+        await act(async () => {
+            view = render(<View additionalFields={first}/>);
+        });
+        expect(view.getByTestId("extra-id_0").textContent).toBe("first");
+
+        // The cell compared the row it was drawn for and nothing else, so it
+        // kept what the first field had drawn.
+        await act(async () => {
+            view.rerender(<View additionalFields={second}/>);
+        });
+        expect(view.getByTestId("extra-id_0").textContent).toBe("second");
+        view.unmount();
+    });
+
+    it("cells drawn while inline editing was on are read-only once it is switched off", async () => {
+        // A cell takes the focus only while it can be edited.
+        const editableCells = (container: HTMLElement) =>
+            Array.from(container.querySelectorAll("#virtual-table [tabindex=\"0\"]"))
+                .filter(el => el.className.includes("group/cell")).length;
+        let view!: ReturnType<typeof render>;
+        await act(async () => {
+            view = render(<View inlineEditing={true}/>);
+        });
+        expect(editableCells(view.container)).toBeGreaterThan(100);
+
+        // The property cell's comparator did not look at `readonly`.
+        await act(async () => {
+            view.rerender(<View inlineEditing={false}/>);
+        });
+        expect(editableCells(view.container)).toBe(0);
         view.unmount();
     });
 });

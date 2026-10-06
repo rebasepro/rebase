@@ -346,25 +346,11 @@ export const EntityTableCell = React.memo<EntityTableCellProps>(
         );
 
         return sortableContent;
-    }, (a, b) => {
-        return a.error === b.error &&
-            a.value === b.value &&
-            a.disabled === b.disabled &&
-            a.savedTimestamp === b.savedTimestamp &&
-            a.allowScroll === b.allowScroll &&
-            a.align === b.align &&
-            a.size === b.size &&
-            a.disabledTooltip === b.disabledTooltip &&
-            a.width === b.width &&
-            a.showExpandIcon === b.showExpandIcon &&
-            a.removePadding === b.removePadding &&
-            a.fullHeight === b.fullHeight &&
-            a.selected === b.selected &&
-            a.opener?.kind === b.opener?.kind &&
-            a.opener?.open === b.opener?.open &&
-            a.opener?.focusOnSelect === b.opener?.focusOnSelect &&
-            a.opener?.label === b.opener?.label &&
-            a.isDragging === b.isDragging &&
-            a.isDraggable === b.isDraggable &&
-            a.frozen === b.frozen;
-    }) as React.FunctionComponent<EntityTableCellProps>;
+    }
+    // Compared by every prop, its children included. It used to compare a
+    // hand-picked list with `value` standing in for what the cell shows, so a
+    // cell whose content changed without its value — a new preview for a
+    // changed property, an additional column's new builder — kept showing the
+    // old one. Its parents (`PropertyTableCell`, the table's cell renderer)
+    // are memoised and draw it only when something changed.
+) as React.FunctionComponent<EntityTableCellProps>;

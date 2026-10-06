@@ -1,7 +1,7 @@
 import { useCellSelected, createSelectionStore } from "../SelectableTable/SelectionStore";
 import type { ArrayProperty, NumberProperty, Property, ReferenceProperty, StringProperty } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { deepEqual as equal } from "fast-equals"
+import { deepEqual as equal, shallowEqual } from "fast-equals"
 
 import { Entity, EntityReference, EntityRelation } from "@rebasepro/types";
 
@@ -417,11 +417,21 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
 // `entity.values` — a key inside a map is written as the whole map — and hands
 // them to `beforeSave` as the previous values, so a cell must not hold on to a
 // row that has since changed in another column or in a sibling key.
+//
+// Every prop is compared. Leaving `readonly`, `disabled` and `enablePopupIcon`
+// out meant switching inline editing off, or a permission changing, did not
+// reach a cell already drawn until its row changed.
 function areEqual(prevProps: PropertyTableCellProps<any>, nextProps: PropertyTableCellProps<any>) {
     return prevProps.height === nextProps.height &&
         prevProps.propertyKey === nextProps.propertyKey &&
+        prevProps.columnIndex === nextProps.columnIndex &&
         prevProps.align === nextProps.align &&
         prevProps.width === nextProps.width &&
+        prevProps.readonly === nextProps.readonly &&
+        prevProps.disabled === nextProps.disabled &&
+        prevProps.enablePopupIcon === nextProps.enablePopupIcon &&
+        prevProps.customFieldValidator === nextProps.customFieldValidator &&
+        prevProps.path === nextProps.path &&
         equal(prevProps.property, nextProps.property) &&
         equal(prevProps.value, nextProps.value) &&
         prevProps.entity.id === nextProps.entity.id &&
@@ -429,6 +439,12 @@ function areEqual(prevProps: PropertyTableCellProps<any>, nextProps: PropertyTab
         (prevProps.entity === nextProps.entity || equal(prevProps.entity.values, nextProps.entity.values)) &&
         prevProps.isDragging === nextProps.isDragging &&
         prevProps.isDraggable === nextProps.isDraggable &&
-        prevProps.frozen === nextProps.frozen
+        prevProps.frozen === nextProps.frozen &&
+        prevProps.sortableNodeRef === nextProps.sortableNodeRef &&
+        shallowEqual(prevProps.sortableStyle ?? NO_STYLE, nextProps.sortableStyle ?? NO_STYLE) &&
+        shallowEqual(prevProps.sortableAttributes ?? NO_ATTRIBUTES, nextProps.sortableAttributes ?? NO_ATTRIBUTES)
         ;
 }
+
+const NO_STYLE: React.CSSProperties = {};
+const NO_ATTRIBUTES: Record<string, unknown> = {};
