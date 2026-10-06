@@ -7,6 +7,31 @@ function sameEntity(a: Entity<any>, b: Entity<any>): boolean {
     return a.id === b.id && a.path === b.path;
 }
 
+/**
+ * The rows of a list, by path and then by id, for asking about one row in
+ * constant time. Keyed in two levels rather than by a joined string: a path
+ * and an id may both contain a slash, and `1` and `"1"` are different ids, as
+ * they are to `sameEntity`.
+ */
+type RowIndex = Map<unknown, Set<unknown>>;
+
+function indexRows(entities: Entity<any>[]): RowIndex {
+    const index: RowIndex = new Map();
+    for (const entity of entities) {
+        let ids = index.get(entity.path);
+        if (!ids) {
+            ids = new Set();
+            index.set(entity.path, ids);
+        }
+        ids.add(entity.id);
+    }
+    return index;
+}
+
+function indexHas(index: RowIndex, entity: Entity<any>): boolean {
+    return index.get(entity.path)?.has(entity.id) ?? false;
+}
+
 const EMPTY_SELECTION: EntitySelection<any> = {
     type: "entities",
     entities: []
@@ -54,15 +79,23 @@ export function useSelectionController<M extends Record<string, unknown> = Recor
         });
     }, []);
 
+    // Built once per selection. The views ask about every row they hold —
+    // the selection menu and the list or card view, after each change — and a
+    // linear search per row made "select all loaded rows" quadratic: 10,000
+    // rows, ~200 ms per view per change.
+    const selectionIndex = useMemo(
+        () => indexRows(selection.type === "query" ? selection.excluded : selection.entities),
+        [selection]);
+
     const isEntitySelected = useCallback((entity: Entity<M>) => {
         // Every row a view can show you in query mode came out of that query,
         // so membership is the exclusion list and nothing else. The binding
         // clears the selection if the filter moves underneath it, which is what
         // keeps that true.
         if (selection.type === "query")
-            return !selection.excluded.some(e => sameEntity(e, entity));
-        return selection.entities.some(e => sameEntity(e, entity));
-    }, [selection]);
+            return !indexHas(selectionIndex, entity);
+        return indexHas(selectionIndex, entity);
+    }, [selection, selectionIndex]);
 
     const setSelectedEntities = useCallback((entities: Entity<M>[]) => {
         setSelection({
