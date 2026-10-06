@@ -659,8 +659,24 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
             .filter(Boolean) as EntityAction<M>[];
         const allActions = getActionsForEntity({ entity,
 customEntityActions });
-        return allActions.filter(a => a.showActionsInListView);
+        const shown = allActions.filter(a => a.showActionsInListView);
+        return shown.length > 0 ? shown : EMPTY_LIST_VIEW_ACTIONS;
     }, [getActionsForEntity, collection.entityActions, customizationController.entityActions]);
+
+    // One array per row for as long as the row object and the actions are the
+    // same: `ListRow` is memoised, and a new array per render — `filter`
+    // returns one even when nothing passes — drew every visible row again on
+    // every render of the list. Keyed by the row object, so a row that changes
+    // gets its actions asked again; dropped with the actions function.
+    const listViewActionsCache = useMemo(() => new WeakMap<Entity<M>, EntityAction[]>(), [getListViewActions]);
+    const listViewActionsFor = useCallback((entity: Entity<M>): EntityAction[] => {
+        let actions = listViewActionsCache.get(entity);
+        if (!actions) {
+            actions = getListViewActions(entity);
+            listViewActionsCache.set(entity, actions);
+        }
+        return actions;
+    }, [listViewActionsCache, getListViewActions]);
 
     const showImage = size !== "xs";
 
@@ -687,10 +703,10 @@ customEntityActions });
         if (!getActionsForEntity) return 0;
         let most = 0;
         for (const entity of data.slice(0, ACTIONS_SAMPLE_SIZE)) {
-            most = Math.max(most, getListViewActions(entity).length);
+            most = Math.max(most, listViewActionsFor(entity).length);
         }
         return most === 0 ? 0 : most * ACTION_BUTTON_WIDTH + (most - 1) * ACTION_BUTTON_GAP;
-    }, [data, getActionsForEntity, getListViewActions]);
+    }, [data, getActionsForEntity, listViewActionsFor]);
 
     // Responsive: keep only the columns the row can actually pay for.
     //
@@ -736,9 +752,14 @@ customEntityActions });
         onEntityClick?.(entity);
     }, [onEntityClick, analyticsController]);
 
+    // The same function for the life of the list: the selection controller is
+    // a new object with every selection, and a handler that followed it drew
+    // every row on each tick to redraw the one that was ticked.
+    const selectionControllerRef = useRef(selectionController);
+    selectionControllerRef.current = selectionController;
     const handleSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {
-        selectionController?.toggleEntitySelection(entity, selected);
-    }, [selectionController]);
+        selectionControllerRef.current?.toggleEntitySelection(entity, selected);
+    }, []);
 
     const isEntitySelected = useCallback((entity: Entity<M>) => {
         return selectionController?.isEntitySelected(entity) ?? false;
@@ -862,6 +883,7 @@ position });
                 selectedEntityId={selectedEntityId}
                 header={header}
                 renderRow={useCallback(({ item: entity, style, className, selected, highlighted, isLast, onClick, onSelectionChange }) => {
+                    const listViewActions = listViewActionsFor(entity);
                     return (
                         <div
                             key={entity.id}
@@ -885,16 +907,19 @@ position });
                                 size={size}
                                 isLast={isLast}
                                 isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
-                                listViewActions={getListViewActions(entity)}
+                                listViewActions={listViewActions}
                                 actionsWidth={actionsWidth}
                                 context={context}
                                 path={path}
-                                selectionController={selectionController}
+                                // Read only by the row's actions — asked
+                                // `isEnabled` with it — so a row without any
+                                // is not drawn again for every selection.
+                                selectionController={listViewActions.length > 0 ? selectionController : undefined}
                                 openEntityMode={openEntityMode}
                             />
                         </div>
                     );
-                }, [resolvedCollection, selectionEnabled, combineSelection, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId, getListViewActions, actionsWidth, context, path, selectionController, openEntityMode, handleRowSelectionChange, handleEntityClick, searchString])}
+                }, [resolvedCollection, selectionEnabled, combineSelection, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId, listViewActionsFor, actionsWidth, context, path, selectionController, openEntityMode, handleRowSelectionChange, handleEntityClick, searchString])}
             />
         </div>
     );
