@@ -60,7 +60,7 @@ A file exported from a collection imports back into the same values, CSV or JSON
 
 The preview lists every cell that does not convert, per column, with how many there are and the first few by row and reason. Those cells are left empty in the imported rows; nothing is turned into `0`, `false` or an empty value without being listed. Go back to map the column to another property, or correct the file and upload it again.
 
-The collection's own rules — required fields, enum options, unique values — are checked by the server as the rows are written, 25 rows at a time. If a row is refused, the import stops and names it; the rows before it are already saved, and **Retry** resumes from the refused row.
+The collection's own rules — required fields, enum options, unique values — are checked by the server as the rows are written, in batches of up to 500 rows (fewer when the rows are wide, so a request stays under about 1 MB). A batch is saved whole or not at all. If a row is refused, the import stops and names it; the batches before it are already saved, and **Retry** resumes from the first row of the refused row's batch.
 
 ### Creating a collection from a file
 

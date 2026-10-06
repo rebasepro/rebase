@@ -73,6 +73,11 @@ export function ImportSaveInProgress<C extends AdminCollection<any>>
         const failedRows = errorSaving.failedTo - errorSaving.failedFrom > 1
             ? `rows ${errorSaving.failedFrom + 1}–${errorSaving.failedTo}`
             : `row ${errorSaving.failedFrom + 1}`;
+        // A batch is written whole or not at all, so the server's naming of
+        // the one row that failed is what says what to fix.
+        const causeRow = errorSaving.failedRow !== undefined
+            ? ` Row ${errorSaving.failedRow + 1} is the one that failed.`
+            : "";
         return (
             <CenteredView className={"flex flex-col gap-4 items-center"}>
                 <Typography variant={"h6"}>
@@ -85,7 +90,7 @@ export function ImportSaveInProgress<C extends AdminCollection<any>>
 
                 <Typography variant={"body2"}>
                     {errorSaving.committed} of {total} rows were imported.
-                    The import stopped on {failedRows}, which {errorSaving.failedTo - errorSaving.failedFrom > 1 ? "were" : "was"} not written.
+                    The import stopped on {failedRows}, which {errorSaving.failedTo - errorSaving.failedFrom > 1 ? "were" : "was"} not written.{causeRow}
                 </Typography>
 
                 <Button
