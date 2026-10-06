@@ -21,8 +21,10 @@ export type { UnsavedChangesDialogProps } from "./components/UnsavedChangesDialo
 export type { RebaseStorageSource } from "./core/RebaseProps";
 export { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
 export * from "./i18n/RebaseI18nProvider";
+// English only: it is the fallback table and the reference for every key. The
+// other languages are chunks `RebaseI18nProvider` fetches on demand; a static
+// re-export here would put one back on every login screen.
 export * from "./locales/en";
-export * from "./locales/es";
 
 // Studio Bridge — shared context for optional admin↔Studio integration
 export * from "./hooks/useStudioBridge";
