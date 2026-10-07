@@ -315,11 +315,11 @@ Client                                                   Rebase Server
 
 ### Upload Lifecycle Mechanics
 
-1. **Session Initialisation (`POST`)**: The client sends the total file size in the `Upload-Length` header and base64 metadata via `Upload-Metadata`. The server creates an empty placeholder file under a hidden temporary directory `.tus-uploads/` and returns the upload URL.
+1. **Session Initialisation (`POST`)**: The client sends the total file size in the `Upload-Length` header and base64 metadata via `Upload-Metadata`. The server creates an empty placeholder file under a hidden temporary directory `.tus-uploads/`, <span class="since-badge" data-since="0.24">Since 0.24</span> with a record of the upload beside it (`<id>.json`: its key, bucket, source, type, size and owner), and returns the upload URL. The upload lives in that directory, not in the process: a restarted server resumes it, and every instance that shares `STORAGE_PATH` serves it — see [Running several instances](/docs/deployment/multiple-instances/#files).
 2. **Progress Inquiries (`HEAD`)**: If an upload is interrupted, the client queries the upload URL using a `HEAD` request. The server returns the current byte position in the `Upload-Offset` header.
 3. **Data Appending (`PATCH`)**: The client resumes sending binary data starting at the returned offset with `Content-Type: application/offset+octet-stream`. The server writes each chunk to the temporary file at the byte offset the request declares, which must be the offset the server holds (`409` otherwise). One chunk is received at a time: a `PATCH` that arrives while another for the same upload is still being received — typically a client re-sending a chunk that stalled — is answered `423 UPLOAD_LOCKED`, and the client resumes from the offset `HEAD` reports.
 4. **Finalisation**: When the accumulated `Upload-Offset` matches the declared `Upload-Length`, Rebase reads the completed temporary file, wraps it as a standard JavaScript `File` object, and saves it to the configured storage backend (local disk or S3). The temporary file is then deleted.
-5. **Periodic Sweep**: A background cleaner runs every **60 seconds** to delete orphaned, incomplete temporary uploads that have exceeded the **24-hour** retention threshold.
+5. **Periodic Sweep**: A background cleaner runs every **60 seconds** to delete orphaned, incomplete temporary uploads that have exceeded the **24-hour** retention threshold — those another process started too, read from the directory.
 
 ## Environment Variables
 

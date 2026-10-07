@@ -136,7 +136,10 @@ describe("a TUS upload that cannot be stored", () => {
 
         await patch();
 
-        expect(tempFiles()).toHaveLength(1);
+        // The bytes, and the record a retry — on this process or another — resumes from.
+        const kept = tempFiles();
+        expect(kept.filter(name => !name.endsWith(".json"))).toHaveLength(1);
+        expect(kept.filter(name => name.endsWith(".json"))).toHaveLength(1);
     });
 
     it("refuses the PATCH when no storage is configured at all", async () => {
