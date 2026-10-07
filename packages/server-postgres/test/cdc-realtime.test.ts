@@ -6,11 +6,15 @@ import { parseCdcPayload, type CdcChangeEvent } from "../src/services/cdc/CdcLis
 
 // The RLS-bound refetch path (fetchCollectionWithAuth / fetchEntityWithAuth)
 // builds a DataService inside the auth transaction — mock it so no real DB is hit.
-const mockFetchCollection = jest.fn().mockResolvedValue([
-    { id: 1, path: "posts", values: { title: "From RLS refetch" } }
+// Each read returns a row no earlier read returned: a refetch that reads what
+// its subscriber was last sent sends nothing, and these tests are about whether
+// a change reaches a subscriber, so every read here is news.
+let mockReads = 0;
+const mockFetchCollection = jest.fn(async () => [
+    { id: 1, path: "posts", values: { title: "From RLS refetch", read: ++mockReads } }
 ]);
-const mockFetchEntity = jest.fn().mockResolvedValue(
-    { id: 1, path: "posts", values: { title: "From RLS refetch" } }
+const mockFetchEntity = jest.fn(async (): Promise<Record<string, unknown> | null> =>
+    ({ id: 1, path: "posts", values: { title: "From RLS refetch", read: ++mockReads } })
 );
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
@@ -265,11 +269,10 @@ describe("RealtimeService — database-level CDC", () => {
         });
         await flushTimers();
         ws.send.mockClear();
-        mockFetchEntity.mockResolvedValue(null);
+        mockFetchEntity.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
 
         await emitCdc(service, { schema: "public", table: "posts", op: "TRUNCATE", row: {} });
         await flushTimers();
-        mockFetchEntity.mockResolvedValue({ id: 1, path: "posts", values: { title: "From RLS refetch" } });
 
         expect(sentTo(ws)).toEqual(["list", "row-1", "row-2"]);
         const rows = ws.send.mock.calls.map((call: unknown[]) => JSON.parse(String(call[0]))).filter((f: { type: string }) => f.type === "single_update");

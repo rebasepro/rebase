@@ -52,8 +52,10 @@ jest.mock("pg", () => ({
     })
 }));
 
-const mockFetchCollection = jest.fn(async () => [{ id: 1, title: "Closed" }]);
-const mockFetchEntity = jest.fn(async () => ({ id: 1, title: "Closed" }));
+// Each read is news: a refetch that reads what its subscriber was last sent sends nothing.
+let mockReads = 0;
+const mockFetchCollection = jest.fn(async () => [{ id: 1, title: "Closed", read: ++mockReads }]);
+const mockFetchEntity = jest.fn(async () => ({ id: 1, title: "Closed", read: ++mockReads }));
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
         fetchCollectionForRest: mockFetchCollection,

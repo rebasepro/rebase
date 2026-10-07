@@ -18,8 +18,10 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 import type { CollectionConfig } from "@rebasepro/types";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
-const mockFetchCollection = jest.fn().mockResolvedValue([{ id: 43, title: "Refetched" }]);
-const mockFetchOne = jest.fn().mockResolvedValue({ id: 43, title: "Refetched" });
+// Each read is news: a refetch that reads what its subscriber was last sent sends nothing.
+let mockReads = 0;
+const mockFetchCollection = jest.fn(async () => [{ id: 43, title: "Refetched", read: ++mockReads }]);
+const mockFetchOne = jest.fn(async () => ({ id: 43, title: "Refetched", read: ++mockReads }));
 
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({

@@ -1,6 +1,6 @@
 import { WebSocket } from "ws";
 import { EventEmitter } from "events";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { DataService } from "./dataService";
 
 import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, CollectionUpdateMeta, IncludeSpec, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, OrderByTuple, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
@@ -246,6 +246,13 @@ type Subscription = {
     started: number;
     /** The highest started-sequence that has already reached the subscriber. */
     delivered: number;
+    /**
+     * A socket subscriber's last data frame, as {@link frameDigest} of what
+     * follows its subscription id; unset before the first and after an error
+     * frame. A refetch that reads the same rows sends it nothing — see
+     * {@link sendDataFrame}.
+     */
+    lastFrame?: string;
 };
 
 /**
@@ -925,25 +932,27 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 const request = group.collectionRequest ?? {};
                 const toSockets = targets.some((target) => !target.callback);
                 const { rows, meta } = await this.fetchCollectionWithAuth(group.path, request, group.authContext, { meta: toSockets });
-                let frameTail: string | undefined;
+                let frame: { body: string; digest: string } | undefined;
                 for (const target of targets) {
                     if (!target.canDeliver()) continue;
                     if (target.callback) {
                         target.callback(rows);
                         continue;
                     }
-                    frameTail ??= this.collectionFrameTail(rows, group.path, meta);
-                    this.sendRaw(
-                        target.subscription.clientId,
-                        `{"type":"collection_update","subscriptionId":${JSON.stringify(target.subscription.subscriptionId)},${frameTail}`
-                    );
+                    frame ??= this.dataFrame(this.collectionFrameTail(rows, group.path, meta));
+                    this.sendDataFrame(target.subscription, "collection_update", frame);
                 }
             } else {
                 const row = (await this.fetchEntityWithAuth(group.path, group.id!, group.authContext)) ?? null;
+                let frame: { body: string; digest: string } | undefined;
                 for (const target of targets) {
                     if (!target.canDeliver()) continue;
-                    if (target.callback) target.callback(row);
-                    else this.sendSingleUpdate(target.subscription.clientId, target.subscription.subscriptionId, row);
+                    if (target.callback) {
+                        target.callback(row);
+                        continue;
+                    }
+                    frame ??= this.dataFrame(this.singleFrameTail(row));
+                    this.sendDataFrame(target.subscription, "single_update", frame);
                 }
             }
         } catch (error) {
@@ -952,7 +961,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     logger.error(`❌ [RealtimeService] Error in a refetch for DataDriver subscription ${target.subscription.subscriptionId}`, { error });
                     this.reportDriverFetchFailure(target.subscription, target.canDeliver, error);
                 } else {
-                    this.reportSocketFetchFailure(target.subscription.clientId, target.subscription.subscriptionId, group.path, error, target.canDeliver);
+                    this.reportSocketFetchFailure(target.subscription.clientId, target.subscription.subscriptionId, group.path, error, target.canDeliver, target.subscription);
                 }
             }
         }
@@ -1420,11 +1429,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             );
 
             if (canDeliver()) {
-                this.sendCollectionUpdate(clientId, subscriptionId, rows, request.path, meta);
+                this.sendDataFrame(subscription, "collection_update", this.dataFrame(this.collectionFrameTail(rows, request.path, meta)));
             }
 
         } catch (error) {
-            this.reportSocketFetchFailure(clientId, subscriptionId, request.path, error, canDeliver);
+            this.reportSocketFetchFailure(clientId, subscriptionId, request.path, error, canDeliver, this._subscriptions.get(key));
         }
     }
 
@@ -1472,11 +1481,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             );
 
             if (canDeliver()) {
-                this.sendSingleUpdate(clientId, subscriptionId, row || null);
+                this.sendDataFrame(subscription, "single_update", this.dataFrame(this.singleFrameTail(row || null)));
             }
 
         } catch (error) {
-            this.reportSocketFetchFailure(clientId, subscriptionId, request.path, error, canDeliver);
+            this.reportSocketFetchFailure(clientId, subscriptionId, request.path, error, canDeliver, this._subscriptions.get(key));
         }
     }
 
@@ -1498,11 +1507,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         subscriptionId: string,
         path: string,
         error: unknown,
-        canDeliver: DeliveryCheck | undefined
+        canDeliver: DeliveryCheck | undefined,
+        subscription?: Subscription
     ) {
         const sanitized = sanitizeErrorForClient(error, path);
         if (canDeliver && !canDeliver.mayReportFailure()) return;
         this.sendError(clientId, sanitized.message, subscriptionId, sanitized.code);
+        // The subscriber now shows an error: the rows it last had are news again.
+        if (subscription && subscription.subscriptionId === subscriptionId && subscription.clientId === clientId) {
+            subscription.lastFrame = undefined;
+        }
     }
 
     /**
@@ -2119,45 +2133,59 @@ roles: ["anon"] };
         );
     }
 
-    private sendCollectionUpdate(
-        clientId: string,
-        subscriptionId: string,
-        rows: Record<string, unknown>[],
-        path: string,
-        meta?: CollectionUpdateMeta
-    ) {
-        const message: CollectionUpdateMessage = {
-            type: "collection_update",
-            subscriptionId,
-            rows: rows,
-            pks: this.primaryKeysForPath(path),
-            // Beside the rows rather than fetched afterwards — see
-            // {@link CollectionUpdateMeta} for the round trip this removes.
-            ...(meta && { meta })
-        };
-        this.sendMessage(clientId, message);
-    }
-
     /**
      * Everything in a `collection_update` frame after its subscription id,
-     * serialised once for every member of a group: the same rows, keys and
-     * meta as {@link sendCollectionUpdate} sends, in the same order.
+     * serialised once for every member of a group: the rows, the collection's
+     * key columns, and the `meta` beside them (see {@link CollectionUpdateMeta}
+     * for the round trip that removes). The order is the one
+     * {@link CollectionUpdateMessage} declares.
      */
     private collectionFrameTail(rows: Record<string, unknown>[], path: string, meta?: CollectionUpdateMeta): string {
-        return JSON.stringify({
+        const tail: Omit<CollectionUpdateMessage, "type" | "subscriptionId"> = {
             rows,
             pks: this.primaryKeysForPath(path),
             ...(meta && { meta })
-        }).slice(1);
+        };
+        return JSON.stringify(tail).slice(1);
     }
 
-    private sendSingleUpdate(clientId: string, subscriptionId: string, row: Record<string, unknown> | null) {
-        const message: SingleUpdateMessage = {
-            type: "single_update",
-            subscriptionId,
-            row: row
-        };
-        this.sendMessage(clientId, message);
+    /** Everything in a `single_update` frame after its subscription id. */
+    private singleFrameTail(row: Record<string, unknown> | null): string {
+        const tail: Omit<SingleUpdateMessage, "type" | "subscriptionId"> = { row };
+        return JSON.stringify(tail).slice(1);
+    }
+
+    /** A frame tail with its {@link frameDigest}, computed once for every member it goes to. */
+    private dataFrame(body: string): { body: string; digest: string } {
+        return { body, digest: this.frameDigest(body) };
+    }
+
+    /**
+     * What a subscriber was last sent, in 44 bytes: holding the frames
+     * themselves would keep a page of rows per subscriber in memory.
+     */
+    private frameDigest(body: string): string {
+        return createHash("sha256").update(body).digest("base64");
+    }
+
+    /**
+     * Send a data frame to a socket subscriber — unless it is exactly the one
+     * the subscriber was last sent.
+     *
+     * A write anywhere in a collection refetches every list of it, and the
+     * first 50 rows of a 10k-row list come back the same for 99.5% of writes.
+     * Each of those frames was sent anyway: ~30 KB per viewer per write,
+     * parsed, merged and re-rendered by every client to change nothing. The
+     * comparison is per subscriber, because the members of one group need not
+     * have been sent the same frame last — one may have joined since.
+     */
+    private sendDataFrame(subscription: Subscription, type: "collection_update" | "single_update", frame: { body: string; digest: string }): void {
+        if (subscription.lastFrame === frame.digest) return;
+        subscription.lastFrame = frame.digest;
+        this.sendRaw(
+            subscription.clientId,
+            `{"type":"${type}","subscriptionId":${JSON.stringify(subscription.subscriptionId)},${frame.body}`
+        );
     }
 
     /**

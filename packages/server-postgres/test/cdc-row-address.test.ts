@@ -22,8 +22,9 @@ import { parseCdcPayload } from "../src/services/cdc/CdcListener";
 
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
-        fetchCollectionForRest: jest.fn().mockResolvedValue([]),
-        fetchOneForRest: jest.fn().mockResolvedValue({ role: "owner" }),
+        // Each read is news: a refetch that reads what its subscriber was last sent sends nothing.
+        fetchCollectionForRest: jest.fn(async () => [{ read: Math.random() }]),
+        fetchOneForRest: jest.fn(async () => ({ role: "owner", read: Math.random() })),
         count: jest.fn().mockResolvedValue(0),
         cursorFor: jest.fn().mockReturnValue(undefined)
     }))

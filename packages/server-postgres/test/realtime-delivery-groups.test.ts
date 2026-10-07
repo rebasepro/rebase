@@ -92,7 +92,20 @@ beforeEach(() => {
     fetchCollectionForRest.mockClear();
     fetchOneForRest.mockClear();
     count.mockClear();
+    fetchCollectionForRest.mockImplementation(async () => [{ id: 1, title: "Row" }]);
+    fetchOneForRest.mockImplementation(async () => ({ id: 1, title: "Row" }));
 });
+
+/**
+ * Every read from here on returns a row it has not returned before, so each
+ * refetch has news to send: a refetch that finds the rows its subscribers
+ * were last sent sends them nothing (see "a refetch that finds nothing new").
+ */
+function everyReadIsNew() {
+    let version = 0;
+    fetchCollectionForRest.mockImplementation(async () => [{ id: 1, title: `Row ${++version}` }]);
+    fetchOneForRest.mockImplementation(async () => ({ id: 1, title: `Row ${++version}` }));
+}
 
 afterEach(async () => {
     await service.destroy();
@@ -110,6 +123,7 @@ describe("one write, many identical subscribers", () => {
         fetchCollectionForRest.mockClear();
         count.mockClear();
         for (const ws of sockets) ws.send.mockClear();
+        everyReadIsNew();
 
         await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
         jest.advanceTimersByTime(350);
@@ -162,6 +176,7 @@ describe("one write, many identical subscribers", () => {
         await flush();
         fetchOneForRest.mockClear();
         for (const ws of sockets) ws.send.mockClear();
+        everyReadIsNew();
 
         // A numeric id on the subscription and the string a write reports are
         // one row.
@@ -183,6 +198,7 @@ describe("a subscription id", () => {
         await flush();
         a.send.mockClear();
         b.send.mockClear();
+        everyReadIsNew();
 
         await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
         jest.advanceTimersByTime(350);
@@ -198,6 +214,7 @@ describe("a subscription id", () => {
         await subscribeList("a", "sub-1", ALICE);
         await flush();
         a.send.mockClear();
+        everyReadIsNew();
 
         await service.handleClientMessage("b", { type: "unsubscribe", subscriptionId: "sub-1" });
         await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
@@ -335,6 +352,7 @@ describe("a steady stream of writes", () => {
         await subscribeList("a", "s", ALICE);
         await flush();
         ws.send.mockClear();
+        everyReadIsNew();
 
         const start = Date.now();
         const deliveredAt: number[] = [];
@@ -373,7 +391,7 @@ describe("one write to a list many different principals watch", () => {
             peak = Math.max(peak, ++inFlight);
             await new Promise<void>((release) => held.push(release));
             inFlight--;
-            return [{ id: 1, title: "Row" }];
+            return [{ id: 1, title: "Edited" }];
         });
         try {
             await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
@@ -445,5 +463,89 @@ describe("a list refetch for sockets", () => {
         await flush();
         expect(frames(ws).filter(f => f.type === "collection_update")).toHaveLength(1);
         expect(lastMeta(ws)).toEqual({ limit: 1, offset: 0, hasMore: false, partial: true });
+    });
+});
+
+/**
+ * A write anywhere in a collection refetches every list of it, and a list
+ * showing the first 50 of 10k rows comes back unchanged for 99.5% of them. The
+ * frame was sent anyway — ~30 KB per viewer per write, parsed, merged and
+ * re-rendered by every client for nothing.
+ */
+describe("a refetch that finds nothing new", () => {
+    const updates = (ws: Socket) => frames(ws).filter(f => f.type === "collection_update" || f.type === "single_update");
+    const write = async () => {
+        await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
+        jest.advanceTimersByTime(350);
+        await flush();
+    };
+
+    it("sends a list's subscribers nothing, and the next real change to each of them", async () => {
+        const a = connect("a");
+        const b = connect("b");
+        await subscribeList("a", "s", ALICE);
+        await subscribeList("b", "s", ALICE);
+        await flush();
+        expect(updates(a)).toHaveLength(1);
+        a.send.mockClear();
+        b.send.mockClear();
+
+        await write();
+        expect(fetchCollectionForRest).toHaveBeenCalled();
+        expect(updates(a)).toHaveLength(0);
+        expect(updates(b)).toHaveLength(0);
+
+        fetchCollectionForRest.mockResolvedValueOnce([{ id: 1, title: "Edited" }]);
+        await write();
+        expect(updates(a).map(f => f.rows)).toEqual([[{ id: 1, title: "Edited" }]]);
+        expect(updates(b).map(f => f.rows)).toEqual([[{ id: 1, title: "Edited" }]]);
+    });
+
+    it("compares each subscriber with what it was last sent, not with the group", async () => {
+        const a = connect("a");
+        await subscribeList("a", "s", ALICE);
+        await flush();
+        fetchCollectionForRest.mockResolvedValueOnce([{ id: 1, title: "Edited" }]);
+        await write();
+        // Joins the same group after the change: its first frame is the
+        // current rows, and only a change after that is news to it.
+        const b = connect("b");
+        fetchCollectionForRest.mockResolvedValueOnce([{ id: 1, title: "Edited" }]);
+        await subscribeList("b", "s", ALICE);
+        await flush();
+        a.send.mockClear();
+        b.send.mockClear();
+
+        fetchCollectionForRest.mockResolvedValueOnce([{ id: 1, title: "Edited" }]);
+        await write();
+        expect(updates(a)).toHaveLength(0);
+        expect(updates(b)).toHaveLength(0);
+    });
+
+    it("sends the same rows again after a failed refetch told the subscriber something else", async () => {
+        const a = connect("a");
+        await subscribeList("a", "s", ALICE);
+        await flush();
+        fetchCollectionForRest.mockRejectedValueOnce(new Error("connection reset"));
+        await write();
+        expect(frames(a).at(-1)?.type).toBe("error");
+        a.send.mockClear();
+
+        await write();
+        expect(updates(a)).toHaveLength(1);
+    });
+
+    it("sends a single-row subscriber nothing when its row reads the same", async () => {
+        const a = connect("a");
+        await service.handleClientMessage("a", { type: "subscribe_one", payload: { path: "posts", id: "1", subscriptionId: "one" } }, ALICE);
+        await flush();
+        a.send.mockClear();
+
+        await write();
+        expect(updates(a)).toHaveLength(0);
+
+        fetchOneForRest.mockResolvedValueOnce(null);
+        await write();
+        expect(updates(a).map(f => f.row)).toEqual([null]);
     });
 });

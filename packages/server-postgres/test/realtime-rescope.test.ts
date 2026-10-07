@@ -90,6 +90,10 @@ describe("rescopeClient", () => {
         await flush();
         ws.send.mockClear();
         const before = statements.length;
+        // What the narrower identity reads. (Rows that read the same as the
+        // ones a subscriber was last sent are not sent again.)
+        mockFetchCollection.mockResolvedValueOnce([{ id: 1, title: "Row, as a viewer" }]);
+        mockFetchEntity.mockResolvedValueOnce({ id: 1, title: "Row, as a viewer" });
 
         await service.rescopeClient("c1", VIEWER);
         jest.advanceTimersByTime(350);

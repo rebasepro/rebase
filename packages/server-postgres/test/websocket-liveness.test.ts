@@ -21,8 +21,9 @@ import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals
 
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
-        fetchCollectionForRest: jest.fn(async () => [{ id: 1 }]),
-        fetchOneForRest: jest.fn(async () => ({ id: 1 })),
+        // Each read is news: a refetch that reads what its subscriber was last sent sends nothing.
+        fetchCollectionForRest: jest.fn(async () => [{ id: 1, read: Math.random() }]),
+        fetchOneForRest: jest.fn(async () => ({ id: 1, read: Math.random() })),
         count: jest.fn(async () => 1),
         cursorFor: jest.fn().mockReturnValue(undefined)
     }))
