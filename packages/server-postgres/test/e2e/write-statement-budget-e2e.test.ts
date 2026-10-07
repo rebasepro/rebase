@@ -798,6 +798,19 @@ describe("a write's statements (E2E)", () => {
             expect(await service.pruneExpired()).toBe(0);
         });
 
+        it("a sweep asked to stop ends after the batch in flight, and the next one takes the rest", async () => {
+            const service = new HistoryService(connection.db as never, { maxEntries: 200, ttlDays: 1 });
+            await admin.query(
+                `INSERT INTO rebase.entity_history (table_name, entity_id, action, updated_at)
+                 SELECT 'interrupted', g::text, 'delete', NOW() - INTERVAL '2 days' FROM generate_series(1, 12000) g`
+            );
+            const stopping = new AbortController();
+            const first = service.pruneExpired({ signal: stopping.signal });
+            stopping.abort();
+            expect(await first).toBeLessThanOrEqual(5_000);
+            expect(await service.pruneExpired()).toBe(12_000 - await first);
+        });
+
         it("is started by the boot: its first hour is claimed", async () => {
             const { rows } = await admin.query("SELECT job_id FROM rebase.cron_claims WHERE job_id = 'rebase:history:retention'");
             expect(rows).toHaveLength(1);

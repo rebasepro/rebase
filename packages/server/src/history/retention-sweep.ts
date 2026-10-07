@@ -34,8 +34,12 @@ export const HISTORY_RETENTION_SWEEP_JOB_ID = "rebase:history:retention";
 export const HISTORY_RETENTION_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 
 export interface HistoryRetentionSweepOptions {
-    /** Delete every entry past retention; resolves to how many went. */
-    pruneExpired: () => Promise<number>;
+    /**
+     * Delete every entry past retention; resolves to how many went. `signal`
+     * is aborted by {@link HistoryRetentionSweep.stop}, so a long sweep ends
+     * after its current batch instead of holding the shutdown.
+     */
+    pruneExpired: (options: { signal: AbortSignal }) => Promise<number>;
     /**
      * Claim `slot` for `jobId` across every instance: `true` for the one that
      * wins it. Throws when the store cannot tell. Absent, every instance sweeps.
@@ -66,6 +70,7 @@ export function createHistoryRetentionSweep(options: HistoryRetentionSweepOption
     const now = options.now ?? Date.now;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let inFlight: Promise<HistoryRetentionSweepOutcome> | undefined;
+    let stopping = new AbortController();
 
     /** The interval this instant falls in, by its start: the same key on every instance. */
     const currentSlot = (): string => new Date(Math.floor(now() / intervalMs) * intervalMs).toISOString();
@@ -86,7 +91,7 @@ export function createHistoryRetentionSweep(options: HistoryRetentionSweepOption
             if (!claimed) return "claimed-elsewhere";
         }
         try {
-            const deleted = await options.pruneExpired();
+            const deleted = await options.pruneExpired({ signal: stopping.signal });
             if (deleted > 0) logger.info(`[history] Deleted ${deleted} history entr${deleted === 1 ? "y" : "ies"} past retention`, { slot });
             return "swept";
         } catch (error) {
@@ -119,6 +124,7 @@ export function createHistoryRetentionSweep(options: HistoryRetentionSweepOption
     return {
         start() {
             if (timer) return;
+            if (stopping.signal.aborted) stopping = new AbortController();
             schedule();
             // Not awaited: boot does not wait on housekeeping.
             void runSlot();
@@ -126,6 +132,8 @@ export function createHistoryRetentionSweep(options: HistoryRetentionSweepOption
         async stop() {
             if (timer) clearTimeout(timer);
             timer = undefined;
+            // A sweep in flight finishes the batch it is on, then returns.
+            stopping.abort();
             // A tick never rejects (it reports its failures), so this only waits.
             await inFlight;
         },
@@ -136,7 +144,7 @@ export function createHistoryRetentionSweep(options: HistoryRetentionSweepOption
 /** What {@link startHistoryRetentionSweep} is given by the boot. */
 export interface HistoryRetentionSweepWiring {
     /** The history service the driver records through, when history is on. */
-    historyService?: { pruneExpired?(): Promise<number> };
+    historyService?: { pruneExpired?(options?: { signal?: AbortSignal }): Promise<number> };
     /** The default data driver: its SQL admin backs the slot claim. */
     driver: DataDriver;
     /** Whether this process owns the timers (`ownership.cronScheduler`). */

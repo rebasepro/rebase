@@ -92,14 +92,20 @@ describe("the history retention sweep", () => {
         expect(pruneExpired).toHaveBeenCalledTimes(2);
     });
 
-    it("lets a stop wait for the sweep still running", async () => {
+    it("lets a stop wait for the sweep still running, and tells that sweep to end after its batch", async () => {
         let finish!: () => void;
-        const pruneExpired = jest.fn(() => new Promise<number>(resolve => { finish = () => resolve(10); }));
+        let signal: AbortSignal | undefined;
+        const pruneExpired = jest.fn((options: { signal: AbortSignal }) => {
+            signal = options.signal;
+            return new Promise<number>(resolve => { finish = () => resolve(10); });
+        });
         const sweep = createHistoryRetentionSweep({ pruneExpired });
         sweep.start();
+        expect(signal?.aborted).toBe(false);
         let stopped = false;
         const stopping = sweep.stop().then(() => { stopped = true; });
         await Promise.resolve();
+        expect(signal?.aborted).toBe(true);
         expect(stopped).toBe(false);
         finish();
         await stopping;

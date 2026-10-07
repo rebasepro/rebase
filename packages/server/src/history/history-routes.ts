@@ -158,9 +158,10 @@ export interface HistoryService {
     /**
      * Delete every entry past the retention period, of every row; resolves to
      * how many went. Run hourly by the backend — see `retention-sweep.ts`. A
-     * service without it is pruned only inline, after each write.
+     * service without it is pruned only inline, after each write. `signal`
+     * asks it to stop between batches.
      */
-    pruneExpired?(): Promise<number>;
+    pruneExpired?(options?: { signal?: AbortSignal }): Promise<number>;
 }
 
 /** Entries returned when the caller names no `?limit`. */

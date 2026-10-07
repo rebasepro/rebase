@@ -287,10 +287,15 @@ export class HistoryService {
      * (or a sweep meeting an inline prune) split the work instead of waiting
      * on each other. Each batch reads `idx_history_updated_at`, built in the
      * background at boot (`ensureHistoryIndexes`).
+     *
+     * `signal` ends it after the batch in flight: a shutdown waits for the
+     * sweep, and a first sweep over a large backlog is hundreds of batches.
+     * What is left goes in the next sweep.
      */
-    async pruneExpired(): Promise<number> {
+    async pruneExpired(options?: { signal?: AbortSignal }): Promise<number> {
         let total = 0;
         for (;;) {
+            if (options?.signal?.aborted) return total;
             const result = await this.db.execute(sql`
                 DELETE FROM rebase.entity_history
                 WHERE id IN (
