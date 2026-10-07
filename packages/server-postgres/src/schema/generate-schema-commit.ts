@@ -261,7 +261,8 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
     // Both sides planned once, here, rather than through `additiveStatements` —
     // which would plan `after` a second time for the withheld constraints. The
     // planner is pure, so a second call is only wasted work rather than a
-    // correctness problem, but this runs on every `/plan` keystroke in the panel.
+    // correctness problem, but this runs on every `/plan` — every change the
+    // panel reviews — and again on `/apply`.
     const previous = planCollectionSchemaEnsure(input.before, existing, options);
     const next = planCollectionSchemaEnsure(input.after, existing, options);
     const already = new Set(previous.statements);

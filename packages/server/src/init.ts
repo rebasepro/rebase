@@ -2402,8 +2402,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         if (canEditSchema) {
             const collectionsDir = config.collectionsDir;
             // Resolved once, at boot. A deployment either has a working tree or
-            // it does not, and asking git on every request would be a process
-            // spawn per keystroke in the panel.
+            // it does not, and asking git on every request would spawn a
+            // process for every plan the panel asks for.
             const repositoryRoot = collectionsDir
                 ? await findRepositoryRoot(collectionsDir)
                 : undefined;

@@ -712,9 +712,10 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             config.policy
         );
 
-        // The branch belongs here rather than on the plan, which is recomputed
-        // on every keystroke: locally this is a git call, and a panel that asked
-        // per keystroke would spawn a process per keystroke. It is also the
+        // The branch belongs here rather than on the plan, which is asked again
+        // for every change the panel reviews and every retry: locally this is a
+        // git call, a process spawned each time, for an answer that does not
+        // change between them. It is also the
         // thing somebody most needs *before* confirming — a commit is landing
         // somewhere, and "somewhere" should be on screen rather than in the
         // receipt afterwards.
