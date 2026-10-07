@@ -71,6 +71,8 @@ type CaptureRow = {
     relkind?: string | null;
     columns: Array<{ name: string; primary: boolean }>;
     triggers: TriggerRow[];
+    row_function_current?: boolean;
+    statement_code_current?: boolean;
     compat_until?: string | null;
 };
 
@@ -204,6 +206,38 @@ describe("provisionTriggerCdc", () => {
             expect(calls[1]).toContain("compat_until CONSTANT timestamptz := '-infinity';");
         });
 
+        it("rewrites neither function when both are already the current ones", async () => {
+            const { run, calls } = captureRunner({
+                "public.posts": {
+                    columns: idColumn, triggers: currentTriggers("id"),
+                    row_function_current: true, statement_code_current: true, compat_until: "-infinity"
+                }
+            });
+            await provisionTriggerCdc(run, [{ schema: "public", table: "posts" }]);
+            expect(calls).toHaveLength(1);
+            expect(calls.filter((c) => c.includes("CREATE OR REPLACE FUNCTION"))).toEqual([]);
+        });
+
+        it.each([
+            ["the row function is not current", { row_function_current: false }, [CDC_TRIGGER_FUNCTION]],
+            ["the statement function's code is not current", { statement_code_current: false }, [CDC_STATEMENT_FUNCTION]],
+            // A conversion opens the compatibility window, which lives in the body.
+            ["a table is converted from the row trigger", { triggers: [rowTrigger("id")] }, [CDC_STATEMENT_FUNCTION]]
+        ])("rewrites only what differs when %s", async (_label, patch, rewritten) => {
+            const { run, calls } = captureRunner({
+                "public.posts": {
+                    columns: idColumn, triggers: currentTriggers("id"),
+                    row_function_current: true, statement_code_current: true, compat_until: "-infinity", ...patch
+                }
+            });
+            await provisionTriggerCdc(run, [{ schema: "public", table: "posts" }]);
+            const ddl = calls.filter((c) => c.includes("CREATE OR REPLACE FUNCTION"));
+            expect(ddl).toHaveLength(1);
+            for (const fn of [CDC_TRIGGER_FUNCTION, CDC_STATEMENT_FUNCTION]) {
+                expect(ddl[0].includes(`CREATE OR REPLACE FUNCTION ${fn}()`)).toBe(rewritten.includes(fn));
+            }
+        });
+
         const withOne = (patch: Partial<TriggerRow>): TriggerRow[] =>
             currentTriggers("id").map((t) => (t.name === "rebase_cdc_update" ? { ...t, ...patch } : t));
 
@@ -307,7 +341,9 @@ describe("provisionTriggerCdc", () => {
 
                 calls.length = 0;
                 const second = await provisionTriggerCdc(run, tables);
-                expect(calls.filter((c) => /DROP TRIGGER|CREATE TRIGGER/.test(c))).toEqual([]);
+                // A boot that changes nothing writes nothing: one catalogue read.
+                expect(calls.filter((c) => /DROP TRIGGER|CREATE TRIGGER|CREATE OR REPLACE FUNCTION/.test(c))).toEqual([]);
+                expect(calls).toHaveLength(1);
                 expect(second.installed).toHaveLength(2);
 
                 // Switched off by hand: the next boot switches it back on.
@@ -328,7 +364,15 @@ describe("provisionTriggerCdc", () => {
                 expect(calls.filter((c) => /CREATE TRIGGER/.test(c))).toHaveLength(1);
                 calls.length = 0;
                 await provisionTriggerCdc(run, tables);
-                expect(calls.filter((c) => /DROP TRIGGER|CREATE TRIGGER/.test(c))).toEqual([]);
+                expect(calls.filter((c) => /DROP TRIGGER|CREATE TRIGGER|CREATE OR REPLACE FUNCTION/.test(c))).toEqual([]);
+                // An older body is replaced, and nothing else.
+                await db.exec(`CREATE OR REPLACE FUNCTION ${CDC_TRIGGER_FUNCTION}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NULL; END $$`);
+                calls.length = 0;
+                await provisionTriggerCdc(run, tables);
+                const rewritten = calls.filter((c) => c.includes("CREATE OR REPLACE FUNCTION"));
+                expect(rewritten).toHaveLength(1);
+                expect(rewritten[0]).toContain(`CREATE OR REPLACE FUNCTION ${CDC_TRIGGER_FUNCTION}()`);
+                expect(rewritten[0]).not.toContain(`CREATE OR REPLACE FUNCTION ${CDC_STATEMENT_FUNCTION}()`);
                 // The window the conversion opened is kept by the boots after it.
                 const { rows: fn } = await db.query<{ src: string }>(
                     "SELECT prosrc AS src FROM pg_proc WHERE proname = 'rebase_cdc_notify_statement'"
@@ -395,6 +439,16 @@ describe("parseCdcPayload", () => {
 });
 
 describe("refreshInstalledCdcFunction", () => {
+    it("rewrites nothing when the installed functions are current", async () => {
+        const calls: string[] = [];
+        const run = async (text: string): Promise<Record<string, unknown>[]> => {
+            calls.push(text);
+            return [{ installed: true, statement_installed: true, row_function_current: true, statement_code_current: true, compat_until: "-infinity" }];
+        };
+        expect(await refreshInstalledCdcFunction(run)).toBe(true);
+        expect(calls).toHaveLength(1);
+    });
+
     it("replaces only the functions that are installed, keeping the statement function's window", async () => {
         const calls: string[] = [];
         const run = async (text: string): Promise<Record<string, unknown>[]> => {

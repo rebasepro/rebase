@@ -343,7 +343,7 @@ BEGIN
 
     IF TG_NARGS = 1 AND TG_ARGV[0] = 'id' THEN
         BEGIN
-            -- None, one, or more — no further — and the one named as the row trigger names it.
+            -- None, one, or more (no further), and the one named as the row trigger names it.
             IF TG_OP = 'DELETE' THEN
                 ${firstTwo(OLD_ROWS)}
             ELSE
@@ -527,6 +527,59 @@ const compatMs = (literal: unknown): number => {
 const compatLiteral = (ms: number): string => (Number.isFinite(ms) ? new Date(ms).toISOString() : "-infinity");
 
 /**
+ * What a boot compares the installed functions with, so one that changes
+ * nothing leaves them alone: every boot used to run `CREATE OR REPLACE` on
+ * both, rewriting their catalogue rows to the same text.
+ *
+ * `prosrc` is the body exactly as written between the dollar quotes, so the
+ * comparison is of text. The statement function's is compared without its
+ * `compat_until` line: the window is read on its own, and the code is
+ * current whatever window it carries. The bodies are ASCII, so the
+ * comparison holds in a database of any encoding.
+ */
+const DOLLAR_QUOTE = "$rebase_cdc$";
+const functionBody = (sql: string): string =>
+    sql.slice(sql.indexOf(DOLLAR_QUOTE) + DOLLAR_QUOTE.length, sql.lastIndexOf(DOLLAR_QUOTE));
+const COMPAT_LINE_SQL_PATTERN = `${COMPAT_DECLARATION}'[^']*'`;
+const withoutCompat = (body: string): string => body.replace(new RegExp(COMPAT_LINE_SQL_PATTERN), "");
+
+/** Whether each installed function is the current one, as SQL columns of one row. */
+const functionsCurrentSql = (): string =>
+    `(SELECT p.prosrc = ${quoteLiteral(functionBody(buildCdcRowFunctionSql()))} ` +
+    `FROM pg_proc p WHERE p.oid = ${ROW_FUNCTION_OID}) AS row_function_current, ` +
+    `(SELECT regexp_replace(p.prosrc, ${quoteLiteral(COMPAT_LINE_SQL_PATTERN)}, '') = ` +
+    `${quoteLiteral(withoutCompat(functionBody(buildCdcStatementFunctionSql("-infinity"))))} ` +
+    `FROM pg_proc p WHERE p.oid = ${STATEMENT_FUNCTION_OID}) AS statement_code_current, ` +
+    `${INSTALLED_COMPAT_SQL} AS compat_until`;
+
+/** The installed functions, as {@link functionsCurrentSql} reads them. */
+interface InstalledFunctions {
+    rowCurrent: boolean;
+    statementCodeCurrent: boolean;
+    /** The statement function's `compat_until` literal, as written; `null` when it is not installed. */
+    compatLiteral: string | null;
+}
+
+const readInstalledFunctions = (row: Record<string, unknown> | undefined): InstalledFunctions => ({
+    rowCurrent: row?.row_function_current === true,
+    statementCodeCurrent: row?.statement_code_current === true,
+    compatLiteral: typeof row?.compat_until === "string" ? row.compat_until : null
+});
+
+/**
+ * The function DDL this boot needs: none when both are already exactly what
+ * it would write, `compatUntil` included.
+ */
+function functionSqlToRun(installed: InstalledFunctions | undefined, compatUntil: string, only?: { row: boolean; statement: boolean }): string | undefined {
+    const sql: string[] = [];
+    if ((only?.row ?? true) && !installed?.rowCurrent) sql.push(buildCdcRowFunctionSql());
+    if ((only?.statement ?? true) && !(installed?.statementCodeCurrent && installed.compatLiteral === compatUntil)) {
+        sql.push(buildCdcStatementFunctionSql(compatUntil));
+    }
+    return sql.length > 0 ? `CREATE SCHEMA IF NOT EXISTS rebase;\n\n${sql.join("\n\n")}` : undefined;
+}
+
+/**
  * Replace the already-installed trigger functions with the current bodies, and
  * install nothing where there is none.
  *
@@ -542,14 +595,15 @@ export async function refreshInstalledCdcFunction(run: RawSqlRunner): Promise<bo
     const rows = await run(
         `SELECT ${ROW_FUNCTION_OID} IS NOT NULL AS installed, ` +
         `${STATEMENT_FUNCTION_OID} IS NOT NULL AS statement_installed, ` +
-        `${INSTALLED_COMPAT_SQL} AS compat_until`
+        functionsCurrentSql()
     );
     const row = rows[0];
-    const sql: string[] = [];
-    if (row?.installed === true) sql.push(buildCdcRowFunctionSql());
-    if (row?.statement_installed === true) sql.push(buildCdcStatementFunctionSql(compatLiteral(compatMs(row.compat_until))));
-    if (sql.length === 0) return false;
-    await run(sql.join("\n\n"));
+    const rowInstalled = row?.installed === true;
+    const statementInstalled = row?.statement_installed === true;
+    if (!rowInstalled && !statementInstalled) return false;
+    const installed = readInstalledFunctions(row);
+    const sql = functionSqlToRun(installed, compatLiteral(compatMs(installed.compatLiteral)), { row: rowInstalled, statement: statementInstalled });
+    if (sql) await run(sql);
     return true;
 }
 
@@ -639,7 +693,10 @@ const decodeTriggerArgs = (hex: string): string[] => {
  * locks on every boot, measured holding a live `SELECT` behind the boot for
  * 4.4 s while a report read the table.
  */
-async function readCaptureState(run: RawSqlRunner, refs: CdcTableRef[]): Promise<{ tables: Map<string, CaptureState>; compatUntil: number }> {
+async function readCaptureState(
+    run: RawSqlRunner,
+    refs: CdcTableRef[]
+): Promise<{ tables: Map<string, CaptureState>; compatUntil: number; functions: InstalledFunctions }> {
     const targets = refs
         .map((ref) => `(${quoteLiteral(`${ref.schema}.${ref.table}`)}, to_regclass(${quoteLiteral(`${quoteIdent(ref.schema)}.${quoteIdent(ref.table)}`)}))`)
         .join(", ");
@@ -667,8 +724,8 @@ async function readCaptureState(run: RawSqlRunner, refs: CdcTableRef[]): Promise
                             'oldTable', tr.tgoldtable)), '[]'::json)
                    FROM pg_trigger tr
                   WHERE tr.tgrelid = t.rel AND tr.tgname IN (${ALL_TRIGGER_NAMES.map(quoteLiteral).join(", ")})) AS triggers,
-                ${INSTALLED_COMPAT_SQL} AS compat_until
-           FROM target t`
+                f.*
+           FROM target t, (SELECT ${functionsCurrentSql()}) f`
     );
     const parseJson = <T>(value: unknown): T => (typeof value === "string" ? JSON.parse(value) : value) as T;
     const tables = new Map<string, CaptureState>();
@@ -692,7 +749,7 @@ async function readCaptureState(run: RawSqlRunner, refs: CdcTableRef[]): Promise
             }))
         });
     }
-    return { tables, compatUntil };
+    return { tables, compatUntil, functions: readInstalledFunctions(rows[0]) };
 }
 
 /** Whether `trigger` is exactly what {@link buildCdcTriggerSql} creates for `spec`. */
@@ -792,11 +849,13 @@ export async function provisionTriggerCdc(
     // every table takes the old path — read its key, drop and re-create.
     let states: Map<string, CaptureState> | undefined;
     let installedCompat = -Infinity;
+    let functions: InstalledFunctions | undefined;
     try {
         if (byTable.size > 0) {
             const read = await readCaptureState(run, [...byTable.values()]);
             states = read.tables;
             installedCompat = read.compatUntil;
+            functions = read.functions;
         } else {
             states = new Map();
         }
@@ -817,8 +876,9 @@ export async function provisionTriggerCdc(
     });
     const compatUntil = convertsFromRows ? Math.max(installedCompat, now + CDC_ROW_COMPAT_MS) : installedCompat;
 
-    // The shared trigger functions (once).
-    await run(buildCdcFunctionSql({ compatUntil: compatLiteral(compatUntil) }));
+    // The shared trigger functions (once), unless they are already exactly these.
+    const functionSql = functionSqlToRun(functions, compatLiteral(compatUntil));
+    if (functionSql) await run(functionSql);
 
     let unchanged = 0;
     for (const [key, ref] of byTable) {
