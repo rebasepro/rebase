@@ -76,6 +76,50 @@ describe("policy-authenticated-tautology", () => {
         }
     });
 
+    /**
+     * `policy.registered()` is `authenticated()` plus "not a guest", and the
+     * database stores the extra conjunct as `NOT ( SELECT rebase.is_anonymous()
+     * …)`. The parser did not know it, so it stayed quiet on the whole clause —
+     * both checks did — though every account that is not a guest reads every
+     * row: exactly this finding, one notch narrower.
+     */
+    it("flags Rebase's own registered(), as the database stores it and as the compiler writes it", () => {
+        for (const using of [
+            "((( SELECT rebase.uid() AS uid) IS NOT NULL) AND (( SELECT rebase.uid() AS uid) <> ALL (ARRAY['anonymous'::text, 'anon'::text])) AND (NOT ( SELECT rebase.is_anonymous() AS is_anonymous)))",
+            "((rebase.uid() IS NOT NULL) AND (rebase.uid() <> ALL (ARRAY['anonymous'::text, 'anon'::text])) AND (NOT rebase.is_anonymous()))",
+            "(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon') AND NOT (SELECT rebase.is_anonymous())",
+            "((rebase.uid() IS NOT NULL) AND (rebase.uid() <> 'anonymous'::text) AND (rebase.is_anonymous() = false))"
+        ]) {
+            const findings = policyAuthenticatedTautology.run(withPolicy(using));
+            expect({ using, findings: findings.length }).toEqual({ using, findings: 1 });
+            expect(findings[0].detail).toContain("not a guest");
+            expect({ using, findings: policyAnonymousTautology.run(withPolicy(using)).length }).toEqual({ using, findings: 0 });
+        }
+    });
+
+    it("stays quiet when registered() is joined by a condition that scopes rows or names a role", () => {
+        for (const using of [
+            "((( SELECT rebase.uid() AS uid) IS NOT NULL) AND (( SELECT rebase.uid() AS uid) <> ALL (ARRAY['anonymous'::text, 'anon'::text])) AND (NOT ( SELECT rebase.is_anonymous() AS is_anonymous)) AND (owner_id = ( SELECT rebase.uid() AS uid)))",
+            "( SELECT ((rebase.uid() IS NOT NULL) AND (rebase.uid() <> ALL (ARRAY['anonymous'::text, 'anon'::text])) AND (NOT rebase.is_anonymous()) AND (string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text])))",
+            "((rebase.uid() IS NOT NULL) AND (rebase.uid() <> 'anonymous'::text) AND (NOT rebase.is_anonymous()) AND (org_id = (rebase.jwt() ->> 'org'::text)))"
+        ]) {
+            expect({ using, findings: policyAuthenticatedTautology.run(withPolicy(using)).length }).toEqual({ using, findings: 0 });
+            expect({ using, findings: policyAnonymousTautology.run(withPolicy(using)).length }).toEqual({ using, findings: 0 });
+        }
+    });
+
+    /**
+     * A guest is a signed-in account, so `NOT rebase.is_anonymous()` does not
+     * keep a signed-out caller out: one arrives with the uid `'anonymous'` and
+     * `is_anonymous()` false. Without the sentinel guard the null test stands
+     * on its own — the anonymous tautology, not this one.
+     */
+    it("leaves a guest exclusion without the sentinel guard to the anonymous check", () => {
+        const unguarded = withPolicy("((rebase.uid() IS NOT NULL) AND (NOT rebase.is_anonymous()))");
+        expect(policyAuthenticatedTautology.run(unguarded)).toEqual([]);
+        expect(policyAnonymousTautology.run(unguarded)).toHaveLength(1);
+    });
+
     it("stays quiet when the stored form also scopes rows or names a role", () => {
         for (const using of [
             "((rebase.uid() IS NOT NULL) AND (rebase.uid() <> ALL (ARRAY['anonymous'::text, 'anon'::text])) AND (owner_id = rebase.uid()))",

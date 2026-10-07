@@ -344,6 +344,10 @@ not do is scope any rows: what remains is *every registered account may read eve
 this table*, which is a different sentence from the one it is usually meant to be. On a
 Rebase project this is a rule whose `condition` is `policy.authenticated()` and nothing
 else, which the database stores as `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])`.
+<span class="since-badge" data-since="0.24">Since 0.24</span> A rule whose condition is
+only `policy.registered()` is reported too: its extra `NOT rebase.is_anonymous()` keeps
+guests out and scopes no rows either, so every account that is not a guest reads every
+row. With the default `--fail-on high`, a CI run that scans such a policy now fails.
 
 That is the shape that turns a `users` table into a directory of every address on the
 platform, readable by anyone who signed up — and where registration is open, "anyone who
