@@ -35,7 +35,7 @@ import { probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
 import { createAuthSchema } from "./schema/auth-schema";
 import { HistoryService } from "./history/HistoryService";
-import { ensureHistoryIndexes, ensureHistoryTableExists } from "./history/ensure-history-table";
+import { ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { patchPgNumericToNumber } from "./utils/pg-numeric-number-patch";
 import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./schema/introspect-runtime";
@@ -1332,26 +1332,6 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             const db = internals.db;
 
             const inTransaction = await ensureHistoryTableExists(db);
-
-            // The index the hourly retention sweep reads, built like any
-            // index a live table is missing: concurrently, after the boot —
-            // or right here in a provisioning-only run, which exits when boot
-            // returns. See `ensureHistoryIndexes`.
-            const { BOOT_LOCK_TIMEOUT_MS } = await import("./schema/boot-ddl");
-            const historyIndexes = await ensureHistoryIndexes(db, { lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS });
-            if (historyIndexes.length > 0) {
-                const { buildDeferredIndexes, scheduleDeferredIndexBuild } = await import("./schema/deferred-index-build");
-                const indexOptions = { log: (message: string) => logger.info(`[history] ${message}`), lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS };
-                const provisionOnly = ["1", "true"].includes((process.env.REBASE_PROVISION_ONLY ?? "").trim().toLowerCase());
-                if (provisionOnly) {
-                    await buildDeferredIndexes(openIndexBuildSession(driverResult), historyIndexes, indexOptions);
-                } else {
-                    scheduleDeferredIndexBuild(openIndexBuildSession(driverResult), historyIndexes, {
-                        ...indexOptions,
-                        delayMs: DEFERRED_INDEX_BUILD_DELAY_MS
-                    }).start();
-                }
-            }
 
             const retention = typeof config === "object" ? config.retention : undefined;
             const historyService = new HistoryService(db, retention ? { ttlDays: retention } : undefined, { inTransaction });
