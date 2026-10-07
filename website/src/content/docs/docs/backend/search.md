@@ -33,6 +33,8 @@ three limits that no setting inside it can fix:
   can be on page seven.
 - **It cannot use an index.** A leading `%` defeats a B-tree, so every search is
   a sequential scan. Fine at a thousand rows; a cliff at a million.
+  `rebase doctor` names the collections where this has started to matter: no
+  `search` block and more than about 10,000 rows.
 
 The term is matched **literally**: `%` and `_` are LIKE metacharacters, and they
 are escaped before the pattern is built, so searching for `50%` searches for

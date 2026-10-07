@@ -230,6 +230,8 @@ Run `doctor` whenever something feels out of sync. It pinpoints exactly where th
 
 The database comparison needs `DATABASE_URL` (or `ADMIN_CONNECTION_STRING`). Without one, that phase is reported as **skipped** rather than passing, and the run never closes with "All schemas are in sync" — a check that did not happen is not a clean bill of health.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> It also names every collection with no [`search` block](/docs/backend/search) whose table holds more than about 10,000 rows. A search there — the admin's search box, `.search()`, `?searchString=` — is `ILIKE '%term%'` over the text columns, which no index can serve, so each one reads the whole table, and its count reads it again (about a third of a second at 100,000 rows, growing with the table). The row count is Postgres's own estimate, so the check scans nothing. It is a hint: it does not change the exit code, and nothing is indexed for you.
+
 ### `rebase generate-sdk`
 
 Generate a typed SDK from your collection definitions:
