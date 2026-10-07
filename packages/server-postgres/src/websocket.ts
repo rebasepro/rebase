@@ -227,6 +227,14 @@ const MAX_UNAUTHENTICATED_FRAME_BYTES = 64 * 1024;
 const DEFAULT_IDENTITY_RECHECK_MS = 30_000;
 
 /**
+ * How many auth-store lookups the sweep runs at once. It shares the pool with
+ * every REST request — 20 connections by default — so it takes a few of them,
+ * however many sockets are due: 5,000 sockets at ~0.3 ms a lookup is under
+ * half a second of sweep, rather than a burst that held the whole pool.
+ */
+const IDENTITY_SWEEP_CONCURRENCY = 4;
+
+/**
  * Channel frames are re-checked at most this often, in ms. They are the
  * high-rate traffic (see `WS_CHANNEL_RATE_LIMIT`): a database read for every
  * cursor position would make realtime presence the busiest query a backend
@@ -676,13 +684,16 @@ export function createPostgresWebSocket(
      * - `"unavailable"`: the store could not answer. The frame is refused,
      *   the session kept, and the next frame or sweep asks again.
      */
-    async function recheckIdentity(clientId: string): Promise<"live" | "ended" | "unavailable"> {
+    async function recheckIdentity(
+        clientId: string,
+        resolve: (token: string, impersonate?: string) => ReturnType<typeof resolveIdentity> = resolveIdentity
+    ): Promise<"live" | "ended" | "unavailable"> {
         const session = clientSessions.get(clientId);
         const credential = session?.credential;
         if (!session?.user || !credential) return "live";
         let outcome: Awaited<ReturnType<typeof resolveIdentity>>;
         try {
-            outcome = await resolveIdentity(credential, session.impersonate);
+            outcome = await resolve(credential, session.impersonate);
         } catch {
             return "unavailable";
         }
@@ -737,13 +748,63 @@ export function createPostgresWebSocket(
     // The sweep: a socket that only listens sends nothing to be re-checked
     // before, so it is re-checked on a timer instead.
     const identityRecheckMs = Math.max(250, options?.identityRecheckIntervalMs ?? DEFAULT_IDENTITY_RECHECK_MS);
-    const identitySweep = setInterval(() => {
+
+    /**
+     * Re-check every socket that is due, asking the auth store once per
+     * question.
+     *
+     * Each socket used to be asked about on its own, all in the same tick: S
+     * listening sockets were S concurrent lookups on the pool REST shares,
+     * and a person with five tabs was five identical lookups of one token.
+     * Sockets are grouped by what they would ask — their credential and the
+     * user they impersonate — and each group asks once, at most
+     * {@link IDENTITY_SWEEP_CONCURRENCY} groups at a time.
+     *
+     * The answer is the group's alone, made when the group's turn comes and
+     * dropped when it is done; nothing is kept from one sweep to the next, so
+     * a credential revoked after a sweep is asked about afresh, and refused,
+     * by the next one. A socket that authenticated again while its group
+     * waited is asked about the credential it holds now — see `answerFor`.
+     */
+    async function sweepIdentities(): Promise<void> {
         const now = Date.now();
+        const groups = new Map<string, { credential: string; impersonate?: string; clientIds: string[] }>();
         for (const [id, session] of clientSessions) {
-            if (session.user && session.credential && now - session.checkedAt >= identityRecheckMs / 2) {
-                void recheckIdentity(id).catch(() => undefined);
-            }
+            if (!session.user || !session.credential || now - session.checkedAt < identityRecheckMs / 2) continue;
+            const key = JSON.stringify([session.credential, session.impersonate ?? null]);
+            const group = groups.get(key);
+            if (group) group.clientIds.push(id);
+            else groups.set(key, { credential: session.credential, impersonate: session.impersonate, clientIds: [id] });
         }
+        const queue = [...groups.values()];
+        const work = async (): Promise<void> => {
+            for (let group = queue.shift(); group; group = queue.shift()) {
+                let answer: ReturnType<typeof resolveIdentity> | undefined;
+                // The group's question is answered once. Any other — a socket
+                // that has since authenticated with another token, or asked to
+                // act as someone else — is asked on its own.
+                const answerFor = (token: string, impersonate?: string): ReturnType<typeof resolveIdentity> => {
+                    if (token !== group!.credential || impersonate !== group!.impersonate) return resolveIdentity(token, impersonate);
+                    answer ??= resolveIdentity(token, impersonate);
+                    return answer;
+                };
+                for (const id of group.clientIds) {
+                    await recheckIdentity(id, answerFor).catch(() => undefined);
+                }
+            }
+        };
+        await Promise.all(Array.from({ length: Math.min(IDENTITY_SWEEP_CONCURRENCY, queue.length) }, work));
+    }
+
+    // A sweep still working through a large number of sockets when the next
+    // is due lets that one pass, rather than asking about them twice at once.
+    let sweeping = false;
+    const identitySweep = setInterval(() => {
+        if (sweeping) return;
+        sweeping = true;
+        void sweepIdentities().catch(() => undefined).finally(() => {
+            sweeping = false;
+        });
     }, identityRecheckMs);
     // Unref'd, so it never holds a process open; stopped with whichever goes
     // first, the socket server or the HTTP server it is attached to.
