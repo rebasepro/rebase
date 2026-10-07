@@ -296,11 +296,11 @@ describe("a rename through the patch path, on every shipped collection", () => {
 
 describe("POST /schema-editor/collection/save with a patch", () => {
     it("writes the patch, the same way the live door does", async () => {
-        const { createSchemaEditorRoutes } = await import("../src/api/schema-editor-routes");
+        const { createSchemaEditorRoutes, createSchemaSourceEditor } = await import("../src/api/schema-editor-routes");
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ast-patch-route-"));
         try {
             fs.writeFileSync(path.join(dir, "books.ts"), BOOKS);
-            const app = createSchemaEditorRoutes(dir);
+            const app = createSchemaEditorRoutes(createSchemaSourceEditor(dir));
             const response = await app.request("/collection/save", {
                 method: "POST",
                 headers: { "content-type": "application/json" },

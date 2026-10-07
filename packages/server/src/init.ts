@@ -8,7 +8,6 @@ import {
     CollectionCallbacks,
     AnyCollectionConfig,
     CollectionConfig,
-    CollectionPatch,
     HealthCheckResult,
     HistoryConfig,
     InitializedDriver,
@@ -72,6 +71,8 @@ import {
 } from "./schema-edit/project-root";
 import { createGitHubRepository } from "./schema-edit/github-repository";
 import { rewriteRemoteCollection } from "./schema-edit/remote-source";
+import { editCollectionSource, writeLocalCollectionSource } from "./schema-edit/local-source";
+import type { SchemaSourceEditor } from "./schema-edit/source-editor";
 import type { SchemaEditPolicy, RemoteRepositoryConfig } from "./schema-edit/schema-edit-permissions";
 
 /**
@@ -98,7 +99,6 @@ export interface LiveSchemaConfig extends SchemaEditPolicy {
 }
 import { createLocalGitRepository, findRepositoryRoot } from "./schema-edit/local-git-repository";
 import nodePath from "node:path";
-import nodeFs from "node:fs/promises";
 import { createRlsAudit, type RlsAuditConfig, type RlsAudit } from "./rls-audit";
 import { startExpiredTokenSweep } from "./auth/expired-token-sweep";
 import { startHistoryRetentionSweep } from "./history/retention-sweep";
@@ -2317,13 +2317,17 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     let schemaEditorOff = schemaEditorUnavailable();
     let schemaEditorRoutes: Hono<HonoEnv> | undefined;
+    // The one editor of `collectionsDir` in this process, shared by the
+    // source-only editor's routes and live schema editing's `/apply`.
+    let schemaSourceEditor: SchemaSourceEditor | undefined;
 
     if (!schemaEditorOff && config.collectionsDir) {
         // ts-morph is an optional peer dependency, so it can legitimately be
         // absent — run without the schema editor instead of failing startup.
         try {
             const editorModule = await import("./api/schema-editor-routes");
-            schemaEditorRoutes = editorModule.createSchemaEditorRoutes(config.collectionsDir);
+            schemaSourceEditor = editorModule.createSchemaSourceEditor(config.collectionsDir);
+            schemaEditorRoutes = editorModule.createSchemaEditorRoutes(schemaSourceEditor);
         } catch (err) {
             if ((err as { code?: string })?.code === "ERR_MODULE_NOT_FOUND") {
                 schemaEditorOff = {
@@ -2501,42 +2505,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 // `SCHEMA_EDITOR_MISSING_DEPENDENCY`, the panel never offers the
                 // control, and a caller that asks anyway gets a refusal that
                 // names the missing dependency.
-                writeSource: schemaEditorRoutes ? async (change) => {
-                    // Applies the edit the one way it is implemented, wherever
-                    // the file came from. `ts-morph` is what knows how to keep a
-                    // collection file's imports, comments and formatting, and a
-                    // second implementation of that for the remote case would be
-                    // a second thing to get wrong.
-                    //
-                    // An existing collection arrives as a patch — what the
-                    // person changed — and only those keys are written; a new
-                    // one arrives whole.
-                    const applyEdit = async (
-                        dir: string,
-                        collectionId: string,
-                        edit: { collection?: Record<string, unknown>; patch?: CollectionPatch }
-                    ) => {
-                        const { AstSchemaEditor } = await import("./api/ast-schema-editor");
-                        const editor = new AstSchemaEditor(dir);
-                        if (edit.patch) await editor.applyPatch(collectionId, edit.patch);
-                        else await editor.saveCollection(collectionId, edit.collection ?? {}, { partial: false });
-                    };
-
-                    // A removal deletes the file and edits `index.ts`; both
-                    // go in the commit, the file as a deletion.
-                    if (change.remove) {
-                        if (remoteRepo) {
-                            throw new Error("Deleting a collection is not available with a remote repository yet. Delete it in the repository instead.");
-                        }
-                        const { AstSchemaEditor } = await import("./api/ast-schema-editor");
-                        const { deleted, changed } = await new AstSchemaEditor(collectionsDir!).deleteCollection(change.collectionId);
-                        return [
-                            { path: nodePath.relative(repositoryRoot!, deleted), contents: "", deleted: true },
-                            ...await Promise.all(changed.map(async file => ({
-                                path: nodePath.relative(repositoryRoot!, file),
-                                contents: await nodeFs.readFile(file, "utf8")
-                            })))
-                        ];
+                writeSource: schemaSourceEditor ? async (change) => {
+                    // The edit is applied the one way it is implemented,
+                    // wherever the file came from (`editCollectionSource`):
+                    // a second implementation of keeping a collection file's
+                    // imports, comments and formatting for the remote case
+                    // would be a second thing to get wrong.
+                    if (change.remove && remoteRepo) {
+                        throw new Error("Deleting a collection is not available with a remote repository yet. Delete it in the repository instead.");
                     }
 
                     // No source on this machine: fetch it, rewrite it in a
@@ -2558,24 +2534,25 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                             {
                                 repository,
                                 collectionsPath: remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH,
-                                edit: applyEdit
+                                // A scratch directory holding the one file:
+                                // an editor of its own costs a single parse.
+                                edit: async (dir, collectionId, edit) => {
+                                    const { AstSchemaEditor } = await import("./api/ast-schema-editor");
+                                    await editCollectionSource(new AstSchemaEditor(dir), collectionId, edit);
+                                }
                             },
                             change.collectionId,
                             change
                         );
                     }
 
-                    await applyEdit(collectionsDir!, change.collectionId, change);
-
-                    // Read back what it wrote. The editor resolves
-                    // `<collectionsDir>/<id>.ts`, and the commit needs the
-                    // contents rather than a promise that a file changed.
-                    const file = nodePath.join(collectionsDir!, `${change.collectionId}.ts`);
-                    const contents = await nodeFs.readFile(file, "utf8");
-                    return [{
-                        path: nodePath.relative(repositoryRoot!, file),
-                        contents
-                    }];
+                    // This machine's source: through the process's editor,
+                    // queued behind any edit already running in either router.
+                    return writeLocalCollectionSource(
+                        schemaSourceEditor,
+                        { collectionsDir: collectionsDir!, repositoryRoot: repositoryRoot! },
+                        change
+                    );
                 } : undefined,
                 // The same path `writeSource` resolves, derived without writing
                 // anything — the dirty-tree check has to know it before the

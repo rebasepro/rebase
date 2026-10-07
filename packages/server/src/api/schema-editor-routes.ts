@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { collectionPatchProblems, isCollectionPatch } from "@rebasepro/types";
 import { AstSchemaEditor } from "./ast-schema-editor";
+import { SchemaSourceEditor } from "../schema-edit/source-editor";
 import { ApiError, errorHandler } from "./errors";
 import { HonoEnv } from "./types";
 
@@ -65,20 +66,30 @@ async function body<S extends z.ZodType>(c: { req: { json: () => Promise<unknown
     return parsed.data;
 }
 
-export function createSchemaEditorRoutes(collectionsDir: string): Hono<HonoEnv> {
+/**
+ * The editor for `collectionsDir`: one per process, shared by these routes
+ * and live schema editing's `/apply`. See {@link SchemaSourceEditor}.
+ *
+ * Here rather than beside the class because building it loads `ts-morph`, an
+ * optional peer dependency this module is imported to probe for.
+ */
+export function createSchemaSourceEditor(collectionsDir: string): SchemaSourceEditor {
+    return new SchemaSourceEditor(new AstSchemaEditor(collectionsDir));
+}
+
+export function createSchemaEditorRoutes(source: SchemaSourceEditor): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
-    const editor = new AstSchemaEditor(collectionsDir);
 
     router.post("/property/save", async (c) => {
         const { collectionId, propertyKey, propertyConfig } = await body(c, propertySaveSchema);
-        await refusalsAsBadRequest(() => editor.saveProperty(collectionId, propertyKey, propertyConfig));
+        await refusalsAsBadRequest(() => source.run(editor => editor.saveProperty(collectionId, propertyKey, propertyConfig)));
         return c.json({ success: true });
     });
 
     router.post("/property/delete", async (c) => {
         const { collectionId, propertyKey } = await body(c, propertyDeleteSchema);
-        await refusalsAsBadRequest(() => editor.deleteProperty(collectionId, propertyKey));
+        await refusalsAsBadRequest(() => source.run(editor => editor.deleteProperty(collectionId, propertyKey)));
         return c.json({ success: true });
     });
 
@@ -94,15 +105,15 @@ export function createSchemaEditorRoutes(collectionsDir: string): Hono<HonoEnv> 
         if (patch !== undefined && !isCollectionPatch(patch)) {
             throw ApiError.badRequest(collectionPatchProblems(patch).join(" "), "INVALID_INPUT");
         }
-        await refusalsAsBadRequest(() => patch
+        await refusalsAsBadRequest(() => source.run(editor => patch
             ? editor.applyPatch(collectionId, patch)
-            : editor.saveCollection(collectionId, collectionData ?? {}, { partial: partial === true }));
+            : editor.saveCollection(collectionId, collectionData ?? {}, { partial: partial === true })));
         return c.json({ success: true });
     });
 
     router.post("/collection/delete", async (c) => {
         const { collectionId } = await body(c, collectionDeleteSchema);
-        await refusalsAsBadRequest(() => editor.deleteCollection(collectionId));
+        await refusalsAsBadRequest(() => source.run(editor => editor.deleteCollection(collectionId)));
         return c.json({ success: true });
     });
 
