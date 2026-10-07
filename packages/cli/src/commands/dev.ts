@@ -960,6 +960,48 @@ export function schemaPushArgv(databaseUrl: string | undefined): string[] {
 }
 
 /**
+ * Start-up's independent halves, overlapped rather than run one after another.
+ *
+ * `rebase dev` used to regenerate the schema and the SDK, then derive the
+ * resource graph (every collection evaluated again, in this process), then
+ * start the managed database and wait for it — about a second when it was not
+ * already running — and only then spawn the backend. None of the three reads
+ * what another writes: the generators read `config/` and write
+ * `backend/src/schema.generated.ts` and `generated/sdk/`; the derivation reads
+ * `config/resources.ts` and the collections; the database needs neither, and
+ * `schema generate` never connects to one. So `database` starts first and is
+ * collected last.
+ *
+ * `preflight` is the exception, and the reason this is not one `Promise.all`:
+ * on the `--docker` path it pushes the schema the generators have just written,
+ * so it still runs after them.
+ *
+ * A database that fails to start is reported where it always was — after the
+ * generators' and the preflight's output — rather than ahead of it, and it is
+ * never an unhandled rejection while they run.
+ *
+ * Exported for its test.
+ */
+export async function overlapDevStartup<T>(steps: {
+    generate: () => Promise<SchemaGeneration>;
+    preflight: () => Promise<void>;
+    /** Resolve and, for the managed database, start it. `null` when this run starts none. */
+    database: (() => Promise<T>) | null;
+}): Promise<{ schemaGeneration: SchemaGeneration; database: T | null }> {
+    const database = steps.database
+        ? steps.database().then(
+            (value) => ({ ok: true as const, value }),
+            (error: unknown) => ({ ok: false as const, error })
+        )
+        : null;
+    const schemaGeneration = await steps.generate();
+    await steps.preflight();
+    const settled = database ? await database : null;
+    if (settled && !settled.ok) throw settled.error;
+    return { schemaGeneration, database: settled ? settled.value : null };
+}
+
+/**
  * The database half of `rebase dev` starting up.
  *
  * Separated from `ensureDevDatabase` so that everything needing a project on
@@ -1004,6 +1046,36 @@ async function runDatabasePreflight(options: {
     });
 
     if (outcome.action === "started") console.log("");
+}
+
+/**
+ * The tsx the backend is watched with, or exit saying why there is none.
+ *
+ * Checked before anything is started rather than just before the backend
+ * spawns: start-up begins the database at once now, and a project whose
+ * dependencies are missing should hear that first, not after two generators
+ * have each failed on the same cause.
+ */
+function requireUsableTsx(projectRoot: string): string {
+    const tsxBin = resolveTsx(projectRoot);
+    if (!tsxBin) {
+        console.error(chalk.red(`  ✗ ${dependenciesNotInstalled(projectRoot)}`));
+        process.exit(1);
+    }
+
+    // Verify the tsx installation is intact (not just the symlink)
+    const tsxValidationError = validateTsxInstallation(tsxBin);
+    if (tsxValidationError) {
+        const pmCmdsLocal = getPMCommands(detectPackageManager(projectRoot));
+        const installCmd = pmCmdsLocal.install.join(" ");
+        console.error(chalk.red("  ✗ tsx installation appears corrupted."));
+        console.error(chalk.gray(`    ${tsxValidationError}`));
+        console.error("");
+        console.error(chalk.gray("    To fix, run:"));
+        console.error(chalk.cyan(`      rm -rf node_modules && ${installCmd}`));
+        process.exit(1);
+    }
+    return tsxBin;
 }
 
 export async function devCommand(rawArgs: string[]): Promise<void> {
@@ -1080,6 +1152,13 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         }
     }
 
+    const startsBackend = !frontendOnly && Boolean(backendDir);
+
+    // Before anything is started, because the database now starts at once: a
+    // project that cannot run its backend should not be left with a database
+    // daemon it never got to use, nor wait for two generators first.
+    const tsxBin = startsBackend ? requireUsableTsx(projectRoot) : null;
+
     console.log("");
     console.log(chalk.bold("  🚀 Rebase Dev Server"));
     console.log("");
@@ -1089,22 +1168,44 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // when it declines is in `ensureDevDatabase`; the frontend-only case is
     // decided here because there is no backend to need a database at all.
     let schemaGeneration: SchemaGeneration = "skipped";
+    /**
+     * The database this run's backend gets. A project with a DATABASE_URL is
+     * untouched; a project without one gets a managed Postgres, which is what
+     * makes `rebase dev` the only command a new project needs.
+     *
+     * `--no-db` means start nothing, and that includes the managed database.
+     * It used to gate only the preflight, so the one path that actually starts
+     * a database on a scaffolded project — the managed PGlite — ran anyway:
+     * `rebase dev --no-db` wrote `.rebase/pglite/`, booted a daemon and served
+     * against it, which is the opposite of what a reader asking for no database
+     * expects. The backend is left to fail on the DATABASE_URL it cannot find,
+     * which is the failure the flag exists to produce.
+     */
+    let prepared: PreparedDatabase | null = null;
     if (!frontendOnly) {
-        // Before the database, because neither needs one and because the push
-        // below regenerates the schema anyway on the one path that reaches it.
-        // Side by side: they read the same collections and write different
-        // files, so the SDK costs nothing on top of the schema's two seconds.
-        [schemaGeneration] = await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdk(projectRoot)]);
-        await runDatabasePreflight({
-            projectRoot,
-            disabled: noDb,
-            // `--docker` names a container, not a connection string, and the
-            // preflight is what starts it. Derived from the compose file so the
-            // two halves agree on which database "the docker one" is.
-            databaseUrl: args["--docker"]
-                ? resolveComposeUrl(projectRoot, readEnvFile(projectRoot)) ?? undefined
-                : undefined
-        });
+        ({ schemaGeneration, database: prepared } = await overlapDevStartup({
+            // Side by side: they read the same collections and write different
+            // files, so the SDK costs nothing on top of the schema.
+            generate: async () => (await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdk(projectRoot)]))[0],
+            preflight: () => runDatabasePreflight({
+                projectRoot,
+                disabled: noDb,
+                // `--docker` names a container, not a connection string, and the
+                // preflight is what starts it. Derived from the compose file so the
+                // two halves agree on which database "the docker one" is.
+                databaseUrl: args["--docker"]
+                    ? resolveComposeUrl(projectRoot, readEnvFile(projectRoot)) ?? undefined
+                    : undefined
+            }),
+            database: startsBackend && !noDb
+                ? async () => prepareDatabaseEnv(projectRoot, {
+                    flagUrl: typeof args["--database-url"] === "string" ? args["--database-url"] : null,
+                    flagDocker: Boolean(args["--docker"]),
+                    onProgress: (message) => console.log(chalk.gray(`  ${message}`)),
+                    additionalKeys: await declaredAdditionalDatabases(projectRoot)
+                })
+                : null
+        }));
     }
 
     const children: ResultPromise[] = [];
@@ -1350,50 +1451,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     }
 
     // Start backend
-    if (!frontendOnly && backendDir) {
-        const tsxBin = resolveTsx(projectRoot);
-        if (!tsxBin) {
-            console.error(chalk.red(`  ✗ ${dependenciesNotInstalled(projectRoot)}`));
-            process.exit(1);
-        }
-
-        // Verify the tsx installation is intact (not just the symlink)
-        const tsxValidationError = validateTsxInstallation(tsxBin);
-        if (tsxValidationError) {
-            const pmCmdsLocal = getPMCommands(detectPackageManager(projectRoot));
-            const installCmd = pmCmdsLocal.install.join(" ");
-            console.error(chalk.red("  ✗ tsx installation appears corrupted."));
-            console.error(chalk.gray(`    ${tsxValidationError}`));
-            console.error("");
-            console.error(chalk.gray("    To fix, run:"));
-            console.error(chalk.cyan(`      rm -rf node_modules && ${installCmd}`));
-            process.exit(1);
-        }
-
+    if (startsBackend && backendDir && tsxBin) {
         const envFile = findEnvFile(projectRoot);
         const env: Record<string, string> = { ...process.env as Record<string, string> };
         if (envFile) {
             env.DOTENV_CONFIG_PATH = envFile;
         }
 
-        // The database, before anything that needs one starts. A project with a
-        // DATABASE_URL is untouched; a project without one gets a managed
-        // Postgres started here, which is what makes `rebase dev` the only
-        // command a new project needs.
-        // `--no-db` means start nothing, and that includes the managed
-        // database. It used to gate only the preflight, so the one path that
-        // actually starts a database on a scaffolded project — the managed
-        // PGlite, started here — ran anyway: `rebase dev --no-db` wrote
-        // `.rebase/pglite/`, booted a daemon and served against it, which is
-        // the opposite of what a reader asking for no database expects. The
-        // backend is left to fail on the DATABASE_URL it cannot find, which is
-        // the failure the flag exists to produce.
-        const prepared = noDb ? null : await prepareDatabaseEnv(projectRoot, {
-            flagUrl: typeof args["--database-url"] === "string" ? args["--database-url"] : null,
-            flagDocker: Boolean(args["--docker"]),
-            onProgress: (message) => console.log(chalk.gray(`  ${message}`)),
-            additionalKeys: await declaredAdditionalDatabases(projectRoot)
-        });
+        // The database was resolved — and the managed one started — beside the
+        // generators above; see `overlapDevStartup`.
         if (prepared) Object.assign(env, prepared.env);
         /**
          * Whether this run is on the managed database.
