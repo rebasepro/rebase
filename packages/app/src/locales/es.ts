@@ -1359,6 +1359,10 @@ export const es: RebaseTranslations = {
     studio_schema_no_collections_body: "Todavía no hay nada que dibujar. Añade una colección en config/collections/, o abre «Editar colecciones» para añadir una aquí.",
     studio_schema_introspect_hint: "Contra una base de datos que ya tiene tablas, rebase schema introspect escribe los archivos de colección por ti.",
     studio_schema_visualizer_source: "Dibujado a partir de tus colecciones: tablas, columnas, tipos y relaciones tal como las declaran. Solo los indicadores de RLS se leen de la base de datos.",
+    studio_schema_laying_out: "Organizando el diagrama…",
+    studio_schema_neighbourhood: "Mostrando {{shown}} de {{total}} tablas: {{table}} y las tablas a su alrededor. Elige otra en la lista para moverte.",
+    studio_schema_neighbourhood_depth_1: "A 1 relación",
+    studio_schema_neighbourhood_depth_2: "A 2 relaciones",
 
 
     // ─── Studio: RLS editor confirmations ───────────────────────

@@ -6,7 +6,6 @@ import {
     Background,
     BackgroundVariant,
     useReactFlow,
-    useNodesInitialized,
     ReactFlowProvider,
     applyNodeChanges,
     applyEdgeChanges
@@ -24,6 +23,7 @@ import {
     CircularProgress,
     ResizablePanels,
     IconButton,
+    ToggleButtonGroup,
     useIsDarkMode
 } from "@rebasepro/ui";
 import {
@@ -36,7 +36,7 @@ import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { getTableName } from "@rebasepro/common";
 import { useSchemaGraph } from "./useSchemaGraph";
 import { useLiveRlsTables } from "./useLiveRls";
-import type { TableNodeData } from "./useSchemaGraph";
+import type { NeighbourhoodDepth, TableNodeData } from "./useSchemaGraph";
 import { TableNode } from "./TableNode";
 import { RelationEdge } from "./RelationEdge";
 import type { AdminCollection } from "@rebasepro/cms-types";
@@ -66,25 +66,33 @@ function SchemaVisualizerCanvas({
     // theme used to answer to, and the whole canvas re-lit itself. Follow the
     // app instead so its controls, minimap and our tokens all agree.
     const isDark = useIsDarkMode();
+    // A large schema is drawn one table's neighbourhood at a time; these say
+    // which table, and how far out. See `LARGE_SCHEMA_TABLES`.
+    const [focus, setFocus] = useState<string | null>(null);
+    const [depth, setDepth] = useState<NeighbourhoodDepth>(1);
     const {
         nodes: layoutedNodes,
         edges: layoutedEdges,
+        allNodes,
         relayout,
         tableCount,
-        relationCount
-    } = useSchemaGraph(collections, liveRls);
+        relationCount,
+        layingOut,
+        neighbourhood
+    } = useSchemaGraph(collections, liveRls, focus, depth);
 
     const [nodes, setNodes] = useState<Node[]>([]);
     const [edges, setEdges] = useState<Edge[]>([]);
     const [selectedTable, setSelectedTable] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
-    const initialFitDone = useRef(false);
 
-    // Sync layouted data into state
+    // Sync layouted data into state. While a new layout runs, what is drawn
+    // stays drawn: a neighbourhood being replaced is not an empty canvas.
     useEffect(() => {
+        if (layingOut) return;
         setNodes(layoutedNodes);
         setEdges(layoutedEdges);
-    }, [layoutedNodes, layoutedEdges]);
+    }, [layoutedNodes, layoutedEdges, layingOut]);
 
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -96,24 +104,25 @@ function SchemaVisualizerCanvas({
     );
 
     /**
-     * Fit the graph into view, once, as soon as it can be measured.
+     * Fit the graph into view when it is first drawn, and again whenever a
+     * different neighbourhood replaces it.
      *
-     * This used to fire on a 200ms timer. `fitView` needs every node's real
-     * width and height, which React Flow only knows after it has laid them out
-     * and measured them — with a dozen tables, a cold Monaco-sized bundle and
-     * a slow first paint, 200ms is often too early. The fit then ran against
-     * zero-sized nodes and produced a viewport nothing lines up with, and
-     * `initialFitDone` made sure it was never retried: the ERD opened as a
-     * scatter of specks in a corner and stayed there until you hit "fit" by
-     * hand. `useNodesInitialized` is the event this was approximating.
+     * `fitView` needs every node's real width and height, which React Flow
+     * only knows once it has rendered and measured them; a fit made before
+     * that leaves the ERD a scatter of specks in a corner. React Flow's own
+     * `fitView` waits for the measurement, so it is asked for in the commit
+     * that hands it the new nodes — after its store has them, which a
+     * child's effect does before this one runs.
      */
-    const nodesInitialized = useNodesInitialized();
+    const fitPending = useRef(true);
     useEffect(() => {
-        if (!nodesInitialized || nodes.length === 0 || initialFitDone.current) return;
-        initialFitDone.current = true;
-        reactFlowInstance.fitView({ padding: 0.15,
-duration: 400 });
-    }, [nodesInitialized, nodes.length, reactFlowInstance]);
+        if (!fitPending.current || nodes.length === 0) return;
+        fitPending.current = false;
+        void reactFlowInstance.fitView({
+            padding: 0.15,
+            duration: 400
+        });
+    }, [nodes, reactFlowInstance]);
 
     const handleFitView = useCallback(() => {
         reactFlowInstance.fitView({ padding: 0.15,
@@ -128,10 +137,18 @@ duration: 400 });
         setSelectedTable(null);
     }, []);
 
-    // Focus on a table from the sidebar
+    // Focus on a table from the sidebar. A large schema draws the picked
+    // table's neighbourhood instead, and fits that once it is laid out.
     const handleTableSelect = useCallback(
         (nodeId: string) => {
             setSelectedTable(nodeId);
+            if (neighbourhood) {
+                if (neighbourhood.focus !== nodeId) {
+                    fitPending.current = true;
+                    setFocus(nodeId);
+                }
+                return;
+            }
             const node = nodes.find((n) => n.id === nodeId);
             if (node) {
                 reactFlowInstance.setCenter(
@@ -142,8 +159,13 @@ duration: 400 }
                 );
             }
         },
-        [nodes, reactFlowInstance]
+        [nodes, reactFlowInstance, neighbourhood]
     );
+
+    const handleDepthChange = useCallback((value: string) => {
+        fitPending.current = true;
+        setDepth(value === "2" ? 2 : 1);
+    }, []);
 
     // Sidebar panel size
     const [sidebarSize, setSidebarSize] = useState(() => {
@@ -183,29 +205,36 @@ duration: 400 }
         );
     }, [postgresCollections, searchQuery]);
 
-    // Junction table nodes
+    // Junction table nodes — every one in the schema, drawn or not.
     const junctionNodes = useMemo(
         () =>
-            nodes.filter(
+            allNodes.filter(
                 (n) => (n.data as TableNodeData).isJunction
             ),
-        [nodes]
+        [allNodes]
     );
 
     /**
      * The RLS answer for one collection, from the same place the graph used.
      *
-     * `nodes` already carries it, so look it up there rather than re-deriving —
-     * that is what kept the sidebar dots, the node badges and the total from
-     * agreeing.
+     * The graph's nodes already carry it, so look it up there rather than
+     * re-deriving — that is what kept the sidebar dots, the node badges and the
+     * total from agreeing. Every node, not only the drawn ones: a large schema
+     * draws a neighbourhood, and the list shows every table.
      */
-    const rlsEnabledFor = useCallback(
-        (collection: AdminCollection): boolean => {
-            const node = nodes.find((n) => n.id === `table-${getTableName(collection)}`);
-            return Boolean((node?.data as TableNodeData | undefined)?.rlsEnabled);
-        },
-        [nodes]
+    const rlsByNodeId = useMemo(
+        () => new Map(allNodes.map((n) => [n.id, Boolean((n.data as TableNodeData).rlsEnabled)])),
+        [allNodes]
     );
+    const rlsEnabledFor = useCallback(
+        (collection: AdminCollection): boolean => rlsByNodeId.get(`table-${getTableName(collection)}`) ?? false,
+        [rlsByNodeId]
+    );
+
+    const focusName = useMemo(() => {
+        const node = neighbourhood ? allNodes.find((n) => n.id === neighbourhood.focus) : undefined;
+        return node ? (node.data as TableNodeData).collectionName : "";
+    }, [allNodes, neighbourhood]);
 
     // Stats
     const stats = useMemo(
@@ -218,13 +247,13 @@ duration: 400 }
             // Counting `securityRules` here instead made the total disagree
             // with the badges, and read 0 in the hosted console, where the
             // contract endpoint strips those rules.
-            withRls: nodes.filter((n) => (n.data as TableNodeData | undefined)?.rlsEnabled).length
+            withRls: allNodes.filter((n) => (n.data as TableNodeData | undefined)?.rlsEnabled).length
         }),
         [
             tableCount,
             relationCount,
             junctionNodes.length,
-            nodes
+            allNodes
         ]
     );
 
@@ -579,6 +608,56 @@ duration: 400 }
                                 className="!bg-surface-card !border !border-hairline !shadow-sm !rounded-lg"
                             />
                         </ReactFlow>
+
+                        {/* A large schema: which part is drawn, and how far out */}
+                        {neighbourhood && (
+                            <div className="absolute top-4 left-4 right-4 flex justify-start pointer-events-none">
+                                <div className="flex flex-wrap items-center gap-2 max-w-full px-3 py-2 bg-surface-card/90 backdrop-blur-sm rounded-lg border border-hairline shadow-sm pointer-events-auto">
+                                    <Typography
+                                        variant="caption"
+                                        className="text-text-secondary dark:text-text-secondary-dark"
+                                    >
+                                        {t("studio_schema_neighbourhood", {
+                                            shown: neighbourhood.shown,
+                                            total: neighbourhood.total,
+                                            table: focusName
+                                        })}
+                                    </Typography>
+                                    <ToggleButtonGroup
+                                        value={String(neighbourhood.depth)}
+                                        onValueChange={handleDepthChange}
+                                        options={[
+                                            {
+                                                value: "1",
+                                                label: t("studio_schema_neighbourhood_depth_1")
+                                            },
+                                            {
+                                                value: "2",
+                                                label: t("studio_schema_neighbourhood_depth_2")
+                                            }
+                                        ]}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* The layout runs in a worker; say so while it does */}
+                        {layingOut && (
+                            <div
+                                role="status"
+                                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                            >
+                                <div className="flex items-center gap-2 px-3 py-2 bg-surface-card/90 backdrop-blur-sm rounded-lg border border-hairline shadow-sm">
+                                    <CircularProgress size="smallest"/>
+                                    <Typography
+                                        variant="caption"
+                                        className="text-text-secondary dark:text-text-secondary-dark"
+                                    >
+                                        {t("studio_schema_laying_out")}
+                                    </Typography>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Legend overlay */}
                         <div className="absolute bottom-4 left-4 flex items-center gap-3 px-3 py-2 bg-surface-card/90 backdrop-blur-sm rounded-lg border border-hairline shadow-sm">

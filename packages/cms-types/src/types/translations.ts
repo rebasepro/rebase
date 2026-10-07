@@ -1463,6 +1463,10 @@ export interface RebaseTranslations {
     studio_schema_no_collections_body?: string;
     studio_schema_introspect_hint?: string;
     studio_schema_visualizer_source?: string;
+    studio_schema_laying_out?: string;
+    studio_schema_neighbourhood?: string;
+    studio_schema_neighbourhood_depth_1?: string;
+    studio_schema_neighbourhood_depth_2?: string;
 
 
     // ─── Studio: RLS editor confirmations ───────────────────────
