@@ -97,6 +97,15 @@ function realtimeLostError(): RebaseApiError {
     );
 }
 
+/**
+ * Whether realtime debugging is on: `globalThis.__REBASE_DEBUG_REALTIME__ = true`,
+ * set from a console or a test. While it is, each refetched row that differs
+ * from the one held is explained key by key with `console.debug`.
+ */
+function realtimeDebugOn(): boolean {
+    return Reflect.get(globalThis, "__REBASE_DEBUG_REALTIME__") === true;
+}
+
 /** The ceiling of the reconnect backoff. */
 const MAX_RECONNECT_DELAY_MS = 30_000;
 
@@ -1685,10 +1694,19 @@ options }
     }
 
     /**
-     * Recursively compare two values for structural equality.
-     * Handles primitives, null, undefined, Date, RegExp, arrays, and plain objects.
+     * Recursively compare two values a refetch can carry for structural
+     * equality: primitives, null, undefined, Date, RegExp, arrays and objects.
+     *
+     * A relation compares by the reference it holds, not by the row it happens
+     * to have loaded, so its `data` is left out on both sides. That used to be
+     * done by normalising each side into a copy first — two deep copies of
+     * every cached row on every frame, most of which then compared equal. It is
+     * done in place now, and an unchanged row costs no copy.
+     *
+     * `relationAware` is off for a relation's own fields: the copies never
+     * looked inside those either.
      */
-    private deepEqual(a: unknown, b: unknown): boolean {
+    private deepEqual(a: unknown, b: unknown, relationAware = true): boolean {
         // Same reference or same primitive
         if (a === b) return true;
 
@@ -1722,55 +1740,38 @@ options }
         if (aIsArray && bIsArray) {
             if (a.length !== b.length) return false;
             for (let i = 0; i < a.length; i++) {
-                if (!this.deepEqual(a[i], b[i])) return false;
+                if (!this.deepEqual(a[i], b[i], relationAware)) return false;
             }
             return true;
         }
 
-        // Plain object comparison
+        // Object comparison
         const aObj = a as Record<string, unknown>;
         const bObj = b as Record<string, unknown>;
-        const aKeys = Object.keys(aObj);
-        const bKeys = Object.keys(bObj);
+        // A relation is equal only to a relation, and never by its `data`.
+        let skip: string | undefined;
+        let nested = relationAware;
+        if (relationAware) {
+            const aIsRelation = aObj.__type === "relation";
+            if (aIsRelation !== (bObj.__type === "relation")) return false;
+            if (aIsRelation) {
+                skip = "data";
+                nested = false;
+            }
+        }
 
-        if (aKeys.length !== bKeys.length) return false;
-
-        for (const key of aKeys) {
+        let aCount = 0;
+        for (const key of Object.keys(aObj)) {
+            if (key === skip) continue;
+            aCount++;
             if (!Object.prototype.hasOwnProperty.call(bObj, key)) return false;
-            if (!this.deepEqual(aObj[key], bObj[key])) return false;
+            if (!this.deepEqual(aObj[key], bObj[key], nested)) return false;
         }
-
-        return true;
-    }
-
-    private normalizeForComparison(val: unknown): unknown {
-        if (!val) return val;
-
-        if (Array.isArray(val)) {
-            return val.map(item => this.normalizeForComparison(item));
+        let bCount = 0;
+        for (const key of Object.keys(bObj)) {
+            if (key !== skip) bCount++;
         }
-
-        if (typeof val === "object") {
-            if (val instanceof Date) return val;
-            if (val instanceof RegExp) return val;
-
-            const obj = val as Record<string, unknown>;
-            if (obj.__type === "relation") {
-                // `data` is dropped on purpose: a relation compares by the
-                // reference it holds, not by the row it happens to have loaded.
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { data, ...rest } = obj;
-                return rest;
-            }
-
-            const result: Record<string, unknown> = {};
-            for (const [k, v] of Object.entries(obj)) {
-                result[k] = this.normalizeForComparison(v);
-            }
-            return result;
-        }
-
-        return val;
+        return aCount === bCount;
     }
 
     /**
@@ -1812,25 +1813,28 @@ options }
             if (address !== undefined) cachedById.set(address, row);
         }
 
+        // Read once per frame, not per row.
+        const explain = realtimeDebugOn();
+
         return incoming.map(incomingRow => {
             const address = this.rowAddress(incomingRow, pks);
             const cachedRow = address === undefined ? undefined : cachedById.get(address);
             if (!cachedRow) return incomingRow;
 
             // Compare flat rows directly (no more path/values nesting)
-            const normCached = this.normalizeForComparison(cachedRow) as Record<string, unknown>;
-            const normIncoming = this.normalizeForComparison(incomingRow) as Record<string, unknown>;
+            if (this.deepEqual(cachedRow, incomingRow)) return cachedRow;
 
-            if (this.deepEqual(normCached, normIncoming)) {
-                return cachedRow;
-            } else {
-                // Deep debug: Why did it fail?
+            // Why it differs, key by key — a debugging aid, so only while
+            // realtime debugging is on. It used to run for every changed row
+            // of every frame, in production: a bulk write to a 1,000-row live
+            // list was 1,000 `JSON.stringify` calls and console lines a frame.
+            if (explain) {
                 const mismatches: Record<string, { cached: unknown, incoming: unknown }> = {};
-                const allKeys = new Set([...Object.keys(normCached), ...Object.keys(normIncoming)]);
+                const allKeys = new Set([...Object.keys(cachedRow), ...Object.keys(incomingRow)]);
                 for (const key of allKeys) {
-                    if (!this.deepEqual(normCached[key], normIncoming[key])) {
-                        mismatches[key] = { cached: normCached[key],
-incoming: normIncoming[key] };
+                    if (!this.deepEqual(cachedRow[key], incomingRow[key])) {
+                        mismatches[key] = { cached: cachedRow[key],
+incoming: incomingRow[key] };
                     }
                 }
                 console.debug(`[RebaseWS] Row ${address} refetch mismatch:\n`, JSON.stringify(mismatches, null, 2));
