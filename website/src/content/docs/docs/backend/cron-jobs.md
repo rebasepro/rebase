@@ -430,17 +430,9 @@ The dashboard auto-refreshes every 15 seconds.
 
 The panel shows the same thing whichever process serves it. A job another
 process is running shows as running.
-<span class="since-badge" data-since="0.24">Since 0.24</span> On every process that has a store, the run count, the failure count and the
-last run are read from the database, where every process's runs are counted. A
-process's own counters hold only the runs it made: the `api` role beside a
-worker runs nothing, and of two replicas that both schedule, neither sees the
-slots the other one claimed. Only when the database cannot be read does the card
-fall back to this process's own counters, with a warning in the server log.
+<span class="since-badge" data-since="0.24">Since 0.24</span> On every process that has a store, the run count, the failure count and the last run are read from the database, where every process's runs are counted. A process's own counters hold only the runs it made: the `api` role beside a worker runs nothing, and of two replicas that both schedule, neither sees the slots the other one claimed. Only when the database cannot be read does the card fall back to this process's own counters, with a warning in the server log.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> The counts are all-time; the history is the last 30 days. Each run's
-row in `rebase.cron_logs` is deleted 30 days after it started, by an hourly
-sweep, while the run and failure counts keep counting it. A skipped run counts
-as a run, as it always has: it is a row of the history.
+<span class="since-badge" data-since="0.24">Since 0.24</span> The counts are all-time; the history is the last 30 days. Each run's row in `rebase.cron_logs` is deleted 30 days after it started, by an hourly sweep, while the run and failure counts keep counting it. A skipped run counts as a run, as it always has: it is a row of the history.
 
 ## Schedule Validation & AST Parsing
 
@@ -529,19 +521,9 @@ it on its next deploy. None of them is a collection, and the end-user role
 let a signed-in user pause a job for everyone, or hold its lease so that nothing
 runs it.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A run's row and its count are written in one statement: the insert into
-`cron_logs` and an upsert of the job's counters on `cron_job_state`. A listing
-reads one `cron_job_state` row per job, however long the history, and so does
-the scheduler when it seeds `totalRuns` and `totalFailures` on startup. Log
-writes do not hold up the run; if one fails, the scheduler logs the error and
-carries on, with the run still in the in-memory ring buffer.
+<span class="since-badge" data-since="0.24">Since 0.24</span> A run's row and its count are written in one statement: the insert into `cron_logs` and an upsert of the job's counters on `cron_job_state`. A listing reads one `cron_job_state` row per job, however long the history, and so does the scheduler when it seeds `totalRuns` and `totalFailures` on startup. Log writes do not hold up the run; if one fails, the scheduler logs the error and carries on, with the run still in the in-memory ring buffer.
 
-Once an hour, and when it starts, the scheduler deletes the history rows older
-than 30 days and counts any run that is not counted yet, both in batches of
-5,000 rows. A history written before 0.24 is counted by the first of these
-sweeps, off the boot path. Until it has finished, a listing adds the runs it has
-not counted yet to the counters, so the numbers do not change on upgrade. The
-same goes for a run an older server logs during a rolling deploy.
+Once an hour, and when it starts, the scheduler deletes the history rows older than 30 days and counts any run that is not counted yet, both in batches of 5,000 rows. A history written before 0.24 is counted by the first of these sweeps, off the boot path. Until it has finished, a listing adds the runs it has not counted yet to the counters, so the numbers do not change on upgrade. The same goes for a run an older server logs during a rolling deploy.
 
 ## Example: Daily Cleanup Job
 
