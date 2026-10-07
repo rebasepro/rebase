@@ -498,10 +498,10 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 | `orderBy` | The same sort spelling, including the NULL placement. Ties, and a `limit` with no `orderBy`, go by the related row's key, ascending |
 | `fields` | Columns of the *related* row; its key always survives |
 | `include` | Relations of the related row, in turn |
+| `count` | <span class="since-badge" data-since="0.24">Since 0.24</span> `true` also returns each parent's total under `_count` (`"_count":{"comments":37}`), counted by the same statement. To-many relations only. See [Counting what a limit leaves out](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
 
-`true` means "load it whole", so `{"author":true}` and `author` are the same
-request. Both spellings work on the list route, the get-by-id route and the
-nested subcollection routes.
+`true` means "load it whole", so `{"author":true}` and `author` are the same request.
+Both spellings work on the list route, the get-by-id route and the nested subcollection routes.
 
 Each hop is one batched query for the whole page, never one per row.
 

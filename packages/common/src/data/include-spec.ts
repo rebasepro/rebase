@@ -33,6 +33,8 @@ export interface IncludeNode {
     orderBy?: OrderByTuple[];
     /** Columns of the related row to return. */
     fields?: string[];
+    /** Serve the per-parent total under the row's `_count` too. */
+    count?: boolean;
     /** Relations of the related row, loaded in turn. */
     children: Record<string, IncludeNode>;
 }
@@ -105,8 +107,14 @@ function normalizeOptions(key: string, options: IncludeOptions, depth: number): 
             `"${key}" has limit ${JSON.stringify(options.limit)} — expected a whole number of 1 or more.`
         );
     }
+    if (options.count !== undefined && typeof options.count !== "boolean") {
+        throw new IncludeSpecError(
+            `"${key}" has count ${JSON.stringify(options.count)} — expected \`true\` or \`false\`.`
+        );
+    }
     const node: IncludeNode = { children: {} };
     if (options.limit !== undefined) node.limit = options.limit;
+    if (options.count) node.count = true;
     if (options.where) node.where = options.where;
     if (options.logical) node.logical = options.logical;
     if (options.fields && options.fields.length > 0) node.fields = [...options.fields];
@@ -234,6 +242,7 @@ function hasOptions(tree: Record<string, IncludeNode>): boolean {
     return Object.values(tree).some(node =>
         node.limit !== undefined || node.where !== undefined || node.logical !== undefined
         || node.orderBy !== undefined || node.fields !== undefined
+        || node.count !== undefined
         || hasOptions(node.children));
 }
 
@@ -295,6 +304,7 @@ function mergeTrees(
         if (node.logical !== undefined) existing.logical = node.logical;
         if (node.orderBy !== undefined) existing.orderBy = node.orderBy;
         if (node.fields !== undefined) existing.fields = node.fields;
+        if (node.count !== undefined) existing.count = node.count;
         existing.children = mergeTrees(existing.children, node.children);
     }
     return into;
@@ -341,6 +351,7 @@ function toWireTree(normalized: NormalizedInclude): Record<string, unknown> {
             if (node.logical) options.logical = node.logical;
             if (node.orderBy) options.orderBy = node.orderBy;
             if (node.fields) options.fields = node.fields;
+            if (node.count) options.count = true;
             const children = emit(node.children);
             if (Object.keys(children).length > 0) options.include = children;
             out[key] = Object.keys(options).length > 0 ? options : true;

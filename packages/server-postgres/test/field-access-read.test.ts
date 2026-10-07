@@ -178,6 +178,42 @@ describe("`_matches`, the list of fields a search hit", () => {
     });
 });
 
+describe("`_count`, the totals of counted relations", () => {
+    /**
+     * `include: { reviews: { limit, count: true } }` serves the total beside
+     * the rows. A relation property the caller may not read is withheld whole,
+     * and its total says as much about it as its rows: it goes with them.
+     */
+    const team = {
+        name: "Teams",
+        slug: "teams",
+        properties: {
+            id: { name: "Id", type: "number", isId: "increment" },
+            members: { name: "Members", type: "relation", relationName: "members" },
+            reviews: { name: "Reviews", type: "relation", relationName: "reviews", access: { read: ["hr"] } }
+        }
+    } as unknown as CollectionConfig;
+
+    it("loses the total of a relation the caller cannot read, and keeps the rest", () => {
+        const raw = { id: 1, members: [], reviews: [], _count: { members: 12, reviews: 3 } };
+        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, team));
+        expect(served).not.toHaveProperty("reviews");
+        expect(served._count).toEqual({ members: 12 });
+    });
+
+    it("goes altogether when every counted relation is withheld", () => {
+        const raw = { id: 1, reviews: [], _count: { reviews: 3 } };
+        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, team));
+        expect(served).not.toHaveProperty("_count");
+    });
+
+    it("is untouched for a caller who can read them all", () => {
+        const raw = { id: 1, members: [], reviews: [], _count: { members: 12, reviews: 3 } };
+        const served = withFieldViewer({ roles: ["hr"] }, () => stripUnreadable(raw, team));
+        expect(served._count).toEqual({ members: 12, reviews: 3 });
+    });
+});
+
 describe("the trusted server plane", () => {
     /**
      * No viewer means no request: an in-process `rebase.data` read, a migration,

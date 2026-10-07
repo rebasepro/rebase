@@ -1,4 +1,4 @@
-import { CollectionConfig, JUNCTION_PIVOT_KEY, Property, ResolvedRelation, isManyToMany, type ResolvedVia } from "@rebasepro/types";
+import { CollectionConfig, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, Property, ResolvedRelation, isManyToMany, type ResolvedVia } from "@rebasepro/types";
 import { canReadField, resolveCollectionRelations, findRelation, createRelationRefWithData, fieldKeyForColumn } from "@rebasepro/common";
 import { currentFieldViewer } from "./field-viewer";
 import { normalizeDbValues } from "../data-transformer";
@@ -210,6 +210,13 @@ export function stripUnreadable(
         }
     }
 
+    // A relation withheld from this viewer is withheld whole: its total under
+    // `_count` says as much about it as its rows would.
+    const counts = row[INCLUDE_COUNT_KEY];
+    if (hidden.size > 0 && counts && typeof counts === "object") {
+        for (const name of hidden) delete (counts as Record<string, unknown>)[name];
+        if (Object.keys(counts).length === 0) delete row[INCLUDE_COUNT_KEY];
+    }
     if (hidden.size > 0 && Array.isArray(row._matches)) {
         row._matches = (row._matches as unknown[]).filter(
             match => !hidden.has(typeof match === "string" ? match : String((match as { field?: unknown })?.field))

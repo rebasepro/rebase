@@ -153,6 +153,15 @@ export interface RelatedRowWindow {
     limit?: number;
     /** Their order, by the target's own columns. */
     orderBy?: OrderByTuple[];
+    /**
+     * Filled, when given and a `limit` is set, with each parent's number of
+     * matching related rows *before* the limit — what `include: { x: { limit,
+     * count: true } }` serves under `_count`. Counted in the ranking subquery,
+     * so it is the same statement, the same conditions and the same RLS
+     * context as the rows. A parent with no related row is absent (zero).
+     * Without a limit nothing is cut, and the caller counts what it got.
+     */
+    totals?: Map<string, number>;
 }
 
 /**
@@ -215,14 +224,49 @@ export function relatedRowOrder(targetTable: PgTable, targetKeys: AnyPgColumn[],
 function rankedKeyFields(
     keys: AnyPgColumn[],
     partitionBy: AnyPgColumn[],
-    order: SQL[]
+    order: SQL[],
+    /**
+     * Also select the partition's number of related rows, as `total` — set
+     * for `include: { x: { count: true } }`.
+     *
+     * - `"rows"`: `count(*)`, where each related row is one row of the
+     *   subquery (a foreign key on the target).
+     * - the target's key columns: distinct keys, where one target can appear
+     *   twice — a `via` chain reaching it along two paths, a junction without
+     *   a key on its pair linking it twice. Those rows tie on rank and count
+     *   once against the limit, so they count once here too. `count(DISTINCT
+     *   …) OVER` does not exist, so it is the classic pair of ranks: ascending
+     *   plus descending over the key, less one, is the number of distinct keys
+     *   in the partition.
+     */
+    total?: "rows" | AnyPgColumn[]
 ): Record<string, SQL.Aliased<unknown>> {
     const fields: Record<string, SQL.Aliased<unknown>> = {};
     keys.forEach((key, i) => {
         fields[`k${i}`] = sql`${key}`.as(`__k${i}`);
     });
-    fields.rank = sql`dense_rank() over (partition by ${sql.join(partitionBy, sql`, `)} order by ${sql.join(order, sql`, `)})`.as("__rank");
+    const partition = sql.join(partitionBy, sql`, `);
+    fields.rank = sql`dense_rank() over (partition by ${partition} order by ${sql.join(order, sql`, `)})`.as("__rank");
+    if (total === "rows") {
+        fields.total = sql<number>`(count(*) over (partition by ${partition}))::int`.as("__total");
+    } else if (total) {
+        const ascending = sql.join(total.map(key => sql`${key} ASC`), sql`, `);
+        const descending = sql.join(total.map(key => sql`${key} DESC`), sql`, `);
+        fields.total = sql<number>`(dense_rank() over (partition by ${partition} order by ${ascending}) + dense_rank() over (partition by ${partition} order by ${descending}) - 1)::int`.as("__total");
+    }
     return fields;
+}
+
+/**
+ * Record one parent's total from a ranked row, for {@link RelatedRowWindow.totals}.
+ *
+ * Every row of a parent carries the same total, so the first one seen wins and
+ * the rest are a no-op.
+ */
+function recordTotal(window: RelatedRowWindow | undefined, parentId: string, row: Record<string, unknown>): void {
+    if (!window?.totals || window.totals.has(parentId)) return;
+    const total = (row[RANKED] as { total?: unknown } | undefined)?.total;
+    if (total !== undefined && total !== null) window.totals.set(parentId, Number(total));
 }
 
 /**
@@ -1335,7 +1379,7 @@ export class RelationService {
                 const parentKeys = parentPks.map(pk => parentTable[pk.fieldName as keyof typeof parentTable] as AnyPgColumn);
                 const keys = [...parentKeys, ...targetKeys];
                 const ranked = throughPath(
-                    this.db.selectDistinct(rankedKeyFields(keys, parentKeys, order)).from(parentTable).$dynamic()
+                    this.db.selectDistinct(rankedKeyFields(keys, parentKeys, order, window.totals ? targetKeys : undefined)).from(parentTable).$dynamic()
                 ).where(scope).as(RANKED);
                 results = await throughPath(this.db.select().from(parentTable).$dynamic())
                     .innerJoin(ranked, and(...keys.map((key, i) => eq(key, ranked[`k${i}`])))!)
@@ -1352,6 +1396,7 @@ export class RelationService {
                 const parentRow = (row[getTableName(parentCollection)] || row) as Record<string, unknown>;
                 const targetRow = (row[targetTableName] || row) as Record<string, unknown>;
                 const parentId = buildCompositeId(parentRow, parentPks);
+                recordTotal(window, parentId, row);
                 const arr = resultMap.get(parentId) || [];
                 arr.push(await this.toRelatedRow(targetRow, targetCollection, targetPks, render));
                 resultMap.set(parentId, arr);
@@ -1395,7 +1440,7 @@ export class RelationService {
                 // primary key on the pair cannot multiply the rows it joins.
                 const keys = [sourceJunctionCol, targetJunctionCol];
                 const ranked = this.db
-                    .selectDistinct(rankedKeyFields(keys, [sourceJunctionCol], order))
+                    .selectDistinct(rankedKeyFields(keys, [sourceJunctionCol], order, window.totals ? [targetJunctionCol] : undefined))
                     .from(junctionTable)
                     .innerJoin(targetTable, eq(targetJunctionCol, targetIdField))
                     .where(scope)
@@ -1431,6 +1476,7 @@ export class RelationService {
                 const targetData = (row[targetTableName] || row) as Record<string, unknown>;
 
                 const parentId = String(junctionData[relation.through.sourceColumn]);
+                recordTotal(window, parentId, row);
                 const arr = resultMap.get(parentId) || [];
                 const related = await this.toRelatedRow(targetData, targetCollection, targetPks, render);
                 if (junctionConfig) {
@@ -1471,7 +1517,7 @@ export class RelationService {
         if (window?.limit !== undefined && foreignKeyColumn) {
             // The relation's own condition, the include's `where`, the soft
             // delete and `beforeQuery`: everything the unlimited read applies.
-            let rankedQuery = this.db.select(rankedKeyFields(targetKeys, [foreignKeyColumn], order)).from(targetTable).$dynamic();
+            let rankedQuery = this.db.select(rankedKeyFields(targetKeys, [foreignKeyColumn], order, window.totals ? "rows" : undefined)).from(targetTable).$dynamic();
             rankedQuery = applyDynamicRelationQuery(
                 rankedQuery, rankedQuery, relation, matchValues, targetTable, parentTable,
                 parentIdCol, targetIdField, this.registry, narrowTarget ? [narrowTarget] : []
@@ -1508,6 +1554,7 @@ export class RelationService {
             const parentId = parentIdByKey.get(String(foreignKeyValue));
             if (parentId !== undefined) {
                 const key = String(parentId);
+                recordTotal(window, key, row);
                 const arr = resultMap.get(key) || [];
                 arr.push(await this.toRelatedRow(targetRow, targetCollection, targetPks, render));
                 resultMap.set(key, arr);

@@ -569,4 +569,102 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
             for (const thread of json.data ?? []) expect((thread.labels as Row[]).length).toBe(LABELS_PER_THREAD);
         });
     });
+
+    // ── `count`: the total beside the capped rows, from the same statement ──
+
+    describe("a counted include", () => {
+        const limited = (spec: Record<string, unknown>, query = `limit=${THREADS}&orderBy=id:asc`) =>
+            `/threads?${query}&include=${encodeURIComponent(JSON.stringify(spec))}`;
+        const relatedReads = (sent: Statement[], table: string) =>
+            reading(sent, table).filter(s => !/^select count\(/i.test(s.text));
+
+        it("serves each thread's total messages under `_count`, beside the capped rows (hasMany)", async () => {
+            const { json, statements: sent } = await measure(limited({ messages: { limit: 2, count: true } }));
+
+            const rows = json.data ?? [];
+            expect(rows).toHaveLength(THREADS);
+            for (const thread of rows) {
+                expect((thread.messages as Row[]).length).toBe(2);
+                expect(thread._count).toEqual({ messages: MESSAGES_PER_THREAD });
+            }
+            // Counted by the statement that reads the rows: still one read of
+            // `messages`, still only the 200 rows served leave the database.
+            const read = relatedReads(sent, "messages");
+            expect(read).toHaveLength(1);
+            expect(read[0].rows).toBeLessThanOrEqual(THREADS * 2);
+        });
+
+        it("costs the same statements as the limit alone", async () => {
+            const plain = cost((await measure(limited({ messages: { limit: 2 }, labels: { limit: 2 } }))).statements);
+            const counted = cost((await measure(limited({ messages: { limit: 2, count: true }, labels: { limit: 2, count: true } }))).statements);
+            expect(counted.transactions).toBe(plain.transactions);
+            expect(counted.work).toHaveLength(plain.work.length);
+        });
+
+        it("serves each thread's total labels (manyToMany)", async () => {
+            const { json, statements: sent } = await measure(limited({ labels: { limit: 3, count: true } }));
+            for (const thread of json.data ?? []) {
+                expect((thread.labels as Row[]).length).toBe(3);
+                expect((thread._count as Row).labels).toBe(LABELS_PER_THREAD);
+            }
+            const read = relatedReads(sent, "threads_labels");
+            expect(read).toHaveLength(1);
+            expect(read[0].rows).toBeLessThanOrEqual(THREADS * 3);
+        });
+
+        it("counts the rows the include's `where` keeps, and 0 where it keeps none", async () => {
+            const { json } = await measure(limited({ messages: { limit: 2, count: true, where: { rank: ["<", 100] } } }));
+            const expected = await admin.query<{ thread_id: number; n: number }>(
+                "SELECT thread_id, count(*)::int AS n FROM messages WHERE rank < 100 GROUP BY thread_id ORDER BY thread_id"
+            );
+            const byThread = new Map(expected.rows.map(r => [Number(r.thread_id), Number(r.n)]));
+            for (const thread of json.data ?? []) {
+                expect((thread._count as Row).messages).toBe(byThread.get(Number(thread.id)) ?? 0);
+            }
+
+            const none = await measure(limited({ messages: { limit: 2, count: true, where: { rank: ["<", 0] } } }, "limit=3&orderBy=id:asc"));
+            for (const thread of none.json.data ?? []) {
+                expect(thread.messages).toEqual([]);
+                expect(thread._count).toEqual({ messages: 0 });
+            }
+        });
+
+        it("without a limit, counts what it serves", async () => {
+            const { json } = await measure(limited({ labels: { count: true } }, "limit=2&orderBy=id:asc"));
+            for (const thread of json.data ?? []) {
+                expect((thread.labels as Row[]).length).toBe(LABELS_PER_THREAD);
+                expect((thread._count as Row).labels).toBe(LABELS_PER_THREAD);
+            }
+        });
+
+        it("counts each target once on a to-many `via`", async () => {
+            const { json } = await measure(`/authors?limit=20&orderBy=id:asc&include=${encodeURIComponent(JSON.stringify({ writings: { limit: 1, count: true } }))}`);
+            const expected = await admin.query<{ author_id: number; n: number }>(
+                "SELECT author_id, count(*)::int AS n FROM posts GROUP BY author_id"
+            );
+            const byAuthor = new Map(expected.rows.map(r => [Number(r.author_id), Number(r.n)]));
+            for (const author of json.data ?? []) {
+                expect((author.writings as Row[]).length).toBeLessThanOrEqual(1);
+                expect((author._count as Row).writings).toBe(byAuthor.get(Number(author.id)) ?? 0);
+            }
+        });
+
+        it("survives a `fields` projection, on the list and on the get-by-id route", async () => {
+            const include = encodeURIComponent(JSON.stringify({ labels: { limit: 1, count: true } }));
+            const list = await measure(`/threads?limit=2&orderBy=id:asc&fields=id,title&include=${include}`);
+            for (const thread of list.json.data ?? []) expect(thread._count).toEqual({ labels: LABELS_PER_THREAD });
+
+            const res = await app.request(`/api/data/threads/1?fields=id,title&include=${include}`);
+            expect(res.status).toBe(200);
+            const one = await res.json() as Row;
+            expect(Object.keys(one).sort()).toEqual(["_count", "id", "labels", "title"]);
+            expect(one._count).toEqual({ labels: LABELS_PER_THREAD });
+        });
+
+        it("is a 400 on a to-one relation", async () => {
+            const res = await app.request(`/api/data/posts?limit=2&include=${encodeURIComponent(JSON.stringify({ author: { count: true } }))}`);
+            expect(res.status).toBe(400);
+            expect((await res.json() as { error?: { code?: string } }).error?.code).toBe("INVALID_INCLUDE");
+        });
+    });
 });

@@ -80,9 +80,36 @@ const { data } = await client.data.posts.include({
 | `orderBy` | The same sort spelling, including the [NULL placement](/docs/sdk/querying#where-nulls-sort). Ties, and a `limit` with no `orderBy`, go by the related row's key, ascending. |
 | `fields` | Columns of the *related* row. Its key always survives, so the row stays addressable. |
 | `include` | Relations of the related row, in turn — this is how the tree nests. |
+| `count` | <span class="since-badge" data-since="0.24">Since 0.24</span> Also return how many related rows there are in all, per parent, under the row's `_count`. See [Counting what a limit leaves out](#counting-what-a-limit-leaves-out). |
 
 `true` is the shorthand for "load it whole": `{ author: true }` and
 `["author"]` are the same request.
+
+### Counting what a limit leaves out
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A `limit` caps
+what is sent, and `count: true` says how much was left out. This is what a list
+needs to show four tags and a "+33":
+
+```typescript
+const { data } = await client.data.posts.include({
+    tags: { limit: 4, count: true }
+}).find();
+
+// data[0] → { id: 1, title: "…", tags: [ …4 rows ], _count: { tags: 37 } }
+```
+
+- `_count` is one object per row, keyed by relation name. Counting two relations
+  adds two keys.
+- The total is counted in the same SQL statement that reads the rows. It covers
+  the same rows a read without the `limit` would return: the include's `where`,
+  soft delete and row-level security all apply. Asking for it adds no query.
+- Without a `limit`, the total is the number of rows returned.
+- `count` works on to-many relations only. On a to-one relation, it returns a
+  400 `INVALID_INCLUDE`. So does a collection that has a property named
+  `_count`, because the total would overwrite it.
+- A relation the caller may not read (field access) is left out of `_count`,
+  the same way its rows are.
 
 ### Unknown relation names are refused
 

@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
-import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import type { IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, hasFieldAccessRules, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
@@ -646,6 +646,42 @@ target });
     }
 
     /**
+     * Refuse a `count` the loader cannot serve honestly, before anything runs.
+     *
+     * - On a to-one relation: there is nothing to count past a row or none,
+     *   and answering 0 or 1 under `_count` would invent a shape for it.
+     * - On a collection with a property named `_count`: the total would be
+     *   written over that column's value. A silent overwrite answers 200 with
+     *   the column gone, so it is a 400 naming why.
+     */
+    private assertCountsAllowed(
+        collection: CollectionConfig,
+        levels: { key: string; node: IncludeNode; relation: ResolvedRelation }[]
+    ): void {
+        const counted = levels.filter(({ node }) => node.count);
+        if (counted.length === 0) return;
+        const collectionName = collection.slug ?? collection.name;
+        for (const { key, relation } of counted) {
+            if (relation.cardinality === "one") {
+                throw ApiError.badRequest(
+                    `Cannot count relation '${key}' on collection '${collectionName}': ` +
+                    "it is a to-one relation. `count` totals the rows of a to-many relation.",
+                    "INVALID_INCLUDE",
+                    { relation: key, collection: collectionName }
+                );
+            }
+        }
+        if (Object.prototype.hasOwnProperty.call(collection.properties ?? {}, INCLUDE_COUNT_KEY)) {
+            throw ApiError.badRequest(
+                `Cannot serve \`count\` on collection '${collectionName}': it declares a property named ` +
+                `'${INCLUDE_COUNT_KEY}', which is where the totals would go.`,
+                "INVALID_INCLUDE",
+                { collection: collectionName, field: INCLUDE_COUNT_KEY }
+            );
+        }
+    }
+
+    /**
      * Cap and project the rows of ONE relation, per parent.
      *
      * The order and the limit are Postgres's: the batch loader ranks each
@@ -721,6 +757,7 @@ target });
         const rowIds = addressable.map(row => addressOf(row) as string);
 
         const levels = this.resolveIncludeLevel(collection, include.tree, include.wildcard);
+        this.assertCountsAllowed(collection, levels);
 
         for (const { key, node, relation } of levels) {
             const targetCollection = relation.target();
@@ -760,15 +797,27 @@ target });
                     }
                 } else {
                     // The include's own order and limit, which the loader
-                    // applies per parent in SQL.
-                    const window = node.limit !== undefined || (node.orderBy && node.orderBy.length > 0)
-                        ? { limit: node.limit, orderBy: node.orderBy }
+                    // applies per parent in SQL — and, for `count`, the totals
+                    // the same statement counts before the limit.
+                    const totals = node.count ? new Map<string, number>() : undefined;
+                    const window = node.limit !== undefined || (node.orderBy && node.orderBy.length > 0) || totals
+                        ? { limit: node.limit, orderBy: node.orderBy, totals }
                         : undefined;
                     const results = await this.relationService.batchFetchRelatedEntitiesMany(
                         collectionPath, rowIds, key, relation, narrow, window, { style: "rest" }
                     );
                     for (const row of addressable) {
-                        const related = results.get(String(addressOf(row))) ?? [];
+                        const address = String(addressOf(row));
+                        const related = results.get(address) ?? [];
+                        if (totals) {
+                            // Without a limit nothing was cut: the total is
+                            // the related rows themselves, one per target.
+                            const total = node.limit !== undefined
+                                ? totals.get(address) ?? 0
+                                : new Set(related.map(e => String(e.id))).size;
+                            const counts = (row[INCLUDE_COUNT_KEY] ??= {}) as Record<string, number>;
+                            counts[key] = total;
+                        }
                         const shaped = this.shapeRelatedRows(
                             // The junction's own columns ride along under
                             // `_pivot` — the link's data, not the target's, so
