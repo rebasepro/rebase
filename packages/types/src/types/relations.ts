@@ -116,6 +116,23 @@ export interface BelongsToRelation extends RelationBase {
      * Defaults to `<relationName>_id`.
      */
     localKey?: string;
+    /**
+     * Whether Rebase creates a btree index on {@link localKey}. Defaults to
+     * `true`.
+     *
+     * Postgres indexes the key a foreign key *points at* but never the column
+     * holding it, so without one every read from the other side seq-scans this
+     * table: a `hasMany`/`hasOne` include, a nested listing such as
+     * `/authors/5/posts`, and the `ON DELETE` check when a target row is
+     * deleted. The derived index is skipped on its own when the column already
+     * leads one — the primary key, a `validation.unique`, or an entry in
+     * `indexes:` — so it never duplicates an index you declared.
+     *
+     * Set `false` for a table so write-heavy that the index costs more than
+     * the lookups it serves, or when you keep an index of your own on the
+     * column outside Rebase's `indexes:` block.
+     */
+    index?: boolean;
 }
 
 /**
@@ -390,6 +407,8 @@ export interface ResolvedBelongsTo extends ResolvedRelationBase {
     shared: false;
     /** Column on this collection's table. */
     localKey: string;
+    /** As authored, with the default filled in — see {@link BelongsToRelation.index}. */
+    index: boolean;
 }
 
 /** @group Models */

@@ -160,6 +160,80 @@ describe("boot-ensure agrees with db push", () => {
         expect(missing).toEqual([]);
     });
 
+    // ── Indexes, including the ones Rebase derives for foreign keys ─────────
+    //
+    // `db push` hands Atlas `schema.sql` as the desired state, and Atlas drops
+    // a Rebase-named index the desired state does not list. So an index boot
+    // builds that push does not render — or the same index under two names —
+    // is dropped by the next push and rebuilt by the next boot, forever.
+    it("names every index exactly as the generator does, foreign-key indexes included", async () => {
+        const generated = await generatePostgresDdl(collections);
+        const pushed = [...generated.matchAll(/CREATE (?:UNIQUE )?INDEX "([^"]+)"/g)].map(m => m[1]).sort();
+        const booted = planCollectionSchemaEnsure(collections, emptyDb()).actions
+            .filter(a => a.kind === "create-index")
+            .map(a => /INDEX (?:CONCURRENTLY )?(?:IF NOT EXISTS )?"([^"]+)"/.exec(a.sql)![1])
+            .sort();
+
+        expect(booted).toEqual(pushed);
+        // The ones this is about: both belongsTo keys and the junction's
+        // target column. `profiles.primary_tag` is a `reference`, not a
+        // relation, and gets none.
+        expect(pushed.filter(name => !name.startsWith("users_"))).toEqual([
+            expect.stringMatching(/^posts_author_id_ix_[0-9a-f]{7}$/),
+            expect.stringMatching(/^posts_tags_tag_id_ix_[0-9a-f]{7}$/),
+            expect.stringMatching(/^profiles_author_id_ix_[0-9a-f]{7}$/)
+        ]);
+    });
+
+    it("builds a new table's foreign-key index with the table, not concurrently", () => {
+        const plan = planCollectionSchemaEnsure(collections, emptyDb());
+        const index = plan.actions.find(a => a.kind === "create-index" && a.target === "public.posts_tags")!;
+        expect(index.sql).toMatch(/^CREATE INDEX IF NOT EXISTS "posts_tags_tag_id_ix_[0-9a-f]{7}" ON "public"."posts_tags" \("tag_id"\);$/);
+        expect(plan.deferredIndexes).toEqual([]);
+    });
+
+    it("leaves a live table's missing foreign-key index out of the actions, for later", () => {
+        // Every table there, every column there, every index there but the
+        // derived ones: a database provisioned before this release.
+        const live: ExistingSchema = {
+            tables: new Map([
+                ["public.posts", new Set(["id", "title", "author_id"])],
+                ["public.authors", new Set(["id", "name"])],
+                ["public.tags", new Set(["id", "name"])],
+                ["public.posts_tags", new Set(["post_id", "tag_id"])],
+                ["public.profiles", new Set(["id", "bio", "author_id", "primary_tag"])]
+            ]),
+            enums: new Set(),
+            constraints: new Set(),
+            indexes: new Set(),
+            invalidIndexes: new Set()
+        };
+        const plan = planCollectionSchemaEnsure([posts, authors, tags, profiles], live);
+
+        expect(plan.actions.filter(a => a.kind === "create-index")).toEqual([]);
+        expect(plan.statements.join("\n")).not.toMatch(/_author_id_ix_|_tag_id_ix_/);
+        expect(plan.deferredIndexes.map(d => `${d.table}.${d.indexName.replace(/_[0-9a-f]{7}$/, "")}`)).toEqual([
+            "posts.posts_author_id_ix",
+            "posts_tags.posts_tags_tag_id_ix",
+            "profiles.profiles_author_id_ix"
+        ]);
+        for (const deferred of plan.deferredIndexes) {
+            expect(deferred.sql).toMatch(/^CREATE INDEX CONCURRENTLY IF NOT EXISTS "/);
+            expect(deferred.invalid).toBe(false);
+        }
+
+        // Present and valid: nothing to do. Present and INVALID: rebuilt.
+        const name = plan.deferredIndexes[0].indexName;
+        const built = planCollectionSchemaEnsure([posts, authors, tags, profiles], {
+            ...live, indexes: new Set([`public.${name}`])
+        });
+        expect(built.deferredIndexes.map(d => d.indexName)).not.toContain(name);
+        const husk = planCollectionSchemaEnsure([posts, authors, tags, profiles], {
+            ...live, indexes: new Set([`public.${name}`]), invalidIndexes: new Set([`public.${name}`])
+        });
+        expect(husk.deferredIndexes.find(d => d.indexName === name)).toMatchObject({ invalid: true });
+    });
+
     // ── The comparison the three tests above do not make ────────────────────
     //
     // They check that both paths mention the same columns and name constraints
@@ -572,6 +646,118 @@ describe("a composite primary key, applied to a live database", () => {
         } finally {
             await pushed.close();
             await booted.close();
+        }
+    }, 30_000);
+});
+
+/**
+ * The derived foreign-key indexes, against a real database: whichever door
+ * built it, a database ends up with the same indexes under the same names —
+ * and one provisioned before they existed gets them, without a duplicate and
+ * without the INVALID husk an interrupted concurrent build leaves behind.
+ */
+describe("foreign-key indexes, applied to a live database", () => {
+    const fixture = [posts, authors, tags, profiles];
+
+    const withRlsHelpers = async (db: PGlite): Promise<void> => {
+        await db.exec(
+            "CREATE SCHEMA IF NOT EXISTS rebase;" +
+            "CREATE OR REPLACE FUNCTION rebase.uid() RETURNS text LANGUAGE sql STABLE AS $$ SELECT NULL::text $$;" +
+            "CREATE OR REPLACE FUNCTION rebase.roles() RETURNS text LANGUAGE sql STABLE AS $$ SELECT ''::text $$;"
+        );
+    };
+
+    const asQueryable = (db: PGlite) => ({
+        query: <R,>(text: string) => db.query<R>(text) as Promise<{ rows: R[] }>
+    });
+
+    /** Every index in `public`, valid or not. */
+    const indexesOf = async (db: PGlite): Promise<string[]> => {
+        const { rows } = await db.query<{ name: string; valid: boolean }>(
+            "SELECT c.relname AS name, i.indisvalid AS valid FROM pg_index i " +
+            "JOIN pg_class c ON c.oid = i.indexrelid JOIN pg_namespace n ON n.oid = c.relnamespace " +
+            "WHERE n.nspname = 'public' ORDER BY 1"
+        );
+        return rows.map(r => (r.valid ? r.name : `${r.name} (INVALID)`));
+    };
+
+    const derivedNames = (ddl: string): string[] =>
+        [...ddl.matchAll(/CREATE INDEX "([^"]+_id_ix_[0-9a-f]{7})"/g)].map(m => m[1]);
+
+    it("holds the same indexes whichever door created it", async () => {
+        const pushed = new PGlite();
+        const booted = new PGlite();
+        try {
+            await withRlsHelpers(pushed);
+            await pushed.exec(generatePostgresDdl(fixture));
+            await withRlsHelpers(booted);
+            const { ensureCollectionTables } = await import("../src/schema/ensure-collection-tables");
+            await ensureCollectionTables(asQueryable(booted), fixture);
+
+            expect(await indexesOf(booted)).toEqual(await indexesOf(pushed));
+            expect((await indexesOf(pushed)).filter(n => /_ix_/.test(n))).toHaveLength(3);
+        } finally {
+            await pushed.close();
+            await booted.close();
+        }
+    }, 30_000);
+
+    it("gives a database from before this release the push's indexes, once, and repairs an INVALID one", async () => {
+        const db = new PGlite();
+        try {
+            await withRlsHelpers(db);
+            const ddl = generatePostgresDdl(fixture);
+            // The same schema minus the derived indexes: what an older push left.
+            const names = derivedNames(ddl);
+            expect(names).toHaveLength(3);
+            await db.exec(ddl.split("\n").filter(line => !names.some(n => line.includes(`"${n}"`))).join("\n"));
+            await db.exec(
+                "INSERT INTO public.authors (id, name) VALUES ('11111111-1111-1111-1111-111111111111', 'ada');" +
+                "INSERT INTO public.posts (id, title, author_id) VALUES " +
+                "('22222222-2222-2222-2222-222222222222', 'p', '11111111-1111-1111-1111-111111111111');"
+            );
+
+            const { ensureCollectionTables } = await import("../src/schema/ensure-collection-tables");
+            const first = await ensureCollectionTables(asQueryable(db), fixture);
+            expect(first.actions.filter(a => a.kind === "create-index")).toEqual([]);
+            expect(first.deferredIndexes.map(d => d.indexName).sort()).toEqual([...names].sort());
+            expect(first.indexBuilds?.built.sort()).toEqual(names.map(n => `public.${n}`).sort());
+            expect((await indexesOf(db)).filter(n => n.includes("_ix_")).sort()).toEqual([...names].sort());
+
+            // An interrupted CONCURRENTLY build: the name exists, the index
+            // does not work, and IF NOT EXISTS would skip it forever.
+            await db.exec(`UPDATE pg_index SET indisvalid = false WHERE indexrelid = 'public."${names[0]}"'::regclass`);
+            expect(await indexesOf(db)).toContain(`${names[0]} (INVALID)`);
+
+            const second = await ensureCollectionTables(asQueryable(db), fixture);
+            expect(second.deferredIndexes).toEqual([expect.objectContaining({ indexName: names[0], invalid: true })]);
+            expect(second.indexBuilds?.built).toEqual([`public.${names[0]}`]);
+            expect(await indexesOf(db)).toContain(names[0]);
+            expect((await indexesOf(db)).filter(n => n.includes("INVALID"))).toEqual([]);
+
+            // And from then on, nothing.
+            const third = await ensureCollectionTables(asQueryable(db), fixture);
+            expect(third.deferredIndexes).toEqual([]);
+        } finally {
+            await db.close();
+        }
+    }, 30_000);
+
+    it("leaves them to the caller when asked to defer", async () => {
+        const db = new PGlite();
+        try {
+            await withRlsHelpers(db);
+            const ddl = generatePostgresDdl(fixture);
+            const names = derivedNames(ddl);
+            await db.exec(ddl.split("\n").filter(line => !names.some(n => line.includes(`"${n}"`))).join("\n"));
+
+            const { ensureCollectionTables } = await import("../src/schema/ensure-collection-tables");
+            const outcome = await ensureCollectionTables(asQueryable(db), fixture, undefined, { deferIndexBuilds: true });
+            expect(outcome.deferredIndexes).toHaveLength(3);
+            expect(outcome.indexBuilds).toBeUndefined();
+            expect((await indexesOf(db)).filter(n => n.includes("_ix_"))).toEqual([]);
+        } finally {
+            await db.close();
         }
     }, 30_000);
 });

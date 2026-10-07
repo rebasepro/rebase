@@ -206,7 +206,7 @@ const renderColumn = (column: ColumnPlan, table: TablePlan, plan: SchemaPlan, us
     return out;
 };
 
-/** The declared `indexes:` block, as Drizzle table extras. */
+/** The table's indexes — declared, tenant and foreign-key — as Drizzle table extras. */
 const indexExtras = (table: TablePlan, uses: BuilderUses): string[] =>
     table.indexes.map(spec => {
         const builder = spec.unique ? needs(uses, "uniqueIndex") : needs(uses, "index");
@@ -317,9 +317,10 @@ export function renderDrizzleSchema(plan: SchemaPlan, options: DrizzleRenderOpti
                 member("table", table.columns.find(c => c.column === name && !c.columnOwnedByProperty)?.key ?? name);
             extras.push(`    ${needs(uses, "primaryKey")}({ columns: [${table.primaryKey.map(keyMember).join(", ")}] }),`);
         }
-        if (table.kind === "collection") {
-            extras.push(...indexExtras(table, uses));
-        }
+        // A junction has indexes too since the plan derives one for its
+        // target column, and the file drizzle-kit plans from has to carry it
+        // or a `drizzle-kit push` would drop what `db push` created.
+        extras.push(...indexExtras(table, uses));
         if (withPolicies) {
             extras.push(...table.policies.map(policy => policyExtra(policy, uses)));
         }

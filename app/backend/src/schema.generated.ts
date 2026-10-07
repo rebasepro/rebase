@@ -109,6 +109,8 @@ export const orderItems = pgTable("order_items", {
     unit_price: numeric("unit_price"),
     line_total: numeric("line_total")
 }, (table) => ([
+    index("order_items_order_id_ix_87f761d").on(table.orderId.asc().nullsLast()),
+    index("order_items_product_id_ix_630810a").on(table.productId.asc().nullsLast()),
     pgPolicy("order_items_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
     pgPolicy("order_items_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("order_items_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
@@ -141,6 +143,7 @@ export const orders = pgTable("orders", {
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     __order: text("order")
 }, (table) => ([
+    index("orders_customer_id_ix_f0b5d92").on(table.customerId.asc().nullsLast()),
     pgPolicy("orders_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
     pgPolicy("orders_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("orders_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
@@ -184,6 +187,7 @@ export const postsTags = pgTable("posts_tags", {
     tag_id: uuid("tag_id").notNull().references((): AnyPgColumn => tags.id, { onDelete: "cascade" }),
 }, (table) => ([
     primaryKey({ columns: [table.post_id, table.tag_id] }),
+    index("posts_tags_tag_id_ix_d4456f1").on(table.tag_id.asc().nullsLast()),
     pgPolicy("posts_tags_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("posts_tags_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("posts_tags_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
@@ -201,6 +205,7 @@ export const productLocales = pgTable("product_locales", {
     name: text("name"),
     description: text("description")
 }, (table) => ([
+    index("product_locales_product_id_ix_cbc4870").on(table.productId.asc().nullsLast()),
     pgPolicy("product_locales_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
     pgPolicy("product_locales_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("product_locales_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
@@ -273,6 +278,7 @@ export const tickets = pgTable("tickets", {
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     __order: text("order")
 }, (table) => ([
+    index("tickets_customer_id_ix_ff86aa9").on(table.customerId.asc().nullsLast()),
     pgPolicy("tickets_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
     pgPolicy("tickets_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("tickets_update_3561e70_1", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),

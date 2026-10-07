@@ -190,7 +190,14 @@ function toSerializableRelation(link: Relation): SerializableRelation {
     };
     switch (link.kind) {
         case "belongsTo":
-            return { kind: "belongsTo", ...common, ...(link.localKey ? { localKey: link.localKey } : {}) };
+            return {
+                kind: "belongsTo",
+                ...common,
+                ...(link.localKey ? { localKey: link.localKey } : {}),
+                // Only the opt-out: `true` is the default, and writing it into
+                // every saved relation would be noise in the author's file.
+                ...(link.index === false ? { index: false } : {})
+            };
         case "hasOne":
         case "hasMany":
             return {

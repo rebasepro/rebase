@@ -119,6 +119,13 @@ export interface PostgresDriverInternals {
 // Re-export from shared CLI error utilities
 import { deepestErrorMessage, diagnoseDbError, isEconnrefused, parseHostInfo } from "./cli-errors";
 import { classifyConnectFailure } from "./utils/pg-error-utils";
+import type { OpenIndexBuildSession, ScheduledIndexBuild } from "./schema/deferred-index-build";
+
+/**
+ * How long after the policies step the deferred foreign-key index builds
+ * start: past the rest of boot, so the server is listening by then.
+ */
+const DEFERRED_INDEX_BUILD_DELAY_MS = 5_000;
 
 /**
  * Which table name the boot-time drift check should look for, for one collection.
@@ -419,6 +426,30 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             }
         };
     };
+
+    /**
+     * A connection of its own for the derived foreign-key index builds — see
+     * `poolIndexBuildSession` for why it cannot be the pool's next free one. A
+     * handle with no pool behind it (PGlite, an application's own client)
+     * gets the shared queryable, and the builder leaves session settings
+     * alone on it.
+     */
+    const openIndexBuildSession = (driverResult?: InitializedDriver): OpenIndexBuildSession => async () => {
+        const db = requireProvisioningDb(driverResult);
+        const pool = "$client" in db ? db.$client : undefined;
+        const { isPgPool, poolIndexBuildSession } = await import("./schema/deferred-index-build");
+        if (isPgPool(pool)) return poolIndexBuildSession(pool)();
+        const queryable = provisioningQueryable(driverResult);
+        return { dedicated: false, query: <T>(text: string) => queryable.query<T>(text), release: () => undefined };
+    };
+
+    /**
+     * The derived foreign-key indexes the last schema ensure left for later —
+     * see `schema/deferred-index-build`. Started once the policies step is
+     * done, the last DDL a boot runs, so the build never holds a table that
+     * step needs; and by its own fallback timer if that step never runs here.
+     */
+    let pendingIndexBuild: ScheduledIndexBuild | undefined;
 
     /**
      * Create the `rebase` schema and the helper functions every generated
@@ -1371,6 +1402,11 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             // validates them before they reach a string.
             const queryable = provisioningQueryable(driverResult);
             const { BOOT_LOCK_TIMEOUT_MS } = await import("./schema/boot-ddl");
+            // A provisioning-only run exits as soon as boot returns, so an
+            // index left for later would never be built by it — and the
+            // serving processes of such a deployment provision nothing. It is
+            // a migration job: building inline is what it is for.
+            const provisionOnly = ["1", "true"].includes((process.env.REBASE_PROVISION_ONLY ?? "").trim().toLowerCase());
             const plan = await ensureCollectionTables(
                 queryable,
                 collections as Parameters<typeof ensureCollectionTables>[1],
@@ -1380,10 +1416,30 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 // for longer than that. See `schema/boot-ddl`. And a table this
                 // boot creates is built in a few transactions, not one commit
                 // per column.
-                { lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS, batchNewTables: true }
+                {
+                    lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS,
+                    batchNewTables: true,
+                    deferIndexBuilds: !provisionOnly,
+                    openIndexBuildSession: openIndexBuildSession(driverResult)
+                }
             );
             for (const failure of plan.failures) {
                 logger.warn(describeEnsureFailure(failure));
+            }
+            pendingIndexBuild?.cancel();
+            pendingIndexBuild = undefined;
+            if (!provisionOnly && plan.deferredIndexes.length > 0) {
+                const { scheduleDeferredIndexBuild } = await import("./schema/deferred-index-build");
+                logger.info(
+                    `[schema] ${plan.deferredIndexes.length} foreign-key index(es) are missing on tables that already ` +
+                    "exist. They are built in the background once the server is serving, one at a time, " +
+                    "without blocking reads or writes."
+                );
+                pendingIndexBuild = scheduleDeferredIndexBuild(openIndexBuildSession(driverResult), plan.deferredIndexes, {
+                    log: message => logger.info(`[schema] ${message}`),
+                    lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS,
+                    delayMs: DEFERRED_INDEX_BUILD_DELAY_MS
+                });
             }
             return { applied: plan.actions.length - plan.failures.length };
         },
@@ -1524,6 +1580,9 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 );
             }
 
+            // The last DDL this boot runs; the deferred index builds may have
+            // the tables now.
+            pendingIndexBuild?.start();
             return { applied: outcome.policiesApplied };
         },
 

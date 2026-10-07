@@ -41,6 +41,7 @@ import {
     helperFunctionKey,
     HELPER_FUNCTIONS,
     type ConstraintPolicy,
+    type DeferredIndexBuild,
     type DiffOptions,
     type EnsureAction,
     type EnsurePlan,
@@ -52,10 +53,16 @@ import {
 } from "./plan/diff-plan";
 import { extractCauseMessage, extractPgError } from "../utils/pg-error-utils";
 import { atomicBatch, isLockTimeout, isMultiStatementRefusal, joinStatements, sleep } from "./boot-ddl";
+import {
+    buildDeferredIndexes,
+    type DeferredIndexOutcome,
+    type OpenIndexBuildSession
+} from "./deferred-index-build";
 import { columnTypeDriftMessage, type ColumnTypeDrift } from "./column-type-drift";
 
 export type {
     ConstraintPolicy,
+    DeferredIndexBuild,
     EnsureAction,
     EnsurePlan,
     ExistingSchema,
@@ -106,6 +113,20 @@ export interface EnsureOptions extends DiffOptions {
      * `ensureCollectionTables`.
      */
     batchNewTables?: boolean;
+    /**
+     * Leave the derived foreign-key indexes a live table is missing to the
+     * caller, in {@link EnsureOutcome.deferredIndexes}, instead of building
+     * them before returning. The boot sets it and builds them in the
+     * background once it serves — see `deferred-index-build`.
+     */
+    deferIndexBuilds?: boolean;
+    /**
+     * The connection those builds run on when they are not deferred. Absent,
+     * they share `client` — fine for a small table, and cut short by the
+     * pool's `statement_timeout` on a large one, which is why the boot hands
+     * over a dedicated connection.
+     */
+    openIndexBuildSession?: OpenIndexBuildSession;
 }
 
 /**
@@ -127,6 +148,12 @@ export interface EnsureOutcome extends EnsurePlan {
      * detection on the next boot, not the deployment. Both are reported loudly.
      */
     failures: { kind: EnsureAction["kind"]; target: string; error: string }[];
+    /**
+     * What happened to {@link EnsurePlan.deferredIndexes} when they were built
+     * here rather than deferred; absent when there were none or they were left
+     * to the caller.
+     */
+    indexBuilds?: DeferredIndexOutcome;
 }
 
 /** The schema a collection lives in, validated before it reaches any DDL. */
@@ -348,6 +375,19 @@ export async function readExistingSchema(
     );
     for (const row of constraintRows) constraints.add(`${row.schema}.${row.table}.${row.name}`);
 
+    // Indexes a `CREATE INDEX CONCURRENTLY` left INVALID. They are in
+    // `indexes` under their name, so without this a husk reads as built and
+    // `IF NOT EXISTS` keeps skipping it — see `deferred-index-build`.
+    const invalidIndexes = new Set<string>();
+    const { rows: invalidRows } = await client.query<{ schema: string; name: string }>(
+        `SELECT n.nspname AS schema, c.relname AS name
+         FROM pg_index i
+         JOIN pg_class c ON c.oid = i.indexrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE NOT i.indisvalid AND n.nspname IN (${inList})`
+    );
+    for (const row of invalidRows) invalidIndexes.add(`${row.schema}.${row.name}`);
+
     // Column comments, which is where a generated search column records the
     // expression it was built from. `objsubid > 0` is what makes a row a
     // *column* comment rather than the table's own.
@@ -425,7 +465,7 @@ export async function readExistingSchema(
 
     return {
         tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables, columnTypes,
-        columnDefaults, triggers, indexes, extensions, functions
+        columnDefaults, triggers, indexes, invalidIndexes, extensions, functions
     };
 }
 
@@ -641,9 +681,24 @@ export async function ensureCollectionTables(
         log?.(message);
     }
 
+    // After every action, so the columns they index exist — whether this run
+    // added them or a previous one did.
+    const buildIndexes = async (): Promise<DeferredIndexOutcome | undefined> => {
+        if (options.deferIndexBuilds || plan.deferredIndexes.length === 0) return undefined;
+        return buildDeferredIndexes(
+            options.openIndexBuildSession ?? (async () => ({
+                query: <T>(sql: string) => client.query<T>(sql),
+                dedicated: false,
+                release: () => undefined
+            })),
+            plan.deferredIndexes,
+            { log, lockTimeoutMs: options.lockTimeoutMs }
+        );
+    };
+
     if (plan.actions.length === 0) {
-        log?.("Schema is up to date; nothing to create.");
-        return { ...plan, failures };
+        if (plan.deferredIndexes.length === 0) log?.("Schema is up to date; nothing to create.");
+        return { ...plan, failures, indexBuilds: await buildIndexes() };
     }
 
     const lockBudget = options.lockTimeoutMs !== undefined
@@ -746,7 +801,7 @@ export async function ensureCollectionTables(
         const last = Math.max(end, i + 1);
         for (; i < last; i++) await applyOne(plan.actions[i]);
     }
-    return { ...plan, failures };
+    return { ...plan, failures, indexBuilds: await buildIndexes() };
 }
 
 /**

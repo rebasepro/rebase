@@ -95,7 +95,13 @@ import {
     vectorExtensionDeclared,
     vectorExtensionStatement
 } from "../vector-index";
-import { buildCollectionIndexSpecs, deriveIndexName, type CollectionIndexSpec } from "../collection-index";
+import {
+    buildCollectionIndexSpecs,
+    deriveIndexName,
+    foreignKeyIndexSpec,
+    leadsWithColumn,
+    type CollectionIndexSpec
+} from "../collection-index";
 import { sharedRelationName } from "../relation-names";
 import { SET_UPDATED_AT_FN, setUpdatedAtFunction } from "./updated-at-trigger";
 import type {
@@ -884,6 +890,20 @@ function planCollectionTable(
     // above can still change.
     settleDefaultOnDelete(collection, columns, relations);
 
+    // After every other index, because the foreign-key ones defer to them: a
+    // declared index or the tenant index that already leads with the column
+    // serves the same lookups, and a second one would only cost writes.
+    const indexes = [...buildCollectionIndexSpecs(collection, resolveColumnName), ...tenantIndexes];
+    indexes.push(...planForeignKeyIndexes(schema, table, columns, primaryKey, indexes, column => {
+        // A `belongsTo` whose author opted out keeps its constraint and loses
+        // only the index. Asked of the relation, not the column: the column a
+        // declared property owns carries no relation of its own.
+        if (column.source.kind !== "relation" || !column.source.propName) return false;
+        const prop = collection.properties?.[column.source.propName] as RelationProperty | undefined;
+        const relation = findRelation(relations, prop?.relation?.relationName ?? column.source.propName);
+        return relation?.kind === "belongsTo" && relation.index;
+    }));
+
     return {
         schema,
         table,
@@ -894,7 +914,7 @@ function planCollectionTable(
         slug: collection.slug,
         columns,
         primaryKey,
-        indexes: [...buildCollectionIndexSpecs(collection, resolveColumnName), ...tenantIndexes],
+        indexes,
         search,
         vector: buildVectorIndexPlan(collection, resolveColumnName),
         vectorColumns: buildVectorColumnSpecs(collection, resolveColumnName),
@@ -1113,6 +1133,47 @@ function applyTenantColumnEffects(
         reason: TENANT_INDEX_REASON
     };
     return [{ ...withoutName, indexName: deriveIndexName(withoutName) }];
+}
+
+/**
+ * A btree on each foreign-key column of one table, where nothing already
+ * serves the lookup — see `foreignKeyIndexSpec` for why the column needs one.
+ *
+ * Skipped, so that no table ever carries two indexes doing one job, when the
+ * column already leads:
+ *
+ * - the primary key — `<table>_pkey` is a btree over the key in key order, so
+ *   its first column is indexed and the rest are not (a junction's
+ *   `(post_id, tag_id)` key serves `post_id`, and `tag_id` gets an index);
+ * - a UNIQUE on the column (`validation.unique`, on the relation or on the
+ *   property that owns the column) — Postgres backs it with a btree;
+ * - another planned index that leads with it ({@link leadsWithColumn}) — one
+ *   the collection declares in `indexes:`, or the tenant index.
+ *
+ * Only the plan is consulted, never the catalogue: `db push` renders this from
+ * the collections alone, and boot has to reach the same set with the same
+ * names, or Atlas would plan to drop what boot built.
+ */
+function planForeignKeyIndexes(
+    schema: string,
+    table: string,
+    columns: ColumnPlan[],
+    primaryKey: string[],
+    planned: readonly CollectionIndexSpec[],
+    wantsIndex: (column: ColumnPlan) => boolean
+): CollectionIndexSpec[] {
+    const created = columns.filter(c => !c.columnOwnedByProperty);
+    const derived: CollectionIndexSpec[] = [];
+    for (const column of columns) {
+        const fk = column.foreignKey;
+        if (!fk || !wantsIndex(column)) continue;
+        const name = fk.column;
+        if (primaryKey[0] === name) continue;
+        if (created.some(c => c.column === name && c.unique)) continue;
+        if ([...planned, ...derived].some(spec => leadsWithColumn(spec, name))) continue;
+        derived.push(foreignKeyIndexSpec(schema, table, name));
+    }
+    return derived;
 }
 
 /**
@@ -1495,7 +1556,12 @@ function planJunctionTable(
         declaringSlugs: spec?.declaringSides.map(side => side.collection.slug) ?? [],
         columns,
         primaryKey: [sourceColumn, targetColumn],
-        indexes: [],
+        // Always, and with no opt-out: the junction is the platform's table,
+        // not the author's. The key covers lookups by `sourceColumn`; the
+        // reverse side of the link — `tags → posts` — filters on
+        // `targetColumn`, which only this index serves.
+        indexes: planForeignKeyIndexes(schema, table, columns, [sourceColumn, targetColumn], [],
+            column => column.source.kind === "junction-key"),
         vectorColumns: [],
         policies,
         triggers,

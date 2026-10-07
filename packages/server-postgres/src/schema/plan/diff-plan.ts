@@ -109,6 +109,14 @@ export interface ExistingSchema {
      */
     indexes?: Set<string>;
     /**
+     * `schema.name` of every index whose `pg_index.indisvalid` is false — the
+     * husk a `CREATE INDEX CONCURRENTLY` leaves behind when it is cancelled,
+     * times out, or loses a race with a peer. Such an index is in
+     * {@link indexes} too, maintained on every write and used by no query, and
+     * `IF NOT EXISTS` skips it by name forever. Absent means unknown.
+     */
+    invalidIndexes?: Set<string>;
+    /**
      * Names of the extensions installed in the database. `CREATE EXTENSION IF
      * NOT EXISTS` skips by name whatever schema the extension is in, so the name
      * is the whole test. Absent means unknown.
@@ -311,6 +319,33 @@ export interface LegacyForeignKey {
     legacy: string;
 }
 
+/**
+ * A derived foreign-key index a table that already exists is missing.
+ *
+ * Not an {@link EnsureAction}, because it must not hold the boot: on a table
+ * with millions of rows `CREATE INDEX CONCURRENTLY` takes minutes, and every
+ * minute of it would be a minute the deployment is not serving. The caller
+ * builds these after the fact — boot in the background once it serves, every
+ * other caller inline after the actions — through `buildDeferredIndexes`.
+ *
+ * Kept out of {@link EnsurePlan.statements} for the same reason: a caller that
+ * applies statements as text (the live schema editor) may run them inside a
+ * transaction, which `CONCURRENTLY` refuses.
+ */
+export interface DeferredIndexBuild {
+    schema: string;
+    /** Bare table name. */
+    table: string;
+    indexName: string;
+    /** `CREATE INDEX CONCURRENTLY IF NOT EXISTS …;` */
+    sql: string;
+    /**
+     * The catalogue already holds an INVALID index under this name, which has
+     * to be dropped before the build — `IF NOT EXISTS` would skip it.
+     */
+    invalid: boolean;
+}
+
 export interface EnsurePlan {
     actions: EnsureAction[];
     /** Every statement, in dependency order. Empty when the schema is current. */
@@ -359,6 +394,8 @@ export interface EnsurePlan {
      * exactly once, which is not a decision to take unattended.
      */
     orphanedRequiredColumns: OrphanedRequiredColumn[];
+    /** @see DeferredIndexBuild */
+    deferredIndexes: DeferredIndexBuild[];
 }
 
 /**
@@ -941,7 +978,26 @@ export function diffPlanAgainstCatalogue(
     //    `concurrently` is a parameter rather than a string replacement on the
     //    rendered SQL: the `.replace(…)` above silently does nothing for a
     //    UNIQUE index, whose text is `CREATE UNIQUE INDEX …`.
-    for (const spec of sortIndexSpecs(collectionTables.flatMap(t => t.indexes))) {
+    //
+    //    The foreign-key indexes the plan derives go through here too, with one
+    //    difference on a table that already exists: they are not actions at
+    //    all, but `deferredIndexes`, built after the boot instead of during it
+    //    (see `DeferredIndexBuild`). A junction table carries one — its target
+    //    column — which is why this walks both kinds of table.
+    const deferredIndexes: DeferredIndexBuild[] = [];
+    for (const spec of sortIndexSpecs([...collectionTables, ...junctionTables].flatMap(t => t.indexes))) {
+        if (spec.derived === "foreign-key" && concurrent(spec.schema, spec.table)) {
+            const invalid = existing.invalidIndexes?.has(`${spec.schema}.${spec.indexName}`) === true;
+            if (indexExists(spec.schema, spec.indexName) && !invalid) continue;
+            deferredIndexes.push({
+                schema: spec.schema,
+                table: spec.table,
+                indexName: spec.indexName,
+                sql: collectionIndexStatement(spec, { concurrently: true, ifNotExists: true }),
+                invalid
+            });
+            continue;
+        }
         if (indexExists(spec.schema, spec.indexName)) continue;
         actions.push({
             kind: "create-index",
@@ -1011,7 +1067,8 @@ export function diffPlanAgainstCatalogue(
         vectorIndexSkipped,
         withheldConstraints,
         columnTypeDrift,
-        orphanedRequiredColumns
+        orphanedRequiredColumns,
+        deferredIndexes
     };
 }
 

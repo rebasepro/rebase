@@ -16,6 +16,7 @@ import type {
     PrimaryKeyRow,
     ForeignKeyRow,
     UniqueConstraintRow,
+    IndexRow,
     CheckConstraintRow,
     CommentRow,
     SchemaMetadata
@@ -268,6 +269,22 @@ export const UNIQUE_CONSTRAINTS_QUERY = `
 `;
 
 /**
+ * Every index on the schema's tables, by name. Only the name is needed: it is
+ * what tells a foreign key Rebase already indexed apart from one it would
+ * index on the first push — see `foreignKeyIndexSpec`.
+ */
+export const INDEXES_QUERY = `
+    SELECT t.relname AS table_name, ic.relname AS index_name
+    FROM pg_index i
+    JOIN pg_class t ON t.oid = i.indrelid
+    JOIN pg_class ic ON ic.oid = i.indexrelid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    WHERE n.nspname = $1
+      AND NOT t.relispartition
+    ORDER BY t.relname, ic.relname
+`;
+
+/**
  * CHECK constraints, as the source text Postgres reproduces them from.
  *
  * `pg_get_constraintdef` output is normalized by the server — the parser in
@@ -356,6 +373,7 @@ export async function readSchemaMetadata(
     const pks = await client.query<PrimaryKeyRow>(PRIMARY_KEYS_QUERY, [schema]);
     const fks = await client.query<ForeignKeyRow>(FOREIGN_KEYS_QUERY, [schema]);
     const uniques = await client.query<UniqueConstraintRow>(UNIQUE_CONSTRAINTS_QUERY, [schema]);
+    const indexes = await client.query<IndexRow>(INDEXES_QUERY, [schema]);
     const checks = await client.query<CheckConstraintRow>(CHECK_CONSTRAINTS_QUERY, [schema]);
     const comments = await client.query<CommentRow>(COMMENTS_QUERY, [schema]);
 
@@ -377,6 +395,7 @@ export async function readSchemaMetadata(
         // collection on the other end to link to.
         fks: scoped(fks.rows).filter((fk) => known.has(fk.foreign_table_name)),
         uniques: scoped(uniques.rows),
+        indexes: scoped(indexes.rows),
         checks: scoped(checks.rows),
         comments: scoped(comments.rows),
         rowCounts: {}

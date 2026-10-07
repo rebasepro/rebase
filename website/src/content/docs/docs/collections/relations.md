@@ -91,6 +91,14 @@ author: {
 // → posts.author_id
 ```
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> The column is
+indexed for you: Postgres indexes the key a foreign key points at, never the
+column holding it, so without one every `hasMany` include and nested listing
+from the other side scans this table. `index: false` keeps the constraint and
+drops the index — see [Foreign keys are indexed for you](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
+for when that is worth it, and for when Rebase skips it on its own because
+another index already serves the column.
+
 ### hasMany / hasOne — the key is on theirs
 
 ```typescript
@@ -501,6 +509,7 @@ interface RelationBase {
 interface BelongsToRelation extends RelationBase {
     kind: "belongsTo";
     localKey?: string;              // column on THIS table
+    index?: boolean;                // btree on localKey; defaults to true
 }
 
 interface HasOneRelation extends RelationBase {
