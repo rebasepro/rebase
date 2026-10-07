@@ -146,16 +146,67 @@ const MAX_FIND_URL_LENGTH = 6 * 1024;
  */
 const serversWithoutQueryRoute = new WeakSet<Transport>();
 
+/** {@link serversWithoutQueryRoute}, for `POST …/count`. */
+const serversWithoutCountRoute = new WeakSet<Transport>();
+
 /**
- * Whether a `find()` goes as `POST …/query` rather than `GET`: always for a
+ * Whether a read goes as its `POST` twin rather than `GET`: always for a
  * vector search, whose embedding is a JSON array in the URL (768 dimensions
  * are 17 KB of it, past Node's 16 KB and nginx's 8 KB), and for anything else
  * whose URL would not fit through a proxy.
  */
-function sendsQueryBody(transport: Transport, path: string, queryString: string, params: FindParams | undefined): boolean {
-    if (serversWithoutQueryRoute.has(transport)) return false;
+function sendsQueryBody(
+    transport: Transport,
+    path: string,
+    queryString: string,
+    params: FindParams | undefined,
+    serversWithoutRoute: WeakSet<Transport>
+): boolean {
+    if (serversWithoutRoute.has(transport)) return false;
     if (params?.vectorSearch) return true;
     return `${transport.baseUrl ?? ""}${transport.apiPath ?? ""}${path}${queryString}`.length > MAX_FIND_URL_LENGTH;
+}
+
+/**
+ * A read whose parameters go in the URL of `GET <path>`, or — where
+ * {@link sendsQueryBody} says so — in the JSON body of its `POST` twin:
+ * `POST …/query` for a listing, `POST …/count` for a count.
+ *
+ * Against a server without the twin (404, or a proxy's 405) the `GET` is sent
+ * instead, and the transport remembers — unless the `GET` 404s as well, which
+ * is the collection's answer, not the route's.
+ */
+async function readWithParams<T>(
+    transport: Transport,
+    path: string,
+    postPath: string,
+    params: FindParams | undefined,
+    serversWithoutRoute: WeakSet<Transport>
+): Promise<T> {
+    const queryString = buildQueryString(params);
+    const get = () => transport.request<T>(path + queryString, { method: "GET" });
+    if (!sendsQueryBody(transport, path, queryString, params, serversWithoutRoute)) return get();
+    try {
+        return await transport.request<T>(postPath, {
+            method: "POST",
+            body: JSON.stringify(buildQueryBody(params))
+        });
+    } catch (error) {
+        if (!(error instanceof RebaseApiError) || (error.status !== 404 && error.status !== 405)) throw error;
+        // A server without the route, or a collection it does not
+        // have: the GET tells the two apart. A 404 from it as well
+        // is the collection's, and says nothing about the route.
+        try {
+            const answer = await get();
+            serversWithoutRoute.add(transport);
+            return answer;
+        } catch (getError) {
+            if (!(getError instanceof RebaseApiError && getError.status === 404)) {
+                serversWithoutRoute.add(transport);
+            }
+            throw getError;
+        }
+    }
 }
 
 function isCountReadAsFilter(error: unknown): boolean {
@@ -326,32 +377,8 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
     const client: CollectionClient<M> = {
         async find(params?: FindParams<M>): Promise<FindResult<M>> {
             type Page = { data: Record<string, unknown>[]; meta: FindResult<M>["meta"] };
-            const read = async (p: FindParams<M> | undefined): Promise<Page> => {
-                const queryString = buildQueryString(p);
-                const get = () => transport.request<Page>(basePath + queryString, { method: "GET" });
-                if (!sendsQueryBody(transport, basePath, queryString, p)) return get();
-                try {
-                    return await transport.request<Page>(`${basePath}/query`, {
-                        method: "POST",
-                        body: JSON.stringify(buildQueryBody(p))
-                    });
-                } catch (error) {
-                    if (!(error instanceof RebaseApiError) || (error.status !== 404 && error.status !== 405)) throw error;
-                    // A server without the route, or a collection it does not
-                    // have: the GET tells the two apart. A 404 from it as well
-                    // is the collection's, and says nothing about the route.
-                    try {
-                        const page = await get();
-                        serversWithoutQueryRoute.add(transport);
-                        return page;
-                    } catch (getError) {
-                        if (!(getError instanceof RebaseApiError && getError.status === 404)) {
-                            serversWithoutQueryRoute.add(transport);
-                        }
-                        throw getError;
-                    }
-                }
-            };
+            const read = (p: FindParams<M> | undefined): Promise<Page> =>
+                readWithParams<Page>(transport, basePath, `${basePath}/query`, p, serversWithoutQueryRoute);
             const counted = { ...params, count: undefined };
             let raw: Awaited<ReturnType<typeof read>>;
             if (params?.count !== "none") {
@@ -594,9 +621,13 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             const existing = inflight.get(key);
             if (existing) return existing;
 
-            const request = transport
-                .request<{ count: number }>(key, { method: "GET" })
-                .then((raw) => raw.count ?? 0);
+            // The verb `find()` would use for the same filters: a vector
+            // search or a URL too long for a proxy goes as `POST …/count`, so
+            // a count beside a `find()` that worked is not the request a
+            // 431/414 refuses.
+            const request = readWithParams<{ count: number }>(
+                transport, `${basePath}/count`, `${basePath}/count`, countParams, serversWithoutCountRoute
+            ).then((raw) => raw.count ?? 0);
             inflight.set(key, request);
             try {
                 return await request;

@@ -40,6 +40,7 @@ Nested relations are accessible via URL paths:
 ```
 GET    /api/data/authors/42/posts         → list author's posts
 POST   /api/data/authors/42/posts/query   → the same listing, parameters in the body (0.24+)
+POST   /api/data/authors/42/posts/count   → the same count, parameters in the body (0.24+)
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
 PATCH  /api/data/authors/42/posts/7       → update the post
@@ -455,10 +456,9 @@ filters behave on the index are on [Vector Search](/docs/backend/vector-search/)
 
 ## Queries too long for a URL
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `POST /api/data/:slug/query`
-is this listing with its query parameters in a JSON body, for a query whose URL
-would not fit — an embedding, a long `in` list. See
-[Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url).
+<span class="since-badge" data-since="0.24">Since 0.24</span> `POST /api/data/:slug/query` (this listing) and `POST /api/data/:slug/count`
+take the query parameters in a JSON body, for a query whose URL would not fit — an embedding, a long `in` list.
+See [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url).
 
 ## Relation Inclusion
 

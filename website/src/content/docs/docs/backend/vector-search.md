@@ -83,6 +83,14 @@ counts against the same rate limit as the `GET`. Nested listings have it too:
 `POST /api/data/authors/42/posts/query`. A server older than 0.24 answers it 404;
 the SDK then sends the `GET`.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> The count has the
+same twin: `POST /api/data/:slug/count` (and `POST /api/data/authors/42/posts/count`)
+is `GET /api/data/:slug/count` with its parameters in the body, read the same way
+and refused the same way. A count carries the filters of the `find()` it describes,
+so its URL is as long. The SDK's `count()` follows the rule `find()` does — every
+vector search, and any count whose URL would pass 6 KB — and falls back to the
+`GET` against an older server.
+
 ## Related
 
 - [REST API](/docs/backend/api/) — every other parameter a listing takes

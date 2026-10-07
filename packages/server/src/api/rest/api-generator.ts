@@ -1332,7 +1332,31 @@ export class RestApiGenerator {
         });
     }
 
-    /** A `POST …/query` body, as the dictionary {@link listRows} reads. See `query-body.ts`. */
+    /**
+     * A collection's count, from the query parameters in `queryDict`: the
+     * URL's for `GET …/count`, a body's for `POST …/count`. One method for
+     * both, as {@link listRows} is for the listing — the same parser, the same
+     * field-access refusals, the same count. The caller has already checked
+     * the credential's scope for `collection`.
+     *
+     * @param collectionPath a nested count's `parent/:id/child` path; unset
+     *   for the collection's own.
+     */
+    private async countRows(
+        c: Context<HonoEnv>,
+        collection: CollectionConfig,
+        queryDict: Record<string, string[]>,
+        collectionPath?: string
+    ): Promise<Response> {
+        const queryOptions = this.parseQuery(queryDict, { collection, c });
+        const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
+        const total = await RestApiGenerator.countRawEntities(
+            this.getScopedDriver(c), collection, queryOptions, searchString, collectionPath
+        );
+        return c.json({ count: total });
+    }
+
+    /** A `POST …/query` or `POST …/count` body, as the dictionary {@link listRows} and {@link countRows} read. See `query-body.ts`. */
     private async queryDictFromRequest(c: Context<HonoEnv>): Promise<Record<string, string[]>> {
         const body = await parseJsonBody(c);
         return queryDictFromBody(body, Object.keys(c.req.queries()));
@@ -1358,13 +1382,16 @@ export class RestApiGenerator {
         // GET /collection/count - Count entities (with optional filters)
         this.router.get(`${basePath}/count`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
-            const queryDict = c.req.queries();
-            const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
-            const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-            const driver = this.getScopedDriver(c);
+            return this.countRows(c, resolvedCollection, c.req.queries());
+        });
 
-            const total = await RestApiGenerator.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
-            return c.json({ count: total });
+        // POST /collection/count — the same count, its parameters in the body,
+        // as `POST …/query` is the listing's. A count carries the filters of
+        // the `find()` it describes, so a vector search's embedding or a long
+        // `in` list makes its URL just as long. A read: `data:read`, as the GET.
+        this.router.post(`${basePath}/count`, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug, "read");
+            return this.countRows(c, resolvedCollection, await this.queryDictFromRequest(c));
         });
 
         // GET /collection/aggregate - count/sum/avg/min/max, optionally grouped
@@ -1880,21 +1907,14 @@ id };
             this.enforceSubcollectionApiKeyPermission(c, nested);
 
             if (parsed.id === "count") {
-                // GET /parent/:parentId/child/count — count child entities
-                const queryDict = c.req.queries();
-                const queryOptions = this.parseQuery(queryDict, nestedAccess);
-                const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-
+                // GET /parent/:parentId/child/count — count child entities.
+                //
                 // The count the root route and both listings take, not a copy
                 // of its option list. This one kept its own, and each option
                 // added to the others was missed here in turn — the logical
                 // group first, then `?deleted=`, so a trash view's count
                 // reported the live rows.
-                const total = await RestApiGenerator.countRawEntities(
-                    driver, nestedCollection, queryOptions, searchString, nested.path
-                );
-
-                return c.json({ count: total });
+                return this.countRows(c, nestedCollection, c.req.queries(), nested.path);
             } else if (parsed.id) {
                 // GET /parent/:parentId/child/:id — single entity
                 const queryOptions = this.parseQuery(c.req.queries(), nestedAccess);
@@ -1952,6 +1972,15 @@ id };
                 const nested = this.resolveNestedPath(parsed.collectionPath);
                 this.enforceSubcollectionApiKeyPermission({ get: (key: string) => c.get(key as never), req: { method: "GET" } }, nested);
                 return this.listRows(c, nested.chain[nested.chain.length - 1], await this.queryDictFromRequest(c), nested.path);
+            }
+            // POST /parent/:parentId/child/count — the nested count, its
+            // parameters in the body, as `POST /<collection>/count` is the
+            // root one. `count` in the id position already names the count on
+            // the GET, so it names nothing else here either.
+            if (parsed.id === "count") {
+                const nested = this.resolveNestedPath(parsed.collectionPath);
+                this.enforceSubcollectionApiKeyPermission({ get: (key: string) => c.get(key as never), req: { method: "GET" } }, nested);
+                return this.countRows(c, nested.chain[nested.chain.length - 1], await this.queryDictFromRequest(c), nested.path);
             }
             if (parsed.id) return next();
 

@@ -166,6 +166,23 @@ describe("vector search over HTTP (E2E)", () => {
         expect(second.meta.hasMore).toBe(false);
     });
 
+    it("counts a thresholded 1,536-dimension search from the SDK, which the same count in the URL cannot", async () => {
+        const docsClient = sdk().data.collection("docs");
+        const all = await docsClient.find({ vectorSearch: { property: "embedding", vector: embeddingFor(7) }, limit: 30 });
+        const distances = all.data.map(row => Number(row._distance));
+        const threshold = (distances[11] + distances[12]) / 2;
+
+        // `POST …/count`: the embedding in the body, as `find()` sends it.
+        expect(await docsClient.count({ vectorSearch: { property: "embedding", vector: embeddingFor(7), threshold } })).toBe(12);
+
+        // `GET …/count` with the same parameters is refused before any route sees it.
+        const query = `vector_search=embedding&vector=${encodeURIComponent(JSON.stringify(embeddingFor(7)))}`
+            + `&vector_threshold=${threshold}`;
+        expect((await fetch(`${plainOrigin}/api/data/docs/count?${query}`)).status).toBe(431);
+        // Through the runtime's own server the GET fits, and counts the same.
+        expect(await (await fetch(`${runtimeOrigin}/api/data/docs/count?${query}`)).json()).toEqual({ count: 12 });
+    });
+
     describe("GET and POST …/query answer the same, on a real database", () => {
         const bigVector = JSON.stringify(embeddingFor(99));
         const CASES: [string, Record<string, string>][] = [

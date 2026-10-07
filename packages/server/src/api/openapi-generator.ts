@@ -593,6 +593,43 @@ description: "Whether more records exist beyond this page" },
         //
         // Registered before the list path so its literal segment cannot be read
         // as an `{id}`, which is the same ordering the router uses.
+        //
+        // Its parameters are the listing's that narrow the rows — the filters,
+        // the logical groups, the search and the vector search, all of which
+        // the route reads (`countRawEntities`) — and not the ones that page or
+        // shape them. The vector search and the groups were read and not
+        // described, which left a generated client unable to count what its
+        // own `find()` had asked for.
+        const countNarrowing = new Set([
+            "where", "or", "and", "not", "searchString",
+            "vector_search", "vector", "vector_distance", "vector_threshold"
+        ]);
+        const countParameters = [
+            ...listQueryParameters()
+                .filter(p => countNarrowing.has(p.name))
+                .map(p => p.name === "vector_threshold"
+                    ? { ...p, description: "Count only the rows within this distance of `vector`." }
+                    : p),
+            ...deletedParameters(collection),
+            ...buildFilterParameters(collection, reservedParameterNames)
+        ];
+        const countResponses = {
+            200: {
+                description: "The number of matching rows",
+                content: {
+                    "application/json": {
+                        schema: {
+                            type: "object",
+                            required: ["count"],
+                            properties: {
+                                count: { type: "integer", description: "Rows matching the filters" }
+                            }
+                        }
+                    }
+                }
+            },
+            ...errorResponses(requireAuth)
+        };
         paths[`${dataPath}/count`] = {
             get: {
                 tags: [collection.name],
@@ -602,29 +639,25 @@ description: "Whether more records exist beyond this page" },
                     "Takes the filter and search parameters of the list endpoint; `limit`, `offset` " +
                     "and `orderBy` are not part of the question and are ignored.",
                 operationId: `count${schemaName}`,
-                parameters: [
-                    ...listQueryParameters().filter(p => p.name === "searchString"),
-                    ...deletedParameters(collection),
-                    ...buildFilterParameters(collection, reservedParameterNames)
-                ],
-                responses: {
-                    200: {
-                        description: "The number of matching rows",
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    type: "object",
-                                    required: ["count"],
-                                    properties: {
-                                        count: { type: "integer", description: "Rows matching the filters" }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    ...errorResponses(requireAuth)
-                }
-            }
+                parameters: countParameters,
+                responses: countResponses
+            },
+            // The same count, its parameters in the body — documented from
+            // the GET's own list, as `POST …/query` is from the listing's.
+            post: queryOperation({
+                tags: [collection.name],
+                summary: `Count ${collection.name}, parameters in the body`,
+                description:
+                    "The count `GET` answers, with its query parameters in a JSON body instead of the URL: " +
+                    "the same filters, search and vector search, the same row-level security, and the same " +
+                    "errors. It reads and never writes, so a credential needs `data:read` for it. Use it when " +
+                    "the URL would not fit: a vector search's embedding, a long `in` list. A parameter also on " +
+                    "the URL is a 400 INVALID_QUERY_BODY.",
+                operationId: `count${schemaName}Query`,
+                parameters: countParameters,
+                responses: countResponses,
+                reserved: reservedParameterNames
+            })
         };
 
         // ── GET /data/{slug}/aggregate — count/sum/avg/min/max ────────
@@ -2017,6 +2050,8 @@ function buildFilterParameters(
 function queryOperation(operation: {
     tags: string[];
     summary: string;
+    /** What the operation answers; the listing's description when unset. */
+    description?: string;
     operationId: string;
     parameters: Array<Record<string, unknown>>;
     responses: Record<string, unknown>;
@@ -2044,7 +2079,7 @@ function queryOperation(operation: {
     return {
         tags: operation.tags,
         summary: operation.summary,
-        description:
+        description: operation.description ??
             "The listing `GET` answers, with its query parameters in a JSON body instead of the URL: " +
             "the same filters, page, count, cursor and includes, the same row-level security, and the " +
             "same errors. It reads and never writes, so a credential needs `data:read` for it. Use it " +
