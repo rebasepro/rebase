@@ -1,5 +1,9 @@
 import net from "node:net";
+import { createServer } from "node:http";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { SMTPEmailService } from "../src/email/smtp-email-service";
+import { createShutdown } from "../src/init/shutdown";
 
 /**
  * Connections to the mail server, counted by a fake SMTP server over a real
@@ -137,5 +141,22 @@ describe("SMTPEmailService connections", () => {
         await until(() => smtp.open() === 0);
 
         expect(smtp.open()).toBe(0);
+    });
+
+    it("are closed by the backend's shutdown, not left to the idle timer", async () => {
+        // `close()` existed, and nothing called it: a shutdown left the pool's
+        // sockets to its 5 s idle timer, or to `process.exit`.
+        await service.send(mail(0));
+        expect(smtp.open()).toBe(1);
+
+        await createShutdown({ server: createServer(), realtimeServices: {}, emailService: service })(3_000);
+        await until(() => smtp.open() === 0);
+
+        expect(smtp.open()).toBe(0);
+    });
+
+    it("is handed to the shutdown by initializeRebaseBackend", () => {
+        const init = readFileSync(path.join(__dirname, "../src/init.ts"), "utf8");
+        expect(init).toMatch(/createShutdown\(\{[\s\S]*?emailService[\s\S]*?\}\)/);
     });
 });

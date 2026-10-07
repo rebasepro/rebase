@@ -211,7 +211,7 @@ async function startServer() {
 startServer();
 ```
 
-> **Standard path:** if your server uses `initializeRebaseBackend` (like the scaffolded template does), don't hand-roll the shutdown handler above — use the built-in helper instead. It drains HTTP, stops the cron scheduler, tears down realtime services, guards against repeated signals, and force-exits if shutdown hangs:
+> **Standard path:** if your server uses `initializeRebaseBackend` (like the scaffolded template does), don't hand-roll the shutdown handler above — use the built-in helper instead. It drains HTTP, stops the cron scheduler, tears down realtime services, closes the SMTP connection pool once nothing can send, guards against repeated signals, and force-exits if shutdown hangs:
 >
 > ```ts
 > import { installShutdownHandlers } from "@rebasepro/server";

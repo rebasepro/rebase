@@ -3801,7 +3801,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         authTokenSweep,
         stopMetricsSampler,
         realtimeServices,
-        closeLongLivedResponses: () => longLivedResponses.abort()
+        closeLongLivedResponses: () => longLivedResponses.abort(),
+        emailService
     });
 
     /**

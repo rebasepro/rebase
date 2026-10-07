@@ -22,6 +22,12 @@ interface ShutdownConfig {
      * one of these left open held the shutdown to its force timeout.
      */
     closeLongLivedResponses?: () => void;
+    /**
+     * The email service, when one is configured. A pooled SMTP transport keeps
+     * its connections open between sends; one with a `close()` is closed once
+     * nothing else can send, rather than left for its idle timer.
+     */
+    emailService?: object;
 }
 
 /**
@@ -156,6 +162,21 @@ function cleanupReserveMs(timeoutMs: number): number {
 const WORK_DRAIN_SHARE = 2 / 3;
 
 export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => Promise<void> {
+    /**
+     * Close the email transport's pooled connections. Last, so a request still
+     * draining can send; a send already in flight finishes on its connection,
+     * which the transport then closes. Never throws.
+     */
+    const closeEmail = (): void => {
+        const email = config.emailService;
+        if (!email || !("close" in email) || typeof email.close !== "function") return;
+        try {
+            email.close();
+        } catch (err) {
+            logger.warn("Error closing the email transport:", { error: err });
+        }
+    };
+
     return (timeoutMs = 15_000): Promise<void> => {
         return new Promise<void>((resolve) => {
             // Force-resolve after the timeout (unless disabled with 0). Armed
@@ -170,6 +191,7 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                     // So the process can actually end: an open socket holds the
                     // event loop, and the cleanup after this closes the pool.
                     config.server.closeAllConnections?.();
+                    closeEmail();
                     resolve();
                 }, timeoutMs)
                 : undefined;
@@ -287,6 +309,8 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                     clearInterval(sweepIdle);
                     logger.info("HTTP server closed");
                     clearTimeout(forceTimer);
+                    // 4. The email transport, once no request can send.
+                    closeEmail();
                     resolve();
                 });
             })();
