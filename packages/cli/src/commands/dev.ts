@@ -1049,6 +1049,85 @@ async function runDatabasePreflight(options: {
 }
 
 /**
+ * Kill a child `rebase dev` started, with everything it started in turn.
+ *
+ * Both servers run detached, in a process group of their own, behind a shell
+ * and a package manager — so the group is what has to go, not the pid.
+ */
+function killChildTree(child: ResultPromise): void {
+    if (child.killed) return;
+    try {
+        if (!child.pid) throw new Error("no pid");
+        if (process.platform === "win32") {
+            execaCommandSync(`taskkill /pid ${child.pid} /T /F`);
+        } else {
+            process.kill(-child.pid, "SIGKILL");
+        }
+    } catch {
+        try {
+            child.kill("SIGKILL");
+        } catch {
+            // Already gone.
+        }
+    }
+}
+
+/**
+ * The port the last `rebase dev` backend landed on, from `.rebase-dev-port`.
+ *
+ * Read the way the server reads it (`listenWithPortRetry`): the first number,
+ * whether the file is the server's `<bound> <requested>` or the CLI's bare
+ * `<bound>`. `null` when there is no file or no number in it.
+ */
+function rememberedDevPort(projectRoot: string): number | null {
+    try {
+        const raw = fs.readFileSync(path.join(projectRoot, DEV_PORT_FILENAME), "utf-8").trim().split(/\s+/)[0];
+        return parsePort(raw) ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Whether the admin panel can start beside the backend instead of after it.
+ *
+ * Vite has to be told the backend's URL when it starts (`VITE_API_URL`), and
+ * the backend's port is only certain once it has bound — so the admin panel
+ * used to wait for "Server running at", and the time to it was the backend's
+ * whole boot plus Vite's start. It can start beside the backend whenever the
+ * port the backend will bind is known in advance:
+ *
+ * - **named with `--port`**: the server binds it or refuses to start, never
+ *   walks past it (`REBASE_DEV_PORT_EXPLICIT`), and `pinnedPortRefusal` has
+ *   already checked that nothing answers there;
+ * - **free, and the port the backend tries first**: the server tries the port
+ *   its last run landed on before the one it is given (`.rebase-dev-port`), so
+ *   a remembered port must be this one — the "kept from the last run" rung —
+ *   or absent, which it is after every clean exit, and the derived port is
+ *   then the one tried. A port something already answers on would make the
+ *   backend move, so that case keeps the old order.
+ *
+ * Nothing here can rule out another process taking the port in the second the
+ * backend boots, so `devCommand` still compares the announced port with the
+ * one Vite was given and restarts the admin panel when they differ.
+ *
+ * Exported for its test.
+ */
+export async function frontendCanStartWithBackend(options: {
+    projectRoot: string;
+    port: number;
+    pinned: boolean;
+    probe?: (host: string, port: number) => Promise<boolean>;
+}): Promise<boolean> {
+    if (options.pinned) return true;
+    const remembered = rememberedDevPort(options.projectRoot);
+    if (remembered !== null && remembered !== options.port) return false;
+    const probe = options.probe ?? probeTcp;
+    const taken = await Promise.all([probe("127.0.0.1", options.port), probe("::1", options.port)]);
+    return !taken.some(Boolean);
+}
+
+/**
  * The tsx the backend is watched with, or exit saying why there is none.
  *
  * Checked before anything is started rather than just before the backend
@@ -1353,23 +1432,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             if (fs.existsSync(urlFile)) fs.unlinkSync(urlFile);
         } catch { /* ignore */ }
 
-        children.forEach((child) => {
-            if (child.pid && !child.killed) {
-                try {
-                    if (process.platform === "win32") {
-                        execaCommandSync(`taskkill /pid ${child.pid} /T /F`);
-                    } else {
-                        process.kill(-child.pid, "SIGKILL");
-                    }
-                } catch (e) {
-                    try {
-                        child.kill("SIGKILL");
-                    } catch (err) {
-                        // ignore
-                    }
-                }
-            }
-        });
+        children.forEach(killChildTree);
         // Not a hard-coded 0. Ctrl+C is how `rebase dev` normally ends, so
         // exiting 0 unconditionally threw away the one thing `--backend-only`
         // has to report: whether the backend it was asked to run is up. A
@@ -1378,6 +1441,10 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     };
     process.on("SIGINT", cleanup);
     process.on("SIGTERM", cleanup);
+
+    /** The running admin panel, and the backend port it was told (`VITE_API_URL`). */
+    let frontendChild: ResultPromise | null = null;
+    let frontendApiPort: number | null = null;
 
     /**
      * Start the Vite frontend, optionally injecting the backend port.
@@ -1389,6 +1456,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
         const frontendEnv: Record<string, string> = { ...process.env as Record<string, string> };
 
+        frontendApiPort = backendPort;
         // Inject the resolved backend URL so Vite picks it up
         if (backendPort) {
             frontendEnv.VITE_API_URL = `http://localhost:${backendPort}`;
@@ -1420,7 +1488,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         if (pinnedFrontendPort) runDevCmd.push("--strictPort");
         console.log(`  ${chalk.gray("↳ frontend port")} = ${chalk.white(String(frontendPort))}`);
 
-        const frontendChild = execa(
+        const child = execa(
             runDevCmd[0],
             runDevCmd.slice(1),
             {
@@ -1431,23 +1499,57 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 detached: process.platform !== "win32"
             }
         );
-        frontendChild.catch(() => {}); // prevent unhandled promise rejection on exit
+        child.catch(() => {}); // prevent unhandled promise rejection on exit
+        frontendChild = child;
 
-        forEachOutputLine(frontendChild.stdout, (line) => {
+        forEachOutputLine(child.stdout, (line) => {
             console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
             const cleanLine = stripAnsi(line);
             const urlMatch = cleanLine.match(/(http:\/\/(?:localhost|127\.0\.0\.1):\d+)/);
-            if (cleanLine.includes("Local:") && urlMatch) {
+            // Only the current one: a replaced admin panel's last words are not its address.
+            if (cleanLine.includes("Local:") && urlMatch && child === frontendChild) {
                 frontendUrl = urlMatch[1];
                 printSummary();
             }
         });
 
-        forEachOutputLine(frontendChild.stderr, (line) => {
+        forEachOutputLine(child.stderr, (line) => {
             console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
         });
 
-        children.push(frontendChild);
+        children.push(child);
+    }
+
+    /**
+     * Start the admin panel again, told the port the backend actually bound.
+     *
+     * Only reachable when it was started beside the backend
+     * ({@link frontendCanStartWithBackend}) and something took that port in the
+     * second the backend booted, so the backend moved. Left alone, the admin
+     * panel would talk to whatever now answers on the old port — very often
+     * another Rebase backend, since dev ports are derived per project.
+     */
+    async function restartFrontend(backendPort: number): Promise<void> {
+        const stale = frontendChild;
+        frontendUrl = "";
+        console.log(`  ${chalk.gray(`↳ The backend moved from ${frontendApiPort} to ${backendPort}; restarting the admin panel on it.`)}`);
+        if (stale) {
+            frontendChild = null;
+            const index = children.indexOf(stale);
+            if (index >= 0) children.splice(index, 1);
+            killChildTree(stale);
+            // Settled either way — it was killed, so it rejects — and never
+            // through `finally`, whose promise would carry that rejection on
+            // with nothing to catch it.
+            await stale.then(() => undefined, () => undefined);
+            // Its port is free once the process is gone, which can trail the
+            // shell above it. Vite would otherwise take the next port — or,
+            // pinned with --strictPort, refuse to start.
+            for (let attempt = 0; attempt < 30 && await probeTcp("127.0.0.1", frontendPort, 200); attempt++) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+        }
+        if (!shuttingDown) startFrontend(backendPort);
     }
 
     // Start backend
@@ -1542,6 +1644,12 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
         /** Whether the frontend has been launched (we only launch it once). */
         let frontendLaunched = false;
+        /**
+         * Whether the backend's first "Server running at" has been compared
+         * with the port an admin panel started beside it was given. Once:
+         * where a later restart lands is the watcher's business, as before.
+         */
+        let frontendPortChecked = false;
 
         // A generated schema that a *library upgrade* invalidated, repaired before
         // the backend sees it.
@@ -1706,6 +1814,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     })();
                 }, 500);
             });
+        }
+
+        // The admin panel beside the backend, when the port it will bind is
+        // already known — so the time to it is the slower of the two starts,
+        // not their sum. Otherwise it waits for "Server running at" below.
+        if (!backendOnly && frontendDir
+            && await frontendCanStartWithBackend({ projectRoot, port: startPort, pinned: portIsPinned })) {
+            frontendLaunched = true;
+            startFrontend(startPort);
         }
 
         const backendChild = execa(
@@ -1883,6 +2000,20 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 disarmReadyDeadline();
                 resolvedBackendPort = parseInt(serverMatch[1], 10);
                 backendUrl = "started";
+
+                // Start frontend now that we know the real port — or, when it
+                // started beside the backend, make sure it was told this one.
+                // Before the banner: a restart clears the frontend URL, and the
+                // banner then waits for the new one.
+                if (!backendOnly && frontendDir) {
+                    if (!frontendLaunched) {
+                        frontendLaunched = true;
+                        startFrontend(resolvedBackendPort);
+                    } else if (!frontendPortChecked && frontendApiPort !== resolvedBackendPort) {
+                        void restartFrontend(resolvedBackendPort);
+                    }
+                    frontendPortChecked = true;
+                }
                 printSummary();
 
                 // Save the url to a temp file for scripts to pick up
@@ -1892,12 +2023,6 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 // Save the port to .rebase-dev-port for port affinity
                 const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
                 fs.writeFileSync(portFile, String(resolvedBackendPort), "utf-8");
-
-                // Start frontend now that we know the real port
-                if (!backendOnly && frontendDir && !frontendLaunched) {
-                    frontendLaunched = true;
-                    startFrontend(resolvedBackendPort);
-                }
             }
         });
 
@@ -1957,15 +2082,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     console.log(chalk.gray("  Press Ctrl+C to stop all servers."));
     console.log("");
 
-    // Wait for all children to exit
-    await Promise.all(
-        children.map(
-            (child) =>
-                new Promise<void>((resolve) => {
-                    child.finally(() => resolve());
-                })
-        )
-    );
+    // Wait for all children to exit — including an admin panel restarted on
+    // the backend's real port, which joins `children` after this wait began.
+    const awaited = new Set<ResultPromise>();
+    for (let pending = [...children]; pending.length > 0; pending = children.filter((child) => !awaited.has(child))) {
+        for (const child of pending) awaited.add(child);
+        // Settled either way: a child that is killed rejects, and `finally`
+        // would hand that rejection on to a promise nothing catches.
+        await Promise.all(pending.map((child) => child.then(() => undefined, () => undefined)));
+    }
 }
 
 function printDevHelp() {
@@ -2031,8 +2156,11 @@ ${chalk.green.bold("Description")}
   Rebase instances simultaneously.
 
   If the assigned port is already in use, the server will automatically
-  try the next available port. The frontend is started only after the
-  backend is ready, and VITE_API_URL is injected automatically.
+  try the next available port. The frontend starts beside the backend
+  when the backend's port is known in advance (named with --port, or
+  free), and after the backend is ready otherwise. Either way
+  VITE_API_URL is injected with the port the backend actually bound —
+  the frontend is restarted if the backend had to move.
 
   On startup and on every save under config/collections, the Drizzle
   schema (backend/src/schema.generated.ts) and the SDK types
