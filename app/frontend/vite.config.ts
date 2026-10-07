@@ -191,6 +191,15 @@ export default defineConfig({
         }
     },
     optimizeDeps: { include: ["react/jsx-runtime", "pgsql-ast-parser"] },
+    // This app bundles @rebasepro/studio from source, so the schema
+    // visualizer's layout worker (`dagre-layout.worker.ts`) is built here, by
+    // this config, not by the library's. Module workers, as the library builds
+    // them: under Vite's `iife` default dagre's CommonJS files find no
+    // `require`, fall back to reading `window`, and the worker dies on load —
+    // the diagram then silently lays itself out on the main thread again.
+    worker: {
+        format: "es"
+    },
     plugins: [
         svgr(),
         react({}),
