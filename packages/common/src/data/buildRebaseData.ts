@@ -1166,7 +1166,13 @@ function toEntityAccessor<M extends Record<string, unknown>>(
     sdk: SDKCollectionClient<M>,
     slug: string,
     getPks: () => PrimaryKeyInfo[] = () => [],
-    toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>
+    toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>,
+    /**
+     * What `toViewModel` converts with — the collection as resolved now. A
+     * live list keeps the entities it built for as long as this and the keys
+     * stay the same object (see `listen`).
+     */
+    viewModelSource: () => unknown = () => undefined
 ): CollectionAccessor<M> {
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams<M>): Promise<FindResponse<M>> {
@@ -1212,8 +1218,38 @@ function toEntityAccessor<M extends Record<string, unknown>>(
             : (params: AggregateParams<M>) => sdk.aggregate(params),
         listen: isUnsupported(sdk.listen)
             ? undefined
-            : (params: FindParams<M> | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) =>
-                sdk.listen(params, (res) => onUpdate({ data: res.data.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel)), meta: res.meta }), onError),
+            : (params: FindParams<M> | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) => {
+                // One entity per row object, for as long as the subscription
+                // lives. The socket hands back the very row it cached when a
+                // refetch of it is equal (`mergeRows`), so a push that changed
+                // one row of fifty arrives with forty-nine rows it has seen;
+                // building fifty new entities threw that away, and every view
+                // downstream compared fifty rows by value again. Keyed on the
+                // row object, so only a row the socket kept is reused, and
+                // dropped whenever the keys or the collection the values are
+                // converted with change (a key learned late, a schema edit).
+                let built = new WeakMap<object, Entity<M>>();
+                let builtWith: [PrimaryKeyInfo[], unknown] | undefined;
+                return sdk.listen(params, (res) => {
+                    const pks = getPks();
+                    const source = viewModelSource();
+                    if (!builtWith || builtWith[0] !== pks || builtWith[1] !== source) {
+                        built = new WeakMap();
+                        builtWith = [pks, source];
+                    }
+                    onUpdate({
+                        data: res.data.map((row) => {
+                            let entity = built.get(row);
+                            if (!entity) {
+                                entity = rowToEntity<M>(row, slug, pks, toViewModel);
+                                built.set(row, entity);
+                            }
+                            return entity;
+                        }),
+                        meta: res.meta
+                    });
+                }, onError);
+            },
         listenById: isUnsupported(sdk.listenById)
             ? undefined
             : (id: string | number, onUpdate: (s: Entity<M> | undefined) => void, onError?: (e: Error) => void) =>
@@ -1265,7 +1301,8 @@ export function wrapAsEntityData(sdkData: Pick<RebaseSdkData, "collection">, opt
     function getAccessor(slug: string): CollectionAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = toEntityAccessor(sdkData.collection(slug), slug, () => primaryKeysFor(slug), viewModelFor(slug));
+            accessor = toEntityAccessor(sdkData.collection(slug), slug, () => primaryKeysFor(slug), viewModelFor(slug),
+                () => options?.resolveCollection?.(slug));
             cache.set(slug, accessor);
         }
         return accessor;

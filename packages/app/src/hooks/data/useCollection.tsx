@@ -120,9 +120,11 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
             const entities = res.data;
             setDataLoading(false);
             setDataLoadingError(undefined);
-            setData(entities.map(e => ({
-                ...e
-            })));
+            // The rows as they came. A row a push did not change arrives as
+            // the object it was last time (the socket and the admin boundary
+            // both keep it), and a copy of every row of every frame told
+            // every consumer memoised on its rows that all of them changed.
+            setData(entities);
             setNoMoreToLoad(!res.meta.hasMore);
             setTotalCount(res.meta.total);
         };
