@@ -1,9 +1,10 @@
 import type { NavigationEntry } from "@rebasepro/cms-types";
-import React from "react";
+import React, { useContext } from "react";
 import { ChevronDownIcon, cls, iconSize, Typography } from "@rebasepro/ui";
 
 import { IconForView, getIcon } from "@rebasepro/app";
-import { DrawerNavigationItem } from "./DrawerNavigationItem";
+import { DrawerNavigationItem, DrawerNavigationItemProps } from "./DrawerNavigationItem";
+import { DrawerExpansionContext } from "./drawer_expansion";
 import { useComponentOverride, useNavigationGroupLabel } from "@rebasepro/app";
 import { NAVIGATION_DEFAULT_GROUP_NAME } from "../hooks/navigation/utils";
 
@@ -72,6 +73,14 @@ export function DrawerNavigationGroup({
     const groupLabel = useNavigationGroupLabel();
     const ResolvedDrawerNavigationItem = useComponentOverride("Shell.DrawerNavigationItem", DrawerNavigationItem);
 
+    // Inside the stock drawer, the stock rows follow the drawer themselves (see
+    // DrawerNavigationItem), so they are handed a `drawerOpen` that does not
+    // change with the hover and are not re-rendered by it. An app's own row is
+    // still told the drawer's state, as it always was.
+    const rowsFollowDrawer = useContext(DrawerExpansionContext) !== null
+        && ResolvedDrawerNavigationItem === DrawerNavigationItem;
+    const rowDrawerOpen = rowsFollowDrawer ? false : drawerOpen;
+
     // The icon decorates the header, and stops there. It used to also strip the
     // entries of theirs and indent them, which made a per-app styling choice into
     // framework behaviour: every project that labelled a group with an icon lost the
@@ -130,16 +139,40 @@ export function DrawerNavigationGroup({
                 )}
             >
                 {entries.map((entry) => (
-                    <ResolvedDrawerNavigationItem
+                    <DrawerNavigationEntry
                         key={entry.id}
-                        icon={<IconForView collectionOrView={entry.collection ?? entry.view} size={"small"}/>}
-                        drawerOpen={drawerOpen}
-                        onClick={() => onItemClick?.(entry)}
-                        url={entry.url}
-                        name={entry.name}
+                        entry={entry}
+                        Item={ResolvedDrawerNavigationItem}
+                        drawerOpen={rowDrawerOpen}
+                        onItemClick={onItemClick}
                     />
                 ))}
             </div>
         </div>
     );
 }
+
+/**
+ * One row, memoised on the entry: its icon element and click handler are made
+ * here, once per entry, so a group re-rendering (its header follows the hover)
+ * hands its rows nothing new.
+ */
+const DrawerNavigationEntry = React.memo(function DrawerNavigationRow({
+    entry,
+    Item,
+    drawerOpen,
+    onItemClick
+}: {
+    entry: NavigationEntry,
+    Item: React.ComponentType<DrawerNavigationItemProps>,
+    drawerOpen: boolean,
+    onItemClick?: (entry: NavigationEntry) => void
+}) {
+    return <Item
+        icon={<IconForView collectionOrView={entry.collection ?? entry.view} size={"small"}/>}
+        drawerOpen={drawerOpen}
+        onClick={() => onItemClick?.(entry)}
+        url={entry.url}
+        name={entry.name}
+    />;
+});

@@ -2,6 +2,7 @@ import React from "react";
 
 import { NavLink } from "react-router";
 import { cls, Tooltip } from "@rebasepro/ui";
+import { useDrawerExpandedWhile } from "./drawer_expansion";
 
 /**
  * Props of a drawer navigation row, named so an app overriding
@@ -10,6 +11,14 @@ import { cls, Tooltip } from "@rebasepro/ui";
 export type DrawerNavigationItemProps = {
     icon: React.ReactElement,
     name: string,
+    /**
+     * Whether the drawer is open, so the row shows its label rather than a
+     * tooltip. Inside `DefaultDrawer` the stock group passes `false` to the
+     * stock row, which then follows the drawer itself (its `data-expanded`
+     * attribute), so the rail floating open under the pointer re-renders no
+     * row. An overriding `Shell.DrawerNavigationItem` is still passed the
+     * drawer's state.
+     */
     drawerOpen: boolean,
     url: string,
     onClick?: () => void,
@@ -61,12 +70,21 @@ export function DrawerNavigationItem({
 
     const [wantsTooltip, setWantsTooltip] = React.useState(false);
 
+    // Inside the stock drawer a row is told `drawerOpen={false}` and follows the
+    // drawer itself: its label and padding through the drawer's `data-expanded`
+    // attribute (the `group-data-[expanded=true]/drawer:` classes below), and
+    // its tooltip mask through the drawer's expansion store — read only while
+    // the tooltip wants to open, so the rail floating open under the pointer
+    // re-renders no row but the one whose tooltip is up.
+    const drawerExpanded = useDrawerExpandedWhile(wantsTooltip);
+    const labelShown = drawerOpen || drawerExpanded;
+
     // Radix will not report a close it never noticed: while the tooltip is masked
     // the pointer can leave the row without `onOpenChange(false)` ever firing. So
     // the stale `true` is dropped on the way *into* the masked state — otherwise
     // it surfaces the moment the mask lifts, as a tooltip hanging over a rail the
     // pointer left long ago.
-    if (drawerOpen && wantsTooltip) setWantsTooltip(false);
+    if (labelShown && wantsTooltip) setWantsTooltip(false);
 
     const listItem = <div>
         <NavLink
@@ -90,7 +108,7 @@ export function DrawerNavigationItem({
             className={({ isActive }: { isActive: boolean }) => cls("rounded-lg truncate group/nav",
                 "hover:bg-surface-hover text-surface-700 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white",
                 "flex flex-row items-center",
-                drawerOpen ? "pr-4 h-[30px]" : "h-[30px]",
+                drawerOpen ? "pr-4 h-[30px]" : "h-[30px] group-data-[expanded=true]/drawer:pr-4",
                 "font-medium text-[13px]",
                 isActive ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary [&_div]:text-primary" : ""
             )}
@@ -102,7 +120,9 @@ export function DrawerNavigationItem({
             <div
                 className={cls(
                     "text-text-primary dark:text-surface-200",
-                    drawerOpen ? "opacity-100" : "opacity-0 hidden",
+                    drawerOpen
+                        ? "opacity-100"
+                        : "opacity-0 hidden group-data-[expanded=true]/drawer:block group-data-[expanded=true]/drawer:opacity-100",
                     "font-inherit truncate space-x-2"
                 )}>
                 {name}
@@ -120,7 +140,7 @@ export function DrawerNavigationItem({
     // tooltip between controlled and uncontrolled as the drawer opens, which
     // strands the old state — a tooltip left up over a pointer nowhere near it.
     return <Tooltip
-        open={!drawerOpen && wantsTooltip}
+        open={!labelShown && wantsTooltip}
         onOpenChange={setWantsTooltip}
         side="right"
         title={name}>

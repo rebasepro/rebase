@@ -1,5 +1,5 @@
 import type { NavigationEntry, NavigationResult } from "@rebasepro/cms-types";
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 
 import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useAuthController, useModeController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry, useComponentOverride } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
@@ -29,6 +29,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { DrawerNavigationGroup } from "./DrawerNavigationGroup";
+import { DrawerExpansionContext, useDrawerExpansion } from "./drawer_expansion";
 import { LanguageToggle, RebaseLogo } from "@rebasepro/app";
 import { useApp } from "./app/useApp";
 
@@ -89,6 +90,12 @@ export function DefaultDrawer({
     const scrollRef = React.useRef<HTMLDivElement>(null);
     const [scrolled, setScrolled] = React.useState(false);
 
+    // Open, pinned or floating under the pointer. The rows read it from the
+    // `data-expanded` attribute (through CSS) and the expansion store, not as a
+    // prop, so the rail opening under the pointer re-renders none of them.
+    const expanded = drawerOpen || drawerHovered;
+    const expansion = useDrawerExpansion(expanded);
+
     const handleScroll = () => {
         if (scrollRef.current) {
             setScrolled(scrollRef.current.scrollTop > 0);
@@ -96,7 +103,9 @@ export function DefaultDrawer({
     };
 
     return (
-        <div role="navigation" aria-label="Main navigation" className={cls("flex flex-col h-full relative grow w-full", className)} style={style}>
+        <div role="navigation" aria-label="Main navigation"
+            data-expanded={expanded}
+            className={cls("group/drawer flex flex-col h-full relative grow w-full", className)} style={style}>
 
             <DrawerLogo
                 logo={resolvedLogo}
@@ -115,7 +124,9 @@ export function DefaultDrawer({
                         ? "linear-gradient(to bottom, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)"
                         : "linear-gradient(to bottom, black 0, black calc(100% - 20px), transparent 100%)"
                 }}>
-                {children ?? <AdminNavigationContent />}
+                <DrawerExpansionContext.Provider value={expansion}>
+                    {children ?? <AdminNavigationContent />}
+                </DrawerExpansionContext.Provider>
             </div>
 
             {footerActions !== null && (
@@ -210,10 +221,8 @@ context });
 drawerHovered,
 context });
 
-    if (!navigationState.topLevelNavigation)
-        return null;
-
-    const onItemClick = (view: NavigationEntry) => {
+    // The same handler across a hover: every row is handed it.
+    const onItemClick = useCallback((view: NavigationEntry) => {
         const eventName: AnalyticsEvent = view.type === "collection"
             ? "drawer_navigate_to_collection"
             : (view.type === "view" ? "drawer_navigate_to_view" : "unmapped_event");
@@ -223,7 +232,10 @@ context });
         } else if (!drawerOpen) {
             closeHover();
         }
-    };
+    }, [analyticsController, largeLayout, drawerOpen, closeDrawer, closeHover]);
+
+    if (!navigationState.topLevelNavigation)
+        return null;
 
     const drawerVisuallyOpen = drawerOpen || drawerHovered;
 
