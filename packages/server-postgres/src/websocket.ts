@@ -143,6 +143,13 @@ interface ClientSession {
     /** The same window, counted separately for channel frames. */
     channelMessageCount: number;
     channelWindowStart: number;
+    /**
+     * How many more fetching realtime frames this socket may send before
+     * they count in its caller's data bucket, and when that was last topped
+     * up. See {@link SOCKET_FETCH_ALLOWANCE}.
+     */
+    fetchAllowance: number;
+    fetchAllowanceAt: number;
 }
 
 
@@ -166,6 +173,35 @@ const WS_RATE_WINDOW_MS = 60_000;
  * a considered product limit (see `docs/channel-authorization.md`).
  */
 const WS_CHANNEL_RATE_LIMIT = 7200;
+
+/**
+ * Realtime frames that read the database as they arrive: a subscription's
+ * first frame is a fetch and a count, run as the subscriber, and a history
+ * request reads the channel's retained messages. Each is a data request by
+ * another name, and counts in the caller's data bucket like a
+ * `FETCH_COLLECTION` — past the socket's own allowance.
+ */
+const FETCHING_REALTIME_TYPES = new Set(["subscribe_collection", "subscribe_one", "channel_history"]);
+
+/**
+ * How many fetching realtime frames one socket may send without counting them
+ * in its caller's data bucket: at least as many as a socket may hold
+ * subscriptions, so a reconnect that re-subscribes everything it held is
+ * never refused, and never spends the budget the person's next request needs.
+ * The default data bucket is 1,000 requests per 15 minutes, so counting a
+ * reconnect against it would have refused most of one, or locked the person
+ * out of the data API until the window turned.
+ */
+const SOCKET_FETCH_ALLOWANCE = 1000;
+
+/**
+ * How long a spent allowance takes to come back in full, in ms — the data
+ * API's default window. A socket churning subscriptions gets its allowance
+ * once, and then this much a quarter-hour; past that, every subscribe is a
+ * request in its person's bucket, which their HTTP requests and other sockets
+ * share.
+ */
+const SOCKET_FETCH_ALLOWANCE_REFILL_MS = 15 * 60_000;
 
 /**
  * The largest frame a socket that has not authenticated may send, in bytes.
@@ -668,6 +704,36 @@ export function createPostgresWebSocket(
         return "live";
     }
 
+    /**
+     * A socket's whole allowance of fetching realtime frames: the default, or
+     * the realtime service's subscription ceiling where a deployment raised
+     * it, so a full socket still re-subscribes without being charged.
+     */
+    function fetchAllowanceCapacity(): number {
+        const ceiling: unknown = Reflect.get(realtimeService, "maxSubscriptionsPerSocket");
+        return typeof ceiling === "number" && Number.isFinite(ceiling)
+            ? Math.max(SOCKET_FETCH_ALLOWANCE, ceiling)
+            : SOCKET_FETCH_ALLOWANCE;
+    }
+
+    /**
+     * Take one fetching realtime frame from the socket's own allowance,
+     * topped up for the time since it was last asked. False when none is
+     * left: the frame then counts in the caller's data bucket.
+     */
+    function spendFetchAllowance(clientId: string): boolean {
+        const session = clientSessions.get(clientId);
+        if (!session) return false;
+        const now = Date.now();
+        const capacity = fetchAllowanceCapacity();
+        const refilled = Math.max(0, now - session.fetchAllowanceAt) * capacity / SOCKET_FETCH_ALLOWANCE_REFILL_MS;
+        session.fetchAllowance = Math.min(capacity, session.fetchAllowance + refilled);
+        session.fetchAllowanceAt = now;
+        if (session.fetchAllowance < 1) return false;
+        session.fetchAllowance -= 1;
+        return true;
+    }
+
     // The sweep: a socket that only listens sends nothing to be re-checked
     // before, so it is re-checked on a timer instead.
     const identityRecheckMs = Math.max(250, options?.identityRecheckIntervalMs ?? DEFAULT_IDENTITY_RECHECK_MS);
@@ -698,7 +764,9 @@ checkedAt: Date.now(),
 messageCount: 0,
 messageWindowStart: Date.now(),
 channelMessageCount: 0,
-channelWindowStart: Date.now() });
+channelWindowStart: Date.now(),
+fetchAllowance: fetchAllowanceCapacity(),
+fetchAllowanceAt: Date.now() });
         realtimeService.addClient(clientId, ws);
 
         ws.on("close", () => {
@@ -922,7 +990,12 @@ roles: verifiedUser.roles }
                 // address's — shared with their HTTP requests and their other
                 // sockets. The counter above is per connection, so on its own
                 // a caller bought budget by opening sockets.
-                if (options?.dataRateLimit && PUBLIC_TYPES.has(type)) {
+                //
+                // A subscribe and a history read are reads too, and count the
+                // same way once the socket's own allowance is spent — see
+                // SOCKET_FETCH_ALLOWANCE for why a socket has one.
+                if (options?.dataRateLimit && (PUBLIC_TYPES.has(type)
+                    || (FETCHING_REALTIME_TYPES.has(type) && !spendFetchAllowance(clientId)))) {
                     const decision = await options.dataRateLimit({
                         ...origin,
                         uid: clientSessions.get(clientId)?.user?.uid,

@@ -254,19 +254,11 @@ start to lag. Beyond that, prefer narrower subscriptions (a page, a filter on
 the user's own rows) or a [broadcast channel](#broadcast-channels) carrying the
 change for clients to re-fetch on their own schedule.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> **One socket may hold at most 1,000 subscriptions.** The next is refused with
-an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the
-socket already holds replaces that subscription and does not count again. The
-SDK shares identical subscriptions on a socket, so this counts the distinct
-lists and records a page has open. Change it with
-`REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket`
-on the Postgres adapter (the environment variable wins); a value that is not a
-positive whole number stops the server at boot. On 0.23 a socket's subscriptions
-are not limited.
+<span class="since-badge" data-since="0.24">Since 0.24</span> **One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. On 0.23 a socket's subscriptions are not limited.
 
-A subscription id is the socket's own: two clients that both name a
-subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the
-sender's.
+A subscription id is the socket's own: two clients that both name a subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the sender's.
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> **Subscribing counts against the data rate limit.** A subscription's first frame is a read, run as the subscriber, and so is a channel's history request. So `subscribe_collection`, `subscribe_one` and `channel_history` count as data requests in the caller's rate-limit bucket (the one their HTTP requests and their other sockets share) once the socket's own allowance is spent. Each socket may send 1,000 of them without counting them, or as many as its subscription ceiling when that is higher, and the allowance comes back over 15 minutes. That is everything a socket can hold, so the re-subscribe after a reconnect is never refused and never spends the person's budget. Past the allowance, a frame over the limit is refused with an error frame coded `RATE_LIMITED`, which the SDK delivers to that subscription's `onError`, or to the channel's. On 0.23 these frames count only against the socket's own budget of 2,000 frames a minute.
 
 ### Sockets that stop answering
 
@@ -581,7 +573,7 @@ channel.onError((error) => {
 | Code | Means |
 |------|-------|
 | `CHANNEL_FORBIDDEN` | You are not a member of the channel — join it before broadcasting or reading its history |
-| `RATE_LIMITED` | Past the channel frame budget above |
+| `RATE_LIMITED` | Past the channel frame budget above, or, for a history request, past the [data rate limit](#what-a-write-costs-and-the-limits) |
 | `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
 | `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
 | `CHANNEL_HISTORY_GAP` | Raised by the client: a catch-up found that the server no longer retains messages this client never received. `details` is `{ from, to }`, the sequence numbers missed. Resync the channel's state from its source of truth |
