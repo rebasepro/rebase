@@ -35,7 +35,7 @@ import { probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
 import { createAuthSchema } from "./schema/auth-schema";
 import { HistoryService } from "./history/HistoryService";
-import { ensureHistoryTableExists } from "./history/ensure-history-table";
+import { ensureHistoryIndexes, ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { patchPgNumericToNumber } from "./utils/pg-numeric-number-patch";
 import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./schema/introspect-runtime";
@@ -122,8 +122,8 @@ import { classifyConnectFailure } from "./utils/pg-error-utils";
 import type { OpenIndexBuildSession, ScheduledIndexBuild } from "./schema/deferred-index-build";
 
 /**
- * How long after the policies step the deferred foreign-key index builds
- * start: past the rest of boot, so the server is listening by then.
+ * How long after the policies step the deferred index builds start: past the
+ * rest of boot, so the server is listening by then.
  */
 const DEFERRED_INDEX_BUILD_DELAY_MS = 5_000;
 
@@ -428,7 +428,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
     };
 
     /**
-     * A connection of its own for the derived foreign-key index builds — see
+     * A connection of its own for the index builds on live tables — see
      * `poolIndexBuildSession` for why it cannot be the pool's next free one. A
      * handle with no pool behind it (PGlite, an application's own client)
      * gets the shared queryable, and the builder leaves session settings
@@ -444,7 +444,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
     };
 
     /**
-     * The derived foreign-key indexes the last schema ensure left for later —
+     * The indexes the last schema ensure left for later on live tables —
      * see `schema/deferred-index-build`. Started once the policies step is
      * done, the last DDL a boot runs, so the build never holds a table that
      * step needs; and by its own fallback timer if that step never runs here.
@@ -1333,6 +1333,26 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
 
             const inTransaction = await ensureHistoryTableExists(db);
 
+            // The index the hourly retention sweep reads, built like any
+            // index a live table is missing: concurrently, after the boot —
+            // or right here in a provisioning-only run, which exits when boot
+            // returns. See `ensureHistoryIndexes`.
+            const { BOOT_LOCK_TIMEOUT_MS } = await import("./schema/boot-ddl");
+            const historyIndexes = await ensureHistoryIndexes(db, { lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS });
+            if (historyIndexes.length > 0) {
+                const { buildDeferredIndexes, scheduleDeferredIndexBuild } = await import("./schema/deferred-index-build");
+                const indexOptions = { log: (message: string) => logger.info(`[history] ${message}`), lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS };
+                const provisionOnly = ["1", "true"].includes((process.env.REBASE_PROVISION_ONLY ?? "").trim().toLowerCase());
+                if (provisionOnly) {
+                    await buildDeferredIndexes(openIndexBuildSession(driverResult), historyIndexes, indexOptions);
+                } else {
+                    scheduleDeferredIndexBuild(openIndexBuildSession(driverResult), historyIndexes, {
+                        ...indexOptions,
+                        delayMs: DEFERRED_INDEX_BUILD_DELAY_MS
+                    }).start();
+                }
+            }
+
             const retention = typeof config === "object" ? config.retention : undefined;
             const historyService = new HistoryService(db, retention ? { ttlDays: retention } : undefined, { inTransaction });
 
@@ -1431,8 +1451,8 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             if (!provisionOnly && plan.deferredIndexes.length > 0) {
                 const { scheduleDeferredIndexBuild } = await import("./schema/deferred-index-build");
                 logger.info(
-                    `[schema] ${plan.deferredIndexes.length} foreign-key index(es) are missing on tables that already ` +
-                    "exist. They are built in the background once the server is serving, one at a time, " +
+                    `[schema] ${plan.deferredIndexes.length} index(es) are missing, or were left INVALID, on tables that ` +
+                    "already exist. They are built in the background once the server is serving, one at a time, " +
                     "without blocking reads or writes."
                 );
                 pendingIndexBuild = scheduleDeferredIndexBuild(openIndexBuildSession(driverResult), plan.deferredIndexes, {

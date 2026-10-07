@@ -325,9 +325,12 @@ doesn't.
 ## Adding the block to a live collection
 
 The generated column is added by the boot-time schema ensure, like any other
-column, and its index is built with `CREATE INDEX CONCURRENTLY` so writes are
-not blocked. Adding a *stored* generated column does rewrite the table, so on a
-large one, plan it like any other rewrite.
+column. Its index is built after the server is serving, in the background, with
+`CREATE INDEX CONCURRENTLY` so writes are not blocked (see
+[Indexes](/docs/backend/indexes#when-they-are-created)). Until the index is
+built, a search works but reads the whole table. Adding a *stored* generated
+column does rewrite the table, so on a large one, plan it like any other
+rewrite.
 
 ## Which engines
 

@@ -55,6 +55,7 @@ import { extractCauseMessage, extractPgError } from "../utils/pg-error-utils";
 import { atomicBatch, isLockTimeout, isMultiStatementRefusal, joinStatements, sleep } from "./boot-ddl";
 import {
     buildDeferredIndexes,
+    TABLE_BUSY_REASON,
     type DeferredIndexOutcome,
     type OpenIndexBuildSession
 } from "./deferred-index-build";
@@ -114,10 +115,11 @@ export interface EnsureOptions extends DiffOptions {
      */
     batchNewTables?: boolean;
     /**
-     * Leave the derived foreign-key indexes a live table is missing to the
+     * Leave the indexes a live table is missing (or holds INVALID) to the
      * caller, in {@link EnsureOutcome.deferredIndexes}, instead of building
      * them before returning. The boot sets it and builds them in the
-     * background once it serves — see `deferred-index-build`.
+     * background once it serves — see `deferred-index-build`. A UNIQUE one is
+     * built before returning either way: see {@link DeferredIndexBuild.unique}.
      */
     deferIndexBuilds?: boolean;
     /**
@@ -149,9 +151,11 @@ export interface EnsureOutcome extends EnsurePlan {
      */
     failures: { kind: EnsureAction["kind"]; target: string; error: string }[];
     /**
-     * What happened to {@link EnsurePlan.deferredIndexes} when they were built
-     * here rather than deferred; absent when there were none or they were left
-     * to the caller.
+     * What happened to the indexes built here rather than left to the caller —
+     * every one of {@link EnsurePlan.deferredIndexes}, or under
+     * `deferIndexBuilds` the UNIQUE ones only; absent when there were none.
+     * An index on a table that already exists reports here, not in
+     * {@link failures}.
      */
     indexBuilds?: DeferredIndexOutcome;
 }
@@ -589,7 +593,9 @@ export async function ensureCollectionTables(
     const existing = await readExistingSchema(client, schemas, {
         probeTables: catalogue => tablesGainingColumns(schema, catalogue)
     });
-    const plan = diffPlanAgainstCatalogue(schema, existing, { constraints: options.constraints });
+    // Every index on a table that already exists goes to the index builder,
+    // which this function runs or hands to the caller — see `buildIndexes`.
+    const plan = diffPlanAgainstCatalogue(schema, existing, { constraints: options.constraints, deferLiveIndexes: true });
     const failures: EnsureOutcome["failures"] = [];
 
     // Reported, not warned: this is a rename the ensure is about to perform, and
@@ -681,24 +687,40 @@ export async function ensureCollectionTables(
         log?.(message);
     }
 
+    // The indexes of tables that already exist. Built here unless the caller
+    // defers them — and a UNIQUE one is built here regardless, before this
+    // returns, so nothing serves the collection without the promise it makes.
+    const builtHere = options.deferIndexBuilds
+        ? plan.deferredIndexes.filter(index => index.unique === true)
+        : plan.deferredIndexes;
+    const leftToCaller = options.deferIndexBuilds
+        ? plan.deferredIndexes.filter(index => index.unique !== true)
+        : plan.deferredIndexes;
+
     // After every action, so the columns they index exist — whether this run
     // added them or a previous one did.
     const buildIndexes = async (): Promise<DeferredIndexOutcome | undefined> => {
-        if (options.deferIndexBuilds || plan.deferredIndexes.length === 0) return undefined;
-        return buildDeferredIndexes(
+        if (builtHere.length === 0) return undefined;
+        const outcome = await buildDeferredIndexes(
             options.openIndexBuildSession ?? (async () => ({
                 query: <T>(sql: string) => client.query<T>(sql),
                 dedicated: false,
                 release: () => undefined
             })),
-            plan.deferredIndexes,
+            builtHere,
             { log, lockTimeoutMs: options.lockTimeoutMs }
         );
+        assertUniqueIndexesBuilt(builtHere, outcome);
+        return outcome;
+    };
+    const finish = async (): Promise<EnsureOutcome> => {
+        const indexBuilds = await buildIndexes();
+        return { ...plan, deferredIndexes: leftToCaller, failures, indexBuilds };
     };
 
     if (plan.actions.length === 0) {
         if (plan.deferredIndexes.length === 0) log?.("Schema is up to date; nothing to create.");
-        return { ...plan, failures, indexBuilds: await buildIndexes() };
+        return finish();
     }
 
     const lockBudget = options.lockTimeoutMs !== undefined
@@ -801,7 +823,28 @@ export async function ensureCollectionTables(
         const last = Math.max(end, i + 1);
         for (; i < last; i++) await applyOne(plan.actions[i]);
     }
-    return { ...plan, failures, indexBuilds: await buildIndexes() };
+    return finish();
+}
+
+/**
+ * Fail the ensure for a UNIQUE index on a live table that could not be built,
+ * exactly as a failed UNIQUE `create-index` action always has (see `applyOne`).
+ *
+ * "Another index on the table is being built" counts: the table's lock is
+ * held by a build that may run for minutes, and serving the collection
+ * meanwhile would be serving a promise the database is not keeping. Another
+ * instance building *this* index does not: once its build commits the
+ * constraint holds, which is also what a peer's `IF NOT EXISTS` race meant.
+ */
+function assertUniqueIndexesBuilt(indexes: readonly DeferredIndexBuild[], outcome: DeferredIndexOutcome): void {
+    for (const index of indexes) {
+        if (index.unique !== true) continue;
+        const qualified = `${index.schema}.${index.indexName}`;
+        const reason = outcome.failed.find(failure => failure.index === qualified)?.error
+            ?? outcome.skipped.find(skip => skip.index === qualified && skip.reason === TABLE_BUSY_REASON)?.reason;
+        if (reason === undefined) continue;
+        throw new Error(`Failed to create-index ${index.schema}.${index.table}: ${qualified}: ${reason}\n  ${index.sql}`);
+    }
 }
 
 /**

@@ -245,6 +245,18 @@ export type ConstraintPolicy = "additive" | "converge";
 export interface DiffOptions {
     /** Defaults to `additive`. See {@link ConstraintPolicy}. */
     constraints?: ConstraintPolicy;
+    /**
+     * Plan every index a table that already exists needs — declared, search
+     * and vector, missing or left INVALID under its name — as a
+     * {@link DeferredIndexBuild} rather than an action, as the derived
+     * foreign-key indexes always are. `ensureCollectionTables` sets it: it
+     * hands them to `buildDeferredIndexes`, which builds them on a connection
+     * of its own with no `statement_timeout`, and drops and rebuilds a husk.
+     *
+     * Absent — the live schema editor, which applies `statements` as text —
+     * they stay `CREATE INDEX CONCURRENTLY IF NOT EXISTS` actions, as before.
+     */
+    deferLiveIndexes?: boolean;
 }
 
 export interface EnsureAction {
@@ -320,13 +332,16 @@ export interface LegacyForeignKey {
 }
 
 /**
- * A derived foreign-key index a table that already exists is missing.
+ * An index a table that already exists is missing, or holds INVALID — a
+ * derived foreign-key index always, and under
+ * {@link DiffOptions.deferLiveIndexes} a declared, search or vector one too.
  *
  * Not an {@link EnsureAction}, because it must not hold the boot: on a table
  * with millions of rows `CREATE INDEX CONCURRENTLY` takes minutes, and every
  * minute of it would be a minute the deployment is not serving. The caller
  * builds these after the fact — boot in the background once it serves, every
- * other caller inline after the actions — through `buildDeferredIndexes`.
+ * other caller inline after the actions — through `buildDeferredIndexes`. A
+ * {@link unique} one is the exception: it is built before the ensure returns.
  *
  * Kept out of {@link EnsurePlan.statements} for the same reason: a caller that
  * applies statements as text (the live schema editor) may run them inside a
@@ -337,13 +352,20 @@ export interface DeferredIndexBuild {
     /** Bare table name. */
     table: string;
     indexName: string;
-    /** `CREATE INDEX CONCURRENTLY IF NOT EXISTS …;` */
+    /** `CREATE [UNIQUE] INDEX CONCURRENTLY IF NOT EXISTS …;` */
     sql: string;
     /**
      * The catalogue already holds an INVALID index under this name, which has
      * to be dropped before the build — `IF NOT EXISTS` would skip it.
      */
     invalid: boolean;
+    /**
+     * A declared `unique: true` index. Not an optimization but the collection
+     * promising two rows cannot share a value, so `ensureCollectionTables`
+     * builds it before it returns — never after the server is serving — and
+     * fails when it cannot, as it did when this was an action. Absent is false.
+     */
+    unique?: boolean;
 }
 
 export interface EnsurePlan {
@@ -936,10 +958,36 @@ export function diffPlanAgainstCatalogue(
     //    reported on a database that has none.
     const indexExists = (schema: string, name: string | undefined): boolean =>
         name !== undefined && existing.indexes?.has(`${schema}.${name}`) === true;
+    //    ...except on a table that already exists, where an index goes to the
+    //    builder instead (`deferredIndexes`, see `DeferredIndexBuild`): a
+    //    derived foreign-key index always, and under `deferLiveIndexes` every
+    //    other kind too. The builder also repairs the one case `IF NOT EXISTS`
+    //    cannot see — an index that is there by name and INVALID, because a
+    //    concurrent build of it was cancelled — so it is planned again.
+    const deferredIndexes: DeferredIndexBuild[] = [];
+    const toBuilder = (schema: string, table: string, derived: boolean): boolean =>
+        concurrent(schema, table) && (derived || options.deferLiveIndexes === true);
+    const deferIndex = (build: Omit<DeferredIndexBuild, "invalid">): void => {
+        const invalid = existing.invalidIndexes?.has(`${build.schema}.${build.indexName}`) === true;
+        if (indexExists(build.schema, build.indexName) && !invalid) return;
+        deferredIndexes.push({ ...build, invalid });
+    };
+    /** A search or vector statement in its concurrent form, or undefined if it has no plain `CREATE INDEX IF NOT EXISTS`. */
+    const concurrentForm = (statement: string): string | undefined => {
+        const rewritten = statement.replace("CREATE INDEX IF NOT EXISTS", "CREATE INDEX CONCURRENTLY IF NOT EXISTS");
+        return rewritten === statement ? undefined : rewritten;
+    };
     for (const table of collectionTables) {
         if (!table.search) continue;
+        const { schema, table: tableName } = table.search;
         for (const statement of searchIndexStatements(table.search)) {
-            if (indexExists(table.schema, indexNameOf(statement))) continue;
+            const name = indexNameOf(statement);
+            const sql = concurrentForm(statement);
+            if (name !== undefined && sql !== undefined && toBuilder(schema, tableName, false)) {
+                deferIndex({ schema, table: tableName, indexName: name, sql });
+                continue;
+            }
+            if (indexExists(table.schema, name)) continue;
             actions.push({
                 kind: "create-index",
                 target: table.qualified,
@@ -957,6 +1005,11 @@ export function diffPlanAgainstCatalogue(
     for (const table of collectionTables) {
         if (!table.vector) continue;
         for (const spec of table.vector.specs) {
+            const sql = concurrentForm(vectorIndexStatement(spec));
+            if (sql !== undefined && toBuilder(spec.schema, spec.table, false)) {
+                deferIndex({ schema: spec.schema, table: spec.table, indexName: spec.indexName, sql });
+                continue;
+            }
             if (indexExists(spec.schema, spec.indexName)) continue;
             actions.push({
                 kind: "create-index",
@@ -979,22 +1032,18 @@ export function diffPlanAgainstCatalogue(
     //    rendered SQL: the `.replace(…)` above silently does nothing for a
     //    UNIQUE index, whose text is `CREATE UNIQUE INDEX …`.
     //
-    //    The foreign-key indexes the plan derives go through here too, with one
-    //    difference on a table that already exists: they are not actions at
-    //    all, but `deferredIndexes`, built after the boot instead of during it
-    //    (see `DeferredIndexBuild`). A junction table carries one — its target
-    //    column — which is why this walks both kinds of table.
-    const deferredIndexes: DeferredIndexBuild[] = [];
+    //    The foreign-key indexes the plan derives go through here too, and on a
+    //    table that already exists they go to the builder whoever plans them
+    //    (see `toBuilder`). A junction table carries one — its target column —
+    //    which is why this walks both kinds of table.
     for (const spec of sortIndexSpecs([...collectionTables, ...junctionTables].flatMap(t => t.indexes))) {
-        if (spec.derived === "foreign-key" && concurrent(spec.schema, spec.table)) {
-            const invalid = existing.invalidIndexes?.has(`${spec.schema}.${spec.indexName}`) === true;
-            if (indexExists(spec.schema, spec.indexName) && !invalid) continue;
-            deferredIndexes.push({
+        if (toBuilder(spec.schema, spec.table, spec.derived === "foreign-key")) {
+            deferIndex({
                 schema: spec.schema,
                 table: spec.table,
                 indexName: spec.indexName,
                 sql: collectionIndexStatement(spec, { concurrently: true, ifNotExists: true }),
-                invalid
+                ...(spec.unique ? { unique: true } : {})
             });
             continue;
         }

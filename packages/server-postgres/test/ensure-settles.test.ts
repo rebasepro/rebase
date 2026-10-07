@@ -113,7 +113,10 @@ describe("the boot ensure settles", () => {
         const name = /INDEX\s+(?:CONCURRENTLY\s+)?IF NOT EXISTS\s+"([^"]+)"/.exec(authorIndex!.sql)![1];
         await db.query(`DROP INDEX "public"."${name}"`);
         const second = await ensureCollectionTables(client, collections, undefined, { databaseExtensions: [] });
-        expect(second.actions.map(a => a.kind)).toEqual(["create-index"]);
-        expect(second.actions[0].sql).toContain(`"${name}"`);
+        // On a table that already exists it goes to the index builder, not
+        // the actions — see `test/live-index-builds.test.ts`.
+        expect(second.actions).toEqual([]);
+        expect(second.deferredIndexes.map(d => d.indexName)).toEqual([name]);
+        expect(second.indexBuilds?.built).toEqual([`public.${name}`]);
     });
 });

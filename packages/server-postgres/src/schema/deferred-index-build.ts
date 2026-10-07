@@ -1,15 +1,19 @@
 /**
- * Building the derived foreign-key indexes a live table is missing, without
- * holding anything up.
+ * Building the indexes a live table is missing — or holds INVALID — without
+ * holding anything up: the derived foreign-key indexes, and the declared,
+ * search and vector ones the boot-time ensure finds missing on a table that
+ * already exists.
  *
- * ## Why not a boot action like every other index
+ * ## Why not a boot action like an index on a new table
  *
  * A table that already exists may hold millions of rows, and an index over
  * them takes minutes to build. Boot-ensure's actions run before the server
  * listens, so an index planned there is minutes of a deployment not serving —
  * on the first boot after an upgrade that adds one to every `belongsTo` in the
  * project, that is every large table at once. So these are planned apart
- * (`DeferredIndexBuild`) and built here, after the boot, one at a time.
+ * (`DeferredIndexBuild`) and built here, after the boot, one at a time. A
+ * UNIQUE one is the exception: `ensureCollectionTables` builds it here too, but
+ * before it returns.
  *
  * ## The build
  *
@@ -130,6 +134,45 @@ interface IndexState {
 
 /** `42P01 undefined_table` — `pg_stat_progress_create_index` before Postgres 12. */
 const isUndefinedTable = (err: unknown): boolean => extractPgError(err)?.code === "42P01";
+
+/** `25001 active_sql_transaction` — `CONCURRENTLY` on a connection inside a transaction block. */
+const isTransactionBlockRefusal = (err: unknown): boolean => extractPgError(err)?.code === "25001";
+
+/**
+ * The rows themselves violate a UNIQUE index being built: `23505` naming the
+ * index (a lost catalogue race names a `pg_` index instead). Building it again
+ * would only fail again, so it is not retried.
+ */
+const isDuplicateRows = (err: unknown, index: DeferredIndexBuild): boolean => {
+    const pg = extractPgError(err);
+    return pg?.code === "23505" && (pg.constraint === index.indexName || /could not create unique index/i.test(pg.message));
+};
+
+const CONCURRENTLY_RE = /\sCONCURRENTLY\s/i;
+
+/** Why an index is skipped while a build of another index holds its table. */
+export const TABLE_BUSY_REASON = "another index on the table is being built";
+
+/**
+ * Run a `CONCURRENTLY` statement — or its plain form, when the connection
+ * turns out to be inside a transaction block. Only a shared handle can be: an
+ * application that builds its own adapter may hand over a connection already
+ * in one. The plain form is always accepted and takes a write lock for the
+ * build, which is the cost of getting the index at all — the same fallback the
+ * ensure's own index actions have.
+ */
+async function runConcurrently(session: IndexBuildSession, sql: string, qualified: string): Promise<void> {
+    try {
+        await session.query(sql);
+    } catch (err) {
+        if (!isTransactionBlockRefusal(err) || !CONCURRENTLY_RE.test(sql)) throw err;
+        logger.warn(
+            `[schema] ${qualified}: this connection is inside a transaction, so the index is built with a write ` +
+            "lock rather than concurrently. Writes to the table block until it finishes."
+        );
+        await session.query(sql.replace(CONCURRENTLY_RE, " "));
+    }
+}
 
 async function readIndexState(session: IndexBuildSession, index: DeferredIndexBuild): Promise<IndexState> {
     const schema = quoteSqlLiteral(index.schema);
@@ -273,7 +316,7 @@ async function buildOne(
             // holds exactly this lock, for as long as its build takes. That
             // one builds this index next; nothing is wrong.
             if (await tableIsBeingIndexed(session, index)) {
-                outcome.skipped.push({ index: qualified, reason: "another index on the table is being built" });
+                outcome.skipped.push({ index: qualified, reason: TABLE_BUSY_REASON });
                 say(`${qualified}: another index on "${index.schema}"."${index.table}" is being built — leaving it for now`);
                 return;
             }
@@ -286,13 +329,13 @@ async function buildOne(
         }
         if (before.valid === false) {
             say(`${qualified}: an earlier build left it INVALID — dropping it to build it again`);
-            await session.query(`DROP INDEX CONCURRENTLY IF EXISTS ${target};`);
+            await runConcurrently(session, `DROP INDEX CONCURRENTLY IF EXISTS ${target};`, qualified);
         }
 
         const started = Date.now();
         say(`${qualified}: building on "${index.schema}"."${index.table}"…`);
         try {
-            await session.query(index.sql);
+            await runConcurrently(session, index.sql, qualified);
         } catch (err) {
             // Whatever went wrong, what matters is the state it left, and a
             // peer is the usual cause: two instances issuing the same `CREATE`
@@ -305,8 +348,9 @@ async function buildOne(
                 return;
             }
             // A build that died part-way leaves a husk, which the next round
-            // drops and builds again — once.
-            if (after?.valid === false && attempt === 1) {
+            // drops and builds again — once. Not when the rows themselves are
+            // what a UNIQUE index refuses: that fails again, as long again.
+            if (after?.valid === false && attempt === 1 && !isDuplicateRows(err, index)) {
                 say(`${qualified}: the build failed (${describe(err)}); retrying once`);
                 continue;
             }
@@ -380,8 +424,8 @@ export async function buildDeferredIndexes(
 
     for (const failure of outcome.failed) {
         logger.warn(
-            `[schema] Foreign-key index ${failure.index} was not built: ${failure.error}. ` +
-            "Reads that filter on that column scan the table until it is; the next boot tries again."
+            `[schema] Index ${failure.index} was not built: ${failure.error}. ` +
+            "Queries it would serve scan the table until it is; the next boot tries again."
         );
     }
     return outcome;
@@ -428,12 +472,12 @@ export function scheduleDeferredIndexBuild(
         const job = queue.then(async () => {
             if (cancelled) return undefined;
             logger.info(
-                `[schema] Building ${indexes.length} foreign-key index(es) in the background, one at a time ` +
+                `[schema] Building ${indexes.length} index(es) in the background, one at a time ` +
                 "(CREATE INDEX CONCURRENTLY — reads and writes are not blocked)."
             );
             return buildDeferredIndexes(openSession, indexes, { ...options, cancelled: () => cancelled });
         }).catch((err: unknown) => {
-            logger.warn(`[schema] Foreign-key indexes were not built this boot: ${describe(err)}`);
+            logger.warn(`[schema] Indexes were not built this boot: ${describe(err)}`);
             return undefined;
         });
         queue = job;

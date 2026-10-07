@@ -250,13 +250,19 @@ Both producers emit them, which matters because not every deployment runs
   index's `INCLUDE` columns are the one exception: Drizzle cannot express them,
   and the generated line carries a comment saying so and pointing at
   `schema.sql`, which does.
-- **Boot-time schema ensure** creates them with
-  `CREATE INDEX CONCURRENTLY IF NOT EXISTS`, on the same terms as the ANN
-  indexes beside it. A managed-runtime tenant provisions at boot and never runs
-  `db push`; without this it would start with none of its declared indexes and
-  nothing would say so. The [foreign-key indexes](#foreign-keys-are-indexed-for-you)
-  Rebase derives are the exception on a table that already exists: they are
-  built after the boot, in the background.
+- **Boot-time schema ensure** creates them too, on the same terms as the
+  search and ANN indexes beside them. A managed-runtime tenant provisions at
+  boot and never runs `db push`; without this it would start with none of its
+  declared indexes and nothing would say so. A table the boot creates gets its
+  indexes with the table. On a table that already exists, the boot builds a
+  missing index after the server is serving, in the background, the way it
+  builds the [foreign-key indexes](#what-upgrading-does-to-an-existing-database).
+  It uses `CREATE INDEX CONCURRENTLY` on a connection of its own, so the
+  pool's 30 s `statement_timeout` cannot cancel a long build. An index that an
+  interrupted build left `INVALID` under its name is dropped and built again.
+  `IF NOT EXISTS` matches on the name, so it never repairs one. A `unique`
+  index is built the same way but before the server serves, and the boot fails
+  if it cannot be built. Serving without it would let duplicate rows in.
 
 ## Foreign keys are indexed for you
 
