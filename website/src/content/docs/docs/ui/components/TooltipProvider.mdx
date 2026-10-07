@@ -1,0 +1,39 @@
+---
+title: TooltipProvider
+sidebar_label: TooltipProvider
+description: TooltipProvider — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+---
+
+```ts
+import { TooltipProvider } from "@rebasepro/ui";
+```
+
+One provider for every `Tooltip` below it. `<Rebase>` mounts one around the whole admin; mount one yourself around a screen that renders kit tooltips outside it. A `Tooltip` with no provider above still works: it brings its own, as before.
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `delayDuration` | `number` | — | How long, in ms, the pointer rests on a trigger before its tooltip opens. A `Tooltip`'s own `delayDuration` wins over it. |
+| `skipDelayDuration` | `number` | — | How long, in ms, after one tooltip closes the next one opens without the delay — so moving along a row of icons does not wait on each. |
+
+## Example
+
+```tsx
+import { TooltipProvider, Tooltip, IconButton, KeyIcon, CopyIcon } from "@rebasepro/ui";
+
+// Outside <Rebase>: one provider for the toolbar's tooltips.
+export const Toolbar = () => (
+    <TooltipProvider>
+        <div className="flex gap-2 p-4">
+            <Tooltip title="Rotate key" asChild={true}>
+                <IconButton size="small" aria-label="Rotate key"><KeyIcon size={16}/></IconButton>
+            </Tooltip>
+            <Tooltip title="Copy" asChild={true}>
+                <IconButton size="small" aria-label="Copy"><CopyIcon size={16}/></IconButton>
+            </Tooltip>
+        </div>
+    </TooltipProvider>
+);
+```

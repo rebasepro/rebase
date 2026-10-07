@@ -4,7 +4,7 @@ import type { CustomizationController, RebasePlugin, AnySlotContribution } from 
 import type { ComponentOverrideMap } from "@rebasepro/cms-types";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { CenteredView, Typography } from "@rebasepro/ui";
+import { CenteredView, TooltipProvider, Typography } from "@rebasepro/ui";
 import { User, CollectionRegistryController, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { RebaseContext, UNRENDERED_SLOTS } from "@rebasepro/cms-types";
 import { PluginProviderStack } from "./PluginProviderStack";
@@ -417,7 +417,11 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         );
     }
 
+    // One tooltip provider for the whole admin: a tooltip under it uses it
+    // instead of mounting its own, and neighbouring tooltips share the skip
+    // delay (moving along a row of icons does not wait on each).
     const content = (
+        <TooltipProvider>
         <RebaseI18nProvider locale={locale} translations={translations}>
         <GlobalComponentOverrideProvider overrides={componentsProp}>
         <SnackbarProvider>
@@ -470,6 +474,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         </SnackbarProvider>
         </GlobalComponentOverrideProvider>
         </RebaseI18nProvider>
+        </TooltipProvider>
     );
 
     const resolvedApiUrl = apiUrl || client?.baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
