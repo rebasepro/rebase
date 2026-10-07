@@ -528,6 +528,14 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     /** Each client's subscriptions, by key — for its ceiling and its disconnect. */
     private subscriptionsByClient = new Map<string, Set<string>>();
 
+    /**
+     * The in-process subscriptions — started by `startDataDriverSubscription`,
+     * `subscribeToCollection` or `subscribeToOne` — by the id their caller
+     * gave them, for {@link unsubscribe}, which has nothing else to go on. It
+     * used to walk every subscription on the server, sockets' included.
+     */
+    private inProcessKeysById = new Map<string, Set<string>>();
+
     /** Subscriptions one refetch answers — see {@link SubscriptionGroup}. */
     private groups = new Map<string, SubscriptionGroup>();
     /**
@@ -790,12 +798,21 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         else this.subscribedPaths.set(subscription.path, { slug: this.collectionSlugAt(subscription.path), count: 1 });
     }
 
+    /** Remember an in-process subscription by its caller's id — see {@link inProcessKeysById}. */
+    private indexInProcess(subscriptionId: string, key: string): void {
+        let keys = this.inProcessKeysById.get(subscriptionId);
+        if (!keys) this.inProcessKeysById.set(subscriptionId, keys = new Set());
+        keys.add(key);
+    }
+
     /** Remove the subscription under `key` from everything that holds it. */
     private dropSubscription(key: string): void {
         const subscription = this._subscriptions.get(key);
         this.subscriptionCallbacks.delete(key);
         if (!subscription) return;
         this._subscriptions.delete(key);
+        const inProcess = this.inProcessKeysById.get(subscription.subscriptionId);
+        if (inProcess?.delete(key) && inProcess.size === 0) this.inProcessKeysById.delete(subscription.subscriptionId);
         this.leaveGroup(key, subscription);
         const owned = this.subscriptionsByClient.get(subscription.clientId);
         owned?.delete(key);
@@ -1047,6 +1064,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             delivered: 0
         };
         this.registerSubscription(key, subscription);
+        this.indexInProcess(subscriptionId, key);
         this.subscriptionCallbacks.set(key, callback);
         void this.deliverFirstToDataDriver(key, subscription, callback);
     }
@@ -1107,6 +1125,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             started: 0,
             delivered: 0
         });
+        this.indexInProcess(subscriptionId, key);
 
         if (callback) {
             this.subscriptionCallbacks.set(key, callback as (data: Record<string, unknown>[] | Record<string, unknown> | null) => void);
@@ -1133,6 +1152,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             started: 0,
             delivered: 0
         });
+        this.indexInProcess(subscriptionId, key);
 
         if (callback) {
             this.subscriptionCallbacks.set(key, callback as (data: Record<string, unknown>[] | Record<string, unknown> | null) => void);
@@ -1147,8 +1167,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * alone. A socket ends its own through the `unsubscribe` frame.
      */
     unsubscribe(subscriptionId: string): void {
-        for (const [key, subscription] of [...this._subscriptions.entries()]) {
-            if (subscription.subscriptionId !== subscriptionId || this.clients.has(subscription.clientId)) continue;
+        for (const key of [...(this.inProcessKeysById.get(subscriptionId) ?? [])]) {
+            const subscription = this._subscriptions.get(key);
+            if (!subscription || this.clients.has(subscription.clientId)) continue;
             this.dropSubscription(key);
         }
     }
@@ -3204,6 +3225,7 @@ lastSeen: Date.now() });
         this.collectionGroupsByPath.clear();
         this.singleGroupsByAddress.clear();
         this.singleGroupsByPath.clear();
+        this.inProcessKeysById.clear();
         this.subscribedPaths.clear();
 
         // 3. Clear broadcast channels and presence

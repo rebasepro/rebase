@@ -549,3 +549,61 @@ describe("a refetch that finds nothing new", () => {
         expect(updates(a).map(f => f.row)).toEqual([null]);
     });
 });
+
+/**
+ * An in-process listener's teardown (`listenCollection` / `listenOne` in the
+ * driver, a function's `listen()`) called `unsubscribe(id)`, which walked every
+ * subscription on the server to find it: ~2 ms per teardown at 100k socket
+ * subscriptions, and the routed provider fans each one out to every provider.
+ */
+describe("ending an in-process subscription", () => {
+    class CountingMap<K, V> extends Map<K, V> {
+        visited = 0;
+        *entries(): MapIterator<[K, V]> {
+            for (const entry of super.entries()) {
+                this.visited++;
+                yield entry;
+            }
+        }
+        [Symbol.iterator](): MapIterator<[K, V]> {
+            return this.entries();
+        }
+        *values(): MapIterator<V> {
+            for (const [, value] of this.entries()) yield value;
+        }
+        *keys(): MapIterator<K> {
+            for (const [key] of this.entries()) yield key;
+        }
+    }
+
+    it("goes straight to it, whatever else the server holds, and leaves a socket's subscription of the same id alone", async () => {
+        const ws = connect("sock");
+        for (let i = 0; i < 300; i++) await subscribeList("sock", `s${i}`, ALICE, { n: ["==", i] });
+        // A socket's own "listener-1", which an in-process unsubscribe must not end.
+        await subscribeList("sock", "listener-1", ALICE);
+        const rows: unknown[] = [];
+        service.startDataDriverSubscription("listener-1", { type: "collection", path: "posts", collectionRequest: {}, authContext: ALICE }, (data) => rows.push(data));
+        service.subscribeToOne("listener-2", { clientId: "function:digest", path: "posts", id: "1" }, () => undefined);
+        await flush();
+
+        const subscriptions = new CountingMap(Reflect.get(service, "_subscriptions") as Map<string, unknown>);
+        Reflect.set(service, "_subscriptions", subscriptions);
+        service.unsubscribe("listener-1");
+        service.unsubscribe("listener-2");
+        service.unsubscribe("nobody");
+        expect(subscriptions.visited).toBe(0);
+
+        const left = [...(Reflect.get(service, "_subscriptions") as Map<string, { subscriptionId: string; clientId: string }>).values()];
+        expect(left.filter(s => s.subscriptionId === "listener-1").map(s => s.clientId)).toEqual(["sock"]);
+        expect(left.some(s => s.subscriptionId === "listener-2")).toBe(false);
+        expect(ws.readyState).toBe(1);
+
+        // Ended, it hears nothing more.
+        rows.length = 0;
+        everyReadIsNew();
+        await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
+        jest.advanceTimersByTime(350);
+        await flush();
+        expect(rows).toEqual([]);
+    });
+});
