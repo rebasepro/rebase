@@ -206,11 +206,6 @@ export const FORBIDDEN_IN_EAGER = [
         why: "syntax highlighting is only used by lazy Studio and editor views"
     },
     {
-        test: /node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?lucide-react\/dist\/esm\/dynamicIconImports\.mjs$/,
-        label: "lucide's per-icon import table",
-        why: "LucideIconByName fetches it (240 kB) the first time an icon is rendered by name"
-    },
-    {
         test: /node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?markdown-it\//,
         label: "markdown-it",
         why: "only markdown cells and previews render it; the kit's Markdown component imports it on first render"

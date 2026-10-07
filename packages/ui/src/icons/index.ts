@@ -12,19 +12,18 @@ export * from "./LucideIconByName";
  *
  * Read the cost before reaching for it. The map holds a reference to every
  * icon in the library, so importing it pulls all ~1,750 into whatever chunk
- * you import it from — about **480 kB minified** (~120 kB gzipped). There is
- * no tree-shaking that helps: the object literal names them all.
+ * you import it from — measured at **822 kB uncompressed**. There is no
+ * tree-shaking that helps: the object literal names them all.
  *
  * It used to be reached by this package's own navigation chrome, which put
- * all of it in the entry chunk, modulepreloaded on the login screen, for
+ * that 822 kB in the entry chunk, modulepreloaded on the login screen, for
  * every visitor of every Rebase admin panel. Those call sites now use
  * {@link LucideIconByName}, so the weight is no longer anybody's by default —
  * it is yours only if you import this binding.
  *
  * Prefer, in order:
  *
- * - {@link LucideIconByName} — renders by name, and fetches only that icon
- *   (~0.4 kB) the first time the name is shown;
+ * - {@link LucideIconByName} — renders by name, fetches the set on first use;
  * - {@link iconKeys} — a plain string array, if you only need to know whether
  *   a name exists (costs nothing);
  * - {@link loadLucideIcons} — the same map, `await`ed, so it lands in an async
