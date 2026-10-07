@@ -13,6 +13,8 @@ interface ShutdownConfig {
     rlsAudit?: { stop(): void };
     /** The expired-token sweep: its timer, and the tick it may have running. */
     authTokenSweep?: { stop(): Promise<void> | void };
+    /** The history retention sweep: its timer, and the sweep it may have running. */
+    historyRetentionSweep?: { stop(): Promise<void> | void };
     /** The stop `MetricsHistory.start()` returned: its interval writes to the pool. */
     stopMetricsSampler?: () => void;
     realtimeServices: Record<string, RealtimeProvider>;
@@ -229,6 +231,9 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 const sweepStopped = Promise.resolve(config.authTokenSweep?.stop()).catch(
                     (err: unknown) => logger.warn("Error stopping the expired-token sweep:", { error: err })
                 );
+                const historySweepStopped = Promise.resolve(config.historyRetentionSweep?.stop()).catch(
+                    (err: unknown) => logger.warn("Error stopping the history retention sweep:", { error: err })
+                );
                 // And the metrics sampler, whose next tick would write to a
                 // pool the embedder closes once this resolves.
                 config.stopMetricsSampler?.();
@@ -248,6 +253,7 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 }
                 await cronStopped;
                 await sweepStopped;
+                await historySweepStopped;
 
                 // 1c. Wait for post-response work handed to `waitUntil()`.
                 //

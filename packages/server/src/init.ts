@@ -101,6 +101,7 @@ import nodePath from "node:path";
 import nodeFs from "node:fs/promises";
 import { createRlsAudit, type RlsAuditConfig, type RlsAudit } from "./rls-audit";
 import { startExpiredTokenSweep } from "./auth/expired-token-sweep";
+import { startHistoryRetentionSweep } from "./history/retention-sweep";
 import type { CaptchaConfig } from "./auth/captcha";
 import {
     ALL_RUNTIME_SURFACES,
@@ -3803,6 +3804,17 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         persistClaims: config.cronPersistence !== false
     });
 
+    // ── History retention ─────────────────────────────────────────────────
+    // The same kind of housekeeping: entries past `retention` deleted once an
+    // hour, fleet-wide, so a row nobody writes again does not keep its history
+    // for good. The inline prune after each write still caps a busy row.
+    const historyRetentionSweep = startHistoryRetentionSweep({
+        historyService: historyConfigResult?.historyService,
+        driver: defaultDriver,
+        ownsTimers: ownership.cronScheduler,
+        persistClaims: config.cronPersistence !== false
+    });
+
     // ── Graceful Shutdown ─────────────────────────────────────────────────
     const shutdown = createShutdown({
         server: config.server,
@@ -3810,6 +3822,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         jobQueue,
         rlsAudit,
         authTokenSweep,
+        historyRetentionSweep,
         stopMetricsSampler,
         realtimeServices,
         closeLongLivedResponses: () => longLivedResponses.abort(),

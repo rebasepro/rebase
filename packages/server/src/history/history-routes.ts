@@ -155,6 +155,12 @@ function isPlainValues(value: unknown): value is Record<string, unknown> {
 export interface HistoryService {
     fetchHistory(tableName: string, id: string, options: { limit: number, offset: number }): Promise<{ data: Record<string, unknown>[], total: number }>;
     fetchHistoryEntry(historyId: string): Promise<Record<string, unknown> | null>;
+    /**
+     * Delete every entry past the retention period, of every row; resolves to
+     * how many went. Run hourly by the backend — see `retention-sweep.ts`. A
+     * service without it is pruned only inline, after each write.
+     */
+    pruneExpired?(): Promise<number>;
 }
 
 /** Entries returned when the caller names no `?limit`. */

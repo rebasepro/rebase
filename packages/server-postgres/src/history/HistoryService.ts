@@ -25,6 +25,9 @@ const DEFAULT_RETENTION: HistoryRetentionConfig = {
     ttlDays: 90
 };
 
+/** Entries one statement of {@link HistoryService.pruneExpired} deletes at most. */
+export const PRUNE_BATCH_SIZE = 5_000;
+
 /**
  * Service for recording and querying row change history.
  * Stores history entries in the `rebase.entity_history` table.
@@ -240,12 +243,39 @@ export class HistoryService {
         return result.rowCount ?? 0;
     }
 
+    /**
+     * Delete every entry older than `ttlDays`, whichever row it belongs to.
+     *
+     * The inline prune above only ever visits a row that was just written,
+     * so a row nobody writes again — every deleted one — kept its history for
+     * good, whatever `ttlDays` said. This is the other half: the backend runs
+     * it once an hour, on one instance of the fleet (see
+     * `startHistoryRetentionSweep` in `@rebasepro/server`).
+     *
+     * In batches of {@link PRUNE_BATCH_SIZE}, each its own statement, repeated
+     * until one comes back short: a first sweep over a year of backlog is many
+     * short deletes, not one that holds millions of row locks and a pool
+     * connection for minutes. `SKIP LOCKED`, so two instances sweeping at once
+     * (or a sweep meeting an inline prune) split the work instead of waiting
+     * on each other. Each batch reads `idx_history_updated_at`, built in the
+     * background at boot (`ensureHistoryIndexes`).
+     */
     async pruneExpired(): Promise<number> {
-        const result = await this.db.execute(sql`
-            DELETE FROM rebase.entity_history
-            WHERE updated_at < NOW() - MAKE_INTERVAL(days => ${this.retention.ttlDays})
-        `);
-        return result.rowCount ?? 0;
+        let total = 0;
+        for (;;) {
+            const result = await this.db.execute(sql`
+                DELETE FROM rebase.entity_history
+                WHERE id IN (
+                    SELECT id FROM rebase.entity_history
+                    WHERE updated_at < NOW() - MAKE_INTERVAL(days => ${this.retention.ttlDays})
+                    LIMIT ${PRUNE_BATCH_SIZE}
+                    FOR UPDATE SKIP LOCKED
+                )
+            `);
+            const deleted = result.rowCount ?? 0;
+            total += deleted;
+            if (deleted < PRUNE_BATCH_SIZE) return total;
+        }
     }
 }
 

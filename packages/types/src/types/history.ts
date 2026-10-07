@@ -49,7 +49,9 @@ export interface RecordHistoryParams {
 }
 
 /**
- * How much history to keep. Pruning runs per row after each write.
+ * How much history to keep. Both rules are applied to a row after each write
+ * to it; `ttlDays` is also applied to every row by an hourly sweep, so the
+ * history of a row nobody writes again (a deleted one) still ages out.
  * @group Backend
  */
 export interface HistoryRetentionConfig {

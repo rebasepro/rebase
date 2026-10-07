@@ -37,6 +37,7 @@ import { errorHandler } from "../../../server/src/api/errors.js";
 import { createHistoryRoutes } from "../../../server/src/history/history-routes.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { HistoryService } from "../../src/history/HistoryService.js";
+import { ensureHistoryIndexes } from "../../src/history/ensure-history-table.js";
 
 // ── statement capture ──────────────────────────────────────────────────────
 //
@@ -652,6 +653,75 @@ describe("a write's statements (E2E)", () => {
             expect(prunes(sparse.statements)).toHaveLength(1);
             expect(sparse.result).toBe(3);
             expect(await remaining("sparse")).toEqual([...few].sort());
+        });
+    });
+
+    describe("history retention without a write", () => {
+        const historyIndexes = async () => (await admin.query<{ indexname: string }>(
+            "SELECT indexname FROM pg_indexes WHERE schemaname = 'rebase' AND tablename = 'entity_history' ORDER BY indexname"
+        )).rows.map(row => row.indexname);
+
+        it("the sweep deletes every expired entry of every row, in batches, and nothing else", async () => {
+            const service = new HistoryService(connection.db as never, { maxEntries: 200, ttlDays: 1 });
+            // Rows nobody writes again: 12,000 entries past retention, over
+            // 4,000 rows, and a few that are not.
+            await admin.query(
+                `INSERT INTO rebase.entity_history (table_name, entity_id, action, updated_at)
+                 SELECT 'abandoned', (g % 4000)::text, 'delete', NOW() - INTERVAL '2 days' - g * INTERVAL '1 second'
+                 FROM generate_series(1, 12000) g`
+            );
+            const { rows: kept } = await admin.query<{ id: string }>(
+                `INSERT INTO rebase.entity_history (table_name, entity_id, action, updated_at)
+                 SELECT 'abandoned', g::text, 'delete', NOW() - INTERVAL '1 hour' FROM generate_series(1, 5) g RETURNING id`
+            );
+
+            const sweep = await statementsOf(() => service.pruneExpired());
+
+            expect(sweep.result).toBe(12_000);
+            // 5,000 + 5,000 + 2,000: one statement per batch, the last one short.
+            expect(sweep.statements.filter(s => /^delete from rebase\.entity_history/i.test(s))).toHaveLength(3);
+            const { rows } = await admin.query<{ id: string }>("SELECT id FROM rebase.entity_history WHERE table_name = 'abandoned'");
+            expect(rows.map(row => row.id).sort()).toEqual(kept.map(row => row.id).sort());
+            expect(await service.pruneExpired()).toBe(0);
+        });
+
+        it("is started by the boot: its first hour is claimed", async () => {
+            const { rows } = await admin.query("SELECT job_id FROM rebase.cron_claims WHERE job_id = 'rebase:history:retention'");
+            expect(rows).toHaveLength(1);
+        });
+
+        it("the boot keeps one per-row index and builds the sweep's index in the background", async () => {
+            // Built after the boot, concurrently: give it the few seconds it waits.
+            for (let i = 0; i < 40 && !(await historyIndexes()).includes("idx_history_updated_at"); i++) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            expect(await historyIndexes()).toEqual(["entity_history_pkey", "idx_history_time", "idx_history_updated_at"]);
+            const { rows } = await admin.query<{ valid: boolean }>(
+                "SELECT indisvalid AS valid FROM pg_index WHERE indexrelid = 'rebase.idx_history_updated_at'::regclass"
+            );
+            expect(rows).toEqual([{ valid: true }]);
+        });
+
+        it("a database from before drops the redundant index, and a held table keeps it for the next boot", async () => {
+            await admin.query("CREATE INDEX IF NOT EXISTS idx_history_entity ON rebase.entity_history (table_name, entity_id)");
+
+            // Something holds the table for longer than the lock budget.
+            const holder = new pg.Client({ connectionString: container.connectionString });
+            await holder.connect();
+            await holder.query("BEGIN");
+            await holder.query("LOCK TABLE rebase.entity_history IN ACCESS SHARE MODE");
+            try {
+                const started = Date.now();
+                await ensureHistoryIndexes(connection.db as never, { lockTimeoutMs: 100, attempts: 2, retryBudgetMs: 500, backoffMs: () => 50 });
+                expect(Date.now() - started).toBeLessThan(5_000);
+                expect(await historyIndexes()).toContain("idx_history_entity");
+            } finally {
+                await holder.query("ROLLBACK");
+                await holder.end();
+            }
+
+            expect(await ensureHistoryIndexes(connection.db as never)).toEqual([]);
+            expect(await historyIndexes()).toEqual(["entity_history_pkey", "idx_history_time", "idx_history_updated_at"]);
         });
     });
 

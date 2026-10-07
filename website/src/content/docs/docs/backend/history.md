@@ -82,11 +82,16 @@ To avoid recording redundant logs where fields are saved but no values change, t
 - If differences are found, the names of the modified properties are saved in the `changed_fields` (`text[]`) column.
 - If the deep equality check detects zero changes, the history insertion is entirely skipped.
 
-### Non-Blocking Post-Save Pruning
+### Pruning
 
-Unlike traditional systems that rely entirely on slow periodic batch scripts, Rebase enforces your retention policies continuously:
-- Right after an entity is saved or deleted, the server schedules an **inline asynchronous sweep** in a non-blocking, fire-and-forget promise.
-- This sweep immediately checks retention limits for that specific entity ID and prunes entries beyond the newest 200, or older than the retention period.
+Retention is enforced in two places:
+- **After each write**, for the entity written: right after it is saved or
+  deleted, the server prunes that entity's entries beyond the newest 200, or
+  older than the retention period. It does not hold up the write.
+- <span class="since-badge" data-since="0.24">Since 0.24</span> **Once an hour**,
+  for every entity: entries older than the retention period are deleted
+  whatever they belong to — including entities that are never written again,
+  such as deleted ones. See [Pruning lifecycle](#pruning-lifecycle-mechanics).
 
 ## REST Endpoint
 
@@ -126,12 +131,32 @@ has no setting.
 
 ### Pruning Lifecycle Mechanics
 
-Pruning is inline only. It runs asynchronously right after each recorded change,
-for the entity that changed: entries older than the retention period go, then
-everything beyond the newest 200. There is no periodic sweep, so the history of
-an entity that is never written again is not pruned — its old entries stay until
-the next change to that entity, or until you delete them from
-`rebase.entity_history` yourself.
+After each recorded change, the entity that changed is pruned: its entries older
+than the retention period go, then everything beyond its newest 200. This runs
+asynchronously and does not hold up the write.
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> Once an hour, the
+backend also deletes every entry older than the retention period, of every
+entity. Before this, the history of an entity that was never written again —
+every deleted one — was not pruned at all. The sweep:
+
+- runs on one instance of the fleet per hour, on the processes that run the
+  scheduled jobs (it claims its hour in `rebase.cron_claims`, as a cron run
+  does), first when the backend starts;
+- deletes in batches of 5,000 entries, one statement each, until a batch comes
+  back short, skipping entries another sweep holds — so a first sweep over a
+  large backlog is many short deletes, not one long one;
+- reads an index on `updated_at`, `idx_history_updated_at`. On a database
+  created before 0.24 it is built in the background after the first boot,
+  `CREATE INDEX CONCURRENTLY`, without blocking reads or writes — about a
+  second per 2 million entries.
+
+The same boot drops `idx_history_entity` where it exists: `idx_history_time`
+leads with the same columns and serves every read it did, so it only slowed each
+recorded change. The drop waits at most a second at a time for the table's lock,
+and a table something holds throughout keeps the index until the next boot.
+
+The cap of 200 entries per entity is applied only after a write to that entity.
 
 ## Next Steps
 
