@@ -63,6 +63,13 @@ function canExecuteSql(ws: object): ws is import("@rebasepro/types").DatabaseAdm
     return typeof (ws as { executeSql?: unknown }).executeSql === "function";
 }
 
+/**
+ * The `slots` default. A `[]` in the parameter list was a new array on every
+ * render, which rebuilt the customization controller — and with it
+ * `useRebaseContext()` for every consumer — each time `<Rebase>` rendered.
+ */
+const EMPTY_SLOTS: AnySlotContribution[] = [];
+
 export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER, DB>) {
 
     const {
@@ -79,7 +86,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
 
         databaseAdmin,
         plugins: pluginsProp,
-        slots: directSlots = [],
+        slots: directSlots = EMPTY_SLOTS,
         onAnalyticsEvent,
         propertyConfigs,
         entityViews,
@@ -234,7 +241,10 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
     // server-transport sources are auto-wired on the client, `direct` sources
     // are completed by the `storageSources` prop (which holds live instances).
     const [remoteStorageSources, setRemoteStorageSources] = useState<StorageSourceDefinition[]>([]);
-    const authUser = authController.user;
+    // Who is signed in, not the user object: a token refresh or a profile edit
+    // hands over a new object for the same person, and the listing does not
+    // depend on anything but being allowed to ask.
+    const authUid = authController.user?.uid;
     const loginSkipped = authController.loginSkipped;
     // Not asked when `GET /auth/config` says the backend has no storage: the
     // answer is already known, and asking would cost a request on every page
@@ -248,7 +258,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
             .then((defs) => { if (!cancelled) setRemoteStorageSources(defs); })
             .catch((e) => {
                 // A 401 before auth is expected; the effect re-runs once the
-                // user logs in (authUser/loginSkipped change) and retries.
+                // user logs in (authUid/loginSkipped change) and retries.
                 //
                 // Guarded on `cancelled` like the success path: once this
                 // provider is gone (or the effect re-ran) the outcome of the
@@ -261,7 +271,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
                 if (!cancelled) console.debug("[Rebase] Could not load storage sources", e);
             });
         return () => { cancelled = true; };
-    }, [client, authUser, loginSkipped, storageEnabled]);
+    }, [client, authUid, loginSkipped, storageEnabled]);
 
     // Normalize the prop + discovered definitions into a registry + sources map.
     const storageSourcesRef = useRef<{

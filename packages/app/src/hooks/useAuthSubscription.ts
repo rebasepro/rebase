@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { deepEqual } from "fast-equals";
 import { AuthClient, User } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/cms-types";
 import { bindSessionCachesToUser, clearSessionCaches } from "../auth/session_caches";
@@ -11,6 +12,16 @@ import { bindSessionCachesToUser, clearSessionCaches } from "../auth/session_cac
 function adoptUser(user: User | null): User | null {
     if (user) bindSessionCachesToUser(user.uid);
     return user;
+}
+
+/**
+ * The state update for a user the SDK handed over. A token refresh hands over
+ * a freshly mapped user every time; the same user, field for field, keeps the
+ * object already held, so the controller — and every context consumer — does
+ * not change with it.
+ */
+function keepIfEqual(next: User | null) {
+    return (previous: User | null) => (previous && next && deepEqual(previous, next)) ? previous : next;
 }
 
 export function useAuthSubscription(authClient?: AuthClient): AuthController {
@@ -76,7 +87,7 @@ export function useAuthSubscription(authClient?: AuthClient): AuthController {
             })
             .then(() => {
                 if (cancelled) return;
-                setUser(adoptUser(authClient.getSession()?.user ?? null));
+                setUser(keepIfEqual(adoptUser(authClient.getSession()?.user ?? null)));
                 setRestoring(false);
             });
         return () => {
@@ -124,7 +135,7 @@ export function useAuthSubscription(authClient?: AuthClient): AuthController {
         if (!authClient) return;
         const unsubscribe = authClient.onAuthStateChange((event, session) => {
             if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
-                setUser(adoptUser(session?.user ?? null));
+                setUser(keepIfEqual(adoptUser(session?.user ?? null)));
             } else if (event === "SIGNED_OUT") {
                 // See `clearSessionCaches`: what this session read must not be
                 // what the next user in the tab is shown first.
