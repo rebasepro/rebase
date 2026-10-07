@@ -117,6 +117,50 @@ function childScriptError(what: string, reason: "script" | "tsx"): string {
         + "incomplete — reinstall it, or run its build if you are working in the monorepo.";
 }
 
+/**
+ * Whether this process can run the generators itself — that is, whether it
+ * runs under tsx, the interpreter the project's collection files need (see
+ * {@link resolveChildScript}). `rebase` always starts the driver that way when
+ * tsx is installed, which a scaffold guarantees; a driver started with plain
+ * `node` keeps the child process, which brings its own tsx.
+ */
+function generatesInProcess(): boolean {
+    const flags = [...process.execArgv, process.env.NODE_OPTIONS ?? ""];
+    return flags.some(flag => /(?:^|[\s\\/=])tsx(?:$|[\s\\/@])/.test(flag));
+}
+
+/**
+ * Run one of the generators in this process — see `schema/generate-files.ts`
+ * for why a one-shot generation no longer gets a process of its own.
+ *
+ * The messages and the exit code are the child's: a generator that failed has
+ * printed its own error, and this adds the one-line verdict; one that could not
+ * even be loaded is reported the way a child that never started was.
+ */
+async function generateInProcess(
+    what: string,
+    label: string,
+    run: (generators: typeof import("./schema/generate-files")) => Promise<void>
+): Promise<void> {
+    let generators: typeof import("./schema/generate-files");
+    try {
+        generators = await import("./schema/generate-files");
+    } catch (err) {
+        outError(chalk.red(`✗ Failed to run ${what}: ${err instanceof Error ? err.message : String(err)}`));
+        process.exit(1);
+    }
+    try {
+        await run(generators);
+    } catch (err) {
+        if (err instanceof generators.GenerationFailed) {
+            outError(chalk.red(`✗ ${label} generation failed — nothing was applied.`));
+        } else {
+            outError(chalk.red(`✗ Failed to run ${what}: ${err instanceof Error ? err.message : String(err)}`));
+        }
+        process.exit(1);
+    }
+}
+
 
 
 async function loadEnv(): Promise<void> {
@@ -1622,8 +1666,9 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
         }
     );
 
-    const ddl = resolveChildScript("generate-postgres-ddl");
-    if (!ddl.ok) {
+    const inProcess = generatesInProcess();
+    const ddl = inProcess ? undefined : resolveChildScript("generate-postgres-ddl");
+    if (ddl && !ddl.ok) {
         outError(chalk.red(childScriptError("DDL generator", ddl.reason)));
         process.exit(1);
     }
@@ -1641,6 +1686,16 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
                 `Removed the old copies — commit the deletion:\n    ${retired.join(", ")}`
             ));
         }
+    }
+
+    if (!ddl) {
+        await generateInProcess("Postgres DDL generator", "Postgres DDL", async ({ writePostgresDdl }) => {
+            await writePostgresDdl({
+                collectionsPath: path.resolve(process.cwd(), collectionsPath),
+                outputPath: path.resolve(process.cwd(), outputPath)
+            });
+        });
+        return;
     }
 
     const cmdParts = [
@@ -1806,6 +1861,26 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
             }
         );
 
+        const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
+        const outputPath = argsList["--output"] || path.join("src", "schema.generated.ts");
+        const watch = argsList["--watch"] || false;
+
+        // One-shot generation runs here, in this process: see `generate-files.ts`.
+        // `--watch` keeps its own process, which re-imports the collections on
+        // every save — this process's module cache would not.
+        if (!watch && generatesInProcess()) {
+            out("");
+            out(chalk.bold("  🔧 Rebase Schema Generator"));
+            out("");
+            await generateInProcess("schema generator", "Drizzle schema", async ({ writeDrizzleSchema }) => {
+                await writeDrizzleSchema({
+                    collectionsPath: path.resolve(process.cwd(), collectionsPath),
+                    outputPath: path.resolve(process.cwd(), outputPath)
+                });
+            });
+            return;
+        }
+
         // Here we just invoke the local generate-drizzle-schema.ts since we are inside the postgresql-backend
         // If installed in node_modules, __cliDirname is node_modules/@rebasepro/server-postgres/dist or src.
         const generator = resolveChildScript("generate-drizzle-schema");
@@ -1813,10 +1888,6 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
             outError(chalk.red(childScriptError("schema generator", generator.reason)));
             process.exit(1);
         }
-
-        const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
-        const outputPath = argsList["--output"] || path.join("src", "schema.generated.ts");
-        const watch = argsList["--watch"] || false;
 
         out("");
         out(chalk.bold("  🔧 Rebase Schema Generator"));
