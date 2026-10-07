@@ -94,6 +94,18 @@ const ENQUEUE_FUNCTION = "rebase.enqueue_job";
 const ENQUEUE_SIGNATURE = `${ENQUEUE_FUNCTION}(text, jsonb, timestamptz, integer, text)`;
 
 /**
+ * The `NOTIFY` channel an insert announces itself on, with the job's `run_at`
+ * in epoch milliseconds as the payload. Workers listening on it are woken
+ * instead of polling; Postgres delivers it when the insert commits, and not at
+ * all if it rolls back. Frozen: workers of the previous release listen on it
+ * during a rolling deploy.
+ */
+export const JOBS_NOTIFY_CHANNEL = "rebase_jobs";
+
+/** `run_at` as the notification's payload: epoch milliseconds, as text. */
+const NOTIFY_PAYLOAD = (runAt: string) => `(extract(epoch FROM ${runAt}) * 1000)::bigint::text`;
+
+/**
  * Which claim an outcome belongs to: the worker holding the job, and the
  * attempt that claim spent.
  *
@@ -143,6 +155,15 @@ export interface JobStore {
     heartbeat?(id: string, claim: JobClaim): Promise<boolean>;
     /** Return jobs stranded by a worker that died holding them. Resolves with how many. */
     reapExpired(visibilityTimeoutMs: number): Promise<number>;
+    /**
+     * Call `onWake` whenever any process inserts a job, with the job's `run_at`
+     * in epoch milliseconds. Resolves, once listening, with the stop; rejects
+     * when this database cannot notify this process — no session connection
+     * to hold a `LISTEN` on — and the worker polls instead. `onReconnect` is
+     * called after a dropped connection is back: what was sent meanwhile is
+     * lost. A store without it leaves the worker polling.
+     */
+    subscribe?(onWake: (runAtMs?: number) => void, onReconnect: () => void): Promise<() => Promise<void>>;
     /**
      * Delete finished jobs past retention — succeeded ones after
      * {@link SUCCEEDED_RETENTION_DAYS} days, failed ones after
@@ -277,6 +298,7 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
                     SECURITY DEFINER
                     SET search_path = pg_catalog, pg_temp
                     AS $fn$
+                        SELECT pg_notify('${JOBS_NOTIFY_CHANNEL}', ${NOTIFY_PAYLOAD("p_run_at")});
                         INSERT INTO ${TABLE} (task, payload, run_at, max_attempts, idempotency_key)
                         VALUES (p_task, p_payload, p_run_at, p_max_attempts, p_idempotency_key)
                         ON CONFLICT DO NOTHING
@@ -335,10 +357,16 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
                 return (rows?.[0]?.id as string | null | undefined) ?? null;
             }
             try {
+                // The notification rides the insert's own statement, so it
+                // is sent exactly when the row commits.
                 const rows = await exec(
-                    `INSERT INTO ${TABLE} (task, payload, run_at, max_attempts, idempotency_key)
-                     VALUES ($1, $2::jsonb, $3, $4, $5)
-                     RETURNING id`,
+                    `WITH inserted AS (
+                         INSERT INTO ${TABLE} (task, payload, run_at, max_attempts, idempotency_key)
+                         VALUES ($1, $2::jsonb, $3, $4, $5)
+                         RETURNING id, run_at
+                     )
+                     SELECT id, pg_notify('${JOBS_NOTIFY_CHANNEL}', ${NOTIFY_PAYLOAD("run_at")}) AS notified
+                     FROM inserted`,
                     params
                 );
                 return (rows?.[0]?.id as string) ?? null;
@@ -492,6 +520,16 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
                 total += deleted;
                 if (deleted < RETENTION_BATCH) return total;
             }
+        },
+
+        async subscribe(onWake: (runAtMs?: number) => void, onReconnect: () => void): Promise<() => Promise<void>> {
+            if (!admin.listen) {
+                throw new Error("this database driver has no notifications");
+            }
+            return admin.listen(JOBS_NOTIFY_CHANNEL, (payload) => {
+                const runAtMs = Number(payload);
+                onWake(Number.isFinite(runAtMs) && runAtMs > 0 ? runAtMs : undefined);
+            }, { onReconnect });
         },
 
         async fetch(id: string): Promise<JobRecord | null> {

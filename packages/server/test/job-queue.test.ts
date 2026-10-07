@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { createJobQueue, defaultBackoff, PermanentJobError } from "../src/jobs";
 import type { JobRecord } from "../src/jobs";
 import type { JobStore } from "../src/jobs";
@@ -565,6 +565,172 @@ describe("the retention sweep", () => {
         } finally {
             await queue.stop();
             jest.useRealTimers();
+        }
+    });
+});
+
+/**
+ * An idle worker used to claim every 2 seconds, forever: 43,200 claims a day
+ * per pod, plus the reaper, each a pool checkout and a round trip, and a
+ * database that could never suspend. Topics and queues force the worker on, so
+ * a project that declared one paid it whether or not anything was queued.
+ */
+describe("an idle worker", () => {
+    const TEN_MINUTES = 10 * 60_000;
+
+    /** A store that counts claims and, when asked, lets the test play the database's NOTIFY. */
+    function countingStore(options: { notifies?: boolean; subscribeFails?: boolean } = {}) {
+        const store = fakeStore();
+        let claims = 0;
+        const claim = store.claim.bind(store);
+        store.claim = async (...args) => { claims++; return claim(...args); };
+        const wakes: { onWake?: (runAtMs?: number) => void; onReconnect?: () => void; stopped: boolean } = { stopped: false };
+        if (options.notifies || options.subscribeFails) {
+            store.subscribe = async (onWake, onReconnect) => {
+                if (options.subscribeFails) throw new Error("no session connection");
+                wakes.onWake = onWake;
+                wakes.onReconnect = onReconnect;
+                return async () => { wakes.stopped = true; };
+            };
+        }
+        return { store, claims: () => claims, wakes };
+    }
+
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
+    it("backs off to one look every 30 seconds when nothing notifies it", async () => {
+        jest.useFakeTimers();
+        const { store, claims } = countingStore();
+        const queue = createJobQueue(store, { tasks: { work: () => undefined } });
+        queue.start();
+        try {
+            await jest.advanceTimersByTimeAsync(TEN_MINUTES);
+            // 2, 4, 8, 16 s, then every 30 s: 24 looks, where it used to be 301.
+            expect(claims()).toBeLessThanOrEqual(25);
+        } finally {
+            await queue.stop();
+        }
+    });
+
+    it("runs a job this process enqueues at once, and looks often again after it", async () => {
+        jest.useFakeTimers();
+        const { store, claims } = countingStore();
+        const ran: string[] = [];
+        const queue = createJobQueue(store, { tasks: { work: (ctx) => { ran.push(ctx.id); } } });
+        queue.start();
+        try {
+            await jest.advanceTimersByTimeAsync(TEN_MINUTES);
+            const before = claims();
+            const id = await queue.enqueue("work");
+            await jest.advanceTimersByTimeAsync(0);
+            expect(ran).toEqual([id]);
+            expect(claims()).toBe(before + 1);
+            // The back-off starts over: the next look is 2 s away, not 30.
+            await jest.advanceTimersByTimeAsync(2_000);
+            expect(claims()).toBe(before + 2);
+        } finally {
+            await queue.stop();
+        }
+    });
+
+    it("looks every 30 seconds while the database notifies it, and at once when it does", async () => {
+        jest.useFakeTimers();
+        const { store, claims, wakes } = countingStore({ notifies: true });
+        const ran: string[] = [];
+        const queue = createJobQueue(store, { tasks: { work: (ctx) => { ran.push(ctx.id); } } });
+        queue.start();
+        try {
+            await jest.advanceTimersByTimeAsync(TEN_MINUTES);
+            // The first look, then the safety poll.
+            expect(claims()).toBe(21);
+
+            // Another process enqueues: a row appears, and the notification.
+            const id = await store.insert({ task: "work", payload: null, runAt: new Date(), maxAttempts: 3 });
+            wakes.onWake?.(Date.now());
+            await jest.advanceTimersByTimeAsync(0);
+            expect(ran).toEqual([id]);
+
+            // A delayed job is looked for when it comes due, not 30 s later.
+            const later = await store.insert({ task: "work", payload: null, runAt: new Date(Date.now() + 5_000), maxAttempts: 3 });
+            wakes.onWake?.(Date.now() + 5_000);
+            await jest.advanceTimersByTimeAsync(5_000);
+            expect(ran).toEqual([id, later]);
+
+            // A reconnect may have missed some: look now.
+            const missed = await store.insert({ task: "work", payload: null, runAt: new Date(), maxAttempts: 3 });
+            wakes.onReconnect?.();
+            await jest.advanceTimersByTimeAsync(0);
+            expect(ran).toEqual([id, later, missed]);
+        } finally {
+            await queue.stop();
+        }
+        expect(wakes.stopped).toBe(true);
+    });
+
+    it("retries a failed job when its backoff ends, not at the next safety poll", async () => {
+        jest.useFakeTimers();
+        const { store, wakes } = countingStore({ notifies: true });
+        let attempts = 0;
+        const queue = createJobQueue(store, {
+            tasks: { flaky: () => { attempts++; if (attempts === 1) throw new Error("once"); } }
+        });
+        queue.start();
+        try {
+            await jest.advanceTimersByTimeAsync(0);
+            await store.insert({ task: "flaky", payload: null, runAt: new Date(), maxAttempts: 3 });
+            wakes.onWake?.();
+            await jest.advanceTimersByTimeAsync(0);
+            expect(attempts).toBe(1);
+            // defaultBackoff(1) is 1 s.
+            await jest.advanceTimersByTimeAsync(1_000);
+            expect(attempts).toBe(2);
+        } finally {
+            await queue.stop();
+        }
+    });
+
+    it("claims as soon as a slot frees when it is woken with every slot busy", async () => {
+        jest.useFakeTimers();
+        const { store, wakes } = countingStore({ notifies: true });
+        let release: () => void = () => undefined;
+        const ran: string[] = [];
+        const queue = createJobQueue(store, {
+            concurrency: 1,
+            tasks: {
+                slow: () => new Promise<void>(resolve => { release = resolve; }),
+                work: (ctx) => { ran.push(ctx.id); }
+            }
+        });
+        queue.start();
+        try {
+            await jest.advanceTimersByTimeAsync(0);
+            await queue.enqueue("slow");
+            await jest.advanceTimersByTimeAsync(0);
+            const id = await store.insert({ task: "work", payload: null, runAt: new Date(), maxAttempts: 3 });
+            wakes.onWake?.();
+            await jest.advanceTimersByTimeAsync(0);
+            expect(ran).toEqual([]);
+            release();
+            await jest.advanceTimersByTimeAsync(0);
+            expect(ran).toEqual([id]);
+        } finally {
+            await queue.stop();
+        }
+    });
+
+    it("polls with back-off when the database cannot notify it", async () => {
+        jest.useFakeTimers();
+        const { store, claims } = countingStore({ subscribeFails: true });
+        const queue = createJobQueue(store, { tasks: { work: () => undefined } });
+        queue.start();
+        try {
+            await jest.advanceTimersByTimeAsync(TEN_MINUTES);
+            expect(claims()).toBeGreaterThan(20);
+            expect(claims()).toBeLessThanOrEqual(25);
+        } finally {
+            await queue.stop();
         }
     });
 });

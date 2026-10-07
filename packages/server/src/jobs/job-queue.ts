@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { logger } from "../utils/logger.js";
+import { currentAmbientTransaction } from "../db/ambient-transaction.js";
 import type { JobClaim, JobStore } from "./job-store.js";
 import type { EnqueueOptions, JobHandler, JobQueueClient, JobQueueOptions, JobRecord } from "./types.js";
 
@@ -15,6 +16,18 @@ const DEFAULT_CONCURRENCY = 5;
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_VISIBILITY_TIMEOUT_MS = 5 * 60_000;
 const DEFAULT_MAX_ATTEMPTS = 3;
+
+/**
+ * The longest an idle worker goes without looking for work.
+ *
+ * An idle worker used to claim every 2 seconds, forever: about 45,000 round
+ * trips a day per pod, each with a pool checkout, and a database that could
+ * never suspend. Now it is woken instead — by `NOTIFY` when another process
+ * enqueues, by its own enqueues, retries and delayed jobs — and this is the
+ * safety poll behind that. Where the database cannot notify it, it backs off
+ * from `pollIntervalMs` to this, doubling after each look that found nothing.
+ */
+const IDLE_POLL_MAX_MS = 30_000;
 
 /** 1s, 5s, 25s, 125s … capped at an hour. */
 export function defaultBackoff(attempt: number): number {
@@ -88,6 +101,20 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
     const workerId = `${process.pid}-${randomUUID().slice(0, 8)}`;
 
     let timer: NodeJS.Timeout | null = null;
+    /** When {@link timer} fires (epoch ms), so a later wake never postpones an earlier one. */
+    let timerDue = Infinity;
+    /**
+     * The wait after a look that found nothing. Doubles to {@link idleCeilingMs}
+     * while the worker polls on its own; back to `pollIntervalMs` whenever
+     * there is work or a wake. Fixed at the ceiling while notifications wake it.
+     */
+    const idleCeilingMs = Math.max(IDLE_POLL_MAX_MS, pollIntervalMs);
+    let idleIntervalMs = pollIntervalMs;
+    /** Notifications from the database wake this worker — see `JobStore.subscribe`. */
+    let listening = false;
+    let unsubscribe: (() => Promise<void>) | null = null;
+    /** A wake arrived while a claim was in flight: claim again once it is done. */
+    let rerun = false;
     let reapTimer: NodeJS.Timeout | null = null;
     let sweepTimer: NodeJS.Timeout | null = null;
     let sweeping = false;
@@ -143,12 +170,9 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
             // the fleet implements dead-letters with an error naming it rather
             // than cycling through such a store forever.
             logger.warn(`[jobs] No handler registered for task "${job.task}" — returning the job to the queue`);
-            await store.fail(
-                job.id,
-                `No handler registered for task "${job.task}"`,
-                job.attempts < job.maxAttempts ? new Date(Date.now() + backoff(job.attempts)) : null,
-                claim
-            );
+            const retryAt = job.attempts < job.maxAttempts ? new Date(Date.now() + backoff(job.attempts)) : null;
+            await store.fail(job.id, `No handler registered for task "${job.task}"`, retryAt, claim);
+            if (retryAt) wake(retryAt.getTime());
             return;
         }
 
@@ -173,7 +197,10 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
 
             // Truncated, because `last_error` holds a stack and a queue that
             // accumulates megabytes of them is its own outage.
-            await store.fail(job.id, message.slice(0, 4_000), willRetry ? new Date(Date.now() + backoff(job.attempts)) : null, claim);
+            const retryAt = willRetry ? new Date(Date.now() + backoff(job.attempts)) : null;
+            await store.fail(job.id, message.slice(0, 4_000), retryAt, claim);
+            // This worker knows when the retry is due; nobody will notify it.
+            if (retryAt) wake(retryAt.getTime());
 
             if (willRetry) {
                 logger.warn(`[jobs] "${job.task}" failed on attempt ${job.attempts}/${job.maxAttempts}; retrying`, { jobId: job.id });
@@ -197,7 +224,8 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         if (reaping) return;
         reaping = true;
         try {
-            await store.reapExpired(visibilityTimeoutMs);
+            // Revived jobs are runnable now, and nothing notified anyone.
+            if (await store.reapExpired(visibilityTimeoutMs) > 0) wake();
         } catch (error) {
             logger.error("[jobs] Failed to reclaim expired jobs", { error });
         } finally {
@@ -237,6 +265,8 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         if (handlers.size === 0) return [];
         const jobs = await store.claim(free, workerId, [...handlers.keys()]);
         backlog = jobs.length >= free;
+        // Found work: look again soon if it runs out. Found none: wait longer.
+        if (jobs.length > 0) idleIntervalMs = pollIntervalMs;
 
         return jobs.map((job) => {
             const run: Promise<void> = runJob(job)
@@ -257,11 +287,16 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         });
     }
 
+    /** Look for work in `delayMs` — unless a look is already due sooner. */
     function schedule(delayMs: number): void {
         if (!running) return;
+        const due = Date.now() + delayMs;
+        if (timer && timerDue <= due) return;
         if (timer) clearTimeout(timer);
+        timerDue = due;
         timer = setTimeout(() => {
             timer = null;
+            timerDue = Infinity;
             void tick();
         }, delayMs);
         // Never hold the process open. A queue with nothing to do should not be
@@ -269,9 +304,31 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         timer.unref?.();
     }
 
+    /**
+     * Work may be runnable at `runAtMs` (now, when absent): a job was enqueued
+     * — here, or in another process that notified — or a retry or a reclaimed
+     * job came due. Resets the back-off.
+     */
+    function wake(runAtMs?: number): void {
+        if (!running) return;
+        idleIntervalMs = pollIntervalMs;
+        const delay = runAtMs === undefined ? 0 : Math.max(0, runAtMs - Date.now());
+        if (delay === 0 && active.size >= concurrency) {
+            // Every slot is busy: the next one to free claims at once.
+            backlog = true;
+            return;
+        }
+        schedule(delay);
+    }
+
     async function tick(): Promise<void> {
-        // A claim already in progress reschedules when it finishes.
-        if (!running || claiming) return;
+        if (!running) return;
+        // A claim already in progress looks again when it finishes — the wake
+        // may be for a row its snapshot did not see.
+        if (claiming) {
+            rerun = true;
+            return;
+        }
         const work = claimAndStart().catch((error) => {
             logger.error("[jobs] Poll failed", { error });
             backlog = false;
@@ -281,9 +338,43 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         claiming = null;
 
         // A full claim with a slot still free — a job already finished — means
-        // go straight back. Otherwise sleep; a job finishing during a backlog
-        // wakes the loop early.
-        schedule(backlog && active.size < concurrency ? 0 : pollIntervalMs);
+        // go straight back, and so does a wake that came in mid-claim.
+        // Otherwise sleep; a job finishing during a backlog wakes the loop
+        // early, and so does anything that calls `wake`.
+        if ((backlog && active.size < concurrency) || rerun) {
+            rerun = false;
+            schedule(0);
+            return;
+        }
+        if (listening) {
+            schedule(idleCeilingMs);
+            return;
+        }
+        schedule(idleIntervalMs);
+        idleIntervalMs = Math.min(idleIntervalMs * 2, idleCeilingMs);
+    }
+
+    /** Be woken by the database when another process enqueues — where it can. */
+    function listen(): void {
+        if (!store.subscribe) return;
+        store.subscribe(
+            (runAtMs) => wake(runAtMs),
+            // Notifications sent while the connection was down are gone.
+            () => wake()
+        ).then((stop) => {
+            if (!running) {
+                void stop().catch(() => undefined);
+                return;
+            }
+            unsubscribe = stop;
+            listening = true;
+            logger.info(`[jobs] Woken by the database on enqueue; looking every ${idleCeilingMs / 1000}s besides`);
+        }).catch((error: unknown) => {
+            logger.info(
+                `[jobs] Not woken by the database (${error instanceof Error ? error.message : String(error)}); ` +
+                `polling instead, from every ${pollIntervalMs}ms up to every ${idleCeilingMs / 1000}s while idle`
+            );
+        });
     }
 
     async function drain(): Promise<void> {
@@ -295,13 +386,15 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         start(): void {
             if (running) return;
             running = true;
-            logger.info(`[jobs] Worker started (concurrency ${concurrency}, poll ${pollIntervalMs}ms)`);
+            idleIntervalMs = pollIntervalMs;
+            logger.info(`[jobs] Worker started (concurrency ${concurrency}, poll ${pollIntervalMs}ms, up to ${idleCeilingMs}ms while idle)`);
             void reap();
             reapTimer = setInterval(() => { void reap(); }, visibilityTimeoutMs * REAP_INTERVAL_FACTOR);
             reapTimer.unref?.();
             void sweep();
             sweepTimer = setInterval(() => { void sweep(); }, RETENTION_SWEEP_INTERVAL_MS);
             sweepTimer.unref?.();
+            listen();
             schedule(0);
         },
 
@@ -310,6 +403,15 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
             if (timer) {
                 clearTimeout(timer);
                 timer = null;
+                timerDue = Infinity;
+            }
+            listening = false;
+            const stopListening = unsubscribe;
+            unsubscribe = null;
+            if (stopListening) {
+                await stopListening().catch((error: unknown) => {
+                    logger.warn("[jobs] Could not close the notification connection", { error });
+                });
             }
             if (reapTimer) {
                 clearInterval(reapTimer);
@@ -362,13 +464,23 @@ export function createJobQueue(store: JobStore, options: JobQueueOptions = {}): 
         },
 
         async enqueue<P = unknown>(task: string, payload?: P, enqueueOptions: EnqueueOptions = {}): Promise<string | null> {
-            return store.insert({
+            const runAt = new Date(Date.now() + (enqueueOptions.delayMs ?? 0));
+            // Read before the insert, which may await: inside a write the row
+            // is invisible until that write commits, so that is when to look.
+            const ambient = currentAmbientTransaction();
+            const id = await store.insert({
                 task,
                 payload: payload ?? null,
-                runAt: new Date(Date.now() + (enqueueOptions.delayMs ?? 0)),
+                runAt,
                 maxAttempts: enqueueOptions.maxAttempts ?? defaultMaxAttempts,
                 idempotencyKey: enqueueOptions.idempotencyKey
             });
+            // This process's own worker needs no notification to hear about it.
+            if (id !== null && running) {
+                if (ambient) ambient.afterCommit(() => wake(runAt.getTime()));
+                else wake(runAt.getTime());
+            }
+            return id;
         }
     };
 }

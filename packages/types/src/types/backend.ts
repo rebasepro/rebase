@@ -702,6 +702,24 @@ export interface SQLAdmin {
      * Fetch the current database name.
      */
     fetchCurrentDatabase?(): Promise<string | undefined>;
+
+    /**
+     * Hold a `LISTEN` on `channel`, on a connection of its own that stays open
+     * and comes back after a drop, and call `onNotify` with each payload — what
+     * wakes the job worker when another process enqueues, instead of a poll
+     * every two seconds.
+     *
+     * Resolves once listening, with the stop. Rejects when no such connection
+     * can be had — an in-process database, a first connect that fails — so the
+     * caller can fall back to polling. `onReconnect` is called each time a
+     * dropped connection is listening again: whatever was sent meanwhile is
+     * lost. `channel` must be a plain identifier.
+     */
+    listen?(
+        channel: string,
+        onNotify: (payload: string) => void,
+        options?: { onReconnect?: () => void }
+    ): Promise<() => Promise<void>>;
 }
 
 /**

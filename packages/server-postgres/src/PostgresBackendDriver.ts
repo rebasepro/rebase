@@ -60,6 +60,7 @@ import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
 import { onOwnSession, openSqlCursorOnPool, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
+import { PgNotifyListener } from "./services/pg-notify-listener";
 
 /**
  * Has an operator opted out of database role switching entirely?
@@ -497,6 +498,7 @@ export class PostgresBackendDriver implements DataDriver {
                     after as CollectionConfig[]
                 )
             }),
+            listen: (...args: Parameters<NonNullable<SQLAdmin["listen"]>>) => this.listen(...args),
             // Branch operations (only available when poolManager is configured)
             ...(this.branchService ? {
                 createBranch: this.branchService.createBranch.bind(this.branchService),
@@ -505,6 +507,38 @@ export class PostgresBackendDriver implements DataDriver {
                 getBranchInfo: this.branchService.getBranchInfo.bind(this.branchService)
             } : {})
         };
+    }
+
+    /**
+     * `SQLAdmin.listen`: a `LISTEN` on a connection of its own, through the
+     * listener CDC and the channel bus use, which reconnects and heartbeats.
+     *
+     * The connection is found the way the realtime listener finds its own:
+     * `DATABASE_DIRECT_URL` when set — a transaction-mode pooler such as
+     * PgBouncer does not keep a `LISTEN` — else the pool's own URL. The
+     * in-process development database has neither, and is refused, as is a
+     * first connect that fails: the caller polls instead.
+     */
+    async listen(
+        channel: string,
+        onNotify: (payload: string) => void,
+        options?: { onReconnect?: () => void }
+    ): Promise<() => Promise<void>> {
+        const pool = "$client" in this.db ? this.db.$client : undefined;
+        const connectionString = process.env.DATABASE_DIRECT_URL
+            || (pool instanceof Pool ? pool.options.connectionString : undefined);
+        if (!connectionString) {
+            throw new Error("no database URL to hold a LISTEN connection on (set DATABASE_DIRECT_URL)");
+        }
+        const listener = new PgNotifyListener({
+            connectionString,
+            channel,
+            logLabel: `[LISTEN ${channel}]`,
+            onPayload: onNotify,
+            onReconnect: options?.onReconnect
+        });
+        await listener.start();
+        return () => listener.stop();
     }
 
     /**
