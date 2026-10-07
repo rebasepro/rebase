@@ -69,6 +69,22 @@ jest.mock("../../src/form/field_bindings/TextFieldBinding", () => {
     };
 });
 
+// Renders of each field's shell — `PropertyFieldBinding` itself, which
+// resolves its property once per render — by property key.
+const mockShells: Record<string, number> = {};
+jest.mock("../../src/form/resolve_form_properties", () => {
+    const actual = jest.requireActual("../../src/form/resolve_form_properties") as {
+        resolveFormProperty: (props: { propertyKey: string }) => unknown
+    };
+    return {
+        ...actual,
+        resolveFormProperty: (props: { propertyKey: string }) => {
+            mockShells[props.propertyKey] = (mockShells[props.propertyKey] ?? 0) + 1;
+            return actual.resolveFormProperty(props);
+        }
+    };
+});
+
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 
@@ -105,6 +121,13 @@ function fortyFields(): { properties: Row, values: Row } {
 
 function resetCounts() {
     for (const key of Object.keys(mockRenders)) delete mockRenders[key];
+    for (const key of Object.keys(mockShells)) delete mockShells[key];
+}
+
+function shellsOf(predicate: (key: string) => boolean): number {
+    return Object.entries(mockShells)
+        .filter(([key]) => predicate(key))
+        .reduce((sum, [, n]) => sum + n, 0);
 }
 
 function rendersOf(predicate: (key: string) => boolean): number {
@@ -204,6 +227,78 @@ describe("a keystroke in a 40-field form with a 500-item array", () => {
         expect(rendersOf(key => key === "dyn")).toBeGreaterThanOrEqual(1);
         expect(rendersOf(key => key === "cond")).toBeGreaterThanOrEqual(1);
         expect((screen.getByLabelText("Cond") as HTMLInputElement).disabled).toBe(true);
+    });
+});
+
+describe("a keystroke reaches the field shells it changed, not every shell", () => {
+
+    beforeEach(() => resetCounts());
+
+    function formWithItems(count: number) {
+        const { properties, values } = fortyFields();
+        properties.items = { type: "array", name: "Items", of: { type: "string", name: "Item" } };
+        values.items = Array.from({ length: count }, (_, i) => "item" + i);
+        return { properties, values };
+    }
+
+    it("typing in a field leaves the other 39 fields and an untouched 500-item array alone", async () => {
+        const { properties, values } = formWithItems(500);
+        renderForm(properties, values);
+        await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+        expect(shellsOf(key => key.startsWith("items."))).toBeGreaterThanOrEqual(500);
+
+        for (let k = 1; k <= 3; k++) {
+            resetCounts();
+            await type("F0", "v0" + "y".repeat(k));
+            // The field typed into, and nothing else: it was 541 shells per
+            // character — every field, every item.
+            expect(shellsOf(key => key === "f0")).toBeGreaterThanOrEqual(1);
+            expect(shellsOf(() => true)).toBeLessThanOrEqual(3);
+        }
+        expect((screen.getByLabelText("F0") as HTMLInputElement).value).toBe("v0yyy");
+    });
+
+    it("typing in one array item re-renders that item and its array, not the other 499", async () => {
+        const { properties, values } = formWithItems(500);
+        renderForm(properties, values);
+        await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+
+        resetCounts();
+        const itemInputs = screen.getAllByLabelText("Item") as HTMLInputElement[];
+        await act(async () => {
+            fireEvent.change(itemInputs[250], { target: { value: "edited" } });
+        });
+        expect(shellsOf(key => key === "items.250")).toBeGreaterThanOrEqual(1);
+        expect(shellsOf(() => true)).toBeLessThanOrEqual(5);
+        expect((screen.getAllByLabelText("Item")[250] as HTMLInputElement).value).toBe("edited");
+    });
+
+    it("costs the same per keystroke with 1,000 untouched items as with none", async () => {
+        const perKeystroke: number[] = [];
+        for (const count of [0, 1000]) {
+            const { properties, values } = formWithItems(count);
+            const { unmount } = renderForm(properties, values);
+            await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+            resetCounts();
+            await type("F0", "changed");
+            perKeystroke.push(shellsOf(() => true));
+            unmount();
+        }
+        expect(perKeystroke[1]).toBe(perKeystroke[0]);
+    }, 120_000);
+
+    it("still shows an error a submit finds, on the field that has it", async () => {
+        const { properties, values } = fortyFields();
+        properties.f3 = { type: "string", name: "F3", validation: { required: true } };
+        values.f3 = "";
+        const { container } = renderForm(properties, values);
+        await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+        await type("F0", "dirty");
+        await act(async () => {
+            fireEvent.submit(container.querySelector("form")!);
+            await new Promise(r => setTimeout(r, 0));
+        });
+        expect(screen.getByText(/required/i)).toBeTruthy();
     });
 });
 

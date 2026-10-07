@@ -1,8 +1,8 @@
 import type { FieldProps, FormContext, PropertyFieldBindingProps } from "../../types/fields";
 import type { ArrayProperty, Property } from "@rebasepro/types";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
-import { Field, useFormex } from "@rebasepro/forms";
+import { FormexController, getIn, useFormexGetter, useFormexSelector } from "@rebasepro/forms";
 
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
@@ -173,7 +173,15 @@ function BlockEntry({
     const type = value && (value[typeField] as string | undefined);
     const [typeInternal, setTypeInternal] = useState<string | undefined>(type ?? undefined);
 
-    const formex = useFormex();
+    const typeFieldName = `${name}.${typeField}`;
+    const valueFieldName = `${name}.${valueField}`;
+
+    // The picked type, and nothing else of the form: through `useFormex` every
+    // entry of every block array — its type picker included — re-rendered on
+    // every keystroke anywhere in the record.
+    const selectType = useCallback((formex: FormexController) => getIn(formex.values, typeFieldName), [typeFieldName]);
+    const typeValue = useFormexSelector(selectType);
+    const getFormex = useFormexGetter();
     const { t } = useTranslation();
 
     useEffect(() => {
@@ -183,6 +191,7 @@ function BlockEntry({
             const defaultType = Object.keys(properties)[0];
             const newSelectedProperty = defaultType ? properties[defaultType] : undefined;
             setTypeInternal(defaultType);
+            const formex = getFormex();
             formex.setFieldValue(typeFieldName, defaultType);
             formex.setFieldValue(valueFieldName, newSelectedProperty ? getDefaultValueFor(newSelectedProperty) : null);
         }
@@ -204,9 +213,6 @@ function BlockEntry({
             label: property.name ?? key
         }));
 
-    const typeFieldName = `${name}.${typeField}`;
-    const valueFieldName = `${name}.${valueField}`;
-
     const fieldProps: PropertyFieldBindingProps | undefined = property
         ? {
             propertyKey: valueFieldName,
@@ -223,6 +229,7 @@ function BlockEntry({
     const updateType = (newType: string | undefined) => {
         const newSelectedProperty = newType ? properties[newType] : undefined;
         setTypeInternal(newType);
+        const formex = getFormex();
         formex.setFieldTouched(typeFieldName, true);
         formex.setFieldValue(typeFieldName, newType);
         formex.setFieldValue(valueFieldName, newSelectedProperty ? getDefaultValueFor(newSelectedProperty) : null);
@@ -231,49 +238,37 @@ function BlockEntry({
     return (
         <div className={cls(paperMixin, "bg-transparent p-2")}>
 
-            <Field
-                name={typeFieldName}
-            >
-                {(fieldProps) => {
-                    const value1 = fieldProps.field.value !== undefined && fieldProps.field.value !== null ? fieldProps.field.value as string : "";
-                    return (
-                        <>
-                            <Select
-                                className="mb-2"
-                                // The placeholder is an element, so this
-                                // control had no name of its own either.
-                                aria-label={t("type")}
-                                placeholder={<Typography variant={"caption"}
-                                                         className={"px-4 py-2 font-medium"}>{t("type")}</Typography>}
-                                size={"medium"}
-                                fullWidth={true}
-                                position={"item-aligned"}
-                                value={value1}
-                                renderValue={(enumKey: string) =>
-                                    <EnumValuesChip
-                                        enumKey={enumKey}
-                                        enumValues={enumValuesConfigs}
-                                        size={"small"}/>
-                                }
-                                onValueChange={(value) => {
-                                    updateType(value);
-                                }}>
-                                {enumValuesConfigs.map((enumConfig) => (
-                                    <SelectItem
-                                        key={enumConfig.id}
-                                        value={String(enumConfig.id)}>
-                                        <EnumValuesChip
-                                            enumKey={enumConfig.id}
-                                            enumValues={enumValuesConfigs}
-                                            size={"small"}/>
-                                    </SelectItem>)
-                                )}
-                            </Select>
-                        </>
-                    );
+            <Select
+                className="mb-2"
+                // The placeholder is an element, so this
+                // control had no name of its own either.
+                aria-label={t("type")}
+                placeholder={<Typography variant={"caption"}
+                                         className={"px-4 py-2 font-medium"}>{t("type")}</Typography>}
+                size={"medium"}
+                fullWidth={true}
+                position={"item-aligned"}
+                value={typeValue !== undefined && typeValue !== null ? typeValue as string : ""}
+                renderValue={(enumKey: string) =>
+                    <EnumValuesChip
+                        enumKey={enumKey}
+                        enumValues={enumValuesConfigs}
+                        size={"small"}/>
                 }
-                }
-            </Field>
+                onValueChange={(value) => {
+                    updateType(value);
+                }}>
+                {enumValuesConfigs.map((enumConfig) => (
+                    <SelectItem
+                        key={enumConfig.id}
+                        value={String(enumConfig.id)}>
+                        <EnumValuesChip
+                            enumKey={enumConfig.id}
+                            enumValues={enumValuesConfigs}
+                            size={"small"}/>
+                    </SelectItem>)
+                )}
+            </Select>
 
             {fieldProps && (
                 // It is important to use this key to force a re-render of the field on type change
