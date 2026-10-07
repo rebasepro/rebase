@@ -42,7 +42,7 @@ import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./s
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
-import { detectConnectionPosture, ensureAppRole, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
+import { detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, refreshInstalledCdcFunction, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { collectionKeyColumns } from "./services/cdc/identity-columns";
@@ -1590,10 +1590,16 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             // a missing schema was never made, so every write to a
             // `history: true` collection answered "permission denied for schema
             // rebase" until a restart found the schema at connect time. Made
-            // now, once provisioning has created them; idempotent otherwise.
+            // now, once provisioning has created them.
+            //
+            // The grant tier only — the role and the membership were settled at
+            // connect, in this process — and only what the catalogue says is
+            // still missing: on a database whose grants already hold, one read.
+            // It used to repeat every grant and every internal-table revoke the
+            // connect-time call had just made.
             if (driver.rlsUserRole) {
                 try {
-                    await ensureAppRole(runSql, managedSchemas);
+                    await ensureAppRoleGrants(runSql, managedSchemas);
                 } catch (err) {
                     // Fails closed — a missing grant refuses requests, it does
                     // not widen them — so a warning, not a refusal to serve.
