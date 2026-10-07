@@ -33,7 +33,11 @@ export default defineConfig(() => ({
             external: isExternal,
             onwarn(warning, warn) {
                 if (warning.code === "MISSING_GLOBAL_NAME") return;
-                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
+                // The one known ineffective dynamic import: factory.ts and
+                // MongoDriver.ts import MongoHistoryService statically, so
+                // MongoBootstrapper's `import()` of it cannot split it off. Any
+                // other is a lazy import that is not lazy, so it is reported.
+                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT" && warning.message.includes("src/services/MongoHistoryService.ts")) return;
                 warn(warning);
             },
             output: {

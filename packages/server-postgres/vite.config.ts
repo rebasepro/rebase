@@ -116,7 +116,11 @@ export default defineConfig(() => ({
             external: isExternal,
             onwarn(warning, warn) {
                 if (warning.code === "MISSING_GLOBAL_NAME") return;
-                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
+                // The one known ineffective dynamic import: index.ts re-exports
+                // the WebSocket server, so PostgresBootstrapper's `import()` of
+                // src/websocket.ts cannot split it off. Any other is a lazy
+                // import that is not lazy, so it is reported.
+                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT" && warning.message.includes("src/websocket.ts")) return;
                 if (warning.code === "EMPTY_IMPORT_META") return;
                 warn(warning);
             },
