@@ -47,6 +47,8 @@ import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigate } from "react-router";
 import { useEntityDisplayTitle } from "../hooks/useEntityDisplayTitle";
+import { useAdminContext } from "../hooks/useAdminContext";
+import { useLeaveRecord, useRecordActions } from "../hooks/useRecordActions";
 
 
 import {
@@ -306,6 +308,30 @@ entityId }
         disabled: true
     }), [entityId, parentCollectionSlugs, parentEntityIds, path, collection, context, readOnlyFormContext, layout]);
     const pluginActionsTop = useSlot("form.actions.top", formActionTopProps);
+
+    // The record's own actions, as on the edit view: a read-only record is
+    // still one you can recalculate, resend or delete. There is no form here,
+    // so they are called without a `formContext`.
+    const adminContext = useAdminContext();
+    const leaveRecord = useLeaveRecord({ layout, path, onCloseRequest });
+    const recordActionClickProps = useMemo(() => usedEntity
+        ? {
+            view: "form" as const,
+            entity: usedEntity as Entity<Record<string, unknown>>,
+            path,
+            collection: collection as AdminCollection,
+            context,
+            sidePanelController: adminContext.sidePanelController,
+            openEntityMode: layout,
+            navigateBack: leaveRecord
+        }
+        : undefined, [usedEntity, path, collection, context, adminContext.sidePanelController, layout, leaveRecord]);
+    const recordActions = useRecordActions({
+        collection,
+        path,
+        entity: usedEntity,
+        clickProps: recordActionClickProps
+    });
 
     // Resolve formView.Builder if provided
     const formViewConfig = (collection as AdminCollection<M> & { formView?: FormViewConfig<M> }).formView;
@@ -586,6 +612,10 @@ entityId }
             externalLink={usedEntity
                 ? customizationController?.entityLinkBuilder?.({ entity: usedEntity })
                 : undefined}
+            recordActions={recordActions}
+            // Where Save stands on the edit view: after the record's own
+            // buttons, ahead of the menu.
+            primaryAction={editButton}
             leading={<>
                 {barActionsStart}
                 {/* Split view: closing the list is opening this record
@@ -595,7 +625,6 @@ entityId }
                 {layout === "full_screen" && onShowList && <SplitListShowButton onClick={onShowList}/>}
             </>}
             trailing={<>
-                {editButton}
                 {pluginActionsTop}
                 {fullScreenButton}
                 {barActions?.({

@@ -63,14 +63,26 @@ export interface EntityAction<M extends Record<string, unknown> = Record<string,
     showActionsInListView?: boolean;
 
     /**
-     * Show this action collapsed in the menu of the collection view.
-     * Defaults to true
-     * If false, the action will be shown in the menu
+     * Whether the action waits in the overflow menu (⋮) or gets a button of
+     * its own. Defaults to `true`: an action is a menu item until you say
+     * otherwise.
+     *
+     * Set it to `false` for the action people open the record to run —
+     * "Publish", "Recalculate tier", "Resend invoice" — and it shows:
+     * - in the record's bar, on its edit form and its read-only view, as a
+     *   labelled button ahead of Save. Where the bar runs short of room (a side
+     *   panel, a dialog) the buttons drop their labels first, then the last
+     *   ones declared fold back into the menu;
+     * - in a table row, as an icon beside Edit while the row is hovered.
+     *
+     * The menu lists what is left in three groups: the collection's own
+     * actions, then Copy, then Delete — last, and apart from the rest.
      */
     collapsed?: boolean;
 
     /**
-     * Show this action in the form, defaults to true
+     * Show this action on the record — its edit form and its read-only view —
+     * and not only in the collection. Defaults to true.
      */
     includeInForm?: boolean;
 
@@ -95,7 +107,9 @@ export type EntityActionClickProps<M extends Record<string, unknown>, USER exten
     sidePanelController?: SidePanelController;
 
     /**
-     * Is the action being called from the collection view or from the entity form view?
+     * Is the action being called from the collection view or from an open
+     * record? `"form"` covers the record's read-only view too, where there is
+     * no form and `formContext` is absent.
      */
     view: "collection" | "form";
 

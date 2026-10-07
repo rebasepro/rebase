@@ -1,5 +1,5 @@
 ---
-sourceHash: 90a147a04897bd60
+sourceHash: 5bea8df7e8fceb05
 title: Ações de Entidade
 sidebar_label: Ações de Entidade
 description: Adicione botões de ação personalizados a entidades para arquivar, publicar, exportar, clonar e muito mais.
@@ -57,6 +57,35 @@ const articlesCollection = defineCollection({
 });
 
 ```
+
+## Onde uma ação aparece
+
+Uma ação aparece no registro, tanto no formulário de edição quanto na visualização somente leitura, e nas linhas da tabela da coleção. Por padrão, ela fica no menu de transbordamento (⋮) nos dois lugares.
+
+Defina `collapsed: false` na ação que é o motivo de abrir o registro, e ela ganha um botão próprio:
+
+- **No registro**, ela vira um botão com rótulo na barra, antes de Salvar (ou de Editar, na visualização somente leitura). Quando falta espaço na barra, como em um painel lateral, um diálogo ou uma janela estreita, os botões perdem primeiro o rótulo e mantêm o ícone, com o nome em um tooltip. Se ainda assim não couber, as últimas declaradas voltam para o menu, então declare a mais importante primeiro.
+- **Em uma linha da tabela**, ela vira um ícone ao lado de Editar enquanto o ponteiro está sobre a linha.
+
+```typescript
+{
+    name: "Publish",
+    icon: "Upload",
+    collapsed: false, // um botão no registro, um ícone na linha
+    onClick: async ({ entity, context }) => { /* … */ }
+}
+```
+
+Reserve isso para a uma ou duas ações que são a razão de abrir o registro. As demais ficam mais legíveis no menu, que as organiza em três grupos: primeiro as ações próprias da coleção, na ordem em que você as declarou; depois Copiar, Histórico e Inspecionar; e por fim Excluir, no final e separado.
+
+| Propriedade | Padrão | Efeito |
+|-------------|--------|--------|
+| `collapsed` | `true` | `false` transforma a ação em um botão no registro e em um ícone na linha da tabela |
+| `includeInForm` | `true` | `false` mantém a ação fora do registro e a deixa nas linhas da coleção |
+| `showActionsInListView` | `false` | `true` mostra a ação como um ícone em cada linha da visualização em lista |
+| `isEnabled` | — | Retorne `false` para mostrar a ação desabilitada, como botão ou como item de menu |
+
+No registro, um botão cujo `onClick` retorna uma promise pendente mostra um indicador de carregamento e não pode ser pressionado de novo até a promise ser concluída. Se a ação lançar um erro ou sua promise for rejeitada, o usuário vê o erro em uma notificação. A visualização somente leitura não tem formulário, então ali `formContext` é undefined.
 
 ## Ações de Coleção
 

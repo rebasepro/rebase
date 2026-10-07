@@ -268,6 +268,19 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 #### Admin (CMS & app)
 
+- **A record's actions can be buttons, not only menu items.** An entity
+  action declared `collapsed: false` is now a labelled button in the record's
+  bar, ahead of Save, as it already was an icon on the table row. Every
+  action used to sit behind the ⋮ on the record, whatever the developer
+  declared. Where the bar is short of room (a side panel, a dialog, a narrow
+  window) the buttons drop their labels, then the last-declared fold back
+  into the menu. The read-only view carries the record's actions too; it had
+  none. The menu now lists the collection's own actions first, then Copy,
+  History and Inspect, then Delete last and set apart — Delete used to be
+  second, between Copy and the collection's actions. A record action that
+  throws or rejects now shows its error in a notification instead of failing
+  silently, and a button shows a spinner while its promise is pending.
+
 - **A data-import preview lists every value that will not be imported, per
   column, with its row and the reason, before anything is written.**
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 90a147a04897bd60
+sourceHash: 5bea8df7e8fceb05
 title: Azioni entità
 sidebar_label: Azioni entità
 description: Aggiungi pulsanti di azione personalizzati alle entità per archiviare, pubblicare, esportare, clonare e altro ancora.
@@ -57,6 +57,35 @@ const articlesCollection = defineCollection({
 });
 
 ```
+
+## Dove appare un'azione
+
+Un'azione appare sul record, sia nel modulo di modifica sia nella vista di sola lettura, e sulle righe della tabella della collection. Per impostazione predefinita resta nel menu di overflow (⋮) in entrambi i punti.
+
+Impostate `collapsed: false` sull'azione per cui si apre il record, e otterrà un pulsante tutto suo:
+
+- **Sul record**, diventa un pulsante con etichetta nella barra, prima di Salva (o di Modifica, nella vista di sola lettura). Quando nella barra manca spazio, come in un pannello laterale, in una finestra di dialogo o in una finestra stretta, i pulsanti perdono prima l'etichetta e conservano l'icona, con il nome in un tooltip. Se ancora non basta, le ultime dichiarate tornano nel menu: dichiarate quindi per prima la più importante.
+- **Su una riga della tabella**, diventa un'icona accanto a Modifica quando il puntatore è sulla riga.
+
+```typescript
+{
+    name: "Publish",
+    icon: "Upload",
+    collapsed: false, // un pulsante sul record, un'icona sulla riga
+    onClick: async ({ entity, context }) => { /* … */ }
+}
+```
+
+Riservatelo alle una o due azioni che sono il motivo per cui si apre il record. Le altre si leggono meglio nel menu, che le raggruppa in tre blocchi: prima le azioni proprie della collection, nell'ordine in cui le avete dichiarate; poi Copia, Cronologia e Ispeziona; infine Elimina, in fondo e separato.
+
+| Proprietà | Predefinito | Effetto |
+|-----------|-------------|---------|
+| `collapsed` | `true` | `false` rende l'azione un pulsante sul record e un'icona sulla riga della tabella |
+| `includeInForm` | `true` | `false` tiene l'azione fuori dal record e la lascia sulle righe della collection |
+| `showActionsInListView` | `false` | `true` mostra l'azione come icona su ogni riga della vista elenco |
+| `isEnabled` | — | Restituite `false` per mostrare l'azione disabilitata, come pulsante o come voce di menu |
+
+Sul record, un pulsante il cui `onClick` restituisce una promise in sospeso mostra un indicatore di caricamento e non si può premere di nuovo finché la promise non si conclude. Se l'azione lancia un errore o la sua promise viene rifiutata, l'utente vede l'errore in una notifica. La vista di sola lettura non ha un modulo, quindi lì `formContext` è undefined.
 
 ## Azioni della collection
 

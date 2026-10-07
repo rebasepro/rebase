@@ -39,16 +39,25 @@ jest.mock("@rebasepro/app", () => {
     });
 });
 
-// The form is not under test, and needs the whole admin to render.
+// The form is not under test, and needs the whole admin to render. Nor are the
+// read-only view's body and the collection views it can nest.
 jest.mock("../../src/form", () => ({ EntityFormBinding: () => null }));
+jest.mock("../../src/components/EntityViewBinding", () => ({ EntityViewBinding: () => null }));
+jest.mock("../../src/components/CollectionViewBinding/CollectionViewBinding", () => ({ CollectionViewBinding: () => null }));
+jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () => {
+    const registry = {};
+    return { useCollectionRegistryController: () => registry };
+});
 
-// The identity bar renders the record's actions in an overflow menu; here the
-// menu is simply open, so its items can be clicked.
+// The identity bar places the record's actions as buttons and menu items; here
+// every one of them is simply a button, so it can be clicked.
 jest.mock("../../src/components/EntityIdentityBar", () => {
-    const { Menu } = jest.requireActual("@rebasepro/ui") as typeof import("@rebasepro/ui");
+    type Placed = import("../../src/util/entity_actions").PlacedEntityActions<import("../../src/components/EntityIdentityBar").RecordActionItem>;
     return {
-        EntityIdentityBar: ({ recordActions }: { recordActions?: React.ReactNode }) =>
-            <Menu open={true} trigger={<button>more</button>}>{recordActions}</Menu>,
+        EntityIdentityBar: ({ recordActions }: { recordActions?: Placed }) => <>
+            {recordActions && [...recordActions.inline, ...recordActions.own, ...recordActions.generic, ...recordActions.destructive]
+                .map(action => <button key={action.key} onClick={() => void action.run()}>{action.name}</button>)}
+        </>,
         EntitySaveActions: () => null
     };
 });
@@ -67,6 +76,7 @@ jest.mock("../../src/components/SideDialogs", () => {
 
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EditViewBinding } from "../../src/components/EditViewBinding";
+import { DetailViewBinding } from "../../src/components/DetailViewBinding";
 import { UrlContext } from "../../src/hooks/navigation/contexts/UrlContext";
 
 const archive: EntityAction = {
@@ -96,21 +106,33 @@ const urlController = {
     navigate: () => undefined
 } as never;
 
-function renderRecord(layout: "split" | "side_panel", props: { onCloseRequest?: () => void, navigateBack?: () => void }) {
+function renderRecord(layout: "split" | "side_panel", props: { onCloseRequest?: () => void, navigateBack?: () => void }, view: "edit" | "detail" = "edit") {
+    const record = view === "edit"
+        ? <EditViewBinding
+            path="posts"
+            collection={collection}
+            entityId="7"
+            layout={layout}
+            parentCollectionSlugs={[]}
+            parentEntityIds={[]}
+            {...props}/>
+        // The read-only view had no record actions at all: a collection opened
+        // on its detail view could run them only from the edit form.
+        : <DetailViewBinding
+            path="posts"
+            collection={collection}
+            entityId="7"
+            layout={layout}
+            parentCollectionSlugs={[]}
+            parentEntityIds={[]}
+            onCloseRequest={props.onCloseRequest}/>;
     return render(
         <RebaseI18nProvider locale="en">
             <AuthControllerContext.Provider value={{ user: { uid: "u1" } } as never}>
             <CustomizationControllerContext.Provider value={customization}>
                 <MemoryRouter>
                     <UrlContext.Provider value={urlController}>
-                        <EditViewBinding
-                            path="posts"
-                            collection={collection}
-                            entityId="7"
-                            layout={layout}
-                            parentCollectionSlugs={[]}
-                            parentEntityIds={[]}
-                            {...props}/>
+                        {record}
                     </UrlContext.Provider>
                 </MemoryRouter>
             </CustomizationControllerContext.Provider>
@@ -151,5 +173,35 @@ describe("a record action that navigates back", () => {
         expect(sideDialogClose).toHaveBeenCalledTimes(1);
         expect(sideDialogClose).toHaveBeenCalledWith(true);
         expect(navigateBack).not.toHaveBeenCalled();
+    });
+});
+
+describe("a record action on the read-only view", () => {
+
+    beforeEach(() => {
+        sideDialogClose.mockReset();
+        jest.spyOn(console, "error").mockImplementation(() => undefined);
+        jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
+    it("is offered, and leaves the split's record when it navigates back", () => {
+        const onCloseRequest = jest.fn();
+        renderRecord("split", { onCloseRequest }, "detail");
+
+        fireEvent.click(screen.getByText("Archive"));
+
+        expect(onCloseRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it("is offered, and closes the side panel when it navigates back", () => {
+        renderRecord("side_panel", {}, "detail");
+
+        fireEvent.click(screen.getByText("Archive"));
+
+        expect(sideDialogClose).toHaveBeenCalledWith(true);
     });
 });

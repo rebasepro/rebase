@@ -12,6 +12,7 @@ import {
     Menu,
     MenuItem,
     MoreVerticalIcon,
+    Separator,
     Skeleton,
     Tooltip
 } from "@rebasepro/ui";
@@ -20,6 +21,7 @@ import { getIcon } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getLocalChangesBackup } from "@rebasepro/app";
 import { useAdminContext } from "../../hooks/useAdminContext";
+import { placeEntityActions } from "../../util/entity_actions";
 
 /**
  *
@@ -104,10 +106,13 @@ export const CollectionRowActions = function CollectionRowActions({
     }, [entity, selectionController?.toggleEntitySelection]);
 
     const hasActions = actions.length > 0 || slotActions.length > 0;
-    const hasCollapsedActions = actions.some(a => a.collapsed || a.collapsed === undefined);
 
-    const collapsedActions = actions.filter(a => a.collapsed || a.collapsed === undefined);
-    const uncollapsedActions = actions.filter(a => a.collapsed === false);
+    // Placed as the record's own bar places them: icons for `collapsed: false`,
+    // and a menu of the collection's actions, then Copy, then Delete apart.
+    const placed = placeEntityActions(actions);
+    const uncollapsedActions = placed.inline;
+    const collapsedGroups = [placed.own, placed.generic, placed.destructive].filter(group => group.length > 0);
+    const hasCollapsedActions = collapsedGroups.length > 0;
     const enableLocalChangesBackup = collection ? getLocalChangesBackup(collection) : false;
     const hasDraft = enableLocalChangesBackup ? getEntityFromCache(path + "/" + entity.id) : false;
     const iconSize = "small" as const;
@@ -197,17 +202,22 @@ export const CollectionRowActions = function CollectionRowActions({
                                 size={iconSize}>
                                 <MoreVerticalIcon/>
                             </IconButton>}>
-                            {collapsedActions.map((action, index) => (
-                                <MenuItem
-                                    key={index}
-                                    disabled={!isActionEnabled(action)}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        action.onClick(clickProps);
-                                    }}>
-                                    {getIcon(action.icon, undefined, undefined, "smallest")}
-                                    {action.name}
-                                </MenuItem>
+                            {collapsedGroups.map((group, groupIndex) => (
+                                <React.Fragment key={groupIndex}>
+                                    {groupIndex > 0 && <Separator orientation={"horizontal"}/>}
+                                    {group.map((action, index) => (
+                                        <MenuItem
+                                            key={action.key ?? index}
+                                            disabled={!isActionEnabled(action)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                action.onClick(clickProps);
+                                            }}>
+                                            {getIcon(action.icon, undefined, undefined, "smallest")}
+                                            {action.name}
+                                        </MenuItem>
+                                    ))}
+                                </React.Fragment>
                             ))}
                         </Menu>
                     }

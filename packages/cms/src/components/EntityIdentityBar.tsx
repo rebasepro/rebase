@@ -1,11 +1,13 @@
 import type { AdminCollection } from "@rebasepro/cms-types";
 import type { EntityStatus } from "@rebasepro/types";
-import React, { useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link } from "react-router";
 import { useTranslation } from "@rebasepro/app";
 import {
     Button,
     CheckIcon,
+    CircularProgress,
     ChevronDownIcon,
     cls,
     CodeIcon,
@@ -24,6 +26,24 @@ import {
     Typography,
     XIcon
 } from "@rebasepro/ui";
+import type { PlacedEntityActions } from "../util/entity_actions";
+import { fitInlineActions, type InlineActionsFit } from "../util/fit_inline_actions";
+
+/**
+ * One of the record's own actions, resolved and ready to run — what the bar
+ * needs to draw it as a button or as a menu item.
+ */
+export interface RecordActionItem {
+    key: string;
+    name: string;
+    icon?: React.ReactNode;
+    enabled: boolean;
+    /**
+     * Runs the action, reporting its own failure. Returns a promise only when
+     * the action is asynchronous, which is what keeps a button's spinner up.
+     */
+    run: () => Promise<void> | undefined;
+}
 
 export interface EntityIdentityBarProps {
     /** Plural collection name, shown as the breadcrumb ahead of the title. */
@@ -99,10 +119,18 @@ export interface EntityIdentityBarProps {
 
     /**
      * Actions performed *on* the record — copy, delete, whatever the collection
-     * adds — as menu items under the overflow button. They live here rather
-     * than in a footer, which is what let the footer go away entirely.
+     * adds — already placed: `inline` ones are buttons ahead of Save, folding
+     * into the overflow menu when the bar runs short of room, and the rest are
+     * menu groups. They live here rather than in a footer, which is what let
+     * the footer go away entirely.
      */
-    recordActions?: React.ReactNode;
+    recordActions?: PlacedEntityActions<RecordActionItem>;
+
+    /**
+     * The read-only view's Edit: its main button, drawn where Save stands on
+     * the edit view — after the record's own buttons, ahead of the menu.
+     */
+    primaryAction?: React.ReactNode;
 
     /** Plugin-contributed actions, rendered inline before Save. */
     pluginActions?: React.ReactNode;
@@ -147,6 +175,7 @@ export function EntityIdentityBar({
     onViewHistory,
     externalLink,
     recordActions,
+    primaryAction,
     pluginActions,
     trailing,
     leading
@@ -154,8 +183,22 @@ export function EntityIdentityBar({
 
     const { t } = useTranslation();
 
-    const hasMenu = Boolean(recordActions) || Boolean(onInspect) || Boolean(onViewHistory)
-        || Boolean(externalLink);
+    const inline = recordActions?.inline ?? NO_ACTIONS;
+    const inlineRef = useRef<HTMLDivElement>(null);
+    const labelledRef = useRef<HTMLDivElement>(null);
+    const compactRef = useRef<HTMLDivElement>(null);
+    const fit = useInlineActionsFit(inlineRef, labelledRef, compactRef, inline);
+
+    // What did not fit leads the menu, ahead of the actions that were always
+    // there: it is what the developer ranked highest.
+    const ownActions = [...inline.slice(fit.count), ...(recordActions?.own ?? NO_ACTIONS)];
+    const genericActions = recordActions?.generic ?? NO_ACTIONS;
+    const destructiveActions = recordActions?.destructive ?? NO_ACTIONS;
+    const hasUtilities = genericActions.length > 0 || Boolean(externalLink) || Boolean(onViewHistory) || Boolean(onInspect);
+    const menuGroups = [ownActions.length > 0, hasUtilities, destructiveActions.length > 0];
+    const hasMenu = menuGroups.some(Boolean);
+    // A rule between two groups that are both there, never at an edge.
+    const ruleBefore = (group: number) => menuGroups[group] && menuGroups.slice(0, group).some(Boolean);
 
     return (
         <div className={cls(
@@ -191,14 +234,43 @@ export function EntityIdentityBar({
                     {collection.name}&nbsp;/
                 </Typography>}
 
-            <span className={"font-headers font-semibold text-[15px] tracking-tight truncate min-w-0"}
+            <span className={cls(
+                "font-headers font-semibold text-[15px] tracking-tight truncate min-w-0",
+                // The title takes the room it needs and the actions get what is
+                // left, so a long one would fold every action away. Capped, it
+                // truncates first — only where there are actions to make room for.
+                inline.length > 0 && "max-w-[40%]"
+            )}
                 title={title}>
                 {title}
             </span>
 
             {entityId !== undefined && <IdChip value={String(entityId)}/>}
 
-            <div className={"flex-1"}/>
+            {/* The bar's free space, and the actions that fit in it. Always
+                rendered: it is the spacer, and the observer measures it. */}
+            <div ref={inlineRef}
+                className={"flex-1 min-w-0 flex items-center justify-end gap-1"}>
+                {inline.slice(0, fit.count).map(action =>
+                    <RecordActionButton key={action.key} action={action} compact={fit.compact}/>)}
+                {inline.length > 0 && (
+                    // Every action in both of its forms, laid out at its natural
+                    // width and never seen, so a fit can be decided without
+                    // first drawing the bar wrong. A zero-size clipping box: it
+                    // takes no room and cannot widen anything it sits in.
+                    <div aria-hidden={true}
+                        className={"absolute w-0 h-0 overflow-hidden invisible pointer-events-none"}>
+                        <div ref={labelledRef} className={"flex w-max"}>
+                            {inline.map(action =>
+                                <RecordActionButton key={action.key} action={action} compact={false}/>)}
+                        </div>
+                        <div ref={compactRef} className={"flex w-max"}>
+                            {inline.map(action =>
+                                <RecordActionButton key={action.key} action={action} compact={true}/>)}
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {pluginActions}
 
@@ -212,6 +284,8 @@ export function EntityIdentityBar({
                 onSaveAndClose={onSaveAndClose}
                 saveAndClosePlacement={saveAndClosePlacement}/>
 
+            {primaryAction}
+
             {hasMenu && (
                 <Menu align={"end"}
                     trigger={
@@ -219,16 +293,18 @@ export function EntityIdentityBar({
                             <MoreVerticalIcon size={iconSize.smallest}/>
                         </IconButton>
                     }>
+                    {/* The collection's own operations first — the reason
+                        someone opened this record — then the ones every record
+                        has, then Delete, last and apart. */}
+                    {ownActions.map(action => <RecordActionMenuItem key={action.key} action={action}/>)}
+                    {ruleBefore(1) && <Separator orientation={"horizontal"}/>}
+                    {genericActions.map(action => <RecordActionMenuItem key={action.key} action={action}/>)}
                     {externalLink && (
                         <MenuItem onClick={() => window.open(externalLink, "_blank", "noopener,noreferrer")}>
                             <ExternalLinkIcon size={iconSize.smallest}/>
                             {t("open_in_live_site") ?? "Open in the live site"}
                         </MenuItem>
                     )}
-                    {externalLink && (recordActions || onInspect || onViewHistory) &&
-                        <Separator orientation={"horizontal"}/>}
-                    {recordActions}
-                    {recordActions && (onInspect || onViewHistory) && <Separator orientation={"horizontal"}/>}
                     {onViewHistory && (
                         <MenuItem onClick={onViewHistory}>
                             <HistoryIcon size={iconSize.smallest}/>
@@ -241,6 +317,8 @@ export function EntityIdentityBar({
                             {t("inspect_record") ?? "Inspect record"}
                         </MenuItem>
                     )}
+                    {ruleBefore(2) && <Separator orientation={"horizontal"}/>}
+                    {destructiveActions.map(action => <RecordActionMenuItem key={action.key} action={action}/>)}
                 </Menu>
             )}
 
@@ -259,6 +337,107 @@ export function EntityIdentityBar({
                 </Tooltip>
             )}
         </div>
+    );
+}
+
+const NO_ACTIONS: RecordActionItem[] = [];
+
+/** `gap-1`, between the inline actions. */
+const INLINE_ACTIONS_GAP = 4;
+
+/**
+ * Which of the inline actions fit in the bar's free space, and whether they
+ * keep their labels — decided from the measuring copies before the bar is
+ * painted, and again whenever the space or the buttons change size: a resize,
+ * Discard appearing beside Save, a web font arriving, a language switch.
+ */
+function useInlineActionsFit(
+    containerRef: React.RefObject<HTMLDivElement | null>,
+    labelledRef: React.RefObject<HTMLDivElement | null>,
+    compactRef: React.RefObject<HTMLDivElement | null>,
+    actions: RecordActionItem[]
+): InlineActionsFit {
+
+    const [fit, setFit] = useState<InlineActionsFit>({ count: actions.length, compact: false });
+    const actionKeys = actions.map(action => action.key).join("\u0000");
+
+    useLayoutEffect(() => {
+        const container = containerRef.current;
+        const labelled = labelledRef.current;
+        const compact = compactRef.current;
+        if (!container || !labelled || !compact) {
+            setFit(previous => previous.count === 0 && !previous.compact ? previous : { count: 0, compact: false });
+            return;
+        }
+        const widths = (row: HTMLElement) =>
+            Array.from(row.children).map(child => child.getBoundingClientRect().width);
+        const measure = () => {
+            const next = fitInlineActions(container.clientWidth, widths(labelled), widths(compact), INLINE_ACTIONS_GAP);
+            setFit(previous => previous.count === next.count && previous.compact === next.compact ? previous : next);
+        };
+        measure();
+        if (typeof ResizeObserver === "undefined") return;
+        // Synchronously: the observer reports after layout and before paint,
+        // and an ordinary update would render after that paint — one frame
+        // with the old buttons drawn over the title whenever Discard appeared.
+        const observer = new ResizeObserver(() => flushSync(measure));
+        observer.observe(container);
+        observer.observe(labelled);
+        observer.observe(compact);
+        return () => observer.disconnect();
+    }, [containerRef, labelledRef, compactRef, actionKeys]);
+
+    return fit;
+}
+
+/**
+ * An action promoted out of the menu: a text button with its icon, as the
+ * collection toolbar draws Filter and Sort, or the icon alone with its name in
+ * a tooltip where the bar is short of room. It shows a spinner while the work
+ * it started is running, and cannot be pressed twice meanwhile.
+ */
+function RecordActionButton({ action, compact }: { action: RecordActionItem, compact: boolean }) {
+
+    const [running, setRunning] = useState(false);
+
+    const onClick = () => {
+        const pending = action.run();
+        if (!pending) return;
+        setRunning(true);
+        pending.finally(() => setRunning(false));
+    };
+
+    if (compact && action.icon) {
+        return (
+            <Tooltip title={action.name}>
+                <IconButton size={"small"}
+                    aria-label={action.name}
+                    disabled={!action.enabled || running}
+                    onClick={onClick}>
+                    {running ? <CircularProgress size={"smallest"}/> : action.icon}
+                </IconButton>
+            </Tooltip>
+        );
+    }
+
+    return (
+        <LoadingButton variant={"text"}
+            size={"small"}
+            startIcon={action.icon}
+            loading={running}
+            disabled={!action.enabled}
+            onClick={onClick}>
+            {action.name}
+        </LoadingButton>
+    );
+}
+
+function RecordActionMenuItem({ action }: { action: RecordActionItem }) {
+    return (
+        <MenuItem disabled={!action.enabled} onClick={() => void action.run()}>
+            {action.icon}
+            {action.name}
+        </MenuItem>
     );
 }
 

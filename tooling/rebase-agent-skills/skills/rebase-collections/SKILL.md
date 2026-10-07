@@ -1582,8 +1582,8 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
 | `admin.icon` | `ReactElement` | — | Optional icon |
 | `onClick` | `(props: EntityActionClickProps) => void \| Promise<void>` | — | Action handler |
 | `isEnabled` | `(props: EntityActionClickProps) => boolean` | — | Conditionally disable the action |
-| `collapsed` | `boolean` | `true` | If `true`, show in overflow menu |
-| `includeInForm` | `boolean` | `true` | Show in entity form view |
+| `collapsed` | `boolean` | `true` | `true`: in the ⋮ menu. `false`: a labelled button in the record's bar (edit and read-only views, folding back into the menu when the bar is short of room) and an icon on the table row. Reserve it for the one or two actions the record is opened for |
+| `includeInForm` | `boolean` | `true` | Show on the record (edit and read-only views); `false` leaves it on the collection's rows only |
 | `showActionsInListView` | `boolean` | `false` | Show inline on each row in list view |
 
 ### EntityActionClickProps

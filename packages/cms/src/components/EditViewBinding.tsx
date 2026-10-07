@@ -21,7 +21,6 @@ import {
     HistoryIcon,
     IconButton,
     Maximize2Icon,
-    MenuItem,
     Skeleton,
     Tab,
     Tabs,
@@ -51,7 +50,7 @@ import { EntityIdentityBar, EntitySaveActions } from "./EntityIdentityBar";
 import { useUndoableDiscard } from "../form/useUndoableDiscard";
 import { SplitListCloseButton } from "./CollectionViewBinding/SplitListCloseButton";
 import { SplitListShowButton } from "./CollectionViewBinding/SplitListShowButton";
-import { useRecordActions } from "../hooks/useRecordActions";
+import { useLeaveRecord, useRecordActions } from "../hooks/useRecordActions";
 import { useSideDialogContext } from "./SideDialogs";
 import { useAdminContext } from "../hooks/useAdminContext";
 import { EntityInspector, InspectorTab } from "./EntityInspector";
@@ -650,52 +649,28 @@ parentEntityIds,
     const canCloseAfterSave = layout === "side_panel" || layout === "dialog"
         || (layout === "split" && Boolean(onCloseRequest));
 
+    const leaveRecord = useLeaveRecord({ layout, path, onCloseRequest });
+
+    const recordActionClickProps = useMemo(() => usedEntity
+        ? {
+            view: "form" as const,
+            entity: usedEntity as Entity<Record<string, unknown>>,
+            path,
+            collection: collection as AdminCollection,
+            context,
+            sidePanelController: adminContext.sidePanelController,
+            openEntityMode: layout,
+            navigateBack: leaveRecord,
+            formContext: formContext as FormContext<Record<string, unknown>> | undefined
+        }
+        : undefined, [usedEntity, path, collection, context, adminContext.sidePanelController, layout, leaveRecord, formContext]);
+
     const recordActions = useRecordActions({
         collection,
         path,
-        entity: usedEntity
+        entity: usedEntity,
+        clickProps: recordActionClickProps
     });
-
-    // What the record's own actions mean by `navigateBack`: leave the record.
-    // The delete action calls it once the row is gone. It is not this view's
-    // `navigateBack` prop, which every layout wires to "leave the edit view
-    // for the record's detail view" — after a delete that is a record that no
-    // longer exists, and the split, the side panel and the dialog stayed open
-    // on it.
-    const leaveRecord = useCallback(() => {
-        if (layout === "side_panel" || layout === "dialog") {
-            sideDialogContext.close(true);
-        } else if (onCloseRequest) {
-            onCloseRequest();
-        } else {
-            navigate(withListState(urlController.buildUrlCollectionPath(path)), { replace: true });
-        }
-    }, [layout, sideDialogContext, onCloseRequest, navigate, urlController, path]);
-
-    const recordActionItems = usedEntity && recordActions.length
-        ? recordActions.map((action, index) => {
-            const clickProps = {
-                view: "form" as const,
-                entity: usedEntity,
-                path,
-                collection,
-                context,
-                sidePanelController: adminContext.sidePanelController,
-                openEntityMode: layout,
-                navigateBack: leaveRecord,
-                formContext
-            };
-            const enabled = !action.isEnabled || action.isEnabled(clickProps as never);
-            return (
-                <MenuItem key={action.key ?? action.name ?? index}
-                    disabled={!enabled}
-                    onClick={() => action.onClick(clickProps as never)}>
-                    {getIcon(action.icon, undefined, undefined, "smallest")}
-                    {action.name}
-                </MenuItem>
-            );
-        })
-        : null;
 
     // Plugin form actions (Autofill and friends) render inline in the bar; the
     // form no longer has a footer to put them in.
@@ -1044,7 +1019,7 @@ parentEntityIds,
             externalLink={usedEntity
                 ? customizationController?.entityLinkBuilder?.({ entity: usedEntity })
                 : undefined}
-            recordActions={recordActionItems}
+            recordActions={recordActions}
             pluginActions={formPluginActions}
             leading={<>
                 {barActionsStart}

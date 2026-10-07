@@ -1,5 +1,5 @@
 ---
-sourceHash: 90a147a04897bd60
+sourceHash: 5bea8df7e8fceb05
 title: Entity-Aktionen
 sidebar_label: Entity-Aktionen
 description: Fügen Sie benutzerdefinierte Aktionsschaltflächen zu Entitäten hinzu, um zu archivieren, zu veröffentlichen, zu exportieren, zu klonen und mehr.
@@ -57,6 +57,35 @@ const articlesCollection = defineCollection({
 });
 
 ```
+
+## Wo eine Aktion erscheint
+
+Eine Aktion erscheint am Datensatz, sowohl im Bearbeitungsformular als auch in der schreibgeschützten Ansicht, und in den Tabellenzeilen der Collection. Standardmäßig wartet sie an beiden Stellen im Überlaufmenü (⋮).
+
+Setzen Sie `collapsed: false` für die Aktion, wegen der man den Datensatz öffnet, und sie erhält eine eigene Schaltfläche:
+
+- **Am Datensatz** wird sie zu einer beschrifteten Schaltfläche in der Leiste, vor „Speichern“ (bzw. „Bearbeiten“ in der schreibgeschützten Ansicht). Wird der Platz in der Leiste knapp, etwa in einem Seitenpanel, einem Dialog oder einem schmalen Fenster, verlieren die Schaltflächen zuerst ihre Beschriftung und behalten das Symbol, mit dem Namen als Tooltip. Reicht das immer noch nicht, wandern die zuletzt deklarierten zurück ins Menü. Deklarieren Sie die wichtigste daher zuerst.
+- **In einer Tabellenzeile** wird sie zu einem Symbol neben „Bearbeiten“, solange der Mauszeiger über der Zeile liegt.
+
+```typescript
+{
+    name: "Publish",
+    icon: "Upload",
+    collapsed: false, // eine Schaltfläche am Datensatz, ein Symbol in der Zeile
+    onClick: async ({ entity, context }) => { /* … */ }
+}
+```
+
+Reservieren Sie das für die ein oder zwei Aktionen, wegen derer der Datensatz geöffnet wird. Alle anderen sind im Menü besser aufgehoben, das sie in drei Gruppen auflistet: zuerst die eigenen Aktionen der Collection in der deklarierten Reihenfolge, dann Kopieren, Verlauf und Untersuchen, dann Löschen, zuletzt und abgesetzt.
+
+| Eigenschaft | Standard | Wirkung |
+|-------------|----------|---------|
+| `collapsed` | `true` | `false` macht die Aktion zu einer Schaltfläche am Datensatz und zu einem Symbol in der Tabellenzeile |
+| `includeInForm` | `true` | `false` hält die Aktion vom Datensatz fern und lässt sie in den Zeilen der Collection |
+| `showActionsInListView` | `false` | `true` zeigt die Aktion als Symbol in jeder Zeile der Listenansicht |
+| `isEnabled` | — | Geben Sie `false` zurück, um die Aktion deaktiviert anzuzeigen, als Schaltfläche oder als Menüeintrag |
+
+Am Datensatz zeigt eine Schaltfläche, deren `onClick` ein noch offenes Promise zurückgibt, einen Ladeindikator und lässt sich erst wieder drücken, wenn das Promise abgeschlossen ist. Wirft die Aktion einen Fehler oder wird ihr Promise abgelehnt, sieht der Benutzer den Fehler in einer Benachrichtigung. Die schreibgeschützte Ansicht hat kein Formular, daher ist `formContext` dort undefined.
 
 ## Collection-Aktionen
 
