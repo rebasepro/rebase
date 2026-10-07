@@ -920,6 +920,10 @@ limit: 20 }, jest.fn());
             it("still sends it once when a dial in between fails", () => {
                 // A failed dial closes too, and a close marks every registration
                 // as not in flight — while its subscribe still sits in the queue.
+                //
+                // Each redial at the end of its step (2 s, then 4 s), so the
+                // one that fails and the one that comes up are the two below.
+                jest.spyOn(Math, "random").mockReturnValue(0.999999);
                 const client = createClient();
                 jest.runAllTimers();
                 MockWebSocket.failToConnect = true;
@@ -1380,13 +1384,13 @@ id: "1" }, onUpdate, onError);
             jest.runAllTimers(); // connect
 
             // The step is 1000 * 2^attempt, capped at 30s, and each delay is
-            // drawn from the last fifth below its step (jitter, so a deploy
-            // does not bring every client back at the same instant). Pinning
-            // the whole schedule is the point: "a second socket exists after
-            // 2s" holds just as well for a client that redials immediately,
-            // or on a flat interval, which is what the backoff is there to
-            // prevent. `Math.random` is pinned to the top of its range, which
-            // makes each delay exactly 80% of its step.
+            // drawn from anywhere between 250 ms and its step (full jitter, so
+            // a deploy does not bring every client back at the same instant).
+            // Pinning the whole schedule is the point: "a second socket exists
+            // after 2s" holds just as well for a client that redials
+            // immediately, or on a flat interval, which is what the backoff is
+            // there to prevent. `Math.random` is pinned to the top of its
+            // range, which makes each delay one millisecond short of its step.
             jest.spyOn(Math, "random").mockReturnValue(0.999999);
             MockWebSocket.failToConnect = true;
             try {
@@ -1395,7 +1399,7 @@ id: "1" }, onUpdate, onError);
                 const steps = [2000, 4000, 8000, 16000, 30000];
                 let sockets = 1;
                 for (const step of steps) {
-                    const delay = step - Math.floor(0.999999 * step * 0.2);
+                    const delay = 250 + Math.floor(0.999999 * (step - 250));
                     jest.advanceTimersByTime(delay - 1);
                     expect(MockWebSocket.instances).toHaveLength(sockets);
                     jest.advanceTimersByTime(1);
@@ -1408,6 +1412,32 @@ id: "1" }, onUpdate, onError);
             } finally {
                 MockWebSocket.failToConnect = false;
             }
+        });
+
+        it("spreads a redial over its whole step, and never sooner than 250 ms", () => {
+            // A deploy drops every client at the same instant. Drawn from the
+            // last fifth of the step, their first redials all landed inside
+            // one 400 ms window (1.6–2 s), each followed by an AUTHENTICATE and
+            // a re-subscribe of everything it held. Drawn from 250 ms to the
+            // step, the same arrivals are spread 4.4x thinner.
+            const firstRedialAfter = (draw: number): number => {
+                MockWebSocket.instances = [];
+                createClient();
+                jest.advanceTimersByTime(10); // connect
+                const random = jest.spyOn(Math, "random").mockReturnValue(draw);
+                getWs().close();
+                let waited = 0;
+                while (MockWebSocket.instances.length === 1 && waited < 60_000) {
+                    jest.advanceTimersByTime(1);
+                    waited++;
+                }
+                random.mockRestore();
+                return waited;
+            };
+
+            expect(firstRedialAfter(0)).toBe(250);
+            expect(firstRedialAfter(0.5)).toBe(1125);
+            expect(firstRedialAfter(0.999999)).toBe(1999);
         });
 
         it("emits reconnect event on subsequent connections", () => {

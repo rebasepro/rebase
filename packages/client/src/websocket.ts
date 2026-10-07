@@ -109,8 +109,23 @@ function realtimeDebugOn(): boolean {
 /** The ceiling of the reconnect backoff. */
 const MAX_RECONNECT_DELAY_MS = 30_000;
 
-/** Each reconnect delay is drawn from the last fifth below its step. */
-const RECONNECT_JITTER = 0.2;
+/**
+ * The shortest reconnect delay. Each delay is drawn from the whole of its step
+ * (full jitter), so without a floor a redial could land the instant the socket
+ * dropped — before a restarting server has any chance of being back.
+ */
+const MIN_RECONNECT_DELAY_MS = 250;
+
+/**
+ * How long the connection is down before the outage is reported: every
+ * registration is told `CONNECTION_LOST` and {@link RebaseWebSocketClient.state}
+ * reads `disconnected`. The first three steps of the backoff, 2 + 4 + 8 s.
+ *
+ * Measured from the drop rather than counted in redials: with full jitter,
+ * three redials can all fail within the first second, and a server restart
+ * that short is a blip, not an outage.
+ */
+const OUTAGE_REPORT_AFTER_MS = 14_000;
 
 /** A frame waiting in `messageQueue`, carrying the handlers of the promise its caller holds. */
 type QueuedFrame = Record<string, unknown> & {
@@ -433,11 +448,11 @@ export class RebaseWebSocketClient {
      */
     private maxReconnectAttempts = 5;
     /**
-     * How many failed redials make a blip an outage: the point at which every
-     * registration is told `CONNECTION_LOST` and {@link state} reads
-     * `disconnected`. Three is 2 + 4 + 8 s of backoff, about 14 s down.
+     * Reports the outage once the connection has been down for
+     * {@link OUTAGE_REPORT_AFTER_MS}. Armed by the first redial after a drop,
+     * cleared when a socket opens or the caller disconnects.
      */
-    private lostAfterAttempts = 3;
+    private outageTimer: ReturnType<typeof setTimeout> | null = null;
     /**
      * Whether a socket of this client has ever opened — what makes the next
      * open a *reconnect*, whose server has forgotten every subscription and
@@ -654,6 +669,7 @@ export class RebaseWebSocketClient {
         }
         // Whatever outage there was ends here: the next dial is a fresh one.
         this.reconnectAttempts = 0;
+        this.clearOutageTimer();
         this.outageReported = false;
         this.gaveUp = false;
         this.setState(permanent ? "closed" : "idle");
@@ -714,6 +730,7 @@ export class RebaseWebSocketClient {
                 // The outage, if there was one, is over. The registrations
                 // hear about it through the re-subscribe below: each one's
                 // next `onUpdate` carries what was written meanwhile.
+                this.clearOutageTimer();
                 this.outageReported = false;
                 this.gaveUp = false;
                 this.setState("connected");
@@ -857,9 +874,15 @@ export class RebaseWebSocketClient {
     private attemptReconnect() {
         if (this.closedByCaller) return;
 
-        // A blip has become an outage. Said once, to everything that is live,
-        // so a view can say its data is stale instead of looking current.
-        if (this.reconnectAttempts >= this.lostAfterAttempts) this.reportConnectionLost();
+        // A blip becomes an outage once it has lasted OUTAGE_REPORT_AFTER_MS.
+        // Said once, to everything that is live, so a view can say its data is
+        // stale instead of looking current.
+        if (!this.outageReported && !this.outageTimer) {
+            this.outageTimer = setTimeout(() => {
+                this.outageTimer = null;
+                this.reportConnectionLost();
+            }, OUTAGE_REPORT_AFTER_MS);
+        }
 
         // Giving up is only for a client nothing depends on. While anything is
         // registered the client keeps redialling at the capped interval:
@@ -870,15 +893,22 @@ export class RebaseWebSocketClient {
         if (this.reconnectAttempts >= this.maxReconnectAttempts && !this.hasRegistrations()) {
             console.warn("[Rebase] Realtime: the server is unreachable and nothing is subscribed. Not retrying until something asks for the connection.");
             this.gaveUp = true;
+            // Given up is down, however soon the redials happened to fail.
+            this.clearOutageTimer();
+            this.reportConnectionLost();
             return;
         }
 
         this.reconnectAttempts = Math.min(this.reconnectAttempts + 1, 30);
         const ceiling = Math.min(1000 * Math.pow(2, this.reconnectAttempts), MAX_RECONNECT_DELAY_MS);
-        // Up to a fifth earlier, at random: a deploy drops every client at the
-        // same instant, and the same schedule would bring them all back at the
-        // same instant too.
-        const delay = ceiling - Math.floor(Math.random() * ceiling * RECONNECT_JITTER);
+        // Anywhere in the step at random, above the floor ("full jitter"): a
+        // deploy drops every client at the same instant, and the same schedule
+        // would bring them all back at the same instant too. Drawn from the
+        // last fifth of the step only, the first redials still landed in one
+        // 400 ms window; spread over 250 ms – 2 s the peak is 4.4x lower.
+        // Uniform above the floor rather than clamped to it, which would land
+        // one client in eight on the same millisecond.
+        const delay = MIN_RECONNECT_DELAY_MS + Math.floor(Math.random() * (ceiling - MIN_RECONNECT_DELAY_MS));
 
         console.debug(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
@@ -911,6 +941,11 @@ export class RebaseWebSocketClient {
      * failed. When the socket is back they are re-subscribed, and the fresh
      * `onUpdate` is the recovery.
      */
+    private clearOutageTimer(): void {
+        if (this.outageTimer) clearTimeout(this.outageTimer);
+        this.outageTimer = null;
+    }
+
     private reportConnectionLost(): void {
         if (this.outageReported) return;
         this.outageReported = true;
