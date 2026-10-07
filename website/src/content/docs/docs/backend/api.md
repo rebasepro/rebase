@@ -21,7 +21,7 @@ For each collection, the following endpoints are generated. Every other route th
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/data/:slug` | List entities |
-| `POST` | `/api/data/:slug/query` | <span class="since-badge" data-since="0.24">Since 0.24</span> The same listing, its query parameters in a JSON body — for a query too long for a URL. See [Queries too long for a URL](#queries-too-long-for-a-url) |
+| `POST` | `/api/data/:slug/query` | <span class="since-badge" data-since="0.24">Since 0.24</span> The same listing, its query parameters in a JSON body — for a query too long for a URL. See [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | Count entities |
 | `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, optionally grouped. Takes the same filters as the list endpoint, and RLS applies to the rows being aggregated — see [Querying](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
@@ -287,7 +287,7 @@ what a list request costs. `?count=none` (`GET /api/data/orders?count=none`)
 skips it: no `meta.total`, while `meta.hasMore` stays exact (the read asks for one
 row past the page). `?count=exact` is the default; any other value is a 400
 `INVALID_COUNT`. A `?distinct=true` read is never counted, and neither is a
-vector search with a `vector_threshold` (see [Vector Search](#vector-search)).
+vector search with a `vector_threshold` (see [Vector Search](/docs/backend/vector-search/)).
 
 ### Cursor pagination
 
@@ -448,84 +448,17 @@ GET /api/data/products?searchString=wireless%20keyboard
 
 ## Vector Search
 
-If a collection defines a property with a type of `vector`, you can perform high-speed similarity searches using pgvector distance operations compiled directly in the database query.
-
-```bash
-GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_distance=cosine&vector_threshold=0.8
-```
-
-### Vector Query Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `vector_search` | `string` | The name of the vector property to query against. |
-| `vector` | `string` | A JSON-serialized array of floats representing the query vector. |
-| `vector_distance` | `string` | The distance metric to evaluate. Supported values: `cosine` (default, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
-| `vector_threshold` | `number` | Maximum distance threshold. Only records with distance less than this threshold are returned. |
-
-<span class="since-badge" data-since="0.24">Since 0.24</span> A vector search with a
-`vector_threshold` has no `meta.total`: counting the rows within a distance means
-computing that distance for every row of the table, which no index serves — several
-times the cost of the page itself, growing with rows × dimensions. `meta.hasMore` is
-exact, from reading one row past the page. Without a threshold the count is the
-ordinary one.
-
-An embedding is long in a URL: 768 dimensions are about 17 KB of query string and
-1,536 about 33 KB. The server accepts up to 64 KB of request line and headers
-(<span class="since-badge" data-since="0.24">Since 0.24</span>; 16 KB before, a 431
-from 768 dimensions up), and a proxy in front of it usually accepts less — nginx's
-default is 8 KB. Send a vector search as [`POST …/query`](#queries-too-long-for-a-url)
-instead; the SDK always does.
-
-### Filters on an approximate index
-
-<span class="since-badge" data-since="0.24">Since 0.24</span> A vector search that
-also filters — a `where`, a search, row-level security — returns the nearest rows
-that match. An HNSW index answers with a fixed number of nearest candidates
-(`hnsw.ef_search`, 40 by default), and the other conditions are applied to those;
-when few of them match, the page came back short or empty though plenty of rows
-did, and offset pages skipped rows. With pgvector 0.8.0 or later the read turns on
-pgvector's iterative index scan (`hnsw.iterative_scan = strict_order`, for that
-read's transaction only), which keeps scanning until the page is full, up to
-`hnsw.max_scan_tuples` (20,000 by default) — a filter that matches almost nothing
-near the query vector can still return a short page. On an older pgvector, and on
-an IVFFlat index, a filtered vector search keeps the short-page behaviour; an exact
-scan (`index: false`) never had it.
+A collection with a `vector` property takes a nearest-neighbour search on the
+listing: `?vector_search=embedding&vector=[0.15,0.22,-0.05]`, with an optional
+`vector_distance` and `vector_threshold`. The parameters, thresholds and how
+filters behave on the index are on [Vector Search](/docs/backend/vector-search/).
 
 ## Queries too long for a URL
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> `POST /api/data/:slug/query`
-is the listing `GET /api/data/:slug` answers, with the query parameters in a JSON
-body instead of the URL. Use it when the URL would not fit — a vector search's
-embedding, a filter on a long `in` list. The SDK sends every vector search this way,
-and any other query whose URL would pass 6 KB.
-
-```bash
-POST /api/data/docs/query
-Content-Type: application/json
-
-{
-  "vector_search": "embedding",
-  "vector": [0.15, 0.22, -0.05],
-  "vector_threshold": 0.8,
-  "where": { "status": ["==", "published"] },
-  "limit": 10
-}
-```
-
-The body's keys are the query parameters, and the server reads them back into
-exactly the parameters the `GET` reads, through the same parser — same filters,
-page, count, cursor and includes, same row-level security, same errors. A value is
-spelled as the URL spells it: a string (or a number or boolean), and for a filter
-repeated in the URL a list (`"views": ["gte.10", "lte.99"]`). `where`, `include`,
-`orderBy` and `vector` take their JSON value itself or that JSON as a string. A
-list for a parameter the URL reads once, an object anywhere else, or a parameter
-also put on the URL is a 400 `INVALID_QUERY_BODY`.
-
-It only reads, so an API key needs `data:read` for it, not `data:write`, and it
-counts against the same rate limit as the `GET`. Nested listings have it too:
-`POST /api/data/authors/42/posts/query`. A server older than 0.24 answers it 404;
-the SDK then sends the `GET`.
+is this listing with its query parameters in a JSON body, for a query whose URL
+would not fit — an embedding, a long `in` list. See
+[Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url).
 
 ## Relation Inclusion
 

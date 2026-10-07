@@ -185,6 +185,7 @@ export default defineConfig({
                         { label: "Realtime & WebSocket", slug: "docs/backend/realtime" },
                         { label: "Realtime across instances", slug: "docs/backend/realtime-transports" },
                         { label: "Search", slug: "docs/backend/search" },
+                        { label: "Vector Search", slug: "docs/backend/vector-search" },
                         { label: "Indexes", slug: "docs/backend/indexes" },
                         { label: "Cron Jobs", slug: "docs/backend/cron-jobs" },
                         { label: "Cron across instances", slug: "docs/backend/cron-across-instances" },

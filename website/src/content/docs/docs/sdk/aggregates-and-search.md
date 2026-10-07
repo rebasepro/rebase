@@ -155,7 +155,7 @@ const { data } = await client.data.docs
 `where` on the same query is a filter on which rows are candidates — this
 returns the nearest rows that also match, not the nearest rows filtered
 afterwards. On the HNSW index that holds from pgvector 0.8.0 (see
-[Filters on an approximate index](/docs/backend/api/#filters-on-an-approximate-index));
+[Filters on an approximate index](/docs/backend/vector-search/#filters-on-an-approximate-index));
 on an older pgvector a filter that few of the nearest rows pass returns a short
 page. Producing `queryVector` is your job: Rebase stores and searches
 embeddings, it does not compute them.
