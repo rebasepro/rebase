@@ -290,6 +290,40 @@ so the bucket never has to be public; a key outside the destination's prefix is
 refused. With `BACKUP_DESTINATION` unset the panel says backups are not
 configured.
 
+### Download a backup
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A browser cannot
+put an `Authorization` header on a download, so Studio and the SDK ask for a
+link first. `POST /api/admin/backups/download-url` with `{ "key": "…" }` (same
+admin scope and key checks as the download) answers
+`{ url, token, expiresIn }`: a URL whose token stands in for the header, for
+that one backup at the current destination, for 60 seconds. The token is
+refused anywhere else — as a session, as a storage download token, for another
+backup — and once it expires. The browser then streams the dump straight to
+disk, so a backup the size of your database never has to fit in a tab.
+
+```ts
+// In a browser: the browser saves the file.
+await client.backups.download(key);
+
+// Anywhere: a link that needs no header, for 60 seconds.
+const { url } = await client.backups.downloadUrl(key);
+
+// In Node: stream the bytes to a file.
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+
+const { stream, name } = await client.backups.stream(key);
+await pipeline(Readable.fromWeb(stream), createWriteStream(name));
+```
+
+Before 0.24, `backups.download(key)` answered a `Blob` holding the whole dump.
+It now saves the file in a browser and throws elsewhere; use `stream(key)`
+in Node. Against a server without download links (one older than 0.24, or one
+with no JWT secret to sign them), `download()` falls back to reading the bytes
+itself.
+
 ## Keep backups private
 
 A backup holds all of your data, credentials and personal data included.

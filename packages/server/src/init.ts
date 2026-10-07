@@ -1795,6 +1795,20 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         config.app.use(`${basePath}/admin/*`, platformTokenPreAuth);
     }
 
+    // A backup download link — `GET /admin/backups/download?key=…&token=…`,
+    // minted behind the Backups gate by `POST /admin/backups/download-url` —
+    // stands in for the admin's header on that one request, for one backup and
+    // 60 seconds, so a browser can stream a dump to disk. It is answered here,
+    // ahead of every gate on `/admin/*`: the auth adapter's admin routers,
+    // mounted below, authenticate everything under that prefix. A request
+    // without `token` passes through to them untouched.
+    if (surfaces.admin) {
+        const { createBackupLinkRoutes, backupDestinationFromEnv } = await import("./backup");
+        config.app.route(`${basePath}/admin/backups`, createBackupLinkRoutes({
+            getDestination: () => backupDestinationFromEnv(process.env)
+        }));
+    }
+
     if (apiKeyStore && surfaces.admin) {
         const apiKeyRoutes = createApiKeyRoutes({
             store: apiKeyStore,
@@ -3542,7 +3556,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // the S3_* environment as the backup cron builds its own — not through the
     // app's file storage, which is another bucket, a local directory, or none.
     if (surfaces.admin) {
-        const { createBackupRoutes, parseBackupDestination, readBackupSchedule } = await import("./backup");
+        const { createBackupRoutes, backupDestinationFromEnv, readBackupSchedule } = await import("./backup");
         const backupRouter = new Hono<HonoEnv>();
 
         applyAdminGate(backupRouter, "Backup", "backups:read");
@@ -3552,10 +3566,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // without starting them and reads their runs from `cron_logs`.
         const scheduler = cronScheduler;
         backupRouter.route("/", createBackupRoutes({
-            getDestination: () => {
-                const out = process.env.BACKUP_DESTINATION?.trim();
-                return out ? parseBackupDestination(out) : null;
-            },
+            getDestination: () => backupDestinationFromEnv(process.env),
             getSchedule: scheduler ? () => readBackupSchedule(scheduler) : undefined,
             scheduledElsewhere: !ownership.cronScheduler
         }));

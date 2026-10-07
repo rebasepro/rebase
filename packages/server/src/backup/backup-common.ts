@@ -244,6 +244,27 @@ export async function readBackupBytes(
 }
 
 /**
+ * Whether `key` names a backup the download route would serve, without
+ * opening it: the same guards as {@link openBackupStream}, and the file or
+ * object is there. An object store without `statObject` is taken at its key —
+ * reading the object to find out would be the download itself.
+ */
+export async function findBackup(
+    dest: BackupDestination,
+    key: string,
+    storage?: StorageController
+): Promise<{ name: string } | null> {
+    if (dest.kind === "local") {
+        const resolved = resolveLocalBackupFile(dest, key);
+        return resolved ? { name: path.basename(resolved) } : null;
+    }
+    if (!storage) throw new Error(noControllerFor(dest));
+    if (!isObjectBackupKey(dest, key)) return null;
+    if (storage.statObject && !(await storage.statObject(key, dest.bucket))) return null;
+    return { name: key.split("/").pop() || key };
+}
+
+/**
  * A single backup, opened for streaming, with its size. Same guards as
  * {@link readBackupBytes}.
  *

@@ -322,7 +322,7 @@ export type { LoadedCronJob, CronStore, CronJobPersistedState, CronRunLease, Cro
 // =============================================================================
 // Backups (admin routes + storage-generic helpers)
 // =============================================================================
-export { createBackupRoutes, parseBackupDestination, parseBackupTimestamp, listBackupObjects, readBackupBytes } from "./backup";
+export { createBackupRoutes, createBackupLinkRoutes, parseBackupDestination, parseBackupTimestamp, listBackupObjects, readBackupBytes } from "./backup";
 export type { BackupRoutesConfig, BackupDestination } from "./backup";
 
 // =============================================================================

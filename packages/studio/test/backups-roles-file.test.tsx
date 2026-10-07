@@ -3,7 +3,7 @@
  */
 import { en } from "../../app/src/locales/en";
 import React from "react";
-import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 /**
@@ -16,7 +16,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
  */
 
 const list = jest.fn<() => Promise<unknown>>();
-const download = jest.fn<(key: string) => Promise<Blob>>();
+const download = jest.fn<(key: string) => Promise<void>>();
 
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => ({
@@ -42,24 +42,10 @@ const UNPAIRED = {
 };
 
 describe("Backups panel and the roles sidecar", () => {
-    const savedAs: string[] = [];
-    const originalClick = HTMLAnchorElement.prototype.click;
-
     beforeEach(() => {
         list.mockReset();
         download.mockReset();
-        savedAs.length = 0;
-        download.mockResolvedValue(new Blob(["x"]));
-        // jsdom has neither object URLs nor downloads: record what would be saved.
-        URL.createObjectURL = () => "blob:test";
-        URL.revokeObjectURL = () => {};
-        HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
-            savedAs.push(this.download);
-        };
-    });
-
-    afterEach(() => {
-        HTMLAnchorElement.prototype.click = originalClick;
+        download.mockResolvedValue(undefined);
     });
 
     it("offers the roles file where there is one, and flags the dump that has none", async () => {
@@ -71,12 +57,26 @@ describe("Backups panel and the roles sidecar", () => {
         expect(screen.getAllByText(en.studio_backups_no_roles_file!)).toHaveLength(1);
     });
 
-    it("downloads the sidecar's own key, saved under the name restore looks for", async () => {
+    it("downloads the sidecar's own key", async () => {
+        // Saved under the key's own name, `rebase-app-…globals.sql` beside its
+        // dump: the name `rebase db restore` looks for. The SDK's `download()`
+        // names the file (client/test/backups.test.ts).
         list.mockResolvedValue({ backups: [PAIRED], destinationKind: "local", configured: true });
         render(<BackupsView/>);
 
         fireEvent.click(await screen.findByText(en.studio_backups_roles_file!));
-        await waitFor(() => expect(savedAs).toEqual(["rebase-app-20260714T030000Z.globals.sql"]));
-        expect(download).toHaveBeenCalledWith(PAIRED.globalsKey);
+        await waitFor(() => expect(download).toHaveBeenCalledWith(PAIRED.globalsKey));
+        expect(PAIRED.globalsKey.split("/").pop()).toBe("rebase-app-20260714T030000Z.globals.sql");
+    });
+
+    it("hands the dump to the SDK's download, which streams it to disk, instead of saving bytes itself", async () => {
+        const createObjectURL = jest.fn(() => "blob:test");
+        URL.createObjectURL = createObjectURL;
+        list.mockResolvedValue({ backups: [PAIRED], destinationKind: "local", configured: true });
+        render(<BackupsView/>);
+
+        fireEvent.click(await screen.findByText(en.download!));
+        await waitFor(() => expect(download).toHaveBeenCalledWith(PAIRED.key));
+        expect(createObjectURL).not.toHaveBeenCalled();
     });
 });

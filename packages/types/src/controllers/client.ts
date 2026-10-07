@@ -4,7 +4,7 @@ import type { RebaseSdkData } from "./data";
 import type { EmailService } from "./email";
 import type { StorageSource } from "./storage";
 import type { CronJobStatus, CronJobLogEntry, CronJobListing } from "../types/cron";
-import type { BackupListing } from "../types/backup";
+import type { BackupDownloadLink, BackupListing } from "../types/backup";
 import type { ApiKeysAPI, PersonalKeysAPI } from "../types/api_keys";
 import type { RoleSummary } from "../types/scopes";
 import type { StorageSourceDefinition } from "../types/storage_source";
@@ -216,8 +216,16 @@ export interface BackupsAPI {
      * the scheduled backup job's last run.
      */
     list(): Promise<BackupListing>;
-    /** Fetch a backup's bytes for download (authenticated). */
-    download(key: string): Promise<Blob>;
+    /**
+     * Save a backup in the browser: the browser is sent to a
+     * {@link downloadUrl} link and streams the dump to disk; the page never
+     * holds it. Browser only — elsewhere use {@link stream} or {@link downloadUrl}.
+     */
+    download(key: string): Promise<void>;
+    /** A link to one backup's bytes, good for 60 seconds, that needs no `Authorization` header. */
+    downloadUrl(key: string): Promise<BackupDownloadLink>;
+    /** A backup's bytes as a stream, read as consumed — to write one to a file outside a browser. */
+    stream(key: string): Promise<{ stream: ReadableStream<Uint8Array>; size?: number; name: string }>;
 }
 
 // ─── Functions API ───────────────────────────────────────────────────────────
