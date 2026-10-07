@@ -2821,22 +2821,28 @@ export class PostgresBackendDriver implements DataDriver {
         `);
         const columns = result.rows as Record<string, unknown>[];
 
-        // Also fetch enum values for any USER-DEFINED columns
+        // The labels of every enum a USER-DEFINED column uses, in one query —
+        // it was one per column, in turn, each a round trip. A USER-DEFINED
+        // type that is not an enum (a composite, a PostGIS type) has none.
         const enumColumns = columns.filter((c) => c.data_type === "USER-DEFINED");
         if (enumColumns.length > 0) {
+            const typeNames = [...new Set(enumColumns.map(col => String(col.udt_name)))];
+            let labelsByType = new Map<string, unknown[]>();
+            try {
+                const enumResult = await this.db.execute(drizzleSql`
+                    SELECT t.typname AS type_name, array_agg(e.enumlabel::text ORDER BY e.enumsortorder) AS labels
+                    FROM pg_type t
+                    JOIN pg_enum e ON t.oid = e.enumtypid
+                    WHERE t.typname IN (${drizzleSql.join(typeNames.map(name => drizzleSql`${name}`), drizzleSql`, `)})
+                    GROUP BY t.typname
+                `);
+                labelsByType = new Map((enumResult.rows as Record<string, unknown>[])
+                    .map(row => [String(row.type_name), Array.isArray(row.labels) ? row.labels : []]));
+            } catch {
+                // As before: a column whose labels cannot be read has none.
+            }
             for (const col of enumColumns) {
-                try {
-                    const enumResult = await this.db.execute(drizzleSql`
-                        SELECT e.enumlabel
-                        FROM pg_type t
-                        JOIN pg_enum e ON t.oid = e.enumtypid
-                        WHERE t.typname = ${col.udt_name as string}
-                        ORDER BY e.enumsortorder
-                    `);
-                    col.enum_values = (enumResult.rows as Record<string, unknown>[]).map(e => e.enumlabel);
-                } catch {
-                    col.enum_values = [];
-                }
+                col.enum_values = labelsByType.get(String(col.udt_name)) ?? [];
             }
         }
         // Rows from hand-written SQL. The element type is the one claim nothing
