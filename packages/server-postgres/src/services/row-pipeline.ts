@@ -225,6 +225,43 @@ export function stripUnreadable(
     return row;
 }
 
+/**
+ * May the current caller be handed the rows of this relation of `collection`?
+ *
+ * A relation property's value *is* its related rows, so a property the caller
+ * may not read withholds the relation whole: an `include` neither loads it nor
+ * counts it. {@link stripUnreadable} cannot be the only guard here, because the
+ * REST rows are stripped before the include loader runs (`toRestRow`, then
+ * `loadIncludes`) — the loader wrote the rows back onto the key the strip had
+ * just deleted, and `_count` beside them.
+ *
+ * Judged by every `type: "relation"` property that names this relation: by its
+ * own key (the include key of an inline relation), or by the `relationName` it
+ * addresses in the collection's `relations` array. A relation declared only in
+ * `relations` has no property, so no field rule, and stays readable.
+ */
+export function canReadRelation(
+    collection: CollectionConfig,
+    key: string,
+    relation: ResolvedRelation
+): boolean {
+    const properties = collection.properties as Record<string, Property> | undefined;
+    if (!properties) return true;
+
+    const viewer = currentFieldViewer();
+    if (!canReadField(properties[key], viewer)) return false;
+
+    let relations: ReturnType<typeof resolveCollectionRelations> | undefined;
+    for (const [name, property] of Object.entries(properties)) {
+        if (property?.type !== "relation" || canReadField(property, viewer)) continue;
+        relations ??= resolveCollectionRelations(collection);
+        if (findRelation(relations, name) === relation) return false;
+        const addressed = property.relation?.relationName;
+        if (addressed && findRelation(relations, addressed) === relation) return false;
+    }
+    return true;
+}
+
 function renderTarget(
     targetRow: Record<string, unknown>,
     targetCollection: CollectionConfig,

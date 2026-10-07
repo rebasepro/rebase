@@ -100,10 +100,17 @@ It applies at every exit: list, single get, relation targets included with
 `?include=`, `_batch` results, realtime frames from `.listen()`, aggregate
 results and [history](#history) snapshots.
 
+A relation property's value is its related rows, so a relation you cannot read is
+withheld whole. `?include=` leaves it out of the row, with its `_count`, from
+every door: REST, the SDK, `.listen()`, and nested includes one level down.
+Naming it anywhere else is refused like a field (see [Queries](#queries)).
+
 ### Queries
 
 A `where`, `orderBy`, `fields`, aggregate `select` or `groupBy` naming a field you
-cannot read is a **400 `FIELD_NOT_READABLE`**:
+cannot read is a **400 `FIELD_NOT_READABLE`**. So is a relation you cannot read
+named in a nested path (`/departments/1/members`, `/departments/1/members/7`) or
+an aggregate sort (`orderBy=count(members)`):
 
 ```http
 GET /api/data/staff?salary=gt.100000

@@ -25,7 +25,7 @@ import { RelationService } from "./RelationService";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { toFlatRow, toRestRow, stripUnreadable } from "./row-pipeline";
+import { toFlatRow, toRestRow, stripUnreadable, canReadRelation } from "./row-pipeline";
 import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-column";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 // One rule, one place. See `soft-delete.ts` for why every read has to ask.
@@ -93,6 +93,36 @@ export function numericAggregateAliases(
                 a.fn === "count" || a.fn === "sum" || a.fn === "avg"
                 || ((a.fn === "min" || a.fn === "max") && isNumberField(a.field)))
             .map(a => a.alias)
+    );
+}
+
+/**
+ * Refuse a read that names a relation property its caller may not read.
+ *
+ * The relation-shaped twin of the REST refusal of `?fields=salary`
+ * (`assertQueryFieldsReadable`): a nested URL (`/departments/1/members`, and
+ * `/departments/1/members/7` — is 7 one of them?) hands over the property's
+ * value, its related rows; an aggregate sort (`orderBy=count(members)`) orders
+ * the parents by it. An `include` omits such a relation instead (see
+ * {@link canReadRelation} in `loadIncludes`), as the row strip omits any
+ * withheld field from a row; a request that *names* one as what to read or
+ * sort by is refused, naming it — field names are public, values are not.
+ */
+function assertRelationReadable(
+    collection: CollectionConfig,
+    key: string,
+    relation: ResolvedRelation,
+    use: string
+): void {
+    if (canReadRelation(collection, key, relation)) return;
+    throw ApiError.badRequest(
+        `'${key}' is not readable on '${collection.slug}' with your roles, so it cannot be used in ${use}.`,
+        "FIELD_NOT_READABLE",
+        {
+            collection: collection.slug,
+            fields: [key],
+            violations: [{ field: key, code: "access", message: `'${key}' is not readable with your roles.` }]
+        }
     );
 }
 
@@ -332,6 +362,11 @@ export class FetchService {
                 { field: orderBy }
             );
         }
+        // Ordering the parents by a relation's count is a reading of it, as
+        // `orderBy=salary` is of a column. An unknown relation is left to the
+        // builder below, which refuses it naming the ones there are.
+        const sorted = findRelation(resolveCollectionRelations(collection), spec.relation);
+        if (sorted) assertRelationReadable(collection, spec.relation, sorted, "`orderBy`");
         const primaryKeys = getPrimaryKeys(collection, this.registry);
         const idColumn = primaryKeys.length === 1
             ? table[primaryKeys[0].fieldName as keyof typeof table] as AnyPgColumn
@@ -756,8 +791,16 @@ target });
         if (addressable.length === 0) return;
         const rowIds = addressable.map(row => addressOf(row) as string);
 
-        const levels = this.resolveIncludeLevel(collection, include.tree, include.wildcard);
-        this.assertCountsAllowed(collection, levels);
+        const requested = this.resolveIncludeLevel(collection, include.tree, include.wildcard);
+        this.assertCountsAllowed(collection, requested);
+
+        // A relation property this caller may not read is withheld whole: not
+        // loaded, so neither embedded nor counted — absent from the row, as the
+        // strip leaves any withheld field. Decided here, the one loader every
+        // door reaches (REST, `POST …/query`, the in-process SDK, socket fetches
+        // and subscriptions), and at every level of a nested include. The REST
+        // rows were stripped before this runs, so the strip cannot catch it.
+        const levels = requested.filter(({ key, relation }) => canReadRelation(collection, key, relation));
 
         for (const { key, node, relation } of levels) {
             const targetCollection = relation.target();
@@ -1314,6 +1357,8 @@ target });
      * target table, so a nested listing can run as an ordinary collection query.
      */
     private buildRelationScope(hop: NestedPathHop): SQL {
+        // The rows of this relation, reached by URL rather than by `include`.
+        assertRelationReadable(hop.parentCollection, hop.relationKey, hop.relation, "a nested path");
         const parentPks = requirePrimaryKeys(hop.parentCollection, this.registry);
         const parsedParent = parseIdValues(hop.parentId, parentPks);
         // What a single-column link compares against. A link from a composite
@@ -1361,6 +1406,9 @@ target });
         if (!isNestedPath(collectionPath)) return true;
         const hop = resolveNestedPath(collectionPath, this.registry);
         if (!hop) return true;
+        // "Is row 7 one of this parent's members" is the relation's value one
+        // row at a time — the same reading the listing below is refused.
+        assertRelationReadable(hop.parentCollection, hop.relationKey, hop.relation, "a nested path");
         return this.relationService.isRelated(hop, id);
     }
 
