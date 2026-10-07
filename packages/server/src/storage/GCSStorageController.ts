@@ -192,45 +192,42 @@ export class GCSStorageController implements StorageController {
         };
     }
 
+    /**
+     * The object's bytes, type and version — all three of ONE generation.
+     *
+     * Described first, then read pinned to the generation described, as
+     * {@link getObjectStream} reads. It used to download and then ask for the
+     * metadata: an overwrite between the two calls answered the old bytes
+     * under the new generation's `updated`, and that `lastModified` keys the
+     * routes' `ETag` and transform cache, so the stale bytes — or a rendition
+     * of them — were served as current. A pinned read of a generation replaced
+     * since it was described fails, and the object is described again.
+     */
     async getObject(key: string, bucket?: string): Promise<File | null> {
-        // Handle gs:// and s3:// URLs
-        let resolvedPath = key;
-        let resolvedBucket = this.getBucket(bucket);
+        for (let attempt = 1; ; attempt++) {
+            const located = await this.locate(key, bucket);
+            if (!located) return null;
 
-        const match = key.match(/^(gs|s3):\/\//);
-        if (match) {
-            const protocolLength = match[0].length;
-            const withoutProtocol = key.substring(protocolLength);
-            const firstSlash = withoutProtocol.indexOf("/");
-            if (firstSlash > 0) {
-                resolvedBucket = withoutProtocol.substring(0, firstSlash);
-                resolvedPath = withoutProtocol.substring(firstSlash + 1);
+            let contents: Buffer;
+            try {
+                contents = await this.readDecompressed(located);
+            } catch (error: unknown) {
+                // Replaced or deleted since it was described. Three
+                // overwrites inside one read is a write loop, not a race.
+                if (isNotFoundError(error) && attempt < 3) continue;
+                if (isNotFoundError(error)) {
+                    throw new Error(`The object "${located.key}" changed on every read; try again.`);
+                }
+                throw error;
             }
-        }
 
-        try {
-            const client = await this.getClient();
-            const gcsFile = client.bucket(resolvedBucket).file(resolvedPath);
-
-            const [contents] = await gcsFile.download();
-
-            // Get content type from metadata
-            const [fileMetadata] = await gcsFile.getMetadata();
-            const contentType = fileMetadata.contentType || "application/octet-stream";
-            const fileName = resolvedPath.split("/").pop() || resolvedPath;
-
-            const blob = new Blob([new Uint8Array(contents)], { type: contentType });
+            const contentType = located.meta.contentType || "application/octet-stream";
             // The object's own version — see `S3StorageController.getObject`.
-            const updated = typeof fileMetadata.updated === "string" ? Date.parse(fileMetadata.updated) : NaN;
-            return new File([blob], fileName, {
+            const updated = typeof located.meta.updated === "string" ? Date.parse(located.meta.updated) : NaN;
+            return new File([contents], located.key.split("/").pop() || located.key, {
                 type: contentType,
                 lastModified: Number.isNaN(updated) ? undefined : updated
             });
-        } catch (error: unknown) {
-            if (isNotFoundError(error)) {
-                return null;
-            }
-            throw error;
         }
     }
 
