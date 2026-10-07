@@ -58,7 +58,7 @@ import {
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, takesDevUrl } from "./schema/atlas-argv";
 import { ScratchDatabase } from "./cli-scratch-database";
-import { applyPushPlan } from "./cli-push";
+import { applyPoliciesFile, applyPushPlan, stampableTables, type PolicyStamping } from "./cli-push";
 import { unexpectedBranchArgs } from "./branch-argv";
 import { assertKnownFlags, collectionsPathIn, parseDriverLine } from "./cli-flags";
 import { assertCollectionsPathExists } from "./cli-collections-path";
@@ -750,7 +750,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     await applyVectorDdl(databaseUrl);
                     await applySearchDdl(databaseUrl);
                     await applyTriggersDdl(databaseUrl);
-                    await applyPolicies(databaseUrl);
+                    await applyPolicies(databaseUrl, collectionsPath);
                     await reconcilePolicies(databaseUrl, collectionsPath);
                     await ensureRlsUserRole(databaseUrl);
                     await retireLegacyAuthSchema(databaseUrl);
@@ -965,7 +965,7 @@ async function retireLegacyAuthSchema(databaseUrl: string): Promise<void> {
     }
 }
 
-async function applyPolicies(databaseUrl: string): Promise<void> {
+async function applyPolicies(databaseUrl: string, collectionsPath: string): Promise<void> {
     try {
         const policiesPath = path.join(generatedSqlDir(), "policies.sql");
         if (!fs.existsSync(policiesPath)) return;
@@ -974,8 +974,13 @@ async function applyPolicies(databaseUrl: string): Promise<void> {
         out("");
         
         const policiesContent = fs.readFileSync(policiesPath, "utf-8");
-        await withAppClient(databaseUrl, client => client.query(policiesContent));
+        const stamping = await policyStamping(databaseUrl, collectionsPath, policiesContent);
+        const { stampError } = await withAppClient(databaseUrl, client => applyPoliciesFile(client, policiesContent, stamping));
         out(chalk.green("  ✓ RLS policies applied successfully."));
+        if (stampError) {
+            // The policies are in; only the boot's shortcut is not. See applyPoliciesFile.
+            outWarn(chalk.yellow(`  ⚠️  The policies could not be stamped (${stampError}); the next boot applies them again.`));
+        }
     } catch (err) {
         const hint = diagnoseDbError(err, databaseUrl);
         if (hint) {
@@ -984,6 +989,29 @@ async function applyPolicies(databaseUrl: string): Promise<void> {
             outError(chalk.red(`  ✗ Failed to apply RLS policies: ${err instanceof Error ? err.message : String(err)}`));
         }
         process.exit(1);
+    }
+}
+
+/**
+ * The stamps a boot looks for, for the policies `policies.sql` is about to
+ * create — see `applyPoliciesFile`. None when the collections cannot be read
+ * here, which costs only the shortcut: the next boot re-applies, as before.
+ */
+async function policyStamping(databaseUrl: string, collectionsPath: string, policiesSql: string): Promise<PolicyStamping> {
+    try {
+        const { loadCollections } = await import("./schema/doctor");
+        const { planCollectionPolicies } = await import("./schema/generate-postgres-ddl-logic");
+        const { policyStampSql } = await import("./schema/ensure-collection-policies");
+        // The rule the boot's connections follow: `search_path=public` unless
+        // the URL pins one of its own, in which case this connection has it too.
+        const { pinSearchPath } = await import("./connection");
+        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const statements = stampableTables(planCollectionPolicies(collections), policiesSql)
+            .map(plan => policyStampSql(plan))
+            .filter((statement): statement is string => statement !== undefined);
+        return { statements, searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public" };
+    } catch {
+        return { statements: [] };
     }
 }
 

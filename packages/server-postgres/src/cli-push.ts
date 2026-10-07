@@ -56,3 +56,86 @@ export async function applyPushPlan(
     await steps.afterApply();
     return synced ? "synced" : "applied";
 }
+
+/** The one call {@link applyPoliciesFile} needs from a connection. */
+export interface PolicyConnection {
+    query(text: string): Promise<unknown>;
+}
+
+/** What {@link applyPoliciesFile} stamps, and how to read the definitions back. */
+export interface PolicyStamping {
+    /**
+     * `policyStampSql` of every table whose policies `policies.sql` creates
+     * exactly as the boot would — see {@link stampableTables}.
+     */
+    statements: string[];
+    /**
+     * The `search_path` a boot reads policies under, when the connection's own
+     * differs. A stamp hashes `pg_get_expr`, which spells a function on the
+     * path unqualified: read under `"$user", public` with a `rebase` role, the
+     * boot's `rebase.uid()` prints as `uid()` and no stamp would ever match.
+     */
+    searchPath?: string;
+}
+
+/**
+ * The tables whose stamp `db push` may write: those every one of whose planned
+ * statements `policies.sql` carries, verbatim.
+ *
+ * A stamp says "this stored definition is what the plan's statement made". It
+ * is only true of a policy the statement *did* make — and since both are
+ * rendered by the same function from the same collections, a table whose
+ * statements are all in the file is one whose policies the file just created.
+ * Anything else (a hand-edited file, a file generated elsewhere) is not
+ * stamped, and the next boot re-applies that table, as before.
+ */
+export function stampableTables<T extends { policyStatements: string[] }>(plans: readonly T[], policiesSql: string): T[] {
+    return plans.filter(plan => plan.policyStatements.length > 0
+        && plan.policyStatements.every(statement => policiesSql.includes(statement)));
+}
+
+/**
+ * Run `policies.sql`, then stamp the policies it created the way a boot does,
+ * in the same transaction.
+ *
+ * Before stamps the push's policies carried none, so the first boot after
+ * every push re-applied them all — a DROP and a CREATE per policy, an ACCESS
+ * EXCLUSIVE lock per table. Stamped here, that boot finds them current.
+ *
+ * The file runs in one transaction, as it did as one implicit one: a policy
+ * that fails leaves the previous ones in place. The stamps run after it, under
+ * a savepoint: a stamp that cannot be written costs the next boot a re-apply,
+ * which is what it did before, so it is reported and the policies are kept.
+ * Nothing is left set on the connection: `SET LOCAL` ends with the transaction.
+ */
+export async function applyPoliciesFile(
+    client: PolicyConnection,
+    policiesSql: string,
+    stamping: PolicyStamping
+): Promise<{ stamped: number; stampError?: string }> {
+    await client.query("BEGIN");
+    let stamped = 0;
+    let stampError: string | undefined;
+    try {
+        await client.query(policiesSql);
+        if (stamping.statements.length > 0) {
+            await client.query("SAVEPOINT rebase_policy_stamps");
+            try {
+                if (stamping.searchPath) {
+                    await client.query(`SET LOCAL search_path TO ${stamping.searchPath}`);
+                }
+                await client.query(stamping.statements.join("\n"));
+                await client.query("RELEASE SAVEPOINT rebase_policy_stamps");
+                stamped = stamping.statements.length;
+            } catch (err) {
+                await client.query("ROLLBACK TO SAVEPOINT rebase_policy_stamps");
+                stampError = err instanceof Error ? err.message : String(err);
+            }
+        }
+        await client.query("COMMIT");
+    } catch (err) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw err;
+    }
+    return { stamped, stampError };
+}

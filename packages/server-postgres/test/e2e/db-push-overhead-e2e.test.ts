@@ -21,6 +21,9 @@ import { fileURLToPath } from "url";
 import { execa } from "execa";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { closeAppClients, withAppClient } from "../../src/cli-helpers";
+import { pinSearchPath } from "../../src/connection";
+import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies";
+import { loadCollectionsFromDirectory } from "@rebasepro/server";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -172,6 +175,30 @@ describe("db push overhead E2E", () => {
         expect(generators).toEqual([]);
         // The recorder ran: Atlas is a spawned process.
         expect(spawned.some(argv => /atlas/.test(argv[0]))).toBe(true);
+    }, 180_000);
+
+    /**
+     * The push stamps the policies it creates the way a boot does, so the
+     * first boot after it — on its own connection, `search_path` pinned to
+     * `public` while the push's role-named `rebase` schema led the default
+     * path — re-applies none of them.
+     */
+    it("leaves the next boot nothing to re-apply in the policies step", async () => {
+        const { result } = await push();
+        expect(result.exitCode, result.all).toBe(0);
+
+        const boot = new pg.Client({ connectionString: pinSearchPath(container.connectionString) });
+        await boot.connect();
+        try {
+            const collections = await loadCollectionsFromDirectory(collectionsDir);
+            const outcome = await ensureCollectionPolicies(
+                { query: async <T>(text: string) => ({ rows: (await boot.query(text)).rows as T[] }) },
+                collections
+            );
+            expect(outcome).toMatchObject({ policiesApplied: 0, unchanged: 2, failures: [], deferred: [] });
+        } finally {
+            await boot.end();
+        }
     }, 180_000);
 
     /**
