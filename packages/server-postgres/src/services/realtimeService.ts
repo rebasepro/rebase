@@ -394,6 +394,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private presence = new Map<string, Map<string, { state: Record<string, unknown>; lastSeen: number }>>();
 
     /**
+     * The reverse of {@link channels} and {@link presence}: the channels each
+     * client is a member of, and those it has a presence entry in. Kept in
+     * step wherever either map gains or loses a client, so a disconnect visits
+     * what the client was in. It used to walk every channel on the instance:
+     * with a channel per document, 5.4 ms per disconnect at 50k channels.
+     */
+    private channelsByClient = new Map<string, Set<string>>();
+    private presenceByClient = new Map<string, Set<string>>();
+
+    /**
      * Ordered, replayable history for channels that opt into it.
      *
      * Undefined until {@link configureChannelHistory} is called, and inert even
@@ -1175,19 +1185,36 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             await this.presenceStoreOp(() => this.presenceStore!.removeClient(clientId), "client removal");
         }
 
-        // Remove from all broadcast channels
-        for (const [channel, members] of this.channels.entries()) {
-            if (members.has(clientId)) {
+        // Remove from the broadcast channels it joined
+        for (const channel of [...(this.channelsByClient.get(clientId) ?? [])]) {
+            const members = this.channels.get(channel);
+            if (members?.has(clientId)) {
                 members.delete(clientId);
                 this.removePresence(clientId, channel, { skipStore: true });
                 if (members.size === 0) this.forgetChannel(channel);
             }
         }
+        this.channelsByClient.delete(clientId);
 
-        // Remove from all presence channels
-        for (const [channel] of this.presence) {
+        // And from every presence it still holds
+        for (const channel of [...(this.presenceByClient.get(clientId) ?? [])]) {
             this.removePresence(clientId, channel, { skipStore: true });
         }
+        this.presenceByClient.delete(clientId);
+    }
+
+    /** Record that `clientId` is in `channel`, in a reverse index — see {@link channelsByClient}. */
+    private indexClientChannel(index: Map<string, Set<string>>, clientId: string, channel: string): void {
+        let channels = index.get(clientId);
+        if (!channels) index.set(clientId, channels = new Set());
+        channels.add(channel);
+    }
+
+    private unindexClientChannel(index: Map<string, Set<string>>, clientId: string, channel: string): void {
+        const channels = index.get(clientId);
+        if (!channels) return;
+        channels.delete(channel);
+        if (channels.size === 0) index.delete(clientId);
     }
 
     private async handleMessage(clientId: string, message: WebSocketMessage, authContext?: SubscriptionAuthContext) {
@@ -1543,8 +1570,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
         const authorizer = this.channelAuthorizer;
         if (!authorizer) return;
-        for (const [channel, members] of [...this.channels.entries()]) {
-            if (!members.has(clientId)) continue;
+        for (const channel of [...(this.channelsByClient.get(clientId) ?? [])]) {
+            if (!this.channels.get(channel)?.has(clientId)) continue;
             let allowed: boolean;
             try {
                 allowed = await authorizer({ channel, action: "join", clientId, user: authContext });
@@ -2438,6 +2465,7 @@ roles: ["anon"] };
             this.channels.set(channel, new Set());
         }
         this.channels.get(channel)!.add(clientId);
+        this.indexClientChannel(this.channelsByClient, clientId, channel);
         this.warnIfMemoryBusOnMultiplePods();
         this.debugLog(`📡 [Broadcast] Client ${clientId} joined channel: ${channel}`);
     }
@@ -2477,6 +2505,7 @@ roles: ["anon"] };
             members.delete(clientId);
             if (members.size === 0) this.forgetChannel(channel);
         }
+        this.unindexClientChannel(this.channelsByClient, clientId, channel);
         // Also remove presence
         this.removePresence(clientId, channel);
     }
@@ -2900,6 +2929,7 @@ roles: ["anon"] };
         const changed = !previous || JSON.stringify(previous.state) !== JSON.stringify(state);
         channelPresence.set(clientId, { state,
 lastSeen: Date.now() });
+        this.indexClientChannel(this.presenceByClient, clientId, channel);
 
         // Refresh the shared roster on every heartbeat — that timestamp is what
         // tells other instances this client is still here.
@@ -2932,6 +2962,7 @@ lastSeen: Date.now() });
         const entry = channelPresence.get(clientId);
         if (entry) {
             channelPresence.delete(clientId);
+            this.unindexClientChannel(this.presenceByClient, clientId, channel);
             this.deliverPresenceDiff(channel, {}, { [clientId]: entry.state });
             this.publishPresenceDiff(channel, {}, { [clientId]: entry.state });
             if (!options?.skipStore) {
@@ -3131,6 +3162,8 @@ lastSeen: Date.now() });
         // 3. Clear broadcast channels and presence
         this.channels.clear();
         this.presence.clear();
+        this.channelsByClient.clear();
+        this.presenceByClient.clear();
         this.presenceTrackers.clear();
         // Pending history writes hold the pool open; let them settle before the
         // caller closes it, but never let a rejected one break shutdown.
