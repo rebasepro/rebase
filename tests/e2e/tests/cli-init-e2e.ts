@@ -1211,6 +1211,14 @@ timeout: 10000 });
         if (!fs.existsSync(path.join(projectPath, "dist-bundle"))) {
             throw new Error("`rebase build` produced no dist-bundle — the runtime has nothing to boot.");
         }
+        // The admin a scaffold actually ships, held to the rule the monorepo's
+        // own build is (`pnpm check:bundle`): nothing meant to load on demand —
+        // exceljs, the lucide map, the SQL editor — in what the browser fetches
+        // before the login screen. Exits 1 and names the module when one is.
+        await execa("node", [
+            path.join(rootDir, "tooling", "scripts", "check-bundle-budget.mjs"),
+            "--dist", path.join(projectPath, "frontend", "dist")
+        ], { cwd: rootDir, stdio: "inherit", env: cleanEnv });
         // Install the bundle's dependencies HERE, on the host.
         //
         // The runtime installs them itself on first boot when they are absent,
