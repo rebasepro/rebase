@@ -18,6 +18,7 @@
 import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import type { DataDriver } from "@rebasepro/types";
+import { REBASE_USER_ROLE } from "@rebasepro/common";
 import { createCronStore } from "../../server/src/cron/cron-store";
 import type { CronJobRunSummary } from "../../server/src/cron/cron-store";
 
@@ -305,12 +306,40 @@ describe("the retention sweep", () => {
 });
 
 describe("booting", () => {
-    it("adds the counters without an exclusive lock on a table that has them", async () => {
-        const first = createCronStore(pgliteDriver(db))!;
-        await first.ensureTable();
+    /** Statements a boot ran that write the catalogue. */
+    const ddlIn = (statements: string[]) =>
+        statements.filter(s => /^\s*(CREATE|ALTER|DROP|REVOKE|GRANT|DO)\b/i.test(s));
 
+    beforeEach(async () => {
+        await db.exec(`CREATE ROLE ${REBASE_USER_ROLE}`);
+    });
+
+    it("writes nothing to the catalogue on a warm boot", async () => {
+        await createCronStore(pgliteDriver(db))!.ensureTable();
+
+        // Every boot used to re-run eleven statements: `CREATE … IF NOT
+        // EXISTS` takes its table's lock before finding the object, and a
+        // REVOKE rewrites the table's catalogue row.
         const statements: string[] = [];
         await createCronStore(pgliteDriver(db, statements))!.ensureTable();
-        expect(statements.filter(s => /ALTER TABLE/.test(s))).toEqual([]);
+        expect(ddlIn(statements)).toEqual([]);
+        // The read, and the release of claims on future slots.
+        expect(statements).toHaveLength(2);
+    });
+
+    it("takes back a privilege granted by hand, and puts back a dropped index", async () => {
+        await createCronStore(pgliteDriver(db))!.ensureTable();
+        await db.exec(`
+            GRANT SELECT, UPDATE ON rebase.cron_job_state TO ${REBASE_USER_ROLE};
+            DROP INDEX rebase.idx_cron_logs_uncounted;
+        `);
+
+        await createCronStore(pgliteDriver(db))!.ensureTable();
+
+        const { rows } = await db.query<{ can_read: boolean; indexed: boolean }>(
+            `SELECT has_table_privilege('${REBASE_USER_ROLE}', 'rebase.cron_job_state', 'SELECT') AS can_read,
+                    to_regclass('rebase.idx_cron_logs_uncounted') IS NOT NULL AS indexed`
+        );
+        expect(rows[0]).toEqual({ can_read: false, indexed: true });
     });
 });

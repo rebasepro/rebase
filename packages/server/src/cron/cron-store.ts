@@ -1,7 +1,7 @@
 import type { CronJobLogEntry } from "@rebasepro/types";
 import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
-import { revokeInternalTableSql } from "@rebasepro/common";
+import { REBASE_USER_ROLE, revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../utils/logger.js";
 import { createDdlBootstrapper, hasInCauseChain } from "../boot/ddl-bootstrap.js";
 
@@ -300,6 +300,72 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
         }
     };
 
+    /**
+     * Whether a boot has nothing to do: the three tables, the three indexes and
+     * the run-counter columns are there, the dropped index is gone, and the
+     * end-user role holds no privilege on any of the tables. One catalogue
+     * read, where every boot used to run eleven statements — `CREATE … IF NOT
+     * EXISTS` takes its table's lock before it finds the object there, and a
+     * `REVOKE` rewrites the table's catalogue row even when nothing is granted.
+     * Anything missing, or a read that fails, and the boot runs them all.
+     */
+    const bootIsCurrent = async (): Promise<boolean> => {
+        const objects = ["cron_logs", "cron_claims", "cron_job_state", "idx_cron_logs_job", "idx_cron_logs_uncounted", "idx_cron_logs_started"];
+        const columns = ["cron_logs.counted", ...["total_runs", "total_failures", "last_run_at", "last_duration_ms", "last_success", "last_error"].map(c => `cron_job_state.${c}`)];
+        const quoted = (names: string[]) => names.map(name => `'${name}'`).join(", ");
+        try {
+            const rows = await exec(`
+                WITH objects AS (
+                    SELECT c.oid, c.relname, c.relkind, c.relrowsecurity, c.relacl FROM pg_class c
+                    WHERE c.relnamespace = to_regnamespace('rebase')
+                ), target AS (
+                    SELECT oid FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}'
+                )
+                SELECT
+                    (SELECT count(*) FROM objects WHERE relname IN (${quoted(objects)}))::int AS present,
+                    (SELECT count(*) FROM objects WHERE relname = 'idx_cron_logs_job_failures')::int AS stale,
+                    (SELECT count(*) FROM information_schema.columns
+                     WHERE table_schema = 'rebase' AND table_name || '.' || column_name IN (${quoted(columns)}))::int AS columns,
+                    (SELECT count(*) FROM objects o
+                     WHERE o.relkind = 'r' AND o.relname IN ('cron_logs', 'cron_claims', 'cron_job_state')
+                       AND NOT o.relrowsecurity AND EXISTS (SELECT 1 FROM target)
+                       AND (o.relacl IS NULL OR EXISTS (
+                           SELECT 1 FROM aclexplode(o.relacl) a WHERE a.grantee = (SELECT oid FROM target)
+                       )))::int AS granted
+            `);
+            const row = rows?.[0];
+            return Number(row?.present) === objects.length && Number(row?.stale) === 0
+                && Number(row?.columns) === columns.length && Number(row?.granted) === 0;
+        } catch {
+            return false;
+        }
+    };
+
+    /**
+     * Drop claims for slots that have not happened yet. A slot is claimed at
+     * the moment it fires, so a future one can only come from a timer that
+     * woke early — and because claims are permanent, that claim would silently
+     * skip the real run when it finally came due. The margin keeps a legitimate
+     * claim made moments early by a clock-skewed peer.
+     */
+    const releaseFutureClaims = () => ddl.step("Future-slot claim sweep", async () => {
+        const stranded = await exec(
+            `DELETE FROM ${CLAIMS_TABLE}
+             WHERE slot > now() + make_interval(mins => $1)
+             RETURNING job_id, slot`,
+            { params: [FUTURE_CLAIM_SKEW_MINUTES] }
+        );
+        // A driver that does not honour RETURNING gives back nothing; the
+        // rows are only used to report, so treat that as "none".
+        for (const row of (stranded ?? []) as { job_id: string; slot: string }[]) {
+            logger.warn(
+                `[cron-store] Released a claim on the future slot ${new Date(row.slot).toISOString()} ` +
+                `for "${row.job_id}" — it was claimed by a timer that fired early, and would ` +
+                "otherwise have skipped that run"
+            );
+        }
+    });
+
     /** Run one sweep statement until a batch comes back short. Resolves with the total of `column`. */
     const inBatches = async (sqlText: string, params: unknown[], column: string): Promise<number> => {
         let total = 0;
@@ -313,6 +379,15 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
 
     return {
         async ensureTable(): Promise<void> {
+            // A warm boot: everything is there and locked away. The future
+            // claims are about the slots this boot is about to fire, so they
+            // are released either way.
+            if (await bootIsCurrent()) {
+                await releaseFutureClaims();
+                logger.info("✅ Cron logs table ready");
+                return;
+            }
+
             // Creation. Every statement here is idempotent, so losing the race
             // to a peer that booted at the same moment is survivable — but only
             // if the loser retries rather than abandoning everything below it.
@@ -427,30 +502,7 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
             ]);
 
             if (claimsReady) {
-                // Drop claims for slots that have not happened yet. A slot is
-                // claimed at the moment it fires, so a future one can only come
-                // from a timer that woke early — and because claims are
-                // permanent, that claim would silently skip the real run when it
-                // finally came due. The margin keeps a legitimate claim made
-                // moments early by a clock-skewed peer.
-                await ddl.step("Future-slot claim sweep", async () => {
-                    const stranded = await exec(
-                        `DELETE FROM ${CLAIMS_TABLE}
-                         WHERE slot > now() + make_interval(mins => $1)
-                         RETURNING job_id, slot`,
-                        { params: [FUTURE_CLAIM_SKEW_MINUTES] }
-                    );
-                    // A driver that does not honour RETURNING gives back
-                    // nothing; the rows are only used to report, so treat that
-                    // as "none".
-                    for (const row of (stranded ?? []) as { job_id: string; slot: string }[]) {
-                        logger.warn(
-                            `[cron-store] Released a claim on the future slot ${new Date(row.slot).toISOString()} ` +
-                            `for "${row.job_id}" — it was claimed by a timer that fired early, and would ` +
-                            "otherwise have skipped that run"
-                        );
-                    }
-                });
+                await releaseFutureClaims();
 
                 // The retention sweep is not here any more: it ran at boot
                 // and only at boot, so a scheduler that lived for months kept

@@ -137,10 +137,11 @@ describe("createCronStore", () => {
             expect(statements.find(s => s.includes("ALTER TABLE rebase.cron_logs")))
                 .toContain("ADD COLUMN IF NOT EXISTS counted BOOLEAN");
 
-            expect(statements.find(s => s.includes("idx_cron_logs_uncounted"))).toContain("WHERE counted IS NULL");
-            expect(statements.find(s => s.includes("idx_cron_logs_started"))).toContain("(started_at)");
+            const ddl = statements.filter(s => /^\s*(CREATE|DROP) INDEX/.test(s));
+            expect(ddl.find(s => s.includes("idx_cron_logs_uncounted"))).toContain("WHERE counted IS NULL");
+            expect(ddl.find(s => s.includes("idx_cron_logs_started"))).toContain("(started_at)");
             // The failure count is a counter now; nothing reads that index.
-            expect(statements.find(s => s.includes("idx_cron_logs_job_failures"))).toContain("DROP INDEX IF EXISTS");
+            expect(ddl.find(s => s.includes("idx_cron_logs_job_failures"))).toContain("DROP INDEX IF EXISTS");
         });
 
         it("says what is lost when the job state table is unusable", async () => {
