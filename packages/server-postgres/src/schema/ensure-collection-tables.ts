@@ -26,13 +26,14 @@ import {
     REBASE_SCHEMA,
     type CollectionConfig
 } from "@rebasepro/types";
-import { relationalCollections } from "@rebasepro/common";
+import { getTableName, relationalCollections } from "@rebasepro/common";
 import { logger, isConcurrentDdlRace, isDuplicateObjectRace } from "@rebasepro/server";
 import { SEARCH_STAMP_PREFIX } from "./search-column";
 import { vectorExtensionHint } from "./vector-index";
 import { planJunctionTables, quoteSqlLiteral } from "./generate-postgres-ddl-logic";
 import { quoteRelation } from "./introspect-db-queries";
 import { planSchema } from "./plan/plan-schema";
+import type { SchemaPlan } from "./plan/types";
 import {
     assertSafeIdentifier,
     describeHelperFunction,
@@ -155,10 +156,26 @@ export function planCollectionSchemaEnsure(
     return diffPlanAgainstCatalogue(plan, existing, { constraints: options.constraints });
 }
 
+export interface ReadSchemaOptions {
+    /**
+     * The existing tables worth probing for rows, given every table's columns.
+     *
+     * Whether a table holds rows decides one thing: whether a NOT NULL or a
+     * UNIQUE can be added with a column *being added* to it. So the boot asks
+     * only about tables gaining a column — none at all on a boot that changes
+     * nothing — rather than probing every table in the schema, adopted and
+     * unmanaged ones included, on every boot. A table that is not probed is
+     * reported as holding rows: the answer that never plans a constraint that
+     * could fail against data. Absent, every table is probed.
+     */
+    probeTables?: (tables: ReadonlyMap<string, ReadonlySet<string>>) => Iterable<string>;
+}
+
 /** Read what the database has, for the schemas the collections live in. */
 export async function readExistingSchema(
     client: Queryable,
-    schemas: string[]
+    schemas: string[],
+    options: ReadSchemaOptions = {}
 ): Promise<ExistingSchema> {
     const tables = new Map<string, Set<string>>();
     const enums = new Set<string>();
@@ -252,9 +269,21 @@ export async function readExistingSchema(
          JOIN pg_namespace n ON c.relnamespace = n.oid
          WHERE c.relkind IN ('r', 'p', 'i', 'I') AND n.nspname IN (${inList})`
     );
-    const realTables = relations.filter(row => row.kind === "r" || row.kind === "p");
+    const allRealTables = relations.filter(row => row.kind === "r" || row.kind === "p");
     for (const row of relations) {
         if (row.kind === "i" || row.kind === "I") indexes.add(`${row.schema}.${row.name}`);
+    }
+    // Only the tables the caller will ask about; every other one reads as
+    // holding rows — see `ReadSchemaOptions.probeTables`.
+    const wanted = options.probeTables ? new Set(options.probeTables(tables)) : undefined;
+    const realTables = wanted
+        ? allRealTables.filter(row => wanted.has(`${row.schema}.${row.name}`))
+        : allRealTables;
+    if (wanted) {
+        for (const row of allRealTables) {
+            const key = `${row.schema}.${row.name}`;
+            if (!wanted.has(key)) populatedTables.add(key);
+        }
     }
     // The names come from `pg_class`, not from the configuration, so on an
     // adopted database they include tables nobody declared — `2024_archive`,
@@ -401,6 +430,21 @@ export async function readExistingSchema(
 }
 
 /**
+ * The planned tables that exist and lack at least one planned column — the
+ * only ones whose emptiness the diff consults (a NOT NULL or UNIQUE arriving
+ * with a new column). A superset, never a subset: a column the plan renames
+ * from a legacy name reads as missing here too.
+ */
+function tablesGainingColumns(plan: SchemaPlan, catalogue: ReadonlyMap<string, ReadonlySet<string>>): string[] {
+    const gaining: string[] = [];
+    for (const table of plan.tables) {
+        const columns = catalogue.get(table.qualified);
+        if (columns && table.columns.some(column => !columns.has(column.column))) gaining.push(table.qualified);
+    }
+    return gaining;
+}
+
+/**
  * What to tell an operator whose `search` block no longer matches its column.
  *
  * Every line here is doing work: naming the collection is not enough, because
@@ -443,11 +487,18 @@ export async function readSchemaFactsFor(
     collections: CollectionConfig[]
 ): Promise<ExistingSchema> {
     const relational = relationalCollections(collections);
+    const junctions = planJunctionTables(relational);
     const schemas = Array.from(new Set([
         ...relational.map(schemaOf),
-        ...planJunctionTables(relational).map(junction => junction.schema)
+        ...junctions.map(junction => junction.schema)
     ]));
-    return readExistingSchema(client, schemas);
+    // Row probes for the declared tables only: the classifier asks about the
+    // collections it is given, never about a table nobody declared.
+    const declared = [
+        ...relational.map(collection => `${schemaOf(collection)}.${getTableName(collection)}`),
+        ...junctions.map(junction => `${junction.schema}.${junction.table}`)
+    ];
+    return readExistingSchema(client, schemas, { probeTables: () => declared });
 }
 
 /**
@@ -495,7 +546,9 @@ export async function ensureCollectionTables(
         await client.query(`CREATE SCHEMA IF NOT EXISTS "${REBASE_SCHEMA}";`);
     }
 
-    const existing = await readExistingSchema(client, schemas);
+    const existing = await readExistingSchema(client, schemas, {
+        probeTables: catalogue => tablesGainingColumns(schema, catalogue)
+    });
     const plan = diffPlanAgainstCatalogue(schema, existing, { constraints: options.constraints });
     const failures: EnsureOutcome["failures"] = [];
 
