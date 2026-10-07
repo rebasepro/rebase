@@ -1,6 +1,6 @@
 import type { OrderByTuple, Property } from "@rebasepro/types";
 import { serializeOrderBy } from "@rebasepro/common";
-import type { AdditionalFieldDelegate, EntityAction, AdminCollection } from "@rebasepro/cms-types";
+import type { AdditionalFieldDelegate, AnySlotContribution, EntityAction, AdminCollection } from "@rebasepro/cms-types";
 import {
     Entity,
     EntityReference,
@@ -101,6 +101,58 @@ function PluginAddColumnComponents() {
             {components}
         </div>
     );
+}
+
+/**
+ * What the plugins' column-header actions are handed besides their column:
+ * this render's collection and table controller. `null` when no plugin
+ * contributes one.
+ */
+type HeaderActionsScope = {
+    contributions: AnySlotContribution[],
+    path: string,
+    collection: AdminCollection,
+    tableController: EntityTableController,
+    parentCollectionSlugs: string[],
+    parentEntityIds: string[]
+};
+const PluginHeaderActionsContext = React.createContext<HeaderActionsScope | null>(null);
+
+/**
+ * The `collection.header.action` contributions for one column. One component
+ * type for the life of the view, like {@link PluginAddColumnComponents}: the
+ * table's columns are built once, and their headers re-render only when their
+ * own props change, so what the actions are handed reaches them through
+ * context. It was closed over when the header was built — the table controller
+ * of the first render (a search, filter or sort typed since never reached a
+ * header action) and the collection of the render before.
+ */
+function PluginHeaderActions({
+    property,
+    propertyKey,
+    onHover
+}: {
+    property: Property,
+    propertyKey: string,
+    onHover: boolean
+}) {
+    const scope = React.useContext(PluginHeaderActionsContext);
+    if (!scope) return null;
+    const headerSlotProps = {
+        property,
+        propertyKey,
+        onHover,
+        path: scope.path,
+        collection: scope.collection,
+        tableController: scope.tableController,
+        parentCollectionSlugs: scope.parentCollectionSlugs,
+        parentEntityIds: scope.parentEntityIds
+    };
+    return <>{scope.contributions.map((s, i) => (
+        <ErrorBoundary key={`header_action_${propertyKey}_${i}`}>
+            <s.Component {...headerSlotProps} {...(s.props ?? {})}/>
+        </ErrorBoundary>
+    ))}</>;
 }
 
 /**
@@ -987,32 +1039,18 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             .filter(s => s.slot === "collection.header.action")
             .sort((a, b) => (a.order ?? 50) - (b.order ?? 50)), [resolvedSlots]);
 
-        const buildAdditionalHeaderWidget = useCallback(({
-            property,
-            propertyKey,
-            onHover
-        }: {
-            property: Property,
-            propertyKey: string,
-            onHover: boolean
-        }) => {
-            const collection = collectionRef.current;
-            const headerSlotProps = {
-                property,
-                propertyKey,
-                onHover,
+        // This render's values, for PluginHeaderActions. Null when no plugin
+        // contributes a header action, so the headers have nothing to follow.
+        const headerActionsScope = useMemo<HeaderActionsScope | null>(() => headerActionContributions.length > 0
+            ? {
+                contributions: headerActionContributions,
                 path,
                 collection: collection as AdminCollection,
                 tableController: tableController as EntityTableController,
                 parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
-parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
-            };
-            return <>{headerActionContributions.map((s, i) => (
-                <ErrorBoundary key={`header_action_${propertyKey}_${i}`}>
-                    <s.Component {...headerSlotProps} {...(s.props ?? {})}/>
-                </ErrorBoundary>
-            ))}</>;
-        }, [headerActionContributions, path, parentCollectionSlugs]);
+                parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
+            }
+            : null, [headerActionContributions, path, collection, tableController, parentCollectionSlugs, parentEntityIds]);
 
         // One component type for the life of the view: the plugins' controls
         // reach it through context. A function declared here was a new
@@ -1236,6 +1274,7 @@ parentEntityIds,
             />
         ) : (
             <PluginAddColumnsContext.Provider value={pluginAddColumnComponents}>
+            <PluginHeaderActionsContext.Provider value={headerActionsScope}>
             <ResolvedCollectionTable
                 key={`collection_table_${path}`}
                 hideToolbar={true}
@@ -1260,13 +1299,14 @@ parentEntityIds,
                 emptyComponent={emptyComponent}
                 hoverRow={hoverRow}
                 inlineEditing={inlineEditingEnabled}
-                AdditionalHeaderWidget={buildAdditionalHeaderWidget}
+                AdditionalHeaderWidget={PluginHeaderActions}
                 AddColumnComponent={addColumnComponentInternal}
                 getIdColumnWidth={getIdColumnWidth}
                 additionalIDHeaderWidget={idHeaderWidget}
                 openEntityMode={openEntityMode}
                 onColumnsOrderChange={onColumnsOrderChange}
             />
+            </PluginHeaderActionsContext.Provider>
             </PluginAddColumnsContext.Provider>
         );
 
