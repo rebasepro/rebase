@@ -43,6 +43,7 @@ import { JSMonacoEditor } from "./JSMonacoEditor";
 import { JSEditorSidebar, JSSnippet } from "./JSEditorSidebar";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
 import { useRunAsUsers } from "../useRunAsUsers";
+import { toCsv } from "../../utils/sql_utils";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -723,15 +724,11 @@ id: String(ra.entityId) })}
 
     const handleExportCSV = useCallback(() => {
         if (tableData.data.length === 0) return;
-        const headers = tableData.columns.map(c => c.key).join(",");
-        const rows = tableData.data.map(row =>
-            tableData.columns.map(c => {
-                const val = row[c.key];
-                const str = val === null || val === undefined ? "" : String(val);
-                return str.includes(",") ? `"${str}"` : str;
-            }).join(",")
-        );
-        const csv = [headers, ...rows].join("\n");
+        // The SQL console's format. This one quoted a value only when it held
+        // a comma — never doubling a quote or quoting a line break, so
+        // `say "hi"` or a two-line string broke its row — and wrote an object
+        // as `[object Object]`.
+        const csv = toCsv(tableData.columns.map(c => c.key), tableData.data);
         const blob = new Blob([csv], { type: "text/csv" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");

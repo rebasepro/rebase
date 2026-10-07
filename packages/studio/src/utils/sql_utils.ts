@@ -434,8 +434,23 @@ export function withAutoLimit(sqlText: string, limit: number): string | null {
 }
 
 /**
- * The rows on screen as CSV text: a header line of column names, then one
- * line per row, each value under its own column.
+ * Rows as CSV text: a header record of column names, then one record per
+ * row, each value under its own column.
+ *
+ * RFC 4180 with every record ended by CRLF — byte for byte what
+ * `POST /api/admin/sql/csv` streams for the same result, so "Export CSV" and
+ * "Download full result as CSV" write one format. They used to differ in
+ * the line break (LF here), which a diff, a checksum or a strict reader
+ * notices.
+ */
+export function toCsv(columns: readonly string[], rows: readonly Record<string, unknown>[]): string {
+    const records = [csvRecord(columns), ...rows.map(row => csvRecord(columns.map(column => row[column])))];
+    return records.map(record => record + "\r\n").join("");
+}
+
+/**
+ * The rows on screen as CSV text — {@link toCsv} over the first row's
+ * columns.
  *
  * A value was quoted only when it held a comma, and a quote in it was never
  * doubled nor a line break quoted, so `say "hi"` or a two-line note broke the
@@ -443,9 +458,7 @@ export function withAutoLimit(sqlText: string, limit: number): string | null {
  */
 export function resultsToCsv(rows: Record<string, unknown>[]): string {
     if (rows.length === 0) return "";
-    const columns = Object.keys(rows[0]);
-    const lines = rows.map(row => csvRecord(columns.map(column => row[column])));
-    return [csvRecord(columns), ...lines].join("\n");
+    return toCsv(Object.keys(rows[0]), rows);
 }
 
 /** Column widths per query, as the console keeps them: SQL text → column → width. */

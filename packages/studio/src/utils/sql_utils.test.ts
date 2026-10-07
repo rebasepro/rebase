@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "@jest/globals";
-import { acceptsAutoLimit, buildExplainSql, COLUMN_WIDTHS_REMEMBERED, formatSql, groupSchemaRows, keepLatestColumnWidths, rememberColumnWidth, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type ResultProvenance } from "./sql_utils";
+import { acceptsAutoLimit, buildExplainSql, COLUMN_WIDTHS_REMEMBERED, formatSql, groupSchemaRows, keepLatestColumnWidths, rememberColumnWidth, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, toCsv, withAutoLimit, type ResultProvenance } from "./sql_utils";
 import type { SqlScriptColumn, SqlScriptTable } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -435,10 +435,29 @@ describe("resultsToCsv", () => {
             else if (char === "\n") { record.push(field); records.push(record); record = []; field = ""; }
             else if (char !== "\r") field += char;
         }
-        record.push(field);
-        records.push(record);
+        // A line break ends the last record; it does not start another.
+        if (field !== "" || record.length > 0) {
+            record.push(field);
+            records.push(record);
+        }
         return records;
     };
+
+    /**
+     * One CSV format in the console. "Download full result as CSV" streams
+     * RFC 4180 records each ended by CRLF (`POST /api/admin/sql/csv`), and
+     * "Export CSV" wrote the same records joined by LF — two files from one
+     * result that a diff, a checksum or a strict reader told apart.
+     */
+    it("ends every record with CRLF, as the streamed download does", () => {
+        expect(resultsToCsv([{ id: 1, note: "two\nlines" }, { id: 2, note: null }]))
+            .toBe("id,note\r\n1,\"two\nlines\"\r\n2,\r\n");
+    });
+
+    it("writes the columns it is given, in that order, for a result that names them", () => {
+        expect(toCsv(["b", "a"], [{ a: 1, b: "x,y" }, { a: { k: 1 }, b: "say \"hi\"" }]))
+            .toBe("b,a\r\n\"x,y\",1\r\n\"say \"\"hi\"\"\",\"{\"\"k\"\":1}\"\r\n");
+    });
 
     it("reads back as the values it was given, quotes, commas and line breaks included", () => {
         const rows = [
