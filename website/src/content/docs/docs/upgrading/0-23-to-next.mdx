@@ -533,6 +533,15 @@ such a column moves the filter there:
 + GET /api/data/products?where={"count":["==",5]}
 ```
 
+**A new SDK against an old server:** `iterate()` and `findAll()` send
+`?count=none` on every page, and so does `find({ count: "none" })`. A 0.23
+server reads it as a filter on a column named `count`. Where the collection has
+no such column it answers `400 UNKNOWN_FILTER_FIELD`, and the SDK sends the read
+again without it. Where the collection has a **text** column named `count`, the
+old server filters to the rows whose `count` is `'none'` instead, with no error:
+the page comes back short or empty and a walk ends early. Upgrade the server
+before the SDK when a collection has such a column.
+
 See [Skipping the count](/docs/backend/api/#skipping-the-count).
 
 ## 66. The remote MCP's `list_collections` has no `structuredContent`
