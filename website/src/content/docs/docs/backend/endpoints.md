@@ -165,6 +165,7 @@ for projects that have not moved; write new code against the canonical path.
 | `GET` | `/api/storage/file/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `DELETE` | `/api/storage/file/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `GET` | `/api/storage/metadata/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
+| `POST` | `/api/storage/metadata` | session + `storageAuthorize`, per key | <span class="since-badge" data-since="0.24">Since 0.24</span> [Storage](/docs/backend/storage/#storage-endpoints): metadata for up to 100 objects |
 | `GET` | `/api/storage/list` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `GET` | `/api/storage/sources` | session | The named storage sources this backend serves |

@@ -15,8 +15,10 @@ import {
 } from "@rebasepro/types";
 import {
     DOWNLOAD_URL_CONCURRENCY,
+    createBatchLoader,
     createConcurrencyLimit,
     createDownloadUrlCache,
+    type DownloadMetadataBatchEntry,
     type ResolvedDownload
 } from "@rebasepro/common";
 import { DEFAULT_API_PATH } from "./ApiConfigContext";
@@ -141,6 +143,47 @@ export function useBackendStorageSource({
     }, [fetchWithAuth, storageBasePath]);
 
     /**
+     * A private file's metadata and download token, or `null` when there is
+     * no such file. The lookups a page starts together go as one
+     * `POST /storage/metadata` per hundred files, which the server charges a
+     * tenth of the requests it replaces; one asked for alone is the `GET` it
+     * always was. A server without the batch route (404) is asked one file at
+     * a time from then on.
+     */
+    const describe = useMemo(() => createBatchLoader<DownloadMetadata | null>({
+        loadOne: async (filePath) => {
+            const response = await limitMetadata(() =>
+                fetchWithAuth(`${storageBasePath}/metadata/${encodeStorageKey(filePath)}`));
+            if (response.status === 404) return null;
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: "Failed to get download URL" }));
+                throw new Error(error.error || "Failed to get download URL");
+            }
+            const result: { data: DownloadMetadata } = await response.json();
+            return result.data;
+        },
+        loadMany: async (filePaths) => {
+            const response = await limitMetadata(() => fetchWithAuth(`${storageBasePath}/metadata`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ keys: filePaths })
+            }));
+            if (!response.ok) {
+                throw Object.assign(new Error(`Failed to get download URLs (${response.status})`), { status: response.status });
+            }
+            const result: { data: Record<string, DownloadMetadataBatchEntry> } = await response.json();
+            const answers = new Map<string, DownloadMetadata | null | Error>();
+            for (const [filePath, entry] of Object.entries(result.data ?? {})) {
+                if (!("error" in entry)) answers.set(filePath, entry);
+                else if (entry.error.status === 404) answers.set(filePath, null);
+                else answers.set(filePath, new Error(entry.error.message || "Failed to get download URL"));
+            }
+            return answers;
+        },
+        isUnsupported: (error) => error instanceof Error && "status" in error && (error.status === 404 || error.status === 405)
+    }), [fetchWithAuth, limitMetadata, storageBasePath]);
+
+    /**
      * Resolve a file's download URL: the network half of `getSignedUrl`.
      */
     const resolveDownload = useCallback(async (
@@ -161,42 +204,34 @@ export function useBackendStorageSource({
             return { config: { url: fileUrl } };
         }
 
-        const response = await limitMetadata(() =>
-            fetchWithAuth(`${storageBasePath}/metadata/${encodeStorageKey(filePath)}`));
+        const metadata = await describe(filePath);
 
-        if (response.status === 404) {
+        if (metadata === null) {
             return { config: { url: null, fileNotFound: true }, noStore: true };
         }
 
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: "Failed to get download URL" }));
-            throw new Error(error.error || "Failed to get download URL");
-        }
-
-        const result: { data: DownloadMetadata } = await response.json();
-
-        if (result.data.public) {
-            return { config: { url: fileUrl, metadata: result.data } };
+        if (metadata.public) {
+            return { config: { url: fileUrl, metadata } };
         }
 
         // A private file is read with the short-lived download token the
         // metadata call minted for this one path. Never the session's access
         // token: the file route refuses it, and a URL is no place for a
         // full-privilege credential — it lands in `<img src>` and access logs.
-        const scopedToken = result.data.token;
+        const scopedToken = metadata.token;
         const downloadConfig: DownloadConfig = {
             url: scopedToken ? `${fileUrl}?token=${encodeURIComponent(scopedToken)}` : fileUrl,
-            metadata: result.data
+            metadata
         };
 
         return {
             config: downloadConfig,
             // Ten seconds early, so a URL handed out is still good when used.
-            expiresAt: result.data.tokenExpiresIn
-                ? Date.now() + (result.data.tokenExpiresIn - 10) * 1000
+            expiresAt: metadata.tokenExpiresIn
+                ? Date.now() + (metadata.tokenExpiresIn - 10) * 1000
                 : undefined
         };
-    }, [fetchWithAuth, limitMetadata, storageBasePath]);
+    }, [describe, storageBasePath]);
 
     /**
      * Get download URL for a file

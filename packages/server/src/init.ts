@@ -133,6 +133,7 @@ import {
     StorageController,
     StorageRegistry
 } from "./storage";
+import { storageRateLimitCost } from "./storage/routes";
 import type { ApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRoutes, createPersonalKeyRoutes } from "./auth/api-keys/api-key-routes";
@@ -2752,7 +2753,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // the context and the limiter buckets by caller rather than by IP, and
         // before `route("/")` for the ordering reason the comment above records.
         if (rateLimitConfig) {
-            storageRouter.use("/*", createDataRateLimiter(rateLimitConfig));
+            // A batched `POST /metadata` of N keys counts as ⌈N/10⌉ requests.
+            storageRouter.use("/*", createDataRateLimiter(rateLimitConfig, { cost: storageRateLimitCost }));
         }
 
         // The upload endpoint's own body limit. The same path is exempted from

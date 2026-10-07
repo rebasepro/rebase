@@ -1,4 +1,4 @@
-import type { DownloadConfig } from "@rebasepro/types";
+import type { DownloadConfig, DownloadMetadata } from "@rebasepro/types";
 
 /**
  * What a storage source resolved for one path, and how long it may be reused.
@@ -185,3 +185,117 @@ export function createConcurrencyLimit(max: number): <T>(task: () => Promise<T>)
 
 /** Requests for signed URLs a storage source keeps open at once. */
 export const DOWNLOAD_URL_CONCURRENCY = 8;
+
+/** Most keys one `POST /storage/metadata` describes. */
+export const DOWNLOAD_METADATA_BATCH_MAX = 100;
+
+/**
+ * What `POST /storage/metadata` answers for one key: its metadata, as
+ * `GET /storage/metadata/<key>` answers it, or the error that request would
+ * have answered.
+ */
+export type DownloadMetadataBatchEntry =
+    | DownloadMetadata
+    | { error: { code?: string; message: string; status: number } };
+
+export interface BatchLoaderOptions<V> {
+    /**
+     * Load these keys in one request: a value or an `Error` for each. Rejects
+     * when the request as a whole failed.
+     */
+    loadMany(keys: string[]): Promise<Map<string, V | Error>>;
+    /** Load one key in a request of its own. */
+    loadOne(key: string): Promise<V>;
+    /**
+     * Whether `loadMany`'s failure means the server has no batch route — an
+     * older server. That batch, and every key after it, is then loaded one
+     * key at a time.
+     */
+    isUnsupported?(error: unknown): boolean;
+    /** Keys per `loadMany`. Default {@link DOWNLOAD_METADATA_BATCH_MAX}. */
+    maxBatch?: number;
+}
+
+/**
+ * Turn the per-key lookups a page makes in one burst into batched requests.
+ *
+ * A collection view mounts its previews in one tick, and each asks for its
+ * file's metadata; {@link createDownloadUrlCache} already makes one load per
+ * distinct key. This collects the loads started together — in the same tick,
+ * give or take a few awaits — and makes them one `loadMany` per
+ * {@link BatchLoaderOptions.maxBatch} keys: a page of 100 thumbnails is one
+ * request, not 100. A key asked for alone goes through `loadOne`, the request
+ * it always made.
+ *
+ * Holds no answers: what it loads is the caller's to cache. Nothing is shared
+ * between keys but the request they travel in.
+ */
+export function createBatchLoader<V>(options: BatchLoaderOptions<V>): (key: string) => Promise<V> {
+    const maxBatch = Math.max(1, options.maxBatch ?? DOWNLOAD_METADATA_BATCH_MAX);
+    let waiting: { key: string; resolve: (value: V) => void; reject: (error: unknown) => void }[] = [];
+    let scheduled = false;
+    let unsupported = false;
+
+    const one = (entry: (typeof waiting)[number]) => {
+        options.loadOne(entry.key).then(entry.resolve, entry.reject);
+    };
+
+    function send(batch: typeof waiting): void {
+        if (batch.length === 1 || unsupported) {
+            batch.forEach(one);
+            return;
+        }
+        options.loadMany([...new Set(batch.map(entry => entry.key))]).then(
+            answers => {
+                for (const entry of batch) {
+                    const answer = answers.get(entry.key);
+                    if (answer === undefined) entry.reject(new Error(`The server did not answer for "${entry.key}".`));
+                    else if (answer instanceof Error) entry.reject(answer);
+                    else entry.resolve(answer);
+                }
+            },
+            error => {
+                if (options.isUnsupported?.(error)) {
+                    unsupported = true;
+                    batch.forEach(one);
+                    return;
+                }
+                for (const entry of batch) entry.reject(error);
+            }
+        );
+    }
+
+    function flush(): void {
+        scheduled = false;
+        const all = waiting;
+        waiting = [];
+        for (let start = 0; start < all.length; start += maxBatch) {
+            send(all.slice(start, start + maxBatch));
+        }
+    }
+
+    return (key) => new Promise<V>((resolve, reject) => {
+        waiting.push({ key, resolve, reject });
+        if (scheduled) return;
+        scheduled = true;
+        void afterBurst().then(flush);
+    });
+}
+
+/**
+ * Microtask turns a batch waits for the rest of its burst. Each lookup reaches
+ * the loader after its own chain of awaits — a token read, the cache — so the
+ * lookups started in one tick arrive over the next few turns, not in one.
+ */
+const BURST_TURNS = 8;
+
+/**
+ * Resolves once the lookups started in the current tick have arrived.
+ *
+ * Promise turns rather than a timer: a timer is faked by `jest.useFakeTimers()`
+ * and its kind, and a lookup behind a faked timer would never be sent in an
+ * application's own tests. Promise jobs are never faked.
+ */
+async function afterBurst(): Promise<void> {
+    for (let turn = 0; turn < BURST_TURNS; turn++) await undefined;
+}

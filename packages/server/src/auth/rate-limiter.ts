@@ -54,6 +54,14 @@ interface RateLimiterOptions {
     resolveLimit?: (c: Parameters<MiddlewareHandler<HonoEnv>>[0]) =>
         number | null | undefined | Promise<number | null | undefined>;
     /**
+     * How many requests this one counts as. Default 1. For a request that
+     * does the work of several — a batch — so batching is cheaper than the
+     * requests it replaces without being free. Charged one hit at a time, and
+     * refused at the first that does not fit; the hits before it stay charged,
+     * as the requests a batch replaces would have been.
+     */
+    cost?: (c: Parameters<MiddlewareHandler<HonoEnv>>[0]) => number | Promise<number>;
+    /**
      * Number of trusted reverse-proxy hops in front of this server. Each hop
      * appends the address it saw to `X-Forwarded-For`, so the real client IP is
      * the Nth entry from the right. Anything further left is client-supplied and
@@ -170,7 +178,8 @@ export function createRateLimiter(options: RateLimiterOptions = {}): MiddlewareH
         message = "Too many requests, please try again later.",
         name,
         store = name ? namedStore(name, windowMs) : new MemoryRateLimitStore(windowMs),
-        resolveLimit
+        resolveLimit,
+        cost
     } = options;
 
     return async (c, next) => {
@@ -180,7 +189,12 @@ export function createRateLimiter(options: RateLimiterOptions = {}): MiddlewareH
         if (effectiveLimit === null) return next();
         const activeLimit = effectiveLimit ?? limit;
 
-        const decision = await store.hit(await keyGenerator(c), windowMs, activeLimit);
+        const key = await keyGenerator(c);
+        let decision = await store.hit(key, windowMs, activeLimit);
+        const charge = cost ? Math.max(1, Math.floor(await cost(c))) : 1;
+        for (let hit = 1; hit < charge && decision.allowed; hit++) {
+            decision = await store.hit(key, windowMs, activeLimit);
+        }
 
         c.header("X-RateLimit-Limit", String(activeLimit));
         c.header("X-RateLimit-Remaining", String(decision.remaining));
@@ -517,7 +531,11 @@ export const DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT = 3000;
  * set them, and one that already has a proxy doing this should pass
  * `enabled: false` rather than pay for it twice.
  */
-export function createDataRateLimiter(config: DataRateLimitConfig = {}): MiddlewareHandler<HonoEnv> {
+export function createDataRateLimiter(
+    config: DataRateLimitConfig = {},
+    /** See {@link RateLimiterOptions.cost}: what one request on this router counts as. */
+    options: { cost?: RateLimiterOptions["cost"] } = {}
+): MiddlewareHandler<HonoEnv> {
     const {
         windowMs = 15 * 60 * 1000,
         // One store for every bucket: the keys are already namespaced, and a
@@ -618,7 +636,8 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
         keyGenerator: async (c) => (await bucketOf(c))?.key ?? `ip:${defaultKeyGenerator(c, trustedProxyHops)}`,
         // `null` means "skip the limiter", which `createRateLimiter` honours
         // before it touches the store.
-        resolveLimit: async (c) => (await bucketOf(c))?.limit ?? null
+        resolveLimit: async (c) => (await bucketOf(c))?.limit ?? null,
+        cost: options.cost
     });
 }
 

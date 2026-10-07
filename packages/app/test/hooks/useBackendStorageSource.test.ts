@@ -162,27 +162,35 @@ describe("useBackendStorageSource", () => {
     // A collection view mounts one preview per row in the same tick, and rows
     // share files; each `/metadata` call spends the user's rate-limit budget.
     describe("many previews at once", () => {
-        /** A backend whose metadata requests stay open until drained. */
+        /**
+         * A backend whose metadata requests stay open until drained. A batched
+         * `POST /storage/metadata` is answered per key, as the server answers it.
+         */
         function slowBackend() {
             const open: (() => void)[] = [];
             let metadataCalls = 0;
+            const batches: string[][] = [];
             let inFlight = 0;
             let peak = 0;
+            const described = { token: "scoped-token", tokenExpiresIn: 300 };
             Object.defineProperty(global, "fetch", {
                 configurable: true,
                 writable: true,
-                value: (input: RequestInfo | URL) => new Promise(resolve => {
-                    metadataCalls += String(input).includes("/storage/metadata/") ? 1 : 0;
+                value: (input: RequestInfo | URL, init?: RequestInit) => new Promise(resolve => {
+                    const keys = init?.method === "POST" ? (JSON.parse(String(init.body)) as { keys: string[] }).keys : undefined;
+                    if (keys) batches.push(keys);
+                    metadataCalls += String(input).includes("/storage/metadata") ? 1 : 0;
                     inFlight++;
                     peak = Math.max(peak, inFlight);
                     open.push(() => {
                         inFlight--;
-                        resolve(reply(200, { json: { data: { token: "scoped-token", tokenExpiresIn: 300 } } }));
+                        resolve(reply(200, { json: { data: keys ? Object.fromEntries(keys.map(key => [key, described])) : described } }));
                     });
                 })
             });
             return {
                 get metadataCalls() { return metadataCalls; },
+                get batches() { return batches; },
                 get peak() { return peak; },
                 async drain() {
                     while (open.length) {
@@ -205,17 +213,78 @@ describe("useBackendStorageSource", () => {
             expect(backend.metadataCalls).toBe(1);
         });
 
-        it("keeps a bounded number of metadata requests open at once", async () => {
+        it("asks for 100 different files together in one request, each with its own token", async () => {
             const backend = slowBackend();
             const source = storage();
 
             const all = Promise.all(Array.from({ length: 100 }, (_, i) => source.getSignedUrl(`photos/${i}.png`)));
             await new Promise(resolve => setTimeout(resolve, 0));
             await backend.drain();
+            const configs = await all;
+
+            expect(backend.metadataCalls).toBe(1);
+            expect(backend.batches.map(keys => keys.length)).toEqual([100]);
+            expect(configs[42].url).toBe(`${API}/api/storage/file/photos/42.png?token=scoped-token`);
+        });
+
+        it("keeps a bounded number of metadata requests open at once", async () => {
+            const backend = slowBackend();
+            const source = storage();
+
+            // 1,000 files: ten batches of a hundred, at most eight open at once.
+            const all = Promise.all(Array.from({ length: 1_000 }, (_, i) => source.getSignedUrl(`photos/${i}.png`)));
+            await new Promise(resolve => setTimeout(resolve, 0));
+            await backend.drain();
             await all;
 
-            expect(backend.metadataCalls).toBe(100);
+            expect(backend.metadataCalls).toBe(10);
             expect(backend.peak).toBeLessThanOrEqual(8);
+        });
+
+        it("asks one file at a time, from then on, of a server without the batch route", async () => {
+            const calls: Call[] = [];
+            Object.defineProperty(global, "fetch", {
+                configurable: true,
+                writable: true,
+                value: async (input: RequestInfo | URL, init?: RequestInit) => {
+                    calls.push({ url: String(input), init });
+                    if (init?.method === "POST") return reply(404, { json: {} });
+                    return reply(200, { json: { data: { token: "scoped-token", tokenExpiresIn: 300 } } });
+                }
+            });
+            const source = storage();
+
+            const configs = await Promise.all(["a.png", "b.png", "c.png"].map(key => source.getSignedUrl(key)));
+            expect(configs.map(config => config.url)).toEqual(["a", "b", "c"].map(name => `${API}/api/storage/file/${name}.png?token=scoped-token`));
+            await Promise.all(["d.png", "e.png"].map(key => source.getSignedUrl(key)));
+
+            expect(calls.filter(call => call.init?.method === "POST")).toHaveLength(1);
+            expect(calls.filter(call => call.init?.method !== "POST").map(call => call.url)).toEqual(
+                ["a", "b", "c", "d", "e"].map(name => `${API}/api/storage/metadata/${name}.png`));
+        });
+
+        it("answers a refused and a missing file on their own, and the rest in full", async () => {
+            Object.defineProperty(global, "fetch", {
+                configurable: true,
+                writable: true,
+                value: async () => reply(200, {
+                    json: {
+                        data: {
+                            "photos/mine.png": { token: "scoped-token", tokenExpiresIn: 300 },
+                            "photos/theirs.png": { error: { code: "FORBIDDEN", message: "Not authorized for this object", status: 403 } },
+                            "photos/gone.png": { error: { code: "NOT_FOUND", message: "File not found", status: 404 } }
+                        }
+                    }
+                })
+            });
+            const source = storage();
+
+            const [mine, theirs, gone] = await Promise.allSettled(
+                ["photos/mine.png", "photos/theirs.png", "photos/gone.png"].map(key => source.getSignedUrl(key)));
+
+            expect(mine).toEqual({ status: "fulfilled", value: expect.objectContaining({ url: expect.stringContaining("token=scoped-token") }) });
+            expect(theirs).toEqual({ status: "rejected", reason: expect.objectContaining({ message: "Not authorized for this object" }) });
+            expect(gone).toEqual({ status: "fulfilled", value: { url: null, fileNotFound: true } });
         });
     });
 

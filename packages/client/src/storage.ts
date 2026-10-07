@@ -1,5 +1,12 @@
-import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, isPublicStoragePath, storageObjectPath } from "@rebasepro/types";
-import { DOWNLOAD_URL_CONCURRENCY, createConcurrencyLimit, createDownloadUrlCache, type ResolvedDownload } from "@rebasepro/common";
+import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, RebaseApiError, isPublicStoragePath, storageObjectPath } from "@rebasepro/types";
+import {
+    DOWNLOAD_URL_CONCURRENCY,
+    createBatchLoader,
+    createConcurrencyLimit,
+    createDownloadUrlCache,
+    type DownloadMetadataBatchEntry,
+    type ResolvedDownload
+} from "@rebasepro/common";
 import { Transport } from "./transport";
 
 /**
@@ -42,6 +49,32 @@ export function createStorage(transport: Transport, storageId?: string): Storage
     // DOWNLOAD_URL_CONCURRENCY of those are open at once.
     const urlsCache = createDownloadUrlCache();
     const limitMetadata = createConcurrencyLimit(DOWNLOAD_URL_CONCURRENCY);
+
+    /**
+     * A private file's metadata and download token. The lookups a page starts
+     * together — a table of thumbnails — go as one `POST /storage/metadata`
+     * per hundred files, which the server charges a tenth of the requests it
+     * replaces; one asked for alone is the `GET` it always was. A server
+     * without the batch route (404) is asked one file at a time from then on.
+     */
+    const describe = createBatchLoader<DownloadMetadata>({
+        loadOne: async (filePath) => (await limitMetadata(() =>
+            transport.request<{ data: DownloadMetadata }>(withStorageId(`/storage/metadata/${encodeStorageKey(filePath)}`)))).data,
+        loadMany: async (filePaths) => {
+            const result = await limitMetadata(() => transport.request<{ data: Record<string, DownloadMetadataBatchEntry> }>("/storage/metadata", {
+                method: "POST",
+                body: JSON.stringify({ keys: filePaths, ...(storageId ? { storageId } : {}) })
+            }));
+            const answers = new Map<string, DownloadMetadata | Error>();
+            for (const [filePath, entry] of Object.entries(result.data ?? {})) {
+                answers.set(filePath, "error" in entry
+                    ? new RebaseApiError(entry.error.message, { status: entry.error.status, code: entry.error.code })
+                    : entry);
+            }
+            return answers;
+        },
+        isUnsupported: (error) => error instanceof Error && "status" in error && (error.status === 404 || error.status === 405)
+    });
 
     /**
      * Base for URLs the *browser* will fetch on its own (file downloads,
@@ -161,15 +194,14 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         }
 
         try {
-            const result = await limitMetadata(() =>
-                transport.request<{ data: DownloadMetadata }>(withStorageId(`/storage/metadata/${encodeStorageKey(filePath)}`)));
+            const metadata = await describe(filePath);
 
             // Public object (server-confirmed): token-less permanent URL.
-            if (result.data.public) {
+            if (metadata.public) {
                 return {
                     config: {
                         url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}`),
-                        metadata: result.data
+                        metadata
                     }
                     // no expiry
                 };
@@ -179,7 +211,7 @@ export function createStorage(transport: Transport, storageId?: string): Storage
             // minted by the server. We deliberately do NOT fall back to the
             // caller's access token — a URL must never carry a full-privilege
             // credential. If no scoped token is present the URL fails closed.
-            const scopedToken = result.data.token;
+            const scopedToken = metadata.token;
             const tokenQuery = scopedToken ? `?token=${scopedToken}` : "";
 
             const downloadConfig: DownloadConfig = {
@@ -187,11 +219,11 @@ export function createStorage(transport: Transport, storageId?: string): Storage
                 // query is already present, so the URL stays valid even when
                 // there is no token.
                 url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}${tokenQuery}`),
-                metadata: result.data
+                metadata
             };
 
-            const expiresAt = result.data.tokenExpiresIn
-                ? Date.now() + (result.data.tokenExpiresIn - 10) * 1000 // subtract 10s buffer
+            const expiresAt = metadata.tokenExpiresIn
+                ? Date.now() + (metadata.tokenExpiresIn - 10) * 1000 // subtract 10s buffer
                 : undefined;
 
             return { config: downloadConfig, expiresAt };

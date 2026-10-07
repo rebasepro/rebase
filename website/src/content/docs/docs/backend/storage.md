@@ -101,6 +101,7 @@ image: {
 | `GET` | `/api/storage/file/*` | Retrieve a file — everything after `/file/` is the object key |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Retrieve a file from a specific backend |
 | `GET` | `/api/storage/metadata/*` | Size, content type and last modification of one object, without its bytes |
+| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.24">Since 0.24</span> The same for up to 100 objects of one source: body `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Delete a file |
 | `GET` | `/api/storage/list` | List objects under a prefix (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). A `maxResults` below 1, or a `pageToken` the source never issued, is `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Create an empty folder marker |
@@ -133,6 +134,8 @@ does not set them.
 `POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }`
 of the stored object under `data`; `GET /api/storage/metadata/*` the object's
 metadata and, for a private object, the short-lived `token`;
+`POST /api/storage/metadata` an object keyed by the paths it was sent, each
+holding what the `GET` would have answered for it (see below);
 `GET /api/storage/sources` the array of configured sources, with
 `configured: true`. On a deployment with no storage at all, it answers
 `200 {"data": [], "configured": false}`, while every other route answers
@@ -145,6 +148,29 @@ On S3 and GCS, a `bucket` has to be one the source serves, on writes as on
 reads: an upload, a `POST /api/storage/folder` or a TUS upload naming any other
 bucket answers `404 UNKNOWN_STORAGE_SOURCE`, as the listing does. Local storage
 still creates a bucket on its first write.
+
+**Many objects at once.** <span class="since-badge" data-since="0.24">Since 0.24</span> `POST /api/storage/metadata` takes
+`{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — up to 100
+object paths of one source, each spelled as `GET /api/storage/metadata/<key>`
+takes it — and answers one entry per key:
+
+```json
+{ "data": {
+  "photos/a.png": { "fullPath": "photos/a.png", "size": 48213, "contentType": "image/png", "token": "…", "tokenExpiresIn": 300 },
+  "photos/b.png": { "error": { "code": "FORBIDDEN", "message": "Not authorized for this object", "status": 403 } }
+} }
+```
+
+Each key is judged exactly as the `GET` judges it — the same `storageAuthorize`
+hook and storage scope, the same public rule, a download token of its own — and a
+key that is refused, missing or malformed answers its own `error` without failing
+or revealing the others. A caller with no session in a deployment that requires
+one gets the `401` the `GET` would answer, unless every key is public. More than
+100 keys, or a body without `keys`, is `400 BAD_REQUEST`. The rate limiter counts
+the request as ⌈N/10⌉ requests for N keys, so a page of 100 thumbnails costs 10.
+`client.storage.getSignedUrl()` and the admin panel send the lookups a page makes
+together this way, and fall back to one `GET` per file on a server without the
+route.
 
 **How a file read is authorized.** The read routes — `/api/storage/file/*` and
 `/api/storage/metadata/*` — take the short-lived signed token that

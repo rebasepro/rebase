@@ -75,7 +75,11 @@ const { url } = await client.storage.getSignedUrl(
 ```
 
 The SDK caches signed URLs to avoid redundant server calls, until each one's
-download token expires. The cache belongs to the credential that asked: when
+download token expires. <span class="since-badge" data-since="0.24">Since 0.24</span> Lookups made together — a page of previews
+calling `getSignedUrl()` in the same tick — go to the server as one
+`POST /api/storage/metadata` per 100 files, which the rate limiter counts as a
+tenth of the requests it replaces; a file that one caller may not read fails
+that call alone. The cache belongs to the credential that asked: when
 the access token changes — a sign-out, another user signing in, a refresh — it
 starts over, so one user is never handed a URL minted for another.
 
