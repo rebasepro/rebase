@@ -60,9 +60,11 @@ const ordersCollection = defineCollection({
 ## How It Works
 
 1. The backend creates a `rebase.entity_history` table automatically.
-2. On every create, update, or delete, a snapshot is recorded with:
+2. On every create, update, or delete, an entry is recorded with:
    - Entity ID, and the collection slug (in `table_name`)
-   - The full entity values (before and after)
+   - The entity's values after the change (`values`; for a delete, the entity
+     that was deleted)
+   - On an update, what the changed fields held before it (`previous_values`)
    - Timestamp and user ID
    - The action (`create`, `update`, `delete`)
    - An array of `changed_fields` showing which columns were modified
@@ -74,6 +76,28 @@ On a collection with [soft delete](/docs/collections/soft-delete/), a delete is
 recorded as `delete` and a restore (the update setting the soft-delete field
 back to `null`) as `update`. A row's history stays readable while the row is in
 the trash, and reverting it to a version from before the delete restores it.
+
+### What `previous_values` holds
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> An update entry
+keeps, in `previous_values`, only the fields listed in `changed_fields`. Every
+other field held the same value before and after the change, so it is in
+`values` already; storing the whole row twice cost a one-field change to a
+20-field row 1,269 bytes, where it now costs 794.
+
+Entries recorded before 0.24 keep the whole previous row. The entry's `format`
+says which it is:
+
+| `format` | `previous_values` on an update |
+|---|---|
+| `1` (entries from before 0.24) | The whole row before the change |
+| `2` | The `changed_fields` only, each as the whole row had it |
+
+The admin's history view and a revert read both alike: the view shows each
+changed field's previous value, and a revert writes the chosen entry's `values`,
+which are whole in both formats. To rebuild the row as it was before a
+`format: 2` change, take `values` and put back each field `previous_values`
+holds.
 
 ### Diff Tracking & Structural Deep Equality
 
@@ -111,9 +135,10 @@ Returns a list of history entries for a specific entity, ordered by most recent 
             "action": "update",
             "changed_fields": ["status"],
             "values": { "status": "shipped", "total": 99.99 },
-            "previous_values": { "status": "pending", "total": 99.99 },
+            "previous_values": { "status": "pending" },
             "updated_by": "admin-user-id",
-            "updated_at": "2025-01-15T10:30:00Z"
+            "updated_at": "2025-01-15T10:30:00Z",
+            "format": 2
         }
     ],
     "meta": { "total": 1, "limit": 20, "offset": 0, "hasMore": false }

@@ -28,8 +28,20 @@ export interface EntityHistoryEntry {
     action: "create" | "update" | "delete";
     /** Which fields changed. `null` for creates and deletes. */
     changed_fields: string[] | null;
+    /** The row after the change; for a delete, the row that was deleted. */
     values: Record<string, unknown> | null;
+    /**
+     * On an update, what the changed fields held before it. `null` for creates
+     * and deletes. Which fields it holds depends on {@link format}.
+     */
     previous_values: Record<string, unknown> | null;
+    /**
+     * How the entry was stored. Absent or `1`: `previous_values` is the whole
+     * row before the change. `2`: it holds the `changed_fields` only — a field
+     * that is absent from it was absent before — and every other field is
+     * unchanged, so it is in `values`.
+     */
+    format?: 1 | 2;
     updated_by: string | null;
     /** ISO-8601. A driver storing a native date converts on read. */
     updated_at: string;

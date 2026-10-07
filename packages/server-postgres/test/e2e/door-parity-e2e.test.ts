@@ -398,7 +398,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const historyInTransaction = await ensureHistoryTableExists(db as never);
+        const historyTable = await ensureHistoryTableExists(db as never);
 
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([peopleCollection, docsCollection]);
@@ -407,10 +407,10 @@ describe("door parity: one operation, one answer (E2E)", () => {
         realtime = new RealtimeService(db as never, registry);
         driver = new PostgresBackendDriver(
             db as never, realtime as never, registry,
-            undefined, undefined, new HistoryService(db as never, undefined, { inTransaction: historyInTransaction })
+            undefined, undefined, new HistoryService(db as never, undefined, historyTable)
         );
         realtime.setDataDriver(driver);
-        historyService = new HistoryService(db as never, undefined, { inTransaction: historyInTransaction });
+        historyService = new HistoryService(db as never, undefined, historyTable);
 
         // REST, as `init.ts` mounts it: every request on a driver scoped to its
         // caller, and history before the generator's nested catch-all.

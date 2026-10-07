@@ -1331,13 +1331,13 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             const internals = driverResult.internals as PostgresDriverInternals;
             const db = internals.db;
 
-            const inTransaction = await ensureHistoryTableExists(db);
+            const { BOOT_LOCK_TIMEOUT_MS } = await import("./schema/boot-ddl");
+            const historyTable = await ensureHistoryTableExists(db, { lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS });
 
             // The index the hourly retention sweep reads, built like any
             // index a live table is missing: concurrently, after the boot —
             // or right here in a provisioning-only run, which exits when boot
             // returns. See `ensureHistoryIndexes`.
-            const { BOOT_LOCK_TIMEOUT_MS } = await import("./schema/boot-ddl");
             const historyIndexes = await ensureHistoryIndexes(db, { lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS });
             if (historyIndexes.length > 0) {
                 const { buildDeferredIndexes, scheduleDeferredIndexBuild } = await import("./schema/deferred-index-build");
@@ -1354,7 +1354,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             }
 
             const retention = typeof config === "object" ? config.retention : undefined;
-            const historyService = new HistoryService(db, retention ? { ttlDays: retention } : undefined, { inTransaction });
+            const historyService = new HistoryService(db, retention ? { ttlDays: retention } : undefined, historyTable);
 
             return { historyService };
         },

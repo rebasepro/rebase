@@ -656,6 +656,64 @@ describe("a write's statements (E2E)", () => {
         });
     });
 
+    describe("a history entry of an update", () => {
+        type Stored = { id: string; format: number; changed_fields: string[]; values: Record<string, unknown>; previous_values: Record<string, unknown>; previous_bytes: number; values_bytes: number };
+        const updateEntries = async (id: number) => (await admin.query<Stored>(
+            `SELECT id, format, changed_fields, "values", previous_values,
+                    pg_column_size(previous_values) AS previous_bytes, pg_column_size("values") AS values_bytes
+             FROM rebase.entity_history WHERE table_name = 'posts' AND entity_id = $1 AND action = 'update'
+             ORDER BY updated_at`,
+            [String(id)]
+        )).rows;
+
+        it("keeps the previous values of the changed fields only, and says so", async () => {
+            const id = await newPost("first draft");
+            const answer = await http("PATCH", `/posts/${id}`, { body: { title: "second draft" } });
+            expect(answer.status).toBe(200);
+
+            const [entry] = await updateEntries(id);
+            expect(entry.format).toBe(2);
+            // Nothing outside the changed fields. (`id` is listed as changed on
+            // every update and was never in a stored previous row; still not.)
+            expect(Object.keys(entry.previous_values).every(key => entry.changed_fields.includes(key))).toBe(true);
+            expect(Object.keys(entry.previous_values).sort()).toEqual(["title", "updatedAt"]);
+            expect(entry.previous_values.title).toBe("first draft");
+            // The rest of the row is in `values`, once.
+            expect(entry.values.title).toBe("second draft");
+            expect(Object.keys(entry.values).length).toBeGreaterThan(Object.keys(entry.previous_values).length);
+            expect(entry.previous_bytes).toBeLessThan(entry.values_bytes);
+
+            const listed = await http("GET", `/posts/${id}/history`);
+            expect(listed.json.data[0]).toMatchObject({ format: 2, previous_values: entry.previous_values });
+        });
+
+        it("an entry stored whole, before 0.24, is still listed as it was and still reverts", async () => {
+            const id = await newPost("kept");
+            const before = (await http("GET", `/posts/${id}`)).json;
+            await admin.query(
+                `INSERT INTO rebase.entity_history (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by, updated_at)
+                 VALUES ('posts', $1, 'update', ARRAY['title'], $2::jsonb, $3::jsonb, 'someone', NOW() - INTERVAL '1 hour')`,
+                [String(id), JSON.stringify({ ...before, title: "old title" }), JSON.stringify({ ...before, title: "older title" })]
+            );
+            await http("PATCH", `/posts/${id}`, { body: { title: "newest" } });
+
+            const listed = await http("GET", `/posts/${id}/history`);
+            const old = listed.json.data.find((e: { updated_by: string }) => e.updated_by === "someone");
+            expect(old.format).toBe(1);
+            expect(old.previous_values).toEqual({ ...before, title: "older title" });
+            const fresh = listed.json.data.find((e: { updated_by: string; action: string }) => e.updated_by !== "someone" && e.action === "update");
+            expect(fresh.format).toBe(2);
+
+            const toOld = await http("POST", `/posts/${id}/history/${old.id}/revert`);
+            expect(toOld.status).toBe(200);
+            expect((await http("GET", `/posts/${id}`)).json.title).toBe("old title");
+
+            const toFresh = await http("POST", `/posts/${id}/history/${fresh.id}/revert`);
+            expect(toFresh.status).toBe(200);
+            expect((await http("GET", `/posts/${id}`)).json.title).toBe("newest");
+        });
+    });
+
     describe("history retention without a write", () => {
         const historyIndexes = async () => (await admin.query<{ indexname: string }>(
             "SELECT indexname FROM pg_indexes WHERE schemaname = 'rebase' AND tablename = 'entity_history' ORDER BY indexname"
