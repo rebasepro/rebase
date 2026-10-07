@@ -5,6 +5,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { out, outWarn, outError } from "./cli-output";
+import { resolveTsxLoader } from "./tsx-loader";
 import { formatRelativeTime } from "@rebasepro/utils";
 import {
     diagnoseMissingBin,
@@ -95,19 +96,27 @@ const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
  * tsx maps it back. Running the built `.js` under plain `node` therefore fails
  * on the user's code rather than on ours, one directory further from anything
  * the error mentions.
+ *
+ * tsx's loader in one Node (`node --import`) when it resolves, rather than the
+ * `tsx` binary, which is a shell shim and a relay Node in front of that same
+ * loader (see `tsx-loader.ts`). The binary stays the fallback — a global tsx.
+ * `args` is everything after `bin`, the script included.
  */
 function resolveChildScript(name: string):
-    | { ok: true; bin: string; script: string }
+    | { ok: true; bin: string; args: string[] }
     | { ok: false; reason: "script" | "tsx" } {
     const built = path.join(__cliDirname, "schema", `${name}.js`);
     const source = path.join(__cliDirname, "schema", `${name}.ts`);
     const script = fs.existsSync(built) ? built : fs.existsSync(source) ? source : null;
     if (!script) return { ok: false, reason: "script" };
 
+    const tsxLoader = resolveTsxLoader();
+    if (tsxLoader) return { ok: true, bin: process.execPath, args: ["--import", tsxLoader, script] };
+
     const tsxBin = resolveLocalBin("tsx");
     if (!tsxBin) return { ok: false, reason: "tsx" };
 
-    return { ok: true, bin: tsxBin, script };
+    return { ok: true, bin: tsxBin, args: [script] };
 }
 
 /** What to print when {@link resolveChildScript} cannot produce a command. */
@@ -1762,7 +1771,7 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
 
     const cmdParts = [
         ddl.bin,
-        ddl.script,
+        ...ddl.args,
         `--collections=${collectionsPath}`,
         `--output=${outputPath}`
     ];
@@ -1957,7 +1966,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
 
         const cmdParts = [
             generator.bin,
-            generator.script,
+            ...generator.args,
             `--collections=${collectionsPath}`,
             `--output=${outputPath}`
         ];
@@ -2013,7 +2022,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
 
         const cmdParts = [
             introspect.bin,
-            introspect.script,
+            ...introspect.args,
             `--output=${outputPath}`,
             ...(argsList["--force"] ? ["--force"] : []),
             ...(argsList["--schema"] ? [`--schema=${argsList["--schema"]}`] : [])
@@ -2064,7 +2073,7 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
 
     const cmdParts = [
         doctor.bin,
-        doctor.script,
+        ...doctor.args,
         `--collections=${collectionsPath}`,
         `--schema=${schemaPath}`,
         `--sdk=${sdkPath}`,

@@ -5,7 +5,9 @@
  * and local binaries — used by all CLI command modules.
  */
 import fs from "fs";
+import { createRequire } from "module";
 import path from "path";
+import { pathToFileURL } from "url";
 import { execSync } from "child_process";
 import dotenv from "dotenv";
 import chalk from "chalk";
@@ -236,6 +238,37 @@ export function resolveLocalBin(projectRoot: string, binName: string): string | 
  */
 export function resolveTsx(projectRoot: string): string | null {
     return resolveLocalBin(projectRoot, "tsx");
+}
+
+/**
+ * tsx's loader, as the URL `node --import` takes, or null when none resolves.
+ *
+ * For running a TypeScript entry in one Node process. The `tsx` binary is a
+ * relay — pnpm's `.bin/tsx` shell shim, then tsx's CLI in one Node, which
+ * spawns a second Node with this same loader to run the script — so spawning
+ * through it costs a shell and a Node start (~50–100 ms) on every hop, and
+ * `rebase dev` pays a hop on every start and every collection save.
+ *
+ * Resolved the way Node resolves the package, from the project first — the
+ * backend, where a scaffold declares tsx, then the root and everything above it
+ * — so the tsx used is the one {@link resolveTsx} would have found; then from
+ * this package, as the repository's own tests resolve `tsx/cli`. A URL rather
+ * than a path: a Windows path is not a valid `--import` specifier.
+ */
+export function resolveTsxLoader(projectRoot: string): string | null {
+    const bases = [
+        path.join(projectRoot, "backend", "noop.js"),
+        path.join(projectRoot, "noop.js"),
+        import.meta.url
+    ];
+    for (const base of bases) {
+        try {
+            return pathToFileURL(createRequire(base).resolve("tsx")).href;
+        } catch {
+            // Not resolvable from here; try the next base.
+        }
+    }
+    return null;
 }
 
 /**

@@ -13,6 +13,7 @@ import {
     getActiveBackendPlugin,
     resolvePluginCliScript,
     resolveTsx,
+    resolveTsxLoader,
     findEnvFile,
     dependenciesNotInstalled
 } from "../utils/project";
@@ -392,6 +393,12 @@ async function resolveDriverCli(): Promise<{
  * tsx whenever it is installed — a devDependency of every scaffold, for exactly
  * this reason. Without it a `.ts` entry cannot run at all; a built entry still
  * runs, and the subcommands that never touch the project's TypeScript still work.
+ *
+ * tsx's loader in one Node (`node --import`) rather than the `tsx` binary,
+ * which is a shell shim and a relay Node in front of the same loader: one Node
+ * start instead of two, ~50–100 ms on each of the driver runs every `rebase
+ * dev` start and every collection save makes. The binary stays the fallback for
+ * a tsx whose loader does not resolve as a package — a global install.
  */
 export async function spawnDriverCli(
     resolved: { projectRoot: string; backendDir: string; pluginCli: string; env: Record<string, string> },
@@ -402,11 +409,13 @@ export async function spawnDriverCli(
     const stdio = options.quiet ? "pipe" : "inherit";
 
     const tsxBin = resolveTsx(projectRoot);
-    if (!tsxBin && pluginCli.endsWith(".ts")) {
+    const tsxLoader = resolveTsxLoader(projectRoot);
+    if (!tsxBin && !tsxLoader && pluginCli.endsWith(".ts")) {
         throw new Error(dependenciesNotInstalled(projectRoot));
     }
 
-    await execa(tsxBin ?? "node", [pluginCli, ...childArgs], { cwd: backendDir, stdio, env });
+    const [command, ...prefix] = tsxLoader ? [process.execPath, "--import", tsxLoader] : [tsxBin ?? "node"];
+    await execa(command, [...prefix, pluginCli, ...childArgs], { cwd: backendDir, stdio, env });
 }
 
 /** @deprecated Use {@link spawnDriverCli}. Kept as the internal name callers use. */
