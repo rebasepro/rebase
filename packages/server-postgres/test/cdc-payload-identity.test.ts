@@ -16,7 +16,7 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 
-import { buildCdcFunctionSql, buildCdcTriggerSql } from "../src/services/cdc/trigger-cdc";
+import { buildCdcFunctionSql, buildCdcTriggerSql, type CdcTriggerLevel } from "../src/services/cdc/trigger-cdc";
 import { parseCdcPayload } from "../src/services/cdc/CdcListener";
 
 /** Values no notification may ever carry. */
@@ -34,14 +34,14 @@ const SECRETS = [
  * Each table, how its trigger is attached, and the only columns its payload
  * may name.
  */
-const TABLES: Array<{ table: string; ddl: string; trigger: string; identity: string[]; writes: string[] }> = [
+const TABLES: Array<{ table: string; ddl: string; trigger: (level: CdcTriggerLevel) => string; identity: string[]; writes: string[] }> = [
     {
         // The auth table, attached with no identity columns — the shape an
         // older boot left it in, and what a table no collection maps still
         // has: the catalogue's primary key is the identity.
         table: "rebase.users",
         ddl: "CREATE TABLE rebase.users (id uuid PRIMARY KEY, email text, password_hash text, email_verification_token text)",
-        trigger: buildCdcTriggerSql("rebase", "users"),
+        trigger: (level) => buildCdcTriggerSql("rebase", "users", [], level),
         identity: ["id"],
         writes: [
             "INSERT INTO rebase.users VALUES ('00000000-0000-0000-0000-000000000001', 'alice@example.com', 'scrypt$N=16384$deadbeef$hash', 'verify-token-123')",
@@ -52,7 +52,7 @@ const TABLES: Array<{ table: string; ddl: string; trigger: string; identity: str
     {
         table: "public.members",
         ddl: "CREATE TABLE public.members (project_id varchar, user_id varchar, role text, PRIMARY KEY (project_id, user_id))",
-        trigger: buildCdcTriggerSql("public", "members"),
+        trigger: (level) => buildCdcTriggerSql("public", "members", [], level),
         identity: ["project_id", "user_id"],
         writes: [
             "INSERT INTO public.members VALUES ('p1', 'bob', 'owner-only role')",
@@ -65,7 +65,7 @@ const TABLES: Array<{ table: string; ddl: string; trigger: string; identity: str
         // trigger is attached with the key the consumer addresses rows by.
         table: "public.docs",
         ddl: "CREATE TABLE public.docs (id serial PRIMARY KEY, slug text UNIQUE, body text)",
-        trigger: buildCdcTriggerSql("public", "docs", ["slug"]),
+        trigger: (level) => buildCdcTriggerSql("public", "docs", ["slug"], level),
         identity: ["slug"],
         writes: [
             "INSERT INTO public.docs (slug, body) VALUES ('hello', 'draft body')",
@@ -78,7 +78,7 @@ const TABLES: Array<{ table: string; ddl: string; trigger: string; identity: str
         // that name the child list, which are not its key.
         table: "public.posts_tags",
         ddl: "CREATE TABLE public.posts_tags (id serial PRIMARY KEY, post_id int, tag_id int, note text)",
-        trigger: buildCdcTriggerSql("public", "posts_tags", ["post_id", "tag_id"]),
+        trigger: (level) => buildCdcTriggerSql("public", "posts_tags", ["post_id", "tag_id"], level),
         identity: ["post_id", "tag_id"],
         writes: [
             "INSERT INTO public.posts_tags (post_id, tag_id, note) VALUES (1, 2, 'linked by mallory')",
@@ -91,7 +91,7 @@ const TABLES: Array<{ table: string; ddl: string; trigger: string; identity: str
         // else — a collection-wide invalidation, never the row.
         table: "public.loose",
         ddl: "CREATE TABLE public.loose (label text)",
-        trigger: buildCdcTriggerSql("public", "loose"),
+        trigger: (level) => buildCdcTriggerSql("public", "loose", [], level),
         identity: [],
         writes: [
             "INSERT INTO public.loose VALUES ('no key at all')",
@@ -100,7 +100,10 @@ const TABLES: Array<{ table: string; ddl: string; trigger: string; identity: str
     }
 ];
 
-describe("a change notification", () => {
+// Both levels a table can be instrumented at: statement triggers on a plain
+// table, the row trigger on a partitioned one — and on every table of a
+// database an older version instrumented, until a boot converts it.
+describe.each<CdcTriggerLevel>(["statement", "row"])("a change notification (%s trigger)", (level) => {
     let db: PGlite;
     const payloads: string[] = [];
 
@@ -110,7 +113,7 @@ describe("a change notification", () => {
         await db.exec("CREATE SCHEMA IF NOT EXISTS rebase;");
         await db.exec(buildCdcFunctionSql());
         for (const { ddl, trigger } of TABLES) {
-            await db.exec(`${ddl};\n${trigger}`);
+            await db.exec(`${ddl};\n${trigger(level)}`);
         }
         await db.listen("rebase_cdc", payload => { payloads.push(payload); });
         for (const { writes } of TABLES) {
@@ -143,11 +146,11 @@ describe("a change notification", () => {
         (table, identity) => {
             const [schema, name] = table.split(".");
             const events = payloads
-                .map(p => parseCdcPayload(p))
-                .filter(e => e?.schema === schema && e.table === name);
+                .flatMap(p => parseCdcPayload(p) ?? [])
+                .filter(e => e.schema === schema && e.table === name);
             expect(events.length).toBeGreaterThan(0);
             for (const event of events) {
-                expect(Object.keys(event!.row).sort()).toEqual([...identity].sort());
+                expect(Object.keys(event.row).sort()).toEqual([...identity].sort());
             }
         }
     );

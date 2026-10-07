@@ -25,7 +25,8 @@ const SRC = join(__dirname, "..", "src");
 /** File → the channel it notifies, and why its payload is safe to publish. */
 const NOTIFY_SITES: Record<string, string> = {
     "services/cdc/trigger-cdc.ts":
-        "rebase_cdc — { schema, table, op, row } where row is the key and nothing else (cdc-payload-identity.test.ts)",
+        "rebase_cdc — { schema, table, op, row }, or a statement's batch { schema, table, op, cols, keys }: keys and nothing " +
+        "else (cdc-payload-identity.test.ts, cdc-statement-trigger.test.ts)",
     "services/realtimeService.ts":
         "rebase_entity_changes — { sid, p, eid, db }, or a batch { sid, c: [[p, eid, db], …] }: addresses, never a row " +
         "(pinned below; cross-instance-notify.test.ts)",

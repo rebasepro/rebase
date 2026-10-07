@@ -133,7 +133,7 @@ describe("the payload of a row too wide for pg_notify", () => {
         await db.query("INSERT INTO members VALUES ('p1', 'bob', $1)", ["x".repeat(9000)]);
         for (let i = 0; i < 50 && payloads.length === 0; i++) await new Promise(resolve => setTimeout(resolve, 10));
 
-        const event = parseCdcPayload(payloads[0]);
+        const [event] = parseCdcPayload(payloads[0]) ?? [];
         expect(event?.truncated).toBe(false);
         expect(event?.row).toEqual({ project_id: "p1", user_id: "bob" });
     });

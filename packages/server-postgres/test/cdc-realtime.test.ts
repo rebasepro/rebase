@@ -2,7 +2,7 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { CollectionConfig } from "@rebasepro/types";
-import type { CdcChangeEvent } from "../src/services/cdc/CdcListener";
+import { parseCdcPayload, type CdcChangeEvent } from "../src/services/cdc/CdcListener";
 
 // The RLS-bound refetch path (fetchCollectionWithAuth / fetchEntityWithAuth)
 // builds a DataService inside the auth transaction — mock it so no real DB is hit.
@@ -225,5 +225,63 @@ describe("RealtimeService — database-level CDC", () => {
 
         expect(mockFetchCollection).toHaveBeenCalled();
         expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("collection_update"));
+    });
+
+    /** Subscribe `clientId` to one row of posts per id, and return its socket. */
+    async function subscribeRows(clientId: string, ids: string[]) {
+        const ws = new MockWebSocket() as any;
+        service.addClient(clientId, ws);
+        for (const id of ids) {
+            await service.handleClientMessage(clientId, {
+                type: "subscribe_one",
+                payload: { path: "posts", id, subscriptionId: `row-${id}` }
+            });
+        }
+        await flushTimers();
+        ws.send.mockClear();
+        mockFetchEntity.mockClear();
+        return ws;
+    }
+
+    const sentTo = (ws: { send: jest.Mock }): string[] =>
+        ws.send.mock.calls.map((call: unknown[]) => JSON.parse(String(call[0])).subscriptionId as string).sort();
+
+    it("delivers a statement's batch to the subscriber of each row it names, and of no other", async () => {
+        const ws = await subscribeRows("client-batch", ["2", "3", "9"]);
+
+        // One notification for a statement that updated rows 1–4.
+        const events = parseCdcPayload(JSON.stringify({ schema: "public", table: "posts", op: "UPDATE", cols: ["id"], keys: [1, 2, 3, 4] }));
+        for (const event of events ?? []) await emitCdc(service, event);
+        await flushTimers();
+
+        expect(sentTo(ws)).toEqual(["row-2", "row-3"]);
+    });
+
+    it("delivers a TRUNCATE to every subscription on the collection, single-row ones included", async () => {
+        const ws = await subscribeRows("client-truncate", ["1", "2"]);
+        await service.handleClientMessage("client-truncate", {
+            type: "subscribe_collection",
+            payload: { path: "posts", subscriptionId: "list" }
+        });
+        await flushTimers();
+        ws.send.mockClear();
+        mockFetchEntity.mockResolvedValue(null);
+
+        await emitCdc(service, { schema: "public", table: "posts", op: "TRUNCATE", row: {} });
+        await flushTimers();
+        mockFetchEntity.mockResolvedValue({ id: 1, path: "posts", values: { title: "From RLS refetch" } });
+
+        expect(sentTo(ws)).toEqual(["list", "row-1", "row-2"]);
+        const rows = ws.send.mock.calls.map((call: unknown[]) => JSON.parse(String(call[0]))).filter((f: { type: string }) => f.type === "single_update");
+        expect(rows.map((f: { row: unknown }) => f.row)).toEqual([null, null]);
+    });
+
+    it("delivers a change that names no row — a key too large to notify — to the single-row subscribers too", async () => {
+        const ws = await subscribeRows("client-unkeyed", ["5"]);
+
+        await emitCdc(service, { schema: "public", table: "posts", op: "UPDATE", row: {}, truncated: true });
+        await flushTimers();
+
+        expect(sentTo(ws)).toEqual(["row-5"]);
     });
 });

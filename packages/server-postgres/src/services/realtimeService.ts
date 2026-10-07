@@ -32,6 +32,13 @@ import { unref } from "@rebasepro/utils";
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
 
 /**
+ * The id of a change that names no row — a `TRUNCATE`, a key too large to
+ * notify, a table with no key. Every list on the path refetches, and so does
+ * every single-row subscription on it: the change may be to any row.
+ */
+const ANY_ROW = "*";
+
+/**
  * Auth context stored per-subscription so real-time refetches respect RLS.
  * Mirrors the session variables set by PostgresBackendDriver.withAuth().
  */
@@ -507,6 +514,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      */
     private collectionGroupsByPath = new Map<string, Set<SubscriptionGroup>>();
     private singleGroupsByAddress = new Map<string, Set<SubscriptionGroup>>();
+    /** The single-row groups on each path, for a change that names no row ({@link ANY_ROW}). */
+    private singleGroupsByPath = new Map<string, Set<SubscriptionGroup>>();
     /**
      * When something on each path a list group reads last changed: the
      * debounce clock those groups share, moved once per changed row instead
@@ -568,6 +577,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     /** Junction table → the child lists its rows belong to, built when CDC starts. */
     private junctionLinkMap?: Map<string, JunctionLink[]>;
 
+    /** Changes waiting for a turn of the event loop — see {@link handleCdcEvents}. */
+    private cdcBacklog: CdcChangeEvent[][] = [];
+    /** Changes handled in the current turn. */
+    private cdcTurnRows = 0;
+    /** How many changed rows one turn of the event loop routes: ~5–10 ms of work. */
+    private static readonly CDC_ROWS_PER_TURN = 5000;
+
     /** Reverse lookup: `schema.table` (and bare `table`) → collection, built when CDC starts. */
     private cdcTableMap?: Map<string, CollectionConfig>;
     /**
@@ -626,9 +642,29 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * redaction lives.
      */
     private debugLog(...args: unknown[]) {
-        if (!rawQueryLoggingEnabled()) return;
+        if (!this.debugEnabled()) return;
         logger.debug(args.map(a => (typeof a === "string" ? a : JSON.stringify(a))).join(" "));
     }
+
+    /**
+     * {@link rawQueryLoggingEnabled}, read at most once a second.
+     *
+     * It reads two environment variables, and `process.env` is a getenv per
+     * read: called three or four times per changed row, it was the largest
+     * cost of a change notification here — 1.4 µs of every ~3.5 µs per row,
+     * so ~1.4 s of event loop for a 1M-row statement. A switch flipped at run
+     * time is honoured within a second.
+     */
+    private debugEnabled(): boolean {
+        const now = Date.now();
+        if (now - this.debugCheckedAt >= 1000) {
+            this.debugFlag = rawQueryLoggingEnabled();
+            this.debugCheckedAt = now;
+        }
+        return this.debugFlag;
+    }
+    private debugFlag = false;
+    private debugCheckedAt = -Infinity;
 
     setDataDriver(driver: DataDriver) {
         this.driver = driver;
@@ -710,7 +746,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             let bucket = index.get(address);
             if (!bucket) index.set(address, bucket = new Set());
             bucket.add(group);
-            if (group.type === "collection") this.markListGroupUnscheduled(group);
+            if (group.type === "collection") {
+                this.markListGroupUnscheduled(group);
+            } else {
+                let onPath = this.singleGroupsByPath.get(group.path);
+                if (!onPath) this.singleGroupsByPath.set(group.path, onPath = new Set());
+                onPath.add(group);
+            }
         }
         group.members.add(key);
 
@@ -752,6 +794,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         const bucket = index.get(address);
         bucket?.delete(group);
         if (bucket?.size === 0) index.delete(address);
+        if (group.type === "single") {
+            const onPath = this.singleGroupsByPath.get(group.path);
+            onPath?.delete(group);
+            if (onPath?.size === 0) this.singleGroupsByPath.delete(group.path);
+        }
         if (group.type === "collection") {
             this.unscheduledListGroups.get(group.path)?.delete(group);
             if (!this.collectionGroupsByPath.has(group.path)) {
@@ -1658,7 +1705,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // only for its own row: a parent path is a different record. Its
         // bucket is per row already.
         if (notifyPath !== originalPath) return;
-        for (const group of this.singleGroupsByAddress.get(`${notifyPath}\u0000${id}`) ?? []) {
+        // A change that names no row may be to any of them.
+        const singles = id === ANY_ROW
+            ? this.singleGroupsByPath.get(notifyPath)
+            : this.singleGroupsByAddress.get(`${notifyPath}\u0000${id}`);
+        for (const group of singles ?? []) {
             this.scheduleGroupRefetch(group);
         }
     }
@@ -3074,6 +3125,7 @@ lastSeen: Date.now() });
         this.groups.clear();
         this.collectionGroupsByPath.clear();
         this.singleGroupsByAddress.clear();
+        this.singleGroupsByPath.clear();
         this.subscribedPaths.clear();
 
         // 3. Clear broadcast channels and presence
@@ -3187,7 +3239,7 @@ lastSeen: Date.now() });
         this.junctionLinkMap = buildJunctionLinkMap(this.registry);
         this.cdcListener = new CdcListener(
             connectionString,
-            (event) => this.handleCdcEvent(event),
+            (events) => this.handleCdcEvents(events),
             () => this.resyncSubscriptions()
         );
         try {
@@ -3238,6 +3290,7 @@ lastSeen: Date.now() });
         this.cdcTableMap = undefined;
         this.junctionLinkMap = undefined;
         this.recentAppEmits.clear();
+        this.cdcBacklog = [];
     }
 
     /**
@@ -3274,6 +3327,46 @@ lastSeen: Date.now() });
      * therefore only ever receives rows its RLS policies permit — filtering is per
      * subscriber, never per publisher.
      */
+    /**
+     * Route the rows one notification names — a statement's batch, or one row.
+     *
+     * Each is handled as a change on its own (the app-emit de-duplication and
+     * single-row addressing are per row), at most {@link CDC_ROWS_PER_TURN} in
+     * one turn of the event loop; the rest wait in order for the next turns. A
+     * socket read hands the listener up to 2 MB of notifications at once, and
+     * batched that is ~250k rows: handled in one go, the event loop stalled
+     * for ~400 ms. Sliced, a 1M-row statement is ~200 short turns that timers,
+     * sockets and requests run between.
+     */
+    private handleCdcEvents(events: CdcChangeEvent[]): void {
+        if (events.length === 0) return;
+        this.cdcBacklog.push(events);
+        this.drainCdcBacklog();
+    }
+
+    private drainCdcBacklog(): void {
+        while (this.cdcBacklog.length > 0) {
+            const room = RealtimeService.CDC_ROWS_PER_TURN - this.cdcTurnRows;
+            if (room <= 0) return;
+            const head = this.cdcBacklog[0];
+            const slice = head.length <= room ? head : head.splice(0, room);
+            if (slice === head) this.cdcBacklog.shift();
+            if (this.cdcTurnRows === 0) {
+                // The next turn starts a new budget, and carries on with what is left.
+                setImmediate(() => {
+                    this.cdcTurnRows = 0;
+                    this.drainCdcBacklog();
+                });
+            }
+            this.cdcTurnRows += slice.length;
+            for (const event of slice) {
+                this.handleCdcEvent(event).catch((error) => {
+                    logger.error("❌ [CDC] Failed to route a change notification", { error });
+                });
+            }
+        }
+    }
+
     private async handleCdcEvent(event: CdcChangeEvent): Promise<void> {
         const collection = this.resolveCollectionForTable(event.schema, event.table);
         if (!collection) {
@@ -3288,11 +3381,12 @@ lastSeen: Date.now() });
 
         const path = collection.slug;
         const databaseId = (collection as { databaseId?: string }).databaseId;
-        const id = this.extractIdFromCdcRow(collection, event.row);
+        // A TRUNCATE names no row: it changed every one.
+        const id = event.op === "TRUNCATE" ? ANY_ROW : this.extractIdFromCdcRow(collection, event.row);
 
         // Deletes carry a null row (subscribers drop the id); inserts/updates carry
         // an invalidation marker that forces a per-subscriber RLS-bound refetch.
-        const row = event.op === "DELETE" ? null : { _rebase_invalidated: true };
+        const row = event.op === "DELETE" || event.op === "TRUNCATE" ? null : { _rebase_invalidated: true };
 
         await this.notifyUpdate(path, id, row, databaseId, /* broadcast */ false, /* origin */ "cdc");
     }
@@ -3317,6 +3411,21 @@ lastSeen: Date.now() });
         const links = this.junctionLinkMap?.get(`${event.schema}.${event.table}`)
             ?? this.junctionLinkMap?.get(event.table);
         if (!links?.length) return false;
+
+        if (event.op === "TRUNCATE") {
+            // Every link is gone, so every list of this relation that is
+            // subscribed to has changed — whichever parent it belongs to.
+            for (const link of links) {
+                const prefix = `${link.parentCollection.slug}/`;
+                const suffix = `/${link.relationKey}`;
+                const lists = [...this.subscribedPaths.keys()].filter((path) =>
+                    path.startsWith(prefix) && path.endsWith(suffix) && path.split("/").length === 3);
+                for (const path of lists) {
+                    await this.notifyUpdate(path, ANY_ROW, null, (link.parentCollection as { databaseId?: string }).databaseId, /* broadcast */ false, /* origin */ "cdc");
+                }
+            }
+            return true;
+        }
 
         for (const link of links) {
             const sourceId = event.row?.[link.sourceColumn];
@@ -3346,11 +3455,15 @@ lastSeen: Date.now() });
         return true;
     }
 
-    /** Compute the canonical (possibly composite) id string from a captured row. */
+    /**
+     * Compute the canonical (possibly composite) id string from a captured row,
+     * or {@link ANY_ROW} when it names none — a key too large to notify, a
+     * table with no key.
+     */
     private extractIdFromCdcRow(collection: CollectionConfig, row: Record<string, unknown>): string {
-        // Unaddressable falls back to a collection-level invalidation: single-row
-        // subs won't match, but collection subs still refetch.
-        return deriveRowAddress(this.cdcRowByKeyFields(collection, row), collection, this.registry) || "*";
+        // Unaddressable is a change to the whole collection. It used to reach
+        // its lists only: a single-row subscriber of the row it was never heard.
+        return deriveRowAddress(this.cdcRowByKeyFields(collection, row), collection, this.registry) || ANY_ROW;
     }
 
     /**
