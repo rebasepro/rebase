@@ -174,6 +174,10 @@ const callbacks: CollectionCallbacks<Order> = {
 Never put a URL that came from your database into a bare `fetch`. The dispatcher rejects loopback,
 link-local, private and non-`http(s)` destinations before it connects, and refuses to follow
 redirects, precisely because a stored URL is attacker-controlled input.
+<span class="since-badge" data-since="0.24">Since 0.24</span> On Node it judges the address each
+connection is actually made to, inside the connection's own DNS lookup, so a name whose record
+changes between a check and the connection cannot slip past it; a receiver's name is resolved
+once per connection, not once per delivery.
 
 ## Sync to External API
 

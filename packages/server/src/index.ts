@@ -370,10 +370,13 @@ export * from "./services/driver-registry";
 // (`@rebasepro/server/services/webhook-service`) resolves in-repo and fails for
 // every installed consumer. Exported from the root, where it is reachable.
 export * from "./services/webhook-service";
-// The destination guard the dispatcher runs before every attempt. Exported on
+// The destination guard the dispatcher runs on every connection. Exported on
 // its own because a webhook is not the only outbound call whose URL comes from
-// data — anything that fetches a stored address wants the same check.
-export * from "./services/outbound-url-guard";
+// data — anything that fetches a stored address wants the same check. By name:
+// the connect-time pieces the dispatcher uses (`guardedLookup`,
+// `assertAllowedBeforeConnecting`) are internal.
+export { BlockedUrlError, blockedAddressReason, assertAllowedOutboundUrl } from "./services/outbound-url-guard";
+export type { OutboundUrlGuardOptions } from "./services/outbound-url-guard";
 
 // =============================================================================
 // Jobs — the durable queue. Application code both produces (`enqueue`) and

@@ -1,3 +1,4 @@
+import type { LookupFunction } from "node:net";
 import { ipVersion } from "../utils/ip-address";
 
 /**
@@ -157,30 +158,13 @@ export function blockedAddressReason(address: string): string | null {
 }
 
 /**
- * Resolve and validate a destination before anything connects to it.
- *
- * Three checks, in order, because each is cheaper than the next: the scheme,
- * the hostname, then every address the hostname resolves to. *Every* address —
- * a name that answers with one public and one private record is a rebinding
- * attempt, and taking the first record would let it through.
- *
- * Known limit: this is validate-then-fetch. Between the lookup here and the
- * connection the runtime makes there is a second resolution this code does not
- * see, so a TTL-0 name that flips between answers can still land on a blocked
- * address. Closing that needs the socket pinned to the address checked here,
- * which Node's global `fetch` does not expose without an undici dispatcher.
- * The redirect policy in {@link WebhookDispatcher} closes the much wider
- * version of the same hole — a receiver that simply *points* at the internal
- * address.
- *
- * @throws BlockedUrlError when the destination is not allowed. DNS failures
- * are rethrown as they are, so callers can tell "never send this" from
- * "could not send this right now".
+ * The checks that need no resolver, in order of cost: the URL parses, the
+ * scheme is http(s), the host is not a name that means "this machine" or "this
+ * network", and an address written into the URL is a public one. Returns the
+ * URL and the host to resolve — `undefined` when the URL names an address,
+ * which needs no resolving and has been judged here.
  */
-export async function assertAllowedOutboundUrl(
-    rawUrl: string,
-    options: OutboundUrlGuardOptions = {}
-): Promise<URL> {
+function checkBeforeResolving(rawUrl: string, options: OutboundUrlGuardOptions): { url: URL; hostname?: string } {
     let url: URL;
     try {
         url = new URL(rawUrl);
@@ -192,7 +176,7 @@ export async function assertAllowedOutboundUrl(
         throw new BlockedUrlError(`Webhook URL must be http(s), got "${url.protocol}" in ${url.href}`);
     }
 
-    if (options.allowPrivateNetworks) return url;
+    if (options.allowPrivateNetworks) return { url };
 
     // `URL` keeps IPv6 literals in brackets.
     const hostname = url.hostname.startsWith("[") ? url.hostname.slice(1, -1) : url.hostname;
@@ -201,13 +185,23 @@ export async function assertAllowedOutboundUrl(
         throw new BlockedUrlError(`Webhook URL host "${hostname}" is an internal name`);
     }
 
-    const addresses = ipVersion(hostname) ? [hostname] : await (options.lookup ?? defaultLookup)(hostname);
+    if (ipVersion(hostname)) {
+        assertAllowedAddresses(hostname, [hostname]);
+        return { url };
+    }
+    return { url, hostname };
+}
+
+/** Why an address may not be connected to, or `null`: {@link blockedAddressReason}. */
+export type AddressJudge = (address: string) => string | null;
+
+/** Every address `hostname` resolved to must be a public one — not the first, every one. */
+function assertAllowedAddresses(hostname: string, addresses: readonly string[], judge: AddressJudge = blockedAddressReason): void {
     if (addresses.length === 0) {
         throw new BlockedUrlError(`Webhook URL host "${hostname}" resolved to no addresses`);
     }
-
     for (const address of addresses) {
-        const reason = blockedAddressReason(address);
+        const reason = judge(address);
         if (reason) {
             throw new BlockedUrlError(
                 `Webhook URL host "${hostname}" resolves to ${address}, which is ${reason}. ` +
@@ -215,6 +209,87 @@ export async function assertAllowedOutboundUrl(
             );
         }
     }
+}
 
+/**
+ * Resolve and validate a destination before anything connects to it.
+ *
+ * Three checks, in order, because each is cheaper than the next: the scheme,
+ * the hostname, then every address the hostname resolves to. *Every* address —
+ * a name that answers with one public and one private record is a rebinding
+ * attempt, and taking the first record would let it through.
+ *
+ * Known limit: this is validate-then-fetch. Between the lookup here and the
+ * connection the runtime makes there is a second resolution this code does not
+ * see, so a TTL-0 name that flips between answers can still land on a blocked
+ * address. On Node the webhook dispatcher does not use this: it checks the
+ * address it connects to, through {@link guardedLookup}. This is the check for
+ * a runtime whose `fetch` cannot be handed a resolver.
+ *
+ * @throws BlockedUrlError when the destination is not allowed. DNS failures
+ * are rethrown as they are, so callers can tell "never send this" from
+ * "could not send this right now".
+ */
+export async function assertAllowedOutboundUrl(
+    rawUrl: string,
+    options: OutboundUrlGuardOptions = {}
+): Promise<URL> {
+    const { url, hostname } = checkBeforeResolving(rawUrl, options);
+    if (hostname !== undefined) {
+        assertAllowedAddresses(hostname, await (options.lookup ?? defaultLookup)(hostname));
+    }
     return url;
+}
+
+/**
+ * Every check of {@link assertAllowedOutboundUrl} but the lookup, for a
+ * connection that resolves the name through {@link guardedLookup}. The scheme,
+ * the internal names and an address written into the URL are judged here —
+ * a connection to a literal address asks no resolver, so nothing else would.
+ *
+ * Internal to the server: not exported from the package.
+ */
+export function assertAllowedBeforeConnecting(rawUrl: string, options: OutboundUrlGuardOptions = {}): URL {
+    return checkBeforeResolving(rawUrl, options).url;
+}
+
+/**
+ * A `dns.lookup` for an http(s) Agent that refuses to connect anywhere the
+ * guard would not send: it resolves the name, judges *every* address it got,
+ * and hands the connection only addresses it judged — so the address checked
+ * is the address connected to. Validate-then-fetch resolves twice, and a
+ * name whose TTL-0 record flips between the two lookups lands on whatever the
+ * second one says.
+ *
+ * Called once per new connection, not per request: a keep-alive connection
+ * is to an address already judged. Nothing is cached — an "allowed" verdict
+ * that outlived its lookup would be the rebinding window again.
+ *
+ * Fails with {@link BlockedUrlError}, which the connection reports as its
+ * error; a resolver failure is reported as itself.
+ *
+ * Internal to the server: not exported from the package. `judge` is for the
+ * tests that need a receiver on loopback; nothing else passes one.
+ */
+export function guardedLookup(options: OutboundUrlGuardOptions = {}, judge: AddressJudge = blockedAddressReason): LookupFunction {
+    const resolve = options.lookup ?? defaultLookup;
+    return (hostname, lookupOptions, callback) => {
+        resolve(hostname).then((addresses) => {
+            if (!options.allowPrivateNetworks) assertAllowedAddresses(hostname, addresses, judge);
+            const family = lookupOptions.family === "IPv4" ? 4 : lookupOptions.family === "IPv6" ? 6 : lookupOptions.family;
+            const usable = addresses
+                .map(address => ({ address, family: ipVersion(address) }))
+                .filter(entry => entry.family !== 0 && (!family || entry.family === family));
+            if (usable.length === 0) {
+                const error: NodeJS.ErrnoException = new Error(`getaddrinfo ENOTFOUND ${hostname}`);
+                error.code = "ENOTFOUND";
+                callback(error, "", 0);
+                return;
+            }
+            if (lookupOptions.all) callback(null, usable);
+            else callback(null, usable[0].address, usable[0].family);
+        }).catch((error: NodeJS.ErrnoException) => {
+            callback(error, "", 0);
+        });
+    };
 }

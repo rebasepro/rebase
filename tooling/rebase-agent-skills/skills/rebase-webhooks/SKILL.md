@@ -45,7 +45,7 @@ const dispatcher = new WebhookDispatcher({
 | `onDelivery` | `(result: WebhookDeliveryResult) => void` | — | Called with the final result of every delivery, queued ones included. |
 | `timeoutMs` | `number` | `10000` | Deadline for one attempt, covering the response body. |
 | `allowPrivateNetworks` | `boolean` | `false` | Permit destinations that resolve to loopback/private/link-local addresses. Re-opens SSRF — only for a receiver you run yourself. |
-| `lookup` | `(hostname: string) => Promise<string[]>` | `dns.lookup` | Resolver used by the destination guard. For tests. |
+| `lookup` | `(hostname: string) => Promise<string[]>` | `dns.lookup` | Resolver used by the destination guard, once per new connection; the connection goes to the address it returns. For tests. |
 | `jobQueue` | `JobQueueClient` | — | Where `enqueueEntityChange` puts deliveries. Without it, an in-memory array a crash empties; with it, rows retried with backoff by a worker. See **Durable delivery** below. |
 
 ### Register Webhooks
@@ -392,16 +392,16 @@ A receiver that answers `200 OK` and then trickles one byte a minute is aborted 
 
 ### Destination Validation
 
-The URL is a string from a config, and configs get loaded from databases — so the dispatcher validates it before every attempt rather than trusting the caller:
+The URL is a string from a config, and configs get loaded from databases — so the dispatcher validates it rather than trusting the caller. On Node it judges the address each new connection is made to, inside the connection's own DNS lookup: the address checked is the address connected to, and a keep-alive connection's name is not resolved again for every delivery.
 
 - the scheme must be `http:` or `https:`;
 - the host must not be `localhost` or end in `.local` / `.internal` / `.localhost` / `.home.arpa`;
 - **every** address the host resolves to must be public — loopback, link-local (`169.254.0.0/16`, the cloud metadata range), RFC1918, CGNAT, multicast and their IPv6 equivalents are refused, including IPv4-mapped forms like `::ffff:127.0.0.1`;
-- redirects are not followed (`redirect: "manual"`), because a `307` would replay the POST — signature, custom headers and all — at an address the guard never saw.
+- redirects are not followed, because a `307` would replay the POST — signature, custom headers and all — at an address the guard never saw.
 
 A refused destination comes back as `success: false` with the reason in `responseBody`. `allowPrivateNetworks: true` turns the address check off for a receiver you run yourself; it re-opens SSRF for any caller who can choose a URL, so do not set it on a dispatcher whose configs come from user data.
 
-> **WARNING FOR AGENTS**: this is validate-then-fetch. The runtime resolves the name a second time when it connects, so a TTL-0 name that flips answers between the two can still land on a blocked address. Do not treat the guard as a licence to accept arbitrary URLs from untrusted users.
+> **WARNING FOR AGENTS**: on a runtime without `node:http`, and with `allowPrivateNetworks`, the dispatcher is validate-then-fetch: the runtime resolves the name a second time when it connects, so a TTL-0 name that flips answers between the two can still land on a blocked address. Do not treat the guard as a licence to accept arbitrary URLs from untrusted users.
 
 ## Integration Patterns
 

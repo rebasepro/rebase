@@ -2,6 +2,17 @@ import { WebhookDispatcher, WebhookConfig, type WebhookDeliveryResult } from "..
 import { createHmac } from "crypto";
 import { logger } from "../src/utils/logger";
 
+// This suite is about the dispatcher — matching, payloads, signatures,
+// retries, deadlines, lanes — and stubs the network at `fetch`. So it sends
+// through the validate-then-fetch transport, the one a runtime without
+// `node:http` uses, with the guard and its resolver as they are. The Node
+// transport, which judges the address it connects to, is exercised over real
+// sockets in `webhook-connect-guard.test.ts`.
+jest.mock("../src/services/outbound-post", () => {
+    const actual = jest.requireActual<typeof import("../src/services/outbound-post")>("../src/services/outbound-post");
+    return { ...actual, createOutboundPost: actual.createFetchPost };
+});
+
 // Mock global fetch
 const mockFetch = jest.fn();
 global.fetch = mockFetch as unknown as typeof fetch;

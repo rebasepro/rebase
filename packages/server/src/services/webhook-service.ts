@@ -1,5 +1,6 @@
 import { createHmac, randomUUID } from "crypto";
-import { assertAllowedOutboundUrl, BlockedUrlError } from "./outbound-url-guard";
+import { BlockedUrlError } from "./outbound-url-guard";
+import { createOutboundPost, type OutboundPost, type OutboundResponse } from "./outbound-post";
 import { logger } from "../utils/logger";
 import { currentAmbientTransaction } from "../db/ambient-transaction";
 import type { JobQueueClient } from "../jobs/types";
@@ -62,7 +63,8 @@ export interface WebhookDispatcherOptions {
      */
     onDelivery?: (result: WebhookDeliveryResult) => void;
     /**
-     * Hostname resolver used by the destination guard. Defaults to
+     * Hostname resolver used by the destination guard — once per new
+     * connection, and its answer is where the connection goes. Defaults to
      * `dns.lookup`; injected by tests so a unit suite never asks a resolver.
      */
     lookup?: (hostname: string) => Promise<string[]>;
@@ -129,9 +131,16 @@ export class WebhookDispatcher {
     /** In-process deliveries, one lane per webhook id. A lane is removed when it empties. */
     private lanes = new Map<string, DeliveryLane>();
 
+    /** Sends one attempt, through the destination guard — see `outbound-post.ts`. */
+    private readonly post: OutboundPost;
+
     constructor(options: WebhookDispatcherOptions = {}) {
         this.options = options;
         this.timeoutMs = options.timeoutMs ?? 10000;
+        this.post = createOutboundPost({
+            allowPrivateNetworks: options.allowPrivateNetworks,
+            lookup: options.lookup
+        });
     }
 
     /** Register webhooks to watch */
@@ -486,28 +495,19 @@ export class WebhookDispatcher {
         const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
         try {
             // The destination is a string from a config, and configs are loaded
-            // from environment *and* from databases. Validate it here rather
-            // than trusting every caller to: unchecked, `fetch` will happily
-            // POST to 169.254.169.254 and hand the response back through
-            // `responseBody`.
-            const url = await assertAllowedOutboundUrl(webhook.url, {
-                allowPrivateNetworks: this.options.allowPrivateNetworks,
-                lookup: this.options.lookup
-            });
-
-            const response = await fetch(url.href, {
-                method: "POST",
-                headers,
-                body,
-                signal: controller.signal,
-                // Following a redirect would send this POST — signature, custom
-                // headers and all — to an address the guard above never saw.
-                // A webhook receiver has no reason to redirect.
-                redirect: "manual"
-            });
+            // from environment *and* from databases. The guard judges it rather
+            // than trusting every caller to: unchecked, this would happily POST
+            // to 169.254.169.254 and hand the response back through
+            // `responseBody`. On Node it judges the address the connection is
+            // made to. Redirects are never followed: that would send this POST
+            // — signature, custom headers and all — to an address the guard
+            // never saw. A webhook receiver has no reason to redirect.
+            const response = await this.post(webhook.url, { headers, body, signal: controller.signal });
 
             if (response.status >= 300 && response.status < 400) {
-                const location = typeof response.headers?.get === "function" ? response.headers.get("location") : null;
+                const location = response.header("location");
+                // Unread, the body would hold its pooled connection.
+                await response.body?.cancel().catch(() => undefined);
                 return {
                     terminal: true,
                     result: {
@@ -571,9 +571,9 @@ export class WebhookDispatcher {
      * rest, so a receiver cannot buffer a 10 GB body into the pod before the
      * caller truncates it to 1000 characters.
      */
-    private async readCappedBody(response: Response): Promise<string> {
+    private async readCappedBody(response: OutboundResponse): Promise<string> {
         const stream = response.body;
-        if (!stream || typeof stream.getReader !== "function") {
+        if (!stream) {
             // A non-streaming Response — a test double, or a polyfilled fetch.
             // The abort signal is still armed, so a stalled body still fails;
             // only the size cap is unavailable here.
