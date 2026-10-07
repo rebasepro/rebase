@@ -35,6 +35,7 @@ import { compareMountOrder, resolveBackendPaths } from "./manifest";
 import { cliVersion } from "./utils/version";
 import { toolStdio } from "./utils/tool-stdio";
 import { analyseFunctionsDirectory, summarisePortability } from "./function-portability";
+import { precompressStaticAssets } from "./precompress";
 import {
     getActiveBackendPlugin,
     resolveLocalBin,
@@ -1878,6 +1879,8 @@ force: true });
         }
     };
     count(staticOut);
+    // After counting: `fileCount` is the app's files, not their siblings.
+    precompressStaticAssets(staticOut);
 
     // Record it, because the runtime finds the assets through the manifest —
     // not by guessing a directory name.
@@ -1933,6 +1936,7 @@ export function buildStaticBundle(options: {
         }
     };
     count(staticOut);
+    precompressStaticAssets(staticOut);
 
     const manifest: RebaseBundleManifest = {
         bundleFormat: BUNDLE_FORMAT_VERSION,
