@@ -88,7 +88,7 @@ describe("the full flow", () => {
 
         const list = await rpc(app, token, { jsonrpc: "2.0", id: 2, method: "tools/list" });
         const listed = (await list.json() as { result: { tools: { name: string }[] } }).result.tools;
-        expect(listed.map(t => t.name)).toEqual(["list_collections", "query_collection", "count_documents", "get_document"]);
+        expect(listed.map(t => t.name)).toEqual(["list_collections", "describe_collection", "query_collection", "count_documents", "get_document"]);
 
         const call = await rpc(app, token, {
             jsonrpc: "2.0", id: 3, method: "tools/call",

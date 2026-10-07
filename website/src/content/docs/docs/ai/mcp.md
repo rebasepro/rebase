@@ -363,9 +363,10 @@ outside.
 
 The [remote endpoint](#the-remote-endpoint) fences its tool results the same
 way and says so to the client; its `structuredContent` carries the plain result.
-<span class="since-badge" data-since="0.24">Since 0.24</span> `list_collections` is
-the exception: only a model reads its listing, so it is sent once, in the text.
-Before 0.24 it carried a `structuredContent` copy too.
+<span class="since-badge" data-since="0.24">Since 0.24</span> `list_collections` and
+`describe_collection` are the exceptions: only a model reads them, so they are
+sent once, in the text. Before 0.24 the listing carried a `structuredContent`
+copy too.
 
 It is a marker, not a sandbox. An assistant holding these tools is only as safe
 as the content you let it read.
@@ -454,12 +455,12 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` limits it
   to clients you register), and sends the person to a consent screen that signs
   them in through your existing `/auth/login`.
-- <span class="since-badge" data-since="0.24">Since 0.24</span> **Seven tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
-  every credential uses. `data:read` offers `list_collections`,
+- <span class="since-badge" data-since="0.24">Since 0.24</span> **Eight tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+  every credential uses. `data:read` offers `list_collections`, `describe_collection`,
   `query_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
   `update_document`; `data:delete` adds `delete_document`. A client that asks for
   nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
-  lists and reads `posts` and nothing else. A scope decides which tools are
+  lists, describes and reads `posts` and nothing else. A scope decides which tools are
   offered and which collections they reach, not which rows: an empty list can be
   RLS working, and `data:write` still cannot write a row the person could not.
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
@@ -476,11 +477,17 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   write — and read through `GET /api/data/<collection>`'s path, so a row comes
   back as REST serves it (ISO dates, a `belongsTo` as its foreign key, e.g.
   `authorId`) and can be sent back in an update unchanged. `query_collection`
-  answers `{ data, meta }` with `meta.total` and `meta.hasMore`, `count_documents`
-  `{ count }`, and `list_collections` each collection's OpenAPI `row` and
-  `create` schemas, plus `softDeleteField` where rows go to a trash. As on REST,
-  a `limit` above 1000, an undeclared argument and an edit or delete of a trashed
-  row (404) are refused; setting the soft-delete field to `null` restores it.
+  answers `{ data, meta }` with `meta.total` and `meta.hasMore`, and `count_documents`
+  `{ count }`. As on REST, a `limit` above 1000, an undeclared argument and an
+  edit or delete of a trashed row (404) are refused; setting the soft-delete
+  field to `null` restores it.
+- <span class="since-badge" data-since="0.24">Since 0.24</span> **The listing names the collections; `describe_collection` gives one's schema.**
+  `list_collections` answers each collection's `name`, `title` and `description`,
+  and `describe_collection { collection }` that collection's OpenAPI `row` and
+  `create` schemas, plus `softDeleteField` where rows go to a trash. The tool
+  descriptions tell the model to describe a collection before writing to it. A
+  200-collection project's listing is about 5k tokens, and each description
+  under 1k; with every schema in the listing it was about 150k.
 - **A token for this endpoint only.** An MCP access token is refused by
   `/api/data`, `/api/admin` and the WebSocket, so connecting an assistant does not
   hand it a session.

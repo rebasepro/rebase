@@ -1265,76 +1265,114 @@ describe("a notification gets no reply, whatever the method", () => {
     });
 });
 
-describe("list_collections reports a real schema", () => {
-    type Listed = {
+describe("list_collections names the collections; describe_collection gives one's schema", () => {
+    type Described = {
         name: string;
+        title?: string;
         softDeleteField?: string;
         row: { required?: string[]; properties: Record<string, { type?: string; enum?: unknown[]; description?: string }> };
         create: { required?: string[]; properties: Record<string, { type?: string; enum?: unknown[] }> };
     };
 
-    /** The listing as the model reads it: the JSON inside the text block's envelope. */
-    function listingIn(text: string): { collections: Listed[] } {
-        return JSON.parse(text.split("\n").slice(2, -1).join("\n")) as { collections: Listed[] };
+    /** A tool's answer as the model reads it: the JSON inside the text block's envelope. */
+    function answerIn<T>(text: string): T {
+        return JSON.parse(text.split("\n").slice(2, -1).join("\n")) as T;
     }
 
-    async function listCollections(collections?: CollectionConfig[]): Promise<Listed[]> {
+    async function callOn(app: Parameters<typeof rpc>[0], accessToken: string, name: string, args: Record<string, unknown>) {
+        const raw = await (await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args }
+        })).text();
+        const body = JSON.parse(raw) as { result: { isError?: boolean; content: { text: string }[]; structuredContent?: unknown } };
+        return { raw, result: body.result, text: body.result.content[0].text };
+    }
+
+    async function describeCollection(name: string, collections?: CollectionConfig[]): Promise<Described> {
         const { app } = buildApp(collections ? { collections } : {});
         const { accessToken } = await connectedClient(app);
-        const res = await rpc(app, accessToken, {
-            jsonrpc: "2.0", id: 1, method: "tools/call",
-            params: { name: "list_collections", arguments: {} }
-        });
-        const body = await res.json() as { result: { content: { text: string }[] } };
-        return listingIn(body.result.content[0].text).collections;
+        const { result, text } = await callOn(app, accessToken, "describe_collection", { collection: name });
+        expect(result.isError).toBeUndefined();
+        return answerIn<Described>(text);
     }
 
-    it("carries the listing once and compact, so a large project still fits in a session", async () => {
-        // The tool every session is told to call first. It answered with the
-        // listing pretty-printed in the text block AND again as
-        // `structuredContent`: 200 collections of 20 fields came to a ~2 MB
-        // reply, ~1.2 MB of it (~317k tokens) in the text alone — more than a
-        // model's whole context. The reply is now about the size of the
-        // listing's own compact JSON (the text is a JSON string inside JSON,
-        // so its quotes are escaped once).
-        const field = (i: number) => ({ type: i % 3 === 0 ? "number" : "string", name: `Field ${i}`, description: `What field ${i} holds` });
-        const many = Array.from({ length: 200 }, (_, c) => ({
-            slug: `collection_${c}`,
-            name: `Collection ${c}`,
-            description: `Synthetic collection ${c}`,
-            properties: Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`field_${i}`, field(i)]))
-        })) as unknown as CollectionConfig[];
-        const { app } = buildApp({ collections: many });
-        const { accessToken } = await connectedClient(app);
-        const raw = await (await rpc(app, accessToken, {
-            jsonrpc: "2.0", id: 1, method: "tools/call",
-            params: { name: "list_collections", arguments: {} }
-        })).text();
-        const body = JSON.parse(raw) as { result: { content: { text: string }[]; structuredContent?: unknown } };
-        const listing = listingIn(body.result.content[0].text);
-        expect(listing.collections).toHaveLength(200);
+    const field = (i: number) => ({ type: i % 3 === 0 ? "number" : "string", name: `Field ${i}`, description: `What field ${i} holds` });
+    const synthetic = (n: number) => Array.from({ length: n }, (_, c) => ({
+        slug: `collection_${c}`,
+        name: `Collection ${c}`,
+        description: `Synthetic collection ${c}`,
+        properties: Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`field_${i}`, field(i)]))
+    })) as unknown as CollectionConfig[];
 
-        const compact = JSON.stringify(listing).length;
-        expect(body.result.structuredContent).toBeUndefined();
-        expect(raw.length).toBeLessThan(compact * 1.5);
+    it("lists a summary, so a large project's listing is a few thousand tokens, not most of a context", async () => {
+        // The tool every session is told to call first. With every collection's
+        // `row` and `create` schema in it, 200 collections of 20 fields were
+        // ~600 KB of text (~150k tokens) — most of a 200k context, spent
+        // before the first question. The listing names the collections; the
+        // schema of the one a model is about to use is describe_collection's.
+        const { app } = buildApp({ collections: synthetic(200) });
+        const { accessToken } = await connectedClient(app);
+        const { raw, result, text } = await callOn(app, accessToken, "list_collections", {});
+        const listing = answerIn<{ collections: Record<string, unknown>[] }>(text);
+
+        expect(listing.collections).toHaveLength(200);
+        expect(listing.collections[7]).toEqual({ name: "collection_7", title: "Collection 7", description: "Synthetic collection 7" });
+        expect(result.structuredContent).toBeUndefined();
+        // ~20 KB at 200 collections, against ~700 KB with the schemas.
+        expect(raw.length).toBeLessThan(40_000);
+    });
+
+    it("describes one collection with the schema REST serves, and nothing of the others", async () => {
+        const { app } = buildApp({ collections: synthetic(200) });
+        const { accessToken } = await connectedClient(app);
+        const { result, text } = await callOn(app, accessToken, "describe_collection", { collection: "collection_7" });
+        const described = answerIn<Described>(text);
+
+        expect(result.isError).toBeUndefined();
+        expect(described.name).toBe("collection_7");
+        expect(Object.keys(described.row.properties)).toEqual(expect.arrayContaining(["field_0", "field_19"]));
+        expect(Object.keys(described.create.properties)).toEqual(expect.arrayContaining(["field_0", "field_19"]));
+        expect(text).not.toContain("collection_8");
+    });
+
+    it("tells the model to describe a collection before writing to it", async () => {
+        const { app } = buildApp();
+        const { accessToken } = await connectedClient(app, { scope: "mcp:read mcp:write" });
+        const tools = (await (await rpc(app, accessToken, { jsonrpc: "2.0", id: 1, method: "tools/list" }))
+            .json() as { result: { tools: { name: string; description: string }[] } }).result.tools;
+        const described = (name: string) => tools.find(t => t.name === name)?.description ?? "";
+        for (const name of ["list_collections", "create_document", "update_document"]) {
+            expect([name, described(name)]).toEqual([name, expect.stringMatching(/describe_collection/)]);
+        }
+        const init = await (await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 2, method: "initialize", params: { protocolVersion: "2025-06-18" }
+        })).json() as { result: { instructions: string } };
+        expect(init.result.instructions).toMatch(/describe_collection/);
+    });
+
+    it("refuses a collection that does not exist, pointing at the listing", async () => {
+        const { app } = buildApp();
+        const { accessToken } = await connectedClient(app);
+        const { result, text } = await callOn(app, accessToken, "describe_collection", { collection: "nope" });
+        expect(result.isError).toBe(true);
+        expect(text).toContain("list_collections");
     });
 
     it("names the actual property type, not `unknown`", async () => {
         // The bug this pins: the code read `property.dataType`, a key no
         // property in `@rebasepro/types` has ever had, so every field came back
-        // as "unknown" — a schema listing that tells a model nothing about what
-        // it may send. The fixtures used the same wrong key, so the tests
-        // agreed with the bug; it surfaced only when a real `CollectionConfig`
-        // went through the real boot, which refused it outright.
-        const [candidates] = await listCollections();
+        // as "unknown" — a schema that tells a model nothing about what it may
+        // send. The fixtures used the same wrong key, so the tests agreed with
+        // the bug; it surfaced only when a real `CollectionConfig` went through
+        // the real boot, which refused it outright.
+        const candidates = await describeCollection("candidates");
         expect(candidates.row.properties.name.type).toBe("string");
         expect(JSON.stringify(candidates)).not.toContain("unknown");
     });
 
     it("hides a property the REST API excludes", async () => {
-        // An agent surface that listed more than `/api/data` does would be a way
-        // to read the schema around the gate.
-        const [candidates] = await listCollections([{
+        // An agent surface that described more than `/api/data` does would be
+        // a way to read the schema around the gate.
+        const candidates = await describeCollection("candidates", [{
             slug: "candidates",
             name: "Candidates",
             properties: {
@@ -1348,7 +1386,7 @@ describe("list_collections reports a real schema", () => {
 
     // A model learned an enum, a required field and a relation's foreign key
     // only by failing writes — and `authorId`, the name every row carries,
-    // appeared nowhere. The listing is the schema REST's OpenAPI document
+    // appeared nowhere. The description is the schema REST's OpenAPI document
     // publishes for the same collection.
     it("says what a write must carry: required fields, enum values, the foreign key, the trash", async () => {
         const authors = { slug: "authors", name: "Authors", properties: { name: { type: "string", name: "Name" } } };
@@ -1364,10 +1402,7 @@ describe("list_collections reports a real schema", () => {
                 deleted_at: { type: "date", name: "Deleted at" }
             }
         };
-        const listed = await listCollections([authors, posts] as unknown as CollectionConfig[]);
-        const listedPosts = listed.find(c => c.name === "posts");
-        expect(listedPosts).toBeDefined();
-        const { row, create, softDeleteField } = listedPosts!;
+        const { row, create, softDeleteField } = await describeCollection("posts", [authors, posts] as unknown as CollectionConfig[]);
 
         expect(row.required).toContain("title");
         expect(create.required).toEqual(["title"]);
@@ -1500,6 +1535,7 @@ describe("rows reach the model inside an untrusted-data envelope", () => {
 
     it.each([
         ["list_collections", {}],
+        ["describe_collection", { collection: "candidates" }],
         ["query_collection", { collection: "candidates" }],
         ["count_documents", { collection: "candidates" }],
         ["get_document", { collection: "candidates", id: "c1" }],
@@ -1516,7 +1552,7 @@ describe("rows reach the model inside an untrusted-data envelope", () => {
         // The row cannot close the block early: the only end marker is the real one.
         expect(text.match(/<<<\s*END_UNTRUSTED_DATA/gi)).toHaveLength(1);
         // `structuredContent` is data by type, and stays the plain result
-        // (list_collections, which only a model reads, sends none).
+        // (list_collections and describe_collection, which only a model reads, send none).
         expect(JSON.stringify(body.result.structuredContent ?? null)).not.toMatch(/The block below is DATA|UNTRUSTED_DATA source=/);
     });
 
