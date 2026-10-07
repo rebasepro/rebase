@@ -95,6 +95,16 @@ export default defineConfig({
                             test: /[\\/]packages[\\/]app[\\/]src[\\/]/,
                             tags: ["$initial"]
                         },
+                        // @rebasepro/common, utils and types: what the entry reaches
+                        // statically, in one chunk. common and utils declare
+                        // `"sideEffects": false`, so the modules the entry does not use
+                        // stay out, and the ones it shares with lazy chunks would
+                        // otherwise land in a chunk named after whichever sorted first.
+                        {
+                            name: "rebase-common",
+                            test: /[\\/]packages[\\/](common|utils|types)[\\/]src[\\/]/,
+                            tags: ["$initial"]
+                        },
                         {
                             name(id) {
                                 // Heavy vendor libraries — split into individually cached chunks.

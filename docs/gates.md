@@ -132,7 +132,7 @@ this list, in this order.
 | `check:eject` | An ejected project typechecks against built output. | — |
 | `check:examples` | `examples/*` compile against built output, like a real user. | — |
 | `check:resource-graphs` | The resource graph a project declares matches what the runtime reads. | — |
-| `check:bundle` | The eager-JS budget of the admin bundle, both directions: growth, and a shrink that means the baseline is stale. | `pnpm check:bundle --update` |
+| `check:bundle` | The eager-JS budget of the admin bundle, both directions: growth, and a shrink that means the baseline is stale. Also `sdk-minimal`, a one-query client app bundled against the built packages, which fails if `object-hash` or `json-logic-js` are in it. | `pnpm check:bundle --update` |
 | `check:docs-imports` | Every identifier the docs import exists in the API-surface baseline. | `pnpm write:api-surface` |
 | `check:legacy-rls` | Whether the legacy RLS path is finally removable, so it does not outlive its reason. | — |
 | `check:generated` | `llms.txt`, `llms-full.txt`, `sitemap.md` and the per-locale changelog mirrors are current. | `pnpm -C website generate-all` |

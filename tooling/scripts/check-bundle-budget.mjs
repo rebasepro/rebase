@@ -62,14 +62,27 @@
  * are keyed on the name with the hash stripped, so an unrelated edit does not
  * churn the baseline.
  *
+ * ## Probes: what an app built on the published packages gets
+ *
+ * A target that is not a directory is a PROBE (see PROBES below): a few lines
+ * of app code bundled against the built `packages/<name>/dist` the way a
+ * consumer's Vite bundles them — through each package's `exports` and its
+ * `sideEffects` — and budgeted the same way. `sdk-minimal` is the smallest
+ * useful client app (create a client, read a page). It also fails when the
+ * bundle carries a module it must not: `object-hash` and `json-logic-js` rode
+ * in every client app (43 kB minified, almost a quarter of it) because
+ * @rebasepro/utils and @rebasepro/common shipped as one file each.
+ *
  *     pnpm check:bundle            # verify
  *     pnpm check:bundle --update   # bank the current measurement
  *     node tooling/scripts/check-bundle-budget.mjs --dist path/to/dist   # ad-hoc
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASELINE = path.join(ROOT, "tooling", "scripts", "bundle-budget.json");
@@ -274,11 +287,114 @@ function measure(distDir) {
     return measured;
 }
 
+/**
+ * App code bundled against the built packages, as a consumer's Vite bundles
+ * them (see "Probes" at the top). `source` is the app; `forbidden` names
+ * modules that must not be in what it downloads, whatever it weighs.
+ */
+export const PROBES = {
+    "sdk-minimal": {
+        packages: ["client", "common", "utils", "types"],
+        source: (root) => [
+            `import { createRebaseClient } from ${JSON.stringify(path.join(root, "packages", "client", "dist", "index.es.js"))};`,
+            `const client = createRebaseClient({ baseUrl: "https://api.example.com", realtime: false });`,
+            `client.data.collection("posts").find({ limit: 10, where: { status: ["==", "published"] } }).then((r) => console.log(r));`
+        ].join("\n"),
+        forbidden: [
+            {
+                test: /node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?object-hash\//,
+                label: "object-hash",
+                why: "only `getHashValue` (@rebasepro/utils objects) uses it; the package must stay one file per " +
+                    "module (preserveModules) with `\"sideEffects\": false`, so a client that never hashes leaves it out"
+            },
+            {
+                test: /node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?json-logic-js\//,
+                label: "json-logic-js",
+                why: "only the conditions module of @rebasepro/common uses it; the package must stay one file per " +
+                    "module (preserveModules) with `\"sideEffects\": false`, so a client that evaluates no condition leaves it out"
+            }
+        ]
+    }
+};
+
+/** Builds a probe with the client package's own Vite: minified, nothing written. */
+async function measureProbe(name) {
+    const probe = PROBES[name];
+    const missing = probe.packages.filter((pkg) => !fs.existsSync(path.join(ROOT, "packages", pkg, "dist")));
+    if (missing.length > 0) {
+        throw new Error(`${name} bundles the built packages, and ${missing.map((pkg) => `packages/${pkg}`).join(", ")} ` +
+            `${missing.length === 1 ? "is" : "are"} not built. Run pnpm run build first.`);
+    }
+    const clientDir = path.join(ROOT, "packages", "client");
+    const vite = await import(pathToFileURL(createRequire(path.join(clientDir, "package.json")).resolve("vite")).href);
+    const id = `rebase-${name}-probe`;
+    const result = await vite.build({
+        configFile: false,
+        logLevel: "silent",
+        root: clientDir,
+        cacheDir: path.join(os.tmpdir(), id),
+        plugins: [{
+            name: id,
+            resolveId: (source) => (source === id ? `\0${id}` : null),
+            load: (moduleId) => (moduleId === `\0${id}` ? probe.source(ROOT) : null)
+        }],
+        build: {
+            write: false,
+            minify: true,
+            target: "es2022",
+            modulePreload: false,
+            reportCompressedSize: false,
+            rollupOptions: { input: id, output: { entryFileNames: `${name}.js`, chunkFileNames: "[name].js" } }
+        }
+    });
+    const chunks = (Array.isArray(result) ? result : [result])
+        .flatMap((r) => r.output)
+        .filter((o) => o.type === "chunk");
+    const byFile = new Map(chunks.map((c) => [c.fileName, c]));
+    // The entry and what it imports statically: a lazy chunk is not downloaded up front.
+    const eager = [];
+    const queue = chunks.filter((c) => c.isEntry).map((c) => c.fileName);
+    while (queue.length > 0) {
+        const chunk = byFile.get(queue.shift());
+        if (!chunk || eager.includes(chunk)) continue;
+        eager.push(chunk);
+        queue.push(...chunk.imports);
+    }
+    const byKey = {};
+    let totalBytes = 0;
+    let totalGzipBytes = 0;
+    const failures = [];
+    for (const chunk of eager) {
+        const bytes = Buffer.byteLength(chunk.code);
+        byKey[chunkKey(chunk.fileName)] = bytes;
+        totalBytes += bytes;
+        totalGzipBytes += zlib.gzipSync(chunk.code, { level: 9 }).length;
+        for (const [moduleId, info] of Object.entries(chunk.modules)) {
+            if (info.renderedLength === 0) continue;
+            const normalized = moduleId.replace(/\\/g, "/");
+            for (const rule of probe.forbidden) {
+                if (rule.test.test(normalized)) failures.push(`${bold(rule.label)} is in the bundle: ${rule.why}.`);
+            }
+        }
+    }
+    const measured = { chunks: byKey, totalBytes, totalGzipBytes };
+    Object.defineProperty(measured, "forbidden", { value: { failures, warnings: [] }, enumerable: false });
+    return measured;
+}
+
+/** A dist directory is measured from its files; a probe is built. */
+async function measureTarget(target) {
+    if (PROBES[target]) return measureProbe(target);
+    const dist = path.join(ROOT, target);
+    if (!fs.existsSync(dist)) throw new Error(`${target} is not built — this gate runs after the build. Run pnpm run build.`);
+    return measure(dist);
+}
+
 function report(target, measured, budget) {
     const failures = [];
     const notes = [];
 
-    const forbidden = forbiddenReport(measured.files);
+    const forbidden = measured.forbidden ?? forbiddenReport(measured.files);
     failures.push(...forbidden.failures);
     for (const warning of forbidden.warnings) console.warn(yellow(`! ${target}: ${warning}`));
 
@@ -363,12 +479,12 @@ const targets = Object.keys(baseline.targets);
 
 if (update) {
     for (const target of targets) {
-        const dist = path.join(ROOT, target);
-        if (!fs.existsSync(dist)) {
-            console.error(red(`✖ ${target} is not built. Run pnpm run build first.`));
+        try {
+            baseline.targets[target] = await measureTarget(target);
+        } catch (error) {
+            console.error(red(`✖ ${error.message}`));
             process.exit(1);
         }
-        baseline.targets[target] = measure(dist);
         const t = baseline.targets[target];
         console.log(green(`banked ${target}: ${kB(t.totalBytes)} eager JS (${kB(t.totalGzipBytes)} gzipped)`));
     }
@@ -378,18 +494,21 @@ if (update) {
 
 let ok = true;
 for (const target of targets) {
-    const dist = path.join(ROOT, target);
-    if (!fs.existsSync(dist)) {
-        console.error(red(`✖ ${target} is not built — this gate runs after the build. Run pnpm run build.`));
+    let measured;
+    try {
+        measured = await measureTarget(target);
+    } catch (error) {
+        console.error(red(`✖ ${error.message}`));
         ok = false;
         continue;
     }
-    ok = report(target, measure(dist), baseline.targets[target]) && ok;
+    ok = report(target, measured, baseline.targets[target]) && ok;
 }
 
 if (!ok) {
     console.error(yellow(
-        "\n  The eager set is everything a browser downloads before the login screen paints.\n" +
+        "\n  The eager set is everything a browser downloads before the login screen paints\n" +
+        "  (for a probe such as sdk-minimal: before a client app built on the packages runs).\n" +
         "  If the growth is deliberate, bank it with `pnpm check:bundle --update` and say so in\n" +
         "  the commit. If it is not, the usual causes are a top-level import of something that\n" +
         "  should be `await import(...)`, a barrel re-export that reaches one, or a manualChunks\n" +
