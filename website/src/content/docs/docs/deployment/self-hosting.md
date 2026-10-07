@@ -373,6 +373,15 @@ broken down by API surface (data, auth, storage, functions) and collection, plus
 process gauges. Without a token the endpoint is readable by anyone who can reach
 the port, so set one unless it is on a private network.
 
+<span class="since-badge" data-since="0.24">Since 0.24</span>
+`rebase_db_pool_wait_ms` is a histogram of how long each query waited for a
+connection from the database pool, opening one included, labelled by data
+source key (`source="(default)"` in a project that declares no data sources). A
+healthy pool keeps it near zero. A tail that
+grows with traffic means requests are queueing for connections — most often
+held by write callbacks that await something slow; see
+[A callback holds a connection](/docs/collections/callbacks/#a-callback-holds-a-connection).
+
 ## Security headers
 
 Every response carries `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options:

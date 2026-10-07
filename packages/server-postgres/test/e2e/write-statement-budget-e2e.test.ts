@@ -38,6 +38,8 @@ import { createHistoryRoutes } from "../../../server/src/history/history-routes.
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { HistoryService } from "../../src/history/HistoryService.js";
 import { ensureHistoryIndexes } from "../../src/history/ensure-history-table.js";
+import { MetricsRegistry } from "../../../server/src/metrics/index.js";
+import { recordPoolWaits } from "../../../server/src/metrics/pool-wait.js";
 
 // ── statement capture ──────────────────────────────────────────────────────
 //
@@ -257,9 +259,25 @@ const badgesCollection = {
     }
 };
 
+/** How long `drafts`' `beforeSave` awaits, when a test sets it: a hook calling something slow. */
+let draftHookMs = 0;
+const draftsCollection = {
+    name: "Drafts", slug: "drafts", table: "drafts",
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        title: { name: "Title", type: "string" }
+    },
+    callbacks: {
+        beforeSave: async ({ values }: { values: Record<string, unknown> }) => {
+            if (draftHookMs > 0) await new Promise(resolve => setTimeout(resolve, draftHookMs));
+            return values;
+        }
+    }
+};
+
 const collections = [
     authorsCollection, tagsCollection, commentsCollection, postsCollection, notesCollection, tasksCollection, projectsCollection,
-    membersCollection, teamsCollection, eventsCollection, dropboxCollection, lettersCollection, badgesCollection
+    membersCollection, teamsCollection, eventsCollection, dropboxCollection, lettersCollection, badgesCollection, draftsCollection
 ] as unknown as CollectionConfig[];
 
 const ADMIN = { uid: "admin-1", roles: ["admin"] };
@@ -653,6 +671,43 @@ describe("a write's statements (E2E)", () => {
             expect(prunes(sparse.statements)).toHaveLength(1);
             expect(sparse.result).toBe(3);
             expect(await remaining("sparse")).toEqual([...few].sort());
+        });
+    });
+
+    describe("write callbacks and the connection pool", () => {
+        /** Checkouts that waited longer than `ms`, from the histogram's text. */
+        const slowerThan = (text: string, ms: number) => {
+            const count = Number(text.match(/rebase_db_pool_wait_ms_count\{source="default"\} (\d+)/)?.[1] ?? 0);
+            const within = Number(text.match(new RegExp(`rebase_db_pool_wait_ms_bucket\\{source="default",le="${ms}"\\} (\\d+)`))?.[1] ?? 0);
+            return { count, slower: count - within };
+        };
+
+        it("a read queued behind connections that slow beforeSave hooks hold is measured, by the pool-wait histogram", async () => {
+            const registry = new MetricsRegistry();
+            recordPoolWaits(registry, [{ key: "default", connection: { pool: connection.pool } }]);
+
+            // The real driver's checkouts — the request's transaction — are timed.
+            expect((await http("GET", "/authors?limit=1")).status).toBe(200);
+            expect(slowerThan(registry.render(), 100).count).toBeGreaterThan(0);
+
+            // More saves than the pool has connections (20), each holding its
+            // connection for the 300 ms its beforeSave awaits.
+            draftHookMs = 300;
+            try {
+                const saves = Array.from({ length: 25 }, (_, i) => http("POST", "/drafts", { body: { title: `draft ${i}` } }));
+                await new Promise(resolve => setTimeout(resolve, 50));
+                const started = performance.now();
+                const read = await http("GET", "/authors?limit=1");
+                const waited = performance.now() - started;
+                expect((await Promise.all(saves)).every(save => save.status === 201)).toBe(true);
+
+                expect(read.status).toBe(200);
+                // The read did nothing slow itself; it waited for a connection.
+                expect(waited).toBeGreaterThan(100);
+                expect(slowerThan(registry.render(), 100).slower).toBeGreaterThan(0);
+            } finally {
+                draftHookMs = 0;
+            }
         });
     });
 

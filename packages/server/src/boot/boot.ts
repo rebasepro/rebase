@@ -50,6 +50,7 @@ import { bundleResolutionRoots, initializeDataSources, probeDataSource, type Ini
 import { resolveRlsAuditOptions } from "./rls-audit-option";
 import { resolveAuthOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
+import { recordPoolWaits } from "../metrics/pool-wait";
 import { fetchBundle, shouldFetchBundle, usableBundleFallback, dedupeRuntimePackages, imageModulesDir, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV, BUNDLE_FETCH_DIR_ENV } from "./fetch-bundle.js";
 import { describeDriverSkew, readRuntimeVersion, schemaRecoveryGuidance } from "./version-skew";
 
@@ -300,6 +301,10 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         : undefined;
     if (metrics) {
         app.use("/*", metrics.middleware);
+        // How long each query waited for a connection, per data source: the
+        // queue that write callbacks holding connections build. See
+        // `metrics/pool-wait.ts`.
+        recordPoolWaits(metrics.registry, dataSources);
     }
 
     const server = createRuntimeHttpServer(getRequestListener(app.fetch));

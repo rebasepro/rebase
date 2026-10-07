@@ -267,7 +267,11 @@ opens. A batch is all-or-nothing, and finding a typo at operation 40 would
 otherwise cost the rollback of the 39 writes before it.
 
 Capped at the same number of operations as a bulk write (1000 by default), since
-one batch holds its locks for the whole transaction. A driver that cannot make
+one batch holds its locks for the whole transaction. Every operation's callbacks
+run inside it, one after another, so a slow hook is paid once per row with the
+transaction open: 100 rows whose `beforeSave` awaits 50 ms hold one connection,
+and the locks of every row written so far, for 5.3 s. The same holds for a
+`/bulk` write. See [A callback holds a connection](/docs/collections/callbacks/#a-callback-holds-a-connection). A driver that cannot make
 the batch atomic answers `BATCH_UNSUPPORTED` rather than falling back to a loop
 of single writes — which would give neither the atomicity nor the single round
 trip a batch is reached for.
