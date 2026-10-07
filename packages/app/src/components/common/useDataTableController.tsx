@@ -4,7 +4,6 @@ import { useLocation } from "react-router";
 
 import { useData, useRebaseContext } from "../../hooks";
 import { useDataOrder } from "../../hooks/data/useDataOrder";
-import { populateFetchCache } from "../../hooks/data/useFetch";
 import { toFindParams } from "../../hooks/data/collectionQuery";
 import { CollectionWindow } from "../../hooks/data/collectionWindow";
 import { getRelationIncludeParams } from "../../util/previews";
@@ -366,12 +365,13 @@ export function useDataTableController<M extends Record<string, any> = any, USER
             process,
             onChange: (state) => {
                 if (cancelled) return;
-                if (state.rows) {
-                    setRawData(state.rows);
-                    // Pre-populate the entity fetch cache so that navigating to an
-                    // entity detail view renders instantly with cached data.
-                    populateFetchCache(path, state.rows);
-                }
+                // The rows do not go into the record cache here. They did, all
+                // of them, on every update, so that opening one showed it at
+                // once — and a table scrolled to 100,000 rows kept every one of
+                // them alive after it closed. Opening a record from a list is a
+                // click, and the click puts that one row there
+                // (`CollectionViewBinding`'s `onEntityClick`).
+                if (state.rows) setRawData(state.rows);
                 if (state.error) console.error("ERROR", state.error);
                 setDataLoading(state.loading);
                 setDataLoadingError(state.error);

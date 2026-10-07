@@ -42,6 +42,7 @@ import {
     useData,
     useDataTableController,
     useLargeLayout,
+    populateFetchCache,
     usePermissions,
     useScrollRestoration,
     useSlot,
@@ -456,6 +457,9 @@ const CollectionViewBindingInner = React.memo(
             }
 
             const entityPath = path ?? clickedEntity.path;
+            // The row on screen is what the record opens with, while its own
+            // read catches up — the one row clicked, not every row held.
+            populateFetchCache(entityPath, [clickedEntity]);
             navigateToEntity({
                 navigation: urlController,
                 path: entityPath,

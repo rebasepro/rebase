@@ -27,6 +27,7 @@ import type { User } from "@rebasepro/types";
 import type { EntityAction, UserCreationResult } from "@rebasepro/cms-types";
 import {
     apiBaseOf,
+    populateFetchCache,
     useAuthController,
     useRebaseClient,
     useSnackbarController,
@@ -92,6 +93,9 @@ export const editEntityAction: EntityAction = {
         if (!context?.urlController) {
             throw new Error("INTERNAL: editEntityAction: urlController is undefined");
         }
+        // The record opens with the row it was opened from on screen, as a
+        // click on the row does.
+        populateFetchCache(newFullIdPath, [entity]);
         navigateToEntity({
             openEntityMode,
             collection,
@@ -139,6 +143,8 @@ export const copyEntityAction: EntityAction = {
         if (!context?.urlController) {
             throw new Error("INTERNAL: copyEntityAction: urlController is undefined");
         }
+        // The copy's form starts from this row's values.
+        populateFetchCache(usedPath, [entity]);
         navigateToEntity({
             openEntityMode,
             collection,

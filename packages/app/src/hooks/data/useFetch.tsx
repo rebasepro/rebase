@@ -26,18 +26,56 @@ export interface FetchResult<M extends Record<string, any>> {
     dataLoadingError?: Error
 }
 
-const CACHE: Record<string, Entity<any> | undefined> = {};
+/**
+ * The most records {@link useFetch}'s cache holds. Past it, the record written
+ * or read least recently goes first.
+ *
+ * The cache is what lets a record open with its values already on screen while
+ * its listener catches up. It used to be fed every row a collection view held,
+ * on every update of the view, and never let go of one: a table scrolled to
+ * 100,000 rows kept ~260 MB alive after it was closed. A record is opened from
+ * a list by clicking it, so the click is what puts it here now (see
+ * `populateFetchCache`), and this bounds whatever else does.
+ */
+const FETCH_CACHE_LIMIT = 2_000;
 
 /**
- * Pre-populate the entity fetch cache with entities loaded from a collection.
- * This allows entity detail views to render instantly using cached data,
- * while the background fetch/listener brings in fresh data.
+ * Key: `${path}/${id}`. Holds what the signed-in user read, so it is emptied on
+ * sign-out (`clearFetchCache`, from `session_caches.ts`). A `Map` for its
+ * insertion order: reading or writing an entry moves it to the end, and the
+ * first entry is the one to evict.
+ */
+const CACHE = new Map<string, Entity<any>>();
+
+function readCache<M extends Record<string, any>>(key: string): Entity<M> | undefined {
+    const entity = CACHE.get(key);
+    if (entity !== undefined) {
+        CACHE.delete(key);
+        CACHE.set(key, entity);
+    }
+    return entity as Entity<M> | undefined;
+}
+
+function writeCache(key: string, entity: Entity<any> | undefined): void {
+    CACHE.delete(key);
+    if (entity === undefined) return;
+    CACHE.set(key, entity);
+    if (CACHE.size > FETCH_CACHE_LIMIT) {
+        const oldest = CACHE.keys().next().value;
+        if (oldest !== undefined) CACHE.delete(oldest);
+    }
+}
+
+/**
+ * Put records in the entity fetch cache, so a view that opens one renders it at
+ * once while the background fetch/listener brings in fresh data. The cache
+ * keeps the 2,000 records written or read most recently.
  * @param path - The collection path (e.g. "products")
  * @param entities - Array of entities to cache
  */
 export function populateFetchCache<M extends Record<string, any>>(path: string, entities: Entity<M>[]): void {
     for (const entity of entities) {
-        CACHE[`${path}/${entity.id}`] = entity;
+        writeCache(`${path}/${entity.id}`, entity);
     }
 }
 
@@ -46,9 +84,7 @@ export function populateFetchCache<M extends Record<string, any>>(path: string, 
  * to prevent stale data from a previous session leaking into the next.
  */
 export function clearFetchCache(): void {
-    for (const key of Object.keys(CACHE)) {
-        delete CACHE[key];
-    }
+    CACHE.clear();
 }
 
 /**
@@ -78,7 +114,8 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
     // Even when useCache is false, we show cached data instantly while
     // the background fetch/listener brings in fresh data.
     const cacheKey = entityId ? `${path}/${entityId}` : undefined;
-    const cachedEntity = cacheKey ? CACHE[cacheKey] as Entity<M> | undefined : undefined;
+    // Read once per mount, not per render: a read also marks the entry used.
+    const [cachedEntity] = useState<Entity<M> | undefined>(() => cacheKey ? readCache<M>(cacheKey) : undefined);
 
     const [entity, setEntity] = useState<Entity<M> | undefined>(cachedEntity);
     const [dataLoading, setDataLoading] = useState<boolean>(!cachedEntity);
@@ -86,17 +123,20 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
 
     useEffect(() => {
 
+        const key = `${path}/${entityId}`;
+        const cached = readCache<M>(key);
+
         // Only show loading state if we have no cached entity to display
-        if (!CACHE[`${path}/${entityId}`]) {
+        if (!cached) {
             setDataLoading(true);
         }
 
         // Whether a record is on screen — the cached one counts.
-        let showingEntity = Boolean(CACHE[`${path}/${entityId}`]);
+        let showingEntity = Boolean(cached);
 
         const onEntityUpdate = async (updatedEntity?: Entity<M> | null) => {
             showingEntity = Boolean(updatedEntity);
-            CACHE[`${path}/${entityId}`] = updatedEntity ?? undefined;
+            writeCache(key, updatedEntity ?? undefined);
             setEntity(updatedEntity ?? undefined);
             setDataLoading(false);
             setDataLoadingError(undefined);
@@ -114,8 +154,8 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
             setDataLoadingError(error);
         };
 
-        if (entityId && useCache && CACHE[`${path}/${entityId}`]) {
-            setEntity(CACHE[`${path}/${entityId}`]);
+        if (entityId && useCache && cached) {
+            setEntity(cached);
             setDataLoading(false);
             setDataLoadingError(undefined);
             // eslint-disable-next-line @typescript-eslint/no-empty-function
