@@ -598,8 +598,13 @@ export function rebaseManualChunks(id: string): string | undefined {
     // lucide-react has no line on purpose. The ~130 icons the chrome imports by
     // name are static; the by-name lookup map is fetched on demand. One chunk
     // name cannot hold both apart, and naming it welded 822 kB of icons into
-    // the preload set. Left to Rollup, the named icons land in the entry and
-    // the map gets its own async chunk.
+    // the preload set. Left to the bundler, the map gets its own async chunk
+    // and the named icons land in the chunks that import them — except the
+    // few the map shares with an eager chunk, which come out as small eager
+    // chunks of their own (2 of 19, under 4 kB each, in a scaffold-shaped app
+    // measured 2026-10-07). Keeping those together takes a `codeSplitting`
+    // group tagged `$initial`, which a manualChunks function cannot express;
+    // app/frontend/vite.config.ts does it that way.
 
     return undefined;
 }

@@ -4,7 +4,7 @@ import React from "react";
 import type { LucideIcon } from "lucide-react";
 
 /**
- * Rendering a Lucide icon chosen at runtime, without shipping all 1,600 of them
+ * Rendering a Lucide icon chosen at runtime, without shipping all ~1,750 of them
  * on the login screen.
  *
  * `@rebasepro/ui` used to re-export lucide's whole `icons` map:
@@ -15,13 +15,14 @@ import type { LucideIcon } from "lucide-react";
  * the library, so a tree-shaker cannot drop a single one — reaching the map
  * reaches all of them. Two callers reached it, both by name lookup: `getIcon`
  * in `@rebasepro/app` (a collection's `icon: "ShoppingCart"`) and the admin's
- * icon picker. That put 822 kB of SVG components into the entry chunk's static
- * graph, `modulepreload`ed before authentication.
+ * icon picker. That put 822 kB of SVG components (unminified) into the entry
+ * chunk's static graph, `modulepreload`ed before authentication.
  *
  * The ~130 icons the product's own chrome uses are still plain named imports
  * from `lucide-react`, which tree-shake to just those. Only the by-name lookup
- * goes through here, and it pays for the map once, asynchronously, the first
- * time a runtime-chosen icon is rendered.
+ * goes through here (both callers render {@link LucideIconByName} now), and it
+ * pays for the map once, asynchronously, the first time a runtime-chosen icon
+ * is rendered: an async chunk of ~480 kB minified, ~120 kB gzipped.
  */
 
 type IconsMap = Record<string, LucideIcon | undefined>;
@@ -32,8 +33,10 @@ let pending: Promise<IconsMap> | undefined;
 /**
  * The full lucide icon map, fetched on first use and cached for the session.
  *
- * Prefer {@link LucideIconByName}. This is here for callers that need to know
- * whether a name resolves, such as the icon picker's grid.
+ * Prefer {@link LucideIconByName}, which calls this. It is exported for callers
+ * that need the whole set at once; nothing in the admin does (the icon picker
+ * renders `LucideIconByName` per icon). To ask whether a name exists without
+ * fetching anything, use `iconKeys`.
  */
 export function loadLucideIcons(): Promise<IconsMap> {
     if (loaded) return Promise.resolve(loaded);
