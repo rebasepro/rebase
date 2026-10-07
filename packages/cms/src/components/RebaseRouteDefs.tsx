@@ -116,9 +116,13 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
     return (
         <>
             <RebaseRoutes>
+                {/* Without a layout the routes sit directly in the route list.
+                    They were wrapped in a layout route whose element was this
+                    same list — <Route>s rendered as components, outside any
+                    <Routes>, which React Router refuses on every page. */}
                 {layout
                     ? <Route element={layout}>{routeContents}</Route>
-                    : <Route element={<>{routeContents}</>}>{routeContents}</Route>
+                    : routeContents
                 }
             </RebaseRoutes>
             <CollectionEditorDialogs/>
