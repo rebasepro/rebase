@@ -11,7 +11,7 @@ export interface BackupStream {
     stream: ReadableStream<Uint8Array>;
     /** Its size in bytes, when the server said. */
     size?: number;
-    /** The file name the server gave it. */
+    /** Its file name: the key's last segment, as the server names the download. */
     name: string;
 }
 
@@ -71,12 +71,13 @@ export function createBackups(transport: Transport, options?: CreateBackupsOptio
         if (!res.ok || !res.body) {
             throw new RebaseApiError(`Failed to download backup (${res.status})`, { status: res.status });
         }
+        // `Content-Length` is CORS-safelisted; `Content-Disposition` is not,
+        // so the name comes from the key, as the server's does.
         const length = Number(res.headers.get("Content-Length"));
-        const named = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1];
         return {
             stream: res.body,
             ...(Number.isFinite(length) && length > 0 ? { size: length } : {}),
-            name: named ?? fileNameOf(key)
+            name: fileNameOf(key)
         };
     }
 
