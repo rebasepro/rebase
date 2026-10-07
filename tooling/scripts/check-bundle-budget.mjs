@@ -390,7 +390,10 @@ async function measureProbe(name) {
     const failures = new Set();
     for (const chunk of eager) {
         const bytes = Buffer.byteLength(chunk.code);
-        byKey[chunkKey(chunk.fileName)] = bytes;
+        // One key per probe: which shared module names a split-off chunk is
+        // the bundler's choice and changes with unrelated edits; the total and
+        // the forbidden modules are what a probe measures.
+        byKey[name] = (byKey[name] ?? 0) + bytes;
         totalBytes += bytes;
         totalGzipBytes += zlib.gzipSync(chunk.code, { level: 9 }).length;
         for (const [moduleId, info] of Object.entries(chunk.modules)) {
