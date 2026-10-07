@@ -202,6 +202,42 @@ describe("db push overhead E2E", () => {
     }, 180_000);
 
     /**
+     * The btree Rebase derives for `posts.author_id` is missing on a table
+     * that already exists — every table of a project upgraded across the
+     * release that derives them. Left to Atlas it is a plain `CREATE INDEX`
+     * inside the push's transaction, holding the table's writes for the whole
+     * build. The push builds it CONCURRENTLY before Atlas plans, so Atlas
+     * finds it and plans nothing; a dry-run only names it.
+     */
+    it("builds a missing foreign-key index ahead of the plan, and a dry-run only names it", async () => {
+        const derivedIndex = async (): Promise<string | undefined> => (await admin.query<{ name: string }>(
+            "SELECT indexname AS name FROM pg_indexes WHERE tablename = 'posts' AND indexname LIKE 'posts_author_id_ix_%'"
+        )).rows[0]?.name;
+
+        expect((await push()).result.exitCode).toBe(0);
+        const name = await derivedIndex();
+        expect(name).toBeDefined();
+        await admin.query(`DROP INDEX "public"."${name}"`);
+
+        const dry = await push(["--dry-run"]);
+        expect(dry.result.exitCode, dry.result.all).toBe(0);
+        expect(dry.result.all).toContain("would be built first");
+        expect(dry.result.all).toContain(`public.${name}`);
+        expect(await derivedIndex()).toBeUndefined();
+
+        const real = await push();
+        expect(real.result.exitCode, real.result.all).toBe(0);
+        expect(real.result.all).toMatch(/Building 1 foreign-key index/);
+        // Atlas found it already there: its plan was empty, so no apply ran.
+        expect(real.result.all).toContain("Schema is synced");
+        const { rows } = await admin.query<{ valid: boolean }>(
+            "SELECT i.indisvalid AS valid FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE c.relname = $1",
+            [name]
+        );
+        expect(rows).toEqual([{ valid: true }]);
+    }, 240_000);
+
+    /**
      * The connection outlives each step, so a step that fails inside a
      * transaction of its own must not leave the session aborted for the next
      * — `current transaction is aborted` on every step after the first error.

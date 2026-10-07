@@ -65,6 +65,7 @@ import { assertCollectionsPathExists } from "./cli-collections-path";
 import { DESIRED_STATE_URL, GENERATED_SQL_DIR, generatedSqlDir, prepareGeneratedSqlDir } from "./generated-sql";
 import { backupActionOf } from "./backup-argv";
 import type { TableLockResult } from "./schema/ensure-collection-policies";
+import type { DeferredIndexBuild } from "./schema/plan/diff-plan";
 
 import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
 
@@ -567,6 +568,13 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 await ensureAuthSchemaAndFunctions(databaseUrl);
             }
 
+            // Before Atlas plans: the foreign-key indexes an existing table is
+            // missing, built CONCURRENTLY — so the plan finds them, and the
+            // push's one transaction never builds one while holding the
+            // table's writes. See `schema/push-index-prebuild.ts`. A dry-run
+            // only names them.
+            const prebuilt = databaseUrl ? await prebuildForeignKeyIndexes(databaseUrl, collectionsPath, dryRun) : [];
+
             // Preview the plan before touching data. `atlas schema apply` with
             // --auto-approve will silently DROP COLUMN on a field removal and
             // drop+add on a rename, so we first dry-run to obtain the planned
@@ -639,6 +647,15 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     out(chalk.green("  ✓ No changes: the database already matches these collections."));
                 }
                 out("");
+                if (prebuilt.length > 0) {
+                    out(chalk.gray(`  ${prebuilt.length} foreign-key index(es) on existing tables would be built first,`));
+                    out(chalk.gray("  CONCURRENTLY, so the apply would not build them under a write lock (the plan"));
+                    out(chalk.gray("  above lists them because they do not exist yet):"));
+                    for (const name of prebuilt) {
+                        out(chalk.gray(`       ${name}`));
+                    }
+                    out("");
+                }
                 if (rebuildable.length > 0) {
                     out(chalk.gray(`  ${rebuildable.length} generated column(s) would be dropped before the apply and`));
                     out(chalk.gray("  rebuilt from search.sql after it — Postgres cannot retype a column"));
@@ -782,6 +799,58 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         out(chalk.green(`  ✓ rebase db ${subcommand} completed successfully.`));
         out("");
     }
+}
+
+/**
+ * Build, CONCURRENTLY and before Atlas plans, the derived foreign-key indexes
+ * an existing table is missing — see `schema/push-index-prebuild.ts`. With
+ * `dryRun`, only find them.
+ *
+ * Never fatal: an index not built here is one Atlas builds inside the push, as
+ * it always did.
+ *
+ * @returns `schema.index` of each one missing when this started.
+ */
+async function prebuildForeignKeyIndexes(databaseUrl: string, collectionsPath: string, dryRun: boolean): Promise<string[]> {
+    let missing: DeferredIndexBuild[];
+    try {
+        const { loadCollections } = await import("./schema/doctor");
+        const { missingForeignKeyIndexes } = await import("./schema/push-index-prebuild");
+        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        missing = await withAppClient(databaseUrl, client => missingForeignKeyIndexes(
+            { query: async (text) => ({ rows: (await client.query(text)).rows }) },
+            collections
+        ));
+    } catch {
+        // Not knowing changes nothing that matters: Atlas plans whatever is missing.
+        return [];
+    }
+    const names = missing.map(index => `${index.schema}.${index.indexName}`);
+    if (missing.length === 0 || dryRun) return names;
+
+    out(chalk.gray(`  Building ${missing.length} foreign-key index(es) on existing tables first — CONCURRENTLY, so writes go on:`));
+    try {
+        const { buildDeferredIndexes } = await import("./schema/deferred-index-build");
+        // This process's one connection, which is the dedicated session the
+        // builder needs: it lifts `statement_timeout` and resets it, and takes
+        // and releases its claims, on the same backend.
+        const outcome = await withAppClient(databaseUrl, client => buildDeferredIndexes(
+            async () => ({
+                dedicated: true,
+                query: async (text) => ({ rows: (await client.query(text)).rows }),
+                release: () => undefined
+            }),
+            missing,
+            { log: message => out(chalk.gray(`    ${message}`)) }
+        ));
+        for (const failure of outcome.failed) {
+            outWarn(chalk.yellow(`  ⚠️  ${failure.index} was not built ahead (${failure.error}); the push builds it inside its transaction instead.`));
+        }
+    } catch (err) {
+        outWarn(chalk.yellow(`  ⚠️  The foreign-key indexes were not built ahead (${err instanceof Error ? err.message : String(err)}); the push builds them inside its transaction instead.`));
+    }
+    out("");
+    return names;
 }
 
 async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> {
