@@ -163,6 +163,11 @@ query run as them:
    the first one, so a collection written several times a second still sends
    its subscribers a frame at least once a second.
 
+   <span class="since-badge" data-since="0.24">Since 0.24</span> A refetch that reads exactly what a subscriber was last sent sends that
+   subscriber nothing: a write to row 9,000 of a list showing the first 50 costs
+   the read, not a frame to every viewer. After an error frame, the next rows
+   are sent again even if they are the same.
+
 Earlier versions sent an immediate `collection_patch` carrying the written row
 before this refetch, for sub-millisecond cross-tab feedback. That row had been
 read under the writer's scope, so it could — and did — reach subscribers whose
@@ -481,7 +486,7 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies.
 
 1. The WebSocket connection authenticates using the same JWT token as the REST API.
 2. Every subscription refetch runs inside a PostgreSQL transaction with `set_config('app.user_id', ...)` and `set_config('app.user_roles', ...)` — ensuring RLS policies are enforced.
-3. <span class="since-badge" data-since="0.24">Since 0.24</span> The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame, to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame with the code `SESSION_ENDED` or `TOKEN_EXPIRED` and is closed with code `4001`. The SDK authenticates its socket again each time it refreshes its token, and after a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
+3. <span class="since-badge" data-since="0.24">Since 0.24</span> The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame, to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame with the code `SESSION_ENDED` or `TOKEN_EXPIRED` and is closed with code `4001`. The SDK authenticates its socket again each time it refreshes its token; a new token for the same identity (the same user id, roles, guest flag and claims) leaves the open subscriptions as they are, and one for a different identity refetches each of them as it. After a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
 
 This means each socket only receives updates for records its authenticated identity may see.
 
