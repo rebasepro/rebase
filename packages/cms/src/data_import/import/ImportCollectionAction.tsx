@@ -293,6 +293,7 @@ function PropertyTreeSelect({
             // key-value map, like a geopoint, takes a column whole.
             return <SelectItem value={propertyKey}
                 key={propertyKey}
+                textValue={property.name || propertyKey}
                 disabled={property.type === "map" && !takesObjectWhole(property)}>
                 <PropertySelectEntry propertyKey={propertyKey}
                     property={property}

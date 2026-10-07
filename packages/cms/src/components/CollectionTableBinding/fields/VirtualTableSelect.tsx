@@ -148,7 +148,8 @@ export function VirtualTableSelect(props: {
                 {resolvedEnumValues?.map((enumConfig) => (
                     <SelectItem
                         key={enumConfig.id}
-                        value={String(enumConfig.id)}>
+                        value={String(enumConfig.id)}
+                        textValue={enumConfig.label}>
                         <EnumValuesChip
                             enumKey={enumConfig.id}
                             enumValues={enumValues}

@@ -243,7 +243,8 @@ export function StringNumberFilterField({
                         }}>
                         {enumValues.map((enumConfig) => (
                             <SelectItem key={`select_item_${name}_${enumConfig.id}`}
-                                        value={String(enumConfig.id)}>
+                                        value={String(enumConfig.id)}
+                                        textValue={enumConfig.label}>
                                 <EnumValuesChip
                                     enumKey={String(enumConfig.id)}
                                     enumValues={enumValues}
