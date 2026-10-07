@@ -32,6 +32,7 @@ import { Highlighted } from "./SearchHighlight";
 import { useSearchExplanation, MatchExplanation, fieldLabel } from "./SearchExplanation";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { resolveEntityAction } from "../../util/resolutions";
+import { resolveEntityActionState } from "../../util/entity_actions";
 import { getSortablePropertyOptions } from "../CollectionTableBinding/column_utils";
 import { getResolvedPropertyInPath } from "../../util/property_utils";
 
@@ -1193,9 +1194,13 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                             openEntityMode: openEntityMode ?? collection?.openEntityMode ?? "full_screen"
                         };
                         // Asked here as the record's own action bar asks it.
-                        const enabled = !action.isEnabled || action.isEnabled(clickProps);
+                        const { enabled, disabledReason } = resolveEntityActionState(action, clickProps);
+                        // Wrapped when disabled: the icon then takes no pointer
+                        // events, and the tooltip saying why has to open anyway.
                         return (
-                            <Tooltip key={action.key ?? index} title={action.name} asChild>
+                            <Tooltip key={action.key ?? index}
+                                title={disabledReason ? `${action.name}: ${disabledReason}` : action.name}
+                                asChild={enabled}>
                                 <IconButton aria-label={action.name}
                                     size="small"
                                     disabled={!enabled}

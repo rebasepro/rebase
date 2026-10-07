@@ -1,5 +1,5 @@
 ---
-sourceHash: 5bea8df7e8fceb05
+sourceHash: db464576272c842b
 title: Ações de Entidade
 sidebar_label: Ações de Entidade
 description: Adicione botões de ação personalizados a entidades para arquivar, publicar, exportar, clonar e muito mais.
@@ -84,6 +84,18 @@ Reserve isso para a uma ou duas ações que são a razão de abrir o registro. A
 | `includeInForm` | `true` | `false` mantém a ação fora do registro e a deixa nas linhas da coleção |
 | `showActionsInListView` | `false` | `true` mostra a ação como um ícone em cada linha da visualização em lista |
 | `isEnabled` | — | Retorne `false` para mostrar a ação desabilitada, como botão ou como item de menu |
+| `disabledReason` | — | Diz por que uma ação desabilitada não está disponível: sob o nome dela no menu e como tooltip de um botão ou ícone desabilitado |
+
+Uma ação desabilitada que não diz por quê parece quebrada. `disabledReason` recebe as mesmas props que `isEnabled`, então pode dizer o que está faltando:
+
+```typescript
+{
+    name: "Resend to Shopify",
+    isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
+    disabledReason: () => "Este cliente não tem conta na Shopify",
+    onClick: async ({ entity, context }) => { /* … */ }
+}
+```
 
 No registro, um botão cujo `onClick` retorna uma promise pendente mostra um indicador de carregamento e não pode ser pressionado de novo até a promise ser concluída. Se a ação lançar um erro ou sua promise for rejeitada, o usuário vê o erro em uma notificação. A visualização somente leitura não tem formulário, então ali `formContext` é undefined.
 

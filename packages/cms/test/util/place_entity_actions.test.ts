@@ -1,5 +1,6 @@
-import { describe, expect, it } from "@jest/globals";
-import { placeEntityActions } from "../../src/util/entity_actions";
+import { describe, expect, it, jest } from "@jest/globals";
+import type { EntityActionClickProps } from "@rebasepro/cms-types";
+import { placeEntityActions, resolveEntityActionState } from "../../src/util/entity_actions";
 import { fitInlineActions } from "../../src/util/fit_inline_actions";
 
 /**
@@ -77,5 +78,33 @@ describe("fitInlineActions", () => {
 
     it("has nothing to fit without actions", () => {
         expect(fitInlineActions(500, [], [], gap)).toEqual({ count: 0, compact: false });
+    });
+});
+
+describe("resolveEntityActionState", () => {
+
+    const props: EntityActionClickProps<Record<string, unknown>> = {
+        view: "form",
+        entity: { id: "7", path: "customers", values: { shopify_id: null } }
+    };
+
+    it("is enabled without isEnabled, and never asks for a reason then", () => {
+        const disabledReason = jest.fn(() => "never shown");
+        expect(resolveEntityActionState({ disabledReason }, props)).toEqual({ enabled: true });
+        expect(resolveEntityActionState({ isEnabled: () => true, disabledReason }, props)).toEqual({ enabled: true });
+        expect(disabledReason).not.toHaveBeenCalled();
+    });
+
+    it("asks a disabled action why, with the props isEnabled was asked with", () => {
+        const state = resolveEntityActionState({
+            isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
+            disabledReason: ({ entity }) => `Customer ${entity?.id} has no Shopify account`
+        }, props);
+        expect(state).toEqual({ enabled: false, disabledReason: "Customer 7 has no Shopify account" });
+    });
+
+    it("is disabled without a reason when the action gives none", () => {
+        expect(resolveEntityActionState({ isEnabled: () => false }, props)).toEqual({ enabled: false });
+        expect(resolveEntityActionState({ isEnabled: () => false, disabledReason: () => "" }, props)).toEqual({ enabled: false });
     });
 });

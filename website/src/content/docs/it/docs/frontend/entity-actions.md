@@ -1,5 +1,5 @@
 ---
-sourceHash: 5bea8df7e8fceb05
+sourceHash: db464576272c842b
 title: Azioni entità
 sidebar_label: Azioni entità
 description: Aggiungi pulsanti di azione personalizzati alle entità per archiviare, pubblicare, esportare, clonare e altro ancora.
@@ -84,6 +84,18 @@ Riservatelo alle una o due azioni che sono il motivo per cui si apre il record. 
 | `includeInForm` | `true` | `false` tiene l'azione fuori dal record e la lascia sulle righe della collection |
 | `showActionsInListView` | `false` | `true` mostra l'azione come icona su ogni riga della vista elenco |
 | `isEnabled` | — | Restituite `false` per mostrare l'azione disabilitata, come pulsante o come voce di menu |
+| `disabledReason` | — | Spiega perché un'azione disabilitata non è disponibile: sotto il suo nome nel menu e come tooltip di un pulsante o di un'icona disabilitati |
+
+Un'azione disabilitata che non dice perché sembra rotta. `disabledReason` riceve le stesse props di `isEnabled`, quindi può indicare cosa manca:
+
+```typescript
+{
+    name: "Resend to Shopify",
+    isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
+    disabledReason: () => "Questo cliente non ha un account Shopify",
+    onClick: async ({ entity, context }) => { /* … */ }
+}
+```
 
 Sul record, un pulsante il cui `onClick` restituisce una promise in sospeso mostra un indicatore di caricamento e non si può premere di nuovo finché la promise non si conclude. Se l'azione lancia un errore o la sua promise viene rifiutata, l'utente vede l'errore in una notifica. La vista di sola lettura non ha un modulo, quindi lì `formContext` è undefined.
 

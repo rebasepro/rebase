@@ -83,6 +83,18 @@ Keep this for the one or two actions that are the reason the record is open. The
 | `includeInForm` | `true` | `false` keeps the action off the record and leaves it on the collection's rows |
 | `showActionsInListView` | `false` | `true` shows the action as an icon on each row of the list view |
 | `isEnabled` | — | Return `false` to show the action disabled, as a button or as a menu item |
+| `disabledReason` | — | Says why a disabled action is unavailable: under its name in a menu, and as the tooltip of a disabled button or icon |
+
+A disabled action that does not say why reads as broken. `disabledReason` receives the same props as `isEnabled`, so it can name what is missing:
+
+```typescript
+{
+    name: "Resend to Shopify",
+    isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
+    disabledReason: () => "This customer has no Shopify account",
+    onClick: async ({ entity, context }) => { /* … */ }
+}
+```
 
 On the record, a button whose `onClick` returns a pending promise shows a spinner and cannot be pressed again until the promise settles. If the action throws or its promise rejects, the user sees the error in a notification. The read-only view has no form, so `formContext` is undefined there.
 

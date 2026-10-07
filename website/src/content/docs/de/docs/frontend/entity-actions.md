@@ -1,5 +1,5 @@
 ---
-sourceHash: 5bea8df7e8fceb05
+sourceHash: db464576272c842b
 title: Entity-Aktionen
 sidebar_label: Entity-Aktionen
 description: Fügen Sie benutzerdefinierte Aktionsschaltflächen zu Entitäten hinzu, um zu archivieren, zu veröffentlichen, zu exportieren, zu klonen und mehr.
@@ -84,6 +84,18 @@ Reservieren Sie das für die ein oder zwei Aktionen, wegen derer der Datensatz g
 | `includeInForm` | `true` | `false` hält die Aktion vom Datensatz fern und lässt sie in den Zeilen der Collection |
 | `showActionsInListView` | `false` | `true` zeigt die Aktion als Symbol in jeder Zeile der Listenansicht |
 | `isEnabled` | — | Geben Sie `false` zurück, um die Aktion deaktiviert anzuzeigen, als Schaltfläche oder als Menüeintrag |
+| `disabledReason` | — | Sagt, warum eine deaktivierte Aktion nicht verfügbar ist: unter ihrem Namen im Menü und als Tooltip einer deaktivierten Schaltfläche oder eines Symbols |
+
+Eine deaktivierte Aktion, die nicht sagt warum, wirkt defekt. `disabledReason` erhält dieselben Props wie `isEnabled` und kann daher benennen, was fehlt:
+
+```typescript
+{
+    name: "Resend to Shopify",
+    isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
+    disabledReason: () => "Dieser Kunde hat kein Shopify-Konto",
+    onClick: async ({ entity, context }) => { /* … */ }
+}
+```
 
 Am Datensatz zeigt eine Schaltfläche, deren `onClick` ein noch offenes Promise zurückgibt, einen Ladeindikator und lässt sich erst wieder drücken, wenn das Promise abgeschlossen ist. Wirft die Aktion einen Fehler oder wird ihr Promise abgelehnt, sieht der Benutzer den Fehler in einer Benachrichtigung. Die schreibgeschützte Ansicht hat kein Formular, daher ist `formContext` dort undefined.
 

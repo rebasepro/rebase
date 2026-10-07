@@ -56,6 +56,21 @@ export interface EntityAction<M extends Record<string, unknown> = Record<string,
     isEnabled?(props: EntityActionClickProps<M, USER>): boolean;
 
     /**
+     * Why the action is unavailable, asked only when {@link isEnabled} returns
+     * false. A greyed-out item that does not say why reads as broken.
+     *
+     * Shown under the action's name in a menu, and as the tooltip of a
+     * disabled button or icon. It receives the same props as `isEnabled`, so
+     * the reason can name what is missing:
+     * `disabledReason: ({ entity }) => entity?.values.email ? "Already sent" : "No email on file"`.
+     *
+     * A method, like `isEnabled`, and not a `string | function` property: a
+     * function-typed property is checked strictly against `M`, which made an
+     * `AdminCollection<Product>` no longer an `AdminCollection`.
+     */
+    disabledReason?(props: EntityActionClickProps<M, USER>): string | undefined;
+
+    /**
      * When true, this action is rendered inline on each row in the list view.
      * By default, entity actions only appear in the table view and entity form.
      * Use this for actions that should be easily accessible regardless of view mode.

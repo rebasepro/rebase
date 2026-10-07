@@ -281,6 +281,13 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   throws or rejects now shows its error in a notification instead of failing
   silently, and a button shows a spinner while its promise is pending.
 
+- **An entity action can say why it is disabled.** `disabledReason`, asked
+  with the same props as `isEnabled` when that returns false, is shown under
+  the action's name in a menu and as the tooltip of a disabled button or
+  icon — on the record's bar and on the collection's rows. A disabled row icon
+  now shows its tooltip at all: it was the tooltip's own trigger, and a
+  disabled icon takes no hover.
+
 - **A data-import preview lists every value that will not be imported, per
   column, with its row and the reason, before anything is written.**
 

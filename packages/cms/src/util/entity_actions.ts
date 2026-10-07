@@ -1,4 +1,4 @@
-import type { EntityAction } from "@rebasepro/cms-types";
+import type { EntityAction, EntityActionClickProps } from "@rebasepro/cms-types";
 
 const reservedKeys = ["edit", "copy", "delete"];
 
@@ -64,4 +64,24 @@ export function placeEntityActions<A extends Pick<EntityAction, "key" | "collaps
         else placed.own.push(action);
     }
     return placed;
+}
+
+export interface EntityActionState {
+    enabled: boolean;
+    /** Only when disabled, and only if the action says why. */
+    disabledReason?: string;
+}
+
+/**
+ * Whether an action can run for these props and, when it cannot, why — the
+ * one question every surface that draws an action asks, so a reason declared
+ * once shows on the record's bar, its menu and the collection's rows alike.
+ */
+export function resolveEntityActionState(
+    action: Pick<EntityAction, "isEnabled" | "disabledReason">,
+    props: EntityActionClickProps<Record<string, unknown>>
+): EntityActionState {
+    if (!action.isEnabled || action.isEnabled(props)) return { enabled: true };
+    const reason = action.disabledReason?.(props);
+    return reason ? { enabled: false, disabledReason: reason } : { enabled: false };
 }

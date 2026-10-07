@@ -7,7 +7,7 @@ import { Entity } from "@rebasepro/types";
 import { RebaseContext } from "@rebasepro/cms-types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { copyEntityAction, deleteEntityAction, unlinkEntityAction } from "./common/default_entity_actions";
-import { mergeEntityActions } from "../util/entity_actions";
+import { mergeEntityActions, resolveEntityActionState } from "../util/entity_actions";
 import { resolveEntityAction } from "../util/resolutions";
 import { Button, CircularProgress, cls, defaultBorderMixin, DialogActions, IconButton, LoadingButton, Tooltip, Typography } from "@rebasepro/ui";
 import { AlertCircleIcon, iconSize } from "@rebasepro/ui";
@@ -185,12 +185,13 @@ function buildBottomActions<M extends Record<string, unknown>>({
                     formContext
                 } satisfies EntityActionClickProps<Record<string, unknown>>;
 
-                const isEnabled = !action.isEnabled || action.isEnabled(props);
+                const { enabled: isEnabled, disabledReason } = resolveEntityActionState(action, props);
                 return (
                     <EntityActionButton
                         key={action.key ?? action.name ?? index}
                         action={action}
                         enabled={isEnabled}
+                        disabledReason={disabledReason}
                         props={props}
                     />
                 );
@@ -253,16 +254,18 @@ function buildBottomActions<M extends Record<string, unknown>>({
 function EntityActionButton({
     action,
     enabled,
+    disabledReason,
     props
 }: {
     action: EntityAction,
     enabled: boolean,
+    disabledReason?: string,
     props: EntityActionClickProps<Record<string, unknown>>
 }) {
     const snackbarController = useSnackbarController();
     const [loading, setLoading] = React.useState(false);
     return <Tooltip
-        title={action.name}>
+        title={disabledReason ? `${action.name}: ${disabledReason}` : action.name}>
         <IconButton aria-label={action.name}
             disabled={!enabled}
             onClick={(event) => {

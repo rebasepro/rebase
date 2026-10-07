@@ -21,7 +21,8 @@ import { getIcon } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getLocalChangesBackup } from "@rebasepro/app";
 import { useAdminContext } from "../../hooks/useAdminContext";
-import { placeEntityActions } from "../../util/entity_actions";
+import { placeEntityActions, resolveEntityActionState } from "../../util/entity_actions";
+import { ActionMenuLabel } from "../common/ActionMenuLabel";
 
 /**
  *
@@ -133,7 +134,7 @@ export const CollectionRowActions = function CollectionRowActions({
         onCollectionChange,
         openEntityMode: openEntityMode ?? collection?.openEntityMode
     };
-    const isActionEnabled = (action: EntityAction) => !action.isEnabled || action.isEnabled(clickProps);
+    const actionState = (action: EntityAction) => resolveEntityActionState(action, clickProps);
 
     const content = (
         <div
@@ -167,10 +168,13 @@ export const CollectionRowActions = function CollectionRowActions({
 
                     {uncollapsedActions.map((action, index) => {
                         const isEditAction = action.key === "edit";
-                        const tooltip = isEditAction && hasDraft ? t("unsaved_local_changes") : action.name;
+                        const { enabled, disabledReason } = actionState(action);
+                        const tooltip = isEditAction && hasDraft
+                            ? t("unsaved_local_changes")
+                            : disabledReason ? `${action.name}: ${disabledReason}` : action.name;
 
                         let iconButton = <IconButton
-                            disabled={!isActionEnabled(action)}
+                            disabled={!enabled}
                             onClick={(event: MouseEvent) => {
                                 event.stopPropagation();
                                 action.onClick(clickProps);
@@ -185,10 +189,13 @@ export const CollectionRowActions = function CollectionRowActions({
                                 </Badge>
                             );
                         }
+                        // A disabled icon takes no pointer events, so as the
+                        // trigger itself its tooltip — the one place it can
+                        // say why — never opened. Wrapped, the wrapper hovers.
                         return (
                             <Tooltip key={index}
                                 title={tooltip}
-                                asChild={true}>
+                                asChild={enabled}>
                                 {iconButton}
                             </Tooltip>
                         );
@@ -205,18 +212,19 @@ export const CollectionRowActions = function CollectionRowActions({
                             {collapsedGroups.map((group, groupIndex) => (
                                 <React.Fragment key={groupIndex}>
                                     {groupIndex > 0 && <Separator orientation={"horizontal"}/>}
-                                    {group.map((action, index) => (
-                                        <MenuItem
+                                    {group.map((action, index) => {
+                                        const { enabled, disabledReason } = actionState(action);
+                                        return <MenuItem
                                             key={action.key ?? index}
-                                            disabled={!isActionEnabled(action)}
+                                            disabled={!enabled}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 action.onClick(clickProps);
                                             }}>
                                             {getIcon(action.icon, undefined, undefined, "smallest")}
-                                            {action.name}
-                                        </MenuItem>
-                                    ))}
+                                            <ActionMenuLabel name={action.name} disabledReason={disabledReason}/>
+                                        </MenuItem>;
+                                    })}
                                 </React.Fragment>
                             ))}
                         </Menu>

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5bea8df7e8fceb05
+sourceHash: db464576272c842b
 title: Actions d'entité
 sidebar_label: Actions d'entité
 description: Ajoutez des boutons d'action personnalisés aux entités pour archiver, publier, exporter, cloner, et bien plus encore.
@@ -84,6 +84,18 @@ Réservez-le à la ou aux deux actions qui justifient l'ouverture de l'enregistr
 | `includeInForm` | `true` | `false` retire l'action de l'enregistrement et la laisse sur les lignes de la collection |
 | `showActionsInListView` | `false` | `true` affiche l'action sous forme d'icône sur chaque ligne de la vue liste |
 | `isEnabled` | — | Renvoyez `false` pour afficher l'action désactivée, en bouton ou en élément de menu |
+| `disabledReason` | — | Indique pourquoi une action désactivée n'est pas disponible : sous son nom dans le menu, et en info-bulle d'un bouton ou d'une icône désactivés |
+
+Une action désactivée qui ne dit pas pourquoi a l'air cassée. `disabledReason` reçoit les mêmes props que `isEnabled` et peut donc nommer ce qui manque :
+
+```typescript
+{
+    name: "Resend to Shopify",
+    isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
+    disabledReason: () => "Ce client n'a pas de compte Shopify",
+    onClick: async ({ entity, context }) => { /* … */ }
+}
+```
 
 Sur l'enregistrement, un bouton dont le `onClick` renvoie une promesse en attente affiche un indicateur de chargement et ne peut pas être pressé à nouveau tant que la promesse n'est pas réglée. Si l'action lève une erreur ou si sa promesse est rejetée, l'utilisateur voit l'erreur dans une notification. La vue en lecture seule n'a pas de formulaire : `formContext` y est donc undefined.
 

@@ -28,6 +28,7 @@ import {
 } from "@rebasepro/ui";
 import type { PlacedEntityActions } from "../util/entity_actions";
 import { fitInlineActions, type InlineActionsFit } from "../util/fit_inline_actions";
+import { ActionMenuLabel } from "./common/ActionMenuLabel";
 
 /**
  * One of the record's own actions, resolved and ready to run — what the bar
@@ -38,6 +39,8 @@ export interface RecordActionItem {
     name: string;
     icon?: React.ReactNode;
     enabled: boolean;
+    /** Why it is disabled, when it is and its action says. */
+    disabledReason?: string;
     /**
      * Runs the action, reporting its own failure. Returns a promise only when
      * the action is asynchronous, which is what keeps a button's spinner up.
@@ -394,11 +397,13 @@ function useInlineActionsFit(
  * An action promoted out of the menu: a text button with its icon, as the
  * collection toolbar draws Filter and Sort, or the icon alone with its name in
  * a tooltip where the bar is short of room. It shows a spinner while the work
- * it started is running, and cannot be pressed twice meanwhile.
+ * it started is running, and cannot be pressed twice meanwhile. Disabled, its
+ * tooltip says why, where the action gives a reason.
  */
 function RecordActionButton({ action, compact }: { action: RecordActionItem, compact: boolean }) {
 
     const [running, setRunning] = useState(false);
+    const reason = action.enabled ? undefined : action.disabledReason;
 
     const onClick = () => {
         const pending = action.run();
@@ -409,7 +414,7 @@ function RecordActionButton({ action, compact }: { action: RecordActionItem, com
 
     if (compact && action.icon) {
         return (
-            <Tooltip title={action.name}>
+            <Tooltip title={reason ? `${action.name}: ${reason}` : action.name}>
                 <IconButton size={"small"}
                     aria-label={action.name}
                     disabled={!action.enabled || running}
@@ -420,15 +425,20 @@ function RecordActionButton({ action, compact }: { action: RecordActionItem, com
         );
     }
 
+    // The tooltip's wrapper takes the hover: a disabled button receives no
+    // pointer events of its own, so the button lets them through to it.
     return (
-        <LoadingButton variant={"text"}
-            size={"small"}
-            startIcon={action.icon}
-            loading={running}
-            disabled={!action.enabled}
-            onClick={onClick}>
-            {action.name}
-        </LoadingButton>
+        <Tooltip title={reason}>
+            <LoadingButton variant={"text"}
+                size={"small"}
+                startIcon={action.icon}
+                loading={running}
+                disabled={!action.enabled}
+                className={reason ? "pointer-events-none" : undefined}
+                onClick={onClick}>
+                {action.name}
+            </LoadingButton>
+        </Tooltip>
     );
 }
 
@@ -436,7 +446,7 @@ function RecordActionMenuItem({ action }: { action: RecordActionItem }) {
     return (
         <MenuItem disabled={!action.enabled} onClick={() => void action.run()}>
             {action.icon}
-            {action.name}
+            <ActionMenuLabel name={action.name} disabledReason={action.enabled ? undefined : action.disabledReason}/>
         </MenuItem>
     );
 }

@@ -121,6 +121,46 @@ describe("the record bar's actions", () => {
         expect(button.disabled).toBe(false);
     });
 
+    it("says under a disabled menu item why it is unavailable", () => {
+        renderBar({
+            inline: [],
+            own: [item("Resend to Shopify", { enabled: false, disabledReason: "No Shopify account linked" })],
+            generic: [],
+            destructive: []
+        });
+
+        const menuItem = within(openMenu()).getByRole("menuitem");
+        expect(menuItem.textContent).toBe("Resend to ShopifyNo Shopify account linked");
+        expect(menuItem.getAttribute("data-disabled")).not.toBeNull();
+    });
+
+    it("keeps an enabled item's reason to itself", () => {
+        renderBar({
+            inline: [],
+            own: [item("Resend", { disabledReason: "stale" })],
+            generic: [],
+            destructive: []
+        });
+
+        expect(within(openMenu()).getByRole("menuitem").textContent).toBe("Resend");
+    });
+
+    it("lets the hover through a disabled promoted button to the tooltip saying why", () => {
+        renderBar({
+            inline: [item("Resend", { enabled: false, disabledReason: "No Shopify account linked" })],
+            own: [],
+            generic: [],
+            destructive: []
+        });
+
+        const button = screen.getByRole<HTMLButtonElement>("button", { name: "Resend" });
+        expect(button.disabled).toBe(true);
+        // A disabled button receives no pointer events, so the tooltip is on a
+        // wrapper and the button lets the hover through to it.
+        expect(button.className).toContain("pointer-events-none");
+        expect(button.parentElement?.getAttribute("data-state")).toBe("closed");
+    });
+
     it("disables a promoted action the record does not allow", () => {
         renderBar({ inline: [item("Resend", { enabled: false })], own: [], generic: [], destructive: [] });
         expect(screen.getByRole<HTMLButtonElement>("button", { name: "Resend" }).disabled).toBe(true);

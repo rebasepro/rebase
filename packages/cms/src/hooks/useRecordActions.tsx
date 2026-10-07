@@ -4,7 +4,7 @@ import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { getIcon, useCustomizationController, usePermissions, useSnackbarController } from "@rebasepro/app";
 import { copyEntityAction, deleteEntityAction, unlinkEntityAction } from "../components/common/default_entity_actions";
-import { mergeEntityActions, placeEntityActions, type PlacedEntityActions } from "../util/entity_actions";
+import { mergeEntityActions, placeEntityActions, resolveEntityActionState, type PlacedEntityActions } from "../util/entity_actions";
 import { resolveEntityAction } from "../util/resolutions";
 import { useChildViewSource } from "./useChildViewSource";
 import { useUrlController } from "./navigation/contexts/UrlContext";
@@ -96,7 +96,7 @@ export function useRecordActions<M extends Record<string, unknown>>({
             name: action.name,
             icon: getIcon(action.icon, undefined, undefined, "smallest"),
             collapsed: action.collapsed,
-            enabled: !action.isEnabled || action.isEnabled(clickProps),
+            ...resolveEntityActionState(action, clickProps),
             // A failure reaches the user rather than the console alone, wherever
             // the action was clicked from. A promise is handed back only when the
             // action returned one, so a button shows a spinner for work that is

@@ -63,7 +63,8 @@ function publishAction(collapsed: boolean): EntityAction {
         name: "Publish",
         collapsed,
         onClick: () => publishClicked(),
-        isEnabled
+        isEnabled,
+        disabledReason: () => "Already published"
     };
 }
 
@@ -106,5 +107,17 @@ describe("CollectionRowActions — isEnabled", () => {
         const item = screen.getByText("Publish");
         fireEvent.click(item);
         expect(publishClicked).not.toHaveBeenCalled();
+        // And says why, under its name.
+        expect(screen.getByRole("menuitem").textContent).toBe("PublishAlready published");
+    });
+
+    it("opens a disabled inline action's tooltip from a wrapper, since the icon takes no hover", () => {
+        renderRow(publishAction(false));
+
+        const button = screen.getAllByRole<HTMLButtonElement>("button").find(b => !b.hasAttribute("aria-haspopup"))!;
+        expect(button.disabled).toBe(true);
+        // The trigger is the wrapper, not the button that ignores the pointer.
+        expect(button.hasAttribute("data-state")).toBe(false);
+        expect(button.parentElement?.getAttribute("data-state")).toBe("closed");
     });
 });

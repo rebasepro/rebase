@@ -81,6 +81,18 @@ describe("useRecordActions", () => {
         expect(snackbarOpen).toHaveBeenCalledWith({ type: "error", message: "Resend: no wallet configured" });
     });
 
+    it("carries a disabled action's reason, asked with the record", () => {
+        const placed = placedFor({
+            key: "shopify",
+            name: "Resend to Shopify",
+            isEnabled: () => false,
+            disabledReason: ({ entity }) => `Customer ${entity?.id} has no Shopify account`,
+            onClick: () => undefined
+        });
+
+        expect(placed.own[0]).toMatchObject({ enabled: false, disabledReason: "Customer 7 has no Shopify account" });
+    });
+
     it("places a promoted action beside the built-ins it was merged with", () => {
         const placed = placedFor({ key: "recalculate", name: "Recalculate", collapsed: false, onClick: () => undefined });
 
