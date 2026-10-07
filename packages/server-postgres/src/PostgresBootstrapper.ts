@@ -430,7 +430,11 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
      */
     const provisionRlsRuntime = async (driverResult?: InitializedDriver): Promise<void> => {
         const db = requireProvisioningDb(driverResult);
-        const { RLS_BOOTSTRAP_STATEMENTS } = await import("./schema/rls-bootstrap-sql");
+        const { RLS_BOOTSTRAP_STATEMENTS, rlsRuntimeIsCurrent } = await import("./schema/rls-bootstrap-sql");
+        // Nothing to replace: a `CREATE OR REPLACE` of an unchanged function
+        // still rewrites it and invalidates every cached plan that calls it.
+        const run = async (text: string) => sqlRows<Record<string, unknown>>(await db.execute(sql.raw(text)));
+        if (await rlsRuntimeIsCurrent(run).catch(() => false)) return;
         // One statement per call — this handle speaks the extended query
         // protocol, which rejects multi-command strings. Advisory-locked
         // for the same reason the auth path is, and on the same key: two

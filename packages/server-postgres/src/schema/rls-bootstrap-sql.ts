@@ -95,6 +95,91 @@ $$ LANGUAGE sql STABLE`,
 $$ LANGUAGE sql STABLE`
 ];
 
+/** Everything `CREATE OR REPLACE FUNCTION` sets on a function, as one comparable string. */
+const describeFunction = (facts: {
+    returns: string; language: string; volatility: string; strict: boolean; parallel: string;
+    securityDefiner: boolean; leakproof: boolean; cost: number; hasConfig: boolean; body: string;
+}): string => JSON.stringify([
+    facts.returns.toLowerCase(), facts.language.toLowerCase(), facts.volatility, facts.strict, facts.parallel,
+    facts.securityDefiner, facts.leakproof, facts.cost, facts.hasConfig, facts.body
+]);
+
+/**
+ * What each `CREATE OR REPLACE FUNCTION` in {@link RLS_BOOTSTRAP_STATEMENTS}
+ * would leave in the catalogue, by `schema.name`. Parsed
+ * from the statements themselves, so the two cannot drift; a statement this
+ * does not recognise makes {@link rlsRuntimeIsCurrent} answer "no", and the
+ * bootstrap runs as it always did.
+ */
+const expectedRlsFunctions = (): Map<string, string> | undefined => {
+    const expected = new Map<string, string>();
+    for (const statement of RLS_BOOTSTRAP_STATEMENTS) {
+        if (/^CREATE SCHEMA IF NOT EXISTS /.test(statement)) continue;
+        const match = /^CREATE OR REPLACE FUNCTION (\w+)\.(\w+)\(\) RETURNS (\w+) AS \$\$([\s\S]*)\$\$ LANGUAGE (\w+) (IMMUTABLE|STABLE|VOLATILE)$/
+            .exec(statement);
+        if (!match) return undefined;
+        const [, schema, name, returns, body, language, volatility] = match;
+        expected.set(`${schema}.${name}`, describeFunction({
+            returns, language, volatility: volatility[0].toLowerCase(), strict: false, parallel: "u",
+            securityDefiner: false, leakproof: false, cost: 100, hasConfig: false, body
+        }));
+    }
+    return expected;
+};
+
+/**
+ * Whether the `rebase` schema and every RLS helper function are exactly what
+ * {@link RLS_BOOTSTRAP_STATEMENTS} would make them — one catalogue read.
+ *
+ * The boot ran those statements unconditionally, on every boot and on every
+ * source: four `CREATE OR REPLACE FUNCTION`s in a transaction under an
+ * advisory lock. Replacing a function rewrites its `pg_proc` row even when
+ * nothing changed, and every cached plan that inlined it — every plan of every
+ * statement a policy applies to, on every connection — is invalidated by it.
+ * A function that differs in anything `CREATE OR REPLACE` sets (body,
+ * language, volatility, strictness, parallel safety, security, leakproofness,
+ * cost, `SET` options), or is missing, answers `false`, and the statements run
+ * as before.
+ */
+export async function rlsRuntimeIsCurrent(run: (sql: string) => Promise<Record<string, unknown>[]>): Promise<boolean> {
+    const expected = expectedRlsFunctions();
+    if (!expected) return false;
+    const names = [...expected.keys()].map(key => key.split("."));
+    const rows = await run(
+        `SELECT n.nspname AS schema, p.proname AS name, pg_get_function_identity_arguments(p.oid) AS args,
+                format_type(p.prorettype, NULL) AS returns, l.lanname AS language,
+                p.provolatile::text AS volatility, p.proisstrict AS strict, p.proparallel::text AS parallel,
+                p.prosecdef AS security_definer, p.proleakproof AS leakproof, p.procost AS cost,
+                p.proconfig IS NOT NULL AS has_config, p.prosrc AS body
+         FROM pg_proc p
+         JOIN pg_namespace n ON p.pronamespace = n.oid
+         JOIN pg_language l ON p.prolang = l.oid
+         WHERE (n.nspname, p.proname) IN (${names.map(([schema, name]) => `('${schema}', '${name}')`).join(", ")})`
+    );
+    const live = new Map<string, string>();
+    for (const row of rows) {
+        // Only the no-argument overload is the one these statements replace.
+        if (String(row.args ?? "") !== "") continue;
+        live.set(`${row.schema}.${row.name}`, describeFunction({
+            returns: String(row.returns),
+            language: String(row.language),
+            volatility: String(row.volatility),
+            strict: row.strict === true,
+            parallel: String(row.parallel),
+            securityDefiner: row.security_definer === true,
+            leakproof: row.leakproof === true,
+            cost: Number(row.cost),
+            hasConfig: row.has_config === true,
+            body: String(row.body)
+        }));
+    }
+    // The schema exists whenever a function in it does.
+    for (const [key, definition] of expected) {
+        if (live.get(key) !== definition) return false;
+    }
+    return true;
+}
+
 /** The same statements as one script, for migration files and raw clients. */
 export const RLS_BOOTSTRAP_SQL =
     "-- Rebase schema + RLS helper functions (required by the policies below)\n" +

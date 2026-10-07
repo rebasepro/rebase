@@ -4,7 +4,8 @@ import { logger } from "@rebasepro/server";
 import { revokeInternalTableAccess } from "@rebasepro/common";
 import type { CollectionConfig } from "@rebasepro/types";
 import { AUTH_USERS_COLUMNS, authUsersColumnSql } from "../schema/auth-users-columns";
-import { RLS_BOOTSTRAP_STATEMENTS } from "../schema/rls-bootstrap-sql";
+import { RLS_BOOTSTRAP_STATEMENTS, rlsRuntimeIsCurrent } from "../schema/rls-bootstrap-sql";
+import { internalTablesGrantedToUserRole } from "../security/rls-enforcement";
 import { BOOT_LOCK_TIMEOUT_MS } from "../schema/boot-ddl";
 import {
     AuthSchemaVersionError,
@@ -188,6 +189,8 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
 
         const authSchema = usersSchema === "public" ? "rebase" : usersSchema;
         const indexNames = await readIndexNames(db, [usersSchema, authSchema]);
+        const runRaw = async (text: string): Promise<Record<string, unknown>[]> =>
+            (await db.execute(sql.raw(text))).rows as Record<string, unknown>[];
         /** Create an index only when it is missing — see {@link readIndexNames}. */
         const ensureIndex = async (schema: string, name: string, statement: ReturnType<typeof sql>): Promise<void> => {
             if (indexNames.has(`${schema}.${name}`)) return;
@@ -479,12 +482,18 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // the migration stream is the whole point of having them in one place.
         // One call per statement: this handle speaks the extended query
         // protocol, which rejects multi-command strings.
-        await db.transaction(async (tx) => {
-            await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'))`);
-            for (const statement of RLS_BOOTSTRAP_STATEMENTS) {
-                await tx.execute(sql.raw(statement));
-            }
-        });
+        //
+        // Only when the catalogue says they differ: replacing an unchanged
+        // function still rewrites it, and invalidates every cached plan a
+        // policy calling it is part of. See `rlsRuntimeIsCurrent`.
+        if (!await rlsRuntimeIsCurrent(runRaw).catch(() => false)) {
+            await db.transaction(async (tx) => {
+                await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'))`);
+                for (const statement of RLS_BOOTSTRAP_STATEMENTS) {
+                    await tx.execute(sql.raw(statement));
+                }
+            });
+        }
 
         // Seed default roles if none exist
         // (no-op: roles are now stored inline on the users table)
@@ -1036,16 +1045,24 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // so revoking first would leave the one table holding this database's
         // schema version writable by every signed-in user until the next boot.
         // Nothing below re-runs the migrations, so the stamp's guarantee holds.
-        await revokeInternalTableAccess(
-            async (text) => { await db.execute(sql.raw(text)); },
-            authSchema,
-            {
-                onError: (table, err) => logger.warn(
-                    `🔐 Could not revoke authenticated-role access to "${authSchema}"."${table}": ` +
-                    (err instanceof Error ? err.message : String(err))
-                )
-            }
-        );
+        //
+        // Only the tables the user role still holds a privilege on — one read
+        // instead of a `REVOKE` per name, each rewriting the table's catalogue
+        // row on every boot. A read that fails sweeps every name, as before.
+        const stillGranted = await internalTablesGrantedToUserRole(runRaw, authSchema).catch(() => undefined);
+        if (stillGranted === undefined || stillGranted.length > 0) {
+            await revokeInternalTableAccess(
+                async (text) => { await db.execute(sql.raw(text)); },
+                authSchema,
+                {
+                    tables: stillGranted,
+                    onError: (table, err) => logger.warn(
+                        `🔐 Could not revoke authenticated-role access to "${authSchema}"."${table}": ` +
+                        (err instanceof Error ? err.message : String(err))
+                    )
+                }
+            );
+        }
 
         logger.debug("✅ Auth tables ready");
     } catch (error) {

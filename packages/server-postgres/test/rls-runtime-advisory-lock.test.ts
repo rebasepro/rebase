@@ -75,7 +75,12 @@ describe("ensureRlsRuntime", () => {
 
         const lock = pool.statements.find(s => s.text.includes("pg_advisory"));
         expect(lock?.text).toContain(`pg_advisory_xact_lock(${KEY})`);
-        expect(pool.statements).toHaveLength(RLS_BOOTSTRAP_STATEMENTS.length + 1);
-        expect(pool.statements.every(s => s.inTransaction && s.connection === lock!.connection)).toBe(true);
+        // Before it, one read of the catalogue — the helpers are only replaced
+        // when they differ (this pool answers "not there").
+        const [read, ...rest] = pool.statements;
+        expect(read.inTransaction).toBe(false);
+        expect(read.text).toMatch(/^\s*SELECT[\s\S]*FROM pg_proc/);
+        expect(rest).toHaveLength(RLS_BOOTSTRAP_STATEMENTS.length + 1);
+        expect(rest.every(s => s.inTransaction && s.connection === lock!.connection)).toBe(true);
     });
 });
