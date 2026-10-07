@@ -322,6 +322,22 @@ export function refetchConcurrencyFor(db: object): number {
     return Math.max(2, Math.floor(poolMax / 4));
 }
 
+/**
+ * Exactly what a refetch binds of its subscriber — `applyAuthContext` writes
+ * these GUCs and the JWT claims from them, and the field viewer reads the
+ * roles — and nothing else. Roles keep their order: `app.user_roles` is
+ * written in it. A subscription with no identity reads as the anonymous user.
+ */
+function principalOf(authContext: SubscriptionAuthContext | undefined): Record<string, unknown> {
+    const auth = authContext ?? { uid: ANONYMOUS_USER_ID, roles: ["anon"] };
+    return {
+        uid: auth.uid,
+        roles: auth.roles ?? [],
+        isAnonymous: auth.isAnonymous === true,
+        claims: auth.claims
+    };
+}
+
 /** `JSON.stringify` with object keys sorted, so equal requests have one spelling. */
 function canonicalJson(value: unknown): string {
     return JSON.stringify(value, (_key, nested: unknown) => {
@@ -715,18 +731,12 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         target: { type: "collection" | "single"; path: string; id?: string | number; collectionRequest?: StoredCollectionRequest; authContext?: SubscriptionAuthContext }
     ): string {
         if (!shared) return `listener\u0000${key}`;
-        const auth = target.authContext ?? { uid: ANONYMOUS_USER_ID, roles: ["anon"] };
         return canonicalJson({
             type: target.type,
             path: target.path,
             id: target.type === "single" ? String(target.id) : undefined,
             request: target.type === "collection" ? (target.collectionRequest ?? {}) : undefined,
-            // Exactly what the refetch binds: `applyAuthContext` and the field
-            // viewer read these and nothing else.
-            uid: auth.uid,
-            roles: auth.roles ?? [],
-            isAnonymous: auth.isAnonymous === true,
-            claims: auth.claims
+            principal: principalOf(target.authContext)
         });
     }
 
@@ -1538,6 +1548,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * again, when one is installed, and left when it refuses.
      */
     async rescopeClient(clientId: string, authContext: SubscriptionAuthContext): Promise<void> {
+        const principal = canonicalJson(principalOf(authContext));
         for (const key of [...(this.subscriptionsByClient.get(clientId) ?? [])]) {
             const subscription = this._subscriptions.get(key);
             if (!subscription) continue;
@@ -1567,6 +1578,14 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     continue;
                 }
             }
+
+            // The same principal — a token refresh, which the SDK sends about
+            // hourly — reads the same rows: the subscription stays as it is,
+            // in its group, with nothing to refetch. Everything a refetch
+            // binds is in the comparison, so this decides only whether to
+            // look again, never what is shown. The readability check above
+            // still ran: the collection's rules may have changed since.
+            if (canonicalJson(principalOf(subscription.authContext)) === principal) continue;
 
             // A new identity is a new group: the read it shares is now the one
             // its new principal's subscriptions run.
