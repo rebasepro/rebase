@@ -17,7 +17,7 @@ import {
     type StoredObjectStream
 } from "./types";
 import { folderKey, listingPrefix } from "./keys";
-import { bufferWebStream, webStreamFrom } from "./streams";
+import { bufferWebStream, bytesView, webStreamFrom } from "./streams";
 import { ApiError } from "../api/errors";
 import {
     UploadFileProps,
@@ -224,7 +224,7 @@ export class GCSStorageController implements StorageController {
             const contentType = located.meta.contentType || "application/octet-stream";
             // The object's own version — see `S3StorageController.getObject`.
             const updated = typeof located.meta.updated === "string" ? Date.parse(located.meta.updated) : NaN;
-            return new File([contents], located.key.split("/").pop() || located.key, {
+            return new File([bytesView(contents)], located.key.split("/").pop() || located.key, {
                 type: contentType,
                 lastModified: Number.isNaN(updated) ? undefined : updated
             });
