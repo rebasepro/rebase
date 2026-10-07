@@ -151,6 +151,16 @@ const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]*$/;
  * the auth user table is a collection, has RLS, and would now be skipped on its
  * own merits rather than by being kept off a list.
  *
+ * The fourth guard is about cost, and leaves the end state exactly as it was:
+ * the `REVOKE` runs only when it would change something. A `REVOKE` rewrites the
+ * table's `pg_class` row whether or not anything was granted, which invalidates
+ * every cached plan that touches the table on every connection. Every store
+ * that owns an internal table runs this on every boot. So it is skipped when the
+ * end-user role holds nothing on the table — no entry in its ACL or in any
+ * column's ACL — and the ACL has been written. A table whose ACL has never been
+ * written (`relacl` NULL) is still revoked once: the `REVOKE` writes the owner's
+ * default ACL out, exactly as before, and from then on it is skipped.
+ *
  * One command, so it is safe on handles that speak the extended query protocol
  * and reject multi-statement strings.
  */
@@ -162,12 +172,21 @@ export function revokeInternalTableSql(schema: string, table: string): string {
         throw new Error(`Refusing to build SQL with an unsafe table name: ${JSON.stringify(table)}`);
     }
     const qualified = `"${schema}"."${table}"`;
+    const role = `(SELECT oid FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}')`;
     return `
         DO $rebase_revoke$
         BEGIN
             IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}')
                AND to_regclass('${qualified}') IS NOT NULL
-               AND NOT (SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('${qualified}')) THEN
+               AND NOT (SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('${qualified}'))
+               AND (
+                   (SELECT relacl IS NULL FROM pg_class WHERE oid = to_regclass('${qualified}'))
+                   OR EXISTS (SELECT 1 FROM pg_class c, aclexplode(c.relacl) a
+                              WHERE c.oid = to_regclass('${qualified}') AND a.grantee = ${role})
+                   OR EXISTS (SELECT 1 FROM pg_attribute att, aclexplode(att.attacl) a
+                              WHERE att.attrelid = to_regclass('${qualified}') AND att.attacl IS NOT NULL
+                                AND a.grantee = ${role})
+               ) THEN
                 EXECUTE 'REVOKE ALL ON ${qualified} FROM ${REBASE_USER_ROLE}';
             END IF;
         END
