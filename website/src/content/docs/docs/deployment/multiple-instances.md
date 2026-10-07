@@ -96,7 +96,9 @@ S3 or GCS. Mount one volume at `STORAGE_PATH` on every instance and any instance
 serves any upload; a restart or a rolling deploy resumes an upload where it
 stopped. Without a shared volume, a chunk that lands on another instance is
 answered 404: route a client's upload requests to one instance (sticky sessions
-on the load balancer). Ordinary uploads through `POST /upload` are one request
+on the load balancer). The SDK and the admin panel, which use this endpoint for
+files over 8 MiB, then send the file through `POST /upload` instead, and keep
+doing so for the rest of the session. Ordinary uploads through `POST /upload` are one request
 and are not affected. On 0.23 the upload's state was in the process's memory,
 so a shared volume did not help and a restart sent an upload back to byte 0.
 

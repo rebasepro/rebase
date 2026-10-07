@@ -13,7 +13,7 @@ import { writeFile, readFile, readdir, unlink, stat, mkdir, open } from "fs/prom
 import { existsSync, openAsBlob } from "fs";
 import { join } from "path";
 import type { Context } from "hono";
-import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
+import { DEFAULT_STORAGE_SOURCE_KEY, type UploadFileResult } from "@rebasepro/types";
 import type { StorageController } from "./types";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
 import { logger } from "../utils/logger.js";
@@ -102,6 +102,27 @@ interface TusUpload {
 
 /** Maximum upload size: 5 GB. */
 const MAX_UPLOAD_SIZE = 5 * 1024 * 1024 * 1024;
+
+/**
+ * The header a resumable upload's last `PATCH` answers with the stored object
+ * in — `{ key, bucket, storageUrl }`, the `data` of `POST /upload`, as
+ * URI-encoded JSON — so a client gets from the resumable path what it gets
+ * from the multipart one. `create` answers it with `on-complete`, which tells
+ * a client this server will, before it sends a byte.
+ */
+export const UPLOAD_RESULT_HEADER = "Rebase-Upload-Result";
+
+/** `Upload-Metadata` entries carrying the object's custom metadata, as `metadata_<name>` form fields do on `POST /upload`. */
+const CUSTOM_METADATA_PREFIX = "metadata_";
+
+/** The custom metadata an upload carries, as `POST /upload` collects it from its form. */
+function customMetadataOf(metadata: Record<string, string>): Record<string, unknown> | undefined {
+    const custom: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(metadata)) {
+        if (name.startsWith(CUSTOM_METADATA_PREFIX)) custom[name.slice(CUSTOM_METADATA_PREFIX.length)] = value;
+    }
+    return Object.keys(custom).length > 0 ? custom : undefined;
+}
 
 /** Stale upload expiry: 24 hours. */
 const UPLOAD_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -551,7 +572,8 @@ export class TusHandler {
             headers: {
                 Location: location,
                 "Tus-Resumable": "1.0.0",
-                "Upload-Offset": "0"
+                "Upload-Offset": "0",
+                [UPLOAD_RESULT_HEADER]: "on-complete"
             }
         });
     }
@@ -723,15 +745,14 @@ export class TusHandler {
             const nextOffset = offset + chunk.length;
 
             // Finalize if complete
-            if (nextOffset >= upload.size) {
-                await this.finalize(upload);
-            }
+            const stored = nextOffset >= upload.size ? await this.finalize(upload) : undefined;
 
             return new Response(null, {
                 status: 204,
                 headers: {
                     "Tus-Resumable": "1.0.0",
-                    "Upload-Offset": String(nextOffset)
+                    "Upload-Offset": String(nextOffset),
+                    ...(stored ? { [UPLOAD_RESULT_HEADER]: encodeURIComponent(JSON.stringify(stored)) } : {})
                 }
             });
         } finally {
@@ -772,7 +793,7 @@ export class TusHandler {
      * temp file forever. Left false, a client that retries sends an empty chunk
      * at `offset === size`, which lands straight back here.
      */
-    private async finalize(upload: TusUpload): Promise<void> {
+    private async finalize(upload: TusUpload): Promise<UploadFileResult> {
         // Resolve the target controller from the storage source decided — and
         // authorized — in `create`. Reading `upload.metadata.storageId` here
         // instead is how the hook's answer and the write came apart.
@@ -825,9 +846,12 @@ export class TusHandler {
 
             const file = new File([blob], fileName, { type: mimeType });
 
-            await targetController.putObject({
+            const stored = await targetController.putObject({
                 file,
                 key: fileName,
+                // The object's custom metadata, from `metadata_<name>` entries,
+                // as `POST /upload` takes it from `metadata_<name>` fields.
+                metadata: customMetadataOf(upload.metadata),
                 bucket: upload.bucket
             });
 
@@ -849,6 +873,7 @@ export class TusHandler {
                 contentType: mimeType,
                 user: upload.user
             });
+            return stored;
         } catch (err) {
             logger.error(`[TUS] Failed to finalize upload ${upload.id}`, { error: err });
             // The bytes stay on disk and the upload stays incomplete, so a

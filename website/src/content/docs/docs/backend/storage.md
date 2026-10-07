@@ -275,11 +275,7 @@ on every response, transformed URLs and download-token URLs included. Opened
 directly, it renders with scripts disabled and an opaque origin, so it cannot
 reach the API's cookies or endpoints.
 
-## TUS Resumable Upload Protocol
-
-For uploading large files or handling unstable network conditions, Rebase implements the **TUS v1.0.0** open protocol including the `Creation` and `Termination` extensions.
-
-### How large a file may be
+## How large a file may be
 
 Each storage source accepts files up to its own limit: **50 MB** unless
 `STORAGE_MAX_FILE_SIZE` (bytes, suffixed `__<KEY>` for a named source) or the
@@ -297,29 +293,13 @@ STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
 STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 ```
 
-A completed file is held in the server's memory while it is written to the
-store, on every upload path, so size the limit to the memory the server has.
-
-```
-Client                                                   Rebase Server
-  │                                                           │
-  │─── POST /api/storage/tus (Upload-Length: 50000000) ──────>│ (Generates session ID)
-  │<── 201 Created (Location: /api/storage/tus/uuid-abc) ────│
-  │                                                           │
-  │─── PATCH /api/storage/tus/uuid-abc (Upload-Offset: 0) ───>│ (Appends chunk via open/write)
-  │<── 204 No Content (Upload-Offset: 1500000) ───────────────│
-  │                                                           │
-  │─── PATCH /api/storage/tus/uuid-abc (Upload-Offset: 1.5M) ─>│ (Upload finishes)
-  │<── 204 No Content (Upload-Offset: 50000000) ──────────────│ (Copies to storage, unlinks temp)
-```
-
-### Upload Lifecycle Mechanics
-
-1. **Session Initialisation (`POST`)**: The client sends the total file size in the `Upload-Length` header and base64 metadata via `Upload-Metadata`. The server creates an empty placeholder file under a hidden temporary directory `.tus-uploads/`, <span class="since-badge" data-since="0.24">Since 0.24</span> with a record of the upload beside it (`<id>.json`: its key, bucket, source, type, size and owner), and returns the upload URL. The upload lives in that directory, not in the process: a restarted server resumes it, and every instance that shares `STORAGE_PATH` serves it — see [Running several instances](/docs/deployment/multiple-instances/#files).
-2. **Progress Inquiries (`HEAD`)**: If an upload is interrupted, the client queries the upload URL using a `HEAD` request. The server returns the current byte position in the `Upload-Offset` header.
-3. **Data Appending (`PATCH`)**: The client resumes sending binary data starting at the returned offset with `Content-Type: application/offset+octet-stream`. The server writes each chunk to the temporary file at the byte offset the request declares, which must be the offset the server holds (`409` otherwise). One chunk is received at a time: a `PATCH` that arrives while another for the same upload is still being received — typically a client re-sending a chunk that stalled — is answered `423 UPLOAD_LOCKED`, and the client resumes from the offset `HEAD` reports.
-4. **Finalisation**: When the accumulated `Upload-Offset` matches the declared `Upload-Length`, Rebase reads the completed temporary file, wraps it as a standard JavaScript `File` object, and saves it to the configured storage backend (local disk or S3). The temporary file is then deleted.
-5. **Periodic Sweep**: A background cleaner runs every **60 seconds** to delete orphaned, incomplete temporary uploads that have exceeded the **24-hour** retention threshold — those another process started too, read from the directory.
+How much of a file the server holds at once depends on the door.
+`POST /api/storage/upload` is one multipart body, which the server parses whole:
+three to five times the file in its memory. A resumable (TUS) upload holds one
+chunk at a time. <span class="since-badge" data-since="0.24">Since 0.24</span> `client.storage.putObject()` and the admin panel send a file
+over 8 MiB the resumable way. See
+[Resumable uploads (TUS)](/docs/backend/storage-resumable-uploads/) for the
+protocol, what it answers and how it behaves across instances.
 
 ## Environment Variables
 

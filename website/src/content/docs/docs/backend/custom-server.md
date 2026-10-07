@@ -253,10 +253,16 @@ app.use(cors({
     exposedHeaders: [
         "ETag", "Retry-After", "X-Request-ID",
         "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Preference-Applied"
+        "Preference-Applied",
+        // Resumable uploads, which the SDK uses for files over 8 MiB
+        "Location", "Upload-Offset", "Rebase-Upload-Result"
     ]
 }));
 ```
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> The last three are what a resumable upload answers in. Without them the
+SDK cannot follow one from another origin, and sends every file as one
+multipart request instead.
 
 <span class="since-badge" data-since="0.24">Since 0.24</span> The Rebase runtime and the ejected backend send this list already. On 0.23
 they expose none of these headers, so a frontend on another origin reads no `ETag`.

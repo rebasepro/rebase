@@ -289,6 +289,95 @@ describe("useBackendStorageSource", () => {
     });
 
     /**
+     * A file over 8 MiB goes up through the resumable (TUS) endpoint, a chunk
+     * per request, rather than as one multipart body the server parses whole.
+     */
+    describe("a large upload", () => {
+        const MiB = 1024 * 1024;
+        const RESULT = { key: "videos/clip.mp4", bucket: "default", storageUrl: "local://default/videos/clip.mp4" };
+
+        /** A TUS endpoint in memory; `lost` answers every PATCH 404, as another instance would. */
+        function tusBackend(options: { lost?: boolean } = {}) {
+            const calls: Call[] = [];
+            let length = 0;
+            let received = 0;
+            let metadata = "";
+            const headers = (values: Record<string, string>) => ({ get: (name: string) => values[name] ?? null });
+            Object.defineProperty(global, "fetch", {
+                configurable: true,
+                writable: true,
+                value: async (input: RequestInfo | URL, init?: RequestInit) => {
+                    const url = String(input);
+                    calls.push({ url, init });
+                    const sent = (init?.headers ?? {}) as Record<string, string>;
+                    if (url.endsWith("/storage/tus") && init?.method === "POST") {
+                        length = Number(sent["Upload-Length"]);
+                        metadata = sent["Upload-Metadata"];
+                        return { status: 201, ok: true, headers: headers({ Location: "/api/storage/tus/0f0e0d0c-0b0a-4908-8706-050403020100", "Rebase-Upload-Result": "on-complete" }), json: async () => ({}) };
+                    }
+                    if (url.includes("/storage/tus/") && init?.method === "PATCH") {
+                        if (options.lost) return { status: 404, ok: false, headers: headers({}), json: async () => ({ error: { message: "Upload not found" } }) };
+                        received += (init.body as Blob).size;
+                        return {
+                            status: 204,
+                            ok: true,
+                            headers: headers({
+                                "Upload-Offset": String(received),
+                                ...(received >= length ? { "Rebase-Upload-Result": encodeURIComponent(JSON.stringify(RESULT)) } : {})
+                            }),
+                            json: async () => ({})
+                        };
+                    }
+                    if (url.endsWith("/storage/upload")) return { ...reply(201, { json: { data: { ...RESULT, storageUrl: "via-multipart" } } }), headers: headers({}) };
+                    return { ...reply(404, { json: {} }), headers: headers({}) };
+                }
+            });
+            return { calls, get metadata() { return metadata; }, get received() { return received; } };
+        }
+
+        const largeFile = () => new File([new Uint8Array(9 * MiB)], "clip.mp4", { type: "video/mp4" });
+
+        it("sends it a chunk per request, with the session token, and answers what was stored", async () => {
+            const backend = tusBackend();
+            const source = storage();
+
+            const result = await source.putObject({ file: largeFile(), key: "videos/clip.mp4", metadata: { caption: "hi" } });
+
+            expect(result).toEqual(RESULT);
+            expect(backend.calls.map(c => `${c.init?.method} ${c.url.replace(API, "")}`)).toEqual([
+                "POST /api/storage/tus",
+                "PATCH /api/storage/tus/0f0e0d0c-0b0a-4908-8706-050403020100",
+                "PATCH /api/storage/tus/0f0e0d0c-0b0a-4908-8706-050403020100"
+            ]);
+            expect(backend.received).toBe(9 * MiB);
+            expect(backend.calls.every(c => (c.init?.headers as Record<string, string>).Authorization === `Bearer ${ACCESS_JWT}`)).toBe(true);
+            const decoded = Object.fromEntries(backend.metadata.split(",").map(pair => [pair.split(" ")[0], atob(pair.split(" ")[1])]));
+            expect(decoded).toEqual({ key: "videos/clip.mp4", metadata_caption: "hi", filename: "clip.mp4", filetype: "video/mp4" });
+        });
+
+        it("keeps a small file on the multipart route", async () => {
+            const backend = tusBackend();
+            await storage().putObject({ file: new File(["small"], "a.txt", { type: "text/plain" }), key: "a.txt" });
+            expect(backend.calls.map(c => c.url.replace(API, ""))).toEqual(["/api/storage/upload"]);
+        });
+
+        it("falls back to the multipart route when the upload is lost to another instance, and stays there", async () => {
+            const backend = tusBackend({ lost: true });
+            const source = storage();
+
+            expect(await source.putObject({ file: largeFile(), key: "videos/clip.mp4" })).toMatchObject({ storageUrl: "via-multipart" });
+            await source.putObject({ file: largeFile(), key: "videos/second.mp4" });
+
+            expect(backend.calls.map(c => c.url.replace(API, ""))).toEqual([
+                "/api/storage/tus",
+                "/api/storage/tus/0f0e0d0c-0b0a-4908-8706-050403020100",
+                "/api/storage/upload",
+                "/api/storage/upload"
+            ]);
+        });
+    });
+
+    /**
      * A private file's URL carries a download token minted for whoever asked.
      * The hook knows the user only through `getAuthToken`, so the credential is
      * what owns the cache: another user signing in — or a sign-out — in the

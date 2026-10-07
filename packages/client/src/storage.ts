@@ -1,13 +1,16 @@
 import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, RebaseApiError, isPublicStoragePath, storageObjectPath } from "@rebasepro/types";
 import {
     DOWNLOAD_URL_CONCURRENCY,
+    RESUMABLE_UPLOAD_THRESHOLD,
     createBatchLoader,
     createConcurrencyLimit,
     createDownloadUrlCache,
+    uploadResumable,
     type DownloadMetadataBatchEntry,
-    type ResolvedDownload
+    type ResolvedDownload,
+    type ResumableUploadSend
 } from "@rebasepro/common";
-import { Transport } from "./transport";
+import { Transport, type ResponseMeta } from "./transport";
 
 /**
  * Create a StorageSource that talks to the Rebase backend REST API.
@@ -37,6 +40,26 @@ import { Transport } from "./transport";
  */
 export function encodeStorageKey(key: string): string {
     return key.split("/").map(encodeURIComponent).join("/");
+}
+
+/**
+ * The fields of an upload's form, as the resumable endpoint's
+ * `Upload-Metadata`: the same names, plus the file's own name and type, which
+ * the form carries in the file part. A Blob travels in a form as `blob`.
+ */
+function resumableMetadataOf(form: FormData): Record<string, string> {
+    const entries: Record<string, string> = {};
+    for (const [name, value] of form.entries()) {
+        if (typeof value === "string") {
+            entries[name] = value;
+        } else if (name === "file") {
+            const filename = value instanceof File ? value.name : "blob";
+            if (filename) entries.filename = filename;
+            entries.filetype = value.type || "application/octet-stream";
+        }
+    }
+    if (!entries.key && !entries.filename) entries.key = "unnamed";
+    return entries;
 }
 
 export function createStorage(transport: Transport, storageId?: string): StorageSource {
@@ -89,6 +112,30 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         if (!storageId) return path;
         const sep = path.includes("?") ? "&" : "?";
         return `${path}${sep}storageId=${encodeURIComponent(storageId)}`;
+    };
+
+    /**
+     * Whether this source sends large files through the resumable endpoint.
+     * Turned off for the rest of its life by the first upload that finds it
+     * cannot — a server without the endpoint, or several instances that do
+     * not share an upload — so only that one upload pays for finding out.
+     */
+    let resumable = true;
+
+    /** One request of a resumable upload, through the transport (its token, its refresh). */
+    const sendResumable: ResumableUploadSend = async (method, path, headers, body) => {
+        const meta: ResponseMeta = {};
+        try {
+            await transport.request(`/storage/tus${path}`, { method, headers, ...(body ? { body } : {}) }, meta);
+            return { status: meta.status ?? 200, header: (name) => meta.headers?.get(name) ?? null };
+        } catch (error: unknown) {
+            // An HTTP answer is the protocol's to read; a dropped connection
+            // (status 0) is thrown, and the upload asks where it got to.
+            if (error instanceof RebaseApiError && typeof error.status === "number" && error.status > 0) {
+                return { status: error.status, header: () => null, error };
+            }
+            throw error;
+        }
     };
 
     async function putObject({
@@ -144,6 +191,16 @@ export function createStorage(transport: Transport, storageId?: string): Storage
                     );
                 }
             }
+        }
+
+        // A large file goes up a chunk at a time: the multipart request is
+        // parsed whole by the server, three to five times the file in its
+        // memory. Same fields, so the same object, the same checks and the
+        // same triggers — only the transport differs.
+        if (resumable && file.size > RESUMABLE_UPLOAD_THRESHOLD) {
+            const outcome = await uploadResumable({ file, metadata: resumableMetadataOf(formData), send: sendResumable });
+            if ("stored" in outcome) return outcome.stored;
+            resumable = false;
         }
 
         const result = await transport.request<{ data: UploadFileResult }>(withStorageId("/storage/upload"), {

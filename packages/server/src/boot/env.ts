@@ -606,7 +606,11 @@ export const CORS_EXPOSED_HEADERS: readonly string[] = [
     "X-RateLimit-Limit",
     "X-RateLimit-Remaining",
     "X-RateLimit-Reset",
-    "Preference-Applied"
+    "Preference-Applied",
+    // A resumable upload: where it lives, how far it got, and what was stored.
+    "Location",
+    "Upload-Offset",
+    "Rebase-Upload-Result"
 ];
 
 /** What the runtime hands Hono's `cors()`. */

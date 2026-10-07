@@ -29,6 +29,16 @@ const result = await client.storage.putObject({
 // result: { key: string; bucket: string; storageUrl: string }
 ```
 
+<span class="since-badge" data-since="0.24">Since 0.24</span> A file over 8 MiB goes up through the server's resumable (TUS)
+endpoint, 8 MiB per request, instead of as one multipart request the server
+parses whole — so a large upload costs the server one chunk of memory, not three
+to five times the file. A chunk that fails on the way is sent again from where
+the server got to. The result, the stored object and the server's checks are
+the same either way. When the resumable endpoint cannot take the file (an older
+server, or several instances that do not share uploads), it goes as one
+`POST /api/storage/upload`, and so does every later file from that client. See
+[Resumable uploads (TUS)](/docs/backend/storage-resumable-uploads/).
+
 ### From a File Input
 
 ```typescript

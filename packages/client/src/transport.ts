@@ -424,6 +424,11 @@ export interface ResponseMeta {
     etag?: string;
     /** The HTTP status, for a caller that has to tell 200 from 204. */
     status?: number;
+    /**
+     * The response's headers, for a protocol that answers in them — a
+     * resumable upload's `Location` and `Upload-Offset`.
+     */
+    headers?: { get(name: string): string | null };
 }
 
 /** See {@link Transport.setTokenRefresher}. */
@@ -715,6 +720,7 @@ headers });
         if (meta) {
             meta.status = res.status;
             meta.etag = res.headers?.get?.("ETag") ?? undefined;
+            meta.headers = res.headers;
         }
 
         if (res.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
@@ -766,6 +772,7 @@ headers: retryHeaders });
                 if (meta) {
                     meta.status = retryRes.status;
                     meta.etag = retryRes.headers?.get?.("ETag") ?? undefined;
+                    meta.headers = retryRes.headers;
                 }
                 if (retryRes.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
                 const retryText = await retryRes.text().catch(() => "");

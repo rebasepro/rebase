@@ -180,6 +180,7 @@ export default defineConfig({
                         { label: "Custom auth adapters", slug: "docs/backend/auth-adapters" },
                         { label: "Storage Configuration", slug: "docs/backend/storage" },
                         { label: "Storage caching and CDNs", slug: "docs/backend/storage-caching" },
+                        { label: "Resumable uploads (TUS)", slug: "docs/backend/storage-resumable-uploads" },
                         { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },
                         { label: "MongoDB", slug: "docs/backend/mongodb" },
                         { label: "Realtime & WebSocket", slug: "docs/backend/realtime" },

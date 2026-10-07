@@ -93,7 +93,11 @@ app.use("/*", cors({
         "X-RateLimit-Limit",
         "X-RateLimit-Remaining",
         "X-RateLimit-Reset",
-        "Preference-Applied"
+        "Preference-Applied",
+        // A resumable upload: where it lives, how far it got, what was stored.
+        "Location",
+        "Upload-Offset",
+        "Rebase-Upload-Result"
     ]
 }));
 

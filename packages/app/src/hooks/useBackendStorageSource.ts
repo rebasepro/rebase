@@ -2,7 +2,7 @@
  * React hook for using backend storage API as a StorageSource
  */
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useRef } from "react";
 import {
     StorageSource,
     UploadFileProps,
@@ -15,11 +15,14 @@ import {
 } from "@rebasepro/types";
 import {
     DOWNLOAD_URL_CONCURRENCY,
+    RESUMABLE_UPLOAD_THRESHOLD,
     createBatchLoader,
     createConcurrencyLimit,
     createDownloadUrlCache,
+    uploadResumable,
     type DownloadMetadataBatchEntry,
-    type ResolvedDownload
+    type ResolvedDownload,
+    type ResumableUploadSend
 } from "@rebasepro/common";
 import { DEFAULT_API_PATH } from "./ApiConfigContext";
 
@@ -98,6 +101,29 @@ export function useBackendStorageSource({
     }, [getAuthToken]);
 
     /**
+     * Whether this source sends large files through the resumable endpoint.
+     * Turned off by the first upload that finds it cannot — a server without
+     * it, or several instances that do not share an upload.
+     */
+    const resumable = useRef(true);
+
+    /** One request of a resumable upload. */
+    const sendResumable = useCallback<ResumableUploadSend>(async (method, path, headers, body) => {
+        const response = await fetchWithAuth(`${storageBasePath}/tus${path}`, {
+            method,
+            headers,
+            ...(body ? { body } : {})
+        });
+        let error: Error | undefined;
+        if (!response.ok) {
+            const answer: { error?: { message?: string } | string } | undefined = await response.json().catch(() => undefined);
+            const message = typeof answer?.error === "string" ? answer.error : answer?.error?.message;
+            error = new Error(message || `Upload failed (${response.status})`);
+        }
+        return { status: response.status, header: (name) => response.headers.get(name), error };
+    }, [fetchWithAuth, storageBasePath]);
+
+    /**
      * Upload a file to storage
      */
     const putObject = useCallback(async ({
@@ -128,6 +154,24 @@ export function useBackendStorageSource({
             }
         }
 
+        // A large file goes up a chunk at a time: the multipart request is
+        // parsed whole by the server, three to five times the file in its
+        // memory. The same fields, so the same object, checks and triggers.
+        if (resumable.current && file.size > RESUMABLE_UPLOAD_THRESHOLD) {
+            const entries: Record<string, string> = {};
+            for (const [name, value] of formData.entries()) {
+                if (typeof value === "string") entries[name] = value;
+            }
+            const filename = file instanceof File ? file.name : "blob";
+            if (filename) entries.filename = filename;
+            entries.filetype = file.type || "application/octet-stream";
+            if (!entries.key && !entries.filename) entries.key = "unnamed";
+
+            const outcome = await uploadResumable({ file, metadata: entries, send: sendResumable });
+            if ("stored" in outcome) return outcome.stored;
+            resumable.current = false;
+        }
+
         const response = await fetchWithAuth(`${storageBasePath}/upload`, {
             method: "POST",
             body: formData
@@ -140,7 +184,7 @@ export function useBackendStorageSource({
 
         const result = await response.json();
         return result.data;
-    }, [fetchWithAuth, storageBasePath]);
+    }, [fetchWithAuth, sendResumable, storageBasePath]);
 
     /**
      * A private file's metadata and download token, or `null` when there is
