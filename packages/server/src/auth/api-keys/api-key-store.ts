@@ -11,7 +11,7 @@
 import { randomBytes, createHash } from "crypto";
 import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
-import { revokeInternalTableSql } from "@rebasepro/common";
+import { REBASE_USER_ROLE, revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../../utils/logger";
 import { createDdlBootstrapper } from "../../boot/ddl-bootstrap";
 import type {
@@ -55,6 +55,44 @@ BEGIN
     END IF;
 END
 $rebase_drop_hash_index$`.trim();
+
+/** The relations `ensureTable` creates in `rebase`: the table and its two indexes. */
+const BOOT_RELATIONS = ["api_keys", "idx_api_keys_prefix", "idx_api_keys_owner"];
+
+/** The columns `ensureTable` adds to a table created before scopes. */
+const BOOT_COLUMNS = ["kind", "scopes", "roles", "owner_uid"];
+
+/**
+ * One catalogue read answering whether `ensureTable` has anything to do. It
+ * returns one row: whether the table, its indexes and the scope columns are
+ * there, whether the duplicate hash index and the pre-scopes `permissions`
+ * column are gone, and whether the end-user role still holds a privilege (the
+ * same test `revokeInternalTableSql` makes before it revokes). `readable` is
+ * the connection's own access, the question `isReadable` asks.
+ */
+const BOOT_STATE_SQL = (() => {
+    const list = (names: string[]) => names.map(name => `'${name}'`).join(", ");
+    const target = `(SELECT oid FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}')`;
+    const columnCount = (names: string[]) =>
+        `(SELECT count(*) FROM pg_attribute a WHERE a.attrelid = to_regclass('${TABLE}') AND a.attnum > 0 ` +
+        `AND NOT a.attisdropped AND a.attname IN (${list(names)}))::int`;
+    return `
+SELECT
+    (SELECT count(*) FROM pg_class c WHERE c.relnamespace = to_regnamespace('rebase')
+       AND c.relname IN (${list(BOOT_RELATIONS)}))::int AS present,
+    (SELECT count(*) FROM pg_class c WHERE c.relnamespace = to_regnamespace('rebase')
+       AND c.relname = 'idx_api_keys_hash')::int AS stale,
+    ${columnCount(BOOT_COLUMNS)} AS columns,
+    ${columnCount(["permissions"])} AS legacy,
+    (SELECT count(*) FROM pg_class c
+     WHERE c.oid = to_regclass('${TABLE}') AND NOT c.relrowsecurity AND ${target} IS NOT NULL
+       AND (c.relacl IS NULL
+            OR EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = ${target})
+            OR EXISTS (SELECT 1 FROM pg_attribute att, aclexplode(att.attacl) a
+                       WHERE att.attrelid = c.oid AND att.attacl IS NOT NULL AND a.grantee = ${target})))::int AS granted,
+    (has_schema_privilege('rebase', 'USAGE') AND has_table_privilege(to_regclass('${TABLE}'), 'SELECT')) AS readable
+WHERE to_regnamespace('rebase') IS NOT NULL`.trim();
+})();
 
 /**
  * Generate a plaintext API key with the `rk_live_` prefix.
@@ -237,9 +275,40 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
         }
     }
 
+    /**
+     * Whether a boot has nothing to do, from {@link BOOT_STATE_SQL}. Every
+     * statement below is a no-op on such a database, but not a free one: each
+     * `ADD COLUMN IF NOT EXISTS` queues for the table's ACCESS EXCLUSIVE lock
+     * before it finds the column there, each `CREATE INDEX IF NOT EXISTS` takes
+     * a SHARE lock, and the `REVOKE` rewrites the table's catalogue row. Anything
+     * missing, granted or legacy — or a read that fails, as it does on a driver
+     * that is not Postgres — runs the full bootstrap, exactly as before.
+     */
+    async function bootIsCurrent(): Promise<boolean> {
+        try {
+            const row = (await exec(BOOT_STATE_SQL))[0];
+            return row !== undefined
+                && Number(row.present) === BOOT_RELATIONS.length
+                && Number(row.stale) === 0
+                && Number(row.columns) === BOOT_COLUMNS.length
+                && Number(row.legacy) === 0
+                && Number(row.granted) === 0
+                && row.readable === true;
+        } catch {
+            return false;
+        }
+    }
+
     return {
         // ── Schema bootstrap ────────────────────────────────────────
         async ensureTable(): Promise<void> {
+            // A warm boot: the table is complete and the end-user role holds
+            // nothing on it. One read, no lock, no catalogue write.
+            if (await bootIsCurrent()) {
+                logger.debug("✅ API keys table ready");
+                return;
+            }
+
             // Every statement here is idempotent, so losing the race to a peer
             // that booted at the same moment is survivable — but only if the
             // loser retries instead of abandoning everything below it. One
@@ -323,7 +392,8 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
             // tables (like this one) created after that grant ran, so the
             // privilege has to come back off. Without it a user-context query
             // that reached this table could mint itself a key. A security
-            // control, so it is re-applied by every instance on every boot.
+            // control, so every boot checks it: a boot that finds the role
+            // holding anything on the table comes here and revokes it.
             await ddl.step("Revoking end-user access to api_keys", () =>
                 exec(revokeInternalTableSql("rebase", "api_keys")));
 
