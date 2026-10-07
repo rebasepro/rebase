@@ -288,3 +288,54 @@ describe("RealtimeService — database-level CDC", () => {
         expect(sentTo(ws)).toEqual(["row-5"]);
     });
 });
+
+/**
+ * The record of this instance's own writes, kept so their CDC echo is not
+ * delivered twice, purged expired entries by walking the whole map on every
+ * write once it held over 1,000 — and inside the 300 ms window nothing has
+ * expired, so a burst of writes walked it all each time: 703 ms of event loop
+ * for 20,000 marks.
+ */
+describe("RealtimeService — the record of its own writes", () => {
+    /** A Map that counts the entries anything iterates out of it. */
+    class CountingMap<K, V> extends Map<K, V> {
+        visited = 0;
+        *entries(): MapIterator<[K, V]> {
+            for (const entry of super.entries()) {
+                this.visited++;
+                yield entry;
+            }
+        }
+        [Symbol.iterator](): MapIterator<[K, V]> {
+            return this.entries();
+        }
+    }
+
+    const visitedFor = (marks: number): number => {
+        const registry = new PostgresCollectionRegistry();
+        const service = new RealtimeService({ execute: jest.fn(), transaction: jest.fn() } as never, registry);
+        const recent = new CountingMap<string, number>();
+        Reflect.set(service, "recentAppEmits", recent);
+        const mark = Reflect.get(service, "markAppEmit") as (key: string) => void;
+        // A burst inside one window, then one write per window for a while:
+        // the burst's entries expire and are purged.
+        for (let i = 0; i < marks; i++) mark.call(service, `::posts::${i}`);
+        const afterBurst = recent.visited;
+        for (let w = 0; w < 5; w++) {
+            jest.advanceTimersByTime(400);
+            mark.call(service, `::posts::late-${w}`);
+        }
+        expect(recent.size).toBeLessThan(10);
+        return afterBurst;
+    };
+
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it("costs a burst of writes work in proportion to the burst, not its square", () => {
+        const small = visitedFor(2_000);
+        const large = visitedFor(8_000);
+        expect(small).toBeLessThanOrEqual(2_000);
+        expect(large).toBeLessThanOrEqual(8_000);
+    });
+});

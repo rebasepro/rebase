@@ -3570,17 +3570,28 @@ lastSeen: Date.now() });
         return `${databaseId ?? ""}::${path}::${id}`;
     }
 
-    /** Record that this instance just delivered `key` via the app path. */
+    /**
+     * Record that this instance just delivered `key` via the app path.
+     *
+     * Expired entries are purged so the map cannot grow unbounded under write
+     * load — once it holds over 1,000, and at most once per dedup window. The
+     * purge walks the whole map, and it used to run on every write past 1,000:
+     * inside one window nothing has expired yet, so a burst of writes walked
+     * all of it each time (703 ms of event loop for 20,000 marks). Once a
+     * window, the map holds at most two windows' writes.
+     */
     private markAppEmit(key: string): void {
         const now = Date.now();
         this.recentAppEmits.set(key, now + RealtimeService.CDC_DEDUP_WINDOW_MS);
-        // Opportunistic purge so the map cannot grow unbounded under write load.
-        if (this.recentAppEmits.size > 1000) {
+        if (this.recentAppEmits.size > 1000 && now >= this.nextAppEmitPurgeAt) {
+            this.nextAppEmitPurgeAt = now + RealtimeService.CDC_DEDUP_WINDOW_MS;
             for (const [k, expiry] of this.recentAppEmits) {
                 if (expiry <= now) this.recentAppEmits.delete(k);
             }
         }
     }
+    /** When {@link markAppEmit} may next purge expired entries. */
+    private nextAppEmitPurgeAt = 0;
 
     /** Consume a matching app-emit record if present and unexpired; true ⇒ suppress the CDC echo. */
     private consumeAppEmit(key: string): boolean {
