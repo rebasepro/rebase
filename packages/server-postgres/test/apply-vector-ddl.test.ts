@@ -12,14 +12,16 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { applyVectorDdl } from "../src/cli-helpers";
+import { applyVectorDdl, closeAppClients } from "../src/cli-helpers";
 
 const mockQuery = jest.fn();
 jest.mock("pg", () => ({
     Client: jest.fn().mockImplementation(() => ({
         connect: jest.fn(),
         query: (...args: unknown[]) => mockQuery(...args),
-        end: jest.fn()
+        end: jest.fn(),
+        // The push's one connection listens for a drop while it idles.
+        on: jest.fn()
     }))
 }));
 
@@ -30,8 +32,9 @@ beforeEach(() => {
     drizzleDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-vector-"));
 });
 
-afterEach(() => {
+afterEach(async () => {
     fs.rmSync(drizzleDir, { recursive: true, force: true });
+    await closeAppClients();
 });
 
 const writeVectorSql = (): void => {

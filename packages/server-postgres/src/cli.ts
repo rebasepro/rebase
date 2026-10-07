@@ -33,7 +33,9 @@ import {
     queryGeneratedColumnDependencies,
     queryColumnTypes,
     dropGeneratedColumns,
-    loadCollectionsForCli
+    loadCollectionsForCli,
+    withAppClient,
+    closeAppClients
 } from "./cli-helpers";
 import {
     checkDatabaseConnectivity,
@@ -224,15 +226,21 @@ export async function runPluginCommand(args: string[]) {
     // exist" — and the answer was already known before the first write.
     assertCollectionsPathExists(collectionsPathIn(args));
 
-    if (domain === "db") {
-        await scratchDatabase.around(() => dbCommand(subcommand, args));
-    } else if (domain === "schema") {
-        await schemaCommand(subcommand, args);
-    } else if (domain === "doctor") {
-        await doctorPluginCommand(args);
-    } else {
-        outError(chalk.red(`Unknown domain command: ${domain}`));
-        process.exit(1);
+    try {
+        if (domain === "db") {
+            await scratchDatabase.around(() => dbCommand(subcommand, args));
+        } else if (domain === "schema") {
+            await schemaCommand(subcommand, args);
+        } else if (domain === "doctor") {
+            await doctorPluginCommand(args);
+        } else {
+            outError(chalk.red(`Unknown domain command: ${domain}`));
+            process.exit(1);
+        }
+    } finally {
+        // The one connection every step shared (see `withAppClient`). Open, it
+        // would keep this process alive after the command has finished.
+        await closeAppClients();
     }
 }
 
@@ -778,10 +786,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
 
 async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> {
     try {
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
+        await withAppClient(databaseUrl, async client => {
             // Creates the `rebase` schema as its first statement, which also
             // covers the schema Atlas puts its revision table in
             // (`--revisions-schema rebase`). That used to need a separate,
@@ -791,9 +796,7 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
             // now always declares `rebase` in the desired schema, so there is
             // nothing to keep out.
             await client.query(RLS_BOOTSTRAP_SQL);
-        } finally {
-            await client.end();
-        }
+        });
     } catch (err) {
         outWarn(chalk.yellow(`  ⚠️  Failed to bootstrap the RLS helper functions: ${err instanceof Error ? err.message : String(err)}`));
     }
@@ -825,17 +828,10 @@ async function lockManagedTables(databaseUrl: string, collectionsPath: string): 
         const { loadCollections } = await import("./schema/doctor");
         userRole = (await import("./security/rls-enforcement")).REBASE_USER_ROLE;
         const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
-            ({ unsecured } = await lockCollectionTables(
-                { query: async (text) => ({ rows: (await client.query(text)).rows }) },
-                collections
-            ));
-        } finally {
-            await client.end();
-        }
+        ({ unsecured } = await withAppClient(databaseUrl, client => lockCollectionTables(
+            { query: async (text) => ({ rows: (await client.query(text)).rows }) },
+            collections
+        )));
     } catch (err) {
         outError(chalk.red(
             `\n  ✗ The schema was applied, but row-level security could not be switched on for its tables: ` +
@@ -881,7 +877,6 @@ async function ensureAuthTables(databaseUrl: string, collectionsPath: string): P
         const { drizzle } = await import("drizzle-orm/node-postgres");
         const { ensureAuthTablesExist } = await import("./auth/ensure-tables");
         const { loadCollections } = await import("./schema/doctor");
-        const { Client } = await import("pg");
 
         const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
         // The auth collection is flagged with `auth: true` or `auth: { enabled: true }`.
@@ -890,13 +885,7 @@ async function ensureAuthTables(databaseUrl: string, collectionsPath: string): P
             return a === true || (typeof a === "object" && a !== null && a.enabled === true);
         });
 
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
-            await ensureAuthTablesExist(drizzle(client), authCollection);
-        } finally {
-            await client.end();
-        }
+        await withAppClient(databaseUrl, client => ensureAuthTablesExist(drizzle(client), authCollection));
     } catch (err) {
         outWarn(chalk.yellow(`  ⚠️  Failed to ensure framework auth tables: ${err instanceof Error ? err.message : String(err)}`));
     }
@@ -936,19 +925,14 @@ async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
     }
 
     try {
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
+        await withAppClient(databaseUrl, async client => {
             const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
             const posture = await rls.detectConnectionPosture(runSql);
             if (posture.privileged) {
                 await rls.ensureAppRole(runSql, schemas);
                 out(chalk.gray(`  ✓ RLS role "${rls.REBASE_USER_ROLE}" provisioned/refreshed.`));
             }
-        } finally {
-            await client.end();
-        }
+        });
     } catch (err) {
         outError(chalk.red(
             `\n  ✗ The schema change was applied, but the "${rls.REBASE_USER_ROLE}" role could not be ` +
@@ -969,20 +953,13 @@ async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
  */
 async function retireLegacyAuthSchema(databaseUrl: string): Promise<void> {
     try {
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
-            await dropLegacyAuthSchema(
-                async (text) => (await client.query(text)).rows as Record<string, unknown>[],
-                {
-                    info: (m) => out(chalk.gray(`  ${m}`)),
-                    warn: (m) => outWarn(chalk.yellow(`  ⚠️  ${m}`))
-                }
-            );
-        } finally {
-            await client.end();
-        }
+        await withAppClient(databaseUrl, client => dropLegacyAuthSchema(
+            async (text) => (await client.query(text)).rows as Record<string, unknown>[],
+            {
+                info: (m) => out(chalk.gray(`  ${m}`)),
+                warn: (m) => outWarn(chalk.yellow(`  ⚠️  ${m}`))
+            }
+        ));
     } catch {
         // Connection-level failure only; the schema is inert either way.
     }
@@ -997,15 +974,8 @@ async function applyPolicies(databaseUrl: string): Promise<void> {
         out("");
         
         const policiesContent = fs.readFileSync(policiesPath, "utf-8");
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
-            await client.query(policiesContent);
-            out(chalk.green("  ✓ RLS policies applied successfully."));
-        } finally {
-            await client.end();
-        }
+        await withAppClient(databaseUrl, client => client.query(policiesContent));
+        out(chalk.green("  ✓ RLS policies applied successfully."));
     } catch (err) {
         const hint = diagnoseDbError(err, databaseUrl);
         if (hint) {
@@ -1037,10 +1007,7 @@ async function reconcilePolicies(databaseUrl: string, collectionsPath: string): 
         const { loadCollections } = await import("./schema/doctor");
 
         const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
+        await withAppClient(databaseUrl, async client => {
             const drift = await checkPolicyDrift(client as never, collections);
             const { dropped, kept } = await dropOrphanedPolicies(client as never, drift, collections);
 
@@ -1068,9 +1035,7 @@ async function reconcilePolicies(databaseUrl: string, collectionsPath: string): 
                 outWarn(chalk.yellow("  ⚠️  RLS policies do not match your collections:"));
                 outWarn(formatPolicyDrift({ ...remaining, orphaned: [] }));
             }
-        } finally {
-            await client.end();
-        }
+        });
     } catch (err) {
         outWarn(chalk.yellow(`  ⚠️  Could not reconcile RLS policies: ${err instanceof Error ? err.message : String(err)}`));
     }
