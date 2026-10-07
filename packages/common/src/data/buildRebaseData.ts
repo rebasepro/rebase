@@ -1,4 +1,4 @@
-import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateSelect, type ComputedSortField, type FieldPath, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateSelect, type ComputedSortField, type FieldPath, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
@@ -343,16 +343,27 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         async find(params?: FindParams<M>): Promise<FindResponse<M>> {
             // Ensure filters are in canonical [op, value] format even if passed as PostgREST strings
             const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
-            const { limit, offset, driverOffset } = resolveFindWindow(params);
+            const window = resolveFindWindow(params);
+            const { offset, driverOffset } = window;
+            // A vector search nobody bounded reads the nearest
+            // DEFAULT_VECTOR_LIST_LIMIT rows, as it does over HTTP — not 50
+            // rows ordered by distance. The `page` stride stays the plain one,
+            // as the HTTP parser's does.
+            const limit = params?.limit === undefined && params?.vectorSearch
+                ? DEFAULT_VECTOR_LIST_LIMIT
+                : window.limit;
 
             // Keyset paging, through the same codec and the same driver
             // comparison the HTTP route uses. The in-process accessor is a
             // transport like any other: a walk that seeked differently here
             // than over the wire would be a difference the types cannot see.
             const cursor = params?.after ? decodeCursor(params.after) : undefined;
-            const orderBy = cursor
+            const sort = cursor
                 ? reconcileCursorOrder(cursor, normalizeOrderBy(params?.orderBy))
                 : normalizeOrderBy(params?.orderBy);
+            // A cursor issued for an unsorted read carries an empty sort; the
+            // HTTP route hands the driver none at all, and so does this.
+            const orderBy = sort && sort.length > 0 ? sort : undefined;
             const startAfter = cursor ? cursorToStartAfter(cursor) : undefined;
 
             // One relation shape, whatever the call looks like.
@@ -381,8 +392,18 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             // looking at whether the extra row arrived is the answer both have —
             // and it costs nothing, where the count it replaces is a second
             // query over every matching row.
+            //
+            // Counted only where the HTTP listing counts (`RestApiGenerator.readPage`).
+            // A distinct read collapses rows the count would count one by one,
+            // so its total described a different set from the one served, and
+            // `hasMore` — derived from it — offered pages that did not exist.
+            // A vector search with a threshold is a distance computed for every
+            // row of the table, beside a page an index serves in a millisecond.
             const seeking = startAfter !== undefined;
-            const counting = driver.count !== undefined && params?.count !== "none";
+            const counting = driver.count !== undefined
+                && params?.count !== "none"
+                && params?.distinct !== true
+                && params?.vectorSearch?.threshold === undefined;
             const probing = seeking || !counting;
             const probeLimit = probing ? limit + 1 : limit;
 
@@ -408,6 +429,11 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                             startAfter,
                             orderBy,
                             searchString: params?.searchString,
+                            searchExplain: params?.searchExplain,
+                            // Left out, `.vectorSearch(…).find()` in a function
+                            // or a cron read the newest rows in id order, with
+                            // no `_distance` and no error.
+                            vectorSearch: params?.vectorSearch,
                             fields: params?.fields,
                             distinct: params?.distinct
                         },
@@ -422,6 +448,8 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                         logical: params?.logical,
                         orderBy,
                         searchString: params?.searchString,
+                        searchExplain: params?.searchExplain,
+                        vectorSearch: params?.vectorSearch,
                         include: params?.include,
                         fields: params?.fields,
                         distinct: params?.distinct
@@ -435,7 +463,8 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                         path: storedPath(),
                         filter,
                         logical: params?.logical,
-                        searchString: params?.searchString
+                        searchString: params?.searchString,
+                        vectorSearch: params?.vectorSearch
                     })
                     : undefined;
                 return { fetched, counted };
@@ -585,7 +614,10 @@ ids });
                     path: storedPath(),
                     filter,
                     logical: params?.logical,
-                    searchString: params?.searchString
+                    searchString: params?.searchString,
+                    // A threshold drops rows, so it narrows the count as it
+                    // narrows the read — as `GET /count` does.
+                    vectorSearch: params?.vectorSearch
                 });
             }
             : undefined,

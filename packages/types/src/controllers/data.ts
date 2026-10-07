@@ -137,6 +137,19 @@ export interface IncludeOptions {
     fields?: string[];
     /** Relations of the related row to load in turn. */
     include?: IncludeSpec;
+    /**
+     * Also serve how many related rows there are in all, per parent, under
+     * the row's `_count` ({@link INCLUDE_COUNT_KEY}) — `{ tags: [...], _count:
+     * { tags: 37 } }`. Counted by the same query that reads the rows, over the
+     * same rows a read without `limit` would return (the include's `where`,
+     * soft delete, row-level security), so `limit` caps what is sent and the
+     * count says what was left out.
+     *
+     * To-many relations only: a to-one relation is a 400.
+     *
+     * @since 0.24
+     */
+    count?: boolean;
 }
 
 /**
@@ -332,8 +345,10 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      * projection (which it always is) every row is already distinct. Pair it
      * with `fields` naming the columns you actually want the distinct values of.
      *
-     * `meta.total` counts distinct rows too, so a distinct listing's `hasMore`
-     * describes the set it is paging.
+     * A distinct read is not counted, whichever door it goes through: over
+     * HTTP its `meta.total` is absent, and in-process it is the rows up to the
+     * end of the page — as for {@link FindParams.count} `"none"`. `hasMore`
+     * is exact either way.
      */
     distinct?: boolean;
 
