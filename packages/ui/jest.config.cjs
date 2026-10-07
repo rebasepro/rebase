@@ -7,6 +7,8 @@ module.exports = {
     moduleNameMapper: {
         // "\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$":
         //     "<rootDir>/__mocks__/fileMock.js",
-        "^.+\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js"
+        "^.+\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
+        // lucide ships its per-icon import table as ESM only.
+        "^lucide-react/dynamicIconImports\\.mjs$": "<rootDir>/test/__mocks__/lucideDynamicIconImports.cjs"
     }
 };
