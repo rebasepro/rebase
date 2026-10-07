@@ -14,6 +14,9 @@ import type { Entity } from "@rebasepro/types";
  *   table controller and collection the view held when the header was last
  *   built — the controller of the first render, since nothing rebuilt it — so a
  *   header action showing the search, the filter or the sort showed the old one.
+ * - The view's props comparator compared a hand-picked list of collection
+ *   props. A collection passed as props (one not in the registry) that changed
+ *   its name, its actions or its custom views was not re-rendered at all.
  */
 
 if (typeof globalThis.ResizeObserver === "undefined") {
@@ -184,5 +187,32 @@ describe("a plugin's column-header action", () => {
         await act(async () => mockSetSearch("lamp"));
 
         expect(screen.getByTestId("header-probe").textContent).toBe("lamp in Products");
+    });
+
+    it("is handed the collection the view holds now", async () => {
+        let view!: ReturnType<typeof render>;
+        await act(async () => {
+            view = render(<View name={"Products"}/>);
+        });
+        await act(async () => {
+            view.rerender(<View name={"Catalogue"}/>);
+        });
+        expect(screen.getByTestId("header-probe").textContent).toBe("no search in Catalogue");
+    });
+});
+
+describe("a collection passed as props", () => {
+
+    it("shows its new name when the name changes", async () => {
+        let view!: ReturnType<typeof render>;
+        await act(async () => {
+            view = render(<View name={"Products"} viewMode={"list"}/>);
+        });
+        expect(screen.getByRole("heading", { name: "Products" })).toBeTruthy();
+
+        await act(async () => {
+            view.rerender(<View name={"Catalogue"} viewMode={"list"}/>);
+        });
+        expect(screen.getByRole("heading", { name: "Catalogue" })).toBeTruthy();
     });
 });

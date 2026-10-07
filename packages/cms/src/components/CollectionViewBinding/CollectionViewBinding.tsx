@@ -202,6 +202,41 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
 } & AdminCollection<M>;
 
 /**
+ * Props a caller commonly rebuilds on every render — a parent path array, a
+ * properties object, an `Actions` list made with `toArray` — compared by value,
+ * so a re-render that builds the same ones again does not redraw the view.
+ */
+const PROPS_COMPARED_BY_VALUE = new Set<string>([
+    "path", "parentCollectionSlugs", "parentEntityIds", "isSubCollection", "className",
+    "properties", "propertiesOrder", "hideIdFromCollection", "inlineEditing", "selectionEnabled",
+    "selectionController", "Actions", "defaultSize", "includeJsonView", "additionalFields",
+    "sideDialogWidth", "openEntityMode", "exportable", "history", "fixedFilter",
+    "selectedEntityId", "selectedTab"
+]);
+
+/**
+ * Whether the view would draw the same thing with these props.
+ *
+ * Every prop counts: the listed ones by value, every other one — the name, the
+ * entity actions, the custom views, the callbacks, anything a collection
+ * carries — by reference. It used to compare the listed ones only, so a
+ * collection passed as props (one not in the registry, where the view reads it
+ * from) that changed anything else was never redrawn. A caller spreading a
+ * registry collection hands over the same references each render.
+ */
+function collectionViewPropsEqual(a: CollectionViewBindingProps<any>, b: CollectionViewBindingProps<any>): boolean {
+    const previous = a as Record<string, unknown>;
+    const next = b as Record<string, unknown>;
+    const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+    for (const key of keys) {
+        if (previous[key] === next[key]) continue;
+        if (PROPS_COMPARED_BY_VALUE.has(key) && equal(previous[key], next[key])) continue;
+        return false;
+    }
+    return true;
+}
+
+/**
  * This component is in charge of binding a driver path with an {@link AdminCollection}
  * where it's configuration is defined. It includes an infinite scrolling table
  * and a 'Add' new entities button,
@@ -1454,29 +1489,7 @@ parentEntityIds,
         );
 
         return mainContent;
-    }, (a, b) => {
-        return equal(a.path, b.path) &&
-            equal(a.parentCollectionSlugs, b.parentCollectionSlugs) && equal(a.parentEntityIds, b.parentEntityIds) &&
-            equal(a.isSubCollection, b.isSubCollection) &&
-            equal(a.className, b.className) &&
-            equal(a.properties, b.properties) &&
-            equal(a.propertiesOrder, b.propertiesOrder) &&
-            equal(a.hideIdFromCollection, b.hideIdFromCollection) &&
-            equal(a.inlineEditing, b.inlineEditing) &&
-            equal(a.selectionEnabled, b.selectionEnabled) &&
-            equal(a.selectionController, b.selectionController) &&
-            equal(a.Actions, b.Actions) &&
-            equal(a.defaultSize, b.defaultSize) &&
-            equal(a.includeJsonView, b.includeJsonView) &&
-            equal(a.additionalFields, b.additionalFields) &&
-            equal(a.sideDialogWidth, b.sideDialogWidth) &&
-            equal(a.openEntityMode, b.openEntityMode) &&
-            equal(a.exportable, b.exportable) &&
-            equal(a.history, b.history) &&
-            equal(a.fixedFilter, b.fixedFilter) &&
-            equal(a.selectedEntityId, b.selectedEntityId) &&
-            equal(a.selectedTab, b.selectedTab);
-    }) as React.FunctionComponent<CollectionViewBindingProps<any>>;
+    }, collectionViewPropsEqual) as React.FunctionComponent<CollectionViewBindingProps<any>>;
 
 export const CollectionViewBinding = React.memo(
     function CollectionViewBinding<M extends Record<string, unknown>>(props: CollectionViewBindingProps<M>) {
