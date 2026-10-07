@@ -476,6 +476,8 @@ export class PersistService {
         }
 
         let savedId: string | number;
+        /** The row a plain INSERT handed back, already rendered as the read-back would render it. */
+        let returnedRow: Record<string, unknown> | undefined;
         try {
             // Transform relations to IDs, then sanitize
             const serializedResult = serializeDataToServer(otherValues as M, collection.properties as Properties, collection, this.registry);
@@ -483,6 +485,11 @@ export class PersistService {
             // Extract relation updates from the typed result
             const inverseRelationUpdates = serializedResult.inverseRelationUpdates;
             const joinPathRelationUpdates = serializedResult.joinPathRelationUpdates;
+            // Whether the INSERT is the last thing this save writes. Anything
+            // written after it — a relation, a junction row — may change the
+            // row (a self-reference, a trigger), so then it is read back.
+            const rowIsWrittenLast = inverseRelationUpdates.length === 0 && joinPathRelationUpdates.length === 0
+                && Object.keys(relationValues).length === 0 && !junctionTableInfo;
 
             const entityData = sanitizeAndConvertDates(serializedResult.scalarData);
 
@@ -679,7 +686,11 @@ export class PersistService {
                             if (result.length === 0) throw ApiError.notFound(missing);
                         }
                     } else {
-                        result = await insertQuery.returning(returningKeys);
+                        // The whole row, when it can stand in for the read
+                        // back below — see `FetchService.insertReturning`.
+                        const returning = rowIsWrittenLast ? this.fetchService.insertReturning(collection.slug) : undefined;
+                        result = await insertQuery.returning(returning?.columns ?? returningKeys);
+                        if (returning && result[0]) returnedRow = returning.render(result[0]);
                     }
 
                     // DO NOTHING returns no row when it skipped, and an upsert whose
@@ -751,6 +762,11 @@ export class PersistService {
         // wrote this row is the one party who must be able to see the result of
         // their own write, whatever its deleted state — and an ordinary save is
         // unaffected, because an undeleted row is visible either way.
+        //
+        // A plain INSERT that was the last thing written already handed this
+        // row back: the same columns of the same row, rendered the same way.
+        // A bulk create of 1,000 rows was 1,000 of these reads.
+        if (returnedRow) return returnedRow;
         const finalEntity = await this.fetchService.fetchOneForRest(
             collection.slug, savedId, undefined, databaseId, { withDeleted: true }
         );

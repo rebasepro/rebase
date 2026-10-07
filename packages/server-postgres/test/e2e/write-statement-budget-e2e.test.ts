@@ -195,9 +195,70 @@ const teamsCollection = {
     }
 };
 
+/**
+ * Every kind of column a create answers with: a generated key, a declared
+ * default, numbers, a boolean, dates (one the server stamps), an array, a map,
+ * a foreign key, a soft-delete column and a search index column the API never
+ * serves — so that the INSERT's own row and a read of the row can be compared
+ * byte for byte.
+ */
+const eventsCollection = {
+    name: "Events", slug: "events", table: "events",
+    softDelete: true,
+    search: { fields: ["title"] },
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        title: { name: "Title", type: "string" },
+        status: { name: "Status", type: "string", defaultValue: "draft" },
+        seats: { name: "Seats", type: "number" },
+        ratio: { name: "Ratio", type: "number" },
+        open: { name: "Open", type: "boolean" },
+        startsAt: { name: "Starts", type: "date" },
+        createdAt: { name: "Created", type: "date", autoValue: "on_create" },
+        deletedAt: { name: "Deleted", type: "date" },
+        labels: { name: "Labels", type: "array", of: { name: "Label", type: "string" } },
+        details: { name: "Details", type: "map", properties: { room: { name: "Room", type: "string" } } },
+        author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authorsCollection, localKey: "author_id" } }
+    }
+};
+
+/** A row anyone may add and nobody may read back: an insert-only policy. */
+const dropboxCollection = {
+    name: "Dropbox", slug: "dropbox", table: "dropbox",
+    securityRules: [{ name: "anyone_inserts", operation: "insert", access: "public" }],
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        text: { name: "Text", type: "string" }
+    }
+};
+
+/** Anyone may write a letter to anyone; only its addressee reads it. */
+const lettersCollection = {
+    name: "Letters", slug: "letters", table: "letters",
+    securityRules: [
+        { name: "anyone_writes", operation: "insert", access: "public" },
+        { name: "addressee_reads", operation: "select", ownerField: "toId" }
+    ],
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        toId: { name: "To", type: "string", columnName: "to_id" },
+        text: { name: "Text", type: "string" }
+    }
+};
+
+/** A field only admins may read: the read back is projected per viewer. */
+const badgesCollection = {
+    name: "Badges", slug: "badges", table: "badges",
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        label: { name: "Label", type: "string" },
+        secret: { name: "Secret", type: "string", access: { read: ["admin"] } }
+    }
+};
+
 const collections = [
     authorsCollection, tagsCollection, commentsCollection, postsCollection, notesCollection, tasksCollection, projectsCollection,
-    membersCollection, teamsCollection
+    membersCollection, teamsCollection, eventsCollection, dropboxCollection, lettersCollection, badgesCollection
 ] as unknown as CollectionConfig[];
 
 const ADMIN = { uid: "admin-1", roles: ["admin"] };
@@ -367,6 +428,83 @@ describe("a write's statements (E2E)", () => {
             const { result, statements } = await statementsOf(() => http("PATCH", `/posts/${id}`, { body: { title: "hooked 2" } }));
             expect(result.status).toBe(200);
             expect(commitChecks(statements)).toHaveLength(1);
+        });
+    });
+
+    describe("a create answers with the row its INSERT returned", () => {
+        const inserts = (statements: string[], table: string) =>
+            statements.filter(s => new RegExp(`^insert into "?(public"?\\.)?"?${table}"?\\b`, "i").test(s));
+
+        it("reads nothing back, and answers exactly what a read of the row answers", async () => {
+            const body = {
+                title: "Launch", seats: 120, ratio: 0.25, open: true, startsAt: "2026-10-07T09:30:00.000Z",
+                labels: ["a", "b"], details: { room: "Hall 2" }, author: 1
+            };
+            const { result, statements } = await statementsOf(() => http("POST", "/events", { body }));
+            expect(result.status).toBe(201);
+            expect(reads(statements, "events")).toEqual([]);
+
+            const read = await http("GET", `/events/${result.json.id}`);
+            expect(read.status).toBe(200);
+            expect(JSON.stringify(result.json)).toBe(JSON.stringify(read.json));
+            // What was declared and what the server stamped are both there.
+            expect(result.json.status).toBe("draft");
+            expect(typeof result.json.createdAt).toBe("string");
+        });
+
+        it("a create of a row already in the trash answers it too", async () => {
+            const { result } = await statementsOf(() => http("POST", "/events", { body: { title: "Gone", deletedAt: "2026-10-01T00:00:00.000Z" } }));
+            expect(result.status).toBe(201);
+            const read = await http("GET", `/events/${result.json.id}?deleted=include`);
+            expect(JSON.stringify(result.json)).toBe(JSON.stringify(read.json));
+        });
+
+        it("a bulk create of 50 rows sends one statement per row", async () => {
+            const rows = Array.from({ length: 50 }, (_, i) => ({ name: `returned ${i}` }));
+            const { result, statements } = await statementsOf(() => http("POST", "/authors/bulk", { body: { rows } }));
+            expect(result.status).toBe(200);
+            expect(inserts(statements, "authors")).toHaveLength(50);
+            expect(reads(statements, "authors")).toEqual([]);
+            expect(statements.length).toBeLessThanOrEqual(50 + 6);
+            expect(result.json.data.map((row: { name: string }) => row.name)).toEqual(rows.map(row => row.name));
+        });
+
+        it("still reads the row back when the collection has a beforeQuery or per-field read access", async () => {
+            const scoped = await statementsOf(() => http("POST", "/tasks", { body: { title: "scoped", hidden: false } }));
+            expect(scoped.result.status).toBe(201);
+            expect(reads(scoped.statements, "tasks")).toHaveLength(1);
+            await admin.query("DELETE FROM public.tasks WHERE id = $1", [scoped.result.json.id]);
+
+            const restricted = await statementsOf(() => http("POST", "/badges", { body: { label: "gold", secret: "s3" } }));
+            expect(restricted.result.status).toBe(201);
+            expect(reads(restricted.statements, "badges")).toHaveLength(1);
+            expect(restricted.result.json.secret).toBe("s3");
+        });
+
+        it("a policy that lets a caller write a row it may not read refuses the create, as it did", async () => {
+            const dropped = await http("POST", "/dropbox", { body: { text: "anonymous tip" }, as: STRANGER });
+            expect(dropped.status).toBe(403);
+            expect(dropped.json.error).toEqual({
+                code: "WRITE_DENIED",
+                message: "Not permitted to write this row in \"dropbox\": it does not satisfy the row-level security policy."
+            });
+            const { rows } = await admin.query("SELECT count(*)::int AS n FROM public.dropbox");
+            expect(rows).toEqual([{ n: 0 }]);
+
+            const toSomeoneElse = await http("POST", "/letters", { body: { toId: OWNER, text: "hello" }, as: STRANGER });
+            expect(toSomeoneElse.status).toBe(403);
+            expect(toSomeoneElse.json.error).toEqual({
+                code: "WRITE_DENIED",
+                message: "Not permitted to write this row in \"letters\": it does not satisfy the row-level security policy."
+            });
+        });
+
+        it("a row the policies let the caller read back is answered as their read of it", async () => {
+            const own = await statementsOf(() => http("POST", "/letters", { body: { toId: STRANGER.uid, text: "note to self" }, as: STRANGER }));
+            expect(own.result.status).toBe(201);
+            expect(reads(own.statements, "letters")).toEqual([]);
+            const read = await http("GET", `/letters/${own.result.json.id}`, { as: STRANGER });
+            expect(JSON.stringify(own.result.json)).toBe(JSON.stringify(read.json));
         });
     });
 

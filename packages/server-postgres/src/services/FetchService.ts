@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNot
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import type { IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
-import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
+import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, hasFieldAccessRules, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import { enableIterativeScan, inTransaction, iterativeScansAvailable } from "./vector-iterative-scan";
@@ -30,7 +30,7 @@ import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-c
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 // One rule, one place. See `soft-delete.ts` for why every read has to ask.
 import { andSoftDelete, withSoftDelete, type WithDeleted } from "./soft-delete";
-import { beforeQueryCondition, beforeQueryConditions, type ReadCallContextProvider } from "./read-scope";
+import { beforeQueryCondition, beforeQueryConditions, hasBeforeQuery, type ReadCallContextProvider } from "./read-scope";
 import { ApiError, logger } from "@rebasepro/server";
 import { reachedDatabase } from "../utils/pg-error-utils";
 
@@ -2114,6 +2114,51 @@ relatedTo: hop }, include
         }
 
         return row;
+    }
+
+    /**
+     * {@link fetchOneForRest}'s read of a row an INSERT just wrote, taken from
+     * the INSERT's own `RETURNING` instead of a second statement — or
+     * `undefined` when the two could answer differently.
+     *
+     * A write answers with `fetchOneForRest(slug, id, undefined, …, { withDeleted: true })`
+     * (see `PersistService.save`): the row's visible columns, rendered by
+     * `toRestRow`. For a row the statement itself wrote, with nothing written
+     * after it, `RETURNING` those same columns is that row — the same values
+     * through the same column decoders, in the same order, rendered the same
+     * way. Two things narrow the read and not the statement, and either one
+     * keeps the read:
+     *
+     *  - a `beforeQuery` adds conditions to the read (and runs application
+     *    code): a row outside them is no answer today, and would be one from
+     *    `RETURNING`;
+     *  - per-field read access, which projects the read for the viewer.
+     *
+     * Row-level security is the same either way. `INSERT … RETURNING` holds
+     * the new row to the table's SELECT policies and refuses one they hide
+     * (42501) — which the INSERT's `RETURNING <key>` already did, so returning
+     * more columns changes nothing about who may write or read what.
+     */
+    insertReturning(collectionPath: string): {
+        columns: Record<string, AnyPgColumn>;
+        render: (returned: Record<string, unknown>) => Record<string, unknown>;
+    } | undefined {
+        const collection = getCollectionByPath(collectionPath, this.registry);
+        if (hasBeforeQuery(this.registry, collection) || hasFieldAccessRules(collection)) return undefined;
+        const table = getTableForCollection(collection, this.registry);
+        // Not a real drizzle table (a stub in a test): nothing to return, so
+        // the read stays.
+        const tableColumns: Record<string, AnyPgColumn> | undefined = getTableColumns(table);
+        if (!tableColumns) return undefined;
+        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        // The read's projection, kept in the table's column order, so the
+        // rendered row has its keys in the order the read gives them.
+        const visible = this.columnProjection(table, collection, undefined, idInfoArray);
+        const columns: Record<string, AnyPgColumn> = {};
+        for (const [name, column] of Object.entries(tableColumns)) {
+            if (!visible || name in visible) columns[name] = column;
+        }
+        return { columns, render: returned => toRestRow(returned, collection, this.registry) };
     }
 
     /**
