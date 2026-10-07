@@ -272,7 +272,10 @@ them too, as most WebSocket libraries do.
 
 A socket is also terminated when more than 16&nbsp;MiB of frames sent to it are
 still unread. That is a client that does not read what it is sent, or one so far
-behind that what it would read is stale.
+behind that what it would read is stale. And when a server's sockets together
+hold more than 256&nbsp;MiB unread (or a quarter of the memory limit the server
+runs under, when that is smaller), the ones with the most unread are terminated
+first, until the rest fit.
 
 A terminated socket is cleaned up like a closed one. Its subscriptions end, it
 leaves its channels, and its presence is removed, with the departure announced

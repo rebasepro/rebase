@@ -7,7 +7,7 @@ import { isNestedPath, resolveNestedPath } from "./services/nested-path";
 import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketOptions, WebSocketMessage } from "@rebasepro/types";
 import type { SqlScriptResult } from "@rebasepro/types";
 import { redactSqlLiterals } from "@rebasepro/common";
-import { reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
+import { budgetSendBuffers, reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
 import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AdminScope } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
@@ -1825,4 +1825,10 @@ code: "BRANCHING_UNSUPPORTED" } }
     const stopReaping = reapSilentSockets(wss);
     wss.on("close", stopReaping);
     if (typeof server.on === "function") server.on("close", stopReaping);
+
+    // And what its sockets hold unread counts in the budget for all of the
+    // process's sockets, not only in each one's own ceiling.
+    const stopBudgeting = budgetSendBuffers(wss);
+    wss.on("close", stopBudgeting);
+    if (typeof server.on === "function") server.on("close", stopBudgeting);
 }
