@@ -27,6 +27,8 @@ dataLoading: false };
 
 jest.mock("@rebasepro/app", () => ({
     useFetch: () => fetchState,
+    // References read through the batched form, with the same answer.
+    useBatchedFetch: () => fetchState,
     useCustomizationController: () => ({}),
     useComponentOverride: (_id: string, fallback: unknown) => fallback,
     CollectionScopeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,

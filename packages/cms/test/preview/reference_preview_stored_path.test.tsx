@@ -20,7 +20,9 @@ const collectionsAskedFor: string[] = [];
 let scope: { dataSource?: string; engine?: string } | undefined;
 
 jest.mock("@rebasepro/app", () => ({
-    useFetch: (props: { path: string }) => {
+    // A reference's record is read through the batched fetch: one query and
+    // one subscription for every reference on screen, not one per preview.
+    useBatchedFetch: (props: { path: string }) => {
         fetched.push(props);
         return { entity: { id: "abc", path: props.path, values: { name: "Flu" } }, dataLoading: false };
     },
