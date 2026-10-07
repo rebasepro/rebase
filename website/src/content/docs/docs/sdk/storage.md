@@ -154,7 +154,7 @@ const result = await client.storage.listObjects("products/images/", {
 });
 
 for (const item of result.items) {
-    console.log(item.fullPath, item.name);
+    console.log(item.fullPath, item.name, item.size, item.updated, item.contentType);
 }
 
 // Paginate
@@ -164,6 +164,12 @@ if (result.nextPageToken) {
     });
 }
 ```
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> Each item carries its `size` in bytes and `updated` (an ISO 8601
+timestamp) on local storage, S3 and GCS, and its `contentType` on local storage
+and GCS — enough to show a folder without a `getSignedUrl()` per file. An S3
+listing has no content type; folders (`result.prefixes`) carry none of the
+three.
 
 ## Storage Key Formats
 

@@ -85,6 +85,42 @@ async function* blobChunks(file: Blob): AsyncGenerator<Uint8Array> {
     }
 }
 
+/** Files of one listing page described at once: a `stat` and a sidecar read each. */
+const LISTING_DESCRIBE_CONCURRENCY = 32;
+
+/**
+ * Give each listed file its `size`, `updated` and `contentType`, from a `stat`
+ * and the metadata sidecar `putObject` writes. A file gone since the folder
+ * was read keeps its name and nothing else; one without a sidecar is
+ * `application/octet-stream`, as `statObject` reports it.
+ */
+async function describeListed(items: StorageReference[], absolutePathOf: (ref: StorageReference) => string): Promise<void> {
+    let next = 0;
+    const worker = async () => {
+        while (next < items.length) {
+            const ref = items[next++];
+            const absolute = absolutePathOf(ref);
+            let fileStat: fs.Stats;
+            try {
+                fileStat = await fs.promises.stat(absolute);
+            } catch {
+                continue;
+            }
+            let contentType = "application/octet-stream";
+            try {
+                const sidecar = JSON.parse(await fs.promises.readFile(`${absolute}.metadata.json`, "utf-8"));
+                if (typeof sidecar?.contentType === "string" && sidecar.contentType) contentType = sidecar.contentType;
+            } catch {
+                // No sidecar: the default type.
+            }
+            ref.size = fileStat.size;
+            ref.updated = new Date(Math.trunc(fileStat.mtimeMs)).toISOString();
+            ref.contentType = contentType;
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(LISTING_DESCRIBE_CONCURRENCY, items.length) }, worker));
+}
+
 /**
  * Remove initial and trailing slashes from a path.
  * Handles paths like "/images/", "images/", "/images" → "images"
@@ -580,6 +616,11 @@ export class LocalStorageController implements StorageController {
                 }
                 count++;
             }
+
+            // Each file's size, version and stored type, so a folder can be
+            // shown without a metadata request per file — which made the
+            // same `stat` and sidecar read, behind an HTTP round trip each.
+            await describeListed(items, ref => path.join(fullPath, ref.name));
 
             const nextPageToken = scanned < entries.length ? String(scanned) : undefined;
             // The last page of a walk frees the folder's read.

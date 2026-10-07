@@ -530,6 +530,10 @@ export class S3StorageController implements StorageController {
             bucket: resolvedBucket,
             fullPath: obj.Key || "",
             name: (obj.Key || "").split("/").pop() || "",
+            // What the listing already carries, so a folder can be shown
+            // without a HEAD per file. ListObjectsV2 has no content type.
+            ...(typeof obj.Size === "number" ? { size: obj.Size } : {}),
+            ...(obj.LastModified instanceof Date ? { updated: obj.LastModified.toISOString() } : {}),
             parent: null as never,
             root: null as never,
             toString: () => `s3://${resolvedBucket}/${obj.Key}`

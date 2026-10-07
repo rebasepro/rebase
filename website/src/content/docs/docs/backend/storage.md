@@ -119,8 +119,16 @@ is the exception, because its payload is the file — it answers the bytes, with
 
 ```json
 // GET /api/storage/list?prefix=products/images/
-{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg",
+  "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
+
+<span class="since-badge" data-since="0.24">Since 0.24</span> A listing describes each file it returns: its `size` in bytes and
+`updated`, when it was last written, on local storage, S3 and GCS, and its
+`contentType` on local storage and GCS. An S3 listing does not carry the type,
+so on S3 it is absent and `/api/storage/metadata/*` still says. A folder in
+`prefixes` carries none of them, nor does a custom `StorageController` that
+does not set them.
 
 `POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }`
 of the stored object under `data`; `GET /api/storage/metadata/*` the object's

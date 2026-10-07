@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { DownloadConfig, StorageSource } from "@rebasepro/types";
 
-/** What the storage browser shows of a file beyond its name: read per file, from the server. */
+/**
+ * What the storage browser shows of a file beyond its name. The listing carries
+ * the size and version — and, except on S3, the type — of every file; the rest
+ * is read per file, from the server, when it is needed.
+ */
 export interface FileMetadata {
     size?: number;
     contentType?: string;
@@ -34,7 +38,7 @@ const NO_METADATA: ReadonlyMap<string, FileMetadata> = new Map();
  * at a time, through the source that listed it. Cancelled when the listing is
  * replaced, so an answer for a folder or source the view has left is dropped.
  */
-class MetadataRun {
+class MetadataRun<F extends { fullPath: string }> {
     private readonly requested = new Set<string>();
     private queue: string[] = [];
     private inFlight = 0;
@@ -44,12 +48,18 @@ class MetadataRun {
 
     constructor(
         private readonly source: StorageSource | null,
-        private readonly paths: ReadonlySet<string>,
-        private readonly publish: (answered: [string, FileMetadata][]) => void
+        private readonly files: ReadonlyMap<string, F>,
+        private readonly publish: (answered: [string, FileMetadata][]) => void,
+        /** Whether a file is worth a request at all — see `useVisibleFileMetadata`. */
+        private readonly wants: (file: F) => boolean,
+        /** Paths already answered for this listing, by an earlier run over it. */
+        private readonly known: ReadonlyMap<string, FileMetadata>
     ) {}
 
     want(path: string | undefined): void {
-        if (this.cancelled || !this.source || !path || !this.paths.has(path) || this.requested.has(path)) return;
+        if (this.cancelled || !this.source || !path || this.requested.has(path) || this.known.has(path)) return;
+        const file = this.files.get(path);
+        if (!file || !this.wants(file)) return;
         this.requested.add(path);
         this.queue.push(path);
         this.pump();
@@ -96,7 +106,10 @@ class MetadataRun {
 }
 
 /**
- * Metadata for the files of a listing, asked for as each comes on screen.
+ * Metadata for the files of a listing, asked for as each comes on screen —
+ * and only for those `wants` says need it: the listing already describes most
+ * files (see `StorageReference.size`), so what is left is a file a source
+ * listed bare, and the link an image's thumbnail is drawn from.
  *
  * The browser used to ask for every file's metadata before it showed any of
  * them: a folder of 1,000 files was 1,001 requests and seconds of a spinner.
@@ -110,14 +123,27 @@ class MetadataRun {
  * `IntersectionObserver` every file of the listing is asked for, still a few
  * at a time and still after the listing is shown.
  */
-export function useVisibleFileMetadata(source: StorageSource | null, files: readonly { fullPath: string }[]): {
+export function useVisibleFileMetadata<F extends { fullPath: string }>(
+    source: StorageSource | null,
+    files: readonly F[],
+    wants: (file: F) => boolean = () => true
+): {
     metadata: ReadonlyMap<string, FileMetadata>;
     observe: (element: HTMLElement | null) => (() => void) | undefined;
 } {
-    const [store, setStore] = useState<{ files: readonly { fullPath: string }[]; entries: ReadonlyMap<string, FileMetadata> }>(
+    const [store, setStore] = useState<{ files: readonly F[]; entries: ReadonlyMap<string, FileMetadata> }>(
         () => ({ files, entries: NO_METADATA })
     );
-    const runRef = useRef<MetadataRun | null>(null);
+    // What is already answered for this listing, for a run started over it
+    // again — `wants` changed, say the grid was switched to — so it does not
+    // ask for those twice.
+    // Kept current by a layout effect declared before the one that reads it,
+    // so it runs first in the same commit.
+    const storeRef = useRef(store);
+    useLayoutEffect(() => {
+        storeRef.current = store;
+    });
+    const runRef = useRef<MetadataRun<F> | null>(null);
     const elementsRef = useRef(new Set<HTMLElement>());
     const observerRef = useRef<IntersectionObserver | null>(null);
 
@@ -135,10 +161,11 @@ export function useVisibleFileMetadata(source: StorageSource | null, files: read
     // Layout, not passive: it runs in the commit that shows the listing,
     // before an observer can report an element of it.
     useLayoutEffect(() => {
-        const run = new MetadataRun(source, new Set(files.map(file => file.fullPath)), answered => setStore(previous => ({
+        const known = storeRef.current.files === files ? storeRef.current.entries : NO_METADATA;
+        const run = new MetadataRun(source, new Map(files.map(file => [file.fullPath, file])), answered => setStore(previous => ({
             files,
             entries: new Map([...(previous.files === files ? previous.entries : NO_METADATA), ...answered])
-        })));
+        })), wants, known);
         runRef.current = run;
         // The elements already on screen — the same ones, when a folder is
         // read again — are looked at afresh for this listing.
@@ -152,7 +179,7 @@ export function useVisibleFileMetadata(source: StorageSource | null, files: read
             }
         }
         return () => run.cancel();
-    }, [source, files, observer]);
+    }, [source, files, wants, observer]);
 
     useEffect(() => () => {
         observerRef.current?.disconnect();

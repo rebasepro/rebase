@@ -248,6 +248,37 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
         expect(root.prefixes.map(p => p.fullPath)).toEqual(["docs"]);
     });
 
+    it("describes each listed file — size, version and, where the store lists it, type — so a folder needs no metadata request per file", async () => {
+        await h.controller.putObject({ file: textFile("a.txt", "hello"), key: "described/a.txt" });
+        await h.controller.putObject({ file: textFile("b.png", "png-bytes", "image/png"), key: "described/b.png" });
+        await h.controller.putObject({ file: textFile("c.txt", "x"), key: "described/sub/c.txt" });
+
+        const listing = await h.controller.listObjects("described");
+        const facts = await Promise.all(listing.items.map(async item => {
+            const stat = await h.controller.statObject!(item.fullPath);
+            return {
+                fullPath: item.fullPath,
+                size: item.size,
+                // The listing's version is the object's own: the instant
+                // `statObject` (and so the ETag) reports, to the second —
+                // S3's HEAD floors it.
+                updatedSecond: item.updated === undefined ? undefined : Math.floor(Date.parse(item.updated) / 1000),
+                versionSecond: Math.floor(stat!.lastModified / 1000),
+                contentType: item.contentType
+            };
+        }));
+
+        // An S3 listing (ListObjectsV2) carries no content type.
+        const typed = (type: string) => kind === "s3" ? undefined : type;
+        expect(facts).toEqual([
+            expect.objectContaining({ fullPath: "described/a.txt", size: 5, contentType: typed("text/plain") }),
+            expect.objectContaining({ fullPath: "described/b.png", size: 9, contentType: typed("image/png") })
+        ]);
+        for (const fact of facts) expect(fact.updatedSecond).toBe(fact.versionSecond);
+        // A folder is a prefix: nothing to describe.
+        expect(listing.prefixes).toEqual([expect.not.objectContaining({ size: expect.anything() })]);
+    });
+
     it("pages a listing so every entry comes back exactly once", async () => {
         for (const name of ["e", "a", "d", "b", "c"]) {
             await h.controller.putObject({ file: textFile(`${name}.txt`, name), key: `pages/${name}.txt` });

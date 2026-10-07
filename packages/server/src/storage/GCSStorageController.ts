@@ -378,6 +378,9 @@ export class GCSStorageController implements StorageController {
             bucket: resolvedBucket,
             fullPath: file.name,
             name: file.name.split("/").pop() || "",
+            // Each listed object arrives with its full metadata, so a folder
+            // can be shown without a metadata request per file.
+            ...listedFacts(file.metadata),
             parent: null as never,
             root: null as never,
             toString: () => `gs://${resolvedBucket}/${file.name}`
@@ -487,6 +490,17 @@ async function* byteChunks(file: Blob): AsyncGenerator<Uint8Array> {
     } finally {
         reader.releaseLock();
     }
+}
+
+/** What a listing entry says about its object, from the metadata the listing carried. */
+function listedFacts(meta: FileMetadata | undefined): Pick<StorageReference, "size" | "updated" | "contentType"> {
+    if (!meta) return {};
+    const size = meta.size === undefined ? NaN : Number(meta.size);
+    return {
+        ...(Number.isFinite(size) ? { size } : {}),
+        ...(typeof meta.updated === "string" ? { updated: meta.updated } : {}),
+        ...(typeof meta.contentType === "string" && meta.contentType ? { contentType: meta.contentType } : {})
+    };
 }
 
 /** What `statObject` reports, from an object's metadata. */

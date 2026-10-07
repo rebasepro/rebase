@@ -57,7 +57,10 @@ interface StorageFile {
     name: string;
     fullPath: string;
     isFolder: boolean;
-    /** Only populated once the file's metadata is read — see `useVisibleFileMetadata`. */
+    /**
+     * As the listing described it, or once the file's metadata is read — see
+     * `useVisibleFileMetadata`. An S3 listing carries no `contentType`.
+     */
     size?: number;
     contentType?: string;
     downloadUrl?: string;
@@ -81,6 +84,9 @@ interface FileLink {
     expiresInSeconds?: number;
     /** A public file's link: no token, open to anyone, and it does not expire. */
     isPublic: boolean;
+    /** What the metadata minted with the link says about the file. */
+    size?: number;
+    contentType?: string;
 }
 
 function fileLinkOf(config: DownloadConfig, fullPath: string): FileLink | null {
@@ -91,7 +97,18 @@ function fileLinkOf(config: DownloadConfig, fullPath: string): FileLink | null {
         expiresInSeconds: metadata?.token && typeof metadata.tokenExpiresIn === "number" ? metadata.tokenExpiresIn : undefined,
         // The SDK skips the metadata round trip only for a key under the public
         // prefix, and the server says so on every other public object.
-        isPublic: metadata ? metadata.public === true : isPublicStorageKey(fullPath)
+        isPublic: metadata ? metadata.public === true : isPublicStorageKey(fullPath),
+        size: metadata?.size,
+        contentType: metadata?.contentType
+    };
+}
+
+/** `file`, with what the link minted for it says where the listing did not. */
+function withLinkFacts(file: StorageFile, link: FileLink | null): StorageFile {
+    return {
+        ...file,
+        size: file.size ?? link?.size,
+        contentType: file.contentType ?? link?.contentType
     };
 }
 
@@ -120,17 +137,30 @@ function formatFileSize(bytes: number): string {
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function getFileIcon(contentType?: string) {
-    if (!contentType) return FileTextIcon;
-    if (contentType.startsWith("image/")) return ImageIcon;
-    if (contentType.startsWith("video/")) return VideoIcon;
-    if (contentType.startsWith("audio/")) return Music2Icon;
+const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "svg"];
+const VIDEO_EXTENSIONS = ["mp4", "webm", "ogg", "mov"];
+const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a"];
+
+/**
+ * The icon for a file: by its stored type, or — where the listing carried
+ * none, as an S3 listing does not — by its extension.
+ */
+function getFileIcon(contentType: string | undefined, name: string) {
+    const ext = getExtension(name).toLowerCase();
+    if (contentType ? contentType.startsWith("image/") : IMAGE_EXTENSIONS.includes(ext)) return ImageIcon;
+    if (contentType ? contentType.startsWith("video/") : VIDEO_EXTENSIONS.includes(ext)) return VideoIcon;
+    if (contentType ? contentType.startsWith("audio/") : AUDIO_EXTENSIONS.includes(ext)) return Music2Icon;
     return FileTextIcon;
 }
 
 function getExtension(name: string): string {
     const parts = name.split(".");
     return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : "";
+}
+
+/** Whether the grid draws `file` as a thumbnail — which needs a link to it. */
+function isImageFile(file: { name: string; contentType?: string }): boolean {
+    return file.contentType?.startsWith("image/") === true || IMAGE_EXTENSIONS.includes(getExtension(file.name).toLowerCase());
 }
 
 function breadcrumbSegments(path: string, rootLabel: string): { label: string; path: string }[] {
@@ -383,7 +413,7 @@ function FilePreviewPanel({
     const isImage = file.contentType?.startsWith("image/");
     const isVideo = file.contentType?.startsWith("video/");
     const isAudio = file.contentType?.startsWith("audio/");
-    const FileIconComponent = getFileIcon(file.contentType);
+    const FileIconComponent = getFileIcon(file.contentType, file.name);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [urlCopied, setUrlCopied] = useState(false);
 
@@ -452,9 +482,9 @@ message: e instanceof Error ? e.message : String(e) });
                     <div className={cls("flex flex-col items-center justify-center min-h-[200px] p-4 bg-surface-sheet border-b", defaultBorderMixin)}>
                         {(() => {
                             const ext = getExtension(file.name)?.toLowerCase() || "";
-                            const isImage = file.contentType?.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
-                            const isVideo = file.contentType?.startsWith("video/") || ["mp4", "webm", "ogg", "mov"].includes(ext);
-                            const isAudio = file.contentType?.startsWith("audio/") || ["mp3", "wav", "ogg", "m4a"].includes(ext);
+                            const isImage = file.contentType?.startsWith("image/") || IMAGE_EXTENSIONS.includes(ext);
+                            const isVideo = file.contentType?.startsWith("video/") || VIDEO_EXTENSIONS.includes(ext);
+                            const isAudio = file.contentType?.startsWith("audio/") || AUDIO_EXTENSIONS.includes(ext);
                             const previewUrl = link?.url;
 
                             if (isImage && previewUrl) {
@@ -651,11 +681,27 @@ export const StorageView = () => {
     const [files, setFiles] = useState<StorageFile[]>([]);
     /** The source `files` were listed from: their metadata is read through it, whatever is selected since. */
     const [listedFrom, setListedFrom] = useState<StorageSource | null>(null);
-    const { metadata, observe: observeFile } = useVisibleFileMetadata(listedFrom, files);
-    /** `file` with what its metadata has said so far. */
+    // View mode: decides which files need more than the listing says.
+    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+    /**
+     * Which files are worth a metadata request: one the listing did not
+     * describe (a source whose listing carries no sizes), and, in the grid, an
+     * image — its thumbnail is drawn from the link the request mints. A folder
+     * listed with sizes, shown as a list, makes none.
+     */
+    const wantsMetadata = useCallback((file: StorageFile): boolean =>
+        file.size === undefined || (viewMode === "grid" && isImageFile(file)), [viewMode]);
+    const { metadata, observe: observeFile } = useVisibleFileMetadata(listedFrom, files, wantsMetadata);
+    /** `file` with what its metadata has said so far, over what the listing said. */
     const withMetadata = useCallback((file: StorageFile): StorageFile => {
         const read = metadata.get(file.fullPath);
-        return read ? { ...file, ...read } : file;
+        if (!read) return file;
+        return {
+            ...file,
+            size: read.size ?? file.size,
+            contentType: read.contentType ?? file.contentType,
+            downloadUrl: read.downloadUrl ?? file.downloadUrl
+        };
     }, [metadata]);
 
     // Selection and preview
@@ -666,9 +712,6 @@ export const StorageView = () => {
 
     // Upload
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-
-    // View mode
-    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
     // Multi-selection
     const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
@@ -717,12 +760,15 @@ export const StorageView = () => {
                 isFolder: true
             }));
 
-            // Shown as listed. Each file's metadata — one request per file —
-            // is read when the file comes on screen: see `useVisibleFileMetadata`.
+            // Shown as listed, with what the listing says of each file. What
+            // it does not say is read when the file comes on screen, and only
+            // if it is needed: see `useVisibleFileMetadata`.
             const fileItems: StorageFile[] = result.items.map(ref => ({
                 name: ref.name,
                 fullPath: ref.fullPath,
-                isFolder: false
+                isFolder: false,
+                size: ref.size,
+                contentType: ref.contentType
             }));
 
             if (!isCurrent()) return;
@@ -1283,7 +1329,7 @@ message: e instanceof Error ? e.message : String(e) });
                             })}
                             {files.map(listed => {
                                 const file = withMetadata(listed);
-                                const FileIconComp = getFileIcon(file.contentType);
+                                const FileIconComp = getFileIcon(file.contentType, file.name);
                                 const isChecked = selectedPaths.has(file.fullPath);
                                 return (
                                     <tr
@@ -1401,9 +1447,8 @@ message: e instanceof Error ? e.message : String(e) });
                         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
                             {files.map(listed => {
                                 const file = withMetadata(listed);
-                                const FileIconComp = getFileIcon(file.contentType);
-                                const ext = getExtension(file.name)?.toLowerCase() || "";
-                                const isImage = file.contentType?.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
+                                const FileIconComp = getFileIcon(file.contentType, file.name);
+                                const isImage = isImageFile(file);
                                 const isChecked = selectedPaths.has(file.fullPath);
 
                                 return (
@@ -1670,7 +1715,7 @@ message: e instanceof Error ? e.message : String(e) });
                         {selectedFile && (
                             <div className="w-80 lg:w-96 shrink-0">
                                 <FilePreviewPanel
-                                    file={withMetadata(selectedFile)}
+                                    file={withLinkFacts(withMetadata(selectedFile), selectedLink)}
                                     link={selectedLink}
                                     mintLink={refreshPreviewLink}
                                     onClose={() => {
