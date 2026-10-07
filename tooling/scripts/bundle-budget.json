@@ -25,6 +25,19 @@
             },
             "totalBytes": 145656,
             "totalGzipBytes": 41701
+        },
+        "cms-shell": {
+            "chunks": {
+                "cms-shell": 174164,
+                "DialogTitle.es": 83423,
+                "index.es": 468238,
+                "x": 2071,
+                "wand": 3479,
+                "useSidePanel": 527,
+                "rolldown-runtime": 1084
+            },
+            "totalBytes": 732986,
+            "totalGzipBytes": 241730
         }
     }
 }

@@ -314,6 +314,26 @@ export const PROBES = {
                     "module (preserveModules) with `\"sideEffects\": false`, so a client that evaluates no condition leaves it out"
             }
         ]
+    },
+    "cms-shell": {
+        packages: ["cms", "app", "ui", "client", "common", "utils", "types", "cms-types"],
+        source: (root) => [
+            `import { RebaseShell } from ${JSON.stringify(path.join(root, "packages", "cms", "dist", "index.js"))};`,
+            // A side effect, so the build keeps the import.
+            `globalThis.__rebaseProbe = RebaseShell;`
+        ].join("\n"),
+        // The app supplies React; its size is not the package's.
+        external: [/^react($|\/)/, /^react-dom($|\/)/],
+        forbidden: [
+            {
+                // The modules themselves in the per-module layout, and the lib chunks the
+                // single-file layout split them into.
+                test: /packages\/cms\/dist\/(?:(?:components\/(?:CollectionViewBinding\/CollectionViewBinding|EditViewBinding|DetailViewBinding|SidePanelBinding)|form\/(?:EntityForm|PropertyFieldBinding))\.js|(?:CollectionViewBinding|EditViewBinding|DetailViewBinding|SidePanelBinding|PropertyFieldBinding)-[\w-]+\.js)$/,
+                label: "the collection table, record views or entity form",
+                why: "RebaseShell reaches them through components/lazy_record_views.ts; the cms dist must stay one " +
+                    "file per module (preserveModules), or a static import of a single-file `index.js` brings them along"
+            }
+        ]
     }
 };
 
@@ -344,7 +364,11 @@ async function measureProbe(name) {
             target: "es2022",
             modulePreload: false,
             reportCompressedSize: false,
-            rollupOptions: { input: id, output: { entryFileNames: `${name}.js`, chunkFileNames: "[name].js" } }
+            rollupOptions: {
+                input: id,
+                external: probe.external,
+                output: { entryFileNames: `${name}.js`, chunkFileNames: "[name].js" }
+            }
         }
     });
     const chunks = (Array.isArray(result) ? result : [result])
@@ -363,7 +387,7 @@ async function measureProbe(name) {
     const byKey = {};
     let totalBytes = 0;
     let totalGzipBytes = 0;
-    const failures = [];
+    const failures = new Set();
     for (const chunk of eager) {
         const bytes = Buffer.byteLength(chunk.code);
         byKey[chunkKey(chunk.fileName)] = bytes;
@@ -373,12 +397,12 @@ async function measureProbe(name) {
             if (info.renderedLength === 0) continue;
             const normalized = moduleId.replace(/\\/g, "/");
             for (const rule of probe.forbidden) {
-                if (rule.test.test(normalized)) failures.push(`${bold(rule.label)} is in the bundle: ${rule.why}.`);
+                if (rule.test.test(normalized)) failures.add(`${bold(rule.label)} is in the bundle: ${rule.why}.`);
             }
         }
     }
     const measured = { chunks: byKey, totalBytes, totalGzipBytes };
-    Object.defineProperty(measured, "forbidden", { value: { failures, warnings: [] }, enumerable: false });
+    Object.defineProperty(measured, "forbidden", { value: { failures: [...failures], warnings: [] }, enumerable: false });
     return measured;
 }
 

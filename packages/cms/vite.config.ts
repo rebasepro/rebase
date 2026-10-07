@@ -32,7 +32,12 @@ export default defineConfig(() => ({
                 collection_editor_ui: path.resolve(__dirname, "src/collection_editor_ui.ts")
             },
             name: "Rebase CMS",
-            formats: ["es"]
+            formats: ["es"],
+            // One file per source module (`preserveModules` below). The three
+            // entries keep the names package.json's `exports` gives them
+            // (`index.js`, `editor.js`, `collection_editor_ui.js`); every other
+            // module lands at its own path (`components/RebaseCMS.js`).
+            fileName: (format, entryName) => `${entryName}.js`
         },
         target: "ESNEXT",
         minify: false,
@@ -41,11 +46,20 @@ export default defineConfig(() => ({
             external: isExternal,
             onwarn(warning, warn) {
                 if (warning.code === "MISSING_GLOBAL_NAME") return;
-                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
                 warn(warning);
             },
             output: {
-                preserveModules: false
+                // Shipped as one file, the record views, the entity form and the
+                // property previews were static imports of `index.js` (the lazy
+                // `import()`s in components/lazy_record_views.ts had nothing to
+                // split off), so an app built on the published package preloaded
+                // them on its login screen: 1.9 MB of eager JS for a scaffolded
+                // admin, against 1.3 MB now. One file per module lets the app's
+                // bundler keep them lazy and drop what it never imports
+                // (`"sideEffects"` in package.json). Guarded by the `cms-shell`
+                // target of tooling/scripts/check-bundle-budget.mjs.
+                preserveModules: true,
+                preserveModulesRoot: path.resolve(__dirname, "src")
             }
         }
     },
