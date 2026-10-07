@@ -119,7 +119,11 @@ const resolvedDataSources = resolveDataSources(process.env, dataSources);
 async function startServer() {
     const jwtSecret = env.JWT_SECRET;
     const PORT = env.PORT;
-    const server = createServer(getRequestListener(app.fetch));
+    // 64 KB of request line plus headers, as the Rebase runtime takes, not
+    // Node's 16 KB: a vector search's embedding travels in `?vector=`, and
+    // 768 dimensions of it are already 17 KB of URL. (The SDK sends a vector
+    // search in a POST body; this is for a URL built by hand.)
+    const server = createServer({ maxHeaderSize: 64 * 1024 }, getRequestListener(app.fetch));
 
     // `backend/crons` holds the scheduled jobs — nightly backups among them.
     // Passed only when the directory exists, because a configured `cronsDir`

@@ -87,8 +87,9 @@ async function startServer() {
     
     // 1. WebSocket Upgrade Guard
     // WebSockets require hijacking the HTTP Upgrade header. You must bind
-    // Rebase to a raw Node.js http.Server instance.
-    const server = createServer(app);
+    // Rebase to a raw Node.js http.Server instance. 64 KB of headers, as the
+    // Rebase runtime takes: a vector search in the URL outgrows Node's 16 KB.
+    const server = createServer({ maxHeaderSize: 64 * 1024 }, app);
 
     // 2. Configure the connection pool
     const pool = new pg.Pool({

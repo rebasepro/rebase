@@ -66,4 +66,23 @@ describe("the runtime's HTTP server", () => {
         expect(boot).not.toMatch(/\bcreateServer\(/);
         expect(boot.match(/createRuntimeHttpServer\(/g)).toHaveLength(2);
     });
+
+    /**
+     * The servers that do not boot through `boot.ts` build their own: the
+     * backend `rebase eject` writes into a project, and this repository's
+     * example app. Both called a bare `createServer`, so a hand-built
+     * 768-dimension search URL that the runtime answers was a 431 there.
+     * They cannot import the runtime's helper (it is internal), so each
+     * spells the bound, and this holds the spelling to the runtime's.
+     */
+    it.each([
+        ["the eject template", "../../cli/templates/eject/backend/src/index.ts"],
+        ["the example app", "../../../app/backend/src/index.ts"]
+    ])("is the bound %s's server is built with", (_name, file) => {
+        expect(RUNTIME_MAX_HEADER_SIZE).toBe(64 * 1024);
+        const source = readFileSync(path.join(__dirname, file), "utf8");
+        const calls = source.match(/\bcreateServer\([^)]*\)/g) ?? [];
+        expect(calls).toHaveLength(1);
+        expect(calls[0]).toContain("{ maxHeaderSize: 64 * 1024 }");
+    });
 });
