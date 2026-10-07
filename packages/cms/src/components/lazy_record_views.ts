@@ -12,11 +12,18 @@ import { lazyChunk } from "@rebasepro/ui";
  * `prefetchRecordViews` starts the downloads once someone is signed in, when
  * the browser is idle, so the first collection they open does not wait on the
  * network. Guarded by test/shell-static-graph.test.ts.
+ *
+ * It fetches markdown-it too. The kit's `Markdown` imports it the first time
+ * one renders (it is ~100 kB, and the login screen has none) and shows the
+ * source as plain text until it lands; warm in the module cache, it lands in
+ * the same tick instead of after a download, so the first markdown cell or
+ * preview of a session does not flash its source.
  */
 const loadCollectionView = () => import("./CollectionViewBinding/CollectionViewBinding");
 const loadEditView = () => import("./EditViewBinding");
 const loadDetailView = () => import("./DetailViewBinding");
 const loadSidePanel = () => import("./SidePanelBinding");
+const loadMarkdownParser = () => import("markdown-it");
 
 export const LazyCollectionViewBinding = lazyChunk(() => loadCollectionView().then(m => ({ default: m.CollectionViewBinding })));
 export const LazyEditViewBinding = lazyChunk(() => loadEditView().then(m => ({ default: m.EditViewBinding })));
@@ -31,7 +38,7 @@ export const LazySidePanelBinding = lazyChunk(() => loadSidePanel().then(m => ({
 export function prefetchRecordViews(): () => void {
     if (typeof window === "undefined") return () => undefined;
     const run = () => {
-        for (const load of [loadCollectionView, loadEditView, loadDetailView, loadSidePanel]) {
+        for (const load of [loadCollectionView, loadEditView, loadDetailView, loadSidePanel, loadMarkdownParser]) {
             load().catch(() => undefined);
         }
     };
