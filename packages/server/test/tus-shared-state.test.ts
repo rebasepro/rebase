@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
 /**
  * A resumable upload is not held by the process that created it.
  *
@@ -155,10 +155,20 @@ describe("a resumable upload shared by the processes that share its directory", 
         // A fresh one, which stays.
         const fresh = await create(a, "alice", "notes/fresh.txt", 4);
 
-        const sweeper = new TusHandler(root, new LocalStorageController({ type: "local", basePath: root }));
-        await (sweeper as unknown as { cleanupStale(): Promise<void> }).cleanupStale();
+        // A process that never saw the upload, on its minute sweep.
+        jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+        try {
+            new TusHandler(root, new LocalStorageController({ type: "local", basePath: root })).startCleanup();
+            jest.advanceTimersByTime(60_000);
+        } finally {
+            jest.useRealTimers();
+        }
+        const expected = [fresh, `${fresh}.json`].sort();
+        for (let waited = 0; waited < 2_000 && JSON.stringify(fs.readdirSync(dir).sort()) !== JSON.stringify(expected); waited += 10) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
 
-        expect(fs.readdirSync(dir).sort()).toEqual([fresh, `${fresh}.json`].sort());
+        expect(fs.readdirSync(dir).sort()).toEqual(expected);
         expect((await head(a, "alice", id)).status).toBe(404);
     });
 });
