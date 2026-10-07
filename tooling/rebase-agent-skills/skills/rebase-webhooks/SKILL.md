@@ -359,7 +359,7 @@ The `WebhookDispatcher` automatically retries failed deliveries with **exponenti
 | 3 | 5,000 ms (5s) | ~6s |
 
 - **Max retries:** 3 attempts total
-- **Backoff delays:** `[1000, 5000, 15000]` ms (the 15s delay is defined but never used since the 3rd attempt is the last)
+- **Backoff delays:** `[1000, 5000]` ms — one per retry: 1s before the 2nd attempt, 5s before the 3rd
 - A delivery is **successful** if the HTTP response status code is `>= 200 && < 300`
 - A delivery **fails** if the status code is outside 2xx range OR if a network/timeout error occurs
 - If any attempt succeeds, retries stop immediately and the successful result is returned

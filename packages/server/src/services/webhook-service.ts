@@ -124,8 +124,13 @@ const MAX_QUEUED_DELIVERIES_PER_WEBHOOK = 10_000;
 
 export class WebhookDispatcher {
     private webhooks: WebhookConfig[] = [];
+    /** Attempts per in-process delivery, the first included. */
     private maxRetries = 3;
-    private retryDelays = [1000, 5000, 15000]; // Exponential backoff
+    /**
+     * The wait before each attempt after the first: 1 s before the second, 5 s
+     * before the third. One per retry — a third entry here was never reached.
+     */
+    private retryDelays = [1000, 5000];
     private readonly options: WebhookDispatcherOptions;
     private readonly timeoutMs: number;
     /** In-process deliveries, one lane per webhook id. A lane is removed when it empties. */

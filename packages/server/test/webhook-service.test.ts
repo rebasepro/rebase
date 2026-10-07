@@ -223,6 +223,29 @@ name: "Original" };
             expect(results[0].responseBody).toContain("Network error");
         }, 30000);
 
+        it("makes three attempts, waiting 1 s and then 5 s between them", async () => {
+            jest.useFakeTimers();
+            try {
+                const dispatcher = makeDispatcher();
+                dispatcher.setWebhooks([makeWebhook()]);
+                const at: number[] = [];
+                mockFetch.mockImplementation(async () => {
+                    at.push(Date.now());
+                    throw new Error("Network error");
+                });
+                const start = Date.now();
+
+                const delivering = dispatcher.onEntityChange("users", "INSERT", "id_1", { id: "id_1" });
+                await jest.advanceTimersByTimeAsync(60_000);
+                const [result] = await delivering;
+
+                expect(at.map(t => t - start)).toEqual([0, 1_000, 6_000]);
+                expect(result.attemptNumber).toBe(3);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
         it("returns success: false for non-2xx status codes", async () => {
             const dispatcher = makeDispatcher();
             dispatcher.setWebhooks([makeWebhook()]);
