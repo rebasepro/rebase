@@ -2,12 +2,13 @@ import React from "react";
 import type {
     RebasePlugin,
     AnySlotContribution,
-    PluginGenericProps,
     CollectionWidgetsSlotProps,
     HomeCardWidgetSlotProps
 } from "@rebasepro/cms-types";
 import type { InsightsPluginConfig } from "./types";
 import { InsightsProvider } from "./engine/InsightsProvider";
+import { DEFAULT_PERIOD_DAYS } from "./engine/InsightsEngine";
+import { assertValidConfig } from "./validateConfig";
 import { HomeCardInsightSlot } from "./components/HomeCardInsightSlot";
 import { HomeInsightsSlot } from "./components/HomeInsightsSlot";
 import { CollectionInsightsInline } from "./components/CollectionInsightsInline";
@@ -18,38 +19,51 @@ import { CollectionInsightsInline } from "./components/CollectionInsightsInline"
  * This plugin injects scorecard widgets into key UI locations:
  * - **Home page header**: KPI overview via `home.children.start` slot
  * - **Collection list view**: Scorecards inline (below title, above list) via `collection.widgets` slot
- * - **Home page cards**: Compact scorecard metrics auto-extracted from collection insights via `home.card.widget` slot
+ * - **Home page cards**: Compact readouts of the collection's insights via `home.card.widget` slot
  *
- * Collection-level insights (`collections.<slug>`) are the single source of truth:
- * scorecards render in the collection list view and are automatically extracted
- * to show as compact widgets on the corresponding home page card.
+ * Figures come from named `sources`, each fetched once per user however many
+ * insights read it: a value shown on the home page and in a collection view
+ * is the same number. Every source is handed the comparison period, so the
+ * query and the label above the tiles describe the same window.
  *
- * Each insight owns its own `data()` callback — use the Rebase client SDK,
- * call a custom function, or hit any external API. Full flexibility, zero new endpoints.
+ * Pass a memoized config: a new `sources` object starts a new cache.
  *
  * @example
  * ```typescript
  * import { useInsightsPlugin } from "@rebasepro/plugin-insights";
  *
- * const insightsPlugin = useInsightsPlugin({
- *     cacheTTL: 120_000,
- *     insights: {
- *         home: [
- *             { id: "revenue", title: "Revenue", data: async () => ..., scorecard: { ... } },
- *         ],
- *         collections: {
- *             orders: [
- *                 { id: "total", title: "Total Orders", data: async () => ..., scorecard: { ... } },
- *             ],
- *         },
+ * const insightsPlugin = useInsightsPlugin(useMemo(() => ({
+ *     period: { days: 30 },
+ *     sources: {
+ *         orders: ({ period }) => fetchOrderStats(period.from, period.to, period.previousFrom)
  *     },
- * });
+ *     insights: {
+ *         home: [{
+ *             id: "revenue",
+ *             title: "Revenue",
+ *             source: "orders",
+ *             value: { field: "revenue", format: { style: "currency", currency: "USD" } },
+ *             comparison: { previous: "previousRevenue", intent: "increase_is_good" }
+ *         }],
+ *         collections: {
+ *             orders: [{
+ *                 id: "shipped",
+ *                 title: "Shipped",
+ *                 source: "orders",
+ *                 value: { field: "shipped" },
+ *                 comparison: { previous: "previousShipped", intent: "increase_is_good", show: "absolute" }
+ *             }]
+ *         }
+ *     }
+ * }), []));
  * ```
  */
 export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
-    const { insights, cacheTTL } = config;
+    const { insights, sources, period, cacheTTL } = config;
+    const periodDays = period?.days ?? DEFAULT_PERIOD_DAYS;
 
     return React.useMemo(() => {
+        assertValidConfig({ insights, sources, period: { days: periodDays } });
         const slots: AnySlotContribution[] = [];
 
         // ── Home page insights ────────────────────────────────────────────
@@ -57,12 +71,7 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
             const homeInsights = insights.home;
             slots.push({
                 slot: "home.children.start" as const,
-                Component: (props: PluginGenericProps) => (
-                    <HomeInsightsSlot
-                        {...props}
-                        insights={homeInsights}
-                    />
-                ),
+                Component: () => <HomeInsightsSlot insights={homeInsights}/>,
                 order: 10
             });
         }
@@ -84,18 +93,13 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                         if (collectionSlug !== slug) return null;
 
                         // Skip relation-scoped views (e.g. a single product's Orders
-                        // tab). These aggregations are collection-wide — `InsightContext`
-                        // carries no parent entity id, so a definition cannot narrow to
-                        // the parent — and rendering "Revenue $36.2K" above one product's
-                        // two orders reads as a figure for those orders.
+                        // tab). Sources are collection-wide — a source is handed the
+                        // period and nothing about a parent entity — and rendering
+                        // "Revenue $36.2K" above one product's two orders reads as a
+                        // figure for those orders.
                         if (props.parentEntityIds && props.parentEntityIds.length > 0) return null;
 
-                        return (
-                            <CollectionInsightsInline
-                                {...props}
-                                insights={collectionInsights}
-                            />
-                        );
+                        return <CollectionInsightsInline insights={collectionInsights}/>;
                     },
                     order: 10
                 });
@@ -105,12 +109,7 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                     slot: "home.card.widget" as const,
                     Component: (props: HomeCardWidgetSlotProps) => {
                         if (props.slug !== slug) return null;
-                        return (
-                            <HomeCardInsightSlot
-                                {...props}
-                                insights={collectionInsights}
-                            />
-                        );
+                        return <HomeCardInsightSlot insights={collectionInsights}/>;
                     },
                     order: 10
                 });
@@ -124,9 +123,9 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                 {
                     scope: "root" as const,
                     Component: InsightsProvider as React.ComponentType<React.PropsWithChildren<Record<string, unknown>>>,
-                    props: { cacheTTL }
+                    props: { sources, periodDays, cacheTTL }
                 }
             ]
         };
-    }, [insights, cacheTTL]);
+    }, [insights, sources, periodDays, cacheTTL]);
 }

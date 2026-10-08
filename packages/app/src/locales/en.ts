@@ -1463,5 +1463,14 @@ export const en: RebaseTranslations = {
     studio_storage_folder_name_has_slash: "Folder name cannot contain slashes",
     studio_storage_folder_exists: "Folder “{{name}}” already exists",
     studio_storage_folder_created: "Folder “{{name}}” created",
-    studio_storage_create_folder_failed: "Failed to create folder"
+    studio_storage_create_folder_failed: "Failed to create folder",
+
+    // ─── Insights plugin ─────────────────────────────────────────
+    insights_period_last_days: "Last {{count}} days",
+    insights_period_last_days_one: "Last day",
+    insights_previous_period_value: "Previous {{count}} days: {{value}}",
+    insights_previous_period_value_one: "Previous day: {{value}}",
+    insights_change_up: "Up {{change}}",
+    insights_change_down: "Down {{change}}",
+    insights_change_none: "No change"
 };

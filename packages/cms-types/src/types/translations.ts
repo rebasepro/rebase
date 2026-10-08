@@ -1568,4 +1568,14 @@ export interface RebaseTranslations {
     studio_storage_folder_exists?: string;
     studio_storage_folder_created?: string;
     studio_storage_create_folder_failed?: string;
+
+    // ─── Insights plugin ─────────────────────────────────────────
+    /** Above a row of insights: the window their figures cover. Pluralised on `count`. */
+    insights_period_last_days?: string;
+    insights_period_last_days_one?: string;
+    insights_previous_period_value?: string;
+    insights_previous_period_value_one?: string;
+    insights_change_up?: string;
+    insights_change_down?: string;
+    insights_change_none?: string;
 }

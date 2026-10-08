@@ -1455,5 +1455,14 @@ export const hi: RebaseTranslations = {
     studio_storage_folder_name_has_slash: "फ़ोल्डर के नाम में स्लैश नहीं हो सकते",
     studio_storage_folder_exists: "फ़ोल्डर “{{name}}” पहले से मौजूद है",
     studio_storage_folder_created: "फ़ोल्डर “{{name}}” बनाया गया",
-    studio_storage_create_folder_failed: "फ़ोल्डर नहीं बनाया जा सका"
+    studio_storage_create_folder_failed: "फ़ोल्डर नहीं बनाया जा सका",
+
+    // ─── Insights plugin ─────────────────────────────────────────
+    insights_period_last_days: "पिछले {{count}} दिन",
+    insights_period_last_days_one: "पिछला दिन",
+    insights_previous_period_value: "उससे पहले के {{count}} दिन: {{value}}",
+    insights_previous_period_value_one: "उससे पहले का दिन: {{value}}",
+    insights_change_up: "बढ़त: {{change}}",
+    insights_change_down: "गिरावट: {{change}}",
+    insights_change_none: "कोई बदलाव नहीं"
 };

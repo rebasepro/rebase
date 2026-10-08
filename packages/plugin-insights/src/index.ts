@@ -1,10 +1,13 @@
 // ── Types ─────────────────────────────────────────────────────────────
 export type {
     DataRow,
-    ScorecardFormat,
-    ScorecardConfig,
-    InsightDataResult,
+    InsightFormat,
+    InsightComparison,
     InsightDefinition,
+    InsightPeriod,
+    InsightPeriodConfig,
+    InsightSource,
+    InsightSourceContext,
     InsightsPluginConfig
 } from "./types";
 
@@ -13,10 +16,11 @@ export { useInsightsPlugin } from "./useInsightsPlugin";
 
 // ── Engine (for advanced usage) ───────────────────────────────────────
 export { InsightsProvider, useInsightsEngine } from "./engine/InsightsProvider";
-export { InsightsCache } from "./engine/InsightsCache";
-export { useInsightsData } from "./engine/useInsightsData";
+export { InsightsEngine, resolvePeriod } from "./engine/InsightsEngine";
+export type { SourceResult } from "./engine/InsightsEngine";
+export { useInsightSource } from "./engine/useInsightSource";
 
 // ── Widget components (for custom layouts) ────────────────────────────
 export { InsightsScorecardView } from "./components/InsightsScorecardView";
 export { InsightWidget } from "./components/InsightWidget";
-export { InsightWidgetSkeleton } from "./components/InsightWidgetSkeleton";
+export { InsightsRow } from "./components/InsightsRow";

@@ -1,38 +1,42 @@
 import React, { createContext, useContext, useMemo, type PropsWithChildren } from "react";
-import { InsightsCache } from "./InsightsCache";
+import type { InsightSource } from "../types";
+import { InsightsEngine } from "./InsightsEngine";
 
-interface InsightsContextValue {
-    cache: InsightsCache;
-}
-
-const InsightsContext = createContext<InsightsContextValue | null>(null);
+const InsightsContext = createContext<InsightsEngine | null>(null);
 
 /**
  * Root-level provider for the insights data engine.
  * Injected automatically by the plugin via `providers: [{ scope: "root" }]`.
  *
- * Manages a single `InsightsCache` instance shared by all insight widgets
- * for TTL-based caching and inflight request deduplication.
+ * Holds the one `InsightsEngine` every insight widget reads its source from.
  */
 export function InsightsProvider({
+    sources,
+    periodDays,
     cacheTTL,
     children
-}: PropsWithChildren<{ cacheTTL?: number }>) {
-    const cache = useMemo(() => new InsightsCache(cacheTTL), [cacheTTL]);
-    const value = useMemo(() => ({ cache }), [cache]);
+}: PropsWithChildren<{
+    sources: Record<string, InsightSource>;
+    periodDays?: number;
+    cacheTTL?: number;
+}>) {
+    const engine = useMemo(
+        () => new InsightsEngine(sources, periodDays, cacheTTL),
+        [sources, periodDays, cacheTTL]
+    );
 
     return (
-        <InsightsContext.Provider value={value}>
+        <InsightsContext.Provider value={engine}>
             {children}
         </InsightsContext.Provider>
     );
 }
 
 /**
- * Access the insights cache (for advanced usage).
+ * The insights engine (for advanced usage).
  * Returns null when called outside of an `InsightsProvider`
  * (e.g. during auth-loading phase before plugin providers mount).
  */
-export function useInsightsEngine(): InsightsContextValue | null {
+export function useInsightsEngine(): InsightsEngine | null {
     return useContext(InsightsContext);
 }

@@ -1455,5 +1455,14 @@ export const fr: RebaseTranslations = {
     studio_storage_folder_name_has_slash: "Le nom du dossier ne peut pas contenir de barres obliques",
     studio_storage_folder_exists: "Le dossier « {{name}} » existe déjà",
     studio_storage_folder_created: "Dossier « {{name}} » créé",
-    studio_storage_create_folder_failed: "Impossible de créer le dossier"
+    studio_storage_create_folder_failed: "Impossible de créer le dossier",
+
+    // ─── Insights plugin ─────────────────────────────────────────
+    insights_period_last_days: "{{count}} derniers jours",
+    insights_period_last_days_one: "Dernier jour",
+    insights_previous_period_value: "{{count}} jours précédents : {{value}}",
+    insights_previous_period_value_one: "Jour précédent : {{value}}",
+    insights_change_up: "Hausse : {{change}}",
+    insights_change_down: "Baisse : {{change}}",
+    insights_change_none: "Aucun changement"
 };

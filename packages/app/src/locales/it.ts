@@ -1455,5 +1455,14 @@ export const it: RebaseTranslations = {
     studio_storage_folder_name_has_slash: "Il nome della cartella non può contenere barre",
     studio_storage_folder_exists: "La cartella «{{name}}» esiste già",
     studio_storage_folder_created: "Cartella «{{name}}» creata",
-    studio_storage_create_folder_failed: "Impossibile creare la cartella"
+    studio_storage_create_folder_failed: "Impossibile creare la cartella",
+
+    // ─── Insights plugin ─────────────────────────────────────────
+    insights_period_last_days: "Ultimi {{count}} giorni",
+    insights_period_last_days_one: "Ultimo giorno",
+    insights_previous_period_value: "{{count}} giorni precedenti: {{value}}",
+    insights_previous_period_value_one: "Giorno precedente: {{value}}",
+    insights_change_up: "Aumento: {{change}}",
+    insights_change_down: "Calo: {{change}}",
+    insights_change_none: "Nessuna variazione"
 };

@@ -1,150 +1,126 @@
 import { defineFunction, requireAuth } from "@rebasepro/server";
 
-/**
- * Period-over-period change as a ratio (0.15 means +15%).
- *
- * Returns null when the previous window is empty: there is no honest
- * percentage for "grew from nothing", and the scorecard drops the
- * comparison entirely when the field isn't a number.
- */
-function pctChange(current: number, previous: number): number | null {
-    if (previous === 0) return null;
-    return (current - previous) / previous;
-}
+/** The longest window a caller may ask for, so one request cannot scan the whole table. */
+const MAX_WINDOW_MS = 366 * 86_400_000;
 
 /**
- * Insights function — server-side KPI aggregations.
+ * The comparison window the insights plugin asks for: the current period is
+ * `[from, to)` and the previous one `[previousFrom, from)`.
+ *
+ * Taken from the request rather than computed here, so the figures describe
+ * exactly the window the panel labels them with, and every query of one page
+ * load shares the same `to`.
+ */
+function readWindow(query: (name: string) => string | undefined): { previousFrom: string; from: string; to: string } | null {
+    const instants = ["previousFrom", "from", "to"].map((name) => new Date(query(name) ?? ""));
+    const [previousFrom, from, to] = instants;
+    if (instants.some((d) => Number.isNaN(d.getTime()))) return null;
+    if (!(previousFrom < from && from < to)) return null;
+    if (to.getTime() - previousFrom.getTime() > 2 * MAX_WINDOW_MS) return null;
+    return { previousFrom: previousFrom.toISOString(), from: from.toISOString(), to: to.toISOString() };
+}
+
+const WINDOW_REQUIRED = {
+    error: "Pass previousFrom, from and to as ISO dates, in that order, with at most a year between each."
+};
+
+/**
+ * Insights function — server-side KPI aggregations for the admin panel's
+ * insights plugin.
  *
  * Authored with `defineFunction`, which provides a typed `Hono<HonoEnv>`
  * app (so `c.var.user` / `c.var.driver` are typed) and the `rebase`
  * singleton via the injected context — no global import needed.
  *
- * Every metric is windowed and paired with the same metric over the
- * immediately preceding window of equal length, so the deltas the
- * scorecards render are measured rather than decorative.
+ * Each route answers one plugin source with one record. A windowed figure is
+ * returned with its `previous*` twin over the window before it; the plugin
+ * works out the change.
  */
 export default defineFunction((app, { rebase }) => {
     app.use("/*", requireAuth);
 
     /**
-     * GET /api/functions/insights/home
+     * GET /api/functions/insights/orders?previousFrom=…&from=…&to=…
      *
-     * Returns all home-page KPI values in a single round trip.
-     * Runs server-side SQL aggregations instead of fetching
-     * hundreds of rows to the browser.
-     *
-     * Window: the last 30 days, compared against the 30 days before it.
+     * Every order figure the home page and the Orders collection show, from
+     * one query, so the two places cannot disagree.
      */
-    app.get("/home", async (c) => {
-        if (!rebase.sql) {
-            return c.json({ error: "SQL not available" }, 501);
-        }
+    app.get("/orders", async (c) => {
+        if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
+        const range = readWindow((name) => c.req.query(name));
+        if (!range) return c.json(WINDOW_REQUIRED, 400);
 
         const [stats] = await rebase.sql(`
             SELECT
-                COALESCE(SUM(total) FILTER (WHERE current_period),  0) AS revenue,
-                COALESCE(SUM(total) FILTER (WHERE previous_period), 0) AS prev_revenue,
-                COUNT(*)            FILTER (WHERE current_period)      AS orders,
-                COUNT(*)            FILTER (WHERE previous_period)     AS prev_orders,
-                COALESCE(AVG(total) FILTER (WHERE current_period),  0) AS avg_order_value,
-                COALESCE(AVG(total) FILTER (WHERE previous_period), 0) AS prev_avg_order_value,
-                COUNT(*) FILTER (WHERE current_period  AND status = 'refunded') AS refunded,
-                COUNT(*) FILTER (WHERE previous_period AND status = 'refunded') AS prev_refunded
+                COALESCE(SUM(total) FILTER (WHERE current_period),     0) AS revenue,
+                COALESCE(SUM(total) FILTER (WHERE NOT current_period), 0) AS previous_revenue,
+                COUNT(*)            FILTER (WHERE current_period)         AS orders,
+                COUNT(*)            FILTER (WHERE NOT current_period)     AS previous_orders,
+                COALESCE(AVG(total) FILTER (WHERE current_period),     0) AS avg_order_value,
+                COALESCE(AVG(total) FILTER (WHERE NOT current_period), 0) AS previous_avg_order_value,
+                COUNT(*) FILTER (WHERE current_period     AND status = 'refunded')  AS refunded,
+                COUNT(*) FILTER (WHERE NOT current_period AND status = 'refunded')  AS previous_refunded,
+                COUNT(*) FILTER (WHERE current_period     AND status = 'confirmed') AS confirmed,
+                COUNT(*) FILTER (WHERE NOT current_period AND status = 'confirmed') AS previous_confirmed,
+                COUNT(*) FILTER (WHERE current_period     AND status = 'shipped')   AS shipped,
+                COUNT(*) FILTER (WHERE NOT current_period AND status = 'shipped')   AS previous_shipped
             FROM (
-                SELECT
-                    total,
-                    status,
-                    order_date >= now() - interval '30 days' AS current_period,
-                    order_date <  now() - interval '30 days' AS previous_period
+                SELECT total, status, order_date >= $2::timestamptz AS current_period
                 FROM orders
-                WHERE order_date >= now() - interval '60 days'
+                WHERE order_date >= $1::timestamptz AND order_date < $3::timestamptz
             ) windowed
-        `);
-
-        const totalRevenue = Number(stats.revenue);
-        const totalOrders = Number(stats.orders);
-        const avgOrderValue = Number(stats.avg_order_value);
-        const refundedOrders = Number(stats.refunded);
+        `, { params: [range.previousFrom, range.from, range.to] });
 
         return c.json({
-            totalRevenue,
-            totalRevenueChange: pctChange(totalRevenue, Number(stats.prev_revenue)),
-            totalOrders,
-            totalOrdersChange: pctChange(totalOrders, Number(stats.prev_orders)),
-            avgOrderValue,
-            avgOrderValueChange: pctChange(avgOrderValue, Number(stats.prev_avg_order_value)),
-            refundedOrders,
-            refundedOrdersChange: pctChange(refundedOrders, Number(stats.prev_refunded))
+            revenue: Number(stats.revenue),
+            previousRevenue: Number(stats.previous_revenue),
+            orders: Number(stats.orders),
+            previousOrders: Number(stats.previous_orders),
+            avgOrderValue: Number(stats.avg_order_value),
+            previousAvgOrderValue: Number(stats.previous_avg_order_value),
+            refunded: Number(stats.refunded),
+            previousRefunded: Number(stats.previous_refunded),
+            confirmed: Number(stats.confirmed),
+            previousConfirmed: Number(stats.previous_confirmed),
+            shipped: Number(stats.shipped),
+            previousShipped: Number(stats.previous_shipped)
         });
     });
 
-    /**
-     * GET /api/functions/insights/collection/:slug
-     *
-     * Returns collection-level KPI values.
-     */
-    app.get("/collection/:slug", async (c) => {
-        if (!rebase.sql) {
-            return c.json({ error: "SQL not available" }, 501);
-        }
+    /** GET /api/functions/insights/customers?previousFrom=…&from=…&to=… */
+    app.get("/customers", async (c) => {
+        if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
+        const range = readWindow((name) => c.req.query(name));
+        if (!range) return c.json(WINDOW_REQUIRED, 400);
 
-        const slug = c.req.param("slug");
+        const [stats] = await rebase.sql(`
+            SELECT
+                COUNT(*) FILTER (WHERE created_at >= $2::timestamptz) AS new_customers,
+                COUNT(*) FILTER (WHERE created_at <  $2::timestamptz) AS previous_new_customers
+            FROM customers
+            WHERE created_at >= $1::timestamptz AND created_at < $3::timestamptz
+        `, { params: [range.previousFrom, range.from, range.to] });
 
-        switch (slug) {
-            // Same 30-day window as the home scorecards. A shorter one would
-            // read better as a "recent activity" strip, but the demo seeds
-            // ~1 order a day — a 7-day window rounds most of these to noise.
-            case "orders": {
-                const [stats] = await rebase.sql(`
-                    SELECT
-                        COUNT(*) FILTER (WHERE current_period  AND status = 'confirmed') AS confirmed,
-                        COUNT(*) FILTER (WHERE previous_period AND status = 'confirmed') AS prev_confirmed,
-                        COUNT(*) FILTER (WHERE current_period  AND status = 'shipped')   AS shipped,
-                        COUNT(*) FILTER (WHERE previous_period AND status = 'shipped')   AS prev_shipped,
-                        COALESCE(SUM(total) FILTER (WHERE current_period),  0) AS revenue,
-                        COALESCE(SUM(total) FILTER (WHERE previous_period), 0) AS prev_revenue
-                    FROM (
-                        SELECT
-                            total,
-                            status,
-                            order_date >= now() - interval '30 days' AS current_period,
-                            order_date <  now() - interval '30 days' AS previous_period
-                        FROM orders
-                        WHERE order_date >= now() - interval '60 days'
-                    ) windowed
-                `);
+        return c.json({
+            newCustomers: Number(stats.new_customers),
+            previousNewCustomers: Number(stats.previous_new_customers)
+        });
+    });
 
-                const confirmed = Number(stats.confirmed);
-                const shipped = Number(stats.shipped);
-                const revenue = Number(stats.revenue);
+    // Catalog size and open-ticket count are standing totals, not rates —
+    // there is no window to compare them against.
 
-                return c.json({
-                    confirmed,
-                    confirmedChange: pctChange(confirmed, Number(stats.prev_confirmed)),
-                    shipped,
-                    shippedChange: pctChange(shipped, Number(stats.prev_shipped)),
-                    revenue,
-                    revenueChange: pctChange(revenue, Number(stats.prev_revenue))
-                });
-            }
+    /** GET /api/functions/insights/products */
+    app.get("/products", async (c) => {
+        if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
+        const [stats] = await rebase.sql("SELECT COUNT(*) AS total FROM products");
+        return c.json({ total: Number(stats.total) });
+    });
 
-            // Catalog size and open-ticket count are standing totals, not
-            // rates — there is no window to compare them against.
-            case "products": {
-                const [stats] = await rebase.sql("SELECT COUNT(*) AS total FROM products");
-                return c.json({ total: Number(stats.total) });
-            }
-
-            case "tickets": {
-                const [stats] = await rebase.sql(`
-                    SELECT COUNT(*) FILTER (WHERE status = 'open') AS open_count
-                    FROM tickets
-                `);
-                return c.json({ openCount: Number(stats.open_count) });
-            }
-
-            default:
-                return c.json({ error: `No insights defined for "${slug}"` }, 404);
-        }
+    /** GET /api/functions/insights/tickets */
+    app.get("/tickets", async (c) => {
+        if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
+        const [stats] = await rebase.sql("SELECT COUNT(*) FILTER (WHERE status = 'open') AS open FROM tickets");
+        return c.json({ open: Number(stats.open) });
     });
 });

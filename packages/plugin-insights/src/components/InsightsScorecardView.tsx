@@ -1,174 +1,163 @@
-import React, { useRef, useState } from "react";
-import { getIcon } from "@rebasepro/app";
-import { cls, defaultBorderMixin } from "@rebasepro/ui";
-import type { DataRow, ScorecardConfig, ScorecardFormat } from "../types";
+import React from "react";
+import { getIcon, useTranslation } from "@rebasepro/app";
+import { cls, defaultBorderMixin, Tooltip, Typography } from "@rebasepro/ui";
+import type { DataRow, InsightDefinition, InsightPeriod } from "../types";
+import type { SourceResult } from "../engine/InsightsEngine";
+import { changeTone, formatChange, formatValue, type ChangeTone } from "../format";
 
-function formatNumber(value: number, format?: ScorecardFormat): string {
-    if (value === null || value === undefined) return "N/A";
+const toneClasses: Record<ChangeTone, string> = {
+    // The kit's error tier, and its success hue a step darker in light mode:
+    // emerald-600 on the card is 3.8:1, under what 12px text needs.
+    positive: "text-emerald-700 dark:text-emerald-400",
+    negative: "text-red-600 dark:text-red-500",
+    neutral: "text-text-secondary dark:text-text-secondary-dark"
+};
 
-    const options: Intl.NumberFormatOptions = {
-        style: format?.style ?? "decimal",
-        notation: format?.notation ?? "standard"
-    };
+/** A pulsing bar standing in for a figure that has not arrived, sized by its line box. */
+function Placeholder({ className }: { className: string }) {
+    return <span className={cls("inline-block align-middle rounded-sm bg-surface-200 dark:bg-surface-700 animate-pulse", className)}/>;
+}
 
-    // Only pin the fraction digits when the config asks for a specific count.
-    // Without this, Intl's per-style defaults apply: integers stay integers
-    // ("80", not "80.0") while currency keeps its two decimals ("$452.95").
-    if (format?.decimals !== undefined) {
-        options.maximumFractionDigits = format.decimals;
-        options.minimumFractionDigits = format.decimals;
-    }
-
-    if (format?.style === "currency") {
-        options.currency = format.currency ?? "USD";
-    }
-
-    let formatted = new Intl.NumberFormat("en-US", options).format(value);
-
-    if (format?.showSign && value > 0) {
-        formatted = "+" + formatted;
-    }
-
-    return formatted;
+function displayValue(row: DataRow | undefined, definition: InsightDefinition, locale: string): string {
+    const value = row?.[definition.value.field];
+    if (typeof value === "number") return formatValue(value, definition.value.format, locale);
+    if (typeof value === "string" && value !== "") return value;
+    return "—";
 }
 
 /**
- * Scorecard widget for the Rebase design system.
+ * The change against the previous period: an arrow and its size, coloured by
+ * whether it is good news. The arrow is what carries the direction, so it
+ * reads without the colour.
+ */
+function InsightChange({
+    definition,
+    row,
+    period,
+    locale,
+    tooltip
+}: {
+    definition: InsightDefinition;
+    row: DataRow;
+    period: InsightPeriod;
+    locale: string;
+    tooltip: boolean;
+}) {
+    const { t } = useTranslation();
+    const comparison = definition.comparison;
+    if (!comparison) return null;
+
+    const current = row[definition.value.field];
+    const previous = row[comparison.previous];
+    if (typeof current !== "number" || typeof previous !== "number") return null;
+
+    const change = formatChange(current, previous, comparison, definition.value.format, locale);
+    const arrow = change.direction === "up" ? "↑" : change.direction === "down" ? "↓" : null;
+    const spoken = change.direction === "up"
+        ? t("insights_change_up", { change: change.magnitude })
+        : change.direction === "down"
+            ? t("insights_change_down", { change: change.magnitude })
+            : t("insights_change_none");
+    const previousLabel = t("insights_previous_period_value", {
+        count: period.days,
+        value: formatValue(previous, definition.value.format, locale)
+    });
+
+    const label = (
+        <span className={cls("typography-mono text-xs font-medium whitespace-nowrap", toneClasses[changeTone(change.direction, comparison.intent)])}>
+            <span aria-hidden="true">{arrow ? `${arrow} ${change.magnitude}` : change.magnitude}</span>
+            <span className="sr-only">{`${spoken}. ${previousLabel}`}</span>
+        </span>
+    );
+
+    return tooltip ? <Tooltip title={previousLabel}>{label}</Tooltip> : label;
+}
+
+/**
+ * One insight: its label, its value and its change on the previous period.
  *
- * Renders a single KPI metric with optional comparison value and icon.
- * Uses Tailwind `dark:` classes — no JS dark mode detection.
- * Icons are resolved via `getIcon` from `@rebasepro/app`.
+ * The label and icon are known before the figures are, so they render while
+ * the source loads and only the figures pulse. Loading, loaded and failed
+ * share one shell, so nothing moves when the data arrives.
+ *
+ * `compact` is the inline readout on a home-page card; the default is a tile.
  */
 export function InsightsScorecardView({
-    config,
-    data,
-    title,
-    compact = false,
-    embedded = false,
-    fixedHeight
+    definition,
+    result,
+    loading = false,
+    error = null,
+    compact = false
 }: {
-    config: ScorecardConfig;
-    data: DataRow;
-    title: string;
+    definition: InsightDefinition;
+    /** The source's record and the period it was fetched for. */
+    result: SourceResult | null;
+    loading?: boolean;
+    error?: Error | null;
     compact?: boolean;
-    /** When true, skip own border/bg since the parent card provides them. */
-    embedded?: boolean;
-    /** Explicit height to prevent layout shift between skeleton → loaded. */
-    fixedHeight?: number;
 }) {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [containerWidth, setContainerWidth] = useState<number | null>(null);
+    const { i18n } = useTranslation();
+    const locale = i18n.language;
+    const row = result?.row;
+    const value = displayValue(row, definition, locale);
 
-    React.useLayoutEffect(() => {
-        if (!containerRef.current) return;
-        // Read initial width synchronously before paint
-        setContainerWidth(containerRef.current.offsetWidth);
-        const observer = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                setContainerWidth(entry.contentRect.width);
-            }
-        });
-        observer.observe(containerRef.current);
-        return () => observer.disconnect();
-    }, []);
-
-    const mainValue = data[config.value.field];
-    const formattedValue = typeof mainValue === "number"
-        ? formatNumber(mainValue, config.value.format)
-        : String(mainValue ?? "N/A");
-
-    // Comparison rendering
-    let comparisonElement: React.ReactNode = null;
-    if (config.comparison) {
-        const comparisonValue = data[config.comparison.field];
-        if (typeof comparisonValue === "number") {
-            const formattedComparison = formatNumber(comparisonValue, config.comparison.format);
-            const isPositive = comparisonValue > 0;
-            const isNegative = comparisonValue < 0;
-
-            let colorClass = "text-surface-500 dark:text-surface-400";
-            if (config.comparison.intent === "increase_is_good") {
-                if (isPositive) colorClass = "text-emerald-500";
-                if (isNegative) colorClass = "text-red-500";
-            } else if (config.comparison.intent === "decrease_is_good") {
-                if (isPositive) colorClass = "text-red-500";
-                if (isNegative) colorClass = "text-emerald-500";
-            }
-
-            comparisonElement = (
-                <span className={`font-mono tabular-nums font-medium ${compact ? "text-[10px]" : "text-xs"} ${colorClass}`}>
-                    {formattedComparison}
-                </span>
-            );
-        }
-    }
-
-    const isSmall = compact || (containerWidth !== null && containerWidth < 200);
-
-    // Resolve icon via getIcon (Lucide-based resolution)
-    // 14px in the secondary tier, beside the label — the card header grammar.
-    const iconElement = config.icon
-        ? getIcon(config.icon, "text-text-secondary dark:text-text-secondary-dark", undefined, 14)
-        : null;
-
-    // ── Compact card-inline layout ──────────────────────────────────────
     if (compact) {
         return (
-            <div className="flex items-baseline gap-1.5 min-w-0">
-                <span className="text-[10px] uppercase tracking-wider text-surface-400 dark:text-surface-500 truncate">
-                    {title}
-                </span>
-                <div className="flex items-baseline gap-1.5">
-                    <span className="text-sm font-semibold tabular-nums text-surface-800 dark:text-surface-100">
-                        {formattedValue}
-                    </span>
-                    {comparisonElement}
-                </div>
+            <div className="flex items-baseline gap-1.5 min-w-0" title={error?.message}>
+                <Typography variant="micro" color="secondary" className="truncate">
+                    {definition.title}
+                </Typography>
+                {loading
+                    ? <Placeholder className="h-3 w-8"/>
+                    : (
+                        <span className="text-sm font-semibold tabular-nums text-text-primary dark:text-text-primary-dark">
+                            {value}
+                        </span>
+                    )}
+                {!loading && row && result && (
+                    <InsightChange definition={definition} row={row} period={result.period} locale={locale} tooltip={false}/>
+                )}
             </div>
         );
     }
 
-    // ── Standard scorecard layout ───────────────────────────────────────
-    const baseClass = embedded
-        ? `flex flex-col min-w-0 h-full ${isSmall ? "px-3.5 py-3" : "px-5 py-4"}`
-        // A card on the sheet: one step up and a hairline, like every other card.
-        // It was transparent with a border, a box drawn on the sheet rather
-        // than an object sitting on it.
-        : cls("rounded-xl flex flex-col min-w-0 bg-surface-card border", defaultBorderMixin, isSmall ? "px-3.5 py-3" : "px-5 py-4");
+    const icon = definition.icon
+        ? getIcon(definition.icon, "text-text-secondary dark:text-text-secondary-dark", undefined, 14)
+        : null;
 
     return (
-        <div ref={containerRef} className={baseClass} style={embedded ? undefined : fixedHeight ? { height: fixedHeight } : { minHeight: isSmall ? 68 : 92 }}>
-            {/* Title row — the card header grammar the reference page documents:
-                a small icon in the secondary tier, then the label in the micro
-                tier, on ONE line. The icon used to sit alone at the far right,
-                which made every tile read as two unrelated corners. */}
-            <div className={`flex flex-col min-w-0 ${isSmall ? "mb-1" : "mb-2.5"}`}>
-                <div className="flex items-center gap-1.5 min-w-0">
-                    {iconElement && (
-                        <span className="shrink-0 flex items-center text-text-secondary dark:text-text-secondary-dark [&>svg]:size-3.5">{iconElement}</span>
+        // A card on the sheet: one step up and a hairline, like every other card.
+        <div className={cls("@container rounded-xl bg-surface-card border min-w-0", defaultBorderMixin)}>
+            <div className="flex flex-col min-w-0 h-full px-5 py-4 @max-[200px]:px-3.5 @max-[200px]:py-3">
+                {/* The card header grammar the reference page documents: a small
+                    icon in the secondary tier, then the label in the micro tier. */}
+                <div className="flex items-center gap-1.5 min-w-0 mb-2.5 @max-[200px]:mb-1">
+                    {icon && (
+                        <span className="shrink-0 flex items-center text-text-secondary dark:text-text-secondary-dark [&>svg]:size-3.5">{icon}</span>
                     )}
-                    <span className="typography-micro truncate text-surface-400 dark:text-surface-400">
-                        {title}
-                    </span>
+                    <Typography variant="micro" color="secondary" className="truncate">
+                        {definition.title}
+                    </Typography>
                 </div>
-                {config.dateRange && !isSmall && (
-                    <span className="font-mono tabular-nums text-[10px] text-surface-400 dark:text-surface-500 truncate mt-1">
-                        {config.dateRange}
-                    </span>
-                )}
-            </div>
 
-            {/* Main value */}
-            <div className={`font-headers font-semibold leading-tight tracking-display tabular-nums break-all text-text-primary dark:text-text-primary-dark ${isSmall ? "text-lg" : (containerWidth !== null && containerWidth < 300) ? "text-xl" : "text-2xl"}`}>
-                {formattedValue}
-            </div>
-
-            {/* Comparison */}
-            {comparisonElement && (
-                <div className={isSmall ? "mt-0.5" : "mt-1"}>
-                    {comparisonElement}
+                <div className="typography-stat leading-tight break-all text-text-primary dark:text-text-primary-dark @max-[200px]:text-xl">
+                    {loading ? <Placeholder className="h-[0.8em] w-24"/> : value}
                 </div>
-            )}
+
+                {error
+                    ? (
+                        <Typography variant="caption" color="error" className="block mt-1 truncate" title={error.message}>
+                            {error.message}
+                        </Typography>
+                    )
+                    : definition.comparison && (
+                        <div className="mt-1 leading-4">
+                            {loading || !row || !result
+                                ? <Placeholder className="h-3 w-12"/>
+                                : <InsightChange definition={definition} row={row} period={result.period} locale={locale} tooltip={true}/>}
+                        </div>
+                    )}
+            </div>
         </div>
     );
 }

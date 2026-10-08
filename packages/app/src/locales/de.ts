@@ -1455,5 +1455,14 @@ export const de: RebaseTranslations = {
     studio_storage_folder_name_has_slash: "Der Ordnername darf keine Schrägstriche enthalten",
     studio_storage_folder_exists: "Der Ordner „{{name}}“ existiert bereits",
     studio_storage_folder_created: "Ordner „{{name}}“ erstellt",
-    studio_storage_create_folder_failed: "Ordner konnte nicht erstellt werden"
+    studio_storage_create_folder_failed: "Ordner konnte nicht erstellt werden",
+
+    // ─── Insights plugin ─────────────────────────────────────────
+    insights_period_last_days: "Letzte {{count}} Tage",
+    insights_period_last_days_one: "Letzter Tag",
+    insights_previous_period_value: "Vorherige {{count}} Tage: {{value}}",
+    insights_previous_period_value_one: "Vortag: {{value}}",
+    insights_change_up: "Anstieg: {{change}}",
+    insights_change_down: "Rückgang: {{change}}",
+    insights_change_none: "Unverändert"
 };

@@ -134,6 +134,13 @@ Key: key }));
 }
 
 // ── Deterministic RNG & UUIDs ─────────────────────────────────────────
+//
+// Every draw in this file goes through `random()`, never `Math.random()`. The
+// seed runs inside the backend, from the hourly demo reset, and it used to
+// install this generator *as* `Math.random`: every other caller in the server
+// then drew from the seed's sequence, and every one that ran during the seed's
+// awaits shifted it, so two resets produced two different demos. It also handed
+// the whole process a predictable `Math.random` restarted at 1337 every hour.
 let _seed = 1337;
 function random() {
     let t = _seed += 0x6D2B79F5;
@@ -141,7 +148,6 @@ function random() {
     t ^= t + Math.imul(t ^ t >>> 7, t | 61);
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
 }
-Math.random = random;
 
 function generateUUID(prefix: string, index: number): string {
     const hash = createHash("sha256").update(`${prefix}-${index}`).digest("hex");
@@ -288,14 +294,14 @@ async function seedAssets(assetSubdir: string, storagePrefix: string): Promise<s
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
-function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+function pick<T>(arr: T[]): T { return arr[Math.floor(random() * arr.length)]; }
 function pickN<T>(arr: T[], n: number): T[] {
-    const s = [...arr].sort(() => Math.random() - 0.5);
+    const s = [...arr].sort(() => random() - 0.5);
     return s.slice(0, n);
 }
 function randomDate(startDaysAgo: number, endDaysAgo: number): string {
     const now = Date.now();
-    return new Date(now - startDaysAgo * 86400000 + Math.random() * (startDaysAgo - endDaysAgo) * 86400000).toISOString();
+    return new Date(now - startDaysAgo * 86400000 + random() * (startDaysAgo - endDaysAgo) * 86400000).toISOString();
 }
 /**
  * A date within the last `spanDays`, weighted toward the present.
@@ -309,7 +315,7 @@ function randomDate(startDaysAgo: number, endDaysAgo: number): string {
  * a store doing well and more like the numbers are made up.
  */
 function recentBiasedDate(spanDays: number): string {
-    return new Date(Date.now() - (Math.random() ** 1.2) * spanDays * 86400000).toISOString();
+    return new Date(Date.now() - (random() ** 1.2) * spanDays * 86400000).toISOString();
 }
 function currentYear(): number { return new Date().getFullYear(); }
 
@@ -422,14 +428,14 @@ export async function runSeed() {
         type ProductCategory = (typeof productsCategory.enumValues)[number];
         const validCategories: ProductCategory[] = ["electronics", "clothing", "home_garden", "sports", "books", "toys", "health_beauty"];
         function mapCategory(cat: string | undefined | null): ProductCategory {
-            if (!cat) return validCategories[Math.floor(Math.random() * validCategories.length)];
+            if (!cat) return validCategories[Math.floor(random() * validCategories.length)];
             const c = cat.toLowerCase();
             if (c.includes("clothing") || c.includes("sunglasses")) return "clothing";
             if (c.includes("home") || c.includes("kitchen") || c.includes("serveware")) return "home_garden";
             if (c.includes("electronic") || c.includes("watch")) return "electronics";
             if (c.includes("toy")) return "toys";
             if (c.includes("health") || c.includes("beauty")) return "health_beauty";
-            return validCategories[Math.floor(Math.random() * validCategories.length)];
+            return validCategories[Math.floor(random() * validCategories.length)];
         }
 
         // `available_locales` comes from an external product dump, so it is
@@ -479,11 +485,11 @@ export async function runSeed() {
 
         const demoProducts: DemoProduct[] = (demoProductsRaw as DemoProductRaw[]).map((p, index) => ({
             name: p.name || `Product ${index}`,
-            sku: p.asin || `SKU-${Math.floor(Math.random()*100000)}`,
+            sku: p.asin || `SKU-${Math.floor(random()*100000)}`,
             cat: mapCategory(p.category),
-            price: p.price || (10 + Math.random() * 90),
+            price: p.price || (10 + random() * 90),
             cost: (p.price || 50) * 0.4,
-            weight: 100 + Math.floor(Math.random() * 900),
+            weight: 100 + Math.floor(random() * 900),
             desc: p.description || "No description available.",
             brand: p.brand || "Generic",
             locales: mapLocales(p.available_locales),
@@ -685,7 +691,7 @@ name }));
             // Body: the post's own opening, then themed sections interleaved with images.
             const blocks: { type: string; value: string }[] = [{ type: "text",
 value: post.opening }];
-            const sections = pickN(theme.sections, 3 + Math.floor(Math.random() * 2));
+            const sections = pickN(theme.sections, 3 + Math.floor(random() * 2));
             for (const section of sections) {
                 if (contentImagePaths.length > 0) {
                     blocks.push({ type: "image",
@@ -713,7 +719,7 @@ value: section });
 
             // Tags follow the theme rather than being drawn at random.
             const candidates = themeTagIndices[post.theme] ?? [];
-            const assigned = new Set(pickN(candidates, 1 + Math.floor(Math.random() * Math.min(3, candidates.length))));
+            const assigned = new Set(pickN(candidates, 1 + Math.floor(random() * Math.min(3, candidates.length))));
             for (const t of assigned) ptValues.push({ post_id: postIds[i],
 tag_id: tagIds[t] });
         }
@@ -749,24 +755,27 @@ tag_id: tagIds[t] });
             const avatarPool = womenFirstNames.has(fn) ? "women" : "men";
             const avatarNumber = avatarsDrawn[avatarPool]++ % CUSTOMER_AVATARS_PER_POOL + 1;
             const addr = `${pick(streets)}\n${pick(cities)}`;
-            const isVip = Math.random() > 0.8;
-            const ltv = isVip ? Math.floor(2000 + Math.random() * 8000) : Math.floor(50 + Math.random() * 1500);
-            const totalOrd = isVip ? Math.floor(5 + Math.random() * 20) : Math.floor(1 + Math.random() * 6);
+            const isVip = random() > 0.8;
+            const ltv = isVip ? Math.floor(2000 + random() * 8000) : Math.floor(50 + random() * 1500);
+            const totalOrd = isVip ? Math.floor(5 + random() * 20) : Math.floor(1 + random() * 6);
             customerValues.push({
                 id: customerIds[i - 1],
                 first_name: fn,
                 last_name: ln,
                 email: `${fn.toLowerCase()}.${ln.toLowerCase()}${i}@example.com`,
                 avatar: `customer_avatars/${avatarPool}-${String(avatarNumber).padStart(2, "0")}.jpg`,
-                phone: `+1-${String(Math.floor(Math.random() * 900) + 100)}-${String(Math.floor(Math.random() * 900) + 100)}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+                phone: `+1-${String(Math.floor(random() * 900) + 100)}-${String(Math.floor(random() * 900) + 100)}-${String(Math.floor(random() * 9000) + 1000)}`,
                 company: pick(companies),
                 is_vip: isVip,
                 lifetime_value: String(ltv),
                 total_orders: String(totalOrd),
                 shipping_address: addr,
-                billing_address: Math.random() > 0.3 ? addr : `${pick(streets)}\n${pick(cities)}`,
-                notes: isVip ? pick(["VIP customer — priority support", "Wholesale buyer", "Enterprise account"]) : (Math.random() > 0.7 ? pick(["Preferred shipping: FedEx", "Tax exempt", ""]) : null),
-                created_at: randomDate(180, 10),
+                billing_address: random() > 0.3 ? addr : `${pick(streets)}\n${pick(cities)}`,
+                notes: isVip ? pick(["VIP customer — priority support", "Wholesale buyer", "Enterprise account"]) : (random() > 0.7 ? pick(["Preferred shipping: FedEx", "Tax exempt", ""]) : null),
+                // Weighted toward now, like the orders: the Customers card counts sign-ups
+                // in the last 30 days against the 30 before, and a store that is
+                // growing is the one the demo is about.
+                created_at: recentBiasedDate(180),
                 updated_at: randomDate(30, 0)
             });
         }
@@ -778,7 +787,7 @@ tag_id: tagIds[t] });
 
         // The four dimensions the `filterPresets` on the Products collection cut
         // on — status, stock_quantity, is_featured, rating — are assigned by
-        // index, not by Math.random(). A random draw is what made "Low stock
+        // index, not by a random draw. A random draw is what made "Low stock
         // (< 10)" a coin flip: stock was 5..204, so under 3% of the catalogue
         // could ever match it, and a preset chip that lands on an empty grid
         // reads as a broken product, not as a filter that found nothing.
@@ -788,7 +797,7 @@ tag_id: tagIds[t] });
         // 0 for one in 17 (the "Out of stock" card subtitle), 1..9 for one in 7,
         // a healthy 15..200 for the rest.
         const productStock = (i: number): number =>
-            i % 17 === 0 ? 0 : (i % 7 === 0 ? 1 + (i % 9) : 15 + Math.floor(Math.random() * 186));
+            i % 17 === 0 ? 0 : (i % 7 === 0 ? 1 + (i % 9) : 15 + Math.floor(random() * 186));
         // 2.8..5.0 across the catalogue so "Top rated (4+)" excludes a real
         // share of it; the old 3.5..5.0 band made the preset near-vacuous.
         const productRating = (i: number): string =>
@@ -803,13 +812,13 @@ tag_id: tagIds[t] });
             available_locales: p.locales,
             category: p.cat,
             price: p.price.toFixed(2),
-            compare_at_price: Math.random() > 0.7 ? (p.price * (1.1 + Math.random() * 0.4)).toFixed(2) : null,
+            compare_at_price: random() > 0.7 ? (p.price * (1.1 + random() * 0.4)).toFixed(2) : null,
             cost: p.cost.toFixed(2),
             stock_quantity: String(productStock(i)),
-            low_stock_threshold: String(Math.floor(Math.random() * 15) + 5),
+            low_stock_threshold: String(Math.floor(random() * 15) + 5),
             weight_grams: String(p.weight),
             rating: productRating(i),
-            review_count: String(Math.floor(Math.random() * 500) + 1),
+            review_count: String(Math.floor(random() * 500) + 1),
             status: productStatus(i),
             is_featured: i % 5 === 0,
             images: p.localImages,
@@ -889,16 +898,16 @@ tag_id: tagIds[t] });
             const payStatus: PaymentStatus = isCancelled ? (status === "refunded" ? "refunded" : "paid") : pick([...paymentStatuses]);
 
             // Pick 1-5 products for this order
-            const numItems = 1 + Math.floor(Math.random() * 4);
+            const numItems = 1 + Math.floor(random() * 4);
             const orderProductIndices = new Set<number>();
             while (orderProductIndices.size < numItems) {
-                orderProductIndices.add(Math.floor(Math.random() * allProducts.length));
+                orderProductIndices.add(Math.floor(random() * allProducts.length));
             }
 
             let subtotal = 0;
             for (const pIdx of orderProductIndices) {
                 const prod = allProducts[pIdx];
-                const qty = 1 + Math.floor(Math.random() * 3);
+                const qty = 1 + Math.floor(random() * 3);
                 const lineTotal = prod.price * qty;
                 subtotal += lineTotal;
                 allOrderItems.push({
@@ -913,16 +922,16 @@ tag_id: tagIds[t] });
                 });
             }
 
-            const taxRate = 0.08 + Math.random() * 0.04;
+            const taxRate = 0.08 + random() * 0.04;
             const taxAmount = subtotal * taxRate;
-            const shippingCost = subtotal > 100 ? 0 : 9.99 + Math.random() * 10;
-            const discountAmount = Math.random() > 0.7 ? subtotal * (0.05 + Math.random() * 0.15) : 0;
+            const shippingCost = subtotal > 100 ? 0 : 9.99 + random() * 10;
+            const discountAmount = random() > 0.7 ? subtotal * (0.05 + random() * 0.15) : 0;
             const total = subtotal + taxAmount + shippingCost - discountAmount;
 
             const orderDate = recentBiasedDate(90);
-            const shippedDate = isShipped ? new Date(new Date(orderDate).getTime() + (1 + Math.random() * 3) * 86400000).toISOString() : null;
-            const deliveredDate = isDelivered && shippedDate ? new Date(new Date(shippedDate).getTime() + (2 + Math.random() * 5) * 86400000).toISOString() : null;
-            const custId = Math.floor(Math.random() * 40) + 1;
+            const shippedDate = isShipped ? new Date(new Date(orderDate).getTime() + (1 + random() * 3) * 86400000).toISOString() : null;
+            const deliveredDate = isDelivered && shippedDate ? new Date(new Date(shippedDate).getTime() + (2 + random() * 5) * 86400000).toISOString() : null;
+            const custId = Math.floor(random() * 40) + 1;
 
             orderValues.push({
                 id: orderIds[i - 1],
@@ -937,8 +946,8 @@ tag_id: tagIds[t] });
                 total: total.toFixed(2),
                 currency: pick([...currencies]),
                 shipping_address: customerValues[(custId - 1)].shipping_address,
-                tracking_number: isShipped ? `${pick(carriers)}-${String(Math.floor(Math.random() * 9000000000) + 1000000000)}` : null,
-                notes: Math.random() > 0.8 ? pick(["Gift wrap requested", "Leave at front door", "Fragile items", "Rush order", ""]) : null,
+                tracking_number: isShipped ? `${pick(carriers)}-${String(Math.floor(random() * 9000000000) + 1000000000)}` : null,
+                notes: random() > 0.8 ? pick(["Gift wrap requested", "Leave at front door", "Fragile items", "Rush order", ""]) : null,
                 order_date: orderDate,
                 shipped_date: shippedDate,
                 delivered_date: deliveredDate,
@@ -1209,7 +1218,7 @@ priority: "high" }
             const template = ticketSubjects[i % ticketSubjects.length];
             const status = pick([...ticketStatuses]);
             const createdAt = randomDate(14, 0);
-            const hasCustomer = Math.random() > 0.15; // 85% have a customer linked
+            const hasCustomer = random() > 0.15; // 85% have a customer linked
 
             const resolutionNotes = (status === "resolved" || status === "closed")
                 ? pick([
@@ -1229,8 +1238,8 @@ priority: "high" }
                 status,
                 priority: template.priority,
                 category: template.category,
-                customerId: hasCustomer ? customerIds[Math.floor(Math.random() * 40)] : null,
-                assigned_to: status === "open" && Math.random() > 0.5 ? null : pick(agentNames),
+                customerId: hasCustomer ? customerIds[Math.floor(random() * 40)] : null,
+                assigned_to: status === "open" && random() > 0.5 ? null : pick(agentNames),
                 __order: "",
                 created_at: createdAt,
                 updated_at: status === "open" ? createdAt : randomDate(7, 0)

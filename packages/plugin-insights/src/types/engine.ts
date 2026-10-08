@@ -1,89 +1,120 @@
-import type { DataRow, ScorecardConfig } from "./widgets";
-
-export interface InsightContext {
-    /** The resolved path of the collection (e.g., "products/123/orders" or "orders") */
-    path?: string;
-    parentCollectionSlugs?: string[];
-    /** The parent entity IDs if this is a subcollection (e.g., ["123"]) */
-    parentEntityIds?: string[];
-    /** The collection slug if this is an insight at the collection level */
-    collectionSlug?: string;
-}
+import type { DataRow, InsightFormat } from "./widgets";
 
 /**
- * Result returned by an insight's data callback.
+ * The window every comparison is measured over: the last `days` days against
+ * the `days` days before them.
  */
-export interface InsightDataResult {
-    rows: DataRow[];
+export interface InsightPeriodConfig {
+    days: number;
 }
 
 /**
- * A single insight definition — the "dry" configuration that describes
- * what data to fetch and how to render it.
+ * A period resolved to instants. The current window is `[from, to)` and the
+ * previous one is `[previousFrom, from)`, both `days` long.
  *
- * Each insight owns its own `data()` callback, giving the developer
- * full flexibility: use the Rebase client SDK, call a custom function,
- * hit an external API — whatever makes sense for that widget.
+ * `to` is fixed when the first source of a page load is fetched and shared by
+ * every source fetched while the cache holds, so two sources on one screen
+ * describe the same window.
+ */
+export interface InsightPeriod {
+    days: number;
+    /** Start of the current window, inclusive. */
+    from: Date;
+    /** End of the current window, exclusive. */
+    to: Date;
+    /** Start of the previous window, inclusive. It ends at `from`. */
+    previousFrom: Date;
+}
+
+/** What a source is called with. */
+export interface InsightSourceContext {
+    period: InsightPeriod;
+}
+
+/**
+ * Fetches one record of figures. Use the Rebase client, call a backend
+ * function, hit any API: the plugin only reads the fields its insights name.
+ *
+ * A source is fetched once per signed-in user however many insights read it,
+ * on the home page and in the collection views alike, so a figure shown in two
+ * places is always the same number.
+ *
+ * @example
+ * ```typescript
+ * orders: ({ period }) => rebaseClient.functions.invoke("insights", undefined, {
+ *     method: "GET",
+ *     path: `orders?from=${period.from.toISOString()}&to=${period.to.toISOString()}`
+ * })
+ * ```
+ */
+export type InsightSource = (context: InsightSourceContext) => Promise<DataRow>;
+
+/**
+ * How an insight compares its value with the previous period. The plugin
+ * works out the change from the two figures, so it can choose how to show it.
+ */
+export interface InsightComparison {
+    /** The field holding the same figure for the previous period. */
+    previous: string;
+    /**
+     * Which direction is good news.
+     * - `increase_is_good`: an increase reads as positive (revenue, sign-ups).
+     * - `decrease_is_good`: a decrease reads as positive (refunds, churn).
+     */
+    intent: "increase_is_good" | "decrease_is_good";
+    /**
+     * - `percent` (default): the relative change, `↑ 42%`. Shown as an
+     *   absolute change when the previous figure is zero.
+     * - `absolute`: the difference in the value's own format, `↑ 9`. Right for
+     *   small counts, where going from 3 to 12 would read as `↑ 300%`.
+     */
+    show?: "percent" | "absolute";
+}
+
+/**
+ * One figure on a scorecard: which source to read, which field holds the
+ * value, and how to write it.
  */
 export interface InsightDefinition {
     /** Unique identifier for this insight */
     id: string;
     /** Display title */
     title: string;
-    /** Optional description */
-    description?: string;
-
-    /**
-     * Async callback that fetches data for this insight.
-     *
-     * The developer has full control — they can use any data source:
-     * - `rebaseClient.data.orders.find({ limit: 100 })`
-     * - `rebaseClient.call("functions/my-analytics", { ... })`
-     * - A plain `fetch()` to any external API
-     * - Static data for prototyping
-     *
-     * @returns Tabular data as `{ rows: DataRow[] }`.
-     *
-     * @example
-     * ```typescript
-     * data: async () => {
-     *     const res = await rebaseClient.data.orders.find({
-     *         limit: 1000,
-     *         orderBy: "created_at",
-     *     });
-     *     return { rows: res.data };
-     * }
-     * ```
-     */
-    data: (context: InsightContext) => Promise<InsightDataResult>;
-
-    /** Scorecard field mapping + formatting. */
-    scorecard: ScorecardConfig;
+    /** The key in {@link InsightsPluginConfig.sources} this insight reads. */
+    source: string;
+    /** The field holding the value, and how to write it. */
+    value: {
+        field: string;
+        format?: InsightFormat;
+    };
+    comparison?: InsightComparison;
+    /** Optional icon key (e.g., "ShoppingCart", "Users"), resolved via `getIcon` */
+    icon?: string;
 }
 
 /**
  * Full plugin configuration passed to `useInsightsPlugin`.
  *
- * The developer defines scorecard widgets by placement and provides
- * their own data callbacks. No global fetch function needed — each
- * widget is self-contained.
- *
  * Collection-level insights (`collections.<slug>`) are rendered in two places
  * automatically:
  * - **Collection list view**: Scorecards appear inline below the title and
  *   above the data list.
- * - **Home page cards**: Scorecards are auto-extracted and rendered as compact
- *   widgets inside each collection's card on the home page.
- *
- * This eliminates the need to duplicate definitions across different locations.
+ * - **Home page cards**: Scorecards are rendered as compact figures inside
+ *   each collection's card on the home page.
  */
 export interface InsightsPluginConfig {
+    /** The comparison window. Defaults to 30 days. */
+    period?: InsightPeriodConfig;
+
+    /** Where the figures come from, by name. Insights refer to these keys. */
+    sources: Record<string, InsightSource>;
+
     /**
      * Insight definitions keyed by placement.
      *
      * - `home`: Rendered at the top of the home page via `home.children.start`.
      * - `collections.<slug>`: Rendered inline in that collection's list view
-     *   and auto-extracted as compact scorecards on the home card.
+     *   and as compact figures on its home card.
      */
     insights: {
         home?: InsightDefinition[];

@@ -1460,5 +1460,14 @@ export const pt: RebaseTranslations = {
     studio_storage_folder_name_has_slash: "O nome da pasta não pode conter barras",
     studio_storage_folder_exists: "A pasta «{{name}}» já existe",
     studio_storage_folder_created: "Pasta «{{name}}» criada",
-    studio_storage_create_folder_failed: "Não foi possível criar a pasta"
+    studio_storage_create_folder_failed: "Não foi possível criar a pasta",
+
+    // ─── Insights plugin ─────────────────────────────────────────
+    insights_period_last_days: "Últimos {{count}} dias",
+    insights_period_last_days_one: "Último dia",
+    insights_previous_period_value: "{{count}} dias anteriores: {{value}}",
+    insights_previous_period_value_one: "Dia anterior: {{value}}",
+    insights_change_up: "Alta: {{change}}",
+    insights_change_down: "Queda: {{change}}",
+    insights_change_none: "Sem alteração"
 };
