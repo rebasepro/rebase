@@ -9,8 +9,8 @@ import { CHROMA, FONT, INK } from "../../theme";
  *
  * The tool names are the server's own (`packages/mcp`: list_documents,
  * delete_document) and the refusal is the one the API actually returns for
- * a key used outside its scope (`api-generator.ts`: 403 API_KEY_FORBIDDEN,
- * with that exact sentence). An invented error message in the one beat
+ * a key used outside its scope (`api-generator.ts`: 403 SCOPE_MISSING, with
+ * the first sentence of its message). An invented error message in the one beat
  * about what an agent cannot do would be the film's own way around it.
  */
 
@@ -29,8 +29,8 @@ const LINES: Line[] = [
     { kind: "call", text: "list_documents   customers · where status = active", at: 22 },
     { kind: "ok", text: "← 48 documents", at: 44 },
     { kind: "call", text: "delete_document  customers · 3f9a2c7e-…", at: 0, refusal: true },
-    { kind: "err", text: "← 403 API_KEY_FORBIDDEN", at: 22, refusal: true },
-    { kind: "note", text: 'API key does not have "delete" permission for collection "customers"', at: 30, refusal: true },
+    { kind: "err", text: "← 403 SCOPE_MISSING", at: 22, refusal: true },
+    { kind: "note", text: 'This credential does not hold "data:delete" for collection "customers".', at: 30, refusal: true },
 ];
 
 const COLOUR: Record<Line["kind"], string> = {
