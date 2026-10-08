@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from "@jest/globals";
+import { describe, expect, it, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { generateKeyPairSync, type KeyObject } from "node:crypto";
 import path from "node:path";
@@ -13,6 +13,15 @@ import {
     PLATFORM_TOKEN_KEY_ENV,
     verifyPlatformToken
 } from "../src/auth/platform-token";
+
+// The cron loader's native `import()` fails under jest's vm-modules once many
+// suites share the workers ("reading 'identifier'" in CI), and the job list
+// then comes back empty. Load the committed CJS fixture the way the loader's
+// own tests do; what this suite tests is the gate in front of the jobs.
+jest.mock("../src/utils/dynamic-import", () => ({
+    ...jest.requireActual<typeof import("../src/utils/dynamic-import")>("../src/utils/dynamic-import"),
+    nativeDynamicImport: jest.requireActual<typeof import("./helpers/require-importer")>("./helpers/require-importer").requireImporter
+}));
 
 /**
  * What a platform token reaches on a booted backend.
