@@ -317,6 +317,14 @@ export async function onOwnSession<T>(
             outcome = { value: await work(connection) };
         } catch (error: unknown) {
             outcome = { error };
+            // pg rejects a query on the server's ErrorResponse and records the
+            // transaction status from the ReadyForQuery that follows it. When
+            // the two arrive in separate packets, the status read now is the
+            // one from before the run, and a transaction the run left aborted
+            // goes unnoticed: no ROLLBACK, and no word that it was rolled back.
+            // pg runs a queued statement only after that ReadyForQuery, and
+            // this one changes nothing whatever state the session is in.
+            await connection.query("SELECT 1").catch(() => undefined);
         }
 
         let leftOpen = false;

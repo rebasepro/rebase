@@ -145,6 +145,42 @@ describe("on a pool", () => {
         expect(connection.release.mock.calls[0][0]).toBeFalsy();
     });
 
+    it("sees a transaction the failed SQL left aborted, though pg rejected before the status arrived", async () => {
+        // pg rejects a query on the server's ErrorResponse and records the
+        // transaction status from the ReadyForQuery after it. When the two
+        // arrive in separate packets, the status read straight after the
+        // rejection is the one from before the run. Here it lands with the
+        // next statement, as pg's queue runs that only after ReadyForQuery.
+        let status = "I";
+        let arriving: string | null = null;
+        connection.query.mockImplementation((async (query: unknown) => {
+            const text = typeof query === "string" ? query : (query as { text: string }).text;
+            statements.push(text);
+            if (arriving) {
+                status = arriving;
+                arriving = null;
+            }
+            if (text.startsWith("BEGIN")) {
+                arriving = "E";
+                throw new Error("division by zero");
+            }
+            if (text === "ROLLBACK") status = "I";
+            return { rows: [], fields: [], rowCount: 0, command: "SELECT" };
+        }) as never);
+        Object.assign(connection, { getTransactionStatus: () => status });
+        const driver = driverOver(drizzleNodePg(pool));
+
+        const error = await driver.executeSql("BEGIN; UPDATE accounts SET balance = 0; SELECT 1/0", { isolateSession: true })
+            .then(() => undefined, (rejection: unknown) => rejection);
+
+        // Drizzle wraps the database's error; the note goes on the cause, which is what the socket reports.
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).cause).toBeInstanceOf(Error);
+        expect(((error as Error).cause as Error).message).toMatch(/division by zero[\s\S]*rolled back/);
+        expect(statements).toContain("ROLLBACK");
+        expect(connection.release.mock.calls[0][0]).toBeFalsy();
+    });
+
     it("assumes the role for the whole session, not inside a transaction a COMMIT can end", async () => {
         connection.query.mockImplementation((async (query: unknown) => {
             const text = typeof query === "string" ? query : (query as { text: string }).text;
