@@ -9,7 +9,7 @@ class ApiError { badRequest, code, conflict, details, expected, forbidden, inter
 class BlockedUrlError
 class BundleError { hint }
 class CollectionConfigError { hint }
-class CronScheduler { fetchJob, fetchJobs, getJob, getJobLogs, getJobLogsFromDb, jobIdsWhere, listJobs, listRejectedJobs, persistJobEnabled, registerJobs, setClient, setJobEnabled, setStore, start, stop, triggerJob }
+class CronScheduler { fetchJob, fetchJobs, getJob, getJobLogs, getJobLogsFromDb, jobIdsWhere, listJobs, listRejectedJobs, persistJobEnabled, registerJobs, rejectedJobsWhere, setClient, setJobEnabled, setStore, start, stop, triggerJob }
 class DefaultDriverRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class GCSStorageController { deleteObject, getMetadata, getObject, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject }
@@ -264,7 +264,7 @@ interface AuthRepository { applyPendingEmailChange, assignDefaultRole, claimMfaF
 interface BaasOptions { unprotectedTables }
 interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, collectionRegistry, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider }
-interface BackupRoutesConfig { getDestination, getSchedule, storage }
+interface BackupRoutesConfig { getDestination, getSchedule, scheduledElsewhere, storageFor }
 interface BootOptions { bundle, bundleDir, bundleFallbackDir, handleSignals, listen, provisionSchema }
 interface BootedRuntime { app, backend, bundle, dataSources, env, port, server, shutdown }
 interface BuiltinAuthAdapterConfig { allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, authHooks, authRepository, captcha, collectionAuthConfig, cookieAuth, defaultRole, disableSelfRegistration, emailConfig, emailService, enableEmailOtp, enableMagicLink, magicLinkCreatesUsers, oauthProviders, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireEmailVerification, serviceKey }
@@ -650,9 +650,9 @@ interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, collectionRegistry, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider }
 interface BackendLifecycle { destroy, healthCheck, initialize }
 interface BackupInfo { createdAt, destinationKind, globalsKey, key, name, sizeBytes }
-interface BackupListing { backups, configured, destinationKind, schedule }
+interface BackupListing { backups, configured, destinationKind, localDiskOfThisProcess, schedule }
 interface BackupRunOutcome { error, finishedAt, manual, startedAt, success }
-interface BackupScheduleStatus { enabled, jobId, lastRun, name, nextRunAt, schedule }
+interface BackupScheduleStatus { disabledInCode, enabled, historyError, jobId, lastManualRun, lastRun, name, nextRunAt, refused, schedule }
 interface BackupsAPI { download, list }
 interface BaseCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, properties, securityRules, singularName, slug, strictWrites }
 interface BaseProperty { access, callbacks, columnName, conditions, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, validation }
@@ -667,7 +667,7 @@ interface BinaryProperty { access, callbacks, columnName, conditions, defaultVal
 interface BooleanProperty { access, callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
 interface BootstrappedAuth { authRepository, emailService, schemaHealthCheck, userService }
 interface BranchAdmin { createBranch, deleteBranch, getBranchInfo, listBranches }
-interface BranchInfo { createdAt, name, parentDatabase, sizeBytes }
+interface BranchInfo { createdAt, database, name, parentDatabase, sizeBytes }
 interface BrinIndex { on, reason, using, where }
 interface BroadcastMessage { channel, error, event, payload, requestId, row, rows, seq, subscriptionId, type }
 interface BtreeIndex { include, on, reason, unique, using, where }
@@ -694,12 +694,13 @@ interface CreatePersonalKeyRequest { expires_at, name, scopes }
 interface CronAPI { getJob, getJobLogs, listJobs, toggleJob, triggerJob }
 interface CronJobContext { jobId, log, rebase, scheduledAt, signal }
 interface CronJobDefinition { catchUpWindowSeconds, description, enabled, handler, name, schedule, timeoutSeconds, timezone }
+interface CronJobListing { jobs, note, rejected, skipped }
 interface CronJobLogEntry { durationMs, error, finishedAt, jobId, logs, manual, result, startedAt, success }
 interface CronJobStatus { description, enabled, id, lastDurationMs, lastError, lastRunAt, name, nextRunAt, schedule, state, totalFailures, totalRuns }
 interface CronResourceOptions { catchUpWindowSeconds, description, enabled, engine, label, schedule, timeoutSeconds, timezone, transport }
 interface CustomAuthAdapterOptions { capabilities, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
 interface DataDriver { admin, batchWrite, checkUniqueField, cmsToDelegateModel, count, currentTime, delegateToCMSModel, delete, deleteAll, deleteMany, fetchCollection, fetchOne, initTextSearch, initialised, isFilterCombinationValid, key, listenCollection, listenOne, needsInitTextSearch, restFetchService, save, saveMany, updateMany, updateRelationPivot }
-interface DataRateLimitCaller { header, socketAddress, uid }
+interface DataRateLimitCaller { apiKey, header, socketAddress, uid }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
 interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 interface DataSourceDefinition { databaseId, engine, key, label, transport }
@@ -816,6 +817,7 @@ interface RebaseWebSocket { authenticate, disconnect, on, onStateChange, setAuth
 interface RecordHistoryParams { action, id, previousValues, tableName, updatedBy, values }
 interface ReferenceProperty { access, callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, isId, metadata, name, path, propertyConfig, type, validation }
 interface RegisteredPolicyExpression { kind }
+interface RejectedCronJob { id, name, reason, schedule }
 interface RelationAggregateSort { agg, field, relation }
 interface RelationBase { onDelete, onUpdate, overrides, relationName, target }
 interface RelationProperty { access, callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, isId, metadata, name, propertyConfig, relation, resolvedRelation, type, validation }
@@ -864,7 +866,7 @@ interface SingleUpdateMessage { channel, error, payload, requestId, row, rows, s
 interface SqlScriptColumn { name, source, type }
 interface SqlScriptColumnSource { column, schema, table }
 interface SqlScriptNotice { message, severity }
-interface SqlScriptResult { columns, command, notices, rowCount, rows, tables }
+interface SqlScriptResult { columns, command, effectiveRole, notices, rowCount, rows, tables }
 interface SqlScriptTable { hasInheritors, kind, primaryKey, schema, table }
 interface StorageAuthorizeContext { bucket, data, key, operation, storageId, user }
 interface StorageAuthorizeData { collection }
@@ -1197,6 +1199,7 @@ function canWriteField
 function checkOperation
 function classifyTable
 function collectAllPages
+function compileRulePolicies
 function cond
 function copyCarriesRelation
 function createDataSourceRegistry
@@ -1328,6 +1331,7 @@ function wrapAsSdkData
 interface AnonymousGrantRisk { detail, explanation, pattern }
 interface AuthSecretCandidate { auth, properties }
 interface CheckOperationOptions { clauses, onUnknown }
+interface CompiledRulePolicy { mode, name, operation, roles, using, withCheck }
 interface DataSourceResolvable { dataSource, databaseId, engine }
 interface DecodedCursor { id, orderBy, values }
 interface EntityDataOptions { resolveCollection, resolveDataPath }
