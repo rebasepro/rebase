@@ -1229,3 +1229,66 @@ describe("DrizzleConditionBuilder - manyToMany scope SQL", () => {
         expect(params).toEqual([1]);
     });
 });
+
+/**
+ * A `via` written the way `JoinStep` documents it — bare column names, each
+ * step's `from` on the previous table and `to` on `step.table`.
+ *
+ * The count and include builders read the tables out of a `table.column`
+ * spelling alone, so a documented step named no table and threw "Join tables
+ * not found for step: from  to ". A record read at a nested address is gated on
+ * that count: opening an order from a product's Orders tab (the demo's
+ * products → order_items → orders) failed while the tab itself listed fine.
+ */
+describe("DrizzleConditionBuilder - join path with bare column names", () => {
+    const products = pgTable("products", { id: serial("id").primaryKey(), name: varchar("name") });
+    const orderItems = pgTable("order_items", {
+        id: serial("id").primaryKey(),
+        product_id: integer("product_id"),
+        order_id: integer("order_id")
+    });
+    const orders = pgTable("orders", { id: serial("id").primaryKey(), status: varchar("status") });
+
+    const registry = { getTable: jest.fn() } as unknown as PostgresCollectionRegistry;
+    (registry.getTable as jest.Mock).mockImplementation((name: string) =>
+        ({ products, order_items: orderItems, orders } as Record<string, unknown>)[name]);
+
+    const relation: Relation = {
+        kind: "via",
+        relationName: "orders",
+        target: () => ({ slug: "orders" } as unknown as CollectionConfig),
+        cardinality: "many",
+        joinPath: [
+            { table: "order_items", on: { from: "id", to: "product_id" } },
+            { table: "orders", on: { from: "order_id", to: "id" } }
+        ]
+    };
+
+    it("joins back from the target to the parent for an include", () => {
+        const result = DrizzleConditionBuilder.buildRelationConditions(
+            relation, 7, orders, products, products.id, orders.id, registry
+        );
+
+        expect(result.joinConditions.map(j => j.table)).toEqual([orderItems, products]);
+        expect(result.joinConditions.map(j => renderSql(j.condition).sql)).toEqual([
+            '"order_items"."order_id" = "orders"."id"',
+            '"products"."id" = "order_items"."product_id"'
+        ]);
+        expect(renderSql(result.whereConditions[0])).toMatchObject({ sql: '"products"."id" = $1', params: [7] });
+    });
+
+    it("counts through the same joins, which is what a nested read is gated on", () => {
+        const query = {
+            innerJoin: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            $dynamic: jest.fn().mockReturnThis()
+        };
+
+        DrizzleConditionBuilder.buildRelationCountQuery(
+            query, relation, 7, orders, products, products.id, orders.id, registry
+        );
+
+        expect(query.innerJoin.mock.calls.map(([table]) => table)).toEqual([orderItems, products]);
+        expect(renderSql(query.where.mock.calls[0][0] as SQL)).toMatchObject({ sql: '"products"."id" = $1', params: [7] });
+    });
+});

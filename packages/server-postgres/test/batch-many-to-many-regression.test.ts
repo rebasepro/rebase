@@ -22,6 +22,7 @@
  *   queries junction→target directly and extracts parentId from the junction
  *   table's sourceColumn/targetColumn.
  */
+import { Table } from "drizzle-orm";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
@@ -29,42 +30,49 @@ import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 // ─── Mock Tables ──────────────────────────────────────────────────────
-const mockPostsTable = {
+// Each carries its column map under Drizzle's own symbol as well, which
+// `getTableColumns` reads — a join step's columns are resolved through it.
+const withColumns = <T extends Record<string, unknown>>(table: T): T => {
+    const columns = Object.fromEntries(Object.entries(table).filter(([key]) => key !== "_def"));
+    return Object.assign(table, { [Table.Symbol.Columns]: columns });
+};
+
+const mockPostsTable = withColumns({
     id: { name: "id",
 dataType: "number" },
     title: { name: "title" },
     _def: { tableName: "posts" }
-};
+});
 
-const mockTagsTable = {
+const mockTagsTable = withColumns({
     id: { name: "id",
 dataType: "number" },
     name: { name: "name" },
     _def: { tableName: "tags" }
-};
+});
 
-const mockPostsTagsTable = {
+const mockPostsTagsTable = withColumns({
     post_id: { name: "post_id",
 dataType: "number" },
     tag_id: { name: "tag_id",
 dataType: "number" },
     _def: { tableName: "posts_tags" }
-};
+});
 
-const mockAuthorsTable = {
+const mockAuthorsTable = withColumns({
     id: { name: "id",
 dataType: "number" },
     name: { name: "name" },
     _def: { tableName: "authors" }
-};
+});
 
-const mockAuthorPostsTable = {
+const mockAuthorPostsTable = withColumns({
     author_id: { name: "author_id",
 dataType: "number" },
     post_id: { name: "post_id",
 dataType: "number" },
     _def: { tableName: "author_posts" }
-};
+});
 
 // ─── Mock Collections ─────────────────────────────────────────────────
 

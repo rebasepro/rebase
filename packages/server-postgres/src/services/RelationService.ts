@@ -4,7 +4,7 @@ import { DrizzleClient } from "../interfaces";
 import { CollectionConfig, FilterValues, OrderByTuple, ResolvedRelation, ResolvedManyToMany, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
 import { getTableName, getJunctionConfigForRelation, resolveCollectionRelations, findRelation, fieldKeyForColumn } from "@rebasepro/common";
 import { hasForeignKeyOnTarget, isManyToMany, type ResolvedVia } from "@rebasepro/types";
-import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
+import { DrizzleConditionBuilder, joinColumn } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
     getTableForCollection,
@@ -96,8 +96,10 @@ export function joinStepCondition(
     for (let i = 0; i < Math.max(from.length, to.length); i++) {
         const fromColumn = from[i] ?? "(none)";
         const toColumn = to[i] ?? "(none)";
-        const fromCol = currentTable[fromColumn.split(".").pop()! as keyof typeof currentTable] as AnyPgColumn | undefined;
-        const toCol = joinTable[toColumn.split(".").pop()! as keyof typeof joinTable] as AnyPgColumn | undefined;
+        // By SQL name or property key: a generated table keys `order_id` as
+        // `orderId`, and a step names the column. See `joinColumn`.
+        const fromCol = joinColumn(currentTable, fromColumn);
+        const toCol = joinColumn(joinTable, toColumn);
         if (!fromCol || !toCol) return { missing: `${fromColumn} -> ${toColumn}` };
         pairs.push(eq(fromCol, toCol));
     }
@@ -795,13 +797,22 @@ export class RelationService {
         // Start count with distinct to avoid duplicates from junction tables
         let query = this.db.select({ count: sql<number>`count(distinct ${targetIdField})` }).from(targetTable).$dynamic();
 
-        // A `via` from a parent keyed on several columns is counted through
-        // the scope condition a nested listing filters by. The join-path count
-        // below joins each step on its first column pair and matches the parent
-        // on its first key column, so it counts the rows every parent sharing
-        // that column reaches — and `isRelated` would authorise a write through
-        // `1:::en_US` to a row only `1:::de_DE` reaches.
-        if (relation.kind === "via" && parentPks.length > 1) {
+        // Every `via` is counted through the scope condition a nested listing
+        // filters by, so the count and the listing are one condition rather
+        // than two that have to agree.
+        //
+        // The join-path count `buildRelationCountQuery` builds is not that
+        // condition. It joins each step on its first column pair and matches
+        // the parent on its first key column, so for a parent keyed on several
+        // columns it counted the rows every parent sharing that column reaches
+        // — `isRelated` would authorise a write through `1:::en_US` to a row
+        // only `1:::de_DE` reaches. And it looks a step's columns up by the
+        // Drizzle property key, where a step names the SQL column: on a
+        // generated schema (`orderId: uuid("order_id")`) every count threw
+        // "Join columns not found", and since `isRelated` gates every read at a
+        // nested address, an order opened from a product's Orders tab failed to
+        // load while the tab listed it fine.
+        if (relation.kind === "via") {
             const scope = DrizzleConditionBuilder.buildRelationScopeCondition(
                 relation,
                 () => ({

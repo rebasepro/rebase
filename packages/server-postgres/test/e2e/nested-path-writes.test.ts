@@ -50,6 +50,15 @@ const postsTagsTable = pgTable("posts_tags", {
     post_id: varchar("post_id"),
     tag_id: varchar("tag_id")
 });
+// An ordinary collection table between two others — the demo's `order_items`
+// between products and orders — keyed the way the schema generator keys one:
+// camelCase property, snake_case column. Every other table here is keyed by
+// column name, which is how a lookup by property key went unnoticed.
+const bylinesTable = pgTable("bylines", {
+    id: varchar("id").primaryKey(),
+    authorId: varchar("author_id"),
+    postId: varchar("post_id")
+});
 
 const tagsCollection: CollectionConfig = {
     name: "Tags", slug: "tags", table: "tags",
@@ -82,6 +91,13 @@ const tagsCollection: CollectionConfig = {
     ]
 } as unknown as CollectionConfig;
 
+const bylinesCollection: CollectionConfig = {
+    name: "Bylines", slug: "bylines", table: "bylines",
+    properties: {
+        id: { name: "ID", type: "string", isId: true }
+    }
+} as unknown as CollectionConfig;
+
 const authorsCollection: CollectionConfig = {
     name: "Authors", slug: "authors", table: "authors",
     properties: {
@@ -106,6 +122,29 @@ const authorsCollection: CollectionConfig = {
             cardinality: "many",
             joinPath: [
                 { table: "posts", on: { from: "id", to: "author_id" } }
+            ]
+        },
+        {
+            kind: "via",
+            // Through a camelCase-keyed table: the demo's products → order_items
+            // → orders, which listed fine and could not open a row.
+            relationName: "posts_via_bylines",
+            target: () => postsCollection,
+            cardinality: "many",
+            joinPath: [
+                { table: "bylines", on: { from: "id", to: "author_id" } },
+                { table: "posts", on: { from: "post_id", to: "id" } }
+            ]
+        },
+        {
+            kind: "via",
+            // One step onto a camelCase-keyed foreign key: the listing's own
+            // scope condition looked that column up by property key.
+            relationName: "bylines",
+            target: () => bylinesCollection,
+            cardinality: "many",
+            joinPath: [
+                { table: "bylines", on: { from: "id", to: "author_id" } }
             ]
         }
     ]
@@ -136,11 +175,12 @@ const postsCollection: CollectionConfig = {
 
 function buildRegistry(): PostgresCollectionRegistry {
     const registry = new PostgresCollectionRegistry();
-    registry.registerMultiple([authorsCollection, postsCollection, tagsCollection]);
+    registry.registerMultiple([authorsCollection, postsCollection, tagsCollection, bylinesCollection]);
     registry.registerTable(authorsTable, "authors");
     registry.registerTable(postsTable, "posts");
     registry.registerTable(tagsTable, "tags");
     registry.registerTable(postsTagsTable, "posts_tags");
+    registry.registerTable(bylinesTable, "bylines");
     return registry;
 }
 
@@ -179,6 +219,9 @@ describe("Nested path writes (E2E)", () => {
             CREATE TABLE public.posts_tags (
                 post_id VARCHAR(255), tag_id VARCHAR(255), PRIMARY KEY (post_id, tag_id)
             );
+            CREATE TABLE public.bylines (
+                id VARCHAR(255) PRIMARY KEY, author_id VARCHAR(255), post_id VARCHAR(255)
+            );
         `);
 
         pool = new pg.Pool({ connectionString: container.connectionString });
@@ -197,7 +240,7 @@ describe("Nested path writes (E2E)", () => {
 
     beforeEach(async () => {
         await admin.query(`
-            TRUNCATE public.posts_tags, public.posts, public.tags, public.authors;
+            TRUNCATE public.bylines, public.posts_tags, public.posts, public.tags, public.authors;
             INSERT INTO public.authors (id, name) VALUES ('a-1', 'Ada'), ('a-2', 'Blaise');
             INSERT INTO public.posts (id, title, author_id) VALUES
                 ('p-1', 'Ada post',    'a-1'),
@@ -206,6 +249,9 @@ describe("Nested path writes (E2E)", () => {
             INSERT INTO public.posts_tags (post_id, tag_id) VALUES
                 ('p-1', 't-1'),
                 ('p-2', 't-1');
+            INSERT INTO public.bylines (id, author_id, post_id) VALUES
+                ('b-1', 'a-1', 'p-1'),
+                ('b-2', 'a-2', 'p-2');
         `);
     });
 
@@ -455,6 +501,25 @@ describe("Nested path writes (E2E)", () => {
             expect(await driver.count!({ path: "tags/t-1/posts_via_hops" } as never)).toBe(4);
         });
 
+        // A record read at a nested address is gated on `isRelated`, which
+        // counted a `via` through a join builder that looked a step's columns
+        // up by property key and its tables up by a `table.column` spelling:
+        // a documented step (bare columns) named no table, and on a generated
+        // schema no column either. The listing worked; opening a row from it
+        // did not — "Could not load data" on an order opened from a product.
+        it("opens one row through a one-step joinPath, and not one it does not reach", async () => {
+            expect(await driver.fetchOne({ path: "authors/a-1/posts_via_join", id: "p-1" } as never)).toBeDefined();
+            expect(await driver.fetchOne({ path: "authors/a-1/posts_via_join", id: "p-2" } as never)).toBeUndefined();
+        });
+
+        it("opens one row through a multi-hop joinPath, and not one it does not reach", async () => {
+            await admin.query(`
+                INSERT INTO public.posts (id, title, author_id) VALUES ('p-9', 'Untagged', 'a-1');
+            `);
+            expect(await driver.fetchOne({ path: "tags/t-1/posts_via_hops", id: "p-1" } as never)).toBeDefined();
+            expect(await driver.fetchOne({ path: "tags/t-1/posts_via_hops", id: "p-9" } as never)).toBeUndefined();
+        });
+
         it("does the same through a junction, without the join multiplying rows", async () => {
             const rows = await driver.fetchCollection({
                 path: "tags/t-1/posts_via_tag", orderBy: "title", order: "asc", limit: 2, offset: 1
@@ -462,6 +527,28 @@ describe("Nested path writes (E2E)", () => {
 
             expect(titles(rows)).toEqual(["Ada 3", "Ada post"]);
             expect(await driver.count!({ path: "tags/t-1/posts_via_tag" } as never)).toBe(4);
+        });
+    });
+
+    // ── A joinPath through a table keyed the way a generated schema keys it ──
+
+    describe("a joinPath over camelCase-keyed tables", () => {
+        it("lists through the intermediate table", async () => {
+            const posts = await driver.fetchCollection({ path: "authors/a-1/posts_via_bylines" } as never);
+            expect(posts.map(p => p.id)).toEqual(["p-1"]);
+            expect(await driver.count!({ path: "authors/a-1/posts_via_bylines" } as never)).toBe(1);
+        });
+
+        it("opens a row it reaches, and refuses one it does not", async () => {
+            expect(await driver.fetchOne({ path: "authors/a-1/posts_via_bylines", id: "p-1" } as never)).toBeDefined();
+            expect(await driver.fetchOne({ path: "authors/a-1/posts_via_bylines", id: "p-2" } as never)).toBeUndefined();
+        });
+
+        it("lists and opens through one step onto a camelCase-keyed foreign key", async () => {
+            const bylines = await driver.fetchCollection({ path: "authors/a-1/bylines" } as never);
+            expect(bylines.map(b => b.id)).toEqual(["b-1"]);
+            expect(await driver.fetchOne({ path: "authors/a-1/bylines", id: "b-1" } as never)).toBeDefined();
+            expect(await driver.fetchOne({ path: "authors/a-1/bylines", id: "b-2" } as never)).toBeUndefined();
         });
     });
 });

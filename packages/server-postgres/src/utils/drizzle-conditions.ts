@@ -124,6 +124,23 @@ const relationColumn = (
     return (key in table ? table[key as keyof typeof table] as AnyPgColumn : undefined) || undefined;
 };
 
+/**
+ * A table's column by the name a `joinPath` step gives it — the SQL column — or
+ * by its Drizzle property key.
+ *
+ * A column has two names. A generated schema keys a collection table's columns
+ * by property (`orderId: uuid("order_id")`) while a step names the column
+ * (`from: "order_id"`), so a lookup by key alone found nothing on a real app,
+ * and the hand-written fixtures — keyed by column name — never showed it.
+ * Junction tables are generated keyed by column name, which is why a
+ * many-to-many was unaffected.
+ */
+export function joinColumn(table: PgTable<any>, name: string): AnyPgColumn | undefined {
+    const columns = getTableColumns(table) as Record<string, AnyPgColumn>;
+    const column = getColumnName(name);
+    return columns[column] ?? Object.values(columns).find(candidate => candidate.name === column);
+}
+
 /** The target collection of a relation, or `undefined` if its thunk cannot resolve. */
 const targetOf = (relation: ResolvedRelation): CollectionConfig | undefined => {
     try {
@@ -560,7 +577,7 @@ export class DrizzleConditionBuilder {
         // column rather than a bare name also keeps it qualified, so it binds
         // to the outer target and not to a table joined inside the EXISTS.
         const targetColumn = (name: string): AnyPgColumn => {
-            const column = targetTable[getColumnName(name) as keyof typeof targetTable] as AnyPgColumn;
+            const column = joinColumn(targetTable, name);
             if (!column) {
                 throw new Error(`Join step column '${name}' not found in the target table of this joinPath`);
             }
@@ -1861,11 +1878,12 @@ whereConditions };
     } {
         const joins: { table: PgTable<any>; condition: SQL }[] = [];
         let currentTable = targetTable;
+        const sourceTableName = drizzleTableName(parentTable);
 
         // Process join steps in reverse order to build path back to parent
-        for (const joinStep of [...joinPath].reverse()) {
-            const fromTableName = this.getTableNamesFromColumns(joinStep.on.from)[0];
-            const toTableName = this.getTableNamesFromColumns(joinStep.on.to)[0];
+        for (let index = joinPath.length - 1; index >= 0; index--) {
+            const joinStep = joinPath[index];
+            const { fromTableName, toTableName } = this.joinStepTableNames(joinPath, index, sourceTableName);
             const fromColName = this.getColumnNamesFromColumns(joinStep.on.from)[0];
             const toColName = this.getColumnNamesFromColumns(joinStep.on.to)[0];
 
@@ -1968,10 +1986,8 @@ whereConditions };
             // reaches its methods and symbols, so a relation whose column is
             // named `name` or `enableRLS` got one of those back and passed the
             // `!left || !right` guard below with something that is not a column.
-            const cols = getTableColumns(fromTable);
-            const currentCols = getTableColumns(currentTable);
-            const left = cols[fromColName];
-            const right = currentCols[toColName];
+            const left = joinColumn(fromTable, fromColName);
+            const right = joinColumn(currentTable, toColName);
 
             if (!left || !right) {
                 // Check if this might be a many-to-many relationship requiring a junction table
@@ -1996,8 +2012,8 @@ whereConditions };
             condition = eq(left, right);
         } else if (currentTable === fromTable) {
             // current -> fromTable, so join the toTable
-            const left = toTable[toColName as keyof typeof toTable] as AnyPgColumn;
-            const right = getTableColumns(currentTable)[fromColName];
+            const left = joinColumn(toTable, toColName);
+            const right = joinColumn(currentTable, fromColName);
 
             if (!left || !right) {
                 // Check if this might be a many-to-many relationship requiring a junction table
@@ -2754,11 +2770,12 @@ whereConditions };
     ): T {
         let query = baseCountQuery;
         let currentTable = targetTable;
+        const sourceTableName = drizzleTableName(parentTable);
 
         // Process join steps in reverse order
-        for (const joinStep of [...joinPath].reverse()) {
-            const fromTableName = this.getTableNamesFromColumns(joinStep.on.from)[0];
-            const toTableName = this.getTableNamesFromColumns(joinStep.on.to)[0];
+        for (let index = joinPath.length - 1; index >= 0; index--) {
+            const joinStep = joinPath[index];
+            const { fromTableName, toTableName } = this.joinStepTableNames(joinPath, index, sourceTableName);
             const fromColName = this.getColumnNamesFromColumns(joinStep.on.from)[0];
             const toColName = this.getColumnNamesFromColumns(joinStep.on.to)[0];
 
@@ -2835,6 +2852,33 @@ whereConditions };
     /**
      * Helper method to extract table names from columns
      */
+    /**
+     * The two tables one step of a join path joins, by the rule `JoinStep`
+     * documents: `on.from` is a column of the previous table — the source
+     * collection's for the first step — and `on.to` is a column of
+     * `step.table`. A `table.column` spelling names its table outright.
+     *
+     * The tables used to come from that spelling alone, so a step written the
+     * documented way, `{ from: "id", to: "product_id" }`, named no table at
+     * all: every count and include over such a `via` threw "Join tables not
+     * found for step: from  to ", and since a record read at a nested address
+     * is gated on that count, opening an order from a product's Orders tab
+     * failed. The tab's own listing worked — it walks the path forward from
+     * the parent, by position — so only the record behind it broke.
+     */
+    private static joinStepTableNames(
+        joinPath: JoinStep[],
+        index: number,
+        sourceTableName: string
+    ): { fromTableName: string; toTableName: string } {
+        const step = joinPath[index];
+        return {
+            fromTableName: this.getTableNamesFromColumns(step.on.from)[0]
+                || (index === 0 ? sourceTableName : joinPath[index - 1].table),
+            toTableName: this.getTableNamesFromColumns(step.on.to)[0] || step.table
+        };
+    }
+
     static getTableNamesFromColumns(columns: string | string[]): string[] {
         if (Array.isArray(columns)) {
             return columns.map(col => col.includes(".") ? col.split(".")[0] : "");

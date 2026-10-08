@@ -665,6 +665,19 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 #### Server & REST
 
+- **A record opens from a `via` relation's tab.** Opening a row through a
+  `joinPath` relation (an order from a product's Orders tab, through
+  `order_items`) failed with "Could not load data" while the tab listed it
+  fine. The check that the row belongs to the parent counted through a join
+  builder that read a step's tables only from a `table.column` spelling, and
+  its columns only by Drizzle property key: a step written as `JoinStep`
+  documents it (`{ from: "order_id", to: "id" }`) named no table, and on a
+  generated schema (`orderId: uuid("order_id")`) no column either. A step's
+  tables now come from its position in the path, its columns resolve by SQL
+  name or property key everywhere a join path is built, and the count uses the
+  same condition as the listing. One-to-one `via` writes had the same table
+  lookup and refused every write; they resolve by position too.
+
 - **The OpenAPI spec says a delete on a `softDelete` collection moves the row to the trash.** It documents `?hard=true` on DELETE and bulk delete, and `?deleted=include|only` on list, single read, count and aggregate. A column named `deleted` is no longer offered as a filter, because the server reads that name as the soft-delete parameter.
 
 - **The SQL console's "current database" is the database the app's connection is on**, not the one `ADMIN_CONNECTION_STRING` names. A statement sent under the admin URL's database name no longer runs on the app's connection. "Default (main database)" in branching copies the app's database.

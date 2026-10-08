@@ -781,24 +781,36 @@ export class RelationWriteService {
             throw new Error("resolveJoinPathWriteMapping requires a joinPath relation");
         }
         const parentTableName = getTableName(parentCollection);
-        const lastStep = relation.joinPath[relation.joinPath.length - 1];
-        const targetFKColName = DrizzleConditionBuilder.getColumnNamesFromColumns(lastStep.on.to)[0];
-        let currentFrom = lastStep.on.from;
+        const joinPath = relation.joinPath;
+        let index = joinPath.length - 1;
+        const targetFKColName = DrizzleConditionBuilder.getColumnNamesFromColumns(joinPath[index].on.to)[0];
+        let currentFrom = joinPath[index].on.from;
 
+        // Back along the path to the step whose `from` is on the parent's
+        // table. A `table.column` spelling names that table; a bare column —
+        // the form `JoinStep` documents — is on the previous step's table, or
+        // the parent's for the first step. Reading the table only from the
+        // spelling meant a documented one-to-one `via` (`{ from: "id", to:
+        // "product_id" }`) named no table, matched no step, and refused every
+        // write with "Could not resolve parent source column".
         let safety = 0;
         while (safety++ < 10) {
-            const currentFromTable = DrizzleConditionBuilder.getTableNamesFromColumns(currentFrom)[0];
+            const qualifiedTable = DrizzleConditionBuilder.getTableNamesFromColumns(currentFrom)[0];
+            const currentFromTable = qualifiedTable || (index === 0 ? parentTableName : joinPath[index - 1].table);
             if (currentFromTable === parentTableName) {
                 break;
             }
-            const prevStep = relation.joinPath.find((s) => {
-                const to = Array.isArray(s.on.to) ? s.on.to[0] : s.on.to;
-                return to === currentFrom;
-            });
-            if (!prevStep) {
+            const prevIndex = qualifiedTable
+                ? joinPath.findIndex((s) => {
+                    const to = Array.isArray(s.on.to) ? s.on.to[0] : s.on.to;
+                    return to === currentFrom;
+                })
+                : index - 1;
+            if (prevIndex < 0) {
                 throw new Error(`Could not resolve parent source column for joinPath relation '${relation.relationName}'`);
             }
-            currentFrom = prevStep.on.from;
+            index = prevIndex;
+            currentFrom = joinPath[index].on.from;
         }
         const parentSourceColName = DrizzleConditionBuilder.getColumnNamesFromColumns(currentFrom)[0];
         return { targetFKColName,

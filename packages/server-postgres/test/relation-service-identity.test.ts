@@ -1,3 +1,4 @@
+import { Table } from "drizzle-orm";
 import { CollectionConfig } from "@rebasepro/types";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
@@ -14,9 +15,13 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 describe("RelationService — related rows are addressed by the whole key", () => {
     const registry = new PostgresCollectionRegistry();
 
+    // The column map under Drizzle's own symbol too, which `getTableColumns`
+    // reads — a join step's columns are resolved through it.
     const table = (name: string, columns: string[]) => {
-        const t: Record<string, unknown> = { _def: { tableName: name } };
-        for (const c of columns) t[c] = { name: c };
+        const t: Record<string | symbol, unknown> = { _def: { tableName: name } };
+        const map: Record<string, unknown> = {};
+        for (const c of columns) map[c] = t[c] = { name: c };
+        t[Table.Symbol.Columns] = map;
         return t;
     };
 
