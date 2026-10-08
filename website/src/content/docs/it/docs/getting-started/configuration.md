@@ -1,5 +1,5 @@
 ---
-sourceHash: 71e8910b2dfa49fa
+sourceHash: 2b0f87a51f64cac3
 title: Ambiente e configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -140,6 +140,8 @@ autenticate contro il server di sviluppo con la sua sessione e leggerne le rispo
 | `APPLE_KEY_ID` | Key ID della chiave privata registrata con Apple. | — |
 | `APPLE_PRIVATE_KEY` | Contenuto del file di chiave privata `.p8`, inclusi i ritorni a capo (sono accettati i caratteri di escape `\n`). | — |
 | `REBASE_SERVICE_KEY` | Chiave API amministrativa statica. Bypassa la normale autenticazione JWT per chiamate server-to-server se passata come `Authorization: Bearer <key>`. (Generata automaticamente in fase di sviluppo). | — |
+| `REBASE_PLATFORM_TOKEN_KEY` | <span class="since-badge" data-since="0.24">Da 0.24</span> La chiave pubblica della piattaforma di hosting (PEM, EC P-256) con cui vengono verificati i token di piattaforma `rpt_`; più blocchi PEM durante una rotazione delle chiavi. La piattaforma la imposta al deploy e non contiene nulla di segreto. Insieme a `REBASE_PLATFORM_TOKEN_AUDIENCE` permette al gate di amministrazione di accettare un token di piattaforma per `cron:read`, e per nient'altro. | — |
+| `REBASE_PLATFORM_TOKEN_AUDIENCE` | <span class="since-badge" data-since="0.24">Da 0.24</span> L'id del progetto a cui deve corrispondere l'`aud` di un token di piattaforma, così un token emesso per un altro progetto viene rifiutato. Se è impostata una sola delle due variabili, il server si avvia, registra un avviso e risponde a ogni token `rpt_` con `401 PLATFORM_TOKENS_OFF`. | — |
 | `REBASE_RATE_LIMIT_STORE` | Dove risiedono i contatori del rate-limiting di autenticazione: `memory` (per processo) o `sql` (condiviso tra le repliche). Un processo non può determinare il proprio numero di repliche, quindi un deployment con più nodi deve specificarlo esplicitamente — tre repliche con il valore predefinito applicherebbero il triplo del limite. Qualsiasi altro valore **rifiuta l'avvio** anziché effettuare un fallback, incluso `postgres`. | `memory` |
 | `AUTH_MAGIC_LINK` | Registra il flusso di accesso senza password tramite link (magic link). Richiede un servizio email configurato, altrimenti il link non potrà essere recapitato. | `false` |
 | `AUTH_EMAIL_OTP` | Registra l'accesso senza password con codice a sei cifre inviato via email. Stesso requisito del servizio email indicato sopra. | `false` |

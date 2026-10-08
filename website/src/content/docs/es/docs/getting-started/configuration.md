@@ -1,5 +1,5 @@
 ---
-sourceHash: 71e8910b2dfa49fa
+sourceHash: 2b0f87a51f64cac3
 title: Entorno y configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos Rebase.
@@ -143,6 +143,8 @@ respuestas.
 | `APPLE_KEY_ID` | Key ID de la clave privada registrada en Apple. | — |
 | `APPLE_PRIVATE_KEY` | Contenido del archivo de clave privada `.p8`, incluyendo saltos de línea (se aceptan secuencias de escape `\n`). | — |
 | `REBASE_SERVICE_KEY` | Clave estática de API para administración. Omite la autenticación normal por JWT para llamadas de servidor a servidor cuando se pasa como `Authorization: Bearer <key>`. (Generada automáticamente en desarrollo). | — |
+| `REBASE_PLATFORM_TOKEN_KEY` | <span class="since-badge" data-since="0.24">Desde 0.24</span> La clave pública de la plataforma de hosting (PEM, EC P-256) con la que se verifican los tokens de plataforma `rpt_`; varios bloques PEM durante una rotación de claves. La plataforma la define al desplegar y no contiene nada secreto. Junto con `REBASE_PLATFORM_TOKEN_AUDIENCE`, permite que la puerta de administración acepte un token de plataforma para `cron:read`, y para nada más. | — |
+| `REBASE_PLATFORM_TOKEN_AUDIENCE` | <span class="since-badge" data-since="0.24">Desde 0.24</span> El id del proyecto al que debe ser igual el `aud` de un token de plataforma, de modo que se rechaza un token emitido para otro proyecto. Con solo una de las dos variables definida, el servidor arranca, registra una advertencia y responde a cada token `rpt_` con `401 PLATFORM_TOKENS_OFF`. | — |
 | `REBASE_RATE_LIMIT_STORE` | Dónde residen los contadores de límite de tasa (rate limit) de autenticación: `memory` (por proceso) o `sql` (compartido entre réplicas). Un proceso no puede conocer su propio número de réplicas, por lo que un despliegue distribuido debe indicarlo explícitamente: tres réplicas con el valor por defecto aplicarían tres veces el límite permitido. Cualquier otro valor **rechaza el inicio** en lugar de degradarse a una alternativa, incluyendo `postgres`. | `memory` |
 | `AUTH_MAGIC_LINK` | Habilita el flujo de inicio de sesión sin contraseña mediante enlace (magic link). Requiere un servicio de correo electrónico configurado, de lo contrario el enlace no tiene destino. | `false` |
 | `AUTH_EMAIL_OTP` | Habilita el inicio de sesión sin contraseña mediante un código de seis dígitos enviado por correo electrónico. Mismo requisito de correo electrónico que el anterior. | `false` |

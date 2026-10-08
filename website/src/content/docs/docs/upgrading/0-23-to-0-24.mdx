@@ -1,18 +1,13 @@
 ---
-slug: docs/upgrading/0-23-to-next
-title: Upgrading 0.23 to the next release
-sidebar_label: 0.23 → next
-description: The breaking changes already merged on main and live in these docs, before the release that carries them exists — generated SQL and SDK types, CLI paths, scopes, upserts and keys, the remote MCP endpoint, and sessions and accounts.
+slug: docs/upgrading/0-23-to-0-24
+title: Upgrading 0.23 to 0.24
+sidebar_label: 0.23 → 0.24
+description: The breaking changes 0.24 carries for an app on 0.23 — generated SQL and SDK types, CLI paths, scopes, upserts and keys, the remote MCP endpoint, sessions and accounts, the backup routes, the insights plugin and images in markdown fields.
 ---
 
-# Upgrading 0.23 → next
+# Upgrading 0.23 → 0.24
 
-**Nothing here is released yet.** These are the `### Breaking` entries of the
-changelog's [`[Unreleased]`](/docs/changelog/) section: they are on `main`, and
-this documentation site publishes from `main`, so they are described here before
-the version that carries them exists on npm. If you installed from npm you are
-on 0.23 and none of this has reached you — read it to know what is coming, and
-come back when you move.
+These are the `### Breaking` entries 0.24 carries for an app on 0.23.
 
 Sections 41 to 46 are about the CLI: generated SQL leaves the repository, `rebase
 dev` regenerates the SDK types without being asked, and paths, failures and
@@ -21,8 +16,9 @@ answers, and 51 to 55 are about access. Permissions are now
 [scopes](/docs/backend/roles-and-scopes/), one vocabulary for sessions, API keys,
 roles and MCP tokens; if every person who uses your admin surfaces holds the
 `admin` role, most of them ask nothing of you. Sections 56 to 58 cover the remote
-MCP endpoint, in-process writes and the UI kit, and 59 to 64 the session and
-account changes.
+MCP endpoint, in-process writes and the UI kit, 59 to 64 the session and
+account changes, 65 the backup routes, 66 the insights plugin,
+and 67 images in markdown fields.
 
 ---
 
@@ -515,3 +511,79 @@ door now answers `401 SESSION_REVOKED`, as for a session that was signed out.
 **What to change:** nothing with the SDK, which signs out on it. A client that
 treated a `404` from `/me` as "account gone" checks for `SESSION_REVOKED`
 instead. See [Errors](/docs/backend/errors/).
+
+## 65. `createBackupRoutes` takes `storageFor`, not `storage`
+
+The backup routes listed and downloaded an `s3://` or `gs://` backup through
+the app's own file-storage controller, which addresses another bucket, a local
+directory, or nothing. They now build a controller for the backup
+destination's bucket from `BACKUP_DESTINATION` and the `S3_*` variables, the
+way the backup cron does. The `storage` option of `createBackupRoutes` is gone;
+`storageFor(destination)` replaces it. `listBackupObjects`, `readBackupBytes`
+and `openBackupStream` throw for an object destination they have no controller
+for, where they used to return nothing.
+
+**What to change:** nothing, unless you mount `createBackupRoutes` yourself.
+If you do, drop `storage`, or pass `storageFor` when the destination needs a
+controller other than the one the environment describes. See
+[Backups](/docs/deployment/backups/).
+
+## 66. The insights plugin reads named sources
+
+An insight carried its own `data()` callback and a `scorecard` block, so the
+same figure on the home page and on a collection's card was fetched twice, and
+the change beside it was a delta the callback had to compute. Now the config
+declares `sources` — each returns one record of figures for the period it is
+handed — and an insight names the `source`, the `value` field, and the field
+holding the `previous` figure. The plugin computes the change itself.
+
+**What to change:** in your `useInsightsPlugin` config, move each `data()`
+callback into `sources` under a name, have it return one record instead of
+`{ rows }`, and replace `scorecard` with `source`, `value` and `comparison`.
+`ScorecardFormat` is `InsightFormat`, without `showSign`. Drop `description`
+and `dateRange`: the row above the figures names the period. Wrap the config in
+`useMemo`, because a new `sources` object starts a new cache.
+
+```typescript
+const insightsPlugin = useInsightsPlugin(useMemo(() => ({
+    period: { days: 30 },
+    sources: {
+        orders: ({ period }) => fetchOrderStats(period.previousFrom, period.from, period.to)
+    },
+    insights: {
+        home: [{
+            id: "revenue",
+            title: "Revenue",
+            source: "orders",
+            value: { field: "revenue", format: { style: "currency", currency: "USD" } },
+            comparison: { previous: "previousRevenue", intent: "increase_is_good" }
+        }]
+    }
+}), []));
+```
+
+The source returns both windows' figures, here `{ revenue, previousRevenue }`.
+A count that moves by a few reads better as a difference than a percentage:
+set `show: "absolute"` on its `comparison`.
+
+## 67. A markdown field stores an uploaded image as a storage reference
+
+The markdown editor wrote a private file's signed URL into the text. Its download
+token expires, five minutes after the upload by default, so the image broke in
+the admin panel and on every site that published the text. An image uploaded in
+the editor is now stored as `rebase-storage:<key>` (with `?storageId=` for a
+named source), and the panel exchanges each reference for a fresh URL when it
+renders.
+
+**What to change:** nothing in the panel. A site or app that renders a markdown
+field itself resolves the references before it renders, or the images point at
+`rebase-storage:` URLs a browser cannot open:
+
+```typescript
+import { resolveStorageReferences } from "@rebasepro/client";
+
+const body = await resolveStorageReferences(String(post.body ?? ""), client);
+```
+
+Text saved before keeps the URLs it was saved with. See
+[Files inside text](/docs/sdk/storage/#files-inside-text).

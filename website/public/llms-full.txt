@@ -702,6 +702,8 @@ answers.
 | `APPLE_KEY_ID` | Key ID of the private key registered with Apple. | — |
 | `APPLE_PRIVATE_KEY` | Contents of the `.p8` private key file, newlines and all (`\n` escapes are accepted). | — |
 | `REBASE_SERVICE_KEY` | Static admin API key. Bypasses normal JWT auth for server-to-server calls when passed as `Authorization: Bearer <key>`. (Auto-generated in development). | — |
+| `REBASE_PLATFORM_TOKEN_KEY` | <span class="since-badge" data-since="0.24">Since 0.24</span> The hosting platform's public key (PEM, EC P-256) that `rpt_` platform tokens are verified against; several PEM blocks during a key rotation. The platform sets it at deploy, and it holds nothing secret. Together with `REBASE_PLATFORM_TOKEN_AUDIENCE` it lets the admin gate accept a platform token for `cron:read`, and for nothing else. | — |
+| `REBASE_PLATFORM_TOKEN_AUDIENCE` | <span class="since-badge" data-since="0.24">Since 0.24</span> The project id a platform token's `aud` must equal, so a token minted for another project is refused. With only one of the two variables set, the server boots, logs a warning, and answers every `rpt_` token with `401 PLATFORM_TOKENS_OFF`. | — |
 | `REBASE_RATE_LIMIT_STORE` | Where auth rate-limit counters live: `memory` (per-process) or `sql` (shared across replicas). A process cannot see its own replica count, so a deployment with peers has to say so — three replicas on the default enforce three times the limit. Any other value **refuses to boot** rather than falling back, `postgres` included. | `memory` |
 | `AUTH_MAGIC_LINK` | Mount the passwordless sign-in-link flow. Needs an email service configured, or the link has nowhere to go. | `false` |
 | `AUTH_EMAIL_OTP` | Mount passwordless sign-in with a six-digit code sent by email. Same email requirement as above. | `false` |
@@ -1305,7 +1307,7 @@ downwards — or, if you are coming from 0.12, start at the bottom and work up.
 
 | You are on | Read | What it does to you |
 |---|---|---|
-| **0.23** | [0.23 → next](/docs/upgrading/0-23-to-next/) | Not released yet: what is merged on `main` and already described in these docs. The SQL `db push` and `db generate` render moves out of `drizzle/` into the uncommitted `.rebase/sql/`, the `--generate` flag of `rebase dev` is gone because `dev` always regenerates the SDK types, and a live schema edit commits no SQL. Permissions become scopes: admin surfaces ask for a scope rather than the admin role, API keys hold scopes instead of a permission list and an `admin` flag, and `schema-admin` is no longer an administrator. A relative `--collections` is read from where the command runs, an upsert into a trashed row and an update that changes a key are refused, the remote MCP endpoint takes the SDK's arguments, and open realtime sockets, email-verification links, `signUp` and MFA recovery codes change how they treat a session. |
+| **0.23** | [0.23 → 0.24](/docs/upgrading/0-23-to-0-24/) | The SQL `db push` and `db generate` render moves out of `drizzle/` into the uncommitted `.rebase/sql/`, the `--generate` flag of `rebase dev` is gone because `dev` always regenerates the SDK types, and a live schema edit commits no SQL. Permissions become scopes: admin surfaces ask for a scope rather than the admin role, API keys hold scopes instead of a permission list and an `admin` flag, and `schema-admin` is no longer an administrator. A relative `--collections` is read from where the command runs, an upsert into a trashed row and an update that changes a key are refused, the remote MCP endpoint takes the SDK's arguments, and open realtime sockets, email-verification links, `signUp` and MFA recovery codes change how they treat a session. |
 | **0.21 – 0.22** | [0.21 → 0.23](/docs/upgrading/0-21-to-0-23/) | An API key on a nested path needs `read` on its parents, unreadable numeric variables and session lifetimes refuse to boot, a custom auth repository needs `unlinkUserIdentity`, and guest upgrades take the `register` captcha. 0.22 declares no breaking change, so this is one hop from 0.21. |
 | **0.18 – 0.20** | [0.18 → 0.21](/docs/upgrading/0-18-to-0-21/) | `context.client.data` stops compiling in a collection callback — query through `context.data` — and `selectedEntities` gives way to a selection that can stand for rows nobody has loaded. 0.19 and 0.20 declare no breaking change, so this is one hop from 0.18. |
 | **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Eleven breaking changes, most of them compile errors rather than silent behaviour changes. `rebase.data` disappears at runtime, peer ranges narrow to carets, and the Node floor moves to 22.22.0. |
@@ -1378,16 +1380,11 @@ packages nor the type system will tell you: the change lives in the database, an
 - [Compatibility](/docs/compatibility/) — the six contracts, and which ones a version can break
 - [CLI Commands](/docs/cli/) — `rebase doctor` and the commands the checklists run
 
-## Upgrading 0.23 to the next release
+## Upgrading 0.23 to 0.24
 
-## Upgrading 0.23 → next
+## Upgrading 0.23 → 0.24
 
-**Nothing here is released yet.** These are the `#### Breaking` entries of the
-changelog's [`[Unreleased]`](/docs/changelog/) section: they are on `main`, and
-this documentation site publishes from `main`, so they are described here before
-the version that carries them exists on npm. If you installed from npm you are
-on 0.23 and none of this has reached you — read it to know what is coming, and
-come back when you move.
+These are the `#### Breaking` entries 0.24 carries for an app on 0.23.
 
 Sections 41 to 46 are about the CLI: generated SQL leaves the repository, `rebase
 dev` regenerates the SDK types without being asked, and paths, failures and
@@ -1396,8 +1393,9 @@ answers, and 51 to 55 are about access. Permissions are now
 [scopes](/docs/backend/roles-and-scopes/), one vocabulary for sessions, API keys,
 roles and MCP tokens; if every person who uses your admin surfaces holds the
 `admin` role, most of them ask nothing of you. Sections 56 to 58 cover the remote
-MCP endpoint, in-process writes and the UI kit, and 59 to 64 the session and
-account changes.
+MCP endpoint, in-process writes and the UI kit, 59 to 64 the session and
+account changes, 65 the backup routes, 66 the insights plugin,
+and 67 images in markdown fields.
 
 ---
 
@@ -1890,6 +1888,82 @@ door now answers `401 SESSION_REVOKED`, as for a session that was signed out.
 **What to change:** nothing with the SDK, which signs out on it. A client that
 treated a `404` from `/me` as "account gone" checks for `SESSION_REVOKED`
 instead. See [Errors](/docs/backend/errors/).
+
+### 65. `createBackupRoutes` takes `storageFor`, not `storage`
+
+The backup routes listed and downloaded an `s3://` or `gs://` backup through
+the app's own file-storage controller, which addresses another bucket, a local
+directory, or nothing. They now build a controller for the backup
+destination's bucket from `BACKUP_DESTINATION` and the `S3_*` variables, the
+way the backup cron does. The `storage` option of `createBackupRoutes` is gone;
+`storageFor(destination)` replaces it. `listBackupObjects`, `readBackupBytes`
+and `openBackupStream` throw for an object destination they have no controller
+for, where they used to return nothing.
+
+**What to change:** nothing, unless you mount `createBackupRoutes` yourself.
+If you do, drop `storage`, or pass `storageFor` when the destination needs a
+controller other than the one the environment describes. See
+[Backups](/docs/deployment/backups/).
+
+### 66. The insights plugin reads named sources
+
+An insight carried its own `data()` callback and a `scorecard` block, so the
+same figure on the home page and on a collection's card was fetched twice, and
+the change beside it was a delta the callback had to compute. Now the config
+declares `sources` — each returns one record of figures for the period it is
+handed — and an insight names the `source`, the `value` field, and the field
+holding the `previous` figure. The plugin computes the change itself.
+
+**What to change:** in your `useInsightsPlugin` config, move each `data()`
+callback into `sources` under a name, have it return one record instead of
+`{ rows }`, and replace `scorecard` with `source`, `value` and `comparison`.
+`ScorecardFormat` is `InsightFormat`, without `showSign`. Drop `description`
+and `dateRange`: the row above the figures names the period. Wrap the config in
+`useMemo`, because a new `sources` object starts a new cache.
+
+```typescript
+const insightsPlugin = useInsightsPlugin(useMemo(() => ({
+    period: { days: 30 },
+    sources: {
+        orders: ({ period }) => fetchOrderStats(period.previousFrom, period.from, period.to)
+    },
+    insights: {
+        home: [{
+            id: "revenue",
+            title: "Revenue",
+            source: "orders",
+            value: { field: "revenue", format: { style: "currency", currency: "USD" } },
+            comparison: { previous: "previousRevenue", intent: "increase_is_good" }
+        }]
+    }
+}), []));
+```
+
+The source returns both windows' figures, here `{ revenue, previousRevenue }`.
+A count that moves by a few reads better as a difference than a percentage:
+set `show: "absolute"` on its `comparison`.
+
+### 67. A markdown field stores an uploaded image as a storage reference
+
+The markdown editor wrote a private file's signed URL into the text. Its download
+token expires, five minutes after the upload by default, so the image broke in
+the admin panel and on every site that published the text. An image uploaded in
+the editor is now stored as `rebase-storage:<key>` (with `?storageId=` for a
+named source), and the panel exchanges each reference for a fresh URL when it
+renders.
+
+**What to change:** nothing in the panel. A site or app that renders a markdown
+field itself resolves the references before it renders, or the images point at
+`rebase-storage:` URLs a browser cannot open:
+
+```typescript
+import { resolveStorageReferences } from "@rebasepro/client";
+
+const body = await resolveStorageReferences(String(post.body ?? ""), client);
+```
+
+Text saved before keeps the URLs it was saved with. See
+[Files inside text](/docs/sdk/storage/#files-inside-text).
 
 ## Upgrading 0.21 to 0.23
 
@@ -3542,6 +3616,8 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Server & REST
 
+- **`createBackupRoutes` takes `storageFor(destination)`,** replacing its `storage` option. `listBackupObjects`, `readBackupBytes` and `openBackupStream` throw for an object destination they have no controller for, instead of returning nothing. `BackupScheduleStatus.lastRun` excludes manual runs, and adds `lastManualRun`, `disabledInCode`, `refused` and `historyError`. `BackupListing` adds `localDiskOfThisProcess`.
+
 - **A live schema edit commits the collection and `schema.generated.ts`, and
   no SQL.** The commit also carried the five SQL files, but it wrote them at
   the project root while the CLI writes them next to the backend, so a project
@@ -3641,6 +3717,27 @@ yet, listed so that nobody reads a promise into them:
   is now a compile error. Fix a call site by dropping the prop; nothing about
   what renders changes.
 
+- **The insights plugin reads its figures from named sources, over one
+  comparison period.** An insight carried its own `data()` callback and a
+  `scorecard` mapping, so a figure on the home page and the same figure on a
+  collection's card were two fetches that could disagree, and the change
+  beside a figure was whatever precomputed delta the callback returned.
+  `InsightsPluginConfig` now takes `sources`, functions that each return one
+  record of figures and are called with the `period` (`from`, `to`,
+  `previousFrom`), and an optional `period: { days }` (30 by default). An
+  `InsightDefinition` names its `source`, its `value: { field, format }` and
+  an optional `comparison: { previous, intent, show }`; the plugin works out
+  the change from the two figures, as a percentage or, with
+  `show: "absolute"`, a difference. A source is fetched once per signed-in
+  user however many insights read it. A config whose insight names a source
+  it does not declare, or whose `period.days` is not a whole number of at
+  least 1, throws when the plugin is created. Gone: `ScorecardConfig`,
+  `ScorecardFormat` (now `InsightFormat`, without `showSign`),
+  `InsightDataResult`, `InsightsCache`, `useInsightsData`,
+  `InsightWidgetSkeleton`, and the `description` and `dateRange` fields — the
+  row above the figures names the period itself. New: `InsightsEngine`,
+  `resolvePeriod`, `useInsightSource` and `InsightsRow`.
+
 ##### Auth
 
 - **An open realtime socket is re-checked, and closed when its identity has
@@ -3675,6 +3772,19 @@ yet, listed so that nobody reads a promise into them:
 
 - **A deleted account's token answers 401 `SESSION_REVOKED`** on every door
   (`/me` used to answer 404).
+
+##### Admin (CMS & app)
+
+- **A markdown field stores an uploaded image as a storage reference, not a
+  URL.** The editor wrote a private file's signed URL into the text, and its
+  download token expires (five minutes by default), so the image broke in the
+  panel and on every site that published the text. The text now holds
+  `rebase-storage:<key>`, with `?storageId=` for a named source, and the
+  panel's editor, preview and board cards exchange it for a fresh URL when
+  they render. A site that renders the markdown itself must do the same:
+  `resolveStorageReferences(text, client)` from `@rebasepro/client` signs each
+  object once per render and leaves a reference to a missing object as it is.
+  Text saved before keeps the URLs it was saved with.
 
 #### Added
 
@@ -3828,6 +3938,14 @@ yet, listed so that nobody reads a promise into them:
   notices. It is also available over the socket as `EXECUTE_SQL` with
   `mode: "script"`, and as `RebaseWebSocketClient.runSqlScript`.
 
+- **The Backups panel shows how the scheduled backup is going.** A backup job
+  that failed every night left the panel saying "No backups found yet". The
+  listing (`GET /api/admin/backups`, `client.backups.list()`) now carries
+  `schedule`: the job, its cron, whether it is paused, its next run, and its
+  last run with the error when it failed. The panel shows a failed run as an
+  error, a paused schedule as a warning, and otherwise the last and next
+  run.
+
 ##### Storage & email
 
 - **`STORAGE_MAX_FILE_SIZE`** (bytes, `__<KEY>` per source) sets the largest
@@ -3923,6 +4041,13 @@ yet, listed so that nobody reads a promise into them:
   existing collection as a migration and names the new key. `rebase doctor`
   and the boot warning tell you to mark every key column.
 
+- **A server assembled by hand can install the access model a booted backend
+  uses.** `@rebasepro/server` exports `configureAccess`, and
+  `accessModelFromCollections` to build the model from the users collection,
+  beside `configureJwt`, so a server or test built without
+  `initializeRebaseBackend` answers for a person the way a booted backend
+  does.
+
 ##### CI & tooling
 
 - **`pnpm check:tsconfig-entries`** fails a tsconfig `include`/`paths`/
@@ -4015,15 +4140,20 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Server & REST
 
-- **`createBackupRoutes` takes `storageFor(destination)`,** replacing its `storage` option. `listBackupObjects`, `readBackupBytes` and `openBackupStream` throw for an object destination they have no controller for, instead of returning nothing. `BackupScheduleStatus.lastRun` excludes manual runs, and adds `lastManualRun`, `disabledInCode`, `refused` and `historyError`. `BackupListing` adds `localDiskOfThisProcess`.
-
 - **Realtime and SQL admin:** `EXECUTE_SQL_SUCCESS` carries `effectiveRole` when a statement asked for a role, and `SqlScriptResult` has `effectiveRole`. `BranchInfo` has a required `database` field.
 
 - **`compileRulePolicies(collection, rule, options)`** in `@rebasepro/common` is the one compiler of a security rule into Postgres policies. The schema planner delegates to it.
 
+##### Admin (CMS & app)
+
+- **The home page's collection cards show the favourite star on hover or
+  focus,** and keep it once the collection is a favourite, instead of an
+  empty star on every card; a touch screen always shows it. Group labels use
+  the UI kit's micro type and line up with the cards' left edge.
+
 ##### Studio
 
-- **The translation key `studio_api_keys_admin_reads_every_row` is renamed to `studio_api_keys_admin_bypasses_rls`.** An app that overrides it must rename its override.
+- **The translation key `studio_api_keys_admin_reads_every_row` is renamed to `studio_api_keys_admin_bypasses_rls`.** An app that overrides it must rename its override. The keys `studio_policy_help_role_authenticated` and `studio_policy_help_role_anon` are removed, with the policy help that named roles no request runs as.
 
 - **`POST /api/admin/schema/plan|apply` and
   `/api/admin/schema-editor/collection/save` accept a `patch`** (operations
@@ -4314,7 +4444,8 @@ yet, listed so that nobody reads a promise into them:
   `--help` on such a `rebase cloud` line now prints the named action's page.
   A mistyped action is still refused by name.
 
-- **`rebase cloud debug logs`, `errors`, `requests` and `boot` say what
+- **`rebase cloud debug logs`, `rebase cloud debug errors`,
+  `rebase cloud debug requests` and `rebase cloud debug boot` say what
   window their lines cover, and say when a limit cut it.** The control
   plane returns at most 2000 lines per pod and lowered a larger `--tail`
   without saying so, and its `truncated` flag covers only its byte
@@ -4410,9 +4541,6 @@ yet, listed so that nobody reads a promise into them:
 - **The docs, the scaffold and `rebase-server --help` no longer say boot
   leaves junction-table RLS to `db push`.** Boot applies it.
 
-- **The CLI end-to-end suite passes again,** and no longer leaves the
-  backend it starts running after the suite exits.
-
 - **`rebase skills install --agent codex` writes where Codex reads.** It wrote
   `.codex/skills`, which Codex never opens: Codex reads repository skills from
   `.agents/skills`. It now writes there, the directory Gemini CLI and
@@ -4431,6 +4559,16 @@ yet, listed so that nobody reads a promise into them:
   `.gitignore` excludes. `node_modules`, `dist*` and hidden directories are
   skipped either way. Outside a repository, or run inside a copy its repository
   ignores as a whole, it walks every directory.
+
+- **A new project's .env lists the REBASE_MIGRATE_ON_BOOT values the boot
+  accepts.** It offered `migrate` and `off`, and either one stopped the
+  backend from starting. It now lists `ensure` and `none`, says any other
+  value refuses to boot, and points migration files at `rebase db migrate`.
+
+- **The published rebase-collections skill no longer offers a cuid id.** The
+  0.23.0 skill listed `isId: "cuid"`, which config load refuses, so an agent
+  following it wrote a collection whose first boot failed. The skill now
+  offers `manual`, `uuid` and a SQL strategy, and says `cuid` is refused.
 
 ##### Admin (CMS & app)
 
@@ -4536,13 +4674,6 @@ yet, listed so that nobody reads a promise into them:
   field someone else changed while you edited a different field of the same
   map.**
 
-- **The list view keeps its scroll position when you come back from a record
-  opened full screen.** Full screen replaces the collection view, and the list
-  view, unlike the table and card views, never saved or restored its offset.
-  Going back landed at the top with only the first page loaded. It now returns
-  to the same rows. The card view also stops jumping back slightly the first
-  time more rows load after a fresh visit.
-
 - **A collection whose slug contains slashes can have subcollections that
   open.** A versioned or locale-partitioned collection such as
   `medico/v2.0.0/joints` opened, but nothing under it did: its subcollection
@@ -4579,6 +4710,18 @@ yet, listed so that nobody reads a promise into them:
 
 - In the import's mapping step, a key-value map can be chosen as a column's
   target.
+
+- **A column mixing numbers and text is imported as text.** Creating a
+  collection from a CSV voted such a column into a number, so the zip code
+  02134 became 2134, 20-digit SKUs were rounded, and `N/A` or `1,234` in a
+  price column became empty. Text that spells a number exactly, such as
+  `10.00`, still counts as one.
+
+- **A file imported into a new collection keeps every column, whatever its
+  headers.** `First Name` and `first_name` became one property, and so did
+  `Price ($)` and `Price (€)`; a header row in Japanese, Cyrillic or Greek
+  collapsed to a single property with an empty key. A header that slugs to
+  nothing is now `column_<n>`, and a taken key gets `_2`, `_3` and so on.
 
 ##### Studio
 
@@ -4709,6 +4852,16 @@ yet, listed so that nobody reads a promise into them:
   `bytea`, `json`, `numeric`, timestamps — because the console now reads and
   writes Postgres's own text form.
 
+- **A folder created on S3 or GCS no longer lists a nameless file.** The
+  zero-byte marker that stands for the folder was returned as an item of its
+  own listing.
+
+- **The storage browser is translated.** Its buttons, tooltips, empty and
+  refused states, dialogs and notifications were English in every locale;
+  they are `studio_storage_*` keys in all seven now, with plural forms for
+  counts. The icon buttons' labels in the collection editor and the storage
+  preview are translated too.
+
 ##### Realtime
 
 - **Realtime socket requests are no longer sent twice after a dropped
@@ -4838,6 +4991,11 @@ yet, listed so that nobody reads a promise into them:
 - With `offline` on, a stored session whose refresh is refused on load no
   longer leaves that user's cached rows readable, or their outbox writable, by
   the now signed-out client.
+
+- **The offline queue replays when the browser comes back online, also with
+  automatic retries off.** With `syncIntervalMs: 0` the queue waited for the
+  app to call `sync()`, although the documentation says the browser's online
+  event triggers a replay. It now does.
 
 ##### Auth
 
@@ -4990,6 +5148,22 @@ yet, listed so that nobody reads a promise into them:
 - `/api/storage/file/DEFAULT/public/x`, `public//x` and `.%2Fpublic/x` are
   served anonymously like `public/x`. The route already served that object;
   the public check refused it.
+
+- **A re-sent resumable-upload chunk is written once.** Two TUS `PATCH`es at
+  the same offset, which is how a client retries a stalled chunk, both
+  appended, so the object held the chunk twice. A `PATCH` that arrives while
+  another is being received now answers `423 UPLOAD_LOCKED`, which
+  tus-js-client retries, and each chunk is written at the offset it declares.
+
+- **S3 and GCS objects keep one version across reads.** Every read of an
+  unchanged object had a new `ETag` and a `Last-Modified` of now, so nothing
+  ever answered `304`, every `?width=` request re-encoded the image, and with
+  `storageRenditionCache` on each such request wrote another rendition into
+  the bucket. Objects are now dated by their last write, on local disk too.
+
+- **Reading a folder as a file is a 404 on local storage,** as on S3 and GCS.
+  `GET /api/storage/file/<folder>` answered 500 with the filesystem's `EISDIR`,
+  and `/metadata/<folder>` answered 200.
 
 #### Security
 
@@ -20652,6 +20826,7 @@ the ID you got. Read the response header.
 | `INVALID_CHALLENGE` | 400 | The MFA challenge is unknown or expired. | Start a new one. |
 | `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |
 | `INVALID_CREDENTIALS` | 401 | Wrong email or password — deliberately not saying which. | Retry, or reset the password. |
+| `INVALID_PLATFORM_TOKEN` | 401 | <span class="since-badge" data-since="0.24">Since 0.24</span> An `rpt_` platform token was refused: a bad signature, the wrong audience, expired, or a lifetime over the ceiling. The message says which. | Have the platform mint a fresh one — on Rebase Cloud, run the command again. |
 | `INVALID_SCOPES` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> A key was asked for something that is not a scope: malformed, unknown, or with a target the scope does not take. `details.problems` says which and why; `details.validScopes` lists them all. | Use a name from the list. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | A verification, reset, magic-link or address-change token is malformed, unknown, spent or expired (400). An OAuth provider credential or a refresh token that does not verify is a 401. | Request a fresh link, or sign in again. |
 | `KEY_MANAGEMENT_SCOPE` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> A key was asked for `keys:read` or `keys:write`. No key may manage keys. `details.scopes` names them. | Leave them out. |
@@ -20662,6 +20837,7 @@ the ID you got. Read the response header.
 | `OAUTH_ERROR` | 401 | The OAuth provider refused, or returned an error. | Retry the flow; the message carries the provider's reason. |
 | `PERSONAL_KEYS_DISABLED` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> Personal API keys are off on this backend. | Set `personalKeys: true` in the users collection's `auth` block. |
 | `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> The service key or a guest session tried to use the personal-key routes. Neither has an account for a key to act as. | Sign in to an account, or create a service key under `/api/admin/api-keys`. |
+| `PLATFORM_TOKENS_OFF` | 401 | <span class="since-badge" data-since="0.24">Since 0.24</span> An `rpt_` platform token reached a server that does not accept them: `REBASE_PLATFORM_TOKEN_KEY` and `REBASE_PLATFORM_TOKEN_AUDIENCE` are not set. | The platform hosting the app sets both when it deploys; redeploy, or sign in to the app another way. |
 | `RATE_LIMITED` | 429 | Too many attempts from this caller. | Back off; the message says for how long. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | The redirect target is not on the allow-list. | Add it to the provider configuration. |
 | `REGISTRATION_DISABLED` | 403 | Self-service sign-up is off. | Have an admin create the account. |
@@ -44031,6 +44207,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
 | `start`, `stop`, `restart` | Pausing a project and bringing it back |
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
+| `cron` | The deployed app's cron jobs and their recorded runs, read with your `rebase cloud` login. Read-only |
 | `env` | Environment variables. `list` never prints values; `--secret` is write-only |
 | `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |

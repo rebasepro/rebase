@@ -1,5 +1,5 @@
 ---
-sourceHash: 52e128ca94563aec
+sourceHash: 406fc1b9cadefefb
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se conecta e faz deploy, e o que o beta privado ainda não inclui.
@@ -245,6 +245,7 @@ janela de manutenção.
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Envio e monitoramento |
 | `start`, `stop`, `restart` | Pausar um projeto e reativá-lo |
 | `status`, `metrics`, `debug` | O que está fazendo e por que não está |
+| `cron` | Os cron jobs do app implantado e suas execuções registradas, lidos com o seu login do `rebase cloud`. Somente leitura |
 | `env` | Variáveis de ambiente. `list` nunca exibe valores; `--secret` é somente gravação |
 | `domains` | Domínios personalizados, registros DNS a adicionar e verificação. Um projeto pode responder em vários, cada um verificado separadamente; `verify` e `remove` recebem o domínio sobre o qual agir, que só pode ser omitido quando houver apenas um (para `verify`, um ainda pendente). `list --json` retorna `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Anexar ou criar um banco de dados, conectar-se a ele a partir da sua máquina, backups, restauração e point-in-time recovery |

@@ -109,6 +109,7 @@ the ID you got. Read the response header.
 | `INVALID_CHALLENGE` | 400 | The MFA challenge is unknown or expired. | Start a new one. |
 | `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |
 | `INVALID_CREDENTIALS` | 401 | Wrong email or password — deliberately not saying which. | Retry, or reset the password. |
+| `INVALID_PLATFORM_TOKEN` | 401 | <span class="since-badge" data-since="0.24">Since 0.24</span> An `rpt_` platform token was refused: a bad signature, the wrong audience, expired, or a lifetime over the ceiling. The message says which. | Have the platform mint a fresh one — on Rebase Cloud, run the command again. |
 | `INVALID_SCOPES` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> A key was asked for something that is not a scope: malformed, unknown, or with a target the scope does not take. `details.problems` says which and why; `details.validScopes` lists them all. | Use a name from the list. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | A verification, reset, magic-link or address-change token is malformed, unknown, spent or expired (400). An OAuth provider credential or a refresh token that does not verify is a 401. | Request a fresh link, or sign in again. |
 | `KEY_MANAGEMENT_SCOPE` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> A key was asked for `keys:read` or `keys:write`. No key may manage keys. `details.scopes` names them. | Leave them out. |
@@ -119,6 +120,7 @@ the ID you got. Read the response header.
 | `OAUTH_ERROR` | 401 | The OAuth provider refused, or returned an error. | Retry the flow; the message carries the provider's reason. |
 | `PERSONAL_KEYS_DISABLED` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> Personal API keys are off on this backend. | Set `personalKeys: true` in the users collection's `auth` block. |
 | `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> The service key or a guest session tried to use the personal-key routes. Neither has an account for a key to act as. | Sign in to an account, or create a service key under `/api/admin/api-keys`. |
+| `PLATFORM_TOKENS_OFF` | 401 | <span class="since-badge" data-since="0.24">Since 0.24</span> An `rpt_` platform token reached a server that does not accept them: `REBASE_PLATFORM_TOKEN_KEY` and `REBASE_PLATFORM_TOKEN_AUDIENCE` are not set. | The platform hosting the app sets both when it deploys; redeploy, or sign in to the app another way. |
 | `RATE_LIMITED` | 429 | Too many attempts from this caller. | Back off; the message says for how long. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | The redirect target is not on the allow-list. | Add it to the provider configuration. |
 | `REGISTRATION_DISABLED` | 403 | Self-service sign-up is off. | Have an admin create the account. |

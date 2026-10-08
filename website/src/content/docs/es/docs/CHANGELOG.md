@@ -71,6 +71,8 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 #### Server & REST
 
+- **`createBackupRoutes` takes `storageFor(destination)`,** replacing its `storage` option. `listBackupObjects`, `readBackupBytes` and `openBackupStream` throw for an object destination they have no controller for, instead of returning nothing. `BackupScheduleStatus.lastRun` excludes manual runs, and adds `lastManualRun`, `disabledInCode`, `refused` and `historyError`. `BackupListing` adds `localDiskOfThisProcess`.
+
 - **A live schema edit commits the collection and `schema.generated.ts`, and
   no SQL.** The commit also carried the five SQL files, but it wrote them at
   the project root while the CLI writes them next to the backend, so a project
@@ -170,6 +172,27 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   is now a compile error. Fix a call site by dropping the prop; nothing about
   what renders changes.
 
+- **The insights plugin reads its figures from named sources, over one
+  comparison period.** An insight carried its own `data()` callback and a
+  `scorecard` mapping, so a figure on the home page and the same figure on a
+  collection's card were two fetches that could disagree, and the change
+  beside a figure was whatever precomputed delta the callback returned.
+  `InsightsPluginConfig` now takes `sources`, functions that each return one
+  record of figures and are called with the `period` (`from`, `to`,
+  `previousFrom`), and an optional `period: { days }` (30 by default). An
+  `InsightDefinition` names its `source`, its `value: { field, format }` and
+  an optional `comparison: { previous, intent, show }`; the plugin works out
+  the change from the two figures, as a percentage or, with
+  `show: "absolute"`, a difference. A source is fetched once per signed-in
+  user however many insights read it. A config whose insight names a source
+  it does not declare, or whose `period.days` is not a whole number of at
+  least 1, throws when the plugin is created. Gone: `ScorecardConfig`,
+  `ScorecardFormat` (now `InsightFormat`, without `showSign`),
+  `InsightDataResult`, `InsightsCache`, `useInsightsData`,
+  `InsightWidgetSkeleton`, and the `description` and `dateRange` fields — the
+  row above the figures names the period itself. New: `InsightsEngine`,
+  `resolvePeriod`, `useInsightSource` and `InsightsRow`.
+
 #### Auth
 
 - **An open realtime socket is re-checked, and closed when its identity has
@@ -204,6 +227,19 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 - **A deleted account's token answers 401 `SESSION_REVOKED`** on every door
   (`/me` used to answer 404).
+
+#### Admin (CMS & app)
+
+- **A markdown field stores an uploaded image as a storage reference, not a
+  URL.** The editor wrote a private file's signed URL into the text, and its
+  download token expires (five minutes by default), so the image broke in the
+  panel and on every site that published the text. The text now holds
+  `rebase-storage:<key>`, with `?storageId=` for a named source, and the
+  panel's editor, preview and board cards exchange it for a fresh URL when
+  they render. A site that renders the markdown itself must do the same:
+  `resolveStorageReferences(text, client)` from `@rebasepro/client` signs each
+  object once per render and leaves a reference to a missing object as it is.
+  Text saved before keeps the URLs it was saved with.
 
 ### Added
 
@@ -357,6 +393,14 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   notices. It is also available over the socket as `EXECUTE_SQL` with
   `mode: "script"`, and as `RebaseWebSocketClient.runSqlScript`.
 
+- **The Backups panel shows how the scheduled backup is going.** A backup job
+  that failed every night left the panel saying "No backups found yet". The
+  listing (`GET /api/admin/backups`, `client.backups.list()`) now carries
+  `schedule`: the job, its cron, whether it is paused, its next run, and its
+  last run with the error when it failed. The panel shows a failed run as an
+  error, a paused schedule as a warning, and otherwise the last and next
+  run.
+
 #### Storage & email
 
 - **`STORAGE_MAX_FILE_SIZE`** (bytes, `__<KEY>` per source) sets the largest
@@ -452,6 +496,13 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   existing collection as a migration and names the new key. `rebase doctor`
   and the boot warning tell you to mark every key column.
 
+- **A server assembled by hand can install the access model a booted backend
+  uses.** `@rebasepro/server` exports `configureAccess`, and
+  `accessModelFromCollections` to build the model from the users collection,
+  beside `configureJwt`, so a server or test built without
+  `initializeRebaseBackend` answers for a person the way a booted backend
+  does.
+
 #### CI & tooling
 
 - **`pnpm check:tsconfig-entries`** fails a tsconfig `include`/`paths`/
@@ -544,15 +595,20 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 #### Server & REST
 
-- **`createBackupRoutes` takes `storageFor(destination)`,** replacing its `storage` option. `listBackupObjects`, `readBackupBytes` and `openBackupStream` throw for an object destination they have no controller for, instead of returning nothing. `BackupScheduleStatus.lastRun` excludes manual runs, and adds `lastManualRun`, `disabledInCode`, `refused` and `historyError`. `BackupListing` adds `localDiskOfThisProcess`.
-
 - **Realtime and SQL admin:** `EXECUTE_SQL_SUCCESS` carries `effectiveRole` when a statement asked for a role, and `SqlScriptResult` has `effectiveRole`. `BranchInfo` has a required `database` field.
 
 - **`compileRulePolicies(collection, rule, options)`** in `@rebasepro/common` is the one compiler of a security rule into Postgres policies. The schema planner delegates to it.
 
+#### Admin (CMS & app)
+
+- **The home page's collection cards show the favourite star on hover or
+  focus,** and keep it once the collection is a favourite, instead of an
+  empty star on every card; a touch screen always shows it. Group labels use
+  the UI kit's micro type and line up with the cards' left edge.
+
 #### Studio
 
-- **The translation key `studio_api_keys_admin_reads_every_row` is renamed to `studio_api_keys_admin_bypasses_rls`.** An app that overrides it must rename its override.
+- **The translation key `studio_api_keys_admin_reads_every_row` is renamed to `studio_api_keys_admin_bypasses_rls`.** An app that overrides it must rename its override. The keys `studio_policy_help_role_authenticated` and `studio_policy_help_role_anon` are removed, with the policy help that named roles no request runs as.
 
 - **`POST /api/admin/schema/plan|apply` and
   `/api/admin/schema-editor/collection/save` accept a `patch`** (operations
@@ -843,7 +899,8 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   `--help` on such a `rebase cloud` line now prints the named action's page.
   A mistyped action is still refused by name.
 
-- **`rebase cloud debug logs`, `errors`, `requests` and `boot` say what
+- **`rebase cloud debug logs`, `rebase cloud debug errors`,
+  `rebase cloud debug requests` and `rebase cloud debug boot` say what
   window their lines cover, and say when a limit cut it.** The control
   plane returns at most 2000 lines per pod and lowered a larger `--tail`
   without saying so, and its `truncated` flag covers only its byte
@@ -939,9 +996,6 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 - **The docs, the scaffold and `rebase-server --help` no longer say boot
   leaves junction-table RLS to `db push`.** Boot applies it.
 
-- **The CLI end-to-end suite passes again,** and no longer leaves the
-  backend it starts running after the suite exits.
-
 - **`rebase skills install --agent codex` writes where Codex reads.** It wrote
   `.codex/skills`, which Codex never opens: Codex reads repository skills from
   `.agents/skills`. It now writes there, the directory Gemini CLI and
@@ -960,6 +1014,16 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   `.gitignore` excludes. `node_modules`, `dist*` and hidden directories are
   skipped either way. Outside a repository, or run inside a copy its repository
   ignores as a whole, it walks every directory.
+
+- **A new project's .env lists the REBASE_MIGRATE_ON_BOOT values the boot
+  accepts.** It offered `migrate` and `off`, and either one stopped the
+  backend from starting. It now lists `ensure` and `none`, says any other
+  value refuses to boot, and points migration files at `rebase db migrate`.
+
+- **The published rebase-collections skill no longer offers a cuid id.** The
+  0.23.0 skill listed `isId: "cuid"`, which config load refuses, so an agent
+  following it wrote a collection whose first boot failed. The skill now
+  offers `manual`, `uuid` and a SQL strategy, and says `cuid` is refused.
 
 #### Admin (CMS & app)
 
@@ -1065,13 +1129,6 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   field someone else changed while you edited a different field of the same
   map.**
 
-- **The list view keeps its scroll position when you come back from a record
-  opened full screen.** Full screen replaces the collection view, and the list
-  view, unlike the table and card views, never saved or restored its offset.
-  Going back landed at the top with only the first page loaded. It now returns
-  to the same rows. The card view also stops jumping back slightly the first
-  time more rows load after a fresh visit.
-
 - **A collection whose slug contains slashes can have subcollections that
   open.** A versioned or locale-partitioned collection such as
   `medico/v2.0.0/joints` opened, but nothing under it did: its subcollection
@@ -1108,6 +1165,18 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 - In the import's mapping step, a key-value map can be chosen as a column's
   target.
+
+- **A column mixing numbers and text is imported as text.** Creating a
+  collection from a CSV voted such a column into a number, so the zip code
+  02134 became 2134, 20-digit SKUs were rounded, and `N/A` or `1,234` in a
+  price column became empty. Text that spells a number exactly, such as
+  `10.00`, still counts as one.
+
+- **A file imported into a new collection keeps every column, whatever its
+  headers.** `First Name` and `first_name` became one property, and so did
+  `Price ($)` and `Price (€)`; a header row in Japanese, Cyrillic or Greek
+  collapsed to a single property with an empty key. A header that slugs to
+  nothing is now `column_<n>`, and a taken key gets `_2`, `_3` and so on.
 
 #### Studio
 
@@ -1238,6 +1307,16 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   `bytea`, `json`, `numeric`, timestamps — because the console now reads and
   writes Postgres's own text form.
 
+- **A folder created on S3 or GCS no longer lists a nameless file.** The
+  zero-byte marker that stands for the folder was returned as an item of its
+  own listing.
+
+- **The storage browser is translated.** Its buttons, tooltips, empty and
+  refused states, dialogs and notifications were English in every locale;
+  they are `studio_storage_*` keys in all seven now, with plural forms for
+  counts. The icon buttons' labels in the collection editor and the storage
+  preview are translated too.
+
 #### Realtime
 
 - **Realtime socket requests are no longer sent twice after a dropped
@@ -1367,6 +1446,11 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 - With `offline` on, a stored session whose refresh is refused on load no
   longer leaves that user's cached rows readable, or their outbox writable, by
   the now signed-out client.
+
+- **The offline queue replays when the browser comes back online, also with
+  automatic retries off.** With `syncIntervalMs: 0` the queue waited for the
+  app to call `sync()`, although the documentation says the browser's online
+  event triggers a replay. It now does.
 
 #### Auth
 
@@ -1519,6 +1603,22 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 - `/api/storage/file/DEFAULT/public/x`, `public//x` and `.%2Fpublic/x` are
   served anonymously like `public/x`. The route already served that object;
   the public check refused it.
+
+- **A re-sent resumable-upload chunk is written once.** Two TUS `PATCH`es at
+  the same offset, which is how a client retries a stalled chunk, both
+  appended, so the object held the chunk twice. A `PATCH` that arrives while
+  another is being received now answers `423 UPLOAD_LOCKED`, which
+  tus-js-client retries, and each chunk is written at the offset it declares.
+
+- **S3 and GCS objects keep one version across reads.** Every read of an
+  unchanged object had a new `ETag` and a `Last-Modified` of now, so nothing
+  ever answered `304`, every `?width=` request re-encoded the image, and with
+  `storageRenditionCache` on each such request wrote another rendition into
+  the bucket. Objects are now dated by their last write, on local disk too.
+
+- **Reading a folder as a file is a 404 on local storage,** as on S3 and GCS.
+  `GET /api/storage/file/<folder>` answered 500 with the filesystem's `EISDIR`,
+  and `/metadata/<folder>` answered 200.
 
 ### Security
 

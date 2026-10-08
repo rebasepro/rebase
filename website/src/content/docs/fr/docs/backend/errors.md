@@ -1,5 +1,5 @@
 ---
-sourceHash: db255f48e87ed15b
+sourceHash: 60bdee68b165358f
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -86,6 +86,7 @@ Envoyer le vôtre permet à une trace de traverser les sauts réseau : une passe
 | `INVALID_CHALLENGE` | 400 | Le challenge MFA est inconnu ou expiré. | Démarrez-en un nouveau. |
 | `INVALID_CODE` | 400 / 401 | Le code OTP ou MFA est incorrect : 400 pour la connexion par code e-mail (`/auth/otp/verify`), 401 pour un enrôlement ou un challenge MFA. | Réessayez avec le code actuel. |
 | `INVALID_CREDENTIALS` | 401 | E-mail ou mot de passe incorrect — sans préciser délibérément lequel. | Réessayez ou réinitialisez le mot de passe. |
+| `INVALID_PLATFORM_TOKEN` | 401 | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Un jeton de plateforme `rpt_` a été refusé : mauvaise signature, mauvaise audience, expiré, ou une durée de vie au-dessus du plafond. Le message dit lequel. | Faites émettre un nouveau jeton par la plateforme — sur Rebase Cloud, relancez la commande. |
 | `INVALID_SCOPES` | 400 | <span class="since-badge" data-since="0.24">Depuis 0.24</span> La demande de clé contient quelque chose qui n'est pas une portée : malformée, inconnue, ou avec une cible que la portée n'accepte pas. `details.problems` indique laquelle et pourquoi ; `details.validScopes` les liste toutes. | Utilisez un nom de la liste. Voir [Rôles et portées](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | Un jeton de vérification, de réinitialisation, de lien magique ou de changement d'adresse est malformé, inconnu, déjà consommé ou expiré (400). Un identifiant de fournisseur OAuth ou un refresh token qui ne se vérifie pas donne un 401. | Demandez un nouveau lien, ou reconnectez-vous. |
 | `KEY_MANAGEMENT_SCOPE` | 400 | <span class="since-badge" data-since="0.24">Depuis 0.24</span> La demande de clé contient `keys:read` ou `keys:write`. Aucune clé ne peut gérer des clés. `details.scopes` les nomme. | Retirez-les. |
@@ -96,6 +97,7 @@ Envoyer le vôtre permet à une trace de traverser les sauts réseau : une passe
 | `OAUTH_ERROR` | 401 | Le fournisseur OAuth a refusé la demande ou a renvoyé une erreur. | Réessayez le flux ; le message contient la raison fournie par le fournisseur. |
 | `PERSONAL_KEYS_DISABLED` | 403 | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Les clés API personnelles sont désactivées sur ce backend. | Définissez `personalKeys: true` dans le bloc `auth` de la collection des utilisateurs. |
 | `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | <span class="since-badge" data-since="0.24">Depuis 0.24</span> La clé de service ou une session invité a tenté d'utiliser les routes des clés personnelles. Aucune des deux n'a de compte au nom duquel une clé pourrait agir. | Connectez-vous à un compte, ou créez une clé de service sous `/api/admin/api-keys`. |
+| `PLATFORM_TOKENS_OFF` | 401 | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Un jeton de plateforme `rpt_` a atteint un serveur qui ne les accepte pas : `REBASE_PLATFORM_TOKEN_KEY` et `REBASE_PLATFORM_TOKEN_AUDIENCE` ne sont pas définies. | La plateforme qui héberge l'application définit les deux au déploiement ; redéployez, ou connectez-vous à l'application autrement. |
 | `RATE_LIMITED` | 429 | Trop de tentatives effectuées par cet appelant. | Ralentissez la cadence ; le message indique pendant combien de temps. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | L'URI de redirection ne figure pas sur la liste autorisée. | Ajoutez-la dans la configuration du fournisseur. |
 | `REGISTRATION_DISABLED` | 403 | L'inscription en libre-service est désactivée. | Demandez à un administrateur de créer le compte. |

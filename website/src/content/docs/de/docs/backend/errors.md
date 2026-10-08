@@ -1,5 +1,5 @@
 ---
-sourceHash: db255f48e87ed15b
+sourceHash: 60bdee68b165358f
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -86,6 +86,7 @@ Einen eigenen Header zu senden stellt sicher, dass ein Trace über Hops hinweg e
 | `INVALID_CHALLENGE` | 400 | Die MFA-Abfrage ist unbekannt oder abgelaufen. | Starten Sie eine neue Abfrage. |
 | `INVALID_CODE` | 400 / 401 | Der OTP- oder MFA-Code ist falsch: 400 bei der Anmeldung per E-Mail-Code (`/auth/otp/verify`), 401 bei einer MFA-Einrichtung oder -Challenge. | Versuchen Sie es mit dem aktuellen Code erneut. |
 | `INVALID_CREDENTIALS` | 401 | Falsche E-Mail-Adresse oder falsches Passwort – bewusst ohne Angabe, was davon zutrifft. | Versuchen Sie es erneut oder setzen Sie das Passwort zurück. |
+| `INVALID_PLATFORM_TOKEN` | 401 | <span class="since-badge" data-since="0.24">Seit 0.24</span> Ein `rpt_`-Plattform-Token wurde abgelehnt: falsche Signatur, falsche Audience, abgelaufen oder eine Lebensdauer über der Obergrenze. Die Meldung sagt, welches davon. | Lassen Sie die Plattform ein neues ausstellen — auf Rebase Cloud führen Sie den Befehl erneut aus. |
 | `INVALID_SCOPES` | 400 | <span class="since-badge" data-since="0.24">Seit 0.24</span> Für einen Schlüssel wurde etwas angefordert, das kein Scope ist: fehlerhaft, unbekannt oder mit einem Ziel, das der Scope nicht annimmt. `details.problems` sagt, welche und warum; `details.validScopes` listet sie alle. | Verwenden Sie einen Namen aus der Liste. Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | Ein Verifizierungs-, Reset-, Magic-Link- oder Adressänderungs-Token ist fehlerhaft, unbekannt, verbraucht oder abgelaufen (400). Ein OAuth-Provider-Credential oder ein Refresh-Token, das sich nicht verifizieren lässt, ergibt 401. | Fordern Sie einen neuen Link an oder melden Sie sich erneut an. |
 | `KEY_MANAGEMENT_SCOPE` | 400 | <span class="since-badge" data-since="0.24">Seit 0.24</span> Für einen Schlüssel wurde `keys:read` oder `keys:write` angefordert. Kein Schlüssel darf Schlüssel verwalten. `details.scopes` nennt sie. | Lassen Sie sie weg. |
@@ -96,6 +97,7 @@ Einen eigenen Header zu senden stellt sicher, dass ein Trace über Hops hinweg e
 | `OAUTH_ERROR` | 401 | Der OAuth-Anbieter hat abgelehnt oder einen Fehler zurückgegeben. | Wiederholen Sie den Vorgang; die Nachricht enthält die Begründung des Anbieters. |
 | `PERSONAL_KEYS_DISABLED` | 403 | <span class="since-badge" data-since="0.24">Seit 0.24</span> Persönliche API-Schlüssel sind auf diesem Backend deaktiviert. | Setzen Sie `personalKeys: true` im `auth`-Block der Users-Collection. |
 | `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | <span class="since-badge" data-since="0.24">Seit 0.24</span> Der Service-Key oder eine Gast-Sitzung hat versucht, die Routen für persönliche Schlüssel zu verwenden. Keiner von beiden hat ein Konto, als das ein Schlüssel handeln könnte. | Melden Sie sich bei einem Konto an, oder erstellen Sie einen Service-Schlüssel unter `/api/admin/api-keys`. |
+| `PLATFORM_TOKENS_OFF` | 401 | <span class="since-badge" data-since="0.24">Seit 0.24</span> Ein `rpt_`-Plattform-Token erreichte einen Server, der keine akzeptiert: `REBASE_PLATFORM_TOKEN_KEY` und `REBASE_PLATFORM_TOKEN_AUDIENCE` sind nicht gesetzt. | Die Plattform, die die App hostet, setzt beide beim Deploy; deployen Sie erneut oder melden Sie sich auf andere Weise bei der App an. |
 | `RATE_LIMITED` | 429 | Zu viele Versuche von diesem Aufrufer. | Warten Sie ab; die Nachricht gibt an, wie lange. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | Das Weiterleitungsziel steht nicht auf der Allowlist. | Fügen Sie es zur Anbieterkonfiguration hinzu. |
 | `REGISTRATION_DISABLED` | 403 | Die Selbstregistrierung ist deaktiviert. | Lassen Sie das Konto von einem Administrator anlegen. |

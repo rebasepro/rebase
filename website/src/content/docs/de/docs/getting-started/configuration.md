@@ -1,5 +1,5 @@
 ---
-sourceHash: 71e8910b2dfa49fa
+sourceHash: 2b0f87a51f64cac3
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -143,6 +143,8 @@ zu stellen und die Antworten zu lesen.
 | `APPLE_KEY_ID` | Schlüssel-ID des bei Apple registrierten privaten Schlüssels. | — |
 | `APPLE_PRIVATE_KEY` | Inhalt der privaten Schlüsseldatei `.p8`, inklusive Zeilenumbrüchen (`\n`-Escapes werden akzeptiert). | — |
 | `REBASE_SERVICE_KEY` | Statischer Admin-API-Schlüssel. Umgeht die normale JWT-Authentifizierung für Server-zu-Server-Aufrufe, wenn er als `Authorization: Bearer <key>` übergeben wird. (In der Entwicklung automatisch generiert). | — |
+| `REBASE_PLATFORM_TOKEN_KEY` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Der öffentliche Schlüssel der Hosting-Plattform (PEM, EC P-256), gegen den `rpt_`-Plattform-Tokens geprüft werden; während einer Schlüsselrotation mehrere PEM-Blöcke. Die Plattform setzt ihn beim Deploy, und er enthält nichts Geheimes. Zusammen mit `REBASE_PLATFORM_TOKEN_AUDIENCE` akzeptiert das Admin-Gate ein Plattform-Token für `cron:read` und für nichts anderes. | — |
+| `REBASE_PLATFORM_TOKEN_AUDIENCE` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Die Projekt-ID, der das `aud` eines Plattform-Tokens entsprechen muss, damit ein für ein anderes Projekt ausgestelltes Token abgelehnt wird. Ist nur eine der beiden Variablen gesetzt, startet der Server, protokolliert eine Warnung und beantwortet jedes `rpt_`-Token mit `401 PLATFORM_TOKENS_OFF`. | — |
 | `REBASE_RATE_LIMIT_STORE` | Wo Zähler für Authentifizierungs-Rate-Limits gespeichert werden: `memory` (pro Prozess) oder `sql` (geteilt über Replikate hinweg). Ein Prozess kann seine eigene Anzahl an Replikaten nicht sehen, daher muss ein Deployment mit Peers dies angeben – drei Replikate auf dem Standardwert erzwingen das dreifache Limit. Jeder andere Wert **verweigert den Start**, anstatt auf einen Fallback zurückzugreifen, einschließlich `postgres`. | `memory` |
 | `AUTH_MAGIC_LINK` | Stellt den passwortlosen Ablauf per Anmelde-Link bereit. Erfordert einen konfigurierten E-Mail-Dienst, da der Link sonst nirgendwohin gesendet werden kann. | `false` |
 | `AUTH_EMAIL_OTP` | Stellt die passwortlose Anmeldung mit einem sechsstelligen, per E-Mail gesendeten Code bereit. Gleiche E-Mail-Anforderung wie oben. | `false` |

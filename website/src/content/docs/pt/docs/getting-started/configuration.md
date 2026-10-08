@@ -1,5 +1,5 @@
 ---
-sourceHash: 71e8910b2dfa49fa
+sourceHash: 2b0f87a51f64cac3
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -144,6 +144,8 @@ respostas.
 | `APPLE_KEY_ID` | Key ID da chave privada registrada na Apple. | — |
 | `APPLE_PRIVATE_KEY` | Conteúdo do arquivo de chave privada `.p8`, incluindo quebras de linha (escapes `\n` são aceitos). | — |
 | `REBASE_SERVICE_KEY` | Chave de API de administração estática. Ignora a autenticação JWT normal para chamadas servidor para servidor quando passada como `Authorization: Bearer <key>`. (Gerada automaticamente em desenvolvimento). | — |
+| `REBASE_PLATFORM_TOKEN_KEY` | <span class="since-badge" data-since="0.24">Desde 0.24</span> A chave pública da plataforma de hospedagem (PEM, EC P-256) contra a qual os tokens de plataforma `rpt_` são verificados; vários blocos PEM durante uma rotação de chaves. A plataforma a define no deploy, e ela não contém nada secreto. Junto com `REBASE_PLATFORM_TOKEN_AUDIENCE`, permite que o portão de administração aceite um token de plataforma para `cron:read`, e para nada mais. | — |
+| `REBASE_PLATFORM_TOKEN_AUDIENCE` | <span class="since-badge" data-since="0.24">Desde 0.24</span> O id do projeto ao qual o `aud` de um token de plataforma deve ser igual, para que um token emitido para outro projeto seja recusado. Com apenas uma das duas variáveis definida, o servidor inicia, registra um aviso e responde a todo token `rpt_` com `401 PLATFORM_TOKENS_OFF`. | — |
 | `REBASE_RATE_LIMIT_STORE` | Onde residem os contadores de limite de taxa (rate limit) de autenticação: `memory` (por processo) ou `sql` (compartilhado entre réplicas). Um processo não pode ver sua própria contagem de réplicas, portanto uma implantação com instâncias irmãs precisa especificar isso — três réplicas no padrão aplicam três vezes o limite. Qualquer outro valor **se recusa a inicializar** em vez de adotar um fallback, incluindo `postgres`. | `memory` |
 | `AUTH_MAGIC_LINK` | Monta o fluxo de link de login sem senha (magic link). Necessita de um serviço de e-mail configurado, senão o link não tem para onde ir. | `false` |
 | `AUTH_EMAIL_OTP` | Monta o login sem senha com um código de seis dígitos enviado por e-mail. Mesma exigência de e-mail mencionada acima. | `false` |

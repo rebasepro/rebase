@@ -1,5 +1,5 @@
 ---
-sourceHash: 71e8910b2dfa49fa
+sourceHash: 2b0f87a51f64cac3
 title: Environnement et configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -144,6 +144,8 @@ réponses.
 | `APPLE_KEY_ID` | ID de clé de la clé privée enregistrée auprès d'Apple. | — |
 | `APPLE_PRIVATE_KEY` | Contenu du fichier de clé privée `.p8`, avec tous ses sauts de ligne (les échappements `\n` sont acceptés). | — |
 | `REBASE_SERVICE_KEY` | Clé d'API administrateur statique. Contourne l'authentification JWT normale pour les appels de serveur à serveur lorsqu'elle est transmise sous la forme `Authorization: Bearer <clé>`. (Générée automatiquement en développement). | — |
+| `REBASE_PLATFORM_TOKEN_KEY` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> La clé publique de la plateforme d'hébergement (PEM, EC P-256) contre laquelle les jetons de plateforme `rpt_` sont vérifiés ; plusieurs blocs PEM pendant une rotation de clés. La plateforme la définit au déploiement, et elle ne contient rien de secret. Avec `REBASE_PLATFORM_TOKEN_AUDIENCE`, elle permet à la barrière d'administration d'accepter un jeton de plateforme pour `cron:read`, et pour rien d'autre. | — |
+| `REBASE_PLATFORM_TOKEN_AUDIENCE` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> L'id du projet auquel le `aud` d'un jeton de plateforme doit être égal, de sorte qu'un jeton émis pour un autre projet est refusé. Si une seule des deux variables est définie, le serveur démarre, journalise un avertissement et répond à chaque jeton `rpt_` par `401 PLATFORM_TOKENS_OFF`. | — |
 | `REBASE_RATE_LIMIT_STORE` | Emplacement des compteurs de limitation de débit d'authentification : `memory` (par processus) ou `sql` (partagé entre les réplicas). Un processus ne peut pas voir son propre nombre de réplicas, donc un déploiement avec des pairs doit le spécifier — trois réplicas sur la valeur par défaut appliquent trois fois la limite. Toute autre valeur **refuse de démarrer** plutôt que de se rabattre, y compris `postgres`. | `memory` |
 | `AUTH_MAGIC_LINK` | Monte le flux de lien de connexion sans mot de passe. Nécessite un service d'e-mail configuré, sinon le lien n'a nulle part où aller. | `false` |
 | `AUTH_EMAIL_OTP` | Monte la connexion sans mot de passe avec un code à six chiffres envoyé par e-mail. Même exigence d'e-mail que ci-dessus. | `false` |

@@ -1,5 +1,5 @@
 ---
-sourceHash: db255f48e87ed15b
+sourceHash: 60bdee68b165358f
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con il rispettivo stato HTTP, il significato e come gestirli — oltre all'envelope di risposta, X-Request-ID e le regole di details.
@@ -111,6 +111,7 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `INVALID_CHALLENGE` | 400 | La verifica MFA è sconosciuta o scaduta. | Avviane una nuova. |
 | `INVALID_CODE` | 400 / 401 | Il codice OTP o MFA non è corretto: 400 dall'accesso con codice email (`/auth/otp/verify`), 401 da una registrazione o da un challenge MFA. | Riprova con il codice attuale. |
 | `INVALID_CREDENTIALS` | 401 | Email o password errata — deliberatamente senza specificare quale delle due. | Riprova, o reimposta la password. |
+| `INVALID_PLATFORM_TOKEN` | 401 | <span class="since-badge" data-since="0.24">Da 0.24</span> Un token di piattaforma `rpt_` è stato rifiutato: firma errata, audience sbagliata, scaduto o una durata oltre il limite. Il messaggio dice quale. | Fai emettere un token nuovo alla piattaforma: su Rebase Cloud, esegui di nuovo il comando. |
 | `INVALID_SCOPES` | 400 | <span class="since-badge" data-since="0.24">Da 0.24</span> A una chiave è stato richiesto qualcosa che non è uno scope: malformato, sconosciuto, o con un target che lo scope non accetta. `details.problems` indica quali e perché; `details.validScopes` li elenca tutti. | Usa un nome dell'elenco. Vedi [Ruoli e scope](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | Un token di verifica, reimpostazione, magic link o cambio indirizzo è malformato, sconosciuto, consumato o scaduto (400). Una credenziale di un provider OAuth o un refresh token che non si verifica restituisce 401. | Richiedi un nuovo link, o accedi di nuovo. |
 | `KEY_MANAGEMENT_SCOPE` | 400 | <span class="since-badge" data-since="0.24">Da 0.24</span> A una chiave sono stati richiesti `keys:read` o `keys:write`. Nessuna chiave può gestire le chiavi. `details.scopes` li nomina. | Escludili. |
@@ -121,6 +122,7 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `OAUTH_ERROR` | 401 | Il provider OAuth ha rifiutato la richiesta o ha restituito un errore. | Riprova il flusso; il messaggio riporta la motivazione del provider. |
 | `PERSONAL_KEYS_DISABLED` | 403 | <span class="since-badge" data-since="0.24">Da 0.24</span> Le chiavi API personali sono disattivate su questo backend. | Imposta `personalKeys: true` nel blocco `auth` della collezione users. |
 | `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | <span class="since-badge" data-since="0.24">Da 0.24</span> La service key o una sessione ospite ha tentato di usare le route delle chiavi personali. Nessuna delle due ha un account con cui una chiave possa agire. | Accedi a un account, oppure crea una chiave di servizio sotto `/api/admin/api-keys`. |
+| `PLATFORM_TOKENS_OFF` | 401 | <span class="since-badge" data-since="0.24">Da 0.24</span> Un token di piattaforma `rpt_` ha raggiunto un server che non li accetta: `REBASE_PLATFORM_TOKEN_KEY` e `REBASE_PLATFORM_TOKEN_AUDIENCE` non sono impostate. | La piattaforma che ospita l'app le imposta entrambe al deploy; esegui di nuovo il deploy, o accedi all'app in un altro modo. |
 | `RATE_LIMITED` | 429 | Troppi tentativi da parte di questo chiamante. | Rallenta le richieste; il messaggio indica per quanto tempo attendere. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | La destinazione del reindirizzamento non è presente nella lista dei consentiti (allow-list). | Aggiungila alla configurazione del provider. |
 | `REGISTRATION_DISABLED` | 403 | L'auto-registrazione è disabilitata. | Chiedi a un amministratore di creare l'account. |
