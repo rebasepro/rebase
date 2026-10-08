@@ -1,5 +1,5 @@
 ---
-sourceHash: 461a5f0e0c5ecec5
+sourceHash: 94b81d143b186ece
 title: Soft delete
 sidebar_label: Soft delete
 description: Trasforma l'eliminazione in un timestamp, nascondi le righe contrassegnate da ogni lettura e ripristinale con un normale aggiornamento.
@@ -78,7 +78,7 @@ L'operazione inversa non è un aggiornamento. Impostare il campo su un valore vi
 `beforeDelete` e `afterDelete` si applicano sempre. Un upsert può creare una riga
 già contrassegnata, ma non contrassegna mai una riga già memorizzata.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Né un upsert scrive in una riga nel cestino: quando la sua chiave appartiene a
+Né un upsert scrive in una riga nel cestino: quando la sua chiave appartiene a
 una riga contrassegnata, viene rifiutato con `409` `ROW_IN_TRASH` e non viene
 scritto nulla. Ripristina prima la riga, oppure elimina definitivamente con
 `?hard=true` e ripeti l'upsert. Sulla 0.23 l'upsert scrive i suoi valori nella

@@ -1,5 +1,5 @@
 ---
-sourceHash: 144c4a3958537ebb
+sourceHash: 15e127696fc3c50e
 title: Integration eines eigenen Servers
 sidebar_label: Eigener Server (Express)
 description: Wie Sie Rebase-Datenbank- und Realtime-Dienste in Ihr eigenes benutzerdefiniertes Node.js-Backend einbetten, ohne Hono oder den Rebase-Koordinator zu verwenden.
@@ -247,7 +247,7 @@ app.use(cors({
 }));
 ```
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Die Rebase-Runtime und das ejected Backend senden diese Liste bereits. Auf 0.23
+Die Rebase-Runtime und das ejected Backend senden diese Liste bereits. Auf 0.23
 geben sie keinen dieser Header frei, sodass ein Frontend auf einem anderen Origin kein `ETag` lesen kann.
 
 ## Verwandte Themen

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0ac5189687d9eccf
+sourceHash: 62e51002f973bf74
 title: Realtime-Abonnements
 sidebar_label: Realtime
 description: Abonnieren Sie Live-Datenänderungen mit dem typisierten SDK von Rebase über WebSocket-basierte Realtime-Listener.
@@ -186,7 +186,7 @@ Der WebSocket-Client übernimmt die Authentifizierung automatisch:
 - `client.ws.state` ist der Zustand der Verbindung — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` oder `closed` — und `client.ws.onStateChange(listener)` wird über jede Änderung informiert. `disconnected` ist der Zustand, in dem `CONNECTION_LOST` gemeldet wurde.
 - Über den Socket gesendete Anfragen sind **at-most-once**. Eine, die gesendet wurde, als die Verbindung abbrach, scheitert mit `CONNECTION_LOST` und wird nie erneut gesendet, da der Server sie möglicherweise schon ausgeführt hat. Eine, die nach 30 Sekunden noch auf einen Socket wartet, scheitert mit `REQUEST_TIMEOUT`, ohne gesendet worden zu sein.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> für alles in der Liste nach der Abmeldung. Unter 0.23 gibt der Client nach
+für alles in der Liste nach der Abmeldung. Unter 0.23 gibt der Client nach
 fünf gescheiterten Wiederverbindungsversuchen auf, reiht Anfragen, die während der Trennung
 gestellt wurden, ein und sendet sie bei der Wiederverbindung, hat kein `client.ws.state`, und der
 Server schließt nie einen Socket, dessen Sitzung beendet wurde.

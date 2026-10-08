@@ -1,5 +1,5 @@
 ---
-sourceHash: b3fe9c24649203e8
+sourceHash: aaa2fdfbd560c4cc
 title: Escritura a través de REST
 sidebar_label: Escritura a través de REST
 description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre clave natural, return=minimal y lotes entre colecciones.
@@ -13,7 +13,7 @@ Más allá de los verbos, las rutas de escritura admiten cinco elementos que cam
 
 El cuerpo de una escritura debe ser un objeto JSON. `null`, un número, una cadena o un array es un `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Una actualización no puede cambiar la clave de una fila. Un cuerpo que nombra
+Una actualización no puede cambiar la clave de una fila. Un cuerpo que nombra
 la clave con otro valor es un `400 KEY_IMMUTABLE`, antes de que se ejecute
 ningún hook y sin que se escriba nada, sea cual sea la vía por la que llega la
 actualización: REST, el socket en tiempo real, MCP o el `rebase.data` en

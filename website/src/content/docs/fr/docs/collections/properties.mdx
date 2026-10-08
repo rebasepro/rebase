@@ -1,5 +1,5 @@
 ---
-sourceHash: d79634002cc11c26
+sourceHash: 60c797ac2e9a363f
 title: Propriétés
 sidebar_label: Propriétés
 description: Les types de propriétés définissent le type de données, la validation et le rendu de l'interface utilisateur pour chaque champ d'une collection. Rebase prend en charge les types string, number, boolean, date, array, map, reference, relation et geopoint.
@@ -82,7 +82,7 @@ price: {
 |-----------|------|-------------|
 | `admin.readOnly` | `boolean` | Empêche la modification |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Désactive avec infobulle optionnelle |
-| `admin.filledByServer` | `boolean` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Le serveur remplit le champ lorsqu'un nouvel enregistrement le laisse vide (un hook `beforeSave`). Le formulaire laisse passer une création sans lui ; il reste requis à l'édition, et les propres vérifications du serveur continuent de s'appliquer |
+| `admin.filledByServer` | `boolean` | Le serveur remplit le champ lorsqu'un nouvel enregistrement le laisse vide (un hook `beforeSave`). Le formulaire laisse passer une création sans lui ; il reste requis à l'édition, et les propres vérifications du serveur continuent de s'appliquer |
 | `admin.hideFromCollection` | `boolean` | Masque de la vue en tableau |
 | `admin.columnWidth` | `number` | Largeur de colonne en pixels (vue en tableau) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Largeur du champ sur la grille de formulaire à quatre colonnes |
@@ -294,7 +294,7 @@ base de données totalement différente, et un utilisateur supprimé ne doit pas
 déclarez une [relation](/docs/collections/relations) si vous souhaitez une jointure.
 
 :::note[Clés primaires composites]
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Marquez plusieurs propriétés avec `isId` et elles forment une clé composite : la table
+Marquez plusieurs propriétés avec `isId` et elles forment une clé composite : la table
 reçoit une unique contrainte `PRIMARY KEY (a, b)`, et une ligne est adressée par toutes
 ses valeurs de clé dans l'ordre de déclaration, jointes par `:::` —
 `company_translation/1:::en_US`. Donnez à chaque colonne de la clé la stratégie qui lui
@@ -307,7 +307,7 @@ d'unicité sur plusieurs colonnes plutôt que l'identité de la ligne, il s'agit
 [index](/docs/backend/indexes) unique. Sur la 0.23, un second `isId` est refusé au
 chargement de la configuration.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une collection dont aucune propriété ne revendique `isId` reçoit sa propre colonne `id` : `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. La base de données la remplit, si bien qu'une ligne créée depuis le panneau d'administration, l'API REST ou le SDK n'a besoin d'aucune clé, et une clé que vous envoyez vous-même est utilisée telle quelle. Une table créée avant l'existence de cette valeur par défaut la reçoit au démarrage suivant. Sur la 0.23 la colonne n'a aucune valeur par défaut, et une création qui n'envoie aucune clé échoue.
+Une collection dont aucune propriété ne revendique `isId` reçoit sa propre colonne `id` : `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. La base de données la remplit, si bien qu'une ligne créée depuis le panneau d'administration, l'API REST ou le SDK n'a besoin d'aucune clé, et une clé que vous envoyez vous-même est utilisée telle quelle. Une table créée avant l'existence de cette valeur par défaut la reçoit au démarrage suivant. Sur la 0.23 la colonne n'a aucune valeur par défaut, et une création qui n'envoie aucune clé échoue.
 :::
 
 ## Propriétés numériques (Number)

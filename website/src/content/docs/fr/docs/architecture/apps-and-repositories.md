@@ -1,5 +1,5 @@
 ---
-sourceHash: 8186aa37929028e4
+sourceHash: 6005371e69144db0
 title: Applications et dépôts
 sidebar_label: Apps & dépôts
 description: Un projet est un backend accompagné des applications qui communiquent avec lui, chacune pouvant résider dans son propre dépôt.
@@ -69,7 +69,7 @@ Les outils qui le connaissent l'utilisent :
 - **`rebase dev`** affiche l'URL du CMS dans sa bannière de démarrage lorsqu'il ne s'agit pas simplement de la page d'accueil du frontend.
 - **`rebase apps list`** l'affiche à côté de l'application qui la sert.
 
-Trois configurations, toutes courantes. <span class="since-badge" data-since="0.24">Depuis 0.24</span> pour la troisième : sur la 0.23 le
+Trois configurations, toutes courantes. pour la troisième : sur la 0.23 le
 `path` d'une application ne peut pas être une URL, si bien que le CMS partage le nom d'hôte du projet.
 
 ```jsonc

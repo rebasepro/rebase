@@ -1,5 +1,5 @@
 ---
-sourceHash: c7a020bdf4f333b9
+sourceHash: 7e5bf22227544ae0
 title: Authentification
 sidebar_label: Authentification
 description: Configurez l'authentification JWT, les fournisseurs OAuth, les e-mails SMTP, la protection contre les bots et la collection d'utilisateurs sur le backend Rebase.
@@ -88,7 +88,7 @@ const backend = await initializeRebaseBackend({
 | `accessExpiresIn` | `string` | `1h` | Durée de vie du jeton d'accès |
 | `refreshExpiresIn` | `string` | `30d` | Durée de vie du jeton de rafraîchissement. Glissante : chaque rotation la renouvelle. Le runtime transmet `JWT_REFRESH_EXPIRES_IN`, dont la valeur par défaut est de `400d` |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | Pendant combien de temps un jeton de rafraîchissement remplacé par rotation génère encore un jumeau de sa session, afin qu'un client qui a perdu la réponse d'un rafraîchissement ne soit pas déconnecté |
-| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Ce que fait un jeton de rafraîchissement présenté après cette fenêtre. `"reject"` le refuse (`TOKEN_ALREADY_USED`) et le journalise, et la session subsiste : ce n'est pas une détection de réutilisation, puisque celui qui a rafraîchi le premier garde la session. `"revoke-session"` met fin à toute la connexion lors d'une telle répétition (`SESSION_REVOKED`), comme le fait GoTrue, et le titulaire se reconnecte. `AUTH_REFRESH_TOKEN_REUSE` |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | Ce que fait un jeton de rafraîchissement présenté après cette fenêtre. `"reject"` le refuse (`TOKEN_ALREADY_USED`) et le journalise, et la session subsiste : ce n'est pas une détection de réutilisation, puisque celui qui a rafraîchi le premier garde la session. `"revoke-session"` met fin à toute la connexion lors d'une telle répétition (`SESSION_REVOKED`), comme le fait GoTrue, et le titulaire se reconnecte. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Exiger une session pour l'API de données |
 | `allowRegistration` | `boolean` | `false` | Ouvrir `POST /api/auth/register`. Hors production, le premier utilisateur sur une table vide est admis dans les deux cas ; en production, l'administrateur est défini avec `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Coupe-circuit : ferme également la fenêtre de bootstrap du premier utilisateur laissée ouverte par `allowRegistration: false` |
@@ -99,8 +99,8 @@ const backend = await initializeRebaseBackend({
 | `email` | `EmailConfig` | — | SMTP, pour la réinitialisation de mot de passe, la vérification, les invitations et les liens magiques |
 | `magicLink` | `boolean` | `false` | Activer la connexion sans mot de passe par e-mail. Nécessite la configuration d'`email` ; sinon, les routes répondent `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Activer les codes de connexion à six chiffres par e-mail — voir [Codes à usage unique](#codes-à-usage-unique-par-e-mail). Même prérequis concernant l'e-mail |
-| `magicLinkCreatesUsers` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Inscription sans mot de passe : une demande de lien magique ou de code par e-mail pour une adresse sans compte en crée un (sans mot de passe, non vérifié jusqu'à l'utilisation du lien ou du code), tant que `allowRegistration` est activé. Exécute `beforeUserCreate` et le rôle par défaut. Désactivé, ces demandes ne créent rien et répondent à une adresse inconnue comme à une adresse connue. `AUTH_MAGIC_LINK_CREATES_USERS` |
-| `requireEmailVerification` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Refuser la connexion par mot de passe tant que l'adresse n'est pas vérifiée, et rendre l'inscription à confirmation préalable — voir [Vérification de l'e-mail](/docs/backend/email-verification/). Nécessite `email` ; le démarrage le refuse sans cela |
+| `magicLinkCreatesUsers` | `boolean` | `false` | Inscription sans mot de passe : une demande de lien magique ou de code par e-mail pour une adresse sans compte en crée un (sans mot de passe, non vérifié jusqu'à l'utilisation du lien ou du code), tant que `allowRegistration` est activé. Exécute `beforeUserCreate` et le rôle par défaut. Désactivé, ces demandes ne créent rien et répondent à une adresse inconnue comme à une adresse connue. `AUTH_MAGIC_LINK_CREATES_USERS` |
+| `requireEmailVerification` | `boolean` | `false` | Refuser la connexion par mot de passe tant que l'adresse n'est pas vérifiée, et rendre l'inscription à confirmation préalable — voir [Vérification de l'e-mail](/docs/backend/email-verification/). Nécessite `email` ; le démarrage le refuse sans cela |
 | `cookieAuth` | `CookieAuthConfig` | — | Délivrer le jeton de rafraîchissement sous forme de cookie `httpOnly` `Secure` `SameSite` plutôt que dans le corps JSON — voir ci-dessous |
 | `providers` | `OAuthProvider[]` | `[]` | Tableau OAuth canonique ; les champs de fournisseurs nommés s'y résolvent |
 | `allowedRedirectUris` | `string[]` | — | Restreindre les URI de redirection acceptées par les routes OAuth |
@@ -129,7 +129,7 @@ Le cookie porte le flag `Secure` à moins que vous ne le désactiviez, et rien d
 :::caution[Les callbacks de collection ne se déclenchent pas pour les utilisateurs auth]
 La création et les mises à jour d'utilisateurs via le système d'authentification — inscription, gestion des utilisateurs par un administrateur et OAuth — écrivent **directement** dans le magasin d'utilisateurs et contournent le pipeline d'enregistrement de la collection. Un callback `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete` sur la collection auth (utilisateurs) ne s'exécutera **pas** pour ces opérations. Pour des effets de bord tels que le provisionnement d'une équipe personnelle à l'inscription, utilisez les hooks de cycle de vie de l'authentification (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), qui reçoivent l'enregistrement utilisateur entièrement renseigné.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> OAuth exécute les mêmes hooks que les autres connexions : `beforeLogin`
+OAuth exécute les mêmes hooks que les autres connexions : `beforeLogin`
 (avec l'adresse du fournisseur et `"oauth"`), `beforeUserCreate` lorsque la connexion crée le
 compte, `afterUserCreate`, et `onAuthenticated`. `onAuthenticated` se déclenche aussi lors d'un
 rafraîchissement de jeton (`"refresh"`), d'une réinitialisation de mot de passe
@@ -138,7 +138,7 @@ rafraîchissement, qui n'est pas une connexion. Pour arrêter un compte déjà c
 désactivez-le avec `PUT /api/admin/users/:uid { disabled: true }` : cela refuse chaque connexion
 et chaque rafraîchissement, et met fin à chaque session et jeton qu'il détient.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> `beforeEmailChange(user, newEmail)` s'exécute lorsqu'une personne connectée
+`beforeEmailChange(user, newEmail)` s'exécute lorsqu'une personne connectée
 demande à déplacer son compte vers une autre adresse. Une règle d'adresse que vous appliquez à
 l'inscription dans `beforeUserCreate` (uniquement votre propre domaine, par exemple) a aussi sa
 place ici, sinon un membre peut s'inscrire avec une adresse autorisée puis se déplacer vers
@@ -360,7 +360,7 @@ Ce comportement n'est pas configurable — il n'existe délibérément aucune op
 
 ### Vérification de l'e-mail
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> L'inscription envoie au nouveau compte un
+L'inscription envoie au nouveau compte un
 lien de vérification par e-mail, et le suivre ne conserve que ce que la personne qui le suit
 prouve aussi. `requireEmailVerification` rend l'inscription à confirmation préalable. Voir
 [Vérification de l'e-mail](/docs/backend/email-verification/).

@@ -1,5 +1,5 @@
 ---
-sourceHash: 719f802a23cf78ec
+sourceHash: 98867dc8dd9d38a9
 title: Schema como Código
 sidebar_label: Schema como Código
 description: Como o Rebase usa coleções TypeScript como a única fonte de verdade para o seu schema de banco de dados, UI e API.
@@ -128,7 +128,7 @@ export const relations = {  };
 
 Três coisas ali merecem uma segunda leitura. A coluna `id` que você não
 declarou: toda coleção recebe uma chave primária `text`, a menos que uma
-propriedade reivindique `isId`, e <span class="since-badge" data-since="0.24">Since 0.24</span> o banco de dados a preenche com um uuid
+propriedade reivindique `isId`, e o banco de dados a preenche com um uuid
 (`gen_random_uuid()::text`), de modo que uma linha criada pelo painel admin,
 pela API REST ou pelo SDK não precisa de chave própria. Uma chave que você
 envia é usada como está. Na 0.23 a coluna não tem default, e uma criação que

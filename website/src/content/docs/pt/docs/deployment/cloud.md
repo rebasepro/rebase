@@ -1,5 +1,5 @@
 ---
-sourceHash: 406fc1b9cadefefb
+sourceHash: d2f6e11d9e4f2f6e
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se conecta e faz deploy, e o que o beta privado ainda não inclui.
@@ -150,7 +150,7 @@ a versão restaurada começar a responder antes de reportar sucesso. Acompanhe c
 
 ## CI e agentes
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Um job de CI ou um agente não deveria carregar a sua senha. Dê a ele um token: uma chave que age como a sua conta, restrita a poucas ações em um projeto. Crie-o a partir de um terminal autenticado:
+Um job de CI ou um agente não deveria carregar a sua senha. Dê a ele um token: uma chave que age como a sua conta, restrita a poucas ações em um projeto. Crie-o a partir de um terminal autenticado:
 
 ```bash
 rebase cloud tokens create --project shop --can deploy,logs --expires-in 90

@@ -1,5 +1,5 @@
 ---
-sourceHash: dcc8ea957511a4ea
+sourceHash: 4fc97bd0da41030a
 title: Escrita de dados
 sidebar_label: Escrita de dados
 description: crie, faça upsert, atualize e exclua com o SDK — operações de campo, escritas condicionais, chaves de idempotência, escritas em lote e escrita entre coleções em uma única transação.
@@ -145,7 +145,7 @@ se degrade para uma atualização comum em vez de lançar um erro.
 
 A partir de um navegador em outra origem — um frontend Vite em sua própria
 porta, um host `app.` chamando um host `api.` — o `ETag` só é legível porque o
-servidor o nomeia em `Access-Control-Expose-Headers`. <span class="since-badge" data-since="0.24">Since 0.24</span> O runtime do Rebase faz
+servidor o nomeia em `Access-Control-Expose-Headers`. O runtime do Rebase faz
 isso, junto com `Retry-After`, `X-Request-ID`, os cabeçalhos `X-RateLimit-*` e
 `Preference-Applied`; na 0.23 ele não expõe nenhum deles, então o `etagOf` é
 `undefined` entre origens ali. Um backend que configura seu próprio `cors()` precisa
@@ -280,7 +280,7 @@ result.meta;  // { operations: 4 }
 `op` é `create`, `update`, `upsert` ou `delete`, e `collection` restringe
 `values` ao formato gerado de `Insert` ou `Update` daquela coleção — uma coluna
 que a coleção não tem é um erro de compilação, assim como um `create` sem uma
-coluna obrigatória. <span class="since-badge" data-since="0.24">Since 0.24</span> `collection` é o accessor, o nome que `client.data.<accessor>`
+coluna obrigatória. `collection` é o accessor, o nome que `client.data.<accessor>`
 usa (`orderItems` para o slug `order_items`); o cliente envia o slug, através do
 dicionário `collections` com o qual foi criado. Na 0.23 um batch tipado
 envia o accessor como está escrito, então uma coleção em snake_case não pode ser

@@ -1,5 +1,5 @@
 ---
-sourceHash: 411eeede8d2eab1b
+sourceHash: 7c51c9877d9d0803
 title: Chiavi API
 sidebar_label: Chiavi API
 description: "Chiavi di lunga durata per script, CI, agenti e integrazioni: chiavi di servizio e chiavi personali, gli scope che possiedono, come si combinano con la sicurezza a livello di riga e le route che le gestiscono."
@@ -7,7 +7,7 @@ description: "Chiavi di lunga durata per script, CI, agenti e integrazioni: chia
 
 ## Chiavi API
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Una chiave API è una credenziale bearer di lunga durata, `rk_live_…`, per un chiamante che
+Una chiave API è una credenziale bearer di lunga durata, `rk_live_…`, per un chiamante che
 non è una persona in un browser: uno script, un job di CI, un agente, un client MCP, un altro
 servizio. Ciò che una chiave può fare è un elenco di [scope](/docs/backend/roles-and-scopes/),
 come `data:read:orders` o `cron:write`.
@@ -37,7 +37,7 @@ superfici di amministrazione raggiunte dai suoi scope, sul WebSocket realtime e 
 
 ### Crearne una
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Una chiave di servizio richiede un nome e almeno uno scope.
+Una chiave di servizio richiede un nome e almeno uno scope.
 
 ```bash
 # CLI: talks to the backend with the service key from .env
@@ -137,7 +137,7 @@ admin.
 
 ### Accesso completo, per CI e migrazioni
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> `--full-access` dà alla chiave ogni scope che il suo creatore possiede, tranne `keys:read` e
+`--full-access` dà alla chiave ogni scope che il suo creatore possiede, tranne `keys:read` e
 `keys:write`, che nessuna chiave può avere. Tramite la CLI, che usa la chiave di servizio,
 sono tutti gli scope del piano dati e del piano di amministrazione. Aggiungi `--roles admin` e
 la sicurezza a livello di riga non limita più quali righe legge, modifica o elimina:
@@ -151,7 +151,7 @@ rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
 
 ### Limite di richieste
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Il `rate_limit` di una chiave è il numero di richieste che può fare in un intervallo
+Il `rate_limit` di una chiave è il numero di richieste che può fare in un intervallo
 di 15 minuti, e ogni porta d'accesso lo consuma in un unico bucket, `api-key:<id>`:
 
 - le sue richieste HTTP alle API di dati, storage e funzioni;
@@ -168,7 +168,7 @@ dell'editor SQL, non hanno limite di richieste.
 
 ## Chiavi personali
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Una chiave personale agisce **come il suo proprietario**: con il suo uid, e con i suoi ruoli così come sono a
+Una chiave personale agisce **come il suo proprietario**: con il suo uid, e con i suoi ruoli così come sono a
 ogni richiesta. Le regole basate sul proprietario le corrispondono, quindi legge esattamente ciò che leggerebbe
 il suo proprietario, ristretto dai suoi scope. È adatta agli script di una persona, a una CLI sul suo
 portatile, o a uno strumento che collega al proprio account.
@@ -283,7 +283,7 @@ SQL e dei branch richiedono `database:read` o `database:write`.
 
 ## Agenti e server MCP
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Un agente ha bisogno della chiave *più ristretta* che svolga il suo lavoro. Parti da scope limitati, e dalle
+Un agente ha bisogno della chiave *più ristretta* che svolga il suo lavoro. Parti da scope limitati, e dalle
 una scadenza:
 
 ```bash

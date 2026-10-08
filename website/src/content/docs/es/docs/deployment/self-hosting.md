@@ -1,5 +1,5 @@
 ---
-sourceHash: 57da5c05731b0030
+sourceHash: ae8d9da2fa3d1e43
 title: Autoalojamiento
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial del runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS básico.
@@ -130,7 +130,7 @@ Para un despliegue real, es preferible empaquetar ambos dentro de una imagen, lo
 lo que se ejecuta:
 
 ```dockerfile
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 
@@ -228,7 +228,7 @@ ejecute contenedores funcionará. Dos cosas que debes configurar correctamente e
 
 ```toml
 [build]
-  image = "rebasepro/server:0.23.0"
+  image = "rebasepro/server:0.24.0"
 
 [http_service]
   internal_port = 8080
@@ -380,7 +380,7 @@ nosniff`, una `Referrer-Policy` y `Strict-Transport-Security: max-age=15552000`
 (180 días). La cabecera HSTS omite `includeSubDomains`: eso le diría a los
 navegadores que rechacen HTTP simple en todos los subdominios de tu dominio,
 incluidos los que este servidor no tiene nada que ver, y un navegador la
-mantiene durante todo el tiempo que indique la cabecera. <span class="since-badge" data-since="0.24">Desde 0.24</span>
+mantiene durante todo el tiempo que indique la cabecera.
 Define `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` cuando todos los subdominios sean
 solo HTTPS; hasta la 0.23 inclusive, la cabecera siempre llevaba
 `includeSubDomains`.
@@ -415,7 +415,7 @@ procesos colaborativos. Consulta [Procesos separados](/docs/deployment/split-pro
 ## Actualización
 
 ```yaml
-image: rebasepro/server:0.23.0
+image: rebasepro/server:0.24.0
 ```
 
 Reinicia. Tu bundle no cambia. Dentro de una versión principal (major) del contrato del runtime, un bundle que

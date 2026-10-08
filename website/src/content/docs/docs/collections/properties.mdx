@@ -81,7 +81,7 @@ price: {
 |----------|------|-------------|
 | `admin.readOnly` | `boolean` | Prevent editing |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Disable with optional tooltip |
-| `admin.filledByServer` | `boolean` | <span class="since-badge" data-since="0.24">Since 0.24</span> The server fills the field when a new record leaves it empty (a `beforeSave` hook). The form lets a create through without it; it stays required on edit, and the server's own checks still apply |
+| `admin.filledByServer` | `boolean` | The server fills the field when a new record leaves it empty (a `beforeSave` hook). The form lets a create through without it; it stays required on edit, and the server's own checks still apply |
 | `admin.hideFromCollection` | `boolean` | Hide from table view |
 | `admin.columnWidth` | `number` | Column width in pixels (table view) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Field width over the four-column form grid |
@@ -293,7 +293,7 @@ database entirely, and a deleted user must not take the audit trail with them â€
 declare a [relation](/docs/collections/relations) if you want the join.
 
 :::note[Composite primary keys]
-<span class="since-badge" data-since="0.24">Since 0.24</span> Mark several properties `isId` and they are one composite key: the table gets a
+Mark several properties `isId` and they are one composite key: the table gets a
 single `PRIMARY KEY (a, b)` constraint, and a row is addressed by all of its key
 values in declaration order, joined with `:::` â€” `company_translation/1:::en_US`.
 Give each key column the strategy that fits it: `isId: true` for a value the
@@ -305,7 +305,7 @@ uniqueness constraint over several columns rather than the row's identity, that
 is a unique [index](/docs/backend/indexes). On 0.23 a second `isId` is refused at
 config load.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A collection where no property claims `isId` gets an `id` column of its own:
+A collection where no property claims `isId` gets an `id` column of its own:
 `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. The database fills it, so a
 row created from the admin panel, the REST API or the SDK needs no key, and a key
 you do send is used as given. A table created before this default existed gets

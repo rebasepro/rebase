@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fee7de68fa81701
+sourceHash: 0b7bd3b233513344
 title: Agent Skills
 sidebar_label: Agent Skills
 description: rebase skills install scrive 21 skill di riferimento di Rebase nel tuo repository, nel layout previsto dal tuo assistente IA — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
@@ -15,7 +15,7 @@ Le skill sono **materiale di consultazione, non strumenti**. Spiegano all'assist
 
 ## Configurazione tramite `rebase init`
 
-<span class="since-badge" data-since="0.24">Dalla 0.24</span> Un nuovo progetto non necessita di questo comando. `rebase init` chiede se configurare i tuoi agent di coding IA, quindi elenca quelli rilevati sulla macchina:
+Un nuovo progetto non necessita di questo comando. `rebase init` chiede se configurare i tuoi agent di coding IA, quindi elenca quelli rilevati sulla macchina:
 
 ```text
 ? Set up Rebase skills and the Rebase MCP server for your AI coding agent(s)? Yes
@@ -38,7 +38,7 @@ rebase init my-app --yes --agent claude,cursor
 
 ## Un progetto esistente
 
-<span class="since-badge" data-since="0.24">Dalla 0.24</span> `rebase init` si rifiuta su una cartella che contiene già un progetto, quindi un
+`rebase init` si rifiuta su una cartella che contiene già un progetto, quindi un
 progetto creato prima che esistesse la configurazione degli agent — o uno il
 cui autore ha rifiutato la richiesta — ottiene la stessa configurazione con
 `rebase skills install --mcp`: le skill, e il [server MCP](/docs/ai/mcp)

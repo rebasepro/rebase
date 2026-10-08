@@ -49,7 +49,7 @@ volume, so a restart costs a manifest check rather than a re-download and an
 **`image`** — an image with the bundle already inside:
 
 ```dockerfile
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 

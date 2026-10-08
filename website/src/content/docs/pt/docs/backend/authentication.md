@@ -1,5 +1,5 @@
 ---
-sourceHash: c7a020bdf4f333b9
+sourceHash: 7e5bf22227544ae0
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure a autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a coleção de usuários no backend do Rebase.
@@ -88,7 +88,7 @@ const backend = await initializeRebaseBackend({
 | `accessExpiresIn` | `string` | `1h` | Tempo de vida do token de acesso |
 | `refreshExpiresIn` | `string` | `30d` | Tempo de vida do refresh token. Deslizante: cada rotação o renova. O runtime passa `JWT_REFRESH_EXPIRES_IN`, cujo padrão próprio é `400d` |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | Por quanto tempo um refresh token que foi rotacionado ainda emite um irmão da sua sessão, de modo que um cliente que perdeu uma resposta de refresh não seja desconectado |
-| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | <span class="since-badge" data-since="0.24">Since 0.24</span> O que um refresh token apresentado depois dessa janela faz. `"reject"` o recusa (`TOKEN_ALREADY_USED`) e registra o fato, e a sessão permanece: isso não é detecção de reuso, já que quem fez o refresh primeiro mantém a sessão. `"revoke-session"` encerra todo o login nesse replay (`SESSION_REVOKED`), como o GoTrue faz, e o proprietário faz login novamente. `AUTH_REFRESH_TOKEN_REUSE` |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | O que um refresh token apresentado depois dessa janela faz. `"reject"` o recusa (`TOKEN_ALREADY_USED`) e registra o fato, e a sessão permanece: isso não é detecção de reuso, já que quem fez o refresh primeiro mantém a sessão. `"revoke-session"` encerra todo o login nesse replay (`SESSION_REVOKED`), como o GoTrue faz, e o proprietário faz login novamente. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Exigir uma sessão para a API de dados |
 | `allowRegistration` | `boolean` | `false` | Libera `POST /api/auth/register`. Fora de produção, o primeiro usuário em uma tabela vazia é admitido de qualquer forma; em produção, o admin é definido com `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: também fecha a janela de bootstrap do primeiro usuário que `allowRegistration: false` deixa aberta |
@@ -99,8 +99,8 @@ const backend = await initializeRebaseBackend({
 | `email` | `EmailConfig` | — | SMTP, para redefinição de senha, verificação, convites e magic links |
 | `magicLink` | `boolean` | `false` | Habilita login por e-mail sem senha (passwordless). Requer `email` configurado; sem isso, as rotas respondem com `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Habilita códigos de login de seis dígitos por e-mail — consulte [Códigos de uso único](#códigos-de-uso-único-por-e-mail). Mesma exigência de e-mail |
-| `magicLinkCreatesUsers` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Since 0.24</span> Cadastro sem senha: uma requisição de magic link ou código por e-mail para um endereço sem conta cria uma (sem senha, não verificada até que o link ou código seja usado), enquanto `allowRegistration` estiver ativo. Executa `beforeUserCreate` e a role padrão. Desativado, essas requisições não criam nada e respondem a um endereço desconhecido como respondem a um conhecido. `AUTH_MAGIC_LINK_CREATES_USERS` |
-| `requireEmailVerification` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Since 0.24</span> Recusa o login por senha até que o endereço seja verificado, e torna o registro confirm-first — consulte [Verificação de e-mail](/docs/backend/email-verification/). Requer `email`; a inicialização o recusa sem isso |
+| `magicLinkCreatesUsers` | `boolean` | `false` | Cadastro sem senha: uma requisição de magic link ou código por e-mail para um endereço sem conta cria uma (sem senha, não verificada até que o link ou código seja usado), enquanto `allowRegistration` estiver ativo. Executa `beforeUserCreate` e a role padrão. Desativado, essas requisições não criam nada e respondem a um endereço desconhecido como respondem a um conhecido. `AUTH_MAGIC_LINK_CREATES_USERS` |
+| `requireEmailVerification` | `boolean` | `false` | Recusa o login por senha até que o endereço seja verificado, e torna o registro confirm-first — consulte [Verificação de e-mail](/docs/backend/email-verification/). Requer `email`; a inicialização o recusa sem isso |
 | `cookieAuth` | `CookieAuthConfig` | — | Entrega o refresh token como um cookie `httpOnly` `Secure` `SameSite` em vez de no corpo JSON — veja abaixo |
 | `providers` | `OAuthProvider[]` | `[]` | O array canônico de OAuth; os campos de provedores nomeados são resolvidos nele |
 | `allowedRedirectUris` | `string[]` | — | Restringe quais URIs de redirecionamento as rotas OAuth aceitam |
@@ -152,7 +152,7 @@ colaterais como provisionar uma equipe pessoal no cadastro, utilize os hooks de
 ciclo de vida de autenticação (`afterUserCreate`, `beforeUserCreate`,
 `afterUserDelete`, …), que recebem o registro de usuário totalmente preenchido.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> O OAuth executa os mesmos hooks que os outros logins: `beforeLogin` (com
+O OAuth executa os mesmos hooks que os outros logins: `beforeLogin` (com
 o endereço do provedor e `"oauth"`), `beforeUserCreate` quando o login cria
 a conta, `afterUserCreate`, e `onAuthenticated`. `onAuthenticated` também
 dispara em uma atualização de token (`"refresh"`), uma redefinição de senha (`"password-reset"`) e
@@ -161,7 +161,7 @@ um login. Para impedir uma conta que já está conectada, desative-a com
 `PUT /api/admin/users/:uid { disabled: true }`: isso recusa todo login e
 refresh e encerra toda sessão e token que ela possui.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `beforeEmailChange(user, newEmail)` executa quando um usuário conectado pede para
+`beforeEmailChange(user, newEmail)` executa quando um usuário conectado pede para
 mover sua conta para outro endereço. Uma regra de endereço que você aplica no cadastro
 em `beforeUserCreate` (apenas o seu próprio domínio, por exemplo) também pertence aqui, ou um membro
 pode se cadastrar com um endereço permitido e depois mudar para qualquer outro.
@@ -502,7 +502,7 @@ vincular contas com e-mails não verificados.
 
 ### Verificação de e-mail
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> O registro envia à nova conta um
+O registro envia à nova conta um
 link de verificação, e segui-lo mantém apenas o que a pessoa que o segue também
 comprova. `requireEmailVerification` torna o registro confirm-first. Veja
 [Verificação de e-mail](/docs/backend/email-verification/).

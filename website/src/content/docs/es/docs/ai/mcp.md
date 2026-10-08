@@ -1,5 +1,5 @@
 ---
-sourceHash: 1cc4acaed4c60088
+sourceHash: 373a79f1c328f730
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: "Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto de Rebase: las 42 herramientas que expone, la credencial con la que se autentica y la barrera de loopback que se interpone entre un agente y producción."
@@ -28,7 +28,7 @@ integración completa — arranca esa copia (`pnpm exec rebase-mcp`, o `npx --no
 en un proyecto npm), nunca una más reciente desde npm. Un proyecto más antiguo la añade
 una vez, con `rebase skills install --mcp` o `pnpm add -D @rebasepro/mcp`.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> `rebase init` escribe el bloque para cada agente que elijas cuando
+`rebase init` escribe el bloque para cada agente que elijas cuando
 [configura tus agentes de programación con IA](/docs/ai/skills#set-up-by-rebase-init), manteniendo
 cualquier otro servidor que ya esté en el archivo. `rebase init --agent cursor,codex` hace
 lo mismo sin preguntar.
@@ -195,7 +195,7 @@ resuelva el proyecto.
 
 ### Proporcionar una credencial restringida en su lugar
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Registra una [clave de API](/docs/backend/api-keys) con alcance restringido y el modelo de dos
+Registra una [clave de API](/docs/backend/api-keys) con alcance restringido y el modelo de dos
 barreras se aplicará de verdad. Una clave de servicio se ejecuta con los roles
 `["service"]`, los cuales las políticas de administración inyectadas **no** nombran; por lo tanto,
 RLS no le otorga nada a menos que una de tus propias políticas indique lo contrario, y sus
@@ -449,7 +449,7 @@ de inicio. Ningún `REBASE_ROLE` lo activa.
   activado por defecto; `REBASE_MCP_OPEN_REGISTRATION=false` lo limita a los clientes que
   registres) y envía a la persona a una pantalla de consentimiento que inicia su sesión a
   través de tu `/auth/login` existente.
-- <span class="since-badge" data-since="0.24">Desde 0.24</span> **Siete herramientas, tres alcances.** Los mismos [alcances](/docs/backend/roles-and-scopes/)
+- **Siete herramientas, tres alcances.** Los mismos [alcances](/docs/backend/roles-and-scopes/)
   que usa toda credencial. `data:read` ofrece `list_collections`, `query_collection`,
   `count_documents` y `get_document`; `data:write` añade `create_document` y `update_document`; `data:delete`
   añade `delete_document`. Un cliente que no pide nada recibe `data:read`. Cada uno se
@@ -460,7 +460,7 @@ de inicio. Ningún `REBASE_ROLE` lo activa.
 - **Las concesiones anteriores a 0.24 conservan su alcance.** `mcp:read` se lee como
   `data:read`, y `mcp:write` como `data:write data:delete`, en las concesiones guardadas y en
   los tokens ya emitidos.
-- <span class="since-badge" data-since="0.24">Desde 0.24</span> **También funciona una clave de API.** `/mcp` acepta además `Authorization: Bearer rk_…`,
+- **También funciona una clave de API.** `/mcp` acepta además `Authorization: Bearer rk_…`,
   para un cliente configurado con una cabecera en lugar de un flujo OAuth. La clave llega a
   las herramientas que cubren sus alcances `data:*`, como quien sea que represente: una
   [clave personal](/docs/backend/api-keys/#personal-keys) como su propietario, una clave de

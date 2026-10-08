@@ -4,7 +4,7 @@ sidebar_label: Roles and scopes
 description: "What a caller may do: the data plane every person holds, the admin plane that roles grant, the scopes an app declares for itself, and how each credential carries them."
 ---
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Every request to a Rebase backend asks one question: may this caller do this?
+Every request to a Rebase backend asks one question: may this caller do this?
 The answer is a **scope**, a string named `resource:action`: `data:read`,
 `users:write`, `cron:read`. A person's session, an API key, an MCP token and a
 role all hold scopes, and they all use the same strings. A grant reads the same
@@ -78,7 +78,7 @@ Admin-plane scopes take no target. An app scope takes one when it declares a
 
 ## Declaring roles
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Roles are declared on the users collection, under `auth.roles`. A role is a name
+Roles are declared on the users collection, under `auth.roles`. A role is a name
 the database sees, which RLS policies can match, plus a list of admin-plane and
 app scopes.
 
@@ -265,7 +265,7 @@ and the database's policies for the identity it acts as are another.
 
 ## When a scope is missing
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> The answer is `403 SCOPE_MISSING`, and `details.requiredScope` names the scope,
+The answer is `403 SCOPE_MISSING`, and `details.requiredScope` names the scope,
 with its target when there is one:
 
 ```json

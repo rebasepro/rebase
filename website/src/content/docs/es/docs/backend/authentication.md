@@ -1,5 +1,5 @@
 ---
-sourceHash: c7a020bdf4f333b9
+sourceHash: 7e5bf22227544ae0
 title: Autenticación
 sidebar_label: Autenticación
 description: Configura la autenticación JWT, proveedores OAuth, correo SMTP, protección contra bots y la colección de usuarios en el backend de Rebase.
@@ -88,7 +88,7 @@ const backend = await initializeRebaseBackend({
 | `accessExpiresIn` | `string` | `1h` | Tiempo de vida del token de acceso |
 | `refreshExpiresIn` | `string` | `30d` | Tiempo de vida del token de actualización. Deslizante: cada rotación lo renueva. El runtime pasa `JWT_REFRESH_EXPIRES_IN`, cuyo valor predeterminado es `400d` |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | Durante cuánto tiempo un refresh token que ya se rotó sigue generando un hermano de su sesión, para que un cliente que perdió la respuesta de una renovación no quede desconectado |
-| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | <span class="since-badge" data-since="0.24">Desde 0.24</span> Qué hace un refresh token presentado después de esa ventana. `"reject"` lo rechaza (`TOKEN_ALREADY_USED`) y lo registra, y la sesión se mantiene: esto no es detección de reutilización, ya que quien refrescó primero conserva la sesión. `"revoke-session"` termina todo el inicio de sesión ante tal repetición (`SESSION_REVOKED`), como hace GoTrue, y el propietario vuelve a iniciar sesión. `AUTH_REFRESH_TOKEN_REUSE` |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | Qué hace un refresh token presentado después de esa ventana. `"reject"` lo rechaza (`TOKEN_ALREADY_USED`) y lo registra, y la sesión se mantiene: esto no es detección de reutilización, ya que quien refrescó primero conserva la sesión. `"revoke-session"` termina todo el inicio de sesión ante tal repetición (`SESSION_REVOKED`), como hace GoTrue, y el propietario vuelve a iniciar sesión. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Requiere una sesión para la API de datos |
 | `allowRegistration` | `boolean` | `false` | Habilita `POST /api/auth/register`. Fuera de producción, el primer usuario en una tabla vacía se admite de cualquier manera; en producción, el administrador se define con `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Mecanismo de corte: también cierra la ventana de inicialización del primer usuario que `allowRegistration: false` deja abierta |
@@ -99,8 +99,8 @@ const backend = await initializeRebaseBackend({
 | `email` | `EmailConfig` | — | SMTP, para restablecimiento de contraseña, verificación, invitaciones y enlaces mágicos |
 | `magicLink` | `boolean` | `false` | Habilita el inicio de sesión por correo electrónico sin contraseña. Requiere que `email` esté configurado; sin ello, las rutas responden `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Habilita códigos de inicio de sesión de seis dígitos por correo electrónico — consulte [Códigos de un solo uso por correo electrónico](#códigos-de-un-solo-uso-por-correo-electrónico). Mismo requisito de correo |
-| `magicLinkCreatesUsers` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Desde 0.24</span> Registro sin contraseña: una solicitud de enlace mágico o código por correo para una dirección sin cuenta crea una (sin contraseña, sin verificar hasta que se use el enlace o el código), mientras `allowRegistration` esté activo. Ejecuta `beforeUserCreate` y el rol por defecto. Desactivado, esas solicitudes no crean nada y responden a una dirección desconocida igual que a una conocida. `AUTH_MAGIC_LINK_CREATES_USERS` |
-| `requireEmailVerification` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Desde 0.24</span> Rechaza el inicio de sesión con contraseña hasta que la dirección esté verificada, y hace que el registro confirme primero — consulte [Verificación de correo electrónico](/docs/backend/email-verification/). Necesita `email`; el arranque lo rechaza sin él |
+| `magicLinkCreatesUsers` | `boolean` | `false` | Registro sin contraseña: una solicitud de enlace mágico o código por correo para una dirección sin cuenta crea una (sin contraseña, sin verificar hasta que se use el enlace o el código), mientras `allowRegistration` esté activo. Ejecuta `beforeUserCreate` y el rol por defecto. Desactivado, esas solicitudes no crean nada y responden a una dirección desconocida igual que a una conocida. `AUTH_MAGIC_LINK_CREATES_USERS` |
+| `requireEmailVerification` | `boolean` | `false` | Rechaza el inicio de sesión con contraseña hasta que la dirección esté verificada, y hace que el registro confirme primero — consulte [Verificación de correo electrónico](/docs/backend/email-verification/). Necesita `email`; el arranque lo rechaza sin él |
 | `cookieAuth` | `CookieAuthConfig` | — | Entrega el token de actualización como una cookie `httpOnly` `Secure` `SameSite` en lugar de en el cuerpo JSON — ver más abajo |
 | `providers` | `OAuthProvider[]` | `[]` | El array canónico de OAuth; los campos de proveedores nombrados se resuelven en él |
 | `allowedRedirectUris` | `string[]` | — | Restringe qué URIs de redirección aceptan las rutas OAuth |
@@ -129,7 +129,7 @@ La cookie lleva la directiva `Secure` a menos que la desactive, y nada relativo 
 :::caution[Los callbacks de colección no se ejecutan para usuarios de autenticación]
 La creación y actualización de usuarios mediante el sistema de autenticación — registro, administración de usuarios y OAuth — escribe **directamente** en el almacén de usuarios y omite la canalización de guardado de colecciones. Los callbacks `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete` en la colección de autenticación (usuarios) **no** se ejecutarán en estas rutas. Para efectos secundarios como aprovisionar un equipo personal durante el registro, utilice los hooks del ciclo de vida de autenticación (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), los cuales reciben el registro de usuario completamente poblado.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> OAuth ejecuta los mismos hooks que los demás inicios de sesión: `beforeLogin` (con la
+OAuth ejecuta los mismos hooks que los demás inicios de sesión: `beforeLogin` (con la
 dirección del proveedor y `"oauth"`), `beforeUserCreate` cuando el inicio de sesión crea
 la cuenta, `afterUserCreate` y `onAuthenticated`. `onAuthenticated` también se
 dispara en una renovación de token (`"refresh"`), un restablecimiento de contraseña (`"password-reset"`) y
@@ -138,7 +138,7 @@ un inicio de sesión. Para detener una cuenta que ya tiene la sesión iniciada, 
 `PUT /api/admin/users/:uid { disabled: true }`: eso rechaza todo inicio de sesión y
 toda renovación, y termina todas sus sesiones y tokens.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> `beforeEmailChange(user, newEmail)` se ejecuta cuando un usuario con la sesión iniciada pide
+`beforeEmailChange(user, newEmail)` se ejecuta cuando un usuario con la sesión iniciada pide
 mover su cuenta a otra dirección. Una regla de dirección que impongas en el registro
 en `beforeUserCreate` (solo tu propio dominio, por ejemplo) pertenece también aquí, o un miembro
 podría registrarse con una dirección permitida y luego moverse a cualquier otra.
@@ -357,7 +357,7 @@ Este comportamiento no es configurable — deliberadamente no existe ninguna opc
 
 ### Verificación de correo
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Registrarse envía a la cuenta nueva un
+Registrarse envía a la cuenta nueva un
 enlace de verificación por correo, y seguirlo conserva solo lo que también
 demuestra la persona que lo sigue. `requireEmailVerification` hace que el
 registro confirme primero. Consulte

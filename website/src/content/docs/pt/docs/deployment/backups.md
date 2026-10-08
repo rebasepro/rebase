@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c9aa0d1c19006ba
+sourceHash: 0007bd5679d9971e
 title: Backups e restauração
 sidebar_label: Backups
 description: Crie, agende, liste e restaure backups do banco de dados com pg_dump — o que um backup contém, o arquivo de roles que viaja com ele, e a única coisa que ele não cobre, seus arquivos enviados.
@@ -149,7 +149,7 @@ de backup; qualquer outra coisa que compartilhe o bucket ou o prefixo é
 deixada intacta.
 
 O cron executa o `pg_dump` dentro do processo do servidor.
-<span class="since-badge" data-since="0.24">Desde 0.24</span> a imagem de
+a imagem de
 runtime oficial (`rebasepro/server`, veja [Auto-hospedagem](/docs/deployment/self-hosting/))
 inclui as ferramentas de cliente do PostgreSQL 18 para isso;
 na 0.23 e anteriores ela não tinha nenhuma, e toda execução agendada falhava
@@ -253,13 +253,13 @@ Baixe os dois e mantenha-os no mesmo diretório. Um backup marcado como **No
 roles file** não tem o complemento: recrie suas roles manualmente antes de
 restaurá-lo em um Postgres novo.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> acima da lista
+acima da lista
 ele reporta o job de backup agendado e sua última execução. Uma execução
 falha é exibida como um erro com sua mensagem, então um backup noturno que
 não conseguiu rodar fica visível onde os backups são listados, não apenas no
 painel Cron Jobs.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> o que ele diz sobre o job:
+o que ele diz sobre o job:
 
 - **Last scheduled backup** é a última execução feita pelo agendamento. Uma execução
   iniciada manualmente depois disso (**Run Now** em Cron Jobs) ganha uma linha própria,
@@ -275,7 +275,7 @@ painel Cron Jobs.
 - Quando o histórico de execuções em `rebase.cron_logs` não pode ser lido, o painel
   diz isso, em vez de dizer que o backup ainda não foi executado.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> a lista é lida
+a lista é lida
 pelo processo do servidor que responde a `GET /api/admin/backups`, e esse nem
 sempre é o processo que executa o agendamento:
 

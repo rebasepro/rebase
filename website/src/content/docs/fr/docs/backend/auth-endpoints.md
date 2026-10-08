@@ -1,5 +1,5 @@
 ---
-sourceHash: 56979243362b4790
+sourceHash: 83e2d04a56801ab8
 title: Endpoints d'authentification et jetons
 sidebar_label: Endpoints d'authentification
 description: Les routes d'authentification montées par le backend Rebase, le format de leurs réponses, l'authentification multifacteur, le contexte de base de données vu par une politique, JWKS et clés de service.
@@ -61,7 +61,7 @@ Voir [Rôles et portées](/docs/backend/roles-and-scopes/).
 
 | Méthode | Chemin | Description |
 |--------|------|-------------|
-| `GET` | `/api/admin/users` | Lister les utilisateurs (paginé). `?search=` correspond à une partie, sans tenir compte de la casse, de l'e-mail ou du nom affiché. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Sur Postgres, il correspond aussi à n'importe quel rôle que détient l'utilisateur, et à l'uid ; sur MongoDB, il ne correspond toujours qu'à l'e-mail et au nom affiché |
+| `GET` | `/api/admin/users` | Lister les utilisateurs (paginé). `?search=` correspond à une partie, sans tenir compte de la casse, de l'e-mail ou du nom affiché. Sur Postgres, il correspond aussi à n'importe quel rôle que détient l'utilisateur, et à l'uid ; sur MongoDB, il ne correspond toujours qu'à l'e-mail et au nom affiché |
 | `POST` | `/api/admin/users` | Créer un utilisateur |
 | `GET` | `/api/admin/users/:uid` | Obtenir un utilisateur |
 | `PUT` | `/api/admin/users/:uid` | Mettre à jour un utilisateur. `{ disabled: true }` désactive le compte sans le supprimer : toute connexion et tout rafraîchissement sont refusés (`ACCOUNT_DISABLED`), ses sessions prennent fin et chaque jeton qu'il détient est refusé ; `false` le réactive |
@@ -129,7 +129,7 @@ fonctionné, mais le jeton se trouvait un niveau plus bas.
 
 ### Changer d'adresse e-mail
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une personne connectée
+Une personne connectée
 déplace son propre compte vers une autre adresse en deux étapes :
 
 1. `POST /api/auth/change-email { newEmail }` enregistre le changement et envoie un
@@ -198,7 +198,7 @@ chaque compte est limité à dix tentatives de vérification par tranche de 15 m
 enregistré pour ce facteur afin qu'il ne puisse pas être rejoué durant le reste de sa fenêtre de validité
 de ±1 intervalle (step).
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Dans la table des utilisateurs,
+Dans la table des utilisateurs,
 **Réinitialiser la vérification en deux étapes** (`DELETE /api/admin/users/:uid/mfa`)
 et **Désactiver ou activer le compte** (`PUT /api/admin/users/:uid { disabled }`)
 sont proposées à quiconque détient `users:write`, comme le sont les routes ;

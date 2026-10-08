@@ -1,5 +1,5 @@
 ---
-sourceHash: 155ad50d37e27196
+sourceHash: e94961f22c3fa77e
 title: Distribuzione
 sidebar_label: Distribuzione
 description: Distribuisci il tuo progetto Rebase in produzione utilizzando Docker, piattaforme cloud o configurazioni manuali.
@@ -18,7 +18,7 @@ Non c'è un servizio di amministrazione separato: il pannello di amministrazione
 |--------------|----------------|-------------------|
 | Scaffold predefinito (`rebase init`) | Il pannello di amministrazione | `/` — il frontend **è** l'amministrazione |
 | Frontend di prodotto personalizzato | La tua app | Dove lo monti, comunemente `/admin` — vedi [Cambiare l'URL di Base](#cambiare-lurl-di-base) |
-| Amministrazione come app su un hostname tutto suo | La tua app | <span class="since-badge" data-since="0.24">Da 0.24</span> `https://admin.example.com/`, servito dallo stesso server — vedi [Cambiare l'URL di Base](#cambiare-lurl-di-base) |
+| Amministrazione come app su un hostname tutto suo | La tua app | `https://admin.example.com/`, servito dallo stesso server — vedi [Cambiare l'URL di Base](#cambiare-lurl-di-base) |
 | Progetto solo backend | Nulla (solo API) | Non distribuito |
 
 :::note[Prima visita]

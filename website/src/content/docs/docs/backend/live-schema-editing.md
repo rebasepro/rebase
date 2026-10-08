@@ -25,7 +25,7 @@ Applying also needs one thing more than the scope — see [Who may apply](#who-m
 ## Plan before you apply
 
 `/plan` has no side effects. Post the change, and it tells you what the change
-means. <span class="since-badge" data-since="0.24">Since 0.24</span> A change to an existing collection is a `patch` — what changed, as
+means. A change to an existing collection is a `patch` — what changed, as
 operations on paths of keys — and a new collection is the whole `collection`:
 
 ```json
@@ -138,7 +138,7 @@ refused too. Each refusal names the change and what to do instead.
 The verdict is read from the schema each side produces — the same plan
 `schema.generated.ts` and `db push` are rendered from — so an edit that changes
 the database cannot be reported as no change. Two edits that look like changes
-and are not refused (<span class="since-badge" data-since="0.24">Since 0.24</span>; 0.23 reports both as needing a migration):
+and are not refused (; 0.23 reports both as needing a migration):
 
 - **Renaming a property's key while keeping its column** (`columnName` set to
   the old column) moves no data. It is `safe`; API clients read the new name.
@@ -149,7 +149,7 @@ and are not refused (<span class="since-badge" data-since="0.24">Since 0.24</spa
 
 A refused change can still be written to your collection source and committed,
 leaving the database as it is — removing a property you no longer serve is the
-usual case. <span class="since-badge" data-since="0.24">Since 0.24</span> Post `/apply` with `"sourceOnly": true`. Nothing runs; the commit
+usual case. Post `/apply` with `"sourceOnly": true`. Nothing runs; the commit
 message names what the database keeps, for example
 `chore(schema): remove sku from products (source only — column products.sku kept)`,
 and each change in the plan carries a `sourceOnly` sentence saying what it
@@ -182,7 +182,7 @@ repository, the paths are prefixed with it, found by walking up from your
 collections directory to the nearest `rebase.json`. A project with no
 `rebase.json` keeps the plain paths.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> No SQL goes in the commit. `rebase db push` and `rebase db generate` write theirs
+No SQL goes in the commit. `rebase db push` and `rebase db generate` write theirs
 from the collections on every run, into `.rebase/sql/`, which is gitignored.
 On 0.23 the commit also carries `drizzle/schema.sql`, `drizzle/policies.sql` and
 `drizzle/search.sql`, written at the project root.
@@ -194,7 +194,7 @@ their table edits are invisible to your repository.
 
 ## Who may apply
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Holding `schema:read` is enough to **plan**. Planning has no side effects, and a
+Holding `schema:read` is enough to **plan**. Planning has no side effects, and a
 CI job asking whether a proposed collection change is applicable is a good use of
 it.
 

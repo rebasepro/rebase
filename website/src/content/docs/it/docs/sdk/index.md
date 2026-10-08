@@ -1,5 +1,5 @@
 ---
-sourceHash: b7e862286c030911
+sourceHash: 75ae5bf75334fb86
 title: SDK tipizzato — Primi passi
 sidebar_label: Primi Passi
 description: Installa e configura l'SDK tipizzato di Rebase per interagire con il tuo backend da qualsiasi applicazione JavaScript o TypeScript.
@@ -57,7 +57,7 @@ const client = createRebaseClient({
 | `realtime` | `boolean` | Apre il WebSocket (predefinito `true`) — imposta su `false` in script one-shot |
 | `collections` | `Record<string, string>` | Mappa i nomi degli accessor agli slug delle collection |
 | `offline` | `boolean \| OfflineConfig` | [Sincronizzazione local-first](/docs/sdk/offline) — disattivata per impostazione predefinita |
-| `impersonate` | `string` | <span class="since-badge" data-since="0.24">Da 0.24</span> Esegue ogni richiesta come questo utente (per uid), per verificare cosa vede un utente. Solo con la sessione di un amministratore: API dati, funzioni e realtime vengono eseguiti come quell'utente, ogni altra route rifiuta |
+| `impersonate` | `string` | Esegue ogni richiesta come questo utente (per uid), per verificare cosa vede un utente. Solo con la sessione di un amministratore: API dati, funzioni e realtime vengono eseguiti come quell'utente, ogni altra route rifiuta |
 
 ## Generazione dell'SDK tipizzato
 
@@ -68,7 +68,7 @@ rebase generate-sdk
 ```
 
 Mentre `rebase dev` è in esecuzione non serve: rigenera i tipi in `generated/sdk/` all'avvio e a ogni salvataggio sotto `config/collections/`. Esegui tu stesso il comando in CI, in un repository frontend che non ha collection (`rebase generate-sdk --from link`), o ovunque `rebase dev` non sia in esecuzione.
-<span class="since-badge" data-since="0.24">Dalla 0.24</span> per la rigenerazione: sulla 0.23, `rebase dev` lascia i tipi dell'SDK intatti, quindi esegui
+per la rigenerazione: sulla 0.23, `rebase dev` lascia i tipi dell'SDK intatti, quindi esegui
 il comando dopo ogni modifica a una collection.
 
 Quindi passa il parametro di tipo `Database` a `createRebaseClient` per ottenere l'autocompletamento completo:

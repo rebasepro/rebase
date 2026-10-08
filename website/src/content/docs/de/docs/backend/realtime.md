@@ -1,5 +1,5 @@
 ---
-sourceHash: 4b2acc8e12bf440c
+sourceHash: 259c5bd1a0583132
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Echtzeit-Datensynchronisierung, Broadcast-Kanäle und Presence-Tracking über WebSocket.
@@ -195,13 +195,13 @@ Auf einem Laptop gegen ein lokales PostgreSQL mit einem Verbindungspool von 20 V
 
 300 ms davon sind das Debounce. Die zweite Zeile ist die Obergrenze, mit der Sie planen sollten: Die Refetches reihen sich im selben Pool ein wie Ihr REST-Traffic, sodass eine Collection, die mehrmals pro Sekunde geschrieben wird, während **Hunderte unterschiedlicher Benutzer** dieselbe Liste beobachten, der Punkt ist, an dem Realtime beginnt, mit Anfragen zu konkurrieren. Bevorzugen Sie darüber hinaus engere Abonnements (eine Seite, ein Filter auf die eigenen Zeilen des Benutzers) oder einen [Broadcast-Kanal](#broadcast-kanäle), der die Änderung trägt, damit Clients nach ihrem eigenen Zeitplan erneut abrufen können.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> **Ein Socket darf höchstens 1.000 Abonnements halten.** Das nächste wird mit einem Fehler-Frame mit dem Code `TOO_MANY_SUBSCRIPTIONS` abgelehnt; das erneute Abonnieren unter einer ID, die der Socket bereits hält, ersetzt dieses Abonnement und zählt nicht erneut. Das SDK teilt sich identische Abonnements auf einem Socket, sodass dies die unterschiedlichen Listen und Datensätze zählt, die eine Seite offen hat. Ändern Sie dies mit `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` oder `realtime.maxSubscriptionsPerSocket` auf dem Postgres-Adapter (die Umgebungsvariable gewinnt); ein Wert, der keine positive ganze Zahl ist, stoppt den Server beim Start. Auf 0.23 sind die Abonnements eines Sockets nicht begrenzt.
+**Ein Socket darf höchstens 1.000 Abonnements halten.** Das nächste wird mit einem Fehler-Frame mit dem Code `TOO_MANY_SUBSCRIPTIONS` abgelehnt; das erneute Abonnieren unter einer ID, die der Socket bereits hält, ersetzt dieses Abonnement und zählt nicht erneut. Das SDK teilt sich identische Abonnements auf einem Socket, sodass dies die unterschiedlichen Listen und Datensätze zählt, die eine Seite offen hat. Ändern Sie dies mit `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` oder `realtime.maxSubscriptionsPerSocket` auf dem Postgres-Adapter (die Umgebungsvariable gewinnt); ein Wert, der keine positive ganze Zahl ist, stoppt den Server beim Start. Auf 0.23 sind die Abonnements eines Sockets nicht begrenzt.
 
 Eine Abonnement-ID gehört dem jeweiligen Socket: Zwei Clients, die beide ein Abonnement `"sub-1"` nennen, behalten jeweils ihr eigenes, und ein `unsubscribe` beendet nur das des Absenders.
 
 ### Sockets, die nicht mehr antworten
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Ein Client kann verschwinden, ohne seinen Socket zu schließen: Ein Handy verliert den Empfang, ein Laptop geht in den Ruhezustand, ein NAT vergisst die Verbindung. Es kommt kein Close-Frame an, also sagt dem Server niemand etwas. Deshalb sendet der Server jedem Socket alle 30 Sekunden einen Ping und beendet einen Socket, der bis zum nächsten Ping nicht geantwortet hat. Ein verschwundener Client wird so innerhalb einer Minute freigegeben. Browser und das SDK beantworten Pings von selbst; ein Client, der das Protokoll direkt spricht, muss sie ebenfalls beantworten, wie es die meisten WebSocket-Bibliotheken tun.
+Ein Client kann verschwinden, ohne seinen Socket zu schließen: Ein Handy verliert den Empfang, ein Laptop geht in den Ruhezustand, ein NAT vergisst die Verbindung. Es kommt kein Close-Frame an, also sagt dem Server niemand etwas. Deshalb sendet der Server jedem Socket alle 30 Sekunden einen Ping und beendet einen Socket, der bis zum nächsten Ping nicht geantwortet hat. Ein verschwundener Client wird so innerhalb einer Minute freigegeben. Browser und das SDK beantworten Pings von selbst; ein Client, der das Protokoll direkt spricht, muss sie ebenfalls beantworten, wie es die meisten WebSocket-Bibliotheken tun.
 
 Ein Socket wird außerdem beendet, wenn mehr als 16&nbsp;MiB an Frames, die an ihn gesendet wurden, noch ungelesen sind. Das ist ein Client, der nicht liest, was ihm gesendet wird, oder einer, der so weit zurückliegt, dass das, was er lesen würde, veraltet ist.
 
@@ -366,7 +366,7 @@ Das typisierte SDK verbindet sich automatisch wieder, wenn die WebSocket-Verbind
 - **Automatische Wiederanmeldung (Resubscription)** – Nach erfolgreicher Wiederverbindung werden alle aktiven Abonnements erneut beim Server registriert, und das nächste `onUpdate` jedes einzelnen trägt alles, was geschrieben wurde, während der Client weg war. Dieses Update ist das Erholungssignal. Kein manuelles Eingreifen erforderlich.
 - **Anfragen sind at-most-once** – Eine Anfrage, die gestellt wird, während der Socket unten ist, wartet auf ihn, bis zu 30 Sekunden ab dem Aufruf, und scheitert danach mit `REQUEST_TIMEOUT`, ohne je gesendet worden zu sein. Eine Anfrage, die bereits gesendet war, als die Verbindung abbrach, scheitert mit `CONNECTION_LOST` und wird **nicht** erneut gesendet: Der Server hat sie möglicherweise bereits ausgeführt oder nicht, und nur der Aufrufer weiß, ob eine zweifache Ausführung sicher ist.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> `client.ws.state` gibt an, wo sich die Verbindung befindet, und `onStateChange` wird über
+`client.ws.state` gibt an, wo sich die Verbindung befindet, und `onStateChange` wird über
 jede Änderung informiert. Auf 0.23 existiert keins von beiden, der Client stellt
 nach 5 fehlgeschlagenen Versuchen die Versuche ein, und während der Trennung
 gesendete Nachrichten werden in eine Warteschlange eingereiht und nach der
@@ -403,11 +403,11 @@ WebSocket-Abonnements berücksichtigen automatisch Richtlinien für Row-Level Se
 
 1. Die WebSocket-Verbindung authentifiziert sich mit demselben JWT-Token wie die REST-API.
 2. Jeder Refetch eines Abonnements wird innerhalb einer PostgreSQL-Transaktion mit `set_config('app.user_id', ...)` und `set_config('app.user_roles', ...)` ausgeführt – wodurch sichergestellt wird, dass RLS-Richtlinien durchgesetzt werden.
-3. <span class="since-badge" data-since="0.24">Seit 0.24</span> Die Identität wird erneut geprüft, solange der Socket offen ist, nicht nur bei der Authentifizierung. Vor jedem Frame stellt der Server dieselben Fragen, die auch eine HTTP-Anfrage stellen würde: Ist das Token noch gültig, wurde seine Sitzung abgemeldet oder widerrufen, existiert das Konto noch, und welche Rollen hält es jetzt. Channel-Frames werden höchstens einmal pro Sekunde geprüft. Ein Socket, der nur zuhört, wird mindestens alle 30 Sekunden geprüft, und ein Token wird ab dem Moment seines Ablaufs nicht mehr akzeptiert. Eine entzogene Rolle gilt ab dem nächsten Frame, für Reads, Writes und offene Abonnements gleichermaßen. Ein Socket, dessen Identität beendet wurde, erhält einen `AUTH_ERROR`-Frame mit dem Code `SESSION_ENDED` oder `TOKEN_EXPIRED` und wird mit dem Code `4001` geschlossen. Das SDK authentifiziert seinen Socket jedes Mal neu, wenn es sein Token aktualisiert, und verbindet sich nach einem `4001` mit der Sitzung neu, die es dann hält, oder ganz ohne. Ein Client, der direkt mit dem Protokoll kommuniziert, muss ein frisches Token in `AUTHENTICATE` senden, bevor das alte abläuft.
+3. Die Identität wird erneut geprüft, solange der Socket offen ist, nicht nur bei der Authentifizierung. Vor jedem Frame stellt der Server dieselben Fragen, die auch eine HTTP-Anfrage stellen würde: Ist das Token noch gültig, wurde seine Sitzung abgemeldet oder widerrufen, existiert das Konto noch, und welche Rollen hält es jetzt. Channel-Frames werden höchstens einmal pro Sekunde geprüft. Ein Socket, der nur zuhört, wird mindestens alle 30 Sekunden geprüft, und ein Token wird ab dem Moment seines Ablaufs nicht mehr akzeptiert. Eine entzogene Rolle gilt ab dem nächsten Frame, für Reads, Writes und offene Abonnements gleichermaßen. Ein Socket, dessen Identität beendet wurde, erhält einen `AUTH_ERROR`-Frame mit dem Code `SESSION_ENDED` oder `TOKEN_EXPIRED` und wird mit dem Code `4001` geschlossen. Das SDK authentifiziert seinen Socket jedes Mal neu, wenn es sein Token aktualisiert, und verbindet sich nach einem `4001` mit der Sitzung neu, die es dann hält, oder ganz ohne. Ein Client, der direkt mit dem Protokoll kommuniziert, muss ein frisches Token in `AUTHENTICATE` senden, bevor das alte abläuft.
 
 Dies bedeutet, dass jeder Socket nur Updates für Datensätze erhält, die seine authentifizierte Identität einsehen darf.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Auch ein [API-Schlüssel](/docs/backend/api-keys/) authentifiziert den Socket: Senden Sie den
+Auch ein [API-Schlüssel](/docs/backend/api-keys/) authentifiziert den Socket: Senden Sie den
 `rk_…`-Schlüssel dort, wo das Zugriffstoken stehen würde. Der Socket prüft dann jeden Frame
 gegen die [Scopes](/docs/backend/roles-and-scopes/) des Schlüssels: Ein Abruf, eine Zählung oder eine
 Subscription braucht `data:read` auf ihrer Collection, ein Speichern `data:write`, ein Löschen

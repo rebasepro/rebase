@@ -1,5 +1,5 @@
 ---
-sourceHash: 7efffdd1ca4c7915
+sourceHash: 6e23ad27a4c203f4
 title: Branches de base de données
 sidebar_label: Branches
 description: Créez des branches de base de données isolées pour le développement, le staging et les tests à l'aide de CREATE DATABASE ... TEMPLATE de PostgreSQL — des copies instantanées et parfaitement fidèles, sans temps d'arrêt.
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS rebase.branches (
 );
 ```
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Un serveur qui s'exécute sur une branche conserve les branches dans la base de données à partir de laquelle la branche a été copiée. Le `rebase.branches` propre à la branche n'est qu'un instantané, pris avant que sa ligne ne soit écrite. Ainsi, `rebase dev` dans un espace de travail [basculé](#intégration-cli) définit `REBASE_BRANCH_PARENT_DATABASE` sur la base de données que nomme `.env`, et un serveur doté de cette variable lit et écrit le registre dans celle-ci, et copie par défaut les nouvelles branches à partir d'elle. Sur une branche, le panneau Branches de Studio liste les branches de la base de données principale, y compris la branche courante, et une branche créée depuis ce panneau apparaît dans `rebase db branch list`.
+Un serveur qui s'exécute sur une branche conserve les branches dans la base de données à partir de laquelle la branche a été copiée. Le `rebase.branches` propre à la branche n'est qu'un instantané, pris avant que sa ligne ne soit écrite. Ainsi, `rebase dev` dans un espace de travail [basculé](#intégration-cli) définit `REBASE_BRANCH_PARENT_DATABASE` sur la base de données que nomme `.env`, et un serveur doté de cette variable lit et écrit le registre dans celle-ci, et copie par défaut les nouvelles branches à partir d'elle. Sur une branche, le panneau Branches de Studio liste les branches de la base de données principale, y compris la branche courante, et une branche créée depuis ce panneau apparaît dans `rebase db branch list`.
 
 ---
 
@@ -97,7 +97,7 @@ L'API de gestion des branches est exposée via le `BranchService` du backend. Vo
 
 Génère une nouvelle base de données de branche à partir de la base de données par défaut ou d'un template source explicite.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> La base par défaut est celle sur laquelle se trouve la connexion propre du serveur, ou `REBASE_BRANCH_PARENT_DATABASE` lorsque le serveur s'exécute sur une branche. Ce n'est jamais la base de données que nomme `ADMIN_CONNECTION_STRING`, lorsque celle-ci en désigne une autre.
+La base par défaut est celle sur laquelle se trouve la connexion propre du serveur, ou `REBASE_BRANCH_PARENT_DATABASE` lorsque le serveur s'exécute sur une branche. Ce n'est jamais la base de données que nomme `ADMIN_CONNECTION_STRING`, lorsque celle-ci en désigne une autre.
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -134,7 +134,7 @@ Output:
 */
 ```
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> `database` est la base de données PostgreSQL que constitue la branche, telle que l'indique son enregistrement : celle à laquelle se connecter, et celle à passer comme `source` pour copier la branche. Ce n'est pas le nom de la branche (`staging` correspond à la base de données `rb_staging`).
+`database` est la base de données PostgreSQL que constitue la branche, telle que l'indique son enregistrement : celle à laquelle se connecter, et celle à passer comme `source` pour copier la branche. Ce n'est pas le nom de la branche (`staging` correspond à la base de données `rb_staging`).
 
 ### Obtenir des informations sur une branche
 
@@ -153,7 +153,7 @@ await admin.deleteBranch("feature_oauth");
 ```
 
 > [!CAUTION]
-> Protection de sécurité : La base de données principale (nom de la base configuré par défaut dans les chaînes de connexion) est protégée. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Il s'agit de la base de données sur laquelle se trouve la connexion propre du serveur, ou de `REBASE_BRANCH_PARENT_DATABASE` sur une branche. Si vous tentez de supprimer la base de données parente, le `BranchService` lève une erreur `"Cannot delete the main database"` et s'interrompt.
+> Protection de sécurité : La base de données principale (nom de la base configuré par défaut dans les chaînes de connexion) est protégée. Il s'agit de la base de données sur laquelle se trouve la connexion propre du serveur, ou de `REBASE_BRANCH_PARENT_DATABASE` sur une branche. Si vous tentez de supprimer la base de données parente, le `BranchService` lève une erreur `"Cannot delete the main database"` et s'interrompt.
 
 ---
 

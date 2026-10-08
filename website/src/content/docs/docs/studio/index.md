@@ -79,7 +79,7 @@ open costs nothing.
 | Tab | Slug | Group | What it does |
 |-----|------|-------|--------------|
 | SQL Console | `sql` | Database | Run raw SQL against your PostgreSQL database and read results in a table |
-| RLS Policies | `rls` | Database | Inspect and manage Row Level Security policies for your tables. <span class="since-badge" data-since="0.24">Since 0.24</span> A policy is listed as the database holds it, badged **Differs from code** where that is not what the project declares. A policy Rebase generates cannot be edited straight in the database, and on a table Rebase manages a banner says that each server start and `rebase db push` re-apply the declared policies |
+| RLS Policies | `rls` | Database | Inspect and manage Row Level Security policies for your tables. A policy is listed as the database holds it, badged **Differs from code** where that is not what the project declares. A policy Rebase generates cannot be edited straight in the database, and on a table Rebase manages a banner says that each server start and `rebase db push` re-apply the declared policies |
 | Schema Visualizer | `schema-visualizer` | Database | Entity diagram of your collections and their relations, drawn from the collection definitions: tables, columns, types and relations are as the collections declare them. Only the RLS markers are read from the database |
 | Branches | `branches` | Database | Create and manage [database branches](/docs/backend/branching) |
 | Backups | `backups` | Database | Browse and download database backups |
@@ -98,7 +98,7 @@ Two streams into one in-memory ring, held on the server process:
   collection when the request was about one, and, when the request failed, the
   error `code` and message the client received. A failed request is recorded at
   `warn` (4xx) or `error` (5xx), so the level filter finds it.
-  <span class="since-badge" data-since="0.24">Since 0.24</span> Its `source` comes from the path: `/api/auth/*` and `/api/oauth/*` are
+  Its `source` comes from the path: `/api/auth/*` and `/api/oauth/*` are
   `auth`, `/api/storage/*` is `storage`, and everything else is `api`, so the
   Source filter finds sign-ins under Auth and uploads under Storage.
 - **Everything the server reports at warn or error** — a schema warning, an
@@ -116,7 +116,7 @@ The ring is per process and per boot: it is not durable, it is not shared
 between replicas, and a restart empties it. For anything you need to keep, read
 the process's stdout, which carries the same lines and more.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> The explorer says so. It shows the log of the one server instance serving
+The explorer says so. It shows the log of the one server instance serving
 it and names that instance: the `snapshot` event of
 `GET /api/admin/logs/stream` carries `instance`, the process's `HOSTNAME` (the
 pod name on Kubernetes, the container id under Docker) or else `pid-<n>`. There

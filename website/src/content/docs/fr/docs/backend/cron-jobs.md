@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d36f4d71bfe288e
+sourceHash: 37805343f12779ab
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -285,7 +285,7 @@ Le gestionnaire peut renvoyer n'importe quelle valeur sérialisable en JSON. Ell
 
 ## API REST
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> La lecture exige la portée `cron:read`. Déclencher, mettre en pause et reprendre exigent
+La lecture exige la portée `cron:read`. Déclencher, mettre en pause et reprendre exigent
 `cron:write`. Un administrateur détient les deux. Une personne dont le rôle les déclare aussi, ainsi
 qu'une clé API créée avec elles, ce que devrait porter un planificateur externe :
 
@@ -300,7 +300,7 @@ Voir [Rôles et portées](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | Lister toutes les tâches cron enregistrées |
 | `GET` | `/api/admin/cron/:id` | Obtenir le statut d'une tâche individuelle |
 | `POST` | `/api/admin/cron/:id/trigger` | Déclencher manuellement une tâche — `409` tant qu'elle est déjà en cours |
-| `GET` | `/api/admin/cron/:id/logs` | Obtenir l'historique d'exécution (`?limit=N`). <span class="since-badge" data-since="0.24">Depuis 0.24</span> `503` lorsque `rebase.cron_logs` ne peut pas être lu, plutôt qu'un historique vide |
+| `GET` | `/api/admin/cron/:id/logs` | Obtenir l'historique d'exécution (`?limit=N`). `503` lorsque `rebase.cron_logs` ne peut pas être lu, plutôt qu'un historique vide |
 | `PUT` | `/api/admin/cron/:id` | Mettre en pause ou reprendre une tâche partout (`{ "enabled": false }`) ; `null` suit de nouveau le code |
 
 ### Exemple : Lister toutes les tâches
@@ -409,7 +409,7 @@ await client.cron.toggleJob("health-check", false); // pause
 await client.cron.toggleJob("health-check", true);  // resume
 ```
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> `listJobs()` est typé `CronJobListing` : `jobs`, plus les champs `skipped`,
+`listJobs()` est typé `CronJobListing` : `jobs`, plus les champs `skipped`,
 `rejected` et `note` décrits sous [Les tâches introuvables](#les-tâches-introuvables).
 
 ## Tableau de bord Studio
@@ -419,15 +419,15 @@ Lorsque des tâches cron sont configurées, un outil **Cron Jobs** apparaît dan
 - **Liste des tâches** — Toutes les tâches enregistrées avec des indicateurs d'état en direct
 - **Panneau de détails** — Planification, prochaine/dernière exécution, durée et informations sur les erreurs
 - **Historique d'exécution** — Entrées de journal extensibles avec les sorties capturées et les résultats
-- **Déclenchement manuel** — Exécutez n'importe quelle tâche à la demande en un clic. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Le panneau attend la fin de l'exécution et indique comment elle s'est déroulée : une exécution qui a échoué affiche son erreur
+- **Déclenchement manuel** — Exécutez n'importe quelle tâche à la demande en un clic. Le panneau attend la fin de l'exécution et indique comment elle s'est déroulée : une exécution qui a échoué affiche son erreur
 - **Activer/Désactiver** — Mettez en pause et reprenez les tâches sans redémarrer le serveur, pour tous les processus à la fois ; une pause est conservée après les redémarrages et les déploiements
-- **Tâches introuvables** — <span class="since-badge" data-since="0.24">Depuis 0.24</span> chaque tâche que le planificateur a refusée, avec sa planification et la raison, et le nombre de fichiers cron qui n'ont pas pu être chargés. Aucune d'elles n'est planifiée ; voir [Les tâches introuvables](#les-tâches-introuvables)
+- **Tâches introuvables** — chaque tâche que le planificateur a refusée, avec sa planification et la raison, et le nombre de fichiers cron qui n'ont pas pu être chargés. Aucune d'elles n'est planifiée ; voir [Les tâches introuvables](#les-tâches-introuvables)
 
 Le tableau de bord s'actualise automatiquement toutes les 15 secondes.
 
 Le panneau affiche la même chose quel que soit le processus qui le sert. Une
 tâche qu'un autre processus exécute apparaît comme en cours.
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Sur chaque processus qui dispose d'un magasin, le nombre d'exécutions, le
+Sur chaque processus qui dispose d'un magasin, le nombre d'exécutions, le
 nombre d'échecs et la dernière exécution sont lus dans `rebase.cron_logs`, par une
 requête limitée aux lignes de chaque tâche. Les compteurs propres d'un processus ne
 contiennent que les exécutions qu'il a faites : le rôle `api` à côté d'un worker

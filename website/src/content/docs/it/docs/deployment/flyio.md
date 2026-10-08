@@ -1,5 +1,5 @@
 ---
-sourceHash: cab3ef3500139add
+sourceHash: 5d3705b42ceccca3
 title: Deploy di Rebase su Fly.io
 description: Scopri come eseguire il deploy di Rebase a livello globale o limitarlo ai data center europei utilizzando Fly.io.
 sidebar_label: Fly.io
@@ -38,7 +38,7 @@ rebase build
 Esegui il commit di un `Dockerfile` di tre righe nella root del progetto:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 

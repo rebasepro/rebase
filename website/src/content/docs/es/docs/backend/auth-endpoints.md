@@ -1,5 +1,5 @@
 ---
-sourceHash: 56979243362b4790
+sourceHash: 83e2d04a56801ab8
 title: Endpoints y tokens de autenticación
 sidebar_label: Endpoints de autenticación
 description: Las rutas de autenticación que monta el backend de Rebase, las estructuras de sus respuestas, autenticación multifactor, el contexto de base de datos que ve una directiva, JWKS y claves de servicio.
@@ -57,7 +57,7 @@ La gestión administrativa de usuarios y roles es una **superficie independiente
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `GET` | `/api/admin/users` | Listar usuarios (paginado). `?search=` coincide, sin distinguir mayúsculas de minúsculas, con una parte del correo electrónico o del nombre visible. <span class="since-badge" data-since="0.24">Desde 0.24</span> En Postgres también coincide con cualquier rol que tenga el usuario, y con el uid; en MongoDB sigue coincidiendo solo con el correo electrónico y el nombre visible |
+| `GET` | `/api/admin/users` | Listar usuarios (paginado). `?search=` coincide, sin distinguir mayúsculas de minúsculas, con una parte del correo electrónico o del nombre visible. En Postgres también coincide con cualquier rol que tenga el usuario, y con el uid; en MongoDB sigue coincidiendo solo con el correo electrónico y el nombre visible |
 | `POST` | `/api/admin/users` | Crear un usuario |
 | `GET` | `/api/admin/users/:uid` | Leer un usuario |
 | `PUT` | `/api/admin/users/:uid` | Actualizar un usuario. `{ disabled: true }` deshabilita la cuenta sin eliminarla: todo inicio de sesión y toda renovación se rechazan (`ACCOUNT_DISABLED`), sus sesiones terminan y se rechaza todo token que tenga; `false` la vuelve a habilitar |
@@ -110,7 +110,7 @@ Ambas estructuras son reales; pertenecen a dos capas distintas. Intentar leer la
 
 ### Cambiar una dirección de correo
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Una persona con
+Una persona con
 la sesión iniciada mueve su propia cuenta a otra dirección en dos pasos:
 
 1. `POST /api/auth/change-email { newEmail }` registra el cambio y envía por
@@ -164,7 +164,7 @@ El registro de factores también está restringido. El primer factor en una cuen
 
 La verificación está acotada en ambos ejes: un desafío expira tras cinco intentos fallidos, cada cuenta está limitada a diez intentos de verificación cada 15 minutos (contabilizados por usuario, por lo que rotar direcciones IP no sirve de nada) y un código aceptado se registra contra el factor para que no pueda reutilizarse durante el resto de su ventana de tolerancia de ±1 paso.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> En la tabla de usuarios, **Restablecer verificación en dos pasos**
+En la tabla de usuarios, **Restablecer verificación en dos pasos**
 (`DELETE /api/admin/users/:uid/mfa`) y **Deshabilitar o habilitar cuenta**
 (`PUT /api/admin/users/:uid { disabled }`) se ofrecen a quien tenga
 `users:write`, igual que las rutas; el interruptor nunca se ofrece sobre la

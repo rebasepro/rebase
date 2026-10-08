@@ -1,11 +1,11 @@
 ---
-sourceHash: 922c44ae945d9509
+sourceHash: 3d6a5a62a25e5b8c
 title: Vérification de l'e-mail
 sidebar_label: Vérification de l'e-mail
 description: "Comment un compte prouve son adresse e-mail : le lien envoyé à l'inscription, ce qu'en le suivant on conserve et on retire, et l'inscription à confirmation préalable avec requireEmailVerification."
 ---
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Lorsque l'e-mail est configuré, l'inscription
+Lorsque l'e-mail est configuré, l'inscription
 envoie au nouveau compte un lien de vérification (`<frontend>/verify-email?token=…`, valide 24 heures),
 afin que le titulaire prouve l'adresse à l'inscription, à son propre rythme. `POST /api/auth/send-verification`
 l'envoie à nouveau. Rien n'est envoyé aux adresses synthétiques des invités et des comptes X (Twitter).

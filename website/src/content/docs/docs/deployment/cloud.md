@@ -148,7 +148,7 @@ the restored version to serve before reporting success. Follow it with
 
 ## CI and agents
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A CI job or an agent should not carry your password. Give it a token
+A CI job or an agent should not carry your password. Give it a token
 instead: a key that acts as your account, narrowed to a few actions on one
 project. Create it from a signed-in terminal:
 

@@ -43,7 +43,7 @@ Sets up the project structure with frontend, backend, and shared packages.
 | `--introspect` | Generate collections from that database. Implies `--template blank` and needs `--install` |
 | `--project <slug>` | Link the scaffold to a Rebase Cloud project |
 | `--setup-key <key>` | The one-time key authenticating that link |
-| `-a, --agent <name>` | <span class="since-badge" data-since="0.24">Since 0.24</span> Set up AI coding agents: the [skills](/docs/ai/skills) and the [MCP server](/docs/ai/mcp). Repeatable or comma-separated — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` or `all`. Without it, `init` asks and pre-ticks the agents installed on the machine; under `--yes`, none |
+| `-a, --agent <name>` | Set up AI coding agents: the [skills](/docs/ai/skills) and the [MCP server](/docs/ai/mcp). Repeatable or comma-separated — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` or `all`. Without it, `init` asks and pre-ticks the agents installed on the machine; under `--yes`, none |
 
 ### `rebase dev`
 
@@ -53,7 +53,7 @@ Start the development server:
 rebase dev
 ```
 
-Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save. <span class="since-badge" data-since="0.24">Since 0.24</span> for the SDK types — on 0.23 it regenerates the schema only, and `rebase generate-sdk` is yours to run.
+Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save. for the SDK types — on 0.23 it regenerates the schema only, and `rebase generate-sdk` is yours to run.
 
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
@@ -545,7 +545,7 @@ rebase auth reset-password --email admin@example.com --password NewPassword123!
 
 ### `rebase api-keys`
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Manage the project's service API keys — the credential an agent, script or
+Manage the project's service API keys — the credential an agent, script or
 another service uses, as opposed to an end user's session:
 
 ```bash

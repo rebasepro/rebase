@@ -1,5 +1,5 @@
 ---
-sourceHash: 59fb182b5af4d770
+sourceHash: 0ee4f3fca623b579
 title: Herramientas de Studio
 sidebar_label: Studio
 description: Rebase Studio proporciona herramientas para desarrolladores para la edición visual de esquemas, consultas SQL, scripting de JavaScript, gestión de políticas RLS y navegación de almacenamiento.
@@ -73,7 +73,7 @@ Se incluyen con Studio y **`RebaseStudio` las carga de forma diferida** — cada
 | Pestaña | Slug | Grupo | Qué hace |
 |---------|------|-------|----------|
 | Consola SQL | `sql` | Base de datos | Ejecuta SQL directo contra tu base de datos PostgreSQL y lee los resultados en una tabla |
-| Políticas RLS | `rls` | Base de datos | Inspecciona y gestiona las políticas de Row Level Security de tus tablas. <span class="since-badge" data-since="0.24">Desde 0.24</span> Una política se lista tal como la tiene la base de datos, con la insignia **Differs from code** donde eso no es lo que declara el proyecto. Una política que genera Rebase no se puede editar directamente en la base de datos, y en una tabla que gestiona Rebase un banner indica que cada arranque del servidor y cada `rebase db push` vuelven a aplicar las políticas declaradas |
+| Políticas RLS | `rls` | Base de datos | Inspecciona y gestiona las políticas de Row Level Security de tus tablas. Una política se lista tal como la tiene la base de datos, con la insignia **Differs from code** donde eso no es lo que declara el proyecto. Una política que genera Rebase no se puede editar directamente en la base de datos, y en una tabla que gestiona Rebase un banner indica que cada arranque del servidor y cada `rebase db push` vuelven a aplicar las políticas declaradas |
 | Visualizador de esquema | `schema-visualizer` | Base de datos | Diagrama de entidades de tus colecciones y sus relaciones, trazado a partir de las definiciones de las colecciones: tablas, columnas, tipos y relaciones son tal como los declaran las colecciones. Solo los marcadores de RLS se leen de la base de datos |
 | Ramas | `branches` | Base de datos | Crea y gestiona [ramas de base de datos](/docs/backend/branching) |
 | Copias de seguridad | `backups` | Base de datos | Explora y descarga las copias de seguridad de la base de datos |
@@ -93,7 +93,7 @@ Dos flujos en un único anillo en memoria, sostenido por el proceso del servidor
   `code` de error y el mensaje que recibió el cliente. Una petición fallida se
   registra en `warn` (4xx) o `error` (5xx), de modo que el filtro de nivel la
   encuentra.
-  <span class="since-badge" data-since="0.24">Desde 0.24</span> Su `source` sale de la ruta: `/api/auth/*` y `/api/oauth/*` son
+  Su `source` sale de la ruta: `/api/auth/*` y `/api/oauth/*` son
   `auth`, `/api/storage/*` es `storage`, y todo lo demás es `api`, de modo que el
   filtro de origen encuentra los inicios de sesión en Auth y las subidas en Storage.
 - **Todo lo que el servidor reporta en warn o error** — un aviso de esquema, un
@@ -112,7 +112,7 @@ El anillo es por proceso y por arranque: no es duradero, no se comparte entre
 réplicas y un reinicio lo vacía. Para cualquier cosa que necesites conservar, lee
 la salida estándar del proceso, que lleva las mismas líneas y más.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> El explorador lo indica. Muestra el log de la única instancia del servidor que
+El explorador lo indica. Muestra el log de la única instancia del servidor que
 lo sirve y nombra esa instancia: el evento `snapshot` de
 `GET /api/admin/logs/stream` lleva `instance`, el `HOSTNAME` del proceso (el
 nombre del pod en Kubernetes, el id del contenedor en Docker) o, si no, `pid-<n>`.

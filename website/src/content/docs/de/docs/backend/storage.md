@@ -1,5 +1,5 @@
 ---
-sourceHash: 123256f487ac8a71
+sourceHash: 15c8b3bdbf304f1c
 title: Storage-Konfiguration
 sidebar_label: Storage-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible oder GCS/Firebase Storage-Backends für Datei-Uploads, Bilder und Medien.
@@ -185,7 +185,7 @@ Für das Hochladen großer Dateien oder bei instabilen Netzwerkbedingungen imple
 
 Jede Storage-Quelle akzeptiert Dateien bis zu ihrem eigenen Limit: **50 MB**, sofern `STORAGE_MAX_FILE_SIZE` (Bytes, mit dem Suffix `__<KEY>` für eine benannte Quelle) oder das `maxFileSize` der Quelle nichts anderes vorgibt. Jede Tür hält eine Datei an dieselbe Zahl gebunden. `POST /api/storage/upload` antwortet oberhalb davon mit `413 PAYLOAD_TOO_LARGE`; ein fortsetzbarer Upload wird bereits bei der Erstellung abgelehnt, vor seinem ersten Chunk; und `OPTIONS /api/storage/tus` gibt sie als `Tus-Max-Size` an — für die mit `?storageId=` benannte Quelle, sonst für die Standardquelle.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> für `STORAGE_MAX_FILE_SIZE`: Auf 0.23 legt ausschließlich das `maxFileSize` der Quelle das Limit fest, und die Variable wird nicht gelesen.
+für `STORAGE_MAX_FILE_SIZE`: Auf 0.23 legt ausschließlich das `maxFileSize` der Quelle das Limit fest, und die Variable wird nicht gelesen.
 
 ```bash
 STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
@@ -231,8 +231,8 @@ Client                                                   Rebase Server
 | `GCS_PROJECT_ID` | GCP-Projekt-ID für GCS |
 | `GCS_KEY_FILENAME` | Pfad zu einer GCP-Dienstkonto-Schlüsseldatei (auf GKE weglassen — Workload Identity/ADC liefert Anmeldedaten) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Standard-ADC-Variable, die vom Google-SDK selbst gelesen wird (auf GCP mit Standardanmeldedaten nicht erforderlich) |
-| `STORAGE_DOWNLOAD_TOKEN_TTL` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Wie lange die Download-URL einer privaten Datei funktioniert, in Sekunden — die Lebensdauer des Tokens, das `/api/storage/metadata/*` ausstellt (Standard `300`, höchstens `604800`, eine Woche). Erhöhen Sie ihn für privates Video und Audio, die nach dem Rendern der Seite weiterhin Bereiche anfordern. Die Entsprechung von `storageDownloadTokenTtl` als Umgebungsvariable |
-| `STORAGE_MAX_FILE_SIZE` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Größte Datei, die die Quelle akzeptiert, in Bytes (Standard `52428800`, 50 MB). Suffix `__<KEY>` für eine benannte Quelle. Ein Wert, der keine ganze Zahl von Bytes ist, verweigert den Start. Siehe [Wie groß eine Datei sein darf](#wie-groß-eine-datei-sein-darf) |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | Wie lange die Download-URL einer privaten Datei funktioniert, in Sekunden — die Lebensdauer des Tokens, das `/api/storage/metadata/*` ausstellt (Standard `300`, höchstens `604800`, eine Woche). Erhöhen Sie ihn für privates Video und Audio, die nach dem Rendern der Seite weiterhin Bereiche anfordern. Die Entsprechung von `storageDownloadTokenTtl` als Umgebungsvariable |
+| `STORAGE_MAX_FILE_SIZE` | Größte Datei, die die Quelle akzeptiert, in Bytes (Standard `52428800`, 50 MB). Suffix `__<KEY>` für eine benannte Quelle. Ein Wert, der keine ganze Zahl von Bytes ist, verweigert den Start. Siehe [Wie groß eine Datei sein darf](#wie-groß-eine-datei-sein-darf) |
 | `FORCE_LOCAL_STORAGE` | `STORAGE_TYPE=local` in der Produktion erlauben — siehe unten |
 | `STORAGE_PUBLIC_READ` | Gespeicherte Objekte für unauthentifizierte Leser bereitstellen. Die Entsprechung von `storagePublicRead` als Umgebungsvariable und eine von drei Möglichkeiten, den [Boot-Schutz für die Produktion](#autorisierung-auf-objektebene) zu erfüllen. |
 | `STORAGE_ALLOW_ANY_AUTHENTICATED` | Deaktiviert den Boot-Schutz und stellt das Verhalten wieder her, bei dem jeder angemeldete Benutzer jeden Schlüssel lesen, überschreiben, löschen oder auflisten darf. Die Entsprechung von `storageInsecureAllowAnyAuthenticated` als Umgebungsvariable. Nur vertretbar, wenn jedem angemeldeten Benutzer jede Datei anvertraut werden kann. |
@@ -412,7 +412,7 @@ Wissenswertes:
 
 ### API-Schlüssel und Tokens
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Eine angemeldete Person hält jeden Storage-Scope, für sie entscheiden also der Hook und die Policies oben.
+Eine angemeldete Person hält jeden Storage-Scope, für sie entscheiden also der Hook und die Policies oben.
 Ein [API-Schlüssel](/docs/backend/api-keys/) braucht zusätzlich den Storage-Scope
 für die Operation, auf der Quelle, die die Anfrage nennt: `storage:read` für
 Downloads, Metadaten und Auflistungen, `storage:write` für Uploads, Ordner und jeden

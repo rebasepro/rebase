@@ -1,5 +1,5 @@
 ---
-sourceHash: ce3b9ea649b09037
+sourceHash: 107ae13db8d0ff4a
 title: Relationen abfragen
 sidebar_label: Relationen
 description: "Binden Sie verknüpfte Entitäten in eine Abfrage ein und lesen Sie eine Child-Collection über ihr Parent mit den Relations-Accessors des SDKs."
@@ -156,7 +156,7 @@ data[0].authorId;       // "uuid-1234" — still there
 data[0].author?.name;   // "Jane Doe"
 ```
 
-Ein generiertes `Database` typisiert alle drei präzise: `Insert` und `Update` akzeptieren beide Schreibweisen, `Row` besitzt `authorId` bedingungslos, und `author` ist auf `Row` optional — <span class="since-badge" data-since="0.24">Seit 0.24</span> `RowWith<"posts", ["author"]>` ist die Zeile, auf der es **erforderlich** ist, für einen Lesevorgang, der danach gefragt hat. Siehe [Typisierte Includes](#typisierte-includes).
+Ein generiertes `Database` typisiert alle drei präzise: `Insert` und `Update` akzeptieren beide Schreibweisen, `Row` besitzt `authorId` bedingungslos, und `author` ist auf `Row` optional — `RowWith<"posts", ["author"]>` ist die Zeile, auf der es **erforderlich** ist, für einen Lesevorgang, der danach gefragt hat. Siehe [Typisierte Includes](#typisierte-includes).
 
 Der einzige Fall, in dem die drei zusammenfallen, ist eine Relation, die identisch zu ihrem eigenen Fremdschlüssel benannt ist. Dort wird die eingebundene Zeile *über* der Spalte ausgeliefert, und der generierte Typ bildet dies ab, indem er diesen Schlüssel als beides typisiert.
 
@@ -173,7 +173,7 @@ const ok: IncludeFor<"posts"> = { comments: { limit: 5, include: { author: true 
 const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
-`IncludeFor<A>` beschränkt die Schlüssel eines Includes auf tatsächlich existierende Relationen, und zwar auf jeder Ebene — und <span class="since-badge" data-since="0.24">Seit 0.24</span> ein typisierter Client prüft `include` auf dieselbe Weise, in `find({ include })` wie in `.include(...)`, sodass `posts.include("authr")` ein Compile-Fehler ist statt eines `400 UNKNOWN_RELATION`. Die Zeilen, die ein Lesevorgang zurückgibt, typisieren jede Relation weiterhin als optional; `RowWith<A, I>` ist diese Zeile, bei der jede eingebundene Relation als **erforderlich** festgelegt wird, um zu annotieren, was Sie lesen – nach der Abfrage des Autors benötigt ein `RowWith<"posts", ["author"]>` also kein `?.` auf `row.author.name`. Unter 0.23 gibt es kein `RowWith`, und ein falsch geschriebenes `include` auf dem Client ist ein 400 zur Laufzeit.
+`IncludeFor<A>` beschränkt die Schlüssel eines Includes auf tatsächlich existierende Relationen, und zwar auf jeder Ebene — und ein typisierter Client prüft `include` auf dieselbe Weise, in `find({ include })` wie in `.include(...)`, sodass `posts.include("authr")` ein Compile-Fehler ist statt eines `400 UNKNOWN_RELATION`. Die Zeilen, die ein Lesevorgang zurückgibt, typisieren jede Relation weiterhin als optional; `RowWith<A, I>` ist diese Zeile, bei der jede eingebundene Relation als **erforderlich** festgelegt wird, um zu annotieren, was Sie lesen – nach der Abfrage des Autors benötigt ein `RowWith<"posts", ["author"]>` also kein `?.` auf `row.author.name`. Unter 0.23 gibt es kein `RowWith`, und ein falsch geschriebenes `include` auf dem Client ist ein 400 zur Laufzeit.
 
 Ohne ein generiertes `Database` bleibt `include` ein einfaches `string[]` oder ein Baum: Ein manuell geschriebener Zeilentyp enthält keine Relationen, gegen die geprüft werden könnte, und der 400-Fehler des Servers dient als Fallback.
 

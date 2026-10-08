@@ -1,5 +1,5 @@
 ---
-sourceHash: 411eeede8d2eab1b
+sourceHash: 7c51c9877d9d0803
 title: Clés API
 sidebar_label: Clés API
 description: "Des clés de longue durée pour les scripts, la CI, les agents et les intégrations : clés de service et clés personnelles, les portées qu'elles détiennent, leur articulation avec la sécurité au niveau des lignes, et les routes qui les gèrent."
@@ -7,7 +7,7 @@ description: "Des clés de longue durée pour les scripts, la CI, les agents et 
 
 ## Clés API
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une clé API est un identifiant bearer de longue durée, `rk_live_…`, pour un appelant qui
+Une clé API est un identifiant bearer de longue durée, `rk_live_…`, pour un appelant qui
 n'est pas une personne dans un navigateur : un script, un job de CI, un agent, un client MCP, un autre
 service. Ce qu'une clé peut faire est une liste de [portées](/docs/backend/roles-and-scopes/),
 comme `data:read:orders` ou `cron:write`.
@@ -37,7 +37,7 @@ d'administration que ses portées atteignent, le WebSocket temps réel et le [po
 
 ### En créer une
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une clé de service a besoin d'un nom et d'au moins une portée.
+Une clé de service a besoin d'un nom et d'au moins une portée.
 
 ```bash
 # CLI: talks to the backend with the service key from .env
@@ -138,7 +138,7 @@ administrateur.
 
 ### Accès complet, pour la CI et les migrations
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> `--full-access` donne à la clé toutes les portées que détient son créateur, moins `keys:read` et
+`--full-access` donne à la clé toutes les portées que détient son créateur, moins `keys:read` et
 `keys:write`, qu'aucune clé ne peut détenir. Via le CLI, qui utilise la clé de service, cela fait
 toutes les portées du plan des données et du plan d'administration. Ajoutez `--roles admin` et la
 sécurité au niveau des lignes ne limite plus les lignes qu'elle lit, modifie ou supprime :
@@ -152,7 +152,7 @@ n'est pas la bonne pour un agent.
 
 ### Limite de débit
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Le `rate_limit` d'une clé est le nombre de requêtes qu'elle peut faire dans une fenêtre de
+Le `rate_limit` d'une clé est le nombre de requêtes qu'elle peut faire dans une fenêtre de
 15 minutes, et chaque porte d'entrée est décomptée dans un seul compartiment, `api-key:<id>` :
 
 - ses requêtes HTTP vers les API de données, de stockage et de fonctions ;
@@ -169,7 +169,7 @@ ceux de l'éditeur SQL, ne sont pas soumis à la limite de débit.
 
 ## Clés personnelles
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une clé personnelle agit **en tant que son propriétaire** : son uid, et ses rôles tels qu'ils sont à
+Une clé personnelle agit **en tant que son propriétaire** : son uid, et ses rôles tels qu'ils sont à
 chaque requête. Les règles de type propriétaire lui correspondent, donc elle lit exactement ce que
 son propriétaire lirait, restreint par ses portées. Elle convient aux scripts d'une personne, à un
 CLI sur son ordinateur portable, ou à un outil qu'elle connecte à son propre compte.
@@ -283,7 +283,7 @@ exigent `database:read` ou `database:write`.
 
 ## Agents et serveurs MCP
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Un agent a besoin de la clé la *plus restreinte* qui fait son travail. Commencez avec des portées
+Un agent a besoin de la clé la *plus restreinte* qui fait son travail. Commencez avec des portées
 limitées, et donnez-lui une expiration :
 
 ```bash

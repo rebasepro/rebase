@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c9aa0d1c19006ba
+sourceHash: 0007bd5679d9971e
 title: Copias de seguridad y restauración
 sidebar_label: Copias de seguridad
 description: Crea, programa, lista y restaura copias de seguridad de la base de datos con pg_dump — qué contiene una copia de seguridad, el archivo de roles que la acompaña, y lo único que no cubre, tus archivos subidos.
@@ -153,7 +153,7 @@ copia de seguridad; cualquier otra cosa que comparta el bucket o el prefijo
 se deja intacta.
 
 El cron ejecuta `pg_dump` dentro del proceso del servidor.
-<span class="since-badge" data-since="0.24">Desde 0.24</span> la imagen oficial
+la imagen oficial
 del runtime (`rebasepro/server`, consulta [Autoalojamiento](/docs/deployment/self-hosting/))
 incluye las herramientas de cliente de PostgreSQL 18 para esto;
 en la 0.23 y anteriores no tenía ninguna, y cada ejecución programada fallaba
@@ -257,13 +257,13 @@ tamaño y hora. **Download** descarga el dump; **Roles file** descarga su
 marcada **No roles file** no tiene archivo asociado: recrea sus roles a mano
 antes de restaurarla en un Postgres nuevo.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> encima de la
+encima de la
 lista se informa de la tarea de copia de seguridad programada y su última
 ejecución. Una ejecución fallida se muestra como un error con su mensaje, así
 que una copia de seguridad nocturna que no puede ejecutarse es visible donde
 se listan las copias, no solo en el panel de Cron Jobs.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> lo que dice sobre la tarea:
+lo que dice sobre la tarea:
 
 - **Last scheduled backup** es la última ejecución que hizo la programación.
   Una ejecución iniciada a mano desde entonces (**Run Now** en Cron Jobs) tiene
@@ -281,7 +281,7 @@ se listan las copias, no solo en el panel de Cron Jobs.
   panel lo dice, en lugar de decir que la copia de seguridad aún no se ha
   ejecutado.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> la lista la lee
+la lista la lee
 el proceso del servidor que responde a `GET /api/admin/backups`, y ese no
 siempre es el proceso que ejecuta la programación:
 

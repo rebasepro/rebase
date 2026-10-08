@@ -1,5 +1,5 @@
 ---
-sourceHash: 144c4a3958537ebb
+sourceHash: 15e127696fc3c50e
 title: Intégration de serveur personnalisé
 sidebar_label: Serveur personnalisé (Express)
 description: Comment intégrer les services Rebase Database et Realtime dans votre propre backend Node.js personnalisé sans utiliser Hono ni le coordinateur Rebase.
@@ -248,7 +248,7 @@ app.use(cors({
 }));
 ```
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Le runtime Rebase et le backend éjecté envoient déjà cette liste. Sur la 0.23
+Le runtime Rebase et le backend éjecté envoient déjà cette liste. Sur la 0.23
 ils n'exposent aucun de ces en-têtes, si bien qu'un frontend sur une autre origine ne lit aucun `ETag`.
 
 ## Liens connexes

@@ -1,5 +1,5 @@
 ---
-sourceHash: dcc8ea957511a4ea
+sourceHash: 4fc97bd0da41030a
 title: Escritura de datos
 sidebar_label: Escritura de datos
 description: create, upsert, update y delete con el SDK — operaciones de campo, escrituras condicionales, claves de idempotencia, escrituras por lotes y escritura entre colecciones en una sola transacción.
@@ -146,7 +146,7 @@ se degrada a una actualización ordinaria en lugar de lanzar un error.
 
 Desde un navegador en otro origen — un frontend de Vite en su propio puerto,
 un host `app.` que llama a un host `api.` — el `ETag` solo es legible porque
-el servidor lo nombra en `Access-Control-Expose-Headers`. <span class="since-badge" data-since="0.24">Desde 0.24</span> El runtime de Rebase
+el servidor lo nombra en `Access-Control-Expose-Headers`. El runtime de Rebase
 lo hace, junto con `Retry-After`, `X-Request-ID`, las cabeceras
 `X-RateLimit-*` y `Preference-Applied`; en 0.23 no expone ninguna de ellas, por
 lo que `etagOf` es `undefined` entre orígenes ahí. Un backend que conecta su propio
@@ -281,7 +281,7 @@ result.meta;  // { operations: 4 }
 `op` es `create`, `update`, `upsert` o `delete`, y `collection` restringe
 `values` a la forma `Insert` o `Update` generada de esa colección — una
 columna que la colección no tiene es un error de compilación, y también lo es
-un create al que le falta una obligatoria. <span class="since-badge" data-since="0.24">Desde 0.24</span> `collection` es el accesor, el
+un create al que le falta una obligatoria. `collection` es el accesor, el
 nombre que toma `client.data.<accesor>` (`orderItems` para el slug
 `order_items`); el cliente envía el slug, a través del diccionario
 `collections` con el que se creó. En 0.23 un batch tipado envía el accesor tal

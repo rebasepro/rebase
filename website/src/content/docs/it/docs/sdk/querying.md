@@ -1,5 +1,5 @@
 ---
-sourceHash: 42fa2047884b640a
+sourceHash: b8aea50207626bc4
 title: Interrogare i dati
 sidebar_label: Interrogare i dati
 description: Operazioni CRUD, fluent query builder, operatori di filtro, ordinamento, selezione delle colonne e aggregazioni con l'SDK tipizzato di Rebase.
@@ -392,7 +392,7 @@ const rows = await client.data.orders
 
 Le chiavi dei risultati sono **derivate**, non personalizzabili: `sum(total)` viene restituito come `sum_total`, un semplice `count()` come `count`. Consentire di rinominarle comporterebbe dover verificare che il nome scelto non coincida con un campo presente in `groupBy` — una regola controintuitiva che, se ignorata, porterebbe a sovrascrivere silenziosamente dei valori.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> I gruppi vengono paginati come le righe di un elenco: `limit` li limita e `offset` li salta (il raggruppamento su una colonna ad alta cardinalità potrebbe restituire l'equivalente di un'intera tabella di righe in un'unica risposta). Un'aggregazione raggruppata senza `limit` riceve il valore predefinito di un elenco — **50 gruppi** via HTTP — quindi leggi `meta` sul risultato prima di considerarlo completo:
+I gruppi vengono paginati come le righe di un elenco: `limit` li limita e `offset` li salta (il raggruppamento su una colonna ad alta cardinalità potrebbe restituire l'equivalente di un'intera tabella di righe in un'unica risposta). Un'aggregazione raggruppata senza `limit` riceve il valore predefinito di un elenco — **50 gruppi** via HTTP — quindi leggi `meta` sul risultato prima di considerarlo completo:
 
 ```typescript
 const byCustomer = await client.data.orders.aggregate({

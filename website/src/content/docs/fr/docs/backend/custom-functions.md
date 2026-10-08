@@ -1,5 +1,5 @@
 ---
-sourceHash: c1895420d8eb9878
+sourceHash: 7db64266e1a6960b
 title: Fonctions personnalisées
 sidebar_label: Fonctions personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés aux côtés de vos routes CRUD Rebase. Découverte automatique à partir d'un répertoire, avec un accès complet à l'instance backend.
@@ -250,7 +250,7 @@ Lire `getUser(c)` ne constitue **pas** une garde. Un appelant anonyme reçoit `u
 
 ### Portées et portées d'application
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> `requireAdmin` admet le rôle `admin` et personne d'autre. Pour une action qu'un rôle plus restreint ou une clé API doit pouvoir atteindre, protégez la route avec `requireScope`. Elle prend une [portée](/docs/backend/roles-and-scopes/) intégrée, ou une portée que l'application déclare sous `auth.scopes` dans la collection des utilisateurs, comme `"project:deploy": { label: "Deploy projects", target: "project" }` :
+`requireAdmin` admet le rôle `admin` et personne d'autre. Pour une action qu'un rôle plus restreint ou une clé API doit pouvoir atteindre, protégez la route avec `requireScope`. Elle prend une [portée](/docs/backend/roles-and-scopes/) intégrée, ou une portée que l'application déclare sous `auth.scopes` dans la collection des utilisateurs, comme `"project:deploy": { label: "Deploy projects", target: "project" }` :
 
 ```typescript
 import { defineFunction, requireAuth, requireScope, hasScope } from "@rebasepro/server/functions";

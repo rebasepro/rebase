@@ -1,11 +1,11 @@
 ---
-sourceHash: 922c44ae945d9509
+sourceHash: 3d6a5a62a25e5b8c
 title: E-Mail-Verifizierung
 sidebar_label: E-Mail-Verifizierung
 description: "Wie ein Konto seine E-Mail-Adresse nachweist: der bei der Registrierung versendete Link, was das Folgen behält und entfernt, und Registrierung mit vorheriger Bestätigung über requireEmailVerification."
 ---
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Wenn E-Mail konfiguriert ist, versendet
+Wenn E-Mail konfiguriert ist, versendet
 die Registrierung an das neue Konto einen Verifizierungslink (`<frontend>/verify-email?token=…`,
 24 Stunden gültig), sodass der Eigentümer die Adresse bei der Registrierung von sich aus
 nachweist. `POST /api/auth/send-verification` versendet ihn erneut. An die synthetischen

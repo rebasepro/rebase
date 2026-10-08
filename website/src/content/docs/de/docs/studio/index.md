@@ -1,5 +1,5 @@
 ---
-sourceHash: 59fb182b5af4d770
+sourceHash: 0ee4f3fca623b579
 title: Studio-Tools
 sidebar_label: Studio
 description: Rebase Studio bietet Entwickler-Tools für die visuelle Schema-Bearbeitung, SQL-Abfragen, JavaScript-Skripte, RLS-Richtlinienverwaltung und das Durchsuchen von Speichern.
@@ -74,7 +74,7 @@ Sie gehören zu Studio und werden **von `RebaseStudio` lazy geladen** — jedes 
 | Tab | Slug | Gruppe | Funktion |
 |-----|------|--------|----------|
 | SQL-Konsole | `sql` | Datenbank | Rohes SQL gegen Ihre PostgreSQL-Datenbank ausführen und Ergebnisse als Tabelle lesen |
-| RLS-Richtlinien | `rls` | Datenbank | Row-Level-Security-Richtlinien Ihrer Tabellen prüfen und verwalten. <span class="since-badge" data-since="0.24">Seit 0.24</span> Eine Richtlinie wird so aufgeführt, wie die Datenbank sie hält, und mit **Differs from code** markiert, wo das nicht dem entspricht, was das Projekt deklariert. Eine Richtlinie, die Rebase generiert, lässt sich nicht direkt in der Datenbank bearbeiten, und auf einer Tabelle, die Rebase verwaltet, weist ein Banner darauf hin, dass jeder Serverstart und `rebase db push` die deklarierten Richtlinien erneut anwenden |
+| RLS-Richtlinien | `rls` | Datenbank | Row-Level-Security-Richtlinien Ihrer Tabellen prüfen und verwalten. Eine Richtlinie wird so aufgeführt, wie die Datenbank sie hält, und mit **Differs from code** markiert, wo das nicht dem entspricht, was das Projekt deklariert. Eine Richtlinie, die Rebase generiert, lässt sich nicht direkt in der Datenbank bearbeiten, und auf einer Tabelle, die Rebase verwaltet, weist ein Banner darauf hin, dass jeder Serverstart und `rebase db push` die deklarierten Richtlinien erneut anwenden |
 | Schema-Visualizer | `schema-visualizer` | Datenbank | Entity-Diagramm Ihrer Sammlungen und ihrer Beziehungen, gezeichnet aus den Sammlungsdefinitionen: Tabellen, Spalten, Typen und Beziehungen sind so, wie die Sammlungen sie deklarieren. Nur die RLS-Markierungen werden aus der Datenbank gelesen |
 | Branches | `branches` | Datenbank | [Datenbank-Branches](/docs/backend/branching) anlegen und verwalten |
 | Backups | `backups` | Datenbank | Datenbank-Backups durchsuchen und herunterladen |
@@ -94,7 +94,7 @@ Zwei Ströme in einem In-Memory-Ring, gehalten im Serverprozess:
   Fehler-`code` und die Meldung, die der Client erhalten hat. Ein
   fehlgeschlagener Request wird auf `warn` (4xx) oder `error` (5xx)
   aufgezeichnet, damit der Level-Filter ihn findet.
-  <span class="since-badge" data-since="0.24">Seit 0.24</span> Seine `source` ergibt sich aus dem Pfad: `/api/auth/*` und `/api/oauth/*` sind
+  Seine `source` ergibt sich aus dem Pfad: `/api/auth/*` und `/api/oauth/*` sind
   `auth`, `/api/storage/*` ist `storage`, und alles andere ist `api`, sodass der
   Source-Filter Anmeldungen unter Auth und Uploads unter Storage findet.
 - **Alles, was der Server auf warn oder error meldet** — eine Schema-Warnung,
@@ -114,7 +114,7 @@ zwischen Replicas geteilt, und ein Neustart leert ihn. Für alles, was Sie
 aufbewahren müssen, lesen Sie das stdout des Prozesses, das dieselben Zeilen und
 mehr trägt.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Der Explorer sagt das auch. Er zeigt das Log der einen Serverinstanz, die
+Der Explorer sagt das auch. Er zeigt das Log der einen Serverinstanz, die
 ihn ausliefert, und nennt diese Instanz: Das `snapshot`-Ereignis von
 `GET /api/admin/logs/stream` trägt `instance`, den `HOSTNAME` des Prozesses (auf
 Kubernetes der Pod-Name, unter Docker die Container-ID) oder andernfalls `pid-<n>`.

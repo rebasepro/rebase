@@ -216,7 +216,7 @@ The WebSocket client handles authentication automatically:
 - `client.ws.state` is the connection's state — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` or `closed` — and `client.ws.onStateChange(listener)` is told every change. `disconnected` is the state in which `CONNECTION_LOST` has been reported.
 - Requests sent over the socket are **at-most-once**. One that was sent when the connection dropped fails with `CONNECTION_LOST` and is never sent again, since the server may already have run it. One that is still waiting for a socket after 30 seconds fails with `REQUEST_TIMEOUT` without being sent.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> for everything in the list after sign-out. On 0.23 the client gives up after
+for everything in the list after sign-out. On 0.23 the client gives up after
 five failed reconnection attempts, queues requests made while disconnected and
 sends them on reconnect, has no `client.ws.state`, and the server never closes a
 socket whose session has ended.

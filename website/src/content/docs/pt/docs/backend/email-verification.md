@@ -1,11 +1,11 @@
 ---
-sourceHash: 922c44ae945d9509
+sourceHash: 3d6a5a62a25e5b8c
 title: Verificação de e-mail
 sidebar_label: Verificação de e-mail
 description: "Como uma conta comprova seu endereço de e-mail: o link enviado no registro, o que segui-lo mantém e remove, e o registro confirm-first com requireEmailVerification."
 ---
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Quando o e-mail está configurado, o registro
+Quando o e-mail está configurado, o registro
 envia à nova conta um link de verificação (`<frontend>/verify-email?token=…`, válido por 24 horas),
 de modo que o proprietário comprove o endereço no cadastro, em seus próprios termos. `POST /api/auth/send-verification`
 o envia novamente. Nada é enviado aos endereços sintéticos de convidados e contas do X (Twitter).

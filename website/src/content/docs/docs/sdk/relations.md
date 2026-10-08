@@ -176,7 +176,7 @@ data[0].author?.name;   // "Jane Doe"
 
 A generated `Database` types all three precisely: `Insert` and `Update` accept
 either write spelling, `Row` has `authorId` unconditionally, and `author` is
-optional on `Row` — <span class="since-badge" data-since="0.24">Since 0.24</span> `RowWith<"posts", ["author"]>` is the row with it
+optional on `Row` — `RowWith<"posts", ["author"]>` is the row with it
 **required**, for a read that asked for it. See [Typed includes](#typed-includes).
 
 The one case where the three collapse is a relation named identically to its own
@@ -198,7 +198,7 @@ const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
 `IncludeFor<A>` constrains an include's keys to relations that exist, at every
-level — and <span class="since-badge" data-since="0.24">Since 0.24</span> a typed client checks `include` the same way, in `find({ include })`
+level — and a typed client checks `include` the same way, in `find({ include })`
 and in `.include(...)`, so `posts.include("authr")` is a compile error rather
 than a 400 `UNKNOWN_RELATION`. The rows a read returns still type each relation
 as optional; `RowWith<A, I>` is that row with every included relation made

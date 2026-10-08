@@ -1,5 +1,5 @@
 ---
-sourceHash: b3fe9c24649203e8
+sourceHash: aaa2fdfbd560c4cc
 title: Escrita via REST
 sidebar_label: Escrita via REST
 description: Chaves de idempotência, escritas condicionais com ETag e If-Match, operações de campo, upserts em chave natural, return=minimal e lotes entre coleções.
@@ -21,7 +21,7 @@ então tudo nesta seção vale para elas também, exceto `?on_conflict=`.
 O corpo de uma escrita precisa ser um objeto JSON. `null`, um número, uma string ou
 um array resulta em `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Uma atualização não pode alterar a chave de uma linha. Um corpo que nomeia a
+Uma atualização não pode alterar a chave de uma linha. Um corpo que nomeia a
 chave com outro valor resulta em `400 KEY_IMMUTABLE`, antes de qualquer hook
 rodar e sem nada escrito, seja qual for o caminho pelo qual a atualização
 chega: REST, o socket de tempo real, MCP ou o `rebase.data` em processo. A

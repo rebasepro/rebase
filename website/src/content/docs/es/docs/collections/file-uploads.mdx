@@ -1,5 +1,5 @@
 ---
-sourceHash: b3f66b1a63aa456a
+sourceHash: 40c6996a773e6e50
 title: Campos de subida de archivos
 sidebar_label: Subidas de archivos
 description:"\"Declarar un campo de archivo o imagen en una colección: el bloque storage, subidas de archivos individuales o múltiples, y cuáles de sus opciones son resueltas por el panel en lugar del servidor.\""
@@ -88,7 +88,7 @@ propiedad a la que estaba destinado un archivo, por lo que `curl -F file=@payloa
 eludiendo el selector colocaba un ejecutable de 40 MB en el bucket de avatares y la
 configuración que decía lo contrario nunca era consultada.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Ahora ambos los comprueba el servidor contra **dónde cae el archivo**. En
+Ahora ambos los comprueba el servidor contra **dónde cae el archivo**. En
 0.23 solo se comprueban contra la propiedad que nombra una subida, y una
 subida que no nombra ninguna se sujeta solo al límite propio del origen. El
 `storagePath` de una propiedad es adonde van sus archivos, así que también es
@@ -115,7 +115,7 @@ propiedad `public: true` está bajo `public/`.
 
 ### Imágenes en un campo markdown
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Una propiedad markdown (`admin.markdown: true`) con un bloque `storage`
+Una propiedad markdown (`admin.markdown: true`) con un bloque `storage`
 acepta subidas de imágenes en su editor. El texto almacena cada imagen como
 una **referencia de almacenamiento** — `![](rebase-storage:posts/abc_cover.png)`
 — no como una URL: la URL de un archivo privado lleva un token de descarga

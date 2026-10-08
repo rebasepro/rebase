@@ -1,5 +1,5 @@
 ---
-sourceHash: 7efffdd1ca4c7915
+sourceHash: 6e23ad27a4c203f4
 title: Datenbank-Branching
 sidebar_label: Branching
 description: Erstellen Sie isolierte Datenbank-Branches für Entwicklung, Staging und Tests mit PostgreSQLs CREATE DATABASE ... TEMPLATE – sofortige, originalgetreue Kopien ohne Ausfallzeiten.
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS rebase.branches (
 );
 ```
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Ein Server, der auf einem Branch läuft, verwaltet Branches in der Datenbank, aus der der Branch
+Ein Server, der auf einem Branch läuft, verwaltet Branches in der Datenbank, aus der der Branch
 kopiert wurde. Die eigene `rebase.branches` des Branches ist nur ein Schnappschuss, aufgenommen bevor
 seine Zeile geschrieben wurde. Deshalb setzt `rebase dev` in einem [umgeschalteten](#cli-integration) Checkout
 `REBASE_BRANCH_PARENT_DATABASE` auf die Datenbank, die `.env` nennt, und ein Server
@@ -104,7 +104,7 @@ Die Branching-API wird über den `BranchService` des Backends bereitgestellt. Na
 
 Erzeugt eine neue Branch-Datenbank aus der Standarddatenbank oder einem expliziten Quell-Template.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Der Standard ist die Datenbank, auf der die eigene Verbindung des Servers liegt, oder
+Der Standard ist die Datenbank, auf der die eigene Verbindung des Servers liegt, oder
 `REBASE_BRANCH_PARENT_DATABASE`, wenn der Server auf einem Branch läuft. Es ist nie
 die Datenbank, die `ADMIN_CONNECTION_STRING` nennt, wenn das eine andere ist.
 
@@ -143,7 +143,7 @@ Output:
 */
 ```
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> `database` ist die PostgreSQL-Datenbank, die der Branch ist, so wie sein Eintrag sie angibt:
+`database` ist die PostgreSQL-Datenbank, die der Branch ist, so wie sein Eintrag sie angibt:
 womit Sie sich verbinden und was Sie als `source` übergeben, um den Branch zu kopieren. Es ist nicht
 der Name des Branches (`staging` ist die Datenbank `rb_staging`).
 
@@ -164,7 +164,7 @@ await admin.deleteBranch("feature_oauth");
 ```
 
 > [!CAUTION]
-> Schutzmechanismus: Die Hauptdatenbank (der in den Verbindungszeichenfolgen konfigurierte Standarddatenbankname) ist geschützt. <span class="since-badge" data-since="0.24">Seit 0.24</span> Das ist die Datenbank, auf der die eigene Verbindung des Servers liegt, oder auf einem Branch `REBASE_BRANCH_PARENT_DATABASE`. Wenn Sie versuchen, die übergeordnete Datenbank zu löschen, wirft der `BranchService` den Fehler `"Cannot delete the main database"` und bricht ab.
+> Schutzmechanismus: Die Hauptdatenbank (der in den Verbindungszeichenfolgen konfigurierte Standarddatenbankname) ist geschützt. Das ist die Datenbank, auf der die eigene Verbindung des Servers liegt, oder auf einem Branch `REBASE_BRANCH_PARENT_DATABASE`. Wenn Sie versuchen, die übergeordnete Datenbank zu löschen, wirft der `BranchService` den Fehler `"Cannot delete the main database"` und bricht ab.
 
 ---
 

@@ -1,6 +1,1 @@
-{
-    "`rebase dev` regenerating the SDK types": {
-        "entry": "**`rebase dev --generate` is removed, because what it did is now the default.**",
-        "pattern": "regenerates\\b(?:[^.]|\\.(?! )){0,200}?\\btypes (?:in |\\()`generated/sdk/`"
-    }
-}
+{}

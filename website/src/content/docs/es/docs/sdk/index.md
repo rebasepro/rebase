@@ -1,5 +1,5 @@
 ---
-sourceHash: b7e862286c030911
+sourceHash: 75ae5bf75334fb86
 title: SDK tipado — Primeros pasos
 sidebar_label: Primeros pasos
 description: Instala y configura el SDK tipado de Rebase para interactuar con tu backend desde cualquier aplicación JavaScript o TypeScript.
@@ -57,7 +57,7 @@ const client = createRebaseClient({
 | `realtime` | `boolean` | Abre el WebSocket (por defecto `true`) — establece `false` en scripts de ejecución única |
 | `collections` | `Record<string, string>` | Mapea nombres de accesores a slugs de colecciones |
 | `offline` | `boolean \| OfflineConfig` | [Sincronización local-first](/docs/sdk/offline) — desactivada por defecto |
-| `impersonate` | `string` | <span class="since-badge" data-since="0.24">Desde 0.24</span> Ejecuta cada petición como este usuario (por uid), para comprobar qué ve un usuario. Solo con la sesión de un administrador: la API de datos, las funciones y el tiempo real se ejecutan como ese usuario, y cualquier otra ruta la rechaza |
+| `impersonate` | `string` | Ejecuta cada petición como este usuario (por uid), para comprobar qué ve un usuario. Solo con la sesión de un administrador: la API de datos, las funciones y el tiempo real se ejecutan como ese usuario, y cualquier otra ruta la rechaza |
 
 ## Generación de SDK tipado
 
@@ -68,7 +68,7 @@ rebase generate-sdk
 ```
 
 Mientras `rebase dev` está en ejecución no hace falta: regenera los tipos en `generated/sdk/` al arrancar y en cada guardado bajo `config/collections/`. Ejecuta el comando tú mismo en CI, en un repositorio de frontend que no tiene colecciones (`rebase generate-sdk --from link`), o en cualquier lugar donde `rebase dev` no se esté ejecutando.
-<span class="since-badge" data-since="0.24">Desde 0.24</span> para la regeneración: en 0.23, `rebase dev` deja los tipos del SDK como están, así que ejecuta
+para la regeneración: en 0.23, `rebase dev` deja los tipos del SDK como están, así que ejecuta
 el comando después de cada cambio de colección.
 
 Luego pasa el parámetro de tipo `Database` a `createRebaseClient` para obtener autocompletado completo:

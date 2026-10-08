@@ -1,5 +1,5 @@
 ---
-sourceHash: 481cd30b8a1a6e64
+sourceHash: bc550d505d122629
 title: Sincronización Offline y Local-First
 sidebar_label: Offline
 description: Active el motor de sincronización local-first del SDK tipado de Rebase — una base de datos local de filas, escrituras offline instantáneas con reversión y consultas en vivo reactivas.
@@ -126,9 +126,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Conectividad actual, profundidad de la cola, actividad de sincronización, último error |
 | `onStatusChange(fn)` | Suscribirse a lo anterior |
 | `onQueueChange(fn)` | Solo el número de escrituras sin enviar, para un indicador |
-| `pending()` | Las mutaciones en cola en sí, de la más antigua a la más reciente. <span class="since-badge" data-since="0.24">Desde 0.24</span> `pending({ orphaned: true })`: las que se pusieron en cola sin sesión iniciada — véase [Usuarios](#usuarios) |
+| `pending()` | Las mutaciones en cola en sí, de la más antigua a la más reciente. `pending({ orphaned: true })`: las que se pusieron en cola sin sesión iniciada — véase [Usuarios](#usuarios) |
 | `sync()` | Reproducir ahora — se resuelve con `{ flushed, remaining }` |
-| `clear()` | Descartar las escrituras en cola **y** las filas locales del usuario actual. <span class="since-badge" data-since="0.24">Desde 0.24</span> `clear({ orphaned: true })`: en su lugar, las que se pusieron en cola sin sesión iniciada |
+| `clear()` | Descartar las escrituras en cola **y** las filas locales del usuario actual. `clear({ orphaned: true })`: en su lugar, las que se pusieron en cola sin sesión iniciada |
 
 La reproducción ocurre por su cuenta: cuando el navegador dispara `online`, cuando el usuario inicia sesión y con un backoff exponencial (un segundo, duplicándose hasta un minuto) mientras haya algo en cola. `sync()` es para un botón de «reintentar ahora».
 
@@ -147,7 +147,7 @@ const client = createRebaseClient({
 });
 ```
 
-La cascada es estrecha: un `update` se descarta junto con la escritura que editaba, porque solo puede fallar de la misma manera. Un `create` o `delete` posterior sobre la misma fila se sostiene por sí mismo y se conserva. Una escritura descartada nunca se envió. <span class="since-badge" data-since="0.24">Desde 0.24</span> Se informa con un `RebaseApiError` cuyo `code` es `DEPENDENCY_REJECTED` y cuyo `cause` es el rechazo que la condenó, para que puedas distinguirla de la escritura que el servidor realmente rechazó. En 0.23 lleva en cambio el propio error de la escritura rechazada.
+La cascada es estrecha: un `update` se descarta junto con la escritura que editaba, porque solo puede fallar de la misma manera. Un `create` o `delete` posterior sobre la misma fila se sostiene por sí mismo y se conserva. Una escritura descartada nunca se envió. Se informa con un `RebaseApiError` cuyo `code` es `DEPENDENCY_REJECTED` y cuyo `cause` es el rechazo que la condenó, para que puedas distinguirla de la escritura que el servidor realmente rechazó. En 0.23 lleva en cambio el propio error de la escritura rechazada.
 
 Las ediciones consecutivas sobre una misma fila mientras está sin conexión se fusionan en una única escritura en cola, de modo que un formulario en el que se está escribiendo no hace crecer la cola. Si el servidor rechaza la escritura fusionada por su contenido (un 400, 403 o 422 — por ejemplo, un campo eliminado por un cambio de esquema mientras el usuario estaba sin conexión), el motor la divide de nuevo en las ediciones separadas y reproduce cada una. Solo se revierte y se informa la edición que el servidor rechaza; las demás se conservan.
 
@@ -163,13 +163,13 @@ La base de datos local y la cola de salida están particionadas por usuario aute
 
 ### Mientras se restaura la sesión
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Hasta que el cliente sabe quién ha iniciado sesión, no sabe qué base de datos local ni qué cola de salida usar, así que las lecturas y escrituras offline esperan. Es el tiempo que tarda `auth.isInitialized()`: ninguno para una sesión almacenada que sigue siendo válida, y una petición de refresco cuando la sesión tiene que volver del servidor — en modo cookie, donde no se guarda nada en el dispositivo, eso ocurre en cada carga de página. Una escritura hecha en ese intervalo se pone en cola a nombre de quien resulte ser el usuario de la sesión, y una lectura responde desde su base de datos local. Un evento de tiempo real que llegue mientras tanto se pasa a tu callback tal como lo envió el servidor, y no se guarda en ningún sitio.
+Hasta que el cliente sabe quién ha iniciado sesión, no sabe qué base de datos local ni qué cola de salida usar, así que las lecturas y escrituras offline esperan. Es el tiempo que tarda `auth.isInitialized()`: ninguno para una sesión almacenada que sigue siendo válida, y una petición de refresco cuando la sesión tiene que volver del servidor — en modo cookie, donde no se guarda nada en el dispositivo, eso ocurre en cada carga de página. Una escritura hecha en ese intervalo se pone en cola a nombre de quien resulte ser el usuario de la sesión, y una lectura responde desde su base de datos local. Un evento de tiempo real que llegue mientras tanto se pasa a tu callback tal como lo envió el servidor, y no se guarda en ningún sitio.
 
 Si la sesión no se puede restaurar — el refresco es rechazado o, en modo cookie, no llega al servidor — el cliente queda sin sesión, y las lecturas y escrituras offline son las del usuario sin sesión. En 0.23, el modo cookie trataba todo ese intervalo como sin sesión, así que una escritura hecha en él se ponía en cola como del usuario sin sesión.
 
 ### Escrituras hechas sin sesión iniciada
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Las escrituras puestas en cola mientras nadie había iniciado sesión no se reproducen cuando alguien inicia sesión. Ese usuario no las hizo, y reproducirlas con sus credenciales pondría los cambios de una persona a nombre de otra — en un dispositivo compartido, las escrituras de un visitante en la cuenta del siguiente usuario. Tampoco se mueven a la cola de salida del usuario que inició sesión. Se conservan y se listan aparte, para que la app decida qué hacer con ellas:
+Las escrituras puestas en cola mientras nadie había iniciado sesión no se reproducen cuando alguien inicia sesión. Ese usuario no las hizo, y reproducirlas con sus credenciales pondría los cambios de una persona a nombre de otra — en un dispositivo compartido, las escrituras de un visitante en la cuenta del siguiente usuario. Tampoco se mueven a la cola de salida del usuario que inició sesión. Se conservan y se listan aparte, para que la app decida qué hacer con ellas:
 
 ```typescript
 client.auth.onAuthStateChange(async (event) => {

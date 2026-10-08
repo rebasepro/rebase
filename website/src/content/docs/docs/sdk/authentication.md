@@ -38,7 +38,7 @@ const { user, confirmationRequired } = await client.auth.signUp(
 );
 ```
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> With [`requireEmailVerification`](/docs/backend/email-verification/) on,
+With [`requireEmailVerification`](/docs/backend/email-verification/) on,
 there is no session until the address is confirmed: `confirmationRequired` is `true` and `user` is `null`, so tell the person to open the mail. Otherwise `confirmationRequired` is `false` and `user` is the signed-in account. On 0.23 `signUp` resolves `{ user, accessToken, refreshToken }` and always signs in.
 
 ## OAuth Providers
@@ -102,7 +102,7 @@ await client.auth.signInWithOAuth("custom-provider", {
 
 ## Magic Links
 
-A one-click sign-in link by email. The link is always `<base>/auth/magic-link?token=…`, where `<base>` is the backend's `email.magicLinkUrl`, or its reset-password base (`FRONTEND_URL` on the runtime) when that is not set. There is no per-request `redirectTo`. Serve that path in your frontend, and hand the token back to trade it for a session. <span class="since-badge" data-since="0.24">Since 0.24</span> The CMS serves it, signing in (through the code step when there is a second factor); other frontends need a landing page.
+A one-click sign-in link by email. The link is always `<base>/auth/magic-link?token=…`, where `<base>` is the backend's `email.magicLinkUrl`, or its reset-password base (`FRONTEND_URL` on the runtime) when that is not set. There is no per-request `redirectTo`. Serve that path in your frontend, and hand the token back to trade it for a session. The CMS serves it, signing in (through the code step when there is a second factor); other frontends need a landing page.
 
 ```typescript
 // 1. Ask for the link.
@@ -207,7 +207,7 @@ if (recoveryCodes) showRecoveryCodes(recoveryCodes);
 ```
 
 **Show the recovery codes once and never again.** Only their hashes are stored,
-so nothing can display them later. <span class="since-badge" data-since="0.24">Since 0.24</span> They come with the account's first factor.
+so nothing can display them later. They come with the account's first factor.
 Adding another factor keeps the codes the account already has, and
 `recoveryCodes` is `null`. Starting an enrolment and abandoning it never touches
 them.
@@ -487,7 +487,7 @@ signs in once the link is followed with its password.
 
 ## Changing the Email Address
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A signed-in user moves their own account to another address. Nothing
+A signed-in user moves their own account to another address. Nothing
 changes until the new address answers:
 
 ```typescript

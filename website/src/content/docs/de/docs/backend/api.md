@@ -1,5 +1,5 @@
 ---
-sourceHash: df4fcc013e52c859
+sourceHash: 1e8fb1164e9af606
 title: REST API
 sidebar_label: REST API
 description: Automatisch generierte REST-API-Endpunkte für jede Collection, mit Filterung, Sortierung, Paginierung und Einbindung von Relationen.
@@ -561,7 +561,7 @@ Jeder Hook wird abgewartet, und ein Fehler in einem davon macht den gesamten Sch
 
 Die OpenAPI-Spezifikation wird automatisch aus Ihren Collection-Definitionen generiert: Sie beschreibt die Listen-, Lese-, Erstellungs-, Aktualisierungs-, Lösch- und Bulk-Endpunkte jeder vom Backend bereitgestellten Collection mitsamt deren Query-Parametern und Response-Schemas. Sie ist kein vollständiges Abbild der gesamten HTTP-Oberfläche — die Routen für Auth, Storage, Functions und Cron sind ausschließlich auf dieser Website dokumentiert — und als `excludeFromApi` markierte Spalten werden ausgelassen.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Für eine [`softDelete`](/docs/collections/soft-delete/)-Collection gibt die Spezifikation an,
+Für eine [`softDelete`](/docs/collections/soft-delete/)-Collection gibt die Spezifikation an,
 dass ein Löschen, einzeln oder als Bulk, die Zeile in den Papierkorb verschiebt, und dokumentiert
 `?hard=true` bei beiden Löschvorgängen sowie `?deleted=include|only` bei der Liste, dem einzelnen
 Lesen, der Zählung und der Aggregation. Der API-Explorer von Studio sendet nur die

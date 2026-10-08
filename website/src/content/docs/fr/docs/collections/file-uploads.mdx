@@ -1,5 +1,5 @@
 ---
-sourceHash: b3f66b1a63aa456a
+sourceHash: 40c6996a773e6e50
 title: Champs de téléversement de fichiers
 sidebar_label: Téléversements de fichiers
 description:"\"Déclarer un champ de fichier ou d'image sur une collection : le bloc storage, les téléversements uniques et multiples, et quelles options sont résolues par le panneau plutôt que par le serveur.\""
@@ -88,7 +88,7 @@ ignorait tout de la propriété à laquelle le fichier était destiné ; ainsi, 
 contournant le sélecteur pouvait déposer un exécutable de 40 Mo dans le bucket des avatars sans
 que la configuration stipulant le contraire ne soit jamais consultée.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Les deux sont désormais vérifiés par le serveur par rapport à **l'endroit où le fichier atterrit**. Sur la 0.23 ils ne sont vérifiés que par rapport à la propriété qu'un téléversement nomme, et un téléversement qui n'en nomme aucune ne rencontre que le plafond propre de la source. Le `storagePath` d'une propriété est l'endroit où vont ses fichiers, c'est donc aussi là que s'appliquent ses limites : tout téléversement dont la clé est un fichier directement sous ce chemin — depuis le panneau, `client.storage.putObject`, un téléversement reprenable, le navigateur de stockage de Studio ou `curl` — les respecte, qu'il nomme la propriété ou non, sur la source de stockage propre à la propriété. Les variables de substitution correspondent à ce que le panneau y inscrirait : `{entityId}`, `{rand}`, `{file}` et autres représentent un seul segment de chemin, `{path}` un nombre quelconque. Le chemin d'une propriété `public: true` se trouve sous `public/`.
+Les deux sont désormais vérifiés par le serveur par rapport à **l'endroit où le fichier atterrit**. Sur la 0.23 ils ne sont vérifiés que par rapport à la propriété qu'un téléversement nomme, et un téléversement qui n'en nomme aucune ne rencontre que le plafond propre de la source. Le `storagePath` d'une propriété est l'endroit où vont ses fichiers, c'est donc aussi là que s'appliquent ses limites : tout téléversement dont la clé est un fichier directement sous ce chemin — depuis le panneau, `client.storage.putObject`, un téléversement reprenable, le navigateur de stockage de Studio ou `curl` — les respecte, qu'il nomme la propriété ou non, sur la source de stockage propre à la propriété. Les variables de substitution correspondent à ce que le panneau y inscrirait : `{entityId}`, `{rand}`, `{file}` et autres représentent un seul segment de chemin, `{path}` un nombre quelconque. Le chemin d'une propriété `public: true` se trouve sous `public/`.
 
 - Plusieurs propriétés partageant un même chemin : un fichier accepté par l'une d'elles est accepté.
 - Un téléversement qui nomme aussi sa propriété (`collection` + `property`, comme les envoie `putObject({ context })`) est également soumis à cette propriété. Nommer une propriété plus permissive ne débloque pas le chemin d'une propriété plus stricte.
@@ -97,7 +97,7 @@ que la configuration stipulant le contraire ne soit jamais consultée.
 
 ### Images dans un champ markdown
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une propriété markdown (`admin.markdown: true`) dotée d'un bloc `storage` accepte les téléversements d'images dans son éditeur. Le texte stocke chaque image comme une **référence de stockage** — `![](rebase-storage:posts/abc_cover.png)` — et non comme une URL : l'URL d'un fichier privé porte un token de téléchargement qui expire en quelques minutes, alors que le texte, lui, est enregistré. L'éditeur et les aperçus du panneau d'administration échangent chaque référence contre une URL fraîche au moment de l'affichage ; un site qui restitue le champ fait de même avec `resolveStorageReferences(text, client)` — voir [Fichiers à l'intérieur d'un texte](/docs/sdk/storage#files-inside-text).
+Une propriété markdown (`admin.markdown: true`) dotée d'un bloc `storage` accepte les téléversements d'images dans son éditeur. Le texte stocke chaque image comme une **référence de stockage** — `![](rebase-storage:posts/abc_cover.png)` — et non comme une URL : l'URL d'un fichier privé porte un token de téléchargement qui expire en quelques minutes, alors que le texte, lui, est enregistré. L'éditeur et les aperçus du panneau d'administration échangent chaque référence contre une URL fraîche au moment de l'affichage ; un site qui restitue le champ fait de même avec `resolveStorageReferences(text, client)` — voir [Fichiers à l'intérieur d'un texte](/docs/sdk/storage#files-inside-text).
 
 Un texte enregistré avant ce changement contient les URL elles-mêmes, et leurs tokens ont expiré ; réinsérez ces images pour stocker des références.
 

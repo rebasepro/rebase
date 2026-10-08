@@ -1,5 +1,5 @@
 ---
-sourceHash: 481cd30b8a1a6e64
+sourceHash: bc550d505d122629
 title: Hors ligne et synchronisation local-first
 sidebar_label: Hors ligne
 description: Activez le moteur de synchronisation local-first du SDK typé de Rebase — une base de données locale de lignes, des écritures hors ligne instantanées avec annulation, et des requêtes en direct réactives.
@@ -126,9 +126,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Connectivité actuelle, profondeur de la file d'attente, activité de synchronisation, dernière erreur |
 | `onStatusChange(fn)` | S'abonner à ce qui précède |
 | `onQueueChange(fn)` | Uniquement le nombre d'écritures non envoyées, pour un badge |
-| `pending()` | Les mutations en file d'attente elles-mêmes, les plus anciennes d'abord. <span class="since-badge" data-since="0.24">Depuis 0.24</span> `pending({ orphaned: true })` : celles mises en file d'attente sans session ouverte — voir [Utilisateurs](#utilisateurs) |
+| `pending()` | Les mutations en file d'attente elles-mêmes, les plus anciennes d'abord. `pending({ orphaned: true })` : celles mises en file d'attente sans session ouverte — voir [Utilisateurs](#utilisateurs) |
 | `sync()` | Rejouer maintenant — résout avec `{ flushed, remaining }` |
-| `clear()` | Écarter les écritures en file d'attente **et** les lignes locales de l'utilisateur courant. <span class="since-badge" data-since="0.24">Depuis 0.24</span> `clear({ orphaned: true })` : celles mises en file d'attente sans session ouverte, à la place |
+| `clear()` | Écarter les écritures en file d'attente **et** les lignes locales de l'utilisateur courant. `clear({ orphaned: true })` : celles mises en file d'attente sans session ouverte, à la place |
 
 Le rejeu se déclenche de lui-même : quand le navigateur émet `online`, quand l'utilisateur se connecte, et selon un backoff exponentiel (une seconde, doublant jusqu'à une minute) tant que quelque chose reste en file d'attente. `sync()` sert à un bouton « réessayer maintenant ».
 
@@ -147,7 +147,7 @@ const client = createRebaseClient({
 });
 ```
 
-La cascade est étroite : un `update` est écarté en même temps que l'écriture qu'il modifiait, car il ne peut échouer que de la même manière. Un `create` ou un `delete` ultérieur portant sur la même ligne se suffit à lui-même et est conservé. Une écriture écartée n'a jamais été envoyée. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Elle est signalée avec une `RebaseApiError` dont le `code` est `DEPENDENCY_REJECTED` et dont la `cause` est le refus qui l'a condamnée, ce qui permet de la distinguer de l'écriture que le serveur a réellement refusée. Sur la 0.23 elle porte à la place l'erreur propre de l'écriture refusée.
+La cascade est étroite : un `update` est écarté en même temps que l'écriture qu'il modifiait, car il ne peut échouer que de la même manière. Un `create` ou un `delete` ultérieur portant sur la même ligne se suffit à lui-même et est conservé. Une écriture écartée n'a jamais été envoyée. Elle est signalée avec une `RebaseApiError` dont le `code` est `DEPENDENCY_REJECTED` et dont la `cause` est le refus qui l'a condamnée, ce qui permet de la distinguer de l'écriture que le serveur a réellement refusée. Sur la 0.23 elle porte à la place l'erreur propre de l'écriture refusée.
 
 Des modifications consécutives sur une même ligne pendant la déconnexion sont fusionnées en une seule écriture mise en file d'attente, de sorte qu'un formulaire en cours de saisie ne fait pas grossir la file. Si le serveur refuse l'écriture fusionnée en raison de son contenu (un 400, 403 ou 422 — par exemple un champ supprimé par un changement de schéma pendant que l'utilisateur était hors ligne), le moteur la scinde à nouveau en modifications séparées et rejoue chacune d'elles. Seule la modification que le serveur refuse est annulée et signalée ; les autres sont conservées.
 
@@ -163,13 +163,13 @@ La base de données locale et la file d'attente d'envoi sont cloisonnées par ut
 
 ### Pendant la restauration de la session
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Tant que le client ne sait pas qui est connecté, il ne sait pas quelle base de données locale ni quelle file d'attente d'envoi utiliser : les lectures et écritures hors ligne attendent donc. C'est le temps que prend `auth.isInitialized()` : aucun pour une session stockée encore valide, et une requête de rafraîchissement quand la session doit revenir du serveur — en mode cookie, où rien n'est stocké sur l'appareil, c'est le cas à chaque chargement de page. Une écriture faite pendant cet intervalle est mise en file d'attente au nom de l'utilisateur que la session se révèle être, et une lecture répond depuis sa base de données locale. Un événement temps réel qui arrive entre-temps est transmis à votre callback tel que le serveur l'a envoyé, et n'est conservé nulle part.
+Tant que le client ne sait pas qui est connecté, il ne sait pas quelle base de données locale ni quelle file d'attente d'envoi utiliser : les lectures et écritures hors ligne attendent donc. C'est le temps que prend `auth.isInitialized()` : aucun pour une session stockée encore valide, et une requête de rafraîchissement quand la session doit revenir du serveur — en mode cookie, où rien n'est stocké sur l'appareil, c'est le cas à chaque chargement de page. Une écriture faite pendant cet intervalle est mise en file d'attente au nom de l'utilisateur que la session se révèle être, et une lecture répond depuis sa base de données locale. Un événement temps réel qui arrive entre-temps est transmis à votre callback tel que le serveur l'a envoyé, et n'est conservé nulle part.
 
 Si la session ne peut pas être restaurée — le rafraîchissement est refusé ou, en mode cookie, n'atteint pas le serveur —, le client est déconnecté, et les lectures et écritures hors ligne sont celles de l'utilisateur déconnecté. Sur la 0.23, le mode cookie traitait tout cet intervalle comme déconnecté, si bien qu'une écriture faite pendant celui-ci était mise en file d'attente au nom de l'utilisateur déconnecté.
 
 ### Écritures faites sans session ouverte
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Les écritures mises en file d'attente alors que personne n'était connecté ne sont pas rejouées quand quelqu'un se connecte. Cet utilisateur ne les a pas faites, et les rejouer avec ses identifiants placerait les modifications d'une personne au nom d'une autre — sur un appareil partagé, les écritures d'un visiteur dans le compte de l'utilisateur suivant. Elles ne sont pas non plus déplacées dans la file d'attente d'envoi de l'utilisateur connecté. Elles sont conservées et listées à part, pour que l'application décide quoi en faire :
+Les écritures mises en file d'attente alors que personne n'était connecté ne sont pas rejouées quand quelqu'un se connecte. Cet utilisateur ne les a pas faites, et les rejouer avec ses identifiants placerait les modifications d'une personne au nom d'une autre — sur un appareil partagé, les écritures d'un visiteur dans le compte de l'utilisateur suivant. Elles ne sont pas non plus déplacées dans la file d'attente d'envoi de l'utilisateur connecté. Elles sont conservées et listées à part, pour que l'application décide quoi en faire :
 
 ```typescript
 client.auth.onAuthStateChange(async (event) => {

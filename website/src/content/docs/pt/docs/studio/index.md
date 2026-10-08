@@ -1,5 +1,5 @@
 ---
-sourceHash: 59fb182b5af4d770
+sourceHash: 0ee4f3fca623b579
 title: Ferramentas do Studio
 sidebar_label: Studio
 description: O Rebase Studio oferece ferramentas para desenvolvedores para edição visual de esquemas, consultas SQL, scripting JavaScript, gerenciamento de políticas RLS e navegação de armazenamento.
@@ -73,7 +73,7 @@ Vêm com o Studio e são **carregadas de forma diferida pelo `RebaseStudio`** �
 | Separador | Slug | Grupo | O que faz |
 |-----------|------|-------|-----------|
 | Consola SQL | `sql` | Base de dados | Executar SQL direto na tua base de dados PostgreSQL e ler os resultados numa tabela |
-| Políticas RLS | `rls` | Base de dados | Inspecionar e gerir as políticas de Row Level Security das tuas tabelas. <span class="since-badge" data-since="0.24">Desde 0.24</span> Uma política é listada tal como a base de dados a guarda, marcada com **Differs from code** quando não é o que o projeto declara. Uma política que o Rebase gera não pode ser editada diretamente na base de dados, e numa tabela que o Rebase gere um aviso indica que cada arranque do servidor e cada `rebase db push` voltam a aplicar as políticas declaradas |
+| Políticas RLS | `rls` | Base de dados | Inspecionar e gerir as políticas de Row Level Security das tuas tabelas. Uma política é listada tal como a base de dados a guarda, marcada com **Differs from code** quando não é o que o projeto declara. Uma política que o Rebase gera não pode ser editada diretamente na base de dados, e numa tabela que o Rebase gere um aviso indica que cada arranque do servidor e cada `rebase db push` voltam a aplicar as políticas declaradas |
 | Visualizador de esquema | `schema-visualizer` | Base de dados | Diagrama de entidades das tuas coleções e das suas relações, desenhado a partir das definições das coleções: tabelas, colunas, tipos e relações são tal como as coleções os declaram. Só os marcadores de RLS são lidos da base de dados |
 | Ramos | `branches` | Base de dados | Criar e gerir [ramos da base de dados](/docs/backend/branching) |
 | Cópias de segurança | `backups` | Base de dados | Navegar e descarregar as cópias de segurança da base de dados |
@@ -92,7 +92,7 @@ Dois fluxos num único anel em memória, mantido no processo do servidor:
   quando o pedido dizia respeito a uma e, quando o pedido falhou, o `code` de
   erro e a mensagem que o cliente recebeu. Um pedido falhado é registado em
   `warn` (4xx) ou `error` (5xx), para que o filtro de nível o encontre.
-  <span class="since-badge" data-since="0.24">Desde 0.24</span> O seu `source` vem do caminho: `/api/auth/*` e `/api/oauth/*` são
+  O seu `source` vem do caminho: `/api/auth/*` e `/api/oauth/*` são
   `auth`, `/api/storage/*` é `storage`, e tudo o resto é `api`, para que o filtro
   Source encontre os inícios de sessão em Auth e os carregamentos em Storage.
 - **Tudo o que o servidor reporta em warn ou error** — um aviso de esquema, uma
@@ -111,7 +111,7 @@ O anel é por processo e por arranque: não é durável, não é partilhado entr
 réplicas e um reinício esvazia-o. Para tudo o que precises de guardar, lê o stdout
 do processo, que leva as mesmas linhas e mais.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> O explorador di-lo. Mostra o log da única instância do servidor que o serve
+O explorador di-lo. Mostra o log da única instância do servidor que o serve
 e identifica essa instância: o evento `snapshot` de
 `GET /api/admin/logs/stream` traz `instance`, o `HOSTNAME` do processo (o nome do
 pod no Kubernetes, o id do contentor no Docker) ou, na falta dele, `pid-<n>`. Não há

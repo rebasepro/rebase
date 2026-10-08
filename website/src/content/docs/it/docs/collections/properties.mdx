@@ -1,5 +1,5 @@
 ---
-sourceHash: d79634002cc11c26
+sourceHash: 60c797ac2e9a363f
 title: Proprietà
 sidebar_label: Proprietà
 description: I tipi di proprietà definiscono il tipo di dati, la validazione e il rendering dell'interfaccia utente per ogni campo in una collection. Rebase supporta i tipi string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -82,7 +82,7 @@ price: {
 |----------|------|-------------|
 | `admin.readOnly` | `boolean` | Impedisce la modifica |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Disabilita con tooltip opzionale |
-| `admin.filledByServer` | `boolean` | <span class="since-badge" data-since="0.24">Da 0.24</span> Il server compila il campo quando un nuovo record lo lascia vuoto (un hook `beforeSave`). Il modulo lascia passare una creazione senza di esso; resta obbligatorio in modifica, e i controlli del server si applicano comunque |
+| `admin.filledByServer` | `boolean` | Il server compila il campo quando un nuovo record lo lascia vuoto (un hook `beforeSave`). Il modulo lascia passare una creazione senza di esso; resta obbligatorio in modifica, e i controlli del server si applicano comunque |
 | `admin.hideFromCollection` | `boolean` | Nasconde dalla vista a tabella |
 | `admin.columnWidth` | `number` | Larghezza della colonna in pixel (vista a tabella) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Larghezza del campo sulla griglia del modulo a quattro colonne |
@@ -291,7 +291,7 @@ database completamente separato e un utente eliminato non deve cancellare la tra
 dichiara una [relazione](/docs/collections/relations) se desideri una join.
 
 :::note[Chiavi primarie composite]
-<span class="since-badge" data-since="0.24">Da 0.24</span> Se imposti `isId` su più proprietà, queste formano una chiave composita: la tabella riceve
+Se imposti `isId` su più proprietà, queste formano una chiave composita: la tabella riceve
 un unico vincolo `PRIMARY KEY (a, b)`, e una riga viene indirizzata da tutti i suoi valori
 di chiave nell'ordine di dichiarazione, uniti da `:::` — `company_translation/1:::en_US`.
 Assegna a ogni colonna della chiave la strategia adatta: `isId: true` per un valore fornito
@@ -303,7 +303,7 @@ dello schema. Se l'obiettivo era un vincolo di unicità su più colonne anziché
 della riga, si deve utilizzare un [indice](/docs/backend/indexes) univoco. Sulla 0.23 un
 secondo `isId` viene rifiutato al caricamento della configurazione.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Una collection in cui nessuna proprietà dichiara `isId` ottiene una colonna
+Una collection in cui nessuna proprietà dichiara `isId` ottiene una colonna
 `id` propria: `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. Il database
 la compila, quindi una riga creata dal pannello di amministrazione, dalla
 REST API o dall'SDK non ha bisogno di una chiave, e una chiave che invii tu

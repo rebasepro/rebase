@@ -1,5 +1,5 @@
 ---
-sourceHash: c783339baba900fc
+sourceHash: d7e22a508527032c
 title: Executando mais de uma instância
 sidebar_label: Mais de uma instância
 description: Todo estado que um processo Rebase mantém só para si, e a configuração que o compartilha — o que definir antes de uma segunda réplica, um deploy rolling ou uma implantação dividida receber tráfego.
@@ -120,7 +120,7 @@ O Logs Explorer do Studio lê um anel com as últimas 10.000 linhas de log
 mantidas pelo processo que atende a requisição. Atrás de um load balancer,
 cada atualização pode mostrar as linhas de uma instância diferente, e nenhuma
 delas mostra a implantação inteira.
-<span class="since-badge" data-since="0.24">Desde 0.24</span> O Logs Explorer indica qual instância está mostrando.
+O Logs Explorer indica qual instância está mostrando.
 Não há configuração que compartilhe o anel: o runtime grava uma linha JSON por
 evento no stdout em produção, e é isso que
 deve ser coletado — o serviço de log da sua plataforma, o Loki, ou qualquer

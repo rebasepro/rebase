@@ -1,5 +1,5 @@
 ---
-sourceHash: 411eeede8d2eab1b
+sourceHash: 7c51c9877d9d0803
 title: API-Schlüssel
 sidebar_label: API-Schlüssel
 description: "Langlebige Schlüssel für Skripte, CI, Agents und Integrationen: Service-Schlüssel und persönliche Schlüssel, die Scopes, die sie halten, wie sie mit Row-Level Security zusammenwirken, und die Routen, die sie verwalten."
@@ -7,7 +7,7 @@ description: "Langlebige Schlüssel für Skripte, CI, Agents und Integrationen: 
 
 ## API-Schlüssel
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Ein API-Schlüssel ist ein langlebiges Bearer-Credential, `rk_live_…`, für einen Aufrufer, der
+Ein API-Schlüssel ist ein langlebiges Bearer-Credential, `rk_live_…`, für einen Aufrufer, der
 keine Person im Browser ist: ein Skript, ein CI-Job, ein Agent, ein MCP-Client, ein anderer
 Dienst. Was ein Schlüssel darf, ist eine Liste von [Scopes](/docs/backend/roles-and-scopes/),
 etwa `data:read:orders` oder `cron:write`.
@@ -37,7 +37,7 @@ Admin-Oberflächen, die seine Scopes erreichen, dem Realtime-WebSocket und dem [
 
 ### Einen erstellen
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Ein Service-Key braucht einen Namen und mindestens einen Scope.
+Ein Service-Key braucht einen Namen und mindestens einen Scope.
 
 ```bash
 # CLI: talks to the backend with the service key from .env
@@ -138,7 +138,7 @@ Admin.
 
 ### Vollzugriff, für CI und Migrationen
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> `--full-access` gibt dem Schlüssel jeden Scope, den sein Ersteller hält, abzüglich `keys:read` und
+`--full-access` gibt dem Schlüssel jeden Scope, den sein Ersteller hält, abzüglich `keys:read` und
 `keys:write`, die kein Schlüssel halten darf. Über die CLI, die den Service-Key nutzt,
 ist das jeder Scope der Datenebene und der Admin-Ebene. Fügen Sie `--roles admin` hinzu, und
 Row-Level Security begrenzt nicht mehr, welche Zeilen er liest, ändert oder löscht:
@@ -152,7 +152,7 @@ nicht das richtige Profil für einen Agent.
 
 ### Ratenbegrenzung
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Das `rate_limit` eines Schlüssels gibt an, wie viele Anfragen er in einem 15-Minuten-Fenster
+Das `rate_limit` eines Schlüssels gibt an, wie viele Anfragen er in einem 15-Minuten-Fenster
 stellen darf, und jeder Zugangsweg zählt in einem gemeinsamen Bucket dagegen, `api-key:<id>`:
 
 - seine HTTP-Anfragen an die Daten-, Storage- und Funktions-APIs;
@@ -169,7 +169,7 @@ SQL-Editors, unterliegen keiner Ratenbegrenzung.
 
 ## Persönliche Schlüssel
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Ein persönlicher Schlüssel handelt **als sein Eigentümer**: mit dessen uid und dessen Rollen, so wie sie bei
+Ein persönlicher Schlüssel handelt **als sein Eigentümer**: mit dessen uid und dessen Rollen, so wie sie bei
 jeder Anfrage sind. Regeln im Eigentümer-Stil passen auf ihn, er liest also genau das, was sein Eigentümer
 lesen würde, eingeschränkt durch seine Scopes. Er eignet sich für die eigenen Skripte einer Person, eine CLI auf ihrem
 Laptop oder ein Tool, das sie mit ihrem eigenen Konto verbindet.
@@ -284,7 +284,7 @@ SQL-Editor und Branch-Nachrichten brauchen `database:read` oder `database:write`
 
 ## Agents und MCP-Server
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Ein Agent braucht den *am engsten gefassten* Schlüssel, der seine Aufgabe erledigt. Beginnen Sie mit Scopes, und geben Sie ihm
+Ein Agent braucht den *am engsten gefassten* Schlüssel, der seine Aufgabe erledigt. Beginnen Sie mit Scopes, und geben Sie ihm
 ein Ablaufdatum:
 
 ```bash

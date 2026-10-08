@@ -1,5 +1,5 @@
 ---
-sourceHash: 56979243362b4790
+sourceHash: 83e2d04a56801ab8
 title: Endpoints de autenticação e tokens
 sidebar_label: Endpoints de autenticação
 description: As rotas de autenticação que o backend do Rebase disponibiliza, seus formatos de resposta, autenticação multifator, o contexto de banco de dados que uma política visualiza, JWKS e chaves de serviço.
@@ -61,7 +61,7 @@ Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/).
 
 | Método | Caminho | Descrição |
 |--------|---------|-----------|
-| `GET` | `/api/admin/users` | Listar usuários (paginado). `?search=` corresponde a uma parte do e-mail ou do nome de exibição, sem diferenciar maiúsculas de minúsculas. <span class="since-badge" data-since="0.24">Desde 0.24</span> No Postgres, também corresponde a qualquer papel que o usuário tenha e ao uid; no MongoDB, continua correspondendo apenas ao e-mail e ao nome de exibição |
+| `GET` | `/api/admin/users` | Listar usuários (paginado). `?search=` corresponde a uma parte do e-mail ou do nome de exibição, sem diferenciar maiúsculas de minúsculas. No Postgres, também corresponde a qualquer papel que o usuário tenha e ao uid; no MongoDB, continua correspondendo apenas ao e-mail e ao nome de exibição |
 | `POST` | `/api/admin/users` | Criar um usuário |
 | `GET` | `/api/admin/users/:uid` | Ler um usuário |
 | `PUT` | `/api/admin/users/:uid` | Atualizar um usuário. `{ disabled: true }` desliga a conta sem excluí-la: todo login e refresh é recusado (`ACCOUNT_DISABLED`), suas sessões terminam e todo token que ela possui é recusado; `false` a liga de volta |
@@ -128,7 +128,7 @@ mas não há access token" — o login funcionou perfeitamente, o token estava a
 
 ### Alterando um endereço de e-mail
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Um usuário conectado
+Um usuário conectado
 move a própria conta para outro endereço em duas etapas:
 
 1. `POST /api/auth/change-email { newEmail }` registra a alteração e envia um
@@ -197,7 +197,7 @@ incorretas, cada conta é limitada a dez tentativas de verificação a cada 15 m
 registrado para aquele fator, impedindo que seja reutilizado pelo restante da sua
 janela de ±1 etapa.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Na tabela de usuários, **Reset two-step verification**
+Na tabela de usuários, **Reset two-step verification**
 (`DELETE /api/admin/users/:uid/mfa`) e **Disable or enable account**
 (`PUT /api/admin/users/:uid { disabled }`) são oferecidos a quem possui
 `users:write`, assim como as rotas são; a opção nunca é oferecida na própria

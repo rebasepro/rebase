@@ -1,5 +1,5 @@
 ---
-sourceHash: 406fc1b9cadefefb
+sourceHash: d2f6e11d9e4f2f6e
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud es el mismo Rebase, operado para ti. Qué es, cómo se vincula y despliega un proyecto, y qué no incluye todavía la beta privada.
@@ -103,7 +103,7 @@ Un rollback añade un nuevo despliegue en lugar de rebobinar el historial, y esp
 
 ## CI y agentes
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Un job de CI o un agente no debería llevar tu contraseña. Dale un token en su lugar: una clave que actúa como tu cuenta, limitada a unas pocas acciones sobre un proyecto. Créalo desde una terminal con la sesión iniciada:
+Un job de CI o un agente no debería llevar tu contraseña. Dale un token en su lugar: una clave que actúa como tu cuenta, limitada a unas pocas acciones sobre un proyecto. Créalo desde una terminal con la sesión iniciada:
 
 ```bash
 rebase cloud tokens create --project shop --can deploy,logs --expires-in 90

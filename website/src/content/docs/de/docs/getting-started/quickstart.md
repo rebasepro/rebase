@@ -1,5 +1,5 @@
 ---
-sourceHash: ea3185fba08977a9
+sourceHash: 32fc3b3ccab733ad
 title: Schnellstart
 sidebar_label: Schnellstart
 description: Erstellen Sie ein neues Rebase-Projekt und führen Sie es in weniger als 2 Minuten lokal aus.
@@ -188,7 +188,7 @@ Collections, startet das Backend neu
 und der Bootvorgang erstellt die neue Tabelle — sodass Ihre Collection **Products** in der
 Navigation erscheint.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> für die SDK-Typen: Unter 0.23
+für die SDK-Typen: Unter 0.23
 generiert `rebase dev` nur das Schema neu, führen Sie daher nach einer Collection-Änderung
 `rebase generate-sdk` aus, bevor Sie deren Typen importieren.
 

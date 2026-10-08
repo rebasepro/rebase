@@ -1,5 +1,5 @@
 ---
-sourceHash: b3fe9c24649203e8
+sourceHash: aaa2fdfbd560c4cc
 title: Schreiben über REST
 sidebar_label: Schreiben über REST
 description: Idempotenz-Schlüssel, bedingte Schreibvorgänge mit ETag und If-Match, Feldoperationen, Upserts über natürliche Schlüssel, return=minimal und sammlungsübergreifende Batches.
@@ -13,7 +13,7 @@ Die Verben finden Sie auf der Seite [REST API](/docs/backend/api/). Hier geht es
 
 Der Body eines Schreibvorgangs muss ein JSON-Objekt sein. `null`, eine Zahl, ein String oder ein Array ergibt `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Ein Update kann den Schlüssel einer Zeile nicht ändern. Ein Body, der den Schlüssel mit einem anderen Wert benennt, ergibt `400 KEY_IMMUTABLE`, bevor irgendein Hook läuft und ohne dass etwas geschrieben wird — unabhängig davon, auf welchem Weg das Update eintrifft: REST, der Realtime-Socket, MCP oder das prozessinterne `rebase.data`. Der Schlüssel, den die Zeile bereits hat, wird akzeptiert, so wie ihn ein Formular sendet, das die gesamte Zeile zurückschickt. Um eine Zeile zu einem neuen Schlüssel zu verschieben, erstellen Sie sie dort neu und löschen Sie die alte. Auf 0.23 antwortet ein solches Update mit `500`, und ein prozessinternes hat die Zeile bereits verschoben, wenn es die Exception wirft.
+Ein Update kann den Schlüssel einer Zeile nicht ändern. Ein Body, der den Schlüssel mit einem anderen Wert benennt, ergibt `400 KEY_IMMUTABLE`, bevor irgendein Hook läuft und ohne dass etwas geschrieben wird — unabhängig davon, auf welchem Weg das Update eintrifft: REST, der Realtime-Socket, MCP oder das prozessinterne `rebase.data`. Der Schlüssel, den die Zeile bereits hat, wird akzeptiert, so wie ihn ein Formular sendet, das die gesamte Zeile zurückschickt. Um eine Zeile zu einem neuen Schlüssel zu verschieben, erstellen Sie sie dort neu und löschen Sie die alte. Auf 0.23 antwortet ein solches Update mit `500`, und ein prozessinternes hat die Zeile bereits verschoben, wenn es die Exception wirft.
 
 ### Idempotenz
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 4b2acc8e12bf440c
+sourceHash: 259c5bd1a0583132
 title: Tiempo real y WebSocket
 sidebar_label: Tiempo real
 description: Sincronización de datos en tiempo real, canales de difusión y seguimiento de presencia mediante WebSocket.
@@ -215,7 +215,7 @@ del usuario) o un [canal de difusión](#canales-de-difusión-broadcast-channels)
 que lleve el cambio para que los clientes vuelvan a consultar en su propio
 horario.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> **Un socket puede tener como máximo 1.000 suscripciones.**
+**Un socket puede tener como máximo 1.000 suscripciones.**
 La siguiente se rechaza con una trama de error con el código
 `TOO_MANY_SUBSCRIPTIONS`; volver a suscribirse con un id que el socket ya
 tiene sustituye esa suscripción y no cuenta de nuevo. El SDK comparte
@@ -232,7 +232,7 @@ solo la del emisor.
 
 ### Sockets que dejan de responder
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Un cliente puede desaparecer sin cerrar su socket: un móvil
+Un cliente puede desaparecer sin cerrar su socket: un móvil
 pierde la cobertura, un portátil entra en reposo, un NAT olvida la conexión. No
 llega ningún frame de cierre, así que nada se lo dice al servidor. Por eso el
 servidor envía un ping a cada socket cada 30 segundos y termina el que no ha
@@ -412,7 +412,7 @@ El SDK tipado se reconecta automáticamente cuando se pierde la conexión WebSoc
 - **Resuscripción automática** — Al reconectarse con éxito, todas las suscripciones activas se vuelven a registrar en el servidor, y el siguiente `onUpdate` de cada una lleva todo lo que se escribió mientras el cliente estaba fuera. Esa actualización es la señal de recuperación. No requiere intervención manual.
 - **Las solicitudes son como mucho una vez** — Una solicitud hecha mientras el socket está caído espera a que vuelva, hasta 30 segundos desde la llamada, y luego falla con `REQUEST_TIMEOUT` sin llegar a enviarse nunca. Una que ya se había enviado cuando la conexión cayó falla con `CONNECTION_LOST` y **no** se vuelve a enviar: el servidor puede haberla ejecutado o no, y solo quien la llamó sabe si ejecutarla dos veces es seguro.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> `client.ws.state` indica dónde está la conexión, y `onStateChange` se notifica de
+`client.ws.state` indica dónde está la conexión, y `onStateChange` se notifica de
 cada cambio. En 0.23 ninguno de los dos existe, el cliente se detiene tras 5 intentos fallidos, y
 los mensajes enviados mientras está desconectado se ponen en cola y se envían al reconectar:
 
@@ -447,11 +447,11 @@ Las suscripciones WebSocket respetan automáticamente las políticas de Row-Leve
 
 1. La conexión WebSocket se autentica utilizando el mismo token JWT que la API REST.
 2. Cada reconsulta (refetch) de la suscripción se ejecuta dentro de una transacción de PostgreSQL con `set_config('app.user_id', ...)` y `set_config('app.user_roles', ...)`, garantizando la aplicación de las políticas RLS.
-3. <span class="since-badge" data-since="0.24">Desde 0.24</span> La identidad se vuelve a comprobar durante todo el tiempo que el socket esté abierto, no solo cuando se autentica. Antes de cada trama, el servidor pregunta lo mismo que preguntaría una solicitud HTTP: si el token sigue siendo válido, si su sesión se cerró o se revocó, si la cuenta todavía existe, y qué roles tiene ahora. Las tramas de canal se preguntan como máximo una vez por segundo. Un socket que solo escucha se pregunta al menos cada 30 segundos, y un token deja de respetarse en el instante en que expira. Un rol retirado se aplica desde la siguiente trama, tanto a lecturas como a escrituras y a suscripciones abiertas. Un socket cuya identidad ha terminado recibe una trama `AUTH_ERROR` con el código `SESSION_ENDED` o `TOKEN_EXPIRED` y se cierra con el código `4001`. El SDK vuelve a autenticar su socket cada vez que renueva su token, y tras un `4001` se reconecta con la sesión que tenga en ese momento, o sin ninguna. Un cliente que hable el protocolo directamente tiene que enviar un token nuevo en `AUTHENTICATE` antes de que expire el anterior.
+3. La identidad se vuelve a comprobar durante todo el tiempo que el socket esté abierto, no solo cuando se autentica. Antes de cada trama, el servidor pregunta lo mismo que preguntaría una solicitud HTTP: si el token sigue siendo válido, si su sesión se cerró o se revocó, si la cuenta todavía existe, y qué roles tiene ahora. Las tramas de canal se preguntan como máximo una vez por segundo. Un socket que solo escucha se pregunta al menos cada 30 segundos, y un token deja de respetarse en el instante en que expira. Un rol retirado se aplica desde la siguiente trama, tanto a lecturas como a escrituras y a suscripciones abiertas. Un socket cuya identidad ha terminado recibe una trama `AUTH_ERROR` con el código `SESSION_ENDED` o `TOKEN_EXPIRED` y se cierra con el código `4001`. El SDK vuelve a autenticar su socket cada vez que renueva su token, y tras un `4001` se reconecta con la sesión que tenga en ese momento, o sin ninguna. Un cliente que hable el protocolo directamente tiene que enviar un token nuevo en `AUTHENTICATE` antes de que expire el anterior.
 
 Esto significa que cada socket solo recibe actualizaciones de los registros que su identidad autenticada tiene permiso para ver.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Una [clave de API](/docs/backend/api-keys/) también autentica el socket: envía la
+Una [clave de API](/docs/backend/api-keys/) también autentica el socket: envía la
 clave `rk_…` donde iría el token de acceso. El socket comprueba entonces cada trama
 contra los [alcances](/docs/backend/roles-and-scopes/) de la clave: una lectura, un
 recuento o una suscripción necesitan `data:read` en su colección, un guardado

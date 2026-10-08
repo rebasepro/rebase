@@ -1,5 +1,5 @@
 ---
-sourceHash: bf93b611a72a5f12
+sourceHash: 151bdf50176c7654
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -44,7 +44,7 @@ Richtet die Projektstruktur mit Frontend, Backend und geteilten Packages ein.
 | `--introspect` | Collections aus dieser Datenbank generieren. Impliziert `--template blank` und erfordert `--install` |
 | `--project <slug>` | Das Scaffold mit einem Rebase Cloud-Projekt verknüpfen |
 | `--setup-key <key>` | Der Einmalschlüssel zur Authentifizierung dieser Verknüpfung |
-| `-a, --agent <name>` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Richtet KI-Coding-Agenten ein: die [Skills](/docs/ai/skills) und den [MCP-Server](/docs/ai/mcp). Wiederholbar oder kommagetrennt — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` oder `all`. Ohne diesen Parameter fragt `init` nach und wählt die auf dem Rechner installierten Agenten vorab aus; unter `--yes` keine |
+| `-a, --agent <name>` | Richtet KI-Coding-Agenten ein: die [Skills](/docs/ai/skills) und den [MCP-Server](/docs/ai/mcp). Wiederholbar oder kommagetrennt — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` oder `all`. Ohne diesen Parameter fragt `init` nach und wählt die auf dem Rechner installierten Agenten vorab aus; unter `--yes` keine |
 
 ### `rebase dev`
 
@@ -54,7 +54,7 @@ Startet den Entwicklungsserver:
 rebase dev
 ```
 
-Startet sowohl Frontend als auch Backend mit Hot Reloading und generiert das Drizzle-Schema sowie die SDK-Typen (`generated/sdk/`) beim Start und bei jedem Speichern einer Collection neu. <span class="since-badge" data-since="0.24">Seit 0.24</span> für die SDK-Typen — in 0.23 wird nur das Schema neu generiert, und `rebase generate-sdk` müssen Sie selbst ausführen.
+Startet sowohl Frontend als auch Backend mit Hot Reloading und generiert das Drizzle-Schema sowie die SDK-Typen (`generated/sdk/`) beim Start und bei jedem Speichern einer Collection neu. für die SDK-Typen — in 0.23 wird nur das Schema neu generiert, und `rebase generate-sdk` müssen Sie selbst ausführen.
 
 Beide Ports werden aus dem Pfad des Projekts abgeleitet, sodass mehrere Rebase-Projekte
 nebeneinander laufen können. Verwenden Sie die URLs, die `rebase dev` ausgibt. Einen Port festlegen können Sie mit `rebase dev --port 3001`.
@@ -545,7 +545,7 @@ rebase auth reset-password --email admin@example.com --password NewPassword123!
 
 ### `rebase api-keys`
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Verwaltet die Service-API-Keys des Projekts — die Zugangsdaten, die ein Agent, Skript oder ein
+Verwaltet die Service-API-Keys des Projekts — die Zugangsdaten, die ein Agent, Skript oder ein
 anderer Dienst verwendet, im Gegensatz zur Sitzung eines Endbenutzers:
 
 ```bash

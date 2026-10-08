@@ -87,7 +87,7 @@ property a file was destined for, so `curl -F file=@payload.exe` past the picker
 put a 40 MB executable in the avatar bucket and the config that said otherwise
 was never consulted.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Both are now checked by the server against **where the file lands**. On
+Both are now checked by the server against **where the file lands**. On
 0.23 they are checked only against the property an upload names, and an upload
 that names none meets the source's own cap alone. A
 property's `storagePath` is where its files go, so it is also where its limits
@@ -110,7 +110,7 @@ own storage source. Placeholders match whatever the panel would fill in:
 
 ### Images in a markdown field
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A markdown property (`admin.markdown: true`) with a `storage` block takes image
+A markdown property (`admin.markdown: true`) with a `storage` block takes image
 uploads in its editor. The text stores each image as a **storage reference** —
 `![](rebase-storage:posts/abc_cover.png)` — not as a URL: a private file's URL
 carries a download token that expires in minutes, and the text is saved. The

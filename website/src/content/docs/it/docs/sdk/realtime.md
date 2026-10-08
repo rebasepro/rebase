@@ -1,5 +1,5 @@
 ---
-sourceHash: 0ac5189687d9eccf
+sourceHash: 62e51002f973bf74
 title: Sottoscrizioni Realtime
 sidebar_label: Realtime
 description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato di Rebase utilizzando listener realtime basati su WebSocket.
@@ -186,7 +186,7 @@ Il client WebSocket gestisce l'autenticazione automaticamente:
 - `client.ws.state` è lo stato della connessione — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` o `closed` — e `client.ws.onStateChange(listener)` viene informato di ogni cambiamento. `disconnected` è lo stato in cui `CONNECTION_LOST` è stato segnalato.
 - Le richieste inviate tramite il socket sono **at-most-once**. Una che è stata inviata quando la connessione è caduta fallisce con `CONNECTION_LOST` e non viene mai rinviata, poiché il server potrebbe averla già eseguita. Una che attende ancora un socket dopo 30 secondi fallisce con `REQUEST_TIMEOUT` senza essere inviata.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> per tutto quanto elencato dopo il logout. Sulla 0.23 il client rinuncia dopo
+per tutto quanto elencato dopo il logout. Sulla 0.23 il client rinuncia dopo
 cinque tentativi di riconnessione falliti, accoda le richieste fatte mentre è
 disconnesso e le invia alla riconnessione, non ha `client.ws.state`, e il
 server non chiude mai un socket la cui sessione è terminata.

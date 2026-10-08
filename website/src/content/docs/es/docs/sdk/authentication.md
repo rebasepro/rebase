@@ -1,5 +1,5 @@
 ---
-sourceHash: 13c002a75ecd9ce1
+sourceHash: 8fa955ab0e0d14e2
 title: Autenticación
 sidebar_label: Autenticación
 description: Autenticación del lado del cliente con el SDK de Rebase — inicio de sesión con correo electrónico/contraseña, proveedores OAuth, gestión de sesiones y escuchadores de estado de autenticación.
@@ -45,7 +45,7 @@ const { user, confirmationRequired } = await client.auth.signUp(
 );
 ```
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Con [`requireEmailVerification`](/docs/backend/email-verification/) activado,
+Con [`requireEmailVerification`](/docs/backend/email-verification/) activado,
 no hay sesión hasta que se confirma la dirección: `confirmationRequired` es
 `true` y `user` es `null`, así que indícale a la persona que abra el correo. En caso contrario,
 `confirmationRequired` es `false` y `user` es la cuenta que inició sesión. En 0.23
@@ -117,7 +117,7 @@ Un enlace de inicio de sesión de un solo clic por correo electrónico. El enlac
 backend, o su base de restablecimiento de contraseña (`FRONTEND_URL` en el
 runtime) cuando eso no está establecido. No hay un `redirectTo` por solicitud.
 Sirve esa ruta en tu frontend, y devuelve el token para canjearlo por una
-sesión. <span class="since-badge" data-since="0.24">Desde 0.24</span> El CMS lo sirve, iniciando sesión (a través del paso de
+sesión. El CMS lo sirve, iniciando sesión (a través del paso de
 código cuando hay un segundo factor); otros frontends necesitan una página de
 aterrizaje.
 
@@ -204,7 +204,7 @@ showQrCode(totp.uri);        // otpauth://… — what the authenticator scans
 if (recoveryCodes) showRecoveryCodes(recoveryCodes);
 ```
 
-**Muestra los códigos de recuperación una sola vez y nunca más.** Solo se almacenan sus hashes, por lo que nada podrá mostrarlos más tarde. <span class="since-badge" data-since="0.24">Desde 0.24</span> Vienen con el
+**Muestra los códigos de recuperación una sola vez y nunca más.** Solo se almacenan sus hashes, por lo que nada podrá mostrarlos más tarde. Vienen con el
 primer factor de la cuenta. Añadir otro factor conserva los códigos que la
 cuenta ya tiene, y `recoveryCodes` es `null`. Iniciar un registro y
 abandonarlo nunca los toca.
@@ -466,7 +466,7 @@ sesión una vez que se sigue el enlace con su contraseña.
 
 ## Cambiar la dirección de correo electrónico
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Un usuario que ha iniciado sesión traslada su propia cuenta a otra
+Un usuario que ha iniciado sesión traslada su propia cuenta a otra
 dirección. Nada cambia hasta que la nueva dirección responde:
 
 ```typescript

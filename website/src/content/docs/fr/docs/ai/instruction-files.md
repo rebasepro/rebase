@@ -1,5 +1,5 @@
 ---
-sourceHash: a25cae6749080918
+sourceHash: 9d9d74a72022b7d6
 title: Fichiers d'instructions pour l'IA
 sidebar_label: Fichiers d'instructions pour l'IA
 description: Chaque projet Rebase généré inclut ai-instructions.md ainsi que des fichiers pointeurs de trois lignes pour Claude, Cursor, Windsurf, Copilot et AGENTS.md — une source unique de vérité, plusieurs noms de fichiers.
@@ -33,7 +33,7 @@ Please refer to and follow the instructions defined in [ai-instructions.md](./ai
 The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
 ```
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> pour cette troisième ligne et le `.mcp.json` ci-dessous : sur la 0.23
+pour cette troisième ligne et le `.mcp.json` ci-dessous : sur la 0.23
 la troisième ligne se contente de dire à l'assistant de lancer `rebase skills install --agent claude`,
 et `.mcp.json` démarre le serveur avec `npx -y @rebasepro/mcp` depuis le registre.
 

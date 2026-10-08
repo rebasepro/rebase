@@ -1,5 +1,5 @@
 ---
-sourceHash: 57da5c05731b0030
+sourceHash: ae8d9da2fa3d1e43
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Führen Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle aus – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -130,7 +130,7 @@ Für ein echtes Deployment empfiehlt es sich, beides in ein Image zu packen, wod
 exakt festgelegt wird, was ausgeführt wird:
 
 ```dockerfile
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 
@@ -229,7 +229,7 @@ ausführen kann, ist somit geeignet. Zwei Dinge müssen überall beachtet werden
 
 ```toml
 [build]
-  image = "rebasepro/server:0.23.0"
+  image = "rebasepro/server:0.24.0"
 
 [http_service]
   internal_port = 8080
@@ -380,7 +380,7 @@ Jede Antwort trägt `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosn
 lässt `includeSubDomains` aus: Das würde Browsern sagen, einfaches HTTP auf jeder Subdomain Ihrer
 Domain abzulehnen, einschließlich solcher, mit denen dieser Server nichts zu tun hat, und ein
 Browser behält dies, solange der Header es vorgibt.
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Setzen Sie
+Setzen Sie
 `REBASE_HSTS_INCLUDE_SUBDOMAINS=true`, wenn jede Subdomain ausschließlich HTTPS verwendet; bis
 einschließlich 0.23 trug der Header immer `includeSubDomains`.
 
@@ -410,7 +410,7 @@ als mehrere kooperierende Prozesse gestartet werden. Siehe [Getrennte Prozesse](
 ## Aktualisierung
 
 ```yaml
-image: rebasepro/server:0.23.0
+image: rebasepro/server:0.24.0
 ```
 
 Starten Sie neu. Ihr Bundle bleibt unverändert. Innerhalb einer Hauptversion (Major) des Runtime-Vertrags

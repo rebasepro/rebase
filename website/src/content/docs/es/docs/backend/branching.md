@@ -1,5 +1,5 @@
 ---
-sourceHash: 7efffdd1ca4c7915
+sourceHash: 6e23ad27a4c203f4
 title: Ramificación de bases de datos
 sidebar_label: Ramificación
 description: Crea ramas aisladas de bases de datos para desarrollo, staging y pruebas usando CREATE DATABASE ... TEMPLATE de PostgreSQL — copias instantáneas y de fidelidad total sin tiempo de inactividad.
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS rebase.branches (
 );
 ```
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Un servidor que se ejecuta sobre una rama guarda las ramas en la base de datos de
+Un servidor que se ejecuta sobre una rama guarda las ramas en la base de datos de
 la que se copió la rama. El `rebase.branches` propio de la rama es solo una
 instantánea, tomada antes de que se escribiera su fila. Por eso `rebase dev` en un
 checkout [cambiado a una rama](#integración-con-la-cli) establece
@@ -105,7 +105,7 @@ La API de ramificación se expone a través del `BranchService` del backend. A c
 
 Genera una nueva base de datos rama a partir de la base de datos predeterminada o de una plantilla de origen explícita.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> La predeterminada es la base de datos en la que está la propia conexión del
+La predeterminada es la base de datos en la que está la propia conexión del
 servidor, o `REBASE_BRANCH_PARENT_DATABASE` cuando el servidor se ejecuta sobre una
 rama. Nunca es la base de datos que nombra `ADMIN_CONNECTION_STRING`, cuando esta es
 otra.
@@ -145,7 +145,7 @@ Output:
 */
 ```
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> `database` es la base de datos de PostgreSQL que es la rama, según su registro:
+`database` es la base de datos de PostgreSQL que es la rama, según su registro:
 a qué conectarse, y qué pasar como `source` para copiar la rama. No es el nombre de
 la rama (`staging` es la base de datos `rb_staging`).
 
@@ -166,7 +166,7 @@ await admin.deleteBranch("feature_oauth");
 ```
 
 > [!CAUTION]
-> Protección de seguridad: La base de datos principal (el nombre de base de datos predeterminado configurado en las cadenas de conexión) está protegida. <span class="since-badge" data-since="0.24">Desde 0.24</span> Es la base de datos en la que está la propia conexión del servidor, o `REBASE_BRANCH_PARENT_DATABASE` en una rama. Si intentas eliminar la base de datos principal, `BranchService` lanzará un error `"Cannot delete the main database"` y anulará la operación.
+> Protección de seguridad: La base de datos principal (el nombre de base de datos predeterminado configurado en las cadenas de conexión) está protegida. Es la base de datos en la que está la propia conexión del servidor, o `REBASE_BRANCH_PARENT_DATABASE` en una rama. Si intentas eliminar la base de datos principal, `BranchService` lanzará un error `"Cannot delete the main database"` y anulará la operación.
 
 ---
 

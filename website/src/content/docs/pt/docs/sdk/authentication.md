@@ -1,5 +1,5 @@
 ---
-sourceHash: 13c002a75ecd9ce1
+sourceHash: 8fa955ab0e0d14e2
 title: Autenticação
 sidebar_label: Autenticação
 description: Autenticação no lado do cliente com o SDK Rebase — login com e-mail/senha, provedores OAuth, gerenciamento de sessão e listeners de estado de autenticação.
@@ -45,7 +45,7 @@ const { user, confirmationRequired } = await client.auth.signUp(
 );
 ```
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Com [`requireEmailVerification`](/docs/backend/email-verification/) ativo,
+Com [`requireEmailVerification`](/docs/backend/email-verification/) ativo,
 não há sessão até que o endereço seja confirmado: `confirmationRequired` é
 `true` e `user` é `null`, então diga à pessoa para abrir o e-mail. Caso contrário
 `confirmationRequired` é `false` e `user` é a conta conectada. Na 0.23 o
@@ -116,7 +116,7 @@ Um link de login de um clique enviado por e-mail. O link é sempre
 `<base>/auth/magic-link?token=…`, onde `<base>` é o `email.magicLinkUrl` do backend,
 ou sua base de redefinição de senha (`FRONTEND_URL` no runtime) quando ele não está definido.
 Não há `redirectTo` por requisição. Sirva esse caminho no seu frontend, e envie
-o token de volta para trocá-lo por uma sessão. <span class="since-badge" data-since="0.24">Since 0.24</span> O CMS o serve, fazendo login (através da
+o token de volta para trocá-lo por uma sessão. O CMS o serve, fazendo login (através da
 etapa de código quando há um segundo fator); outros frontends precisam de uma página de destino própria.
 
 ```typescript
@@ -221,7 +221,7 @@ if (recoveryCodes) showRecoveryCodes(recoveryCodes);
 ```
 
 **Exiba os códigos de recuperação uma única vez e nunca mais.** Apenas os hashes são armazenados,
-portanto nada poderá exibi-los mais tarde. <span class="since-badge" data-since="0.24">Since 0.24</span> Eles vêm com o primeiro fator da conta.
+portanto nada poderá exibi-los mais tarde. Eles vêm com o primeiro fator da conta.
 Adicionar outro fator mantém os códigos que a conta já tem, e
 `recoveryCodes` é `null`. Iniciar um cadastro e abandoná-lo nunca os afeta.
 
@@ -491,7 +491,7 @@ faz login assim que o link for seguido com sua senha.
 
 ## Alterando o Endereço de E-mail
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Um usuário conectado move sua própria conta para outro endereço. Nada
+Um usuário conectado move sua própria conta para outro endereço. Nada
 muda até que o novo endereço responda:
 
 ```typescript

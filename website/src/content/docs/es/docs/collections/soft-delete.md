@@ -1,5 +1,5 @@
 ---
-sourceHash: 461a5f0e0c5ecec5
+sourceHash: 94b81d143b186ece
 title: Soft delete
 sidebar_label: Soft delete
 description: Convierte el borrado en una marca de tiempo, oculta las filas marcadas de cada lectura y restáuralas con una actualización ordinaria.
@@ -57,7 +57,7 @@ Esa actualización es la que llega a una fila marcada. Cualquier otra edición d
 
 Lo contrario no es una actualización. Establecer el campo en un valor se rechaza con `400` `FIELD_NOT_WRITABLE` — elimina la fila en su lugar —, de modo que el permiso `delete`, `beforeDelete` y `afterDelete` siempre se le aplican. Un upsert puede crear una fila que ya esté marcada, pero nunca marca una que ya estaba almacenada.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Tampoco escribe un upsert en una fila que está en la papelera: cuando su clave pertenece a una fila marcada, se rechaza con `409` `ROW_IN_TRASH` y no se escribe nada. Restaura la fila primero, o púrgala con `?hard=true` y vuelve a hacer el upsert. En 0.23 el upsert escribe sus valores en la fila oculta y responde `201`.
+Tampoco escribe un upsert en una fila que está en la papelera: cuando su clave pertenece a una fila marcada, se rechaza con `409` `ROW_IN_TRASH` y no se escribe nada. Restaura la fila primero, o púrgala con `?hard=true` y vuelve a hacer el upsert. En 0.23 el upsert escribe sus valores en la fila oculta y responde `201`.
 
 Una eliminación a través de una ruta muchos a muchos, como `DELETE /api/data/posts/1/tags/5`, elimina el vínculo del post 1 con la etiqueta. No hace un soft delete de la etiqueta, que otros posts siguen usando.
 

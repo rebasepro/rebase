@@ -1,5 +1,5 @@
 ---
-sourceHash: b3f66b1a63aa456a
+sourceHash: 40c6996a773e6e50
 title: Campos de upload de arquivos
 sidebar_label: Uploads de arquivos
 description:"\"Declarando um campo de arquivo ou imagem em uma coleção: o bloco de storage, uploads de arquivo único e múltiplos arquivos, e quais de suas opções o painel resolve em vez do servidor.\""
@@ -88,7 +88,7 @@ propriedade a que o arquivo se destinava; assim, um `curl -F file=@payload.exe`
 ignorando o seletor colocava um executável de 40 MB no bucket de avatares e a
 configuração que dizia o contrário nunca era consultada.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Ambos agora são verificados pelo servidor em relação a **onde o arquivo é gravado**. Na
+Ambos agora são verificados pelo servidor em relação a **onde o arquivo é gravado**. Na
 0.23 eles são verificados apenas em relação à propriedade que um upload nomeia, e um upload
 que não nomeia nenhuma atende apenas ao limite da própria fonte.
 O `storagePath` de uma propriedade é para onde vão os seus arquivos, então é
@@ -115,7 +115,7 @@ caminho, `{path}` qualquer número deles. O caminho de uma propriedade com
 
 ### Imagens em um campo markdown
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Uma propriedade markdown (`admin.markdown: true`) com um bloco `storage` aceita
+Uma propriedade markdown (`admin.markdown: true`) com um bloco `storage` aceita
 uploads de imagem em seu editor. O texto armazena cada imagem como uma
 **referência de storage** — `![](rebase-storage:posts/abc_cover.png)` — e não
 como uma URL: a URL de um arquivo privado carrega um token de download que

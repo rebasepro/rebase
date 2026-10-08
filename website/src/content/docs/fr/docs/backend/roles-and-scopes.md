@@ -1,11 +1,11 @@
 ---
-sourceHash: e89814d78c29b234
+sourceHash: 48ce9150935742b8
 title: Rôles et portées
 sidebar_label: Rôles et portées
 description: "Ce qu'un appelant peut faire : le plan des données que détient chaque personne, le plan d'administration que les rôles accordent, les portées qu'une application déclare pour elle-même, et la façon dont chaque identifiant les porte."
 ---
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Chaque requête vers un backend Rebase pose une seule question : cet appelant peut-il faire ceci ?
+Chaque requête vers un backend Rebase pose une seule question : cet appelant peut-il faire ceci ?
 La réponse est une **portée** (scope), une chaîne nommée `resource:action` : `data:read`,
 `users:write`, `cron:read`. La session d'une personne, une clé API, un jeton MCP et un
 rôle détiennent tous des portées, et ils utilisent tous les mêmes chaînes. Une autorisation se lit
@@ -79,7 +79,7 @@ une quand elle déclare une `target`, comme ci-dessous.
 
 ## Déclarer des rôles
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Les rôles se déclarent dans la collection des utilisateurs, sous `auth.roles`. Un rôle est un nom
+Les rôles se déclarent dans la collection des utilisateurs, sous `auth.roles`. Un rôle est un nom
 que la base de données voit, et que les politiques RLS peuvent cibler, plus une liste de portées du
 plan d'administration et de portées d'application.
 
@@ -266,7 +266,7 @@ un autre.
 
 ## Quand une portée manque
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> La réponse est `403 SCOPE_MISSING`, et `details.requiredScope` nomme la portée, avec sa cible
+La réponse est `403 SCOPE_MISSING`, et `details.requiredScope` nomme la portée, avec sa cible
 quand il y en a une :
 
 ```json

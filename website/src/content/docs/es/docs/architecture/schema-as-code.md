@@ -1,5 +1,5 @@
 ---
-sourceHash: 719f802a23cf78ec
+sourceHash: 98867dc8dd9d38a9
 title: Esquema como Código
 sidebar_label: Esquema como Código
 description: Cómo Rebase utiliza colecciones de TypeScript como la única fuente de verdad para el esquema de su base de datos, UI y API.
@@ -129,7 +129,7 @@ export const relations = {  };
 
 Hay tres cosas ahí que merece la pena leer dos veces. La columna `id` que no
 declaraste: toda colección recibe una clave primaria `text` a menos que una
-propiedad declare `isId`, y <span class="since-badge" data-since="0.24">Desde 0.24</span> la base de datos la rellena con un uuid
+propiedad declare `isId`, y la base de datos la rellena con un uuid
 (`gen_random_uuid()::text`), de modo que una fila creada desde el panel de
 administración, la API REST o el SDK no necesita una clave propia. Una clave
 que sí envías se usa tal cual. En la 0.23 la columna no tiene valor por

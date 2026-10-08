@@ -1,5 +1,5 @@
 ---
-sourceHash: 155ad50d37e27196
+sourceHash: e94961f22c3fa77e
 title: Despliegue
 sidebar_label: Despliegue
 description: Despliega tu proyecto Rebase a producción usando Docker, plataformas en la nube o configuraciones manuales.
@@ -18,7 +18,7 @@ No hay un servicio de administración separado: el panel de administración form
 |--------------|----------------|-------------------|
 | Scaffold predeterminado (`rebase init`) | El panel de administración | `/` — el frontend **es** el administrador |
 | Frontend de producto personalizado | Tu app | Donde lo montes, comúnmente `/admin` — consulta [Cambiar la URL Base](#cambiar-la-url-base) |
-| Administración como app en un nombre de host propio | Tu app | <span class="since-badge" data-since="0.24">Desde 0.24</span> `https://admin.example.com/`, servido por el mismo servidor — consulta [Cambiar la URL Base](#cambiar-la-url-base) |
+| Administración como app en un nombre de host propio | Tu app | `https://admin.example.com/`, servido por el mismo servidor — consulta [Cambiar la URL Base](#cambiar-la-url-base) |
 | Proyecto solo backend | Nada (solo API) | No desplegado |
 
 :::note[Primera visita]

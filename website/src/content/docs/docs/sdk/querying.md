@@ -468,7 +468,7 @@ a bare `count()` as `count`. Letting you name them would mean checking the name
 is not also a `groupBy` field — a rule nobody would guess, and a silently
 overwritten value if it went unchecked.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Groups are paged like a listing's rows: `limit` bounds them and `offset` skips
+Groups are paged like a listing's rows: `limit` bounds them and `offset` skips
 them (grouping by a high-cardinality column is a whole table's worth of rows in
 one response). A grouped aggregate with no `limit` gets the listing default —
 **50 groups** over HTTP — so read `meta` on the result before trusting it to be

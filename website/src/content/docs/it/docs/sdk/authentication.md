@@ -1,5 +1,5 @@
 ---
-sourceHash: 13c002a75ecd9ce1
+sourceHash: 8fa955ab0e0d14e2
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Autenticazione lato client con l'SDK di Rebase — accesso con email/password, provider OAuth, gestione delle sessioni e listener dello stato di autenticazione.
@@ -45,7 +45,7 @@ const { user, confirmationRequired } = await client.auth.signUp(
 );
 ```
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Con [`requireEmailVerification`](/docs/backend/email-verification/) attivo,
+Con [`requireEmailVerification`](/docs/backend/email-verification/) attivo,
 non esiste alcuna sessione finché l'indirizzo non viene confermato:
 `confirmationRequired` è `true` e `user` è `null`, quindi avvisa la persona di
 aprire l'email. Altrimenti `confirmationRequired` è `false` e `user` è
@@ -118,7 +118,7 @@ Un link di accesso con un clic inviato via email. Il link è sempre
 backend, oppure la sua base per il reset della password (`FRONTEND_URL` sul
 runtime) quando quella non è impostata. Non esiste un `redirectTo` per singola
 richiesta. Servi quel percorso nel tuo frontend, e restituisci il token per
-scambiarlo con una sessione. <span class="since-badge" data-since="0.24">Da 0.24</span> Il CMS lo serve, effettuando l'accesso (tramite il
+scambiarlo con una sessione. Il CMS lo serve, effettuando l'accesso (tramite il
 passaggio del codice quando è presente un secondo fattore); altri frontend
 hanno bisogno di una pagina di destinazione propria.
 
@@ -205,7 +205,7 @@ showQrCode(totp.uri);        // otpauth://… — what the authenticator scans
 if (recoveryCodes) showRecoveryCodes(recoveryCodes);
 ```
 
-**Mostra i codici di recupero una sola volta e mai più.** Vengono memorizzati solo i relativi hash, quindi nulla potrà mostrarli in seguito. <span class="since-badge" data-since="0.24">Da 0.24</span> Arrivano insieme al primo fattore dell'account.
+**Mostra i codici di recupero una sola volta e mai più.** Vengono memorizzati solo i relativi hash, quindi nulla potrà mostrarli in seguito. Arrivano insieme al primo fattore dell'account.
 Aggiungere un altro fattore mantiene i codici che l'account già possiede, e
 `recoveryCodes` è `null`. Avviare una registrazione e abbandonarla non li
 tocca mai.
@@ -465,7 +465,7 @@ accede una volta che il link viene seguito con la sua password.
 
 ## Cambiare l'indirizzo email
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Un utente autenticato sposta il proprio account su un altro indirizzo.
+Un utente autenticato sposta il proprio account su un altro indirizzo.
 Nulla cambia finché il nuovo indirizzo non risponde:
 
 ```typescript

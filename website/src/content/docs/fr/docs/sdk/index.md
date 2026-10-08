@@ -1,5 +1,5 @@
 ---
-sourceHash: b7e862286c030911
+sourceHash: 75ae5bf75334fb86
 title: SDK typé — Prise en main
 sidebar_label: Prise en main
 description: Installez et configurez le SDK typé de Rebase pour interagir avec votre backend depuis n'importe quelle application JavaScript ou TypeScript.
@@ -57,7 +57,7 @@ const client = createRebaseClient({
 | `realtime` | `boolean` | Ouvre la WebSocket (par défaut `true`) — définissez sur `false` dans les scripts ponctuels |
 | `collections` | `Record<string, string>` | Associe les noms d'accesseurs aux slugs des collections |
 | `offline` | `boolean \| OfflineConfig` | [Synchronisation local-first](/docs/sdk/offline) — désactivée par défaut |
-| `impersonate` | `string` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Exécute chaque requête en tant que cet utilisateur (par uid), pour vérifier ce qu'un utilisateur voit. Uniquement avec la session d'un administrateur : l'API de données, les fonctions et le temps réel s'exécutent en son nom, toute autre route refuse |
+| `impersonate` | `string` | Exécute chaque requête en tant que cet utilisateur (par uid), pour vérifier ce qu'un utilisateur voit. Uniquement avec la session d'un administrateur : l'API de données, les fonctions et le temps réel s'exécutent en son nom, toute autre route refuse |
 
 ## Génération du SDK typé
 
@@ -71,7 +71,7 @@ Pendant que `rebase dev` tourne, vous n'en avez pas besoin : il régénère les 
 `generated/sdk/` au démarrage et à chaque enregistrement sous `config/collections/`. Lancez
 vous-même la commande en CI, dans un dépôt frontend sans collections
 (`rebase generate-sdk --from link`), ou partout où `rebase dev` ne tourne pas.
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> pour la régénération : sur la 0.23, `rebase dev` laisse les types du SDK inchangés, exécutez donc
+pour la régénération : sur la 0.23, `rebase dev` laisse les types du SDK inchangés, exécutez donc
 la commande après chaque modification de collection.
 
 Passez ensuite le paramètre de type `Database` à `createRebaseClient` pour bénéficier d'une autocomplétion complète :

@@ -20,7 +20,7 @@ framework will not catch for it. For tools that act on your data, see the
 
 ## Set up by `rebase init`
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A new project does not need the command. `rebase init` asks
+A new project does not need the command. `rebase init` asks
 whether to set up your AI coding agents, then lists the ones it finds on the
 machine:
 
@@ -47,7 +47,7 @@ rebase init my-app --yes --agent claude,cursor
 
 ## An existing project
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `rebase init` refuses a directory that already holds a project, so a project
+`rebase init` refuses a directory that already holds a project, so a project
 made before agent setup existed — or one whose author declined the prompt —
 gets the same setup from `rebase skills install --mcp`: the skills, and the
 [MCP server](/docs/ai/mcp) registered in each agent's project config. Servers

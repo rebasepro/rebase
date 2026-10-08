@@ -1,11 +1,11 @@
 ---
-sourceHash: e89814d78c29b234
+sourceHash: 48ce9150935742b8
 title: Roles y alcances
 sidebar_label: Roles y alcances
 description: "Lo que puede hacer quien llama: el plano de datos que tiene toda persona, el plano de administración que conceden los roles, los alcances que una aplicación declara para sí misma y cómo los lleva cada credencial."
 ---
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Cada solicitud a un backend de Rebase plantea una pregunta: ¿puede quien llama hacer esto?
+Cada solicitud a un backend de Rebase plantea una pregunta: ¿puede quien llama hacer esto?
 La respuesta es un **alcance** (scope), una cadena con la forma `resource:action`:
 `data:read`, `users:write`, `cron:read`. La sesión de una persona, una clave de API,
 un token de MCP y un rol tienen alcances, y todos usan las mismas cadenas. Una
@@ -82,7 +82,7 @@ aplicación admite uno cuando declara un `target`, como se ve más abajo.
 
 ## Declarar roles
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Los roles se declaran en la colección de usuarios, bajo `auth.roles`. Un rol es un
+Los roles se declaran en la colección de usuarios, bajo `auth.roles`. Un rol es un
 nombre que ve la base de datos, con el que pueden coincidir las políticas de RLS, más
 una lista de alcances del plano de administración y de la aplicación.
 
@@ -280,7 +280,7 @@ otro.
 
 ## Cuando falta un alcance
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> La respuesta es `403 SCOPE_MISSING`, y `details.requiredScope` nombra el alcance, con
+La respuesta es `403 SCOPE_MISSING`, y `details.requiredScope` nombra el alcance, con
 su destino cuando lo tiene:
 
 ```json

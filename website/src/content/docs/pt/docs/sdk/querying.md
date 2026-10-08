@@ -1,5 +1,5 @@
 ---
-sourceHash: 42fa2047884b640a
+sourceHash: b8aea50207626bc4
 title: Consultando Dados
 sidebar_label: Consultando Dados
 description: Operações CRUD, construtor de consultas fluente, operadores de filtro, ordenação, seleção de colunas e agregações com o SDK tipado do Rebase.
@@ -391,7 +391,7 @@ const rows = await client.data.orders
 
 As chaves do resultado são **derivadas**, não escolhidas: `sum(total)` retorna como `sum_total`, um `count()` puro como `count`. Permitir a personalização dos nomes exigiria validar se o nome escolhido não coincide com um campo do `groupBy` — uma regra que ninguém adivinharia, gerando sobrescrita silenciosa de valores caso não fosse verificada.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Os grupos são paginados como as linhas de uma listagem: `limit` os limita e
+Os grupos são paginados como as linhas de uma listagem: `limit` os limita e
 `offset` os pula (agrupar por uma coluna de alta cardinalidade retornaria uma
 tabela inteira de linhas em uma só resposta). Uma agregação agrupada sem
 `limit` recebe o padrão de uma listagem — **50 grupos** via HTTP — então leia

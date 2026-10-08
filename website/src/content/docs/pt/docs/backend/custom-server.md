@@ -1,5 +1,5 @@
 ---
-sourceHash: 144c4a3958537ebb
+sourceHash: 15e127696fc3c50e
 title: Integração com Servidor Customizado
 sidebar_label: Servidor Customizado (Express)
 description: Como incorporar os serviços de Banco de Dados e Realtime do Rebase em seu próprio backend Node.js customizado sem usar o Hono ou o coordenador do Rebase.
@@ -245,7 +245,7 @@ app.use(cors({
 }));
 ```
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> O runtime do Rebase e o backend ejetado já enviam essa lista. Na 0.23
+O runtime do Rebase e o backend ejetado já enviam essa lista. Na 0.23
 eles não expõem nenhum desses cabeçalhos, então um frontend em outra origem não lê nenhum `ETag`.
 
 ## Relacionados

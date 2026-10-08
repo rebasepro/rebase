@@ -1,5 +1,5 @@
 ---
-sourceHash: 56979243362b4790
+sourceHash: 83e2d04a56801ab8
 title: Endpoint e token di autenticazione
 sidebar_label: Endpoint di autenticazione
 description: Le route di autenticazione montate dal backend Rebase, la struttura delle loro risposte, l'autenticazione a più fattori, il contesto del database visibile a una policy, JWKS e chiavi di servizio.
@@ -61,7 +61,7 @@ lui. Vedi [Ruoli e scope](/docs/backend/roles-and-scopes/).
 
 | Metodo | Percorso | Descrizione |
 |--------|------|-------------|
-| `GET` | `/api/admin/users` | Elenca gli utenti (con paginazione). `?search=` trova una parte dell'email o del nome visualizzato, senza distinzione tra maiuscole e minuscole. <span class="since-badge" data-since="0.24">Da 0.24</span> Su Postgres trova anche qualsiasi ruolo che l'utente possiede, e l'uid; su MongoDB trova ancora solo email e nome visualizzato |
+| `GET` | `/api/admin/users` | Elenca gli utenti (con paginazione). `?search=` trova una parte dell'email o del nome visualizzato, senza distinzione tra maiuscole e minuscole. Su Postgres trova anche qualsiasi ruolo che l'utente possiede, e l'uid; su MongoDB trova ancora solo email e nome visualizzato |
 | `POST` | `/api/admin/users` | Crea un utente |
 | `GET` | `/api/admin/users/:uid` | Legge un singolo utente |
 | `PUT` | `/api/admin/users/:uid` | Aggiorna un singolo utente. `{ disabled: true }` disattiva l'account senza eliminarlo: ogni accesso e refresh viene rifiutato (`ACCOUNT_DISABLED`), le sue sessioni terminano e ogni token che possiede viene rifiutato; `false` lo riattiva |
@@ -130,7 +130,7 @@ token si trovava semplicemente un livello più sotto.
 
 ### Cambiare un indirizzo email
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Un utente autenticato
+Un utente autenticato
 sposta il proprio account su un altro indirizzo in due passaggi:
 
 1. `POST /api/auth/change-email { newEmail }` registra la modifica e invia via
@@ -201,7 +201,7 @@ utente, quindi cambiare IP non serve a nulla) e un codice accettato viene regist
 fattore in modo che non possa essere riutilizzato (replay attack) per il resto della sua
 finestra di tolleranza di ±1 step.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Nella tabella degli utenti, **Reset two-step verification** (`DELETE /api/admin/users/:uid/mfa`) e
+Nella tabella degli utenti, **Reset two-step verification** (`DELETE /api/admin/users/:uid/mfa`) e
 **Disable or enable account** (`PUT /api/admin/users/:uid { disabled }`) sono
 offerti a chiunque possieda `users:write`, così come lo sono le route;
 l'interruttore non viene mai offerto sul proprio account, e un account che

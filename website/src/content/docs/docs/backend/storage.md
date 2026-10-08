@@ -248,7 +248,7 @@ resumable upload is refused at creation, before its first chunk; and
 `OPTIONS /api/storage/tus` advertises it as `Tus-Max-Size` — for the source
 named by `?storageId=`, the default one otherwise.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> for `STORAGE_MAX_FILE_SIZE`: on 0.23 only the source's `maxFileSize` sets
+for `STORAGE_MAX_FILE_SIZE`: on 0.23 only the source's `maxFileSize` sets
 the limit, and the variable is not read.
 
 ```bash
@@ -296,8 +296,8 @@ Client                                                   Rebase Server
 | `GCS_PROJECT_ID` | GCP project ID for GCS |
 | `GCS_KEY_FILENAME` | Path to a GCP service account key file (omit on GKE — Workload Identity/ADC supplies credentials) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Standard ADC variable, read by the Google SDK itself (not needed on GCP with default credentials) |
-| `STORAGE_DOWNLOAD_TOKEN_TTL` | <span class="since-badge" data-since="0.24">Since 0.24</span> How long a private file's download URL works, in seconds — the lifetime of the token `/api/storage/metadata/*` mints (default `300`, at most `604800`, a week). Raise it for private video and audio, which keep requesting ranges after the page renders. The env spelling of `storageDownloadTokenTtl` |
-| `STORAGE_MAX_FILE_SIZE` | <span class="since-badge" data-since="0.24">Since 0.24</span> Largest file the source accepts, in bytes (default `52428800`, 50 MB). Suffix `__<KEY>` for a named source. A value that is not a whole number of bytes refuses the boot. See [How large a file may be](#how-large-a-file-may-be) |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | How long a private file's download URL works, in seconds — the lifetime of the token `/api/storage/metadata/*` mints (default `300`, at most `604800`, a week). Raise it for private video and audio, which keep requesting ranges after the page renders. The env spelling of `storageDownloadTokenTtl` |
+| `STORAGE_MAX_FILE_SIZE` | Largest file the source accepts, in bytes (default `52428800`, 50 MB). Suffix `__<KEY>` for a named source. A value that is not a whole number of bytes refuses the boot. See [How large a file may be](#how-large-a-file-may-be) |
 | `FORCE_LOCAL_STORAGE` | Allow `STORAGE_TYPE=local` in production — see below |
 | `STORAGE_PUBLIC_READ` | Serve stored objects to unauthenticated readers. The env spelling of `storagePublicRead`, and one of the three ways to satisfy the [production boot guard](#per-object-authorization). |
 | `STORAGE_ALLOW_ANY_AUTHENTICATED` | Opt out of the boot guard, restoring the behaviour where any signed-in user may read, overwrite, delete or list any key. The env spelling of `storageInsecureAllowAnyAuthenticated`. Only defensible when every signed-in user is trusted with every file. |
@@ -515,7 +515,7 @@ Worth knowing:
 
 ### API keys and tokens
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A signed-in person holds every storage scope, so the hook and the policies above
+A signed-in person holds every storage scope, so the hook and the policies above
 decide for them. An [API key](/docs/backend/api-keys/) also needs the storage
 scope for the operation, on the source the request names: `storage:read` for
 downloads, metadata and listings, `storage:write` for uploads, folders and every

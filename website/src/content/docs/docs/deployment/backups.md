@@ -145,7 +145,7 @@ only files whose names match the backup pattern; anything else sharing the
 bucket or prefix is left alone.
 
 The cron runs `pg_dump` inside the server process.
-<span class="since-badge" data-since="0.24">Since 0.24</span> the official
+the official
 runtime image (`rebasepro/server`, see [Self-hosting](/docs/deployment/self-hosting/))
 ships the PostgreSQL 18 client tools for it;
 on 0.23 and earlier it had none, and every scheduled run failed with
@@ -242,12 +242,12 @@ fetches the dump; **Roles file** fetches its `.globals.sql`. Download both and
 keep them in one directory. A backup marked **No roles file** has no sidecar:
 recreate its roles by hand before restoring it into a new Postgres.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> above the list it
+above the list it
 reports the scheduled backup job and its last run. A failed run is shown as an
 error with its message, so a nightly backup that cannot run is visible where
 the backups are listed, not only in the Cron Jobs panel.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> what it says about the job:
+what it says about the job:
 
 - **Last scheduled backup** is the last run the schedule made. A run started
   by hand since then (**Run Now** in Cron Jobs) gets a line of its own, so a
@@ -262,7 +262,7 @@ the backups are listed, not only in the Cron Jobs panel.
 - When the run history in `rebase.cron_logs` cannot be read, the panel says
   so, rather than that the backup has not run yet.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> the list is read
+the list is read
 by the server process that answers `GET /api/admin/backups`, and that is not
 always the process that runs the schedule:
 

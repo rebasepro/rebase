@@ -1,5 +1,5 @@
 ---
-sourceHash: 411eeede8d2eab1b
+sourceHash: 7c51c9877d9d0803
 title: Chaves de API
 sidebar_label: Chaves de API
 description: "Chaves de longa duração para scripts, CI, agentes e integrações: chaves de serviço e chaves pessoais, os escopos que elas têm, como se combinam com a segurança em nível de linha (RLS) e as rotas que as gerenciam."
@@ -7,7 +7,7 @@ description: "Chaves de longa duração para scripts, CI, agentes e integraçõe
 
 ## Chaves de API
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Uma chave de API é uma credencial bearer de longa duração, `rk_live_…`, para um chamador que
+Uma chave de API é uma credencial bearer de longa duração, `rk_live_…`, para um chamador que
 não é uma pessoa em um navegador: um script, um job de CI, um agente, um cliente MCP, outro
 serviço. O que uma chave pode fazer é uma lista de [escopos](/docs/backend/roles-and-scopes/),
 como `data:read:orders` ou `cron:write`.
@@ -37,7 +37,7 @@ administrativas que seus escopos alcançam, no WebSocket de realtime e no [endpo
 
 ### Criando uma
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Uma chave de serviço precisa de um nome e de pelo menos um escopo.
+Uma chave de serviço precisa de um nome e de pelo menos um escopo.
 
 ```bash
 # CLI: talks to the backend with the service key from .env
@@ -138,7 +138,7 @@ administrador.
 
 ### Acesso total, para CI e migrações
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> `--full-access` dá à chave todos os escopos que seu criador tem, menos `keys:read` e
+`--full-access` dá à chave todos os escopos que seu criador tem, menos `keys:read` e
 `keys:write`, que nenhuma chave pode ter. Pela CLI, que usa a chave de serviço,
 isso significa todos os escopos do plano de dados e do plano administrativo. Adicione `--roles admin` e a
 row-level security deixa de limitar quais linhas ela lê, altera ou exclui:
@@ -152,7 +152,7 @@ Esse é o formato certo para CI, migrações e ferramentas próprias confiáveis
 
 ### Limite de taxa
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> O `rate_limit` de uma chave é quantas requisições ela pode fazer em uma janela de
+O `rate_limit` de uma chave é quantas requisições ela pode fazer em uma janela de
 15 minutos, e todas as portas de entrada contam para ele em um único bucket, `api-key:<id>`:
 
 - suas requisições HTTP às APIs de dados, de storage e de funções;
@@ -169,7 +169,7 @@ as do editor SQL, não têm limite de taxa.
 
 ## Chaves pessoais
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Uma chave pessoal age **como seu proprietário**: com o uid dele e com os papéis dele, como estão
+Uma chave pessoal age **como seu proprietário**: com o uid dele e com os papéis dele, como estão
 a cada requisição. Regras baseadas em proprietário correspondem a ela, então ela lê exatamente o que seu proprietário
 leria, restringido pelos seus escopos. Ela serve para os scripts de uma pessoa, uma CLI no seu
 laptop ou uma ferramenta que ela conecta à própria conta.
@@ -284,7 +284,7 @@ SQL e as mensagens de branch precisam de `database:read` ou `database:write`.
 
 ## Agentes e servidores MCP
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Um agente precisa da chave *mais restrita* que faz o seu trabalho. Comece com escopo restrito e defina
+Um agente precisa da chave *mais restrita* que faz o seu trabalho. Comece com escopo restrito e defina
 uma expiração:
 
 ```bash

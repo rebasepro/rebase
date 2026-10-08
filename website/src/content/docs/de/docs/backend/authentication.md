@@ -1,5 +1,5 @@
 ---
-sourceHash: c7a020bdf4f333b9
+sourceHash: 7e5bf22227544ae0
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Konfigurieren Sie JWT-Authentifizierung, OAuth-Provider, SMTP-E-Mail, Bot-Schutz und die Users-Collection im Rebase-Backend.
@@ -88,7 +88,7 @@ const backend = await initializeRebaseBackend({
 | `accessExpiresIn` | `string` | `1h` | Lebensdauer des Access-Tokens |
 | `refreshExpiresIn` | `string` | `30d` | Lebensdauer des Refresh-Tokens. Gleitend: Jede Rotation verlängert ihn wieder. Die Runtime übergibt `JWT_REFRESH_EXPIRES_IN`, dessen eigener Standardwert `400d` ist |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | Wie lange ein Refresh-Token, das bereits rotiert wurde, noch ein Geschwister seiner Sitzung ausstellt, damit ein Client, der eine Refresh-Antwort verloren hat, nicht abgemeldet wird |
-| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Was mit einem Refresh-Token passiert, das nach diesem Zeitfenster vorgelegt wird. `"reject"` lehnt es ab (`TOKEN_ALREADY_USED`) und protokolliert es, und die Sitzung bleibt bestehen: Dies ist keine Wiederverwendungserkennung, denn wer zuerst aktualisiert hat, behält die Sitzung. `"revoke-session"` beendet bei einer solchen Wiederholung die gesamte Anmeldung (`SESSION_REVOKED`), wie es GoTrue tut, und der Besitzer meldet sich erneut an. `AUTH_REFRESH_TOKEN_REUSE` |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | Was mit einem Refresh-Token passiert, das nach diesem Zeitfenster vorgelegt wird. `"reject"` lehnt es ab (`TOKEN_ALREADY_USED`) und protokolliert es, und die Sitzung bleibt bestehen: Dies ist keine Wiederverwendungserkennung, denn wer zuerst aktualisiert hat, behält die Sitzung. `"revoke-session"` beendet bei einer solchen Wiederholung die gesamte Anmeldung (`SESSION_REVOKED`), wie es GoTrue tut, und der Besitzer meldet sich erneut an. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Erfordert eine Sitzung für die Daten-API |
 | `allowRegistration` | `boolean` | `false` | Gibt `POST /api/auth/register` frei. Außerhalb der Produktion wird der erste Benutzer bei einer leeren Tabelle in jedem Fall zugelassen; in der Produktion wird der Admin über `REBASE_ADMIN_EMAIL` festgelegt |
 | `disableSelfRegistration` | `boolean` | `false` | Kill-Switch: Schließt auch das Bootstrap-Fenster für den ersten Benutzer, das `allowRegistration: false` offen lässt |
@@ -99,8 +99,8 @@ const backend = await initializeRebaseBackend({
 | `email` | `EmailConfig` | — | SMTP für Passwort-Reset, Verifizierung, Einladungen und Magic Links |
 | `magicLink` | `boolean` | `false` | Aktiviert passwortlose E-Mail-Anmeldung. Erfordert konfiguriertes `email`; andernfalls antworten die Routen mit `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Aktiviert sechsstellige Anmeldecodes per E-Mail — siehe [Einmalcodes per E-Mail](#einmalcodes-per-e-mail). Gleiche E-Mail-Voraussetzung |
-| `magicLinkCreatesUsers` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Passwortlose Registrierung: Eine Magic-Link- oder E-Mail-Code-Anfrage für eine Adresse ohne Konto erstellt eines (kein Passwort, unverifiziert, bis der Link oder Code verwendet wird), solange `allowRegistration` aktiv ist. Führt `beforeUserCreate` und die Standardrolle aus. Ist die Option aus, erstellen diese Anfragen nichts und beantworten eine unbekannte Adresse genauso wie eine bekannte. `AUTH_MAGIC_LINK_CREATES_USERS` |
-| `requireEmailVerification` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Verweigert die Passwort-Anmeldung, bis die Adresse verifiziert ist, und lässt die Registrierung erst nach der Bestätigung zu ("confirm-first") — siehe [E-Mail-Verifizierung](/docs/backend/email-verification/). Braucht `email`; ohne das verweigert der Boot |
+| `magicLinkCreatesUsers` | `boolean` | `false` | Passwortlose Registrierung: Eine Magic-Link- oder E-Mail-Code-Anfrage für eine Adresse ohne Konto erstellt eines (kein Passwort, unverifiziert, bis der Link oder Code verwendet wird), solange `allowRegistration` aktiv ist. Führt `beforeUserCreate` und die Standardrolle aus. Ist die Option aus, erstellen diese Anfragen nichts und beantworten eine unbekannte Adresse genauso wie eine bekannte. `AUTH_MAGIC_LINK_CREATES_USERS` |
+| `requireEmailVerification` | `boolean` | `false` | Verweigert die Passwort-Anmeldung, bis die Adresse verifiziert ist, und lässt die Registrierung erst nach der Bestätigung zu ("confirm-first") — siehe [E-Mail-Verifizierung](/docs/backend/email-verification/). Braucht `email`; ohne das verweigert der Boot |
 | `cookieAuth` | `CookieAuthConfig` | — | Liefert das Refresh-Token als `httpOnly` `Secure` `SameSite`-Cookie anstelle im JSON-Body aus — siehe unten |
 | `providers` | `OAuthProvider[]` | `[]` | Das kanonische OAuth-Array; die benannten Provider-Felder werden darin zusammengeführt |
 | `allowedRedirectUris` | `string[]` | — | Schränkt ein, welche Redirect-URIs die OAuth-Routen akzeptieren |
@@ -148,7 +148,7 @@ Nebeneffekte wie das Bereitstellen eines persönlichen Teams bei der Registrieru
 (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …) verwenden, die
 den vollständig ausgefüllten Benutzerdatensatz erhalten.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> OAuth führt dieselben Hooks aus wie die anderen Anmeldearten: `beforeLogin` (mit der
+OAuth führt dieselben Hooks aus wie die anderen Anmeldearten: `beforeLogin` (mit der
 Adresse des Providers und `"oauth"`), `beforeUserCreate`, wenn die Anmeldung das Konto
 erstellt, `afterUserCreate` und `onAuthenticated`. `onAuthenticated` löst außerdem bei einer
 Token-Aktualisierung (`"refresh"`), einem Passwort-Reset (`"password-reset"`) und einem
@@ -157,7 +157,7 @@ Anmeldung ist. Um ein bereits angemeldetes Konto zu stoppen, deaktivieren Sie es
 `PUT /api/admin/users/:uid { disabled: true }`: Das verweigert jede Anmeldung und jedes
 Refresh und beendet jede Sitzung und jedes Token, das es hält.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> `beforeEmailChange(user, newEmail)` läuft, wenn ein angemeldeter Benutzer verlangt,
+`beforeEmailChange(user, newEmail)` läuft, wenn ein angemeldeter Benutzer verlangt,
 sein Konto auf eine andere Adresse zu verschieben. Eine Adressregel, die Sie bei der
 Registrierung in `beforeUserCreate` erzwingen (etwa nur die eigene Domain), gehört auch
 hierhin – sonst kann sich ein Mitglied mit einer zugelassenen Adresse registrieren und
@@ -486,7 +486,7 @@ anhand unbestätigter E-Mails zuzulassen.
 
 ### E-Mail-Verifizierung
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Die Registrierung sendet dem neuen Konto einen
+Die Registrierung sendet dem neuen Konto einen
 Verifizierungslink, und das Folgen behält nur, was die Person, die ihm folgt,
 zusätzlich beweist. `requireEmailVerification` lässt die Registrierung erst nach der
 Bestätigung zu ("confirm-first"). Siehe

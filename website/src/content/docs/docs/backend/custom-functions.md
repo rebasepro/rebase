@@ -249,7 +249,7 @@ Reading `getUser(c)` is **not** a guard. An anonymous caller gets `undefined` an
 
 ### Scopes and app scopes
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `requireAdmin` admits the `admin` role and nobody else. For an action a narrower role or an API key should reach, guard the route with `requireScope`. It takes a built-in [scope](/docs/backend/roles-and-scopes/), or one the app declares under `auth.scopes` on the users collection, such as `"project:deploy": { label: "Deploy projects", target: "project" }`:
+`requireAdmin` admits the `admin` role and nobody else. For an action a narrower role or an API key should reach, guard the route with `requireScope`. It takes a built-in [scope](/docs/backend/roles-and-scopes/), or one the app declares under `auth.scopes` on the users collection, such as `"project:deploy": { label: "Deploy projects", target: "project" }`:
 
 ```typescript
 import { defineFunction, requireAuth, requireScope, hasScope } from "@rebasepro/server/functions";

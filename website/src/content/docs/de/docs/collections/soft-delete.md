@@ -1,5 +1,5 @@
 ---
-sourceHash: 461a5f0e0c5ecec5
+sourceHash: 94b81d143b186ece
 title: Soft Delete
 sidebar_label: Soft Delete
 description: Verwandeln Sie Löschvorgänge in einen Zeitstempel, blenden Sie mit Zeitstempel versehene Zeilen bei jedem Lesezugriff aus und stellen Sie sie mit einer normalen Aktualisierung wieder her.
@@ -84,7 +84,7 @@ Die Umkehrung ist kein Update. Das Setzen des Feldes auf einen Wert wird mit `40
 Upsert kann eine Zeile erstellen, die bereits gestempelt ist, stempelt aber nie
 eine, die gespeichert war.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Ebenso wenig schreibt ein Upsert in eine Zeile im
+Ebenso wenig schreibt ein Upsert in eine Zeile im
 Papierkorb: Wenn sein Schlüssel zu einer gestempelten Zeile gehört, wird er mit
 `409` `ROW_IN_TRASH` abgelehnt, und nichts wird geschrieben. Stellen Sie die
 Zeile zuerst wieder her, oder löschen Sie sie endgültig mit `?hard=true` und

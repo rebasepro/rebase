@@ -1,5 +1,5 @@
 ---
-sourceHash: 1cc4acaed4c60088
+sourceHash: 373a79f1c328f730
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: Conecte o Claude Code, Cursor, Gemini CLI ou qualquer cliente MCP a um projeto Rebase — as 42 ferramentas que ele expõe, a credencial com a qual se autentica e o gate de loopback que fica entre um agente e a produção.
@@ -28,7 +28,7 @@ completa — inicia essa cópia (`pnpm exec rebase-mcp`, ou `npx --no rebase-mcp
 em um projeto npm), nunca uma mais recente do npm. Um projeto mais antigo a adiciona uma vez,
 com `rebase skills install --mcp` ou `pnpm add -D @rebasepro/mcp`.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> O `rebase init` grava o bloco para cada agente escolhido quando ele
+O `rebase init` grava o bloco para cada agente escolhido quando ele
 [configura seus agentes de codificação por IA](/docs/ai/skills#set-up-by-rebase-init), mantendo
 quaisquer outros servidores já presentes no arquivo. O comando `rebase init --agent cursor,codex` faz
 o mesmo sem perguntar.
@@ -194,7 +194,7 @@ do backend e executar DDL contra qualquer `DATABASE_URL` resolvida pelo projeto.
 
 ### Fornecendo uma credencial restrita em vez disso
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Registre uma [API key](/docs/backend/api-keys) com escopo e o modelo de duas etapas
+Registre uma [API key](/docs/backend/api-keys) com escopo e o modelo de duas etapas
 se aplicará de fato. Uma chave de serviço é executada com as roles `["service"]`, as quais
 as políticas de administrador injetadas **não** contemplam — portanto, o RLS não concede nada a ela a menos que uma
 das suas próprias políticas declare o contrário, e os escopos dela a restringem ainda mais:
@@ -451,7 +451,7 @@ a um usuário, o endpoint se recusa a inicializar e informa o motivo no log de b
   vem ativado por padrão; `REBASE_MCP_OPEN_REGISTRATION=false` limita-o
   aos clientes que você registrar) e envia a pessoa para uma tela de consentimento que faz
   o login através do seu `/auth/login` existente.
-- <span class="since-badge" data-since="0.24">Desde 0.24</span> **Sete ferramentas, três escopos.** Os mesmos [escopos](/docs/backend/roles-and-scopes/)
+- **Sete ferramentas, três escopos.** Os mesmos [escopos](/docs/backend/roles-and-scopes/)
   que toda credencial usa. `data:read` oferece `list_collections`,
   `query_collection`, `count_documents` e `get_document`; `data:write` adiciona `create_document` e
   `update_document`; `data:delete` adiciona `delete_document`. Um cliente que não pede
@@ -462,7 +462,7 @@ a um usuário, o endpoint se recusa a inicializar e informa o motivo no log de b
 - **Concessões feitas antes da 0.24 mantêm seu alcance.** `mcp:read` é lido como
   `data:read`, e `mcp:write` como `data:write data:delete`, nas concessões armazenadas e
   nos tokens já emitidos.
-- <span class="since-badge" data-since="0.24">Desde 0.24</span> **Uma chave de API também funciona.** `/mcp` também aceita `Authorization: Bearer rk_…`, para
+- **Uma chave de API também funciona.** `/mcp` também aceita `Authorization: Bearer rk_…`, para
   um cliente configurado com um header em vez de um fluxo OAuth. A chave alcança
   as ferramentas que seus escopos `data:*` cobrem, como quem quer que ela represente: uma
   [chave pessoal](/docs/backend/api-keys/#personal-keys) como seu proprietário, uma chave de serviço

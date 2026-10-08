@@ -33,7 +33,7 @@ variable "image" {
   description = <<-EOT
     A container image with the bundle already baked in:
 
-        FROM rebasepro/server:0.23.0
+        FROM rebasepro/server:0.24.0
         COPY dist-bundle /bundle
 
     Preferred for production — the deployment then has no runtime dependency on

@@ -1,5 +1,5 @@
 ---
-sourceHash: 13c002a75ecd9ce1
+sourceHash: 8fa955ab0e0d14e2
 title: Authentification
 sidebar_label: Authentification
 description: Authentification côté client avec le SDK Rebase — connexion par e-mail/mot de passe, fournisseurs OAuth, gestion des sessions et écouteurs d'état d'authentification.
@@ -44,7 +44,7 @@ const { user, confirmationRequired } = await client.auth.signUp(
 );
 ```
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Avec [`requireEmailVerification`](/docs/backend/email-verification/) activé,
+Avec [`requireEmailVerification`](/docs/backend/email-verification/) activé,
 il n'y a aucune session avant que l'adresse ne soit confirmée : `confirmationRequired` vaut
 `true` et `user` est `null`, dites donc à la personne d'ouvrir le mail. Sinon,
 `confirmationRequired` vaut `false` et `user` est le compte connecté. Sur la 0.23
@@ -115,7 +115,7 @@ Un lien de connexion en un clic par e-mail. Le lien est toujours
 `<base>/auth/magic-link?token=…`, où `<base>` est le `email.magicLinkUrl` du backend,
 ou sa base de réinitialisation de mot de passe (`FRONTEND_URL` sur le runtime) quand celle-ci
 n'est pas définie. Il n'y a pas de `redirectTo` par requête. Servez ce chemin dans votre
-frontend, et renvoyez le jeton pour l'échanger contre une session. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Le CMS le sert, en
+frontend, et renvoyez le jeton pour l'échanger contre une session. Le CMS le sert, en
 connectant (via l'étape du code lorsqu'il y a un second facteur) ; les autres frontends ont
 besoin d'une page d'atterrissage.
 
@@ -207,7 +207,7 @@ showQrCode(totp.uri);        // otpauth://… — what the authenticator scans
 if (recoveryCodes) showRecoveryCodes(recoveryCodes);
 ```
 
-**Affichez les codes de récupération une seule fois et jamais plus.** Seuls leurs hachages sont stockés, rien ne pourra donc les afficher ultérieurement. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Ils accompagnent le premier facteur du compte.
+**Affichez les codes de récupération une seule fois et jamais plus.** Seuls leurs hachages sont stockés, rien ne pourra donc les afficher ultérieurement. Ils accompagnent le premier facteur du compte.
 Ajouter un autre facteur conserve les codes que le compte possède déjà, et
 `recoveryCodes` vaut `null`. Démarrer un enrôlement puis l'abandonner ne les touche jamais.
 
@@ -463,7 +463,7 @@ lien suivi avec son mot de passe.
 
 ## Changer d'adresse e-mail
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une personne connectée déplace son propre compte vers une autre adresse. Rien ne
+Une personne connectée déplace son propre compte vers une autre adresse. Rien ne
 change jusqu'à ce que la nouvelle adresse réponde :
 
 ```typescript

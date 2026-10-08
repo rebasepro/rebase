@@ -1,5 +1,5 @@
 ---
-sourceHash: 4b2acc8e12bf440c
+sourceHash: 259c5bd1a0583132
 title: Temps réel & WebSocket
 sidebar_label: Temps réel
 description: Synchronisation des données en temps réel, canaux de diffusion et suivi de présence via WebSocket.
@@ -213,7 +213,7 @@ filtre sur les propres lignes de l'utilisateur) ou un
 [canal de diffusion](#canaux-de-diffusion-broadcast-channels) qui porte le changement pour que
 les clients le relisent à leur propre rythme.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> **Un socket peut détenir au plus 1 000 abonnements.** Le suivant est refusé avec
+**Un socket peut détenir au plus 1 000 abonnements.** Le suivant est refusé avec
 une trame d'erreur codée `TOO_MANY_SUBSCRIPTIONS` ; se réabonner sous un id que le socket
 détient déjà remplace cet abonnement et ne compte pas une deuxième fois. Le SDK partage les
 abonnements identiques sur un socket, ce qui compte donc les listes et enregistrements
@@ -227,7 +227,7 @@ Un id d'abonnement est propre au socket : deux clients qui nomment tous deux un 
 
 ### Les sockets qui ne répondent plus
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Un client peut disparaître sans fermer son socket : un téléphone perd le réseau, un ordinateur portable se met en veille, un NAT oublie la connexion. Aucune trame de fermeture n'arrive, donc rien ne prévient le serveur. Le serveur envoie donc un ping à chaque socket toutes les 30 secondes et met fin à celui qui n'a pas répondu avant le ping suivant : un client disparu est ainsi libéré en moins d'une minute. Les navigateurs et le SDK répondent seuls aux pings ; un client qui parle directement le protocole doit y répondre aussi, comme le font la plupart des bibliothèques WebSocket.
+Un client peut disparaître sans fermer son socket : un téléphone perd le réseau, un ordinateur portable se met en veille, un NAT oublie la connexion. Aucune trame de fermeture n'arrive, donc rien ne prévient le serveur. Le serveur envoie donc un ping à chaque socket toutes les 30 secondes et met fin à celui qui n'a pas répondu avant le ping suivant : un client disparu est ainsi libéré en moins d'une minute. Les navigateurs et le SDK répondent seuls aux pings ; un client qui parle directement le protocole doit y répondre aussi, comme le font la plupart des bibliothèques WebSocket.
 
 Un socket est aussi fermé de force quand plus de 16&nbsp;Mio de trames qui lui ont été envoyées restent non lues. C'est un client qui ne lit pas ce qu'on lui envoie, ou un client si en retard que ce qu'il lirait est déjà périmé.
 
@@ -392,7 +392,7 @@ Le SDK typé se reconnecte automatiquement lorsque la connexion WebSocket est in
 - **Réabonnement automatique** — En cas de reconnexion réussie, tous les abonnements actifs sont réenregistrés auprès du serveur, et le prochain `onUpdate` de chacun porte tout ce qui a été écrit pendant l'absence du client. Cette mise à jour est le signal de rétablissement. Aucune intervention manuelle n'est requise.
 - **Les requêtes sont au plus une fois (at-most-once)** — Une requête faite pendant que le socket est en panne attend sa remise en ligne, pendant 30 secondes au plus à partir de l'appel, puis échoue avec `REQUEST_TIMEOUT` sans jamais avoir été envoyée. Une requête déjà envoyée au moment de la coupure échoue avec `CONNECTION_LOST` et n'est **pas** renvoyée : le serveur a pu l'exécuter ou non, et seul l'appelant sait s'il est sûr de l'exécuter deux fois.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> `client.ws.state` indique où en est la connexion, et `onStateChange` est informé de
+`client.ws.state` indique où en est la connexion, et `onStateChange` est informé de
 chaque changement. Sur la 0.23 ni l'un ni l'autre n'existe, le client s'arrête après 5 tentatives
 infructueuses, et les messages envoyés pendant la déconnexion sont mis en file et envoyés après la
 reconnexion :
@@ -428,11 +428,11 @@ Les abonnements WebSocket respectent automatiquement les politiques de sécurit�
 
 1. La connexion WebSocket s'authentifie en utilisant le même jeton JWT que l'API REST.
 2. Chaque réévaluation d'abonnement s'exécute dans une transaction PostgreSQL avec `set_config('app.user_id', ...)` et `set_config('app.user_roles', ...)` — garantissant ainsi l'application des politiques RLS.
-3. <span class="since-badge" data-since="0.24">Depuis 0.24</span> L'identité est revérifiée pendant toute la durée où le socket reste ouvert, pas seulement à son authentification. Avant chaque trame, le serveur demande ce qu'une requête HTTP demanderait : le jeton est-il toujours valide, sa session a-t-elle été déconnectée ou révoquée, le compte existe-t-il encore, et quels rôles détient-il maintenant. Les trames de canal sont vérifiées au plus une fois par seconde. Un socket qui ne fait qu'écouter est vérifié au moins toutes les 30 secondes, et un jeton cesse d'être honoré à l'instant où il expire. Un rôle retiré s'applique à partir de la trame suivante, aussi bien pour les lectures, les écritures que les abonnements ouverts. Un socket dont l'identité a pris fin reçoit une trame `AUTH_ERROR` avec le code `SESSION_ENDED` ou `TOKEN_EXPIRED` et est fermé avec le code `4001`. Le SDK réauthentifie son socket chaque fois qu'il actualise son jeton, et après un `4001` il se reconnecte avec la session qu'il détient alors, ou sans aucune. Un client utilisant directement le protocole doit envoyer un jeton frais dans `AUTHENTICATE` avant que l'ancien n'expire.
+3. L'identité est revérifiée pendant toute la durée où le socket reste ouvert, pas seulement à son authentification. Avant chaque trame, le serveur demande ce qu'une requête HTTP demanderait : le jeton est-il toujours valide, sa session a-t-elle été déconnectée ou révoquée, le compte existe-t-il encore, et quels rôles détient-il maintenant. Les trames de canal sont vérifiées au plus une fois par seconde. Un socket qui ne fait qu'écouter est vérifié au moins toutes les 30 secondes, et un jeton cesse d'être honoré à l'instant où il expire. Un rôle retiré s'applique à partir de la trame suivante, aussi bien pour les lectures, les écritures que les abonnements ouverts. Un socket dont l'identité a pris fin reçoit une trame `AUTH_ERROR` avec le code `SESSION_ENDED` ou `TOKEN_EXPIRED` et est fermé avec le code `4001`. Le SDK réauthentifie son socket chaque fois qu'il actualise son jeton, et après un `4001` il se reconnecte avec la session qu'il détient alors, ou sans aucune. Un client utilisant directement le protocole doit envoyer un jeton frais dans `AUTHENTICATE` avant que l'ancien n'expire.
 
 Cela signifie que chaque socket ne reçoit que les mises à jour relatives aux enregistrements que son identité authentifiée est autorisée à voir.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une [clé API](/docs/backend/api-keys/) authentifie aussi le socket : envoyez la clé
+Une [clé API](/docs/backend/api-keys/) authentifie aussi le socket : envoyez la clé
 `rk_…` là où irait le jeton d'accès. Le socket vérifie alors chaque trame
 au regard des [portées](/docs/backend/roles-and-scopes/) de la clé : une lecture, un comptage ou un
 abonnement exige `data:read` sur sa collection, un enregistrement `data:write`, une suppression

@@ -1,5 +1,5 @@
 ---
-sourceHash: 57da5c05731b0030
+sourceHash: ae8d9da2fa3d1e43
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Esegui Rebase ovunque con l'immagine di runtime ufficiale e il bundle del tuo progetto — Docker Compose, Fly, Railway o un semplice VPS.
@@ -82,7 +82,7 @@ Essendo già presenti, puoi montare il bundle in sola lettura — un'ottima prec
 Per un deployment reale, è preferibile incorporare entrambi in un'immagine, bloccando con precisione ciò che viene eseguito:
 
 ```dockerfile
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 
@@ -144,7 +144,7 @@ Il runtime è un normale container in ascolto su `$PORT`, quindi qualsiasi piatt
 
 ```toml
 [build]
-  image = "rebasepro/server:0.23.0"
+  image = "rebasepro/server:0.24.0"
 
 [http_service]
   internal_port = 8080
@@ -254,7 +254,7 @@ nosniff`, un `Referrer-Policy` e `Strict-Transport-Security: max-age=15552000`
 (180 giorni). L'header HSTS omette `includeSubDomains`: questo direbbe ai
 browser di rifiutare l'HTTP semplice su ogni sottodominio del tuo dominio,
 inclusi quelli con cui questo server non ha nulla a che fare, e un browser lo
-conserva per tutto il tempo indicato dall'header. <span class="since-badge" data-since="0.24">Dalla 0.24</span>
+conserva per tutto il tempo indicato dall'header.
 Imposta `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` quando ogni sottodominio è
 solo-HTTPS; fino alla 0.23 incluso, l'header portava sempre `includeSubDomains`.
 
@@ -283,7 +283,7 @@ Tutto quanto descritto sopra prevede un unico container che serve l'intero proge
 ## Aggiornamento
 
 ```yaml
-image: rebasepro/server:0.23.0
+image: rebasepro/server:0.24.0
 ```
 
 Riavvia. Il tuo bundle rimane invariato. All'interno della stessa major version del contratto di runtime, un bundle validato continuerà a funzionare — consulta [Compatibility](/docs/architecture/runtime-and-bundles/#compatibility).

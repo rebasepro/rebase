@@ -1,5 +1,5 @@
 ---
-sourceHash: 719f802a23cf78ec
+sourceHash: 98867dc8dd9d38a9
 title: Schema come Codice
 sidebar_label: Schema come Codice
 description: Come Rebase utilizza le collezioni TypeScript come unica fonte di verità per lo schema del tuo database, l'interfaccia utente e l'API.
@@ -129,7 +129,7 @@ export const relations = {  };
 
 Tre cose qui meritano una seconda lettura. La colonna `id` che non hai
 dichiarato: ogni collezione ottiene una primary key `text` a meno che una
-proprietà non dichiari `isId`, e <span class="since-badge" data-since="0.24">Da 0.24</span> il database la riempie con un uuid
+proprietà non dichiari `isId`, e il database la riempie con un uuid
 (`gen_random_uuid()::text`), così una riga creata dal pannello di
 amministrazione, dalla REST API o dall'SDK non ha bisogno di una propria
 chiave. Una chiave che invii tu viene usata come fornita. Sulla 0.23 la colonna

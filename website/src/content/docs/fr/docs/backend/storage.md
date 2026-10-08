@@ -1,5 +1,5 @@
 ---
-sourceHash: 123256f487ac8a71
+sourceHash: 15c8b3bdbf304f1c
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez des backends de stockage sur système de fichiers local, compatibles S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -244,7 +244,7 @@ de la source en dit autrement. Chaque porte d'accès applique le même nombre à
 est refusé à sa création, avant son premier fragment ; et `OPTIONS /api/storage/tus` l'annonce
 comme `Tus-Max-Size` — pour la source nommée par `?storageId=`, la source par défaut sinon.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> pour `STORAGE_MAX_FILE_SIZE` : sur la 0.23 seul le `maxFileSize` de la
+pour `STORAGE_MAX_FILE_SIZE` : sur la 0.23 seul le `maxFileSize` de la
 source fixe la limite, et la variable n'est pas lue.
 
 ```bash
@@ -293,8 +293,8 @@ Client                                                   Rebase Server
 | `GCS_PROJECT_ID` | ID du projet GCP pour GCS |
 | `GCS_KEY_FILENAME` | Chemin vers un fichier de clé de compte de service GCP (à omettre sur GKE — Workload Identity/ADC fournit les identifiants) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Variable ADC standard, lue directement par le SDK Google (inutile sur GCP avec les identifiants par défaut) |
-| `STORAGE_DOWNLOAD_TOKEN_TTL` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Durée pendant laquelle l'URL de téléchargement d'un fichier privé fonctionne, en secondes — la durée de vie du jeton que mint `/api/storage/metadata/*` (par défaut `300`, au plus `604800`, une semaine). Augmentez-la pour la vidéo et l'audio privés, qui continuent de demander des plages après le rendu de la page. L'orthographe env de `storageDownloadTokenTtl` |
-| `STORAGE_MAX_FILE_SIZE` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Le plus gros fichier que la source accepte, en octets (par défaut `52428800`, 50 Mo). Suffixe `__<KEY>` pour une source nommée. Une valeur qui n'est pas un nombre entier d'octets fait échouer le démarrage. Voir [Quelle taille un fichier peut atteindre](#quelle-taille-un-fichier-peut-atteindre) |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | Durée pendant laquelle l'URL de téléchargement d'un fichier privé fonctionne, en secondes — la durée de vie du jeton que mint `/api/storage/metadata/*` (par défaut `300`, au plus `604800`, une semaine). Augmentez-la pour la vidéo et l'audio privés, qui continuent de demander des plages après le rendu de la page. L'orthographe env de `storageDownloadTokenTtl` |
+| `STORAGE_MAX_FILE_SIZE` | Le plus gros fichier que la source accepte, en octets (par défaut `52428800`, 50 Mo). Suffixe `__<KEY>` pour une source nommée. Une valeur qui n'est pas un nombre entier d'octets fait échouer le démarrage. Voir [Quelle taille un fichier peut atteindre](#quelle-taille-un-fichier-peut-atteindre) |
 | `FORCE_LOCAL_STORAGE` | Autoriser `STORAGE_TYPE=local` en production — voir ci-dessous |
 | `STORAGE_PUBLIC_READ` | Servir les objets stockés aux lecteurs non authentifiés. L'équivalent en variable d'environnement de `storagePublicRead`, et l'un des trois moyens de satisfaire la [protection de démarrage en production](#autorisation-par-objet). |
 | `STORAGE_ALLOW_ANY_AUTHENTICATED` | Se désengager de la protection de démarrage, en rétablissant le comportement où tout utilisateur connecté peut lire, écraser, supprimer ou lister n'importe quelle clé. L'équivalent en variable d'environnement de `storageInsecureAllowAnyAuthenticated`. Défendable uniquement lorsque l'on peut faire confiance à chaque utilisateur connecté pour l'ensemble des fichiers. |
@@ -512,7 +512,7 @@ Bon à savoir :
 
 ### Clés API et jetons
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une personne connectée détient toutes les portées de stockage, donc le hook et les politiques ci-dessus
+Une personne connectée détient toutes les portées de stockage, donc le hook et les politiques ci-dessus
 décident pour elle. Une [clé API](/docs/backend/api-keys/) a aussi besoin de la portée de
 stockage de l'opération, sur la source que nomme la requête : `storage:read` pour les
 téléchargements, les métadonnées et les listages, `storage:write` pour les téléversements, les dossiers et chaque

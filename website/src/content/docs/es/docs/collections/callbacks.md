@@ -1,5 +1,5 @@
 ---
-sourceHash: b3d7ff032778e376
+sourceHash: c1478b42d3c890a5
 title: Callbacks de entidades
 sidebar_label: Callbacks
 description: Usa callbacks de ciclo de vida para ejecutar lógica personalizada cuando las entidades se crean, actualizan, leen o eliminan. Incluye la API context.data para operaciones entre colecciones.
@@ -438,7 +438,7 @@ Por lo tanto, la escritura desencadenante y todo lo que escribieron sus callback
 - Lanzar un error desde `afterSave` o `afterDelete` revierte la escritura desencadenante, junto con cada escritura de `context.data` que hicieron los callbacks. A quien llama se le responde **400 `CALLBACK_REJECTED`** con `details.stage` indicando el hook — o con el propio estado del error cuando lleva uno: un `RebaseApiError` que hayas lanzado, el 409 de una infracción de unicidad.
 - Los suscriptores en tiempo real se enteran de la fila solo después del commit, por lo que una escritura que se revirtió nunca se anuncia.
 - Un callback mantiene la transacción abierta mientras se ejecuta, por lo que uno lento representa un bloqueo retenido y una conexión del pool ocupada.
-- Una escritura de `context.data` también ejecuta los callbacks de la colección destino, así que un `afterSave` que actualiza su propia fila se ejecuta de nuevo a sí mismo. <span class="since-badge" data-since="0.24">Desde 0.24</span> Las escrituras anidadas a más de 16 niveles de profundidad se rechazan con **500 `CALLBACK_RECURSION`**, nombrando el hook y la colección, y toda la escritura se revierte. Haz que una escritura así sea condicional, como hace el ejemplo de más abajo.
+- Una escritura de `context.data` también ejecuta los callbacks de la colección destino, así que un `afterSave` que actualiza su propia fila se ejecuta de nuevo a sí mismo. Las escrituras anidadas a más de 16 niveles de profundidad se rechazan con **500 `CALLBACK_RECURSION`**, nombrando el hook y la colección, y toda la escritura se revierte. Haz que una escritura así sea condicional, como hace el ejemplo de más abajo.
 
 Deja que un fallo lance un error cuando la escritura desencadenante no deba sobrevivir a él. Captúralo cuando sí deba, pero solo en torno a una **escritura** de `context.data`: un create, update o delete que la base de datos rechace (una infracción de clave única o foránea, un trigger) se deshace por sí solo y el resto se confirma.
 

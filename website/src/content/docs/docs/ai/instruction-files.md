@@ -32,7 +32,7 @@ Please refer to and follow the instructions defined in [ai-instructions.md](./ai
 The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
 ```
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> for this third line and the `.mcp.json` below: on 0.23
+for this third line and the `.mcp.json` below: on 0.23
 the third line only tells the assistant to run `rebase skills install --agent claude`,
 and `.mcp.json` starts the server with `npx -y @rebasepro/mcp` from the registry.
 

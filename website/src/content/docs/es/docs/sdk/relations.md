@@ -1,5 +1,5 @@
 ---
-sourceHash: ce3b9ea649b09037
+sourceHash: 107ae13db8d0ff4a
 title: Consultar relaciones
 sidebar_label: Relaciones
 description: "Incluye entidades relacionadas en una consulta y lee una colección secundaria a través de su elemento principal con los accesores de relaciones del SDK."
@@ -177,7 +177,7 @@ data[0].author?.name;   // "Jane Doe"
 
 Un tipo `Database` generado tipa las tres con precisión: `Insert` y `Update` aceptan
 cualquiera de las dos formas de escritura, `Row` tiene `authorId` incondicionalmente, y `author` es
-opcional en `Row` — <span class="since-badge" data-since="0.24">Desde 0.24</span> `RowWith<"posts", ["author"]>` es la fila con ella
+opcional en `Row` — `RowWith<"posts", ["author"]>` es la fila con ella
 **obligatoria**, para una lectura que la haya pedido. Consulta [Includes tipados](#includes-tipados).
 
 El único caso en el que las tres coinciden es una relación nombrada idénticamente a su
@@ -199,7 +199,7 @@ const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
 `IncludeFor<A>` restringe las claves de un include a relaciones existentes, en cada
-nivel — y <span class="since-badge" data-since="0.24">Desde 0.24</span> un cliente tipado comprueba `include` de la misma manera, tanto en `find({ include })`
+nivel — y un cliente tipado comprueba `include` de la misma manera, tanto en `find({ include })`
 como en `.include(...)`, de modo que `posts.include("authr")` es un error de
 compilación en lugar de un `400 UNKNOWN_RELATION`. Las filas que devuelve una lectura
 siguen tipando cada relación como opcional; `RowWith<A, I>` es esa misma fila con cada

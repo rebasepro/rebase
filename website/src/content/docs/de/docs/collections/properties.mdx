@@ -1,5 +1,5 @@
 ---
-sourceHash: d79634002cc11c26
+sourceHash: 60c797ac2e9a363f
 title: Eigenschaften
 sidebar_label: Eigenschaften
 description: Eigenschaftstypen definieren den Datentyp, die Validierung und das UI-Rendering für jedes Feld in einer Collection. Rebase unterstützt die Typen String, Number, Boolean, Date, Array, Map, Reference, Relation und Geopoint.
@@ -82,7 +82,7 @@ price: {
 |----------|------|-------------|
 | `admin.readOnly` | `boolean` | Bearbeitung verhindern |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Deaktivieren mit optionalem Tooltip |
-| `admin.filledByServer` | `boolean` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Der Server befüllt das Feld, wenn ein neuer Datensatz es leer lässt (ein `beforeSave`-Hook). Das Formular lässt eine Erstellung ohne dieses Feld durch; beim Bearbeiten bleibt es erforderlich, und die eigenen Prüfungen des Servers gelten weiterhin |
+| `admin.filledByServer` | `boolean` | Der Server befüllt das Feld, wenn ein neuer Datensatz es leer lässt (ein `beforeSave`-Hook). Das Formular lässt eine Erstellung ohne dieses Feld durch; beim Bearbeiten bleibt es erforderlich, und die eigenen Prüfungen des Servers gelten weiterhin |
 | `admin.hideFromCollection` | `boolean` | In der Tabellenansicht ausblenden |
 | `admin.columnWidth` | `number` | Spaltenbreite in Pixeln (Tabellenansicht) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Feldbreite im vierspaltigen Formularraster |
@@ -295,7 +295,7 @@ andere Datenbank sein, und ein gelöschter Benutzer darf den Audit-Trail nicht m
 deklarieren Sie eine [Relation](/docs/collections/relations), wenn Sie den Join wünschen.
 
 :::note[Zusammengesetzte Primärschlüssel]
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Markieren Sie mehrere Eigenschaften mit `isId`, bilden sie einen zusammengesetzten
+Markieren Sie mehrere Eigenschaften mit `isId`, bilden sie einen zusammengesetzten
 Schlüssel: Die Tabelle erhält einen einzigen `PRIMARY KEY (a, b)`-Constraint, und eine
 Zeile wird über alle Schlüsselwerte in Deklarationsreihenfolge adressiert, verbunden mit
 `:::` – `company_translation/1:::en_US`. Geben Sie jeder Schlüsselspalte die passende
@@ -308,7 +308,7 @@ der Zeile einen Eindeutigkeits-Constraint über mehrere Spalten wollten, ist das
 eindeutiger [Index](/docs/backend/indexes). Auf 0.23 wird ein zweites `isId` beim Laden
 der Konfiguration abgelehnt.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Eine Collection, bei der keine Eigenschaft `isId` beansprucht, erhält eine eigene `id`-Spalte:
+Eine Collection, bei der keine Eigenschaft `isId` beansprucht, erhält eine eigene `id`-Spalte:
 `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. Die Datenbank befüllt sie, sodass eine über das
 Admin-Panel, die REST-API oder das SDK erstellte Zeile keinen Schlüssel braucht, und ein Schlüssel,
 den Sie selbst mitsenden, wird so verwendet, wie er ist. Eine Tabelle, die erstellt wurde, bevor

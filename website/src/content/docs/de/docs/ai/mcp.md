@@ -1,5 +1,5 @@
 ---
-sourceHash: 1cc4acaed4c60088
+sourceHash: 373a79f1c328f730
 title: MCP Server
 sidebar_label: MCP Server
 description: Verbinden Sie Claude Code, Cursor, Gemini CLI oder beliebige MCP-Clients mit einem Rebase-Projekt – die 42 bereitgestellten Tools, die Anmeldedaten zur Authentifizierung und das Loopback-Gate, das zwischen einem Agenten und der Produktion steht.
@@ -30,7 +30,7 @@ oder `npx --no rebase-mcp` in einem npm-Projekt), nie eine neuere aus npm. Ein
 älteres Projekt fügt ihn einmalig hinzu, mit `rebase skills install --mcp` oder
 `pnpm add -D @rebasepro/mcp`.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> `rebase init` schreibt den Block für jeden von Ihnen ausgewählten Agenten, wenn es
+`rebase init` schreibt den Block für jeden von Ihnen ausgewählten Agenten, wenn es
 [Ihre KI-Coding-Agenten einrichtet](/docs/ai/skills#set-up-by-rebase-init), wobei
 alle anderen bereits in der Datei vorhandenen Server erhalten bleiben.
 `rebase init --agent cursor,codex` erledigt dasselbe ohne Nachfrage.
@@ -204,7 +204,7 @@ ausführen, zu der das Projekt aufgelöst wird.
 
 ### Stattdessen eingeschränkte Anmeldedaten verwenden
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Registrieren Sie einen eingeschränkten [API-Key](/docs/backend/api-keys),
+Registrieren Sie einen eingeschränkten [API-Key](/docs/backend/api-keys),
 und das Zwei-Stufen-Modell greift tatsächlich. Ein Service-Key läuft mit den
 Rollen `["service"]`, die von den injizierten Admin-Richtlinien **nicht** genannt
 werden – RLS gewährt ihm also keinerlei Zugriff, sofern keine Ihrer eigenen
@@ -476,7 +476,7 @@ und gibt den Grund im Start-Log an. Keine `REBASE_ROLE` schaltet ihn ein.
   `REBASE_MCP_OPEN_REGISTRATION=false` beschränkt sie auf von Ihnen registrierte
   Clients) und leitet die Person zu einem Consent-Screen weiter, der sie über Ihr
   bestehendes `/auth/login` anmeldet.
-- <span class="since-badge" data-since="0.24">Seit 0.24</span> **Sieben Tools, drei Scopes.** Dieselben [Scopes](/docs/backend/roles-and-scopes/),
+- **Sieben Tools, drei Scopes.** Dieselben [Scopes](/docs/backend/roles-and-scopes/),
   die jedes Credential verwendet. `data:read` bietet `list_collections`,
   `query_collection`, `count_documents` und `get_document`; `data:write` ergänzt `create_document` und
   `update_document`; `data:delete` ergänzt `delete_document`. Ein Client, der nichts
@@ -488,7 +488,7 @@ und gibt den Grund im Start-Log an. Keine `REBASE_ROLE` schaltet ihn ein.
 - **Vor 0.24 erteilte Grants behalten ihre Reichweite.** `mcp:read` wird als
   `data:read` gelesen und `mcp:write` als `data:write data:delete`, bei gespeicherten
   Grants und bei bereits ausgestellten Tokens.
-- <span class="since-badge" data-since="0.24">Seit 0.24</span> **Auch ein API-Key funktioniert.** `/mcp` akzeptiert auch `Authorization: Bearer rk_…`,
+- **Auch ein API-Key funktioniert.** `/mcp` akzeptiert auch `Authorization: Bearer rk_…`,
   für einen Client, der mit einem Header statt mit einem OAuth-Flow konfiguriert ist.
   Der Key erreicht die Tools, die seine `data:*`-Scopes abdecken, als diejenige
   Identität, als die er handelt: ein

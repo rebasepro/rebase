@@ -1,5 +1,5 @@
 ---
-sourceHash: b3fe9c24649203e8
+sourceHash: aaa2fdfbd560c4cc
 title: Écriture via REST
 sidebar_label: Écriture via REST
 description: Clés d'idempotence, écritures conditionnelles avec ETag et If-Match, opérations sur les champs, upserts sur clé naturelle, return=minimal et lots multi-collections.
@@ -13,7 +13,7 @@ Au-delà des verbes, les routes d'écriture acceptent cinq éléments qui modifi
 
 Le corps d'une écriture doit être un objet JSON. `null`, un nombre, une chaîne ou un tableau donne un `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Une mise à jour ne peut pas changer la clé d'une ligne. Un corps qui nomme la clé
+Une mise à jour ne peut pas changer la clé d'une ligne. Un corps qui nomme la clé
 avec une autre valeur donne un `400 KEY_IMMUTABLE`, avant l'exécution de tout hook
 et sans rien écrire, quel que soit le chemin par lequel la mise à jour arrive :
 REST, le socket temps réel, MCP ou `rebase.data` en interne. La clé que la ligne

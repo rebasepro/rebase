@@ -214,7 +214,7 @@ regenerates `backend/src/schema.generated.ts` and the SDK types in
 that are missing. Outside `rebase dev` the same steps are `rebase schema generate`
 and `rebase generate-sdk`.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> for the SDK types: on 0.23, `rebase dev` regenerates the schema only, and
+for the SDK types: on 0.23, `rebase dev` regenerates the schema only, and
 `rebase generate-sdk` is a step of its own.
 
 ## Next Steps

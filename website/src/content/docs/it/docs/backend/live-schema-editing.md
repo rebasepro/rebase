@@ -1,5 +1,5 @@
 ---
-sourceHash: 2efe07fee7cafe0a
+sourceHash: 564c58f7bc002c6f
 title: Modifica dello schema live
 description: "Crea e modifica collection a fronte di un backend in esecuzione: prima committate nel repository, poi applicate."
 ---
@@ -19,7 +19,7 @@ Status e plan richiedono lo scope `schema:read`, e apply richiede `schema:write`
 ## Pianifica prima di applicare
 
 `/plan` non ha effetti collaterali. Invia tramite POST la modifica, e ti
-indicherà cosa comporta. <span class="since-badge" data-since="0.24">Da 0.24</span> Una modifica a una collection esistente è una `patch` — ciò che è
+indicherà cosa comporta. Una modifica a una collection esistente è una `patch` — ciò che è
 cambiato, come operazioni su percorsi di chiavi — mentre una nuova collection è
 l'intero `collection`:
 
@@ -118,7 +118,7 @@ Il verdetto viene letto dallo schema che ciascun lato produce — lo stesso
 piano a partire dal quale vengono generati `schema.generated.ts` e `db push`
 — quindi una modifica che cambia il database non può essere segnalata come
 nessuna modifica. Due modifiche che sembrano cambiamenti e non vengono
-rifiutate (<span class="since-badge" data-since="0.24">Da 0.24</span>; la 0.23 segnala entrambe come richiedenti una migrazione):
+rifiutate (; la 0.23 segnala entrambe come richiedenti una migrazione):
 
 - **Rinominare la chiave di una proprietà mantenendo la sua colonna**
   (`columnName` impostato sul vecchio nome della colonna) non sposta alcun
@@ -131,7 +131,7 @@ rifiutate (<span class="since-badge" data-since="0.24">Da 0.24</span>; la 0.23 s
 
 Una modifica rifiutata può comunque essere scritta nella sorgente della tua
 collection e committata, lasciando il database com'è — rimuovere una
-proprietà che non servi più è il caso tipico. <span class="since-badge" data-since="0.24">Da 0.24</span> Invia `/apply` con `"sourceOnly": true`. Non viene eseguito nulla; il
+proprietà che non servi più è il caso tipico. Invia `/apply` con `"sourceOnly": true`. Non viene eseguito nulla; il
 messaggio di commit specifica cosa mantiene il database, ad esempio
 `chore(schema): remove sku from products (source only — column products.sku kept)`,
 e ogni modifica nel piano porta una frase `sourceOnly` che indica cosa lascia
@@ -160,7 +160,7 @@ Non solo il file della collection. Da esso viene generato lo schema Drizzle, e u
 
 Questi percorsi sono relativi al tuo **progetto**, non al tuo repository. Quando i due coincidono — un progetto `rebase init`, che rappresenta il caso comune — non c'è nulla di cui preoccuparsi. Quando il progetto si trova in una sottodirectory di un repository più grande, i percorsi includono il relativo prefisso, individuato risalendo dalla directory delle collection fino al `rebase.json` più vicino. Un progetto senza `rebase.json` mantiene i percorsi semplici.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Nel commit non finisce alcun SQL. `rebase db push` e `rebase db generate` scrivono il proprio a partire dalle collection a ogni esecuzione, in `.rebase/sql/`, che è in gitignore.
+Nel commit non finisce alcun SQL. `rebase db push` e `rebase db generate` scrivono il proprio a partire dalle collection a ogni esecuzione, in `.rebase/sql/`, che è in gitignore.
 Sulla 0.23 il commit porta anche `drizzle/schema.sql`, `drizzle/policies.sql` e
 `drizzle/search.sql`, scritti nella root del progetto.
 
@@ -168,7 +168,7 @@ Il messaggio di commit descrive la modifica piuttosto che limitarsi ad annunciar
 
 ## Chi può applicare
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Possedere `schema:read` è sufficiente per eseguire **plan**. La pianificazione non ha effetti collaterali, e un job CI che verifichi se una modifica proposta per una collection sia applicabile ne rappresenta un ottimo caso d'uso.
+Possedere `schema:read` è sufficiente per eseguire **plan**. La pianificazione non ha effetti collaterali, e un job CI che verifichi se una modifica proposta per una collection sia applicabile ne rappresenta un ottimo caso d'uso.
 
 L'applicazione è un privilegio distinto, poiché applicare scrive un commit e un commit reca con sé un autore:
 

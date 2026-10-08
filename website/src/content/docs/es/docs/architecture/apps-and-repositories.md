@@ -1,5 +1,5 @@
 ---
-sourceHash: 8186aa37929028e4
+sourceHash: 6005371e69144db0
 title: Apps y repositorios
 sidebar_label: Apps y repositorios
 description: Un proyecto es un backend más las apps que se comunican con él, cada una de las cuales puede residir en su propio repositorio.
@@ -93,7 +93,7 @@ Lo que lo sabe, hace algo con ello:
   simplemente la página principal del frontend.
 - **`rebase apps list`** lo muestra junto a la app que lo sirve.
 
-Tres formas, y todas son comunes. <span class="since-badge" data-since="0.24">Desde 0.24</span> para la tercera: en la 0.23 el
+Tres formas, y todas son comunes. para la tercera: en la 0.23 el
 `path` de una app no puede ser una URL, así que el CMS compartía el nombre de host del proyecto.
 
 ```jsonc

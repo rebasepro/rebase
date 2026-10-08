@@ -1,5 +1,5 @@
 ---
-sourceHash: 461a5f0e0c5ecec5
+sourceHash: 94b81d143b186ece
 title: Soft delete
 sidebar_label: Soft delete
 description: Transforme a exclusão em um timestamp, oculte linhas marcadas de todas as leituras e restaure-as com uma atualização comum.
@@ -78,7 +78,7 @@ O inverso não é uma atualização. Definir o campo com um valor é recusado co
 `beforeDelete` e `afterDelete` sempre se aplicam a ela. Um upsert pode criar uma linha
 que já esteja marcada, mas nunca marca uma que já estava armazenada.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Tampouco um upsert escreve em uma linha na lixeira: quando sua chave pertence a uma
+Tampouco um upsert escreve em uma linha na lixeira: quando sua chave pertence a uma
 linha marcada, ele é recusado com `409` `ROW_IN_TRASH` e nada é escrito.
 Restaure a linha primeiro, ou a expurgue com `?hard=true` e faça o upsert novamente. Na 0.23
 o upsert escreve seus valores na linha oculta e responde `201`.

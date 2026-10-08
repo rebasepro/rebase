@@ -20,7 +20,7 @@ everything in this section applies to them too, except `?on_conflict=`.
 A write's body must be a JSON object. `null`, a number, a string or an array is
 a `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> An update cannot change a row's key. A body that names the key with another
+An update cannot change a row's key. A body that names the key with another
 value is a `400 KEY_IMMUTABLE`, before any hook runs and with nothing written,
 whichever way the update arrives: REST, the realtime socket, MCP or the
 in-process `rebase.data`. The key the row already has is accepted, as a form

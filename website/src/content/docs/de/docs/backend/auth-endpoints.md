@@ -1,5 +1,5 @@
 ---
-sourceHash: 56979243362b4790
+sourceHash: 83e2d04a56801ab8
 title: Auth-Endpunkte und Tokens
 sidebar_label: Auth-Endpunkte
 description: Die Authentifizierungs-Routen, die das Rebase-Backend bereitstellt, ihre Antwortstrukturen, Multi-Faktor-Authentifizierung, der Datenbankkontext für Richtlinien, JWKS und Service-Schlüssel.
@@ -57,7 +57,7 @@ Die administrative Benutzer- und Rollenverwaltung ist eine **separate Schnittste
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
-| `GET` | `/api/admin/users` | Benutzer auflisten (paginiert). `?search=` findet einen Teil der E-Mail-Adresse oder des Anzeigenamens, ohne Beachtung der Groß-/Kleinschreibung. <span class="since-badge" data-since="0.24">Seit 0.24</span> Auf Postgres findet es außerdem jede Rolle, die der Benutzer hält, und die uid; auf MongoDB findet es weiterhin nur E-Mail-Adresse und Anzeigenamen |
+| `GET` | `/api/admin/users` | Benutzer auflisten (paginiert). `?search=` findet einen Teil der E-Mail-Adresse oder des Anzeigenamens, ohne Beachtung der Groß-/Kleinschreibung. Auf Postgres findet es außerdem jede Rolle, die der Benutzer hält, und die uid; auf MongoDB findet es weiterhin nur E-Mail-Adresse und Anzeigenamen |
 | `POST` | `/api/admin/users` | Benutzer erstellen |
 | `GET` | `/api/admin/users/:uid` | Einzelnen Benutzer abrufen |
 | `PUT` | `/api/admin/users/:uid` | Einzelnen Benutzer aktualisieren. `{ disabled: true }` schaltet das Konto ab, ohne es zu löschen: Jede Anmeldung und jedes Refresh wird abgelehnt (`ACCOUNT_DISABLED`), seine Sitzungen enden und jedes Token, das es hält, wird abgelehnt; `false` schaltet es wieder ein |
@@ -124,7 +124,7 @@ Access-Token vorhanden“ bemerkbar macht – die Anmeldung war in Ordnung, das 
 
 ### E-Mail-Adresse ändern
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Ein angemeldeter Benutzer
+Ein angemeldeter Benutzer
 verschiebt sein eigenes Konto in zwei Schritten auf eine andere Adresse:
 
 1. `POST /api/auth/change-email { newEmail }` zeichnet die Änderung auf und sendet
@@ -195,7 +195,7 @@ jedes Konto ist auf zehn Verifizierungsversuche pro 15 Minuten beschränkt
 für den Faktor vermerkt, sodass er für den Rest seines Zeitfensters von
 ±1 Schritt nicht erneut verwendet werden kann.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> In der Benutzertabelle werden **Zwei-Schritt-Verifizierung zurücksetzen**
+In der Benutzertabelle werden **Zwei-Schritt-Verifizierung zurücksetzen**
 (`DELETE /api/admin/users/:uid/mfa`) und **Konto deaktivieren oder aktivieren**
 (`PUT /api/admin/users/:uid { disabled }`) jedem angeboten, der `users:write` hält,
 genau wie die Routen selbst; der Schalter wird nie für das eigene Konto angeboten, und

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d36f4d71bfe288e
+sourceHash: 37805343f12779ab
 title: Cron-Jobs
 sidebar_label: Cron-Jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.
@@ -266,7 +266,7 @@ Der Handler kann jeden JSON-serialisierbaren Wert zurückgeben. Dieser wird im L
 
 ## REST-API
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Lesen braucht den Scope `cron:read`. Auslösen, Pausieren und Fortsetzen brauchen
+Lesen braucht den Scope `cron:read`. Auslösen, Pausieren und Fortsetzen brauchen
 `cron:write`. Ein Admin hält beide. Ebenso eine Person, deren Rolle sie deklariert, und
 ein API-Schlüssel, der mit ihnen erstellt wurde – genau das sollte ein externer Scheduler tragen:
 
@@ -281,7 +281,7 @@ Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | Alle registrierten Cron-Jobs auflisten |
 | `GET` | `/api/admin/cron/:id` | Status eines einzelnen Jobs abrufen |
 | `POST` | `/api/admin/cron/:id/trigger` | Einen Job manuell auslösen — `409`, solange er bereits läuft |
-| `GET` | `/api/admin/cron/:id/logs` | Ausführungsverlauf abrufen (`?limit=N`). <span class="since-badge" data-since="0.24">Seit 0.24</span> `503`, wenn `rebase.cron_logs` nicht gelesen werden kann, statt eines leeren Verlaufs |
+| `GET` | `/api/admin/cron/:id/logs` | Ausführungsverlauf abrufen (`?limit=N`). `503`, wenn `rebase.cron_logs` nicht gelesen werden kann, statt eines leeren Verlaufs |
 | `PUT` | `/api/admin/cron/:id` | Einen Job überall pausieren oder fortsetzen (`{ "enabled": false }`); `null` folgt wieder dem Code |
 
 ### Beispiel: Alle Jobs auflisten
@@ -380,7 +380,7 @@ await client.cron.toggleJob("health-check", false); // pause
 await client.cron.toggleJob("health-check", true);  // resume
 ```
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> `listJobs()` ist als `CronJobListing` typisiert: `jobs`, dazu die Felder `skipped`,
+`listJobs()` ist als `CronJobListing` typisiert: `jobs`, dazu die Felder `skipped`,
 `rejected` und `note`, die unter [Jobs, die nicht vorhanden sind](#jobs-die-nicht-vorhanden-sind) beschrieben sind.
 
 ## Studio-Dashboard
@@ -390,15 +390,15 @@ Wenn Cron-Jobs konfiguriert sind, erscheint in Rebase Studio unter **Compute** n
 - **Job-Liste** — Alle registrierten Jobs mit Live-Statusanzeigen
 - **Detail-Panel** — Zeitplan, nächste/letzte Ausführung, Dauer und Fehlerinformationen
 - **Ausführungsverlauf** — Erweiterbare Log-Einträge mit erfassten Ausgaben und Ergebnissen
-- **Manuelles Triggern** — Führen Sie jeden Job bei Bedarf mit einem Klick aus. <span class="since-badge" data-since="0.24">Seit 0.24</span> Das Panel wartet, bis die Ausführung endet, und zeigt, wie sie verlaufen ist: Eine fehlgeschlagene Ausführung zeigt ihren Fehler
+- **Manuelles Triggern** — Führen Sie jeden Job bei Bedarf mit einem Klick aus. Das Panel wartet, bis die Ausführung endet, und zeigt, wie sie verlaufen ist: Eine fehlgeschlagene Ausführung zeigt ihren Fehler
 - **Aktivieren/Deaktivieren** — Jobs pausieren und fortsetzen, ohne den Server neu zu starten, für alle Prozesse gleichzeitig; eine Pause bleibt über Neustarts und Deploys hinweg bestehen
-- **Jobs, die nicht vorhanden sind** — <span class="since-badge" data-since="0.24">Seit 0.24</span> jeder Job, den der Scheduler abgelehnt hat, mit seinem Zeitplan und dem Grund, und wie viele Cron-Dateien nicht geladen werden konnten. Keiner von ihnen ist eingeplant; siehe [Jobs, die nicht vorhanden sind](#jobs-die-nicht-vorhanden-sind)
+- **Jobs, die nicht vorhanden sind** — jeder Job, den der Scheduler abgelehnt hat, mit seinem Zeitplan und dem Grund, und wie viele Cron-Dateien nicht geladen werden konnten. Keiner von ihnen ist eingeplant; siehe [Jobs, die nicht vorhanden sind](#jobs-die-nicht-vorhanden-sind)
 
 Das Dashboard aktualisiert sich automatisch alle 15 Sekunden.
 
 Das Panel zeigt dasselbe, egal welcher Prozess es ausliefert. Ein Job, den ein
 anderer Prozess gerade ausführt, wird als laufend angezeigt.
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Auf jedem Prozess, der einen Store hat, werden die Anzahl der Ausführungen, die Anzahl der Fehlschläge und die
+Auf jedem Prozess, der einen Store hat, werden die Anzahl der Ausführungen, die Anzahl der Fehlschläge und die
 letzte Ausführung aus `rebase.cron_logs` gelesen, mit einer Abfrage, die auf die eigenen
 Zeilen jedes Jobs begrenzt ist. Die eigenen Zähler eines Prozesses enthalten nur die Ausführungen, die er selbst gemacht hat: Die `api`-Rolle
 neben einem Worker führt nichts aus, und von zwei Repliken, die beide planen, sieht keine

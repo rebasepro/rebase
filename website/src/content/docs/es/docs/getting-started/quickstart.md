@@ -1,5 +1,5 @@
 ---
-sourceHash: ea3185fba08977a9
+sourceHash: 32fc3b3ccab733ad
 title: Inicio rápido
 sidebar_label: Inicio rápido
 description: Crea un nuevo proyecto de Rebase y ponlo en marcha localmente en menos de 2 minutos.
@@ -166,7 +166,7 @@ export const collections = [
 
 Guarda el archivo. Eso es todo: `rebase dev` regenera `backend/src/schema.generated.ts` y los tipos del SDK en `generated/sdk/` a partir de tus colecciones, reinicia el backend y el arranque crea la nueva tabla, por lo que tu colección **Products** aparecerá en la navegación.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> para los tipos del SDK: en 0.23, `rebase dev` solo regenera el esquema, así que ejecuta
+para los tipos del SDK: en 0.23, `rebase dev` solo regenera el esquema, así que ejecuta
 `rebase generate-sdk` después de cambiar una colección, antes de importar sus tipos.
 
 Lo mismo ocurre con una propiedad añadida a una colección que ya tienes: guarda y la columna estará allí.

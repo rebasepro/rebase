@@ -1,5 +1,5 @@
 ---
-sourceHash: 406fc1b9cadefefb
+sourceHash: d2f6e11d9e4f2f6e
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud ist dasselbe Rebase, für Sie betrieben. Was es ist, wie ein Projekt verknüpft und bereitgestellt wird und was die Private Beta noch nicht enthält.
@@ -103,7 +103,7 @@ Ein Rollback fügt ein neues Deployment an, anstatt die Versionshistorie zurück
 
 ## CI und Agenten
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Ein CI-Job oder ein Agent sollte nicht Ihr Passwort mit sich führen. Geben Sie ihm stattdessen ein Token: einen Schlüssel, der als Ihr Konto handelt, beschränkt auf wenige Aktionen in einem Projekt. Erstellen Sie es in einem angemeldeten Terminal:
+Ein CI-Job oder ein Agent sollte nicht Ihr Passwort mit sich führen. Geben Sie ihm stattdessen ein Token: einen Schlüssel, der als Ihr Konto handelt, beschränkt auf wenige Aktionen in einem Projekt. Erstellen Sie es in einem angemeldeten Terminal:
 
 ```bash
 rebase cloud tokens create --project shop --can deploy,logs --expires-in 90

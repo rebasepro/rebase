@@ -242,7 +242,7 @@ narrower subscriptions (a page, a filter on the user's own rows) or a
 [broadcast channel](#broadcast-channels) carrying the change for clients to
 re-fetch on their own schedule.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> **One socket may hold at most 1,000 subscriptions.** The next is refused with
+**One socket may hold at most 1,000 subscriptions.** The next is refused with
 an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the
 socket already holds replaces that subscription and does not count again. The
 SDK shares identical subscriptions on a socket, so this counts the distinct
@@ -258,7 +258,7 @@ sender's.
 
 ### Sockets that stop answering
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A client can vanish without closing its socket: a phone loses
+A client can vanish without closing its socket: a phone loses
 signal, a laptop goes to sleep, a NAT forgets the connection. No close frame
 arrives, so nothing tells the server. The server therefore pings every socket
 every 30 seconds and terminates one that has not answered by the next ping, so
@@ -439,7 +439,7 @@ The typed SDK automatically reconnects when the WebSocket connection drops:
 - **Automatic resubscription** — On successful reconnect, all active subscriptions are re-registered with the server, and each one's next `onUpdate` carries whatever was written while the client was away. That update is the recovery signal. No manual intervention needed.
 - **Requests are at-most-once** — A request made while the socket is down waits for it, for up to 30 seconds from the call, and then fails with `REQUEST_TIMEOUT` without ever being sent. A request that was already sent when the connection dropped fails with `CONNECTION_LOST` and is **not** sent again: the server may or may not have run it, and only the caller knows whether running it twice is safe.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `client.ws.state` says where the connection is, and `onStateChange` is told every
+`client.ws.state` says where the connection is, and `onStateChange` is told every
 change. On 0.23 neither exists, the client stops after 5 failed attempts, and
 messages sent while disconnected are queued and sent after reconnecting:
 
@@ -474,11 +474,11 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies.
 
 1. The WebSocket connection authenticates using the same JWT token as the REST API.
 2. Every subscription refetch runs inside a PostgreSQL transaction with `set_config('app.user_id', ...)` and `set_config('app.user_roles', ...)` — ensuring RLS policies are enforced.
-3. <span class="since-badge" data-since="0.24">Since 0.24</span> The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame, to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame with the code `SESSION_ENDED` or `TOKEN_EXPIRED` and is closed with code `4001`. The SDK authenticates its socket again each time it refreshes its token, and after a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
+3. The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame, to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame with the code `SESSION_ENDED` or `TOKEN_EXPIRED` and is closed with code `4001`. The SDK authenticates its socket again each time it refreshes its token, and after a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
 
 This means each socket only receives updates for records its authenticated identity may see.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> An [API key](/docs/backend/api-keys/) authenticates the socket too: send the
+An [API key](/docs/backend/api-keys/) authenticates the socket too: send the
 `rk_…` key where the access token would go. The socket then checks each frame
 against the key's [scopes](/docs/backend/roles-and-scopes/): a fetch, a count or a
 subscription needs `data:read` on its collection, a save `data:write`, a delete

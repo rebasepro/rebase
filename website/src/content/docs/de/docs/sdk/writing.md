@@ -1,5 +1,5 @@
 ---
-sourceHash: dcc8ea957511a4ea
+sourceHash: 4fc97bd0da41030a
 title: Daten schreiben
 sidebar_label: Daten schreiben
 description: Erstellen, Upserten, Aktualisieren und Löschen mit dem SDK – Feldoperationen, bedingte Schreibvorgänge, Idempotenzschlüssel, Batch-Schreibvorgänge und kollektionsübergreifendes Schreiben in einer einzigen Transaktion.
@@ -145,7 +145,7 @@ Update herabgestuft wird, anstatt einen Fehler zu werfen.
 
 Von einem Browser auf einem anderen Origin aus — ein Vite-Frontend auf eigenem Port, ein
 `app.`-Host, der einen `api.`-Host aufruft — ist das `ETag` nur lesbar, weil der Server es in
-`Access-Control-Expose-Headers` benennt. <span class="since-badge" data-since="0.24">Seit 0.24</span> Die Rebase-Runtime tut dies, zusammen mit
+`Access-Control-Expose-Headers` benennt. Die Rebase-Runtime tut dies, zusammen mit
 `Retry-After`, `X-Request-ID`, den `X-RateLimit-*`-Headern und `Preference-Applied`; unter 0.23
 legt sie keinen davon frei, sodass `etagOf` dort cross-origin immer `undefined` ist. Ein
 Backend, das sein eigenes `cors()` verdrahtet, muss dieselbe Liste freigeben, sonst ist
@@ -280,7 +280,7 @@ result.meta;  // { operations: 4 }
 
 `op` ist `create`, `update`, `upsert` oder `delete`, und `collection` schränkt `values` auf den
 generierten `Insert`- oder `Update`-Typ dieser Kollektion ein — eine Spalte, die die Kollektion
-nicht hat, ist ein Compile-Fehler, ebenso ein Create, dem eine erforderliche fehlt. <span class="since-badge" data-since="0.24">Seit 0.24</span> `collection`
+nicht hat, ist ein Compile-Fehler, ebenso ein Create, dem eine erforderliche fehlt. `collection`
 ist der Accessor, der Name, den `client.data.<accessor>` annimmt (`orderItems` für den Slug
 `order_items`); der Client sendet den Slug, über das `collections`-Dictionary, mit dem er
 erstellt wurde. Unter 0.23 sendet ein typisierter Batch den Accessor wie geschrieben, sodass eine

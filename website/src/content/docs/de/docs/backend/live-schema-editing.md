@@ -1,5 +1,5 @@
 ---
-sourceHash: 2efe07fee7cafe0a
+sourceHash: 564c58f7bc002c6f
 title: Live-Schema-Bearbeitung
 description: Erstellen und Ändern von Collections auf einem laufenden Backend – zuerst in Ihr Repository committet, dann angewendet.
 ---
@@ -26,7 +26,7 @@ Das Anwenden erfordert außerdem eine Sache mehr als den Scope – siehe [Wer Ä
 ## Erst planen, dann anwenden
 
 `/plan` hat keine Nebeneffekte. Senden Sie die Änderung, und der Endpunkt teilt Ihnen mit, was
-die Änderung bedeutet. <span class="since-badge" data-since="0.24">Seit 0.24</span> Eine Änderung an einer bestehenden Collection ist ein
+die Änderung bedeutet. Eine Änderung an einer bestehenden Collection ist ein
 `patch` — was sich geändert hat, als Operationen auf Pfaden von Schlüsseln — und eine neue
 Collection ist die gesamte `collection`:
 
@@ -141,7 +141,7 @@ was stattdessen zu tun ist.
 Das Urteil wird aus dem Schema gelesen, das jede Seite erzeugt — demselben Plan, aus dem
 `schema.generated.ts` und `db push` gerendert werden — sodass eine Änderung, die die Datenbank
 verändert, nicht als „keine Änderung" gemeldet werden kann. Zwei Änderungen, die wie Änderungen
-aussehen und nicht abgelehnt werden (<span class="since-badge" data-since="0.24">Seit 0.24</span>; 0.23 meldet beide als migrationsbedürftig):
+aussehen und nicht abgelehnt werden (; 0.23 meldet beide als migrationsbedürftig):
 
 - **Das Umbenennen des Schlüssels einer Property bei gleichbleibender Spalte** (`columnName`
   auf die alte Spalte gesetzt) bewegt keine Daten. Es ist `safe`; API-Clients lesen den neuen
@@ -154,7 +154,7 @@ aussehen und nicht abgelehnt werden (<span class="since-badge" data-since="0.24"
 
 Eine abgelehnte Änderung kann trotzdem in Ihren Collection-Quellcode geschrieben und committet
 werden, wobei die Datenbank bleibt, wie sie ist — das Entfernen einer Property, die Sie nicht
-mehr bedienen, ist der übliche Fall. <span class="since-badge" data-since="0.24">Seit 0.24</span> Senden Sie `/apply` mit `"sourceOnly": true`. Es
+mehr bedienen, ist der übliche Fall. Senden Sie `/apply` mit `"sourceOnly": true`. Es
 läuft nichts; die Commit-Nachricht benennt, was die Datenbank behält, zum Beispiel
 `chore(schema): remove sku from products (source only — column products.sku kept)`, und jede
 Änderung im Plan trägt einen `sourceOnly`-Satz, der sagt, was sie zurücklässt — auch wenn eine
@@ -187,7 +187,7 @@ Repositorys befindet, werden die Pfade mit diesem vorangestellt, ermittelt durch
 von Ihrem Collections-Verzeichnis aufwärts zur nächsten `rebase.json`. Ein Projekt ohne
 `rebase.json` behält die einfachen Pfade bei.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Kein SQL landet im Commit. `rebase db push` und `rebase db generate` schreiben ihr
+Kein SQL landet im Commit. `rebase db push` und `rebase db generate` schreiben ihr
 SQL bei jedem Lauf aus den Collections nach `.rebase/sql/`, das von Git ignoriert wird.
 Unter 0.23 trägt der Commit außerdem `drizzle/schema.sql`, `drizzle/policies.sql` und
 `drizzle/search.sql`, geschrieben im Projekt-Root.
@@ -199,7 +199,7 @@ deren Tabellenbearbeitungen sind für Ihr Repository unsichtbar.
 
 ## Wer Änderungen anwenden darf
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> `schema:read` zu halten reicht aus, um zu **planen** (`plan`). Das Planen hat keine Nebeneffekte, und ein CI-Job,
+`schema:read` zu halten reicht aus, um zu **planen** (`plan`). Das Planen hat keine Nebeneffekte, und ein CI-Job,
 der abfragt, ob eine vorgeschlagene Collection-Änderung anwendbar ist, ist ein guter Einsatzzweck dafür.
 
 Das Anwenden (`apply`) ist ein zweites Privileg, da das Anwenden einen Commit schreibt und ein Commit

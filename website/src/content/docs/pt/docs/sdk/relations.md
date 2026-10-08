@@ -1,5 +1,5 @@
 ---
-sourceHash: ce3b9ea649b09037
+sourceHash: 107ae13db8d0ff4a
 title: Consultando relações
 sidebar_label: Relações
 description: "Inclua entidades relacionadas em uma consulta e leia uma coleção filha por meio de seu pai com os acessadores de relação do SDK."
@@ -156,7 +156,7 @@ data[0].authorId;       // "uuid-1234" — still there
 data[0].author?.name;   // "Jane Doe"
 ```
 
-Um `Database` gerado tipa os três com precisão: `Insert` e `Update` aceitam qualquer uma das sintaxes de escrita, `Row` possui `authorId` incondicionalmente, e `author` é opcional em `Row` — <span class="since-badge" data-since="0.24">Since 0.24</span> `RowWith<"posts", ["author"]>` é a linha com ele **obrigatório**, para uma leitura que o solicitou. Consulte [Includes tipados](#includes-tipados).
+Um `Database` gerado tipa os três com precisão: `Insert` e `Update` aceitam qualquer uma das sintaxes de escrita, `Row` possui `authorId` incondicionalmente, e `author` é opcional em `Row` — `RowWith<"posts", ["author"]>` é a linha com ele **obrigatório**, para uma leitura que o solicitou. Consulte [Includes tipados](#includes-tipados).
 
 O único caso em que os três se sobrepõem é uma relação nomeada de forma idêntica à sua própria chave estrangeira. Nesse caso, a linha incluída é servida *sobre* a coluna, e o tipo gerado reflete isso tipando essa chave como ambos.
 
@@ -173,7 +173,7 @@ const ok: IncludeFor<"posts"> = { comments: { limit: 5, include: { author: true 
 const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
-`IncludeFor<A>` restringe as chaves de um include às relações que existem, em todos os níveis — e <span class="since-badge" data-since="0.24">Since 0.24</span> um cliente tipado verifica o `include` da mesma forma, em `find({ include })` e em `.include(...)`, então `posts.include("authr")` é um erro de compilação em vez de um 400 `UNKNOWN_RELATION`. As linhas retornadas por uma leitura continuam tipando cada relação como opcional; `RowWith<A, I>` é essa linha com todas as relações incluídas definidas como **obrigatórias**, para anotar o que você leu — portanto, após solicitar o autor, um `RowWith<"posts", ["author"]>` não precisa de `?.` em `row.author.name`. Na 0.23
+`IncludeFor<A>` restringe as chaves de um include às relações que existem, em todos os níveis — e um cliente tipado verifica o `include` da mesma forma, em `find({ include })` e em `.include(...)`, então `posts.include("authr")` é um erro de compilação em vez de um 400 `UNKNOWN_RELATION`. As linhas retornadas por uma leitura continuam tipando cada relação como opcional; `RowWith<A, I>` é essa linha com todas as relações incluídas definidas como **obrigatórias**, para anotar o que você leu — portanto, após solicitar o autor, um `RowWith<"posts", ["author"]>` não precisa de `?.` em `row.author.name`. Na 0.23
 não existe `RowWith`, e um `include` mal escrito no cliente é um 400 em tempo
 de execução.
 

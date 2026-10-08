@@ -1,5 +1,5 @@
 ---
-sourceHash: 1cc4acaed4c60088
+sourceHash: 373a79f1c328f730
 title: Server MCP
 sidebar_label: Server MCP
 description: Connetti Claude Code, Cursor, Gemini CLI o qualsiasi client MCP a un progetto Rebase — i 42 tool esposti, le credenziali con cui si autentica e il loopback gate che si interpone tra un agent e la produzione.
@@ -28,7 +28,7 @@ integrazione — avvia quella copia (`pnpm exec rebase-mcp`, oppure `npx --no re
 in un progetto npm), mai una più recente da npm. Un progetto più vecchio la aggiunge una
 volta, con `rebase skills install --mcp` oppure `pnpm add -D @rebasepro/mcp`.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> `rebase init` scrive il blocco per ciascun agent selezionato quando
+`rebase init` scrive il blocco per ciascun agent selezionato quando
 [configura i tuoi agent di programmazione AI](/docs/ai/skills#set-up-by-rebase-init), mantenendo
 eventuali altri server già presenti nel file. `rebase init --agent cursor,codex` esegue
 la stessa operazione senza chiedere conferma.
@@ -195,7 +195,7 @@ di backend ed eseguire DDL su qualsiasi `DATABASE_URL` risolto dal progetto.
 
 ### Fornire una credenziale con permessi ristretti
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Registra una [API key](/docs/backend/api-keys) con ambito limitato e il modello a
+Registra una [API key](/docs/backend/api-keys) con ambito limitato e il modello a
 doppio controllo (two-gate) si applicherà realmente. Una service key viene eseguita con i ruoli `["service"]`, che le
 policy di amministrazione iniettate **non** menzionano — pertanto l'RLS non le concede nulla a meno che una
 delle tue policy non disponga diversamente, e i suoi scope la restringono ulteriormente:
@@ -452,7 +452,7 @@ a un singolo utente, l'endpoint si rifiuta di essere montato e ne spiega il moti
   è attiva per impostazione predefinita; `REBASE_MCP_OPEN_REGISTRATION=false` la limita
   ai client registrati manualmente) e reindirizza la persona a una schermata di consenso che ne esegue
   l'accesso tramite il tuo `/auth/login` esistente.
-- <span class="since-badge" data-since="0.24">Da 0.24</span> **Sette tool, tre scope.** Gli stessi [scope](/docs/backend/roles-and-scopes/)
+- **Sette tool, tre scope.** Gli stessi [scope](/docs/backend/roles-and-scopes/)
   usati da ogni credenziale. `data:read` offre `list_collections`,
   `query_collection`, `count_documents` e `get_document`; `data:write` aggiunge `create_document` e
   `update_document`; `data:delete` aggiunge `delete_document`. Un client che non chiede
@@ -463,7 +463,7 @@ a un singolo utente, l'endpoint si rifiuta di essere montato e ne spiega il moti
 - **Le autorizzazioni concesse prima della 0.24 mantengono la loro portata.** `mcp:read` viene letto come
   `data:read`, e `mcp:write` come `data:write data:delete`, sulle autorizzazioni memorizzate e
   sui token già emessi.
-- <span class="since-badge" data-since="0.24">Da 0.24</span> **Funziona anche una API key.** `/mcp` accetta anche `Authorization: Bearer rk_…`, per
+- **Funziona anche una API key.** `/mcp` accetta anche `Authorization: Bearer rk_…`, per
   un client configurato con un header anziché con un flusso OAuth. La chiave raggiunge
   i tool coperti dai suoi scope `data:*`, con l'identità con cui agisce: una
   [chiave personale](/docs/backend/api-keys/#personal-keys) come il suo proprietario, una service key

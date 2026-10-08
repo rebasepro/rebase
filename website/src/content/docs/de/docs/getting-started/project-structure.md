@@ -1,5 +1,5 @@
 ---
-sourceHash: 6f5f096b10dbbdb5
+sourceHash: a2683fa13dc31db1
 title: Projektstruktur
 sidebar_label: Projektstruktur
 description: Verstehen Sie die Struktur eines Rebase-Projekts – Frontend, Backend und Collections-Konfiguration.
@@ -220,7 +220,7 @@ generiert und das Backend neu gestartet; beim Hochfahren werden fehlende Tabelle
 Spalten automatisch erstellt. Außerhalb von `rebase dev` entsprechen diese Schritte
 `rebase schema generate` und `rebase generate-sdk`.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> für die SDK-Typen: Unter 0.23
+für die SDK-Typen: Unter 0.23
 generiert `rebase dev` nur das Schema neu, und `rebase generate-sdk` ist ein eigener Schritt.
 
 ## Nächste Schritte

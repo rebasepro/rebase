@@ -1,5 +1,5 @@
 ---
-sourceHash: 481cd30b8a1a6e64
+sourceHash: bc550d505d122629
 title: Offline e Sincronização Local-First
 sidebar_label: Offline
 description: Ative o motor de sincronização local-first do SDK tipado do Rebase — um banco de dados local de linhas, escritas offline instantâneas com reversão e consultas ao vivo reativas.
@@ -126,9 +126,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Conectividade atual, tamanho da fila, atividade de sincronização, último erro |
 | `onStatusChange(fn)` | Assinar o item acima |
 | `onQueueChange(fn)` | Apenas o número de escritas não enviadas, para um badge |
-| `pending()` | As próprias mutações enfileiradas, da mais antiga para a mais recente. <span class="since-badge" data-since="0.24">Desde 0.24</span> `pending({ orphaned: true })`: as que foram enfileiradas sem sessão iniciada — veja [Usuários](#usuários) |
+| `pending()` | As próprias mutações enfileiradas, da mais antiga para a mais recente. `pending({ orphaned: true })`: as que foram enfileiradas sem sessão iniciada — veja [Usuários](#usuários) |
 | `sync()` | Reexecutar agora — resolve com `{ flushed, remaining }` |
-| `clear()` | Descartar as escritas enfileiradas **e** as linhas locais do usuário atual. <span class="since-badge" data-since="0.24">Desde 0.24</span> `clear({ orphaned: true })`: em vez disso, as que foram enfileiradas sem sessão iniciada |
+| `clear()` | Descartar as escritas enfileiradas **e** as linhas locais do usuário atual. `clear({ orphaned: true })`: em vez disso, as que foram enfileiradas sem sessão iniciada |
 
 A reexecução acontece por conta própria: quando o navegador dispara `online`, quando o usuário faz login e em um backoff exponencial (um segundo, dobrando até um minuto) enquanto houver algo na fila. `sync()` serve para um botão de "tentar novamente".
 
@@ -147,7 +147,7 @@ const client = createRebaseClient({
 });
 ```
 
-A cascata é estreita: um `update` é descartado junto com a escrita que ele editava, porque só pode falhar da mesma maneira. Um `create` ou `delete` posterior para a mesma linha se sustenta por conta própria e é mantido. Uma escrita descartada nunca foi enviada. <span class="since-badge" data-since="0.24">Since 0.24</span> Ela é reportada com um `RebaseApiError` cujo `code` é `DEPENDENCY_REJECTED` e cujo `cause` é a recusa que a condenou, para que você possa distingui-la da escrita que o servidor de fato recusou. Na 0.23 ela carrega em vez disso o próprio erro da escrita recusada.
+A cascata é estreita: um `update` é descartado junto com a escrita que ele editava, porque só pode falhar da mesma maneira. Um `create` ou `delete` posterior para a mesma linha se sustenta por conta própria e é mantido. Uma escrita descartada nunca foi enviada. Ela é reportada com um `RebaseApiError` cujo `code` é `DEPENDENCY_REJECTED` e cujo `cause` é a recusa que a condenou, para que você possa distingui-la da escrita que o servidor de fato recusou. Na 0.23 ela carrega em vez disso o próprio erro da escrita recusada.
 
 Edições consecutivas em uma mesma linha enquanto offline são mescladas em uma única escrita na fila, para que um formulário sendo digitado não faça a fila crescer. Se o servidor recusar a escrita mesclada por causa do seu conteúdo (um 400, 403 ou 422 — por exemplo, um campo removido por uma alteração de esquema enquanto o usuário estava offline), o motor a divide novamente nas edições separadas e reproduz cada uma. Apenas a edição que o servidor recusa é revertida e reportada; as demais são mantidas.
 
@@ -163,13 +163,13 @@ O banco de dados local e a fila de saída são particionados por usuário autent
 
 ### Enquanto a sessão é restaurada
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Até o cliente saber quem está com a sessão iniciada, ele não sabe qual banco de dados local nem qual fila de saída usar, então as leituras e escritas offline esperam. É o tempo que `auth.isInitialized()` leva: nenhum para uma sessão armazenada que ainda é válida, e uma requisição de refresh quando a sessão precisa voltar do servidor — no modo cookie, em que nada é armazenado no dispositivo, isso acontece a cada carregamento de página. Uma escrita feita nesse intervalo é enfileirada em nome de quem a sessão se revelar ser, e uma leitura responde a partir do banco de dados local dessa pessoa. Um evento de tempo real que chegue nesse meio-tempo é passado ao seu callback tal como o servidor o enviou, e não é guardado em lugar nenhum.
+Até o cliente saber quem está com a sessão iniciada, ele não sabe qual banco de dados local nem qual fila de saída usar, então as leituras e escritas offline esperam. É o tempo que `auth.isInitialized()` leva: nenhum para uma sessão armazenada que ainda é válida, e uma requisição de refresh quando a sessão precisa voltar do servidor — no modo cookie, em que nada é armazenado no dispositivo, isso acontece a cada carregamento de página. Uma escrita feita nesse intervalo é enfileirada em nome de quem a sessão se revelar ser, e uma leitura responde a partir do banco de dados local dessa pessoa. Um evento de tempo real que chegue nesse meio-tempo é passado ao seu callback tal como o servidor o enviou, e não é guardado em lugar nenhum.
 
 Se a sessão não puder ser restaurada — o refresh é recusado ou, no modo cookie, não alcança o servidor —, o cliente fica sem sessão, e as leituras e escritas offline são as do usuário sem sessão. Na 0.23, o modo cookie tratava todo esse intervalo como sem sessão, de modo que uma escrita feita nele era enfileirada como do usuário sem sessão.
 
 ### Escritas feitas sem sessão iniciada
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Escritas enfileiradas enquanto ninguém estava com a sessão iniciada não são reexecutadas quando alguém faz login. Esse usuário não as fez, e reexecutá-las com as credenciais dele colocaria as alterações de uma pessoa em nome de outra — em um dispositivo compartilhado, as escritas de um visitante na conta do próximo usuário. Elas também não são movidas para a fila de saída do usuário que fez login. São mantidas e listadas à parte, para que o app decida o que fazer com elas:
+Escritas enfileiradas enquanto ninguém estava com a sessão iniciada não são reexecutadas quando alguém faz login. Esse usuário não as fez, e reexecutá-las com as credenciais dele colocaria as alterações de uma pessoa em nome de outra — em um dispositivo compartilhado, as escritas de um visitante na conta do próximo usuário. Elas também não são movidas para a fila de saída do usuário que fez login. São mantidas e listadas à parte, para que o app decida o que fazer com elas:
 
 ```typescript
 client.auth.onAuthStateChange(async (event) => {

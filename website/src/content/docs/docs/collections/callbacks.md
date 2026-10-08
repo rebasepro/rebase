@@ -492,7 +492,7 @@ So the triggering write and everything its callbacks wrote commit together or no
 - A throw from `afterSave` or `afterDelete` rolls the triggering write back, along with every `context.data` write the callbacks made. The caller is answered **400 `CALLBACK_REJECTED`** with `details.stage` naming the hook — or with the error's own status when it carries one: a `RebaseApiError` you threw, a unique violation's 409.
 - Realtime subscribers hear about the row only after the commit, so a write that rolled back is never announced.
 - A callback holds the transaction open while it runs, so a slow one is a lock held and a pooled connection tied up.
-- A `context.data` write runs the target collection's callbacks too, so an `afterSave` that updates its own row runs itself again. <span class="since-badge" data-since="0.24">Since 0.24</span> Writes nested more than 16 deep are refused with **500 `CALLBACK_RECURSION`**, naming the hook and the collection, and the whole write rolls back. Make such a write conditional, as the example below does.
+- A `context.data` write runs the target collection's callbacks too, so an `afterSave` that updates its own row runs itself again. Writes nested more than 16 deep are refused with **500 `CALLBACK_RECURSION`**, naming the hook and the collection, and the whole write rolls back. Make such a write conditional, as the example below does.
 
 Let a failure throw when the triggering write should not survive it. Catch it when it should, but only around a `context.data` **write**: a create, update or delete the database refuses (a unique or foreign key violation, a trigger) is undone on its own, and the rest commits.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: b3fe9c24649203e8
+sourceHash: aaa2fdfbd560c4cc
 title: Scrittura tramite REST
 sidebar_label: Scrittura tramite REST
 description: Chiavi di idempotenza, scritture condizionali con ETag e If-Match, operazioni sui campi, upsert su chiave naturale, return=minimal e batch tra collezioni.
@@ -23,7 +23,7 @@ anche per loro, tranne `?on_conflict=`.
 Il corpo di una scrittura deve essere un oggetto JSON. `null`, un numero, una
 stringa o un array restituisce `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Un aggiornamento non può cambiare la chiave di una riga. Un corpo che nomina la
+Un aggiornamento non può cambiare la chiave di una riga. Un corpo che nomina la
 chiave con un altro valore restituisce `400 KEY_IMMUTABLE`, prima che venga
 eseguito qualsiasi hook e senza che nulla venga scritto, indipendentemente dal
 canale con cui arriva l'aggiornamento: REST, il socket realtime, MCP o

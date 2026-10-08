@@ -1,11 +1,11 @@
 ---
-sourceHash: e89814d78c29b234
+sourceHash: 48ce9150935742b8
 title: Ruoli e scope
 sidebar_label: Ruoli e scope
 description: "Cosa può fare un chiamante: il piano dati che ogni persona possiede, il piano di amministrazione che i ruoli concedono, gli scope che un'app dichiara per sé e come ogni credenziale li porta con sé."
 ---
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Ogni richiesta a un backend Rebase pone una sola domanda: questo chiamante può farlo?
+Ogni richiesta a un backend Rebase pone una sola domanda: questo chiamante può farlo?
 La risposta è uno **scope**, una stringa nella forma `resource:action`: `data:read`,
 `users:write`, `cron:read`. La sessione di una persona, una chiave API, un token MCP e un
 ruolo possiedono tutti degli scope, e usano tutti le stesse stringhe. Una concessione si legge allo stesso modo
@@ -79,7 +79,7 @@ Gli scope del piano di amministrazione non accettano target. Uno scope dell'app 
 
 ## Dichiarare i ruoli
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> I ruoli si dichiarano sulla collezione users, sotto `auth.roles`. Un ruolo è un nome
+I ruoli si dichiarano sulla collezione users, sotto `auth.roles`. Un ruolo è un nome
 che il database vede, a cui i criteri RLS possono corrispondere, più un elenco di scope del piano di amministrazione
 e dell'app.
 
@@ -266,7 +266,7 @@ e i criteri del database per l'identità con cui agisce sono un altro.
 
 ## Quando manca uno scope
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> La risposta è `403 SCOPE_MISSING`, e `details.requiredScope` nomina lo scope,
+La risposta è `403 SCOPE_MISSING`, e `details.requiredScope` nomina lo scope,
 con il suo target quando ce n'è uno:
 
 ```json

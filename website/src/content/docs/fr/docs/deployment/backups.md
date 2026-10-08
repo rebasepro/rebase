@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c9aa0d1c19006ba
+sourceHash: 0007bd5679d9971e
 title: Sauvegardes et restauration
 sidebar_label: Sauvegardes
 description: Prenez, planifiez, listez et restaurez des sauvegardes de base de données avec pg_dump — ce que contient une sauvegarde, le fichier de rôles qui l'accompagne, et la seule chose qu'elle ne couvre pas, vos fichiers téléversés.
@@ -152,7 +152,7 @@ sauvegarde ; tout ce qui partage le bucket ou le préfixe sans y correspondre es
 laissé intact.
 
 La tâche cron exécute `pg_dump` à l'intérieur du processus serveur.
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> l'image de runtime
+l'image de runtime
 officielle (`rebasepro/server`, voir [Auto-hébergement](/docs/deployment/self-hosting/))
 embarque les outils client PostgreSQL 18 pour cela ;
 sur la 0.23 et les versions antérieures elle n'en avait aucun, et chaque exécution
@@ -256,13 +256,13 @@ son `.globals.sql`. Téléchargez les deux et conservez-les dans un même réper
 sauvegarde marquée **Pas de fichier de rôles** n'a pas de fichier associé : recréez ses
 rôles à la main avant de la restaurer dans un nouveau Postgres.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> au-dessus de la liste,
+au-dessus de la liste,
 le panneau indique la tâche de sauvegarde planifiée et sa dernière exécution. Une
 exécution en échec s'affiche comme une erreur avec son message, de sorte qu'une
 sauvegarde nocturne qui ne peut pas s'exécuter est visible là où les sauvegardes sont
 listées, et pas seulement dans le panneau Tâches Cron.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> ce qu'il indique sur la tâche :
+ce qu'il indique sur la tâche :
 
 - **Dernière sauvegarde planifiée** est la dernière exécution effectuée par la
   planification. Une exécution lancée à la main depuis lors (**Run Now** dans Tâches
@@ -281,7 +281,7 @@ listées, et pas seulement dans le panneau Tâches Cron.
   panneau l'indique, plutôt que d'affirmer que la sauvegarde ne s'est pas encore
   exécutée.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> la liste est lue
+la liste est lue
 par le processus serveur qui répond à `GET /api/admin/backups`, et ce n'est pas
 toujours le processus qui exécute la planification :
 

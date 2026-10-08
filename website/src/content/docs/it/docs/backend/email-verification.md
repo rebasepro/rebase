@@ -1,11 +1,11 @@
 ---
-sourceHash: 922c44ae945d9509
+sourceHash: 3d6a5a62a25e5b8c
 title: Verifica email
 sidebar_label: Verifica email
 description: "Come un account dimostra il proprio indirizzo email: il link inviato alla registrazione, cosa mantiene e rimuove seguirlo, e la registrazione confirm-first con requireEmailVerification."
 ---
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Quando l'email è configurata, la registrazione
+Quando l'email è configurata, la registrazione
 invia al nuovo account un link di verifica (`<frontend>/verify-email?token=…`, valido 24 ore),
 così il proprietario dimostra l'indirizzo alla registrazione, con i propri tempi. `POST /api/auth/send-verification`
 lo invia di nuovo. Non viene inviato nulla agli indirizzi sintetici di guest e account X (Twitter).

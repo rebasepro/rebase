@@ -1,5 +1,5 @@
 ---
-sourceHash: 481cd30b8a1a6e64
+sourceHash: bc550d505d122629
 title: Offline & Local-First-Sync
 sidebar_label: Offline
 description: Aktivieren Sie die Local-First-Sync-Engine des typisierten SDK von Rebase — eine lokale Zeilendatenbank, sofortige Offline-Schreibvorgänge mit Rollback und reaktive Live-Abfragen.
@@ -126,9 +126,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Aktuelle Verbindung, Warteschlangentiefe, Sync-Aktivität, letzter Fehler |
 | `onStatusChange(fn)` | Das Obige abonnieren |
 | `onQueueChange(fn)` | Nur die Anzahl der nicht gesendeten Schreibvorgänge, für ein Badge |
-| `pending()` | Die eingereihten Mutationen selbst, älteste zuerst. <span class="since-badge" data-since="0.24">Seit 0.24</span> `pending({ orphaned: true })`: die, die ohne Anmeldung eingereiht wurden — siehe [Benutzer](#benutzer) |
+| `pending()` | Die eingereihten Mutationen selbst, älteste zuerst. `pending({ orphaned: true })`: die, die ohne Anmeldung eingereiht wurden — siehe [Benutzer](#benutzer) |
 | `sync()` | Jetzt wiederholen — löst mit `{ flushed, remaining }` auf |
-| `clear()` | Die eingereihten Schreibvorgänge **und** lokalen Zeilen des aktuellen Benutzers verwerfen. <span class="since-badge" data-since="0.24">Seit 0.24</span> `clear({ orphaned: true })`: stattdessen die, die ohne Anmeldung eingereiht wurden |
+| `clear()` | Die eingereihten Schreibvorgänge **und** lokalen Zeilen des aktuellen Benutzers verwerfen. `clear({ orphaned: true })`: stattdessen die, die ohne Anmeldung eingereiht wurden |
 
 Das Wiederholen geschieht von selbst: wenn der Browser `online` auslöst, wenn sich der Benutzer anmeldet, und mit exponentiellem Backoff (eine Sekunde, verdoppelnd bis zu einer Minute), solange etwas in der Warteschlange steht. `sync()` ist für einen «Jetzt erneut versuchen»-Button gedacht.
 
@@ -147,7 +147,7 @@ const client = createRebaseClient({
 });
 ```
 
-Die Kaskade ist eng gefasst: Ein `update` wird zusammen mit dem Schreibvorgang verworfen, den es bearbeitet hat, weil es nur auf dieselbe Weise scheitern kann. Ein späteres `create` oder `delete` für dieselbe Zeile steht für sich und bleibt erhalten. Ein verworfener Schreibvorgang wurde nie gesendet. <span class="since-badge" data-since="0.24">Seit 0.24</span> Er wird mit einem `RebaseApiError` gemeldet, dessen `code` `DEPENDENCY_REJECTED` ist und dessen `cause` die Ablehnung ist, die ihn zu Fall brachte — so lässt er sich von dem Schreibvorgang unterscheiden, den der Server tatsächlich abgelehnt hat. Unter 0.23 trägt er stattdessen den eigenen Fehler des abgelehnten Schreibvorgangs.
+Die Kaskade ist eng gefasst: Ein `update` wird zusammen mit dem Schreibvorgang verworfen, den es bearbeitet hat, weil es nur auf dieselbe Weise scheitern kann. Ein späteres `create` oder `delete` für dieselbe Zeile steht für sich und bleibt erhalten. Ein verworfener Schreibvorgang wurde nie gesendet. Er wird mit einem `RebaseApiError` gemeldet, dessen `code` `DEPENDENCY_REJECTED` ist und dessen `cause` die Ablehnung ist, die ihn zu Fall brachte — so lässt er sich von dem Schreibvorgang unterscheiden, den der Server tatsächlich abgelehnt hat. Unter 0.23 trägt er stattdessen den eigenen Fehler des abgelehnten Schreibvorgangs.
 
 Aufeinanderfolgende Bearbeitungen einer Zeile im Offline-Zustand werden zu einem einzigen eingereihten Schreibvorgang zusammengeführt, sodass ein Formular, in das gerade getippt wird, die Warteschlange nicht wachsen lässt. Lehnt der Server den zusammengeführten Schreibvorgang wegen seines Inhalts ab (ein 400, 403 oder 422 — etwa ein Feld, das durch eine Schema-Änderung entfernt wurde, während der Benutzer offline war), teilt die Engine ihn wieder in die einzelnen Bearbeitungen auf und spielt jede erneut ab. Nur die Bearbeitung, die der Server ablehnt, wird zurückgerollt und gemeldet; die anderen bleiben erhalten.
 
@@ -163,13 +163,13 @@ Die lokale Datenbank und die Outbox sind pro angemeldetem Benutzer partitioniert
 
 ### Während die Sitzung wiederhergestellt wird
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Solange der Client nicht weiß, wer angemeldet ist, weiß er nicht, welche lokale Datenbank und welche Outbox er verwenden soll — Offline-Lese- und -Schreibvorgänge warten daher. Das ist die Zeit, die `auth.isInitialized()` braucht: keine für eine gespeicherte Sitzung, die noch gültig ist, und eine Refresh-Anfrage, wenn die Sitzung vom Server zurückkommen muss — im Cookie-Modus, in dem nichts auf dem Gerät gespeichert wird, ist das bei jedem Seitenaufruf der Fall. Ein in diesem Zeitraum gemachter Schreibvorgang wird für den Benutzer eingereiht, der sich als Inhaber der Sitzung herausstellt, und ein Lesevorgang antwortet aus dessen lokaler Datenbank. Ein Realtime-Ereignis, das in der Zwischenzeit eintrifft, wird so an Ihren Callback übergeben, wie der Server es gesendet hat, und nirgends gespeichert.
+Solange der Client nicht weiß, wer angemeldet ist, weiß er nicht, welche lokale Datenbank und welche Outbox er verwenden soll — Offline-Lese- und -Schreibvorgänge warten daher. Das ist die Zeit, die `auth.isInitialized()` braucht: keine für eine gespeicherte Sitzung, die noch gültig ist, und eine Refresh-Anfrage, wenn die Sitzung vom Server zurückkommen muss — im Cookie-Modus, in dem nichts auf dem Gerät gespeichert wird, ist das bei jedem Seitenaufruf der Fall. Ein in diesem Zeitraum gemachter Schreibvorgang wird für den Benutzer eingereiht, der sich als Inhaber der Sitzung herausstellt, und ein Lesevorgang antwortet aus dessen lokaler Datenbank. Ein Realtime-Ereignis, das in der Zwischenzeit eintrifft, wird so an Ihren Callback übergeben, wie der Server es gesendet hat, und nirgends gespeichert.
 
 Lässt sich die Sitzung nicht wiederherstellen — der Refresh wird abgelehnt oder erreicht im Cookie-Modus den Server nicht —, ist der Client abgemeldet, und Offline-Lese- und -Schreibvorgänge gehören dem abgemeldeten Benutzer. Unter 0.23 behandelte der Cookie-Modus den ganzen Zeitraum als abgemeldet, sodass ein darin gemachter Schreibvorgang für den abgemeldeten Benutzer eingereiht wurde.
 
 ### Schreibvorgänge ohne Anmeldung
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Schreibvorgänge, die eingereiht wurden, während niemand angemeldet war, werden nicht wiederholt, wenn sich jemand anmeldet. Dieser Benutzer hat sie nicht gemacht, und sie mit seinen Anmeldedaten zu wiederholen, würde die Änderungen einer Person unter dem Namen einer anderen ablegen — auf einem gemeinsam genutzten Gerät die Schreibvorgänge eines Besuchers im Konto des nächsten Benutzers. Sie werden auch nicht in die Outbox des angemeldeten Benutzers verschoben. Sie bleiben erhalten und werden getrennt aufgelistet, damit die App entscheiden kann, was mit ihnen geschieht:
+Schreibvorgänge, die eingereiht wurden, während niemand angemeldet war, werden nicht wiederholt, wenn sich jemand anmeldet. Dieser Benutzer hat sie nicht gemacht, und sie mit seinen Anmeldedaten zu wiederholen, würde die Änderungen einer Person unter dem Namen einer anderen ablegen — auf einem gemeinsam genutzten Gerät die Schreibvorgänge eines Besuchers im Konto des nächsten Benutzers. Sie werden auch nicht in die Outbox des angemeldeten Benutzers verschoben. Sie bleiben erhalten und werden getrennt aufgelistet, damit die App entscheiden kann, was mit ihnen geschieht:
 
 ```typescript
 client.auth.onAuthStateChange(async (event) => {

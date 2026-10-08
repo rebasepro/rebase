@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fee7de68fa81701
+sourceHash: 0b7bd3b233513344
 title: Agent Skills
 sidebar_label: Agent Skills
 description: "rebase skills install schreibt 21 Rebase-Referenz-Skills in dein Repo – genau in dem Layout, das dein KI-Assistent erwartet: Cursor, Claude Code, Windsurf, Gemini CLI und Antigravity."
@@ -15,7 +15,7 @@ Die Skills sind **Referenzmaterial, keine Tools**. Sie erklären einem Assistent
 
 ## Einrichtung durch `rebase init`
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Ein neues Projekt benötigt den Befehl nicht. `rebase init` fragt, ob deine KI-Coding-Agents eingerichtet werden sollen, und listet dann die auf dem Rechner gefundenen auf:
+Ein neues Projekt benötigt den Befehl nicht. `rebase init` fragt, ob deine KI-Coding-Agents eingerichtet werden sollen, und listet dann die auf dem Rechner gefundenen auf:
 
 ```text
 ? Set up Rebase skills and the Rebase MCP server for your AI coding agent(s)? Yes
@@ -38,7 +38,7 @@ rebase init my-app --yes --agent claude,cursor
 
 ## Ein bestehendes Projekt
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> `rebase init` verweigert ein Verzeichnis, das bereits ein Projekt enthält. Ein Projekt, das entstand, bevor es die Agent-Einrichtung gab – oder dessen Autor die Abfrage abgelehnt hat – erhält über `rebase skills install --mcp` dieselbe Einrichtung: die Skills und den in der Projektkonfiguration jedes Agents registrierten [MCP-Server](/docs/ai/mcp). Server, die bereits in der Datei stehen, bleiben erhalten, und ein erneuter Lauf lässt den Rebase-Eintrag unverändert.
+`rebase init` verweigert ein Verzeichnis, das bereits ein Projekt enthält. Ein Projekt, das entstand, bevor es die Agent-Einrichtung gab – oder dessen Autor die Abfrage abgelehnt hat – erhält über `rebase skills install --mcp` dieselbe Einrichtung: die Skills und den in der Projektkonfiguration jedes Agents registrierten [MCP-Server](/docs/ai/mcp). Server, die bereits in der Datei stehen, bleiben erhalten, und ein erneuter Lauf lässt den Rebase-Eintrag unverändert.
 
 ```bash
 rebase skills install --agent cursor --mcp

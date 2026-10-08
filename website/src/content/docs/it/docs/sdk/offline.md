@@ -1,5 +1,5 @@
 ---
-sourceHash: 481cd30b8a1a6e64
+sourceHash: bc550d505d122629
 title: Offline e sincronizzazione local-first
 sidebar_label: Offline
 description: Attiva il motore di sincronizzazione local-first dell'SDK tipizzato di Rebase — un database locale di righe, scritture offline istantanee con rollback e query live reattive.
@@ -126,9 +126,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Connettività attuale, profondità della coda, attività di sincronizzazione, ultimo errore |
 | `onStatusChange(fn)` | Sottoscrivi a quanto sopra |
 | `onQueueChange(fn)` | Solo il numero di scritture non inviate, per un badge |
-| `pending()` | Le mutazioni in coda stesse, dalla più vecchia. <span class="since-badge" data-since="0.24">Da 0.24</span> `pending({ orphaned: true })`: quelle messe in coda senza un accesso — vedi [Utenti](#utenti) |
+| `pending()` | Le mutazioni in coda stesse, dalla più vecchia. `pending({ orphaned: true })`: quelle messe in coda senza un accesso — vedi [Utenti](#utenti) |
 | `sync()` | Ritrasmetti ora — si risolve con `{ flushed, remaining }` |
-| `clear()` | Scarta le scritture in coda dell'utente corrente **e** le righe locali. <span class="since-badge" data-since="0.24">Da 0.24</span> `clear({ orphaned: true })`: invece quelle messe in coda senza un accesso |
+| `clear()` | Scarta le scritture in coda dell'utente corrente **e** le righe locali. `clear({ orphaned: true })`: invece quelle messe in coda senza un accesso |
 
 La ritrasmissione avviene da sé: quando il browser emette `online`, quando l'utente effettua l'accesso e con un backoff esponenziale (un secondo, che raddoppia fino a un minuto) finché c'è qualcosa in coda. `sync()` serve per un pulsante «riprova ora».
 
@@ -147,7 +147,7 @@ const client = createRebaseClient({
 });
 ```
 
-La cascata è ristretta: un `update` viene scartato insieme alla scrittura che modificava, perché può fallire solo allo stesso modo. Un `create` o un `delete` successivo per la stessa riga sta in piedi da solo e viene mantenuto. Una scrittura scartata non è mai stata inviata. <span class="since-badge" data-since="0.24">Da 0.24</span> Viene segnalata con un `RebaseApiError` il cui `code` è `DEPENDENCY_REJECTED` e il cui `cause` è il rifiuto che l'ha condannata, così puoi distinguerla dalla scrittura che il server ha effettivamente rifiutato. Sulla 0.23 porta invece l'errore della scrittura rifiutata stessa.
+La cascata è ristretta: un `update` viene scartato insieme alla scrittura che modificava, perché può fallire solo allo stesso modo. Un `create` o un `delete` successivo per la stessa riga sta in piedi da solo e viene mantenuto. Una scrittura scartata non è mai stata inviata. Viene segnalata con un `RebaseApiError` il cui `code` è `DEPENDENCY_REJECTED` e il cui `cause` è il rifiuto che l'ha condannata, così puoi distinguerla dalla scrittura che il server ha effettivamente rifiutato. Sulla 0.23 porta invece l'errore della scrittura rifiutata stessa.
 
 Modifiche consecutive a una stessa riga mentre si è offline vengono unite in un'unica scrittura in coda, così un form in cui si sta digitando non fa crescere la coda. Se il server rifiuta la scrittura unita per il suo contenuto (un 400, 403 o 422 — ad esempio un campo rimosso da una modifica dello schema mentre l'utente era offline), il motore la scompone di nuovo nelle modifiche separate e le riapplica una per una. Viene annullata e segnalata solo la modifica che il server rifiuta; le altre vengono mantenute.
 
@@ -163,13 +163,13 @@ Il database locale e l'outbox sono partizionati per utente autenticato. Le righe
 
 ### Mentre la sessione viene ripristinata
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Finché il client non sa chi ha effettuato l'accesso, non sa quale database locale e quale outbox usare, quindi le letture e le scritture offline aspettano. È il tempo che impiega `auth.isInitialized()`: nessuno per una sessione salvata ancora valida, e una richiesta di refresh quando la sessione deve tornare dal server — in modalità cookie, dove sul dispositivo non viene salvato nulla, succede a ogni caricamento di pagina. Una scrittura fatta in quell'intervallo viene messa in coda per l'utente che la sessione risulta essere, e una lettura risponde dal suo database locale. Un evento realtime che arriva nel frattempo viene passato alla tua callback così come l'ha inviato il server, e non viene conservato da nessuna parte.
+Finché il client non sa chi ha effettuato l'accesso, non sa quale database locale e quale outbox usare, quindi le letture e le scritture offline aspettano. È il tempo che impiega `auth.isInitialized()`: nessuno per una sessione salvata ancora valida, e una richiesta di refresh quando la sessione deve tornare dal server — in modalità cookie, dove sul dispositivo non viene salvato nulla, succede a ogni caricamento di pagina. Una scrittura fatta in quell'intervallo viene messa in coda per l'utente che la sessione risulta essere, e una lettura risponde dal suo database locale. Un evento realtime che arriva nel frattempo viene passato alla tua callback così come l'ha inviato il server, e non viene conservato da nessuna parte.
 
 Se la sessione non può essere ripristinata — il refresh viene rifiutato o, in modalità cookie, non raggiunge il server — il client risulta disconnesso, e le letture e le scritture offline sono quelle dell'utente disconnesso. Sulla 0.23 la modalità cookie trattava tutto quell'intervallo come disconnesso, quindi una scrittura fatta in quel momento veniva messa in coda per l'utente disconnesso.
 
 ### Scritture fatte senza un accesso
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Le scritture messe in coda mentre nessuno aveva effettuato l'accesso non vengono ritrasmesse quando qualcuno accede. Quell'utente non le ha fatte, e ritrasmetterle con le sue credenziali metterebbe le modifiche di una persona a nome di un'altra — su un dispositivo condiviso, le scritture di un visitatore nell'account dell'utente successivo. Non vengono nemmeno spostate nell'outbox dell'utente che ha effettuato l'accesso. Vengono conservate ed elencate a parte, così l'app può decidere cosa farne:
+Le scritture messe in coda mentre nessuno aveva effettuato l'accesso non vengono ritrasmesse quando qualcuno accede. Quell'utente non le ha fatte, e ritrasmetterle con le sue credenziali metterebbe le modifiche di una persona a nome di un'altra — su un dispositivo condiviso, le scritture di un visitatore nell'account dell'utente successivo. Non vengono nemmeno spostate nell'outbox dell'utente che ha effettuato l'accesso. Vengono conservate ed elencate a parte, così l'app può decidere cosa farne:
 
 ```typescript
 client.auth.onAuthStateChange(async (event) => {

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c9aa0d1c19006ba
+sourceHash: 0007bd5679d9971e
 title: Backup e ripristino
 sidebar_label: Backup
 description: Crea, pianifica, elenca e ripristina backup del database con pg_dump — cosa contiene un backup, il file dei ruoli che lo accompagna, e l'unica cosa che non copre, i tuoi file caricati.
@@ -150,7 +150,7 @@ corrisponde al pattern dei backup; qualsiasi altra cosa che condivide il
 bucket o il prefisso resta intatta.
 
 Il cron esegue `pg_dump` all'interno del processo server.
-<span class="since-badge" data-since="0.24">Dalla 0.24</span> l'immagine di
+l'immagine di
 runtime ufficiale (`rebasepro/server`, vedi
 [Self-hosting](/docs/deployment/self-hosting/)) include a questo scopo gli
 strumenti client di PostgreSQL 18;
@@ -255,13 +255,13 @@ l'orario. **Download** scarica il dump; **Roles file** scarica il suo
 backup contrassegnato **No roles file** non ha il file collaterale: ricrea i
 suoi ruoli a mano prima di ripristinarlo in un nuovo Postgres.
 
-<span class="since-badge" data-since="0.24">Dalla 0.24</span> sopra l'elenco
+sopra l'elenco
 viene mostrato il job di backup pianificato e la sua ultima esecuzione.
 Un'esecuzione fallita viene mostrata come errore con il proprio messaggio,
 così un backup notturno che non riesce a eseguirsi è visibile dove sono
 elencati i backup, non solo nel pannello Cron Jobs.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> ecco cosa riporta sul job:
+ecco cosa riporta sul job:
 
 - **Last scheduled backup** è l'ultima esecuzione fatta dalla pianificazione. Un'esecuzione
   avviata a mano da allora (**Run Now** in Cron Jobs) ha una riga a sé, così un'esecuzione
@@ -277,7 +277,7 @@ elencati i backup, non solo nel pannello Cron Jobs.
 - Quando la cronologia delle esecuzioni in `rebase.cron_logs` non può essere letta, il
   pannello lo dice, anziché dire che il backup non è ancora stato eseguito.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> l'elenco viene letto
+l'elenco viene letto
 dal processo server che risponde a `GET /api/admin/backups`, e non sempre è
 il processo che esegue la pianificazione:
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 4b2acc8e12bf440c
+sourceHash: 259c5bd1a0583132
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Sincronizzazione dei dati in tempo reale, canali di broadcast e tracciamento della presenza tramite WebSocket.
@@ -217,7 +217,7 @@ dell'utente) oppure un [canale di broadcast](#canali-di-broadcast) che
 trasporta la modifica, lasciando che i client eseguano il refetch secondo i
 propri tempi.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> **Un socket può mantenere al massimo 1.000 sottoscrizioni.** La successiva
+**Un socket può mantenere al massimo 1.000 sottoscrizioni.** La successiva
 viene rifiutata con un frame di errore con codice `TOO_MANY_SUBSCRIPTIONS`;
 risottoscriversi con un id già posseduto dal socket sostituisce quella
 sottoscrizione e non conta di nuovo. L'SDK condivide le sottoscrizioni
@@ -235,7 +235,7 @@ entrambi una sottoscrizione `"sub-1"` mantengono ciascuno la propria, e un
 
 ### Socket che smettono di rispondere
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Un client può sparire senza chiudere il proprio socket: un
+Un client può sparire senza chiudere il proprio socket: un
 telefono perde il segnale, un portatile va in sospensione, un NAT dimentica la
 connessione. Non arriva alcun frame di chiusura, quindi nessuno lo dice al
 server. Per questo il server invia un ping a ogni socket ogni 30 secondi e
@@ -415,7 +415,7 @@ L'SDK tipizzato si riconnette automaticamente in caso di caduta della connession
 - **Risottoscrizione automatica** — In caso di riconnessione riuscita, tutte le sottoscrizioni attive vengono nuovamente registrate sul server, e il successivo `onUpdate` di ciascuna porta tutto ciò che è stato scritto mentre il client era assente. Quell'aggiornamento è il segnale di recupero. Non è richiesto alcun intervento manuale.
 - **Le richieste sono at-most-once** — Una richiesta effettuata mentre il socket è inattivo attende che torni, per un massimo di 30 secondi dalla chiamata, e poi fallisce con `REQUEST_TIMEOUT` senza essere mai inviata. Una richiesta già inviata quando la connessione è caduta fallisce con `CONNECTION_LOST` e **non** viene inviata di nuovo: il server potrebbe averla eseguita o no, e solo il chiamante sa se eseguirla due volte è sicuro.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> `client.ws.state` indica lo stato della connessione, e `onStateChange` viene
+`client.ws.state` indica lo stato della connessione, e `onStateChange` viene
 informato di ogni cambiamento. Sulla 0.23 nessuno dei due esiste, il client si
 arresta dopo 5 tentativi falliti, e i messaggi inviati mentre si è
 disconnessi vengono accodati e inviati dopo la riconnessione:
@@ -453,11 +453,11 @@ Le sottoscrizioni WebSocket rispettano automaticamente i criteri di Row-Level Se
 
 1. La connessione WebSocket si autentica utilizzando lo stesso token JWT dell'API REST.
 2. Ogni refetch della sottoscrizione viene eseguito all'interno di una transazione PostgreSQL con `set_config('app.user_id', ...)` e `set_config('app.user_roles', ...)` — garantendo l'applicazione delle policy RLS.
-3. <span class="since-badge" data-since="0.24">Da 0.24</span> L'identità viene controllata di nuovo per tutta la durata in cui il socket resta aperto, non solo quando si autentica. Prima di ogni frame il server si chiede ciò che chiederebbe una richiesta HTTP: il token è ancora valido, la sua sessione è stata disconnessa o revocata, l'account esiste ancora, e quali ruoli possiede ora. I frame di canale vengono interrogati al massimo una volta al secondo. Un socket che si limita ad ascoltare viene interrogato almeno ogni 30 secondi, e un token smette di essere rispettato nell'istante in cui scade. Un ruolo rimosso si applica dal frame successivo, sia alle letture che alle scritture e alle sottoscrizioni aperte. Un socket la cui identità è terminata riceve un frame `AUTH_ERROR` con codice `SESSION_ENDED` o `TOKEN_EXPIRED` ed è chiuso con codice `4001`. L'SDK riautentica il proprio socket ogni volta che aggiorna il token, e dopo un `4001` si riconnette con la sessione che possiede in quel momento, o con nessuna. Un client che implementa direttamente il protocollo deve inviare un token aggiornato tramite `AUTHENTICATE` prima che quello vecchio scada.
+3. L'identità viene controllata di nuovo per tutta la durata in cui il socket resta aperto, non solo quando si autentica. Prima di ogni frame il server si chiede ciò che chiederebbe una richiesta HTTP: il token è ancora valido, la sua sessione è stata disconnessa o revocata, l'account esiste ancora, e quali ruoli possiede ora. I frame di canale vengono interrogati al massimo una volta al secondo. Un socket che si limita ad ascoltare viene interrogato almeno ogni 30 secondi, e un token smette di essere rispettato nell'istante in cui scade. Un ruolo rimosso si applica dal frame successivo, sia alle letture che alle scritture e alle sottoscrizioni aperte. Un socket la cui identità è terminata riceve un frame `AUTH_ERROR` con codice `SESSION_ENDED` o `TOKEN_EXPIRED` ed è chiuso con codice `4001`. L'SDK riautentica il proprio socket ogni volta che aggiorna il token, e dopo un `4001` si riconnette con la sessione che possiede in quel momento, o con nessuna. Un client che implementa direttamente il protocollo deve inviare un token aggiornato tramite `AUTHENTICATE` prima che quello vecchio scada.
 
 Ciò significa che ogni socket riceve aggiornamenti solo per i record che la sua identità autenticata ha il permesso di visualizzare.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Anche una [chiave API](/docs/backend/api-keys/) autentica il socket: invia la chiave
+Anche una [chiave API](/docs/backend/api-keys/) autentica il socket: invia la chiave
 `rk_…` dove andrebbe l'access token. Il socket verifica quindi ogni frame
 rispetto agli [scope](/docs/backend/roles-and-scopes/) della chiave: un fetch, un conteggio o una
 sottoscrizione richiedono `data:read` sulla loro collezione, un salvataggio `data:write`, un'eliminazione

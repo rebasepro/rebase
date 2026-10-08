@@ -1,5 +1,5 @@
 ---
-sourceHash: 1cc4acaed4c60088
+sourceHash: 373a79f1c328f730
 title: Serveur MCP
 sidebar_label: Serveur MCP
 description: Connectez Claude Code, Cursor, Gemini CLI ou n'importe quel client MCP à un projet Rebase — les 42 outils exposés, l'identifiant avec lequel il s'authentifie et le verrou loopback qui s'interpose entre un agent et la production.
@@ -28,7 +28,7 @@ complète — démarre cette copie (`pnpm exec rebase-mcp`, ou `npx --no rebase-
 npm), jamais une plus récente depuis npm. Un projet plus ancien l'ajoute une fois, avec
 `rebase skills install --mcp` ou `pnpm add -D @rebasepro/mcp`.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> `rebase init` écrit le bloc pour chaque agent sélectionné lorsqu'il
+`rebase init` écrit le bloc pour chaque agent sélectionné lorsqu'il
 [configure vos agents de codage IA](/docs/ai/skills#set-up-by-rebase-init), tout en
 conservant les autres serveurs déjà présents dans le fichier. `rebase init --agent cursor,codex` fait
 de même sans poser de questions.
@@ -194,7 +194,7 @@ résolue par le projet.
 
 ### Lui attribuer un identifiant aux droits restreints
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Enregistrez une [clé d'API](/docs/backend/api-keys) restreinte et le modèle à deux verrous s'applique
+Enregistrez une [clé d'API](/docs/backend/api-keys) restreinte et le modèle à deux verrous s'applique
 réellement. Une clé de service s'exécute avec les rôles `["service"]`, que les politiques
 d'administration injectées ne mentionnent **pas** — ainsi, le RLS ne lui accorde rien à moins que l'une
 de vos propres politiques n'en dispose autrement, et ses portées la restreignent davantage :
@@ -446,7 +446,7 @@ Aucun `REBASE_ROLE` ne permet de l'activer.
   dynamique est activé par défaut ; `REBASE_MCP_OPEN_REGISTRATION=false` le limite
   aux clients que vous enregistrez), et redirige la personne vers un écran de consentement qui
   la connecte via votre `/auth/login` existant.
-- <span class="since-badge" data-since="0.24">Depuis 0.24</span> **Sept outils, trois portées (scopes).** Les mêmes [portées](/docs/backend/roles-and-scopes/)
+- **Sept outils, trois portées (scopes).** Les mêmes [portées](/docs/backend/roles-and-scopes/)
   que celles de tous les identifiants. `data:read` propose `list_collections`,
   `query_collection`, `count_documents` et `get_document` ; `data:write` ajoute `create_document` et
   `update_document` ; `data:delete` ajoute `delete_document`. Un client qui ne demande
@@ -458,7 +458,7 @@ Aucun `REBASE_ROLE` ne permet de l'activer.
 - **Les autorisations accordées avant 0.24 gardent leur portée.** `mcp:read` est lu comme
   `data:read`, et `mcp:write` comme `data:write data:delete`, sur les autorisations
   enregistrées et sur les jetons déjà émis.
-- <span class="since-badge" data-since="0.24">Depuis 0.24</span> **Une clé API fonctionne aussi.** `/mcp` accepte aussi `Authorization: Bearer rk_…`, pour
+- **Une clé API fonctionne aussi.** `/mcp` accepte aussi `Authorization: Bearer rk_…`, pour
   un client configuré avec un en-tête plutôt qu'avec un flux OAuth. La clé atteint
   les outils que couvrent ses portées `data:*`, en tant que l'identité pour laquelle elle agit : une
   [clé personnelle](/docs/backend/api-keys/#personal-keys) en tant que son propriétaire, une clé de service

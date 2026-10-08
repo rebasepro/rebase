@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fee7de68fa81701
+sourceHash: 0b7bd3b233513344
 title: Compétences d'agent
 sidebar_label: Compétences d'agent
 description: rebase skills install écrit 21 compétences de référence Rebase dans votre dépôt, selon l'organisation attendue par votre assistant IA — Cursor, Claude Code, Windsurf, Gemini CLI et Antigravity.
@@ -21,7 +21,7 @@ framework ne détectera pas pour lui. Pour les outils qui interagissent avec vos
 
 ## Configuration par `rebase init`
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Un nouveau projet n'a pas besoin de cette commande. `rebase init` vous demande
+Un nouveau projet n'a pas besoin de cette commande. `rebase init` vous demande
 s'il doit configurer vos agents de codage IA, puis liste ceux qu'il détecte sur la
 machine :
 
@@ -48,7 +48,7 @@ rebase init my-app --yes --agent claude,cursor
 
 ## Un projet existant
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> `rebase init` refuse un répertoire qui contient déjà un projet. Un projet
+`rebase init` refuse un répertoire qui contient déjà un projet. Un projet
 créé avant l'existence de la configuration des agents — ou dont l'auteur a refusé l'invite —
 obtient donc la même configuration via `rebase skills install --mcp` : les compétences, et le
 [serveur MCP](/docs/ai/mcp) enregistré dans la configuration de projet de chaque agent. Les serveurs

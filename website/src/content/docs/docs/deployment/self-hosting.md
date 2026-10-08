@@ -129,7 +129,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 
@@ -228,7 +228,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  image = "rebasepro/server:0.23.0"
+  image = "rebasepro/server:0.24.0"
 
 [http_service]
   internal_port = 8080
@@ -380,7 +380,7 @@ nosniff`, a `Referrer-Policy` and `Strict-Transport-Security: max-age=15552000`
 (180 days). The HSTS header leaves out `includeSubDomains`: that would tell
 browsers to refuse plain HTTP on every subdomain of your domain, including ones
 this server has nothing to do with, and a browser keeps it for as long as the
-header says. <span class="since-badge" data-since="0.24">Since 0.24</span>
+header says.
 Set `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` when every subdomain is HTTPS-only;
 up to and including 0.23 the header always carried `includeSubDomains`.
 
@@ -410,7 +410,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ## Upgrading
 
 ```yaml
-image: rebasepro/server:0.23.0
+image: rebasepro/server:0.24.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that

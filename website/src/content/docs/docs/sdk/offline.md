@@ -125,9 +125,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Current connectivity, queue depth, sync activity, last error |
 | `onStatusChange(fn)` | Subscribe to the above |
 | `onQueueChange(fn)` | Just the number of unsent writes, for a badge |
-| `pending()` | The queued mutations themselves, oldest first. <span class="since-badge" data-since="0.24">Since 0.24</span> `pending({ orphaned: true })`: the ones queued while signed out — see [Users](#users) |
+| `pending()` | The queued mutations themselves, oldest first. `pending({ orphaned: true })`: the ones queued while signed out — see [Users](#users) |
 | `sync()` | Replay now — resolves with `{ flushed, remaining }` |
-| `clear()` | Discard the current user's queued writes **and** local rows. <span class="since-badge" data-since="0.24">Since 0.24</span> `clear({ orphaned: true })`: the ones queued while signed out instead |
+| `clear()` | Discard the current user's queued writes **and** local rows. `clear({ orphaned: true })`: the ones queued while signed out instead |
 
 Replay happens on its own: when the browser fires `online`, when the user signs in, and on an exponential backoff (one second, doubling to a minute) while anything is queued. `sync()` is for a "retry now" button.
 
@@ -146,7 +146,7 @@ const client = createRebaseClient({
 });
 ```
 
-The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A discarded write was never sent. <span class="since-badge" data-since="0.24">Since 0.24</span> It is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused. On 0.23 it carries the refused write's own error instead.
+The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A discarded write was never sent. It is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused. On 0.23 it carries the refused write's own error instead.
 
 Consecutive edits to one row while offline are merged into a single queued write, so a form being typed into does not grow the queue. If the server refuses the merged write over its contents (a 400, 403 or 422 — say, a field removed by a schema change while the user was offline), the engine splits it back into the separate edits and replays each one. Only the edit the server refuses is rolled back and reported; the others are kept.
 
@@ -162,13 +162,13 @@ The local database and the outbox are partitioned per signed-in user. Cached row
 
 ### While the session is being restored
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Until the client knows who is signed in, it does not know whose local database and outbox to use, so offline reads and writes wait. That is the time `auth.isInitialized()` takes: none for a stored session that is still valid, and one refresh request when the session has to come back from the server — in cookie mode, where nothing is stored on the device, that is every page load. A write made in that window is queued as whoever the session turns out to be, and a read answers from their local database. A realtime frame that arrives meanwhile is passed to your callback as the server sent it, and kept nowhere.
+Until the client knows who is signed in, it does not know whose local database and outbox to use, so offline reads and writes wait. That is the time `auth.isInitialized()` takes: none for a stored session that is still valid, and one refresh request when the session has to come back from the server — in cookie mode, where nothing is stored on the device, that is every page load. A write made in that window is queued as whoever the session turns out to be, and a read answers from their local database. A realtime frame that arrives meanwhile is passed to your callback as the server sent it, and kept nowhere.
 
 If the session cannot be restored — the refresh is refused, or in cookie mode cannot reach the server — the client is signed out, and offline reads and writes are the signed-out user's. On 0.23, cookie mode treated the whole window as signed out, so a write made in it was queued as the signed-out user's.
 
 ### Writes made while signed out
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Writes queued while nobody was signed in are not replayed when someone signs in. That user did not make them, and replaying them with their credentials would put one person's changes in another's name — on a shared device, a visitor's writes in the next user's account. They are not moved into the signed-in user's outbox either. They are kept and listed separately, so the app can decide what to do with them:
+Writes queued while nobody was signed in are not replayed when someone signs in. That user did not make them, and replaying them with their credentials would put one person's changes in another's name — on a shared device, a visitor's writes in the next user's account. They are not moved into the signed-in user's outbox either. They are kept and listed separately, so the app can decide what to do with them:
 
 ```typescript
 client.auth.onAuthStateChange(async (event) => {

@@ -1,5 +1,5 @@
 ---
-sourceHash: b3f66b1a63aa456a
+sourceHash: 40c6996a773e6e50
 title: Campi di caricamento file
 sidebar_label: Caricamenti file
 description:"\"Dichiarare un campo file o immagine su una collezione: il blocco storage, i caricamenti di file singoli e multipli e quali delle sue opzioni vengono risolte dal pannello anziché dal server.\""
@@ -88,7 +88,7 @@ alla proprietà a cui un file era destinato; quindi `curl -F file=@payload.exe` 
 inserendo un eseguibile da 40 MB nel bucket degli avatar, senza che la configurazione contraria
 venisse mai consultata.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Entrambi vengono ora verificati dal server in base a **dove finisce il file**.
+Entrambi vengono ora verificati dal server in base a **dove finisce il file**.
 Sulla 0.23 venivano verificati solo rispetto alla proprietà indicata da un
 caricamento, e un caricamento che non ne nomina alcuna incontra solo il limite
 proprio della sorgente. Lo
@@ -116,7 +116,7 @@ proprietà `public: true` è sotto `public/`.
 
 ### Immagini in un campo markdown
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Una proprietà markdown (`admin.markdown: true`) con un blocco `storage`
+Una proprietà markdown (`admin.markdown: true`) con un blocco `storage`
 accetta caricamenti di immagini nel suo editor. Il testo memorizza ogni
 immagine come **riferimento di storage** — `![](rebase-storage:posts/abc_cover.png)`
 — non come URL: l'URL di un file privato porta un token di download che scade

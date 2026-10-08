@@ -1,11 +1,11 @@
 ---
-sourceHash: e89814d78c29b234
+sourceHash: 48ce9150935742b8
 title: Papéis e escopos
 sidebar_label: Papéis e escopos
 description: "O que um chamador pode fazer: o plano de dados que toda pessoa tem, o plano administrativo que os papéis concedem, os escopos que um app declara para si mesmo e como cada credencial os carrega."
 ---
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Toda requisição a um backend Rebase faz uma pergunta: este chamador pode fazer isto?
+Toda requisição a um backend Rebase faz uma pergunta: este chamador pode fazer isto?
 A resposta é um **escopo**, uma string no formato `resource:action`: `data:read`,
 `users:write`, `cron:read`. A sessão de uma pessoa, uma chave de API, um token MCP e um
 papel têm escopos, e todos usam as mesmas strings. Uma concessão se lê da mesma forma
@@ -78,7 +78,7 @@ Os escopos do plano administrativo não aceitam alvo. Um escopo de app aceita um
 
 ## Declarando papéis
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Os papéis são declarados na coleção de usuários, em `auth.roles`. Um papel é um nome
+Os papéis são declarados na coleção de usuários, em `auth.roles`. Um papel é um nome
 que o banco de dados vê, ao qual as políticas de RLS podem corresponder, mais uma lista de escopos do plano
 administrativo e de escopos de app.
 
@@ -265,7 +265,7 @@ e as políticas do banco de dados para a identidade como a qual ele age são out
 
 ## Quando falta um escopo
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A resposta é `403 SCOPE_MISSING`, e `details.requiredScope` nomeia o escopo,
+A resposta é `403 SCOPE_MISSING`, e `details.requiredScope` nomeia o escopo,
 com seu alvo quando há um:
 
 ```json

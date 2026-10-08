@@ -1,5 +1,5 @@
 ---
-sourceHash: 406fc1b9cadefefb
+sourceHash: d2f6e11d9e4f2f6e
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, géré pour vous. De quoi il s'agit, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -148,7 +148,7 @@ que la version restaurée réponde avant de confirmer le succès. Suivez-le avec
 
 ## CI et agents
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Un job de CI ou un agent ne devrait pas transporter votre mot de passe. Donnez-lui plutôt un jeton : une clé qui agit en tant que votre compte, restreinte à quelques actions sur un projet. Créez-le depuis un terminal connecté :
+Un job de CI ou un agent ne devrait pas transporter votre mot de passe. Donnez-lui plutôt un jeton : une clé qui agit en tant que votre compte, restreinte à quelques actions sur un projet. Créez-le depuis un terminal connecté :
 
 ```bash
 rebase cloud tokens create --project shop --can deploy,logs --expires-in 90

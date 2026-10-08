@@ -60,7 +60,7 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/admin/users` | List users (paginated). `?search=` matches a case-insensitive part of the email or display name. <span class="since-badge" data-since="0.24">Since 0.24</span> On Postgres it also matches any role the user holds, and the uid; on MongoDB it still matches email and display name only |
+| `GET` | `/api/admin/users` | List users (paginated). `?search=` matches a case-insensitive part of the email or display name. On Postgres it also matches any role the user holds, and the uid; on MongoDB it still matches email and display name only |
 | `POST` | `/api/admin/users` | Create a user |
 | `GET` | `/api/admin/users/:uid` | Read one user |
 | `PUT` | `/api/admin/users/:uid` | Update one user. `{ disabled: true }` switches the account off without deleting it: every sign-in and refresh is refused (`ACCOUNT_DISABLED`), its sessions end and every token it holds is refused; `false` switches it back on |
@@ -127,7 +127,7 @@ but there is no access token" — the login was fine, the token was one level do
 
 ### Changing an email address
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A signed-in user
+A signed-in user
 moves their own account to another address in two steps:
 
 1. `POST /api/auth/change-email { newEmail }` records the change and mails a
@@ -196,7 +196,7 @@ guesses, each account is limited to ten verification attempts per 15 minutes
 recorded against the factor so it cannot be replayed for the rest of its
 ±1-step window.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> In the CMS users table, **Reset two-step verification**
+In the CMS users table, **Reset two-step verification**
 (`DELETE /api/admin/users/:uid/mfa`) and **Disable or enable account**
 (`PUT /api/admin/users/:uid { disabled }`) are offered to whoever holds
 `users:write`, as the routes are; the switch is never offered on your own

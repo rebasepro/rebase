@@ -1,5 +1,5 @@
 ---
-sourceHash: 2efe07fee7cafe0a
+sourceHash: 564c58f7bc002c6f
 title: Edición de esquemas en vivo
 description: "Crea y modifica colecciones en un backend en ejecución: primero se confirman en tu repositorio y luego se aplican."
 ---
@@ -19,7 +19,7 @@ El estado y el plan necesitan el alcance `schema:read`, y aplicar necesita `sche
 ## Planifica antes de aplicar
 
 `/plan` no tiene efectos secundarios. Envía el cambio, y te indica qué implica
-el cambio. <span class="since-badge" data-since="0.24">Desde 0.24</span> Un cambio a una colección existente es
+el cambio. Un cambio a una colección existente es
 un `patch` — lo que cambió, como operaciones sobre rutas de claves — y una
 colección nueva es el `collection` completo:
 
@@ -115,7 +115,7 @@ especifica el cambio y qué hacer en su lugar.
 El veredicto se lee a partir del esquema que produce cada lado — el mismo del
 que se generan `schema.generated.ts` y `db push` — de modo que una edición que
 cambia la base de datos no puede reportarse como que no hay cambio. Dos
-ediciones que parecen cambios y no se rechazan (<span class="since-badge" data-since="0.24">Desde 0.24</span>; 0.23 reporta
+ediciones que parecen cambios y no se rechazan (; 0.23 reporta
 ambas como que necesitan una migración):
 
 - **Renombrar la clave de una propiedad conservando su columna** (`columnName`
@@ -129,7 +129,7 @@ ambas como que necesitan una migración):
 
 Un cambio rechazado aún puede escribirse en el código fuente de tu colección y
 confirmarse, dejando la base de datos como está — eliminar una propiedad que
-ya no sirves es el caso habitual. <span class="since-badge" data-since="0.24">Desde 0.24</span> Envía `/apply` con
+ya no sirves es el caso habitual. Envía `/apply` con
 `"sourceOnly": true`. No se ejecuta nada; el mensaje del commit especifica lo
 que conserva la base de datos, por ejemplo
 `chore(schema): remove sku from products (source only — column products.sku kept)`,
@@ -159,7 +159,7 @@ No solo el archivo de la colección. El esquema de Drizzle se genera a partir de
 
 Estas rutas son relativas a tu **proyecto**, no a tu repositorio. Cuando ambos son lo mismo —un proyecto `rebase init`, que es el caso habitual—, no hay nada de qué preocuparse. Cuando tu proyecto se encuentra en un subdirectorio de un repositorio más grande, las rutas se prefijan con él, ubicándolo subiendo desde tu directorio de colecciones hasta el `rebase.json` más cercano. Un proyecto sin `rebase.json` conserva las rutas simples.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> El commit no incluye SQL. `rebase db push` y `rebase db generate` escriben el suyo a partir de las colecciones en cada ejecución, en `.rebase/sql/`, que Git ignora.
+El commit no incluye SQL. `rebase db push` y `rebase db generate` escriben el suyo a partir de las colecciones en cada ejecución, en `.rebase/sql/`, que Git ignora.
 En 0.23 el commit también incluía `drizzle/schema.sql`, `drizzle/policies.sql` y
 `drizzle/search.sql`, escritos en la raíz del proyecto.
 
@@ -167,7 +167,7 @@ El mensaje del commit describe el cambio en lugar de limitarse a anunciarlo, y s
 
 ## Quién puede aplicar cambios
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Tener `schema:read` es suficiente para **planificar**. La planificación no tiene efectos secundarios, y un trabajo de CI que consulte si un cambio propuesto en una colección es aplicable es un buen caso de uso.
+Tener `schema:read` es suficiente para **planificar**. La planificación no tiene efectos secundarios, y un trabajo de CI que consulte si un cambio propuesto en una colección es aplicable es un buen caso de uso.
 
 Aplicar los cambios es un privilegio adicional, porque aplicar escribe un commit y un commit lleva un autor:
 

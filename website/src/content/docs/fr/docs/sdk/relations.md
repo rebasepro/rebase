@@ -1,5 +1,5 @@
 ---
-sourceHash: ce3b9ea649b09037
+sourceHash: 107ae13db8d0ff4a
 title: Interroger les relations
 sidebar_label: Relations
 description: "Incluez des entités liées dans une requête et lisez une collection enfant via son parent grâce aux accesseurs de relations du SDK."
@@ -177,7 +177,7 @@ data[0].author?.name;   // "Jane Doe"
 
 Un type `Database` généré type précisément les trois : `Insert` et `Update` acceptent
 l'une ou l'autre des syntaxes d'écriture, `Row` possède `authorId` sans condition, et `author` est
-facultatif sur `Row` — <span class="since-badge" data-since="0.24">Depuis 0.24</span> `RowWith<"posts", ["author"]>` est la ligne avec cette relation
+facultatif sur `Row` — `RowWith<"posts", ["author"]>` est la ligne avec cette relation
 **requise**, pour une lecture qui l'a demandée. Voir [Includes typés](#includes-typés).
 
 Le seul cas où les trois formes se confondent est celui d'une relation nommée de manière identique à sa propre
@@ -199,7 +199,7 @@ const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
 `IncludeFor<A>` restreint les clés d'un include aux relations existantes, à chaque
-niveau — et <span class="since-badge" data-since="0.24">Depuis 0.24</span> un client typé vérifie `include` de la même manière, dans `find({ include })`
+niveau — et un client typé vérifie `include` de la même manière, dans `find({ include })`
 et dans `.include(...)`, si bien que `posts.include("authr")` est une erreur de compilation plutôt
 qu'une 400 `UNKNOWN_RELATION`. Les lignes qu'une lecture renvoie continuent de typer chaque relation
 comme facultative ; `RowWith<A, I>` est cette ligne avec chaque relation incluse rendue

@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS rebase.branches (
 );
 ```
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A server running on a branch keeps branches in the database the branch was
+A server running on a branch keeps branches in the database the branch was
 copied from. The branch's own `rebase.branches` is only a snapshot, taken before
 its row was written. So `rebase dev` on a [switched](#cli-integration) checkout
 sets `REBASE_BRANCH_PARENT_DATABASE` to the database `.env` names, and a server
@@ -104,7 +104,7 @@ The branching API is exposed via the backend's `BranchService`. Below is a refer
 
 Generates a new branch database from the default database or an explicit source template.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> The default is the database the server's own connection is on, or
+The default is the database the server's own connection is on, or
 `REBASE_BRANCH_PARENT_DATABASE` when the server runs on a branch. It is never
 the database `ADMIN_CONNECTION_STRING` names, when that is another one.
 
@@ -143,7 +143,7 @@ Output:
 */
 ```
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `database` is the PostgreSQL database the branch is, as its record says:
+`database` is the PostgreSQL database the branch is, as its record says:
 what to connect to, and what to pass as `source` to copy the branch. It is not
 the branch's name (`staging` is the database `rb_staging`).
 
@@ -164,7 +164,7 @@ await admin.deleteBranch("feature_oauth");
 ```
 
 > [!CAUTION]
-> Safety Guard: The main database (default database name configured in connection strings) is protected. <span class="since-badge" data-since="0.24">Since 0.24</span> That is the database the server's own connection is on, or `REBASE_BRANCH_PARENT_DATABASE` on a branch. If you attempt to delete the parent database, the `BranchService` throws a `"Cannot delete the main database"` error and aborts.
+> Safety Guard: The main database (default database name configured in connection strings) is protected. That is the database the server's own connection is on, or `REBASE_BRANCH_PARENT_DATABASE` on a branch. If you attempt to delete the parent database, the `BranchService` throws a `"Cannot delete the main database"` error and aborts.
 
 ---
 

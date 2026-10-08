@@ -59,7 +59,7 @@ const client = createRebaseClient({
 | `realtime` | `boolean` | Open the WebSocket (default `true`) — set `false` in one-shot scripts |
 | `collections` | `Record<string, string>` | Maps accessor names to collection slugs |
 | `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
-| `impersonate` | `string` | <span class="since-badge" data-since="0.24">Since 0.24</span> Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
+| `impersonate` | `string` | Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
 
 ## Typed SDK Generation
 
@@ -73,7 +73,7 @@ While `rebase dev` is running you do not need to: it regenerates the types in
 `generated/sdk/` on start and on every save under `config/collections/`. Run the
 command yourself in CI, in a frontend repository that has no collections
 (`rebase generate-sdk --from link`), or anywhere `rebase dev` is not running.
-<span class="since-badge" data-since="0.24">Since 0.24</span> for the regeneration: on 0.23, `rebase dev` leaves the SDK types alone, so run
+for the regeneration: on 0.23, `rebase dev` leaves the SDK types alone, so run
 the command after every collection change.
 
 Then pass the `Database` type parameter to `createRebaseClient` for full autocomplete:

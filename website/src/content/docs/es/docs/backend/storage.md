@@ -1,5 +1,5 @@
 ---
-sourceHash: 123256f487ac8a71
+sourceHash: 15c8b3bdbf304f1c
 title: Configuración de almacenamiento
 sidebar_label: Configuración de almacenamiento
 description: Configure backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para la subida de archivos, imágenes y contenido multimedia.
@@ -248,7 +248,7 @@ el momento de crearse, antes de su primer fragmento; y
 `OPTIONS /api/storage/tus` lo anuncia como `Tus-Max-Size` — para el origen
 nombrado por `?storageId=`, o el predeterminado en su defecto.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> para `STORAGE_MAX_FILE_SIZE`: en 0.23 solo el `maxFileSize` del
+para `STORAGE_MAX_FILE_SIZE`: en 0.23 solo el `maxFileSize` del
 origen fija el límite, y la variable no se lee.
 
 ```bash
@@ -297,8 +297,8 @@ Client                                                   Rebase Server
 | `GCS_PROJECT_ID` | ID de proyecto de GCP para GCS |
 | `GCS_KEY_FILENAME` | Ruta a un archivo de clave de cuenta de servicio de GCP (omitir en GKE; Workload Identity/ADC proporciona las credenciales) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Variable estándar de ADC, leída por el propio SDK de Google (no es necesaria en GCP con credenciales predeterminadas) |
-| `STORAGE_DOWNLOAD_TOKEN_TTL` | <span class="since-badge" data-since="0.24">Desde 0.24</span> Durante cuánto tiempo funciona la URL de descarga de un archivo privado, en segundos — la vida del token que acuña `/api/storage/metadata/*` (por defecto `300`, como máximo `604800`, una semana). Aumenta este valor para vídeo y audio privados, que siguen solicitando rangos después de que se renderiza la página. La variante en variable de entorno de `storageDownloadTokenTtl` |
-| `STORAGE_MAX_FILE_SIZE` | <span class="since-badge" data-since="0.24">Desde 0.24</span> El archivo más grande que acepta el origen, en bytes (por defecto `52428800`, 50 MB). Sufijo `__<KEY>` para un origen con nombre. Un valor que no sea un número entero de bytes rechaza el arranque. Consulta [Cuán grande puede ser un archivo](#cuán-grande-puede-ser-un-archivo) |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | Durante cuánto tiempo funciona la URL de descarga de un archivo privado, en segundos — la vida del token que acuña `/api/storage/metadata/*` (por defecto `300`, como máximo `604800`, una semana). Aumenta este valor para vídeo y audio privados, que siguen solicitando rangos después de que se renderiza la página. La variante en variable de entorno de `storageDownloadTokenTtl` |
+| `STORAGE_MAX_FILE_SIZE` | El archivo más grande que acepta el origen, en bytes (por defecto `52428800`, 50 MB). Sufijo `__<KEY>` para un origen con nombre. Un valor que no sea un número entero de bytes rechaza el arranque. Consulta [Cuán grande puede ser un archivo](#cuán-grande-puede-ser-un-archivo) |
 | `FORCE_LOCAL_STORAGE` | Permitir `STORAGE_TYPE=local` en producción — ver a continuación |
 | `STORAGE_PUBLIC_READ` | Servir objetos almacenados a lectores no autenticados. La variante en variable de entorno de `storagePublicRead`, y una de las tres formas de satisfacer la [protección de arranque en producción](#autorización-por-objeto). |
 | `STORAGE_ALLOW_ANY_AUTHENTICATED` | Desactivar la protección de arranque, restaurando el comportamiento en el que cualquier usuario autenticado puede leer, sobrescribir, eliminar o listar cualquier clave. La variante en variable de entorno de `storageInsecureAllowAnyAuthenticated`. Solo justificable cuando se confía cada archivo a cada usuario autenticado. |
@@ -517,7 +517,7 @@ Conviene saber:
 
 ### Claves de API y tokens
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Una persona con la sesión iniciada tiene todos los alcances de almacenamiento, así que
+Una persona con la sesión iniciada tiene todos los alcances de almacenamiento, así que
 el hook y las políticas anteriores deciden por ella. Una [clave de API](/docs/backend/api-keys/)
 necesita además el alcance de almacenamiento de la operación, en el origen que nombra
 la solicitud: `storage:read` para descargas, metadatos y listados, `storage:write` para

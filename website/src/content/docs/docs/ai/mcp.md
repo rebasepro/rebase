@@ -27,7 +27,7 @@ integration — starts that copy (`pnpm exec rebase-mcp`, or `npx --no rebase-mc
 in an npm project), never a newer one from npm. An older project adds it once,
 with `rebase skills install --mcp` or `pnpm add -D @rebasepro/mcp`.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `rebase init` writes the block for each agent you pick when it
+`rebase init` writes the block for each agent you pick when it
 [sets up your AI coding agents](/docs/ai/skills#set-up-by-rebase-init), keeping
 any other servers already in the file. `rebase init --agent cursor,codex` does
 the same without asking.
@@ -194,7 +194,7 @@ function, and run DDL against whatever `DATABASE_URL` the project resolves.
 
 ### Giving it a narrow credential instead
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Register a scoped [API key](/docs/backend/api-keys) and the two-gate model
+Register a scoped [API key](/docs/backend/api-keys) and the two-gate model
 applies for real. A service key runs with the roles `["service"]`, which the
 injected admin policies do **not** name — so RLS grants it nothing unless one of
 your own policies says otherwise, and its scopes narrow it further:
@@ -451,7 +451,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` limits it
   to clients you register), and sends the person to a consent screen that signs
   them in through your existing `/auth/login`.
-- <span class="since-badge" data-since="0.24">Since 0.24</span> **Seven tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+- **Seven tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_collections`,
   `query_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
   `update_document`; `data:delete` adds `delete_document`. A client that asks for
@@ -462,7 +462,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
   `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and
   on tokens already issued.
-- <span class="since-badge" data-since="0.24">Since 0.24</span> **An API key works too.** `/mcp` also accepts `Authorization: Bearer rk_…`, for
+- **An API key works too.** `/mcp` also accepts `Authorization: Bearer rk_…`, for
   a client configured with a header rather than an OAuth flow. The key reaches
   the tools its `data:*` scopes cover, as whoever it acts as: a
   [personal key](/docs/backend/api-keys/#personal-keys) as its owner, a service key

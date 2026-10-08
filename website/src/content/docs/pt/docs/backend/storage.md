@@ -1,5 +1,5 @@
 ---
-sourceHash: 123256f487ac8a71
+sourceHash: 15c8b3bdbf304f1c
 title: Configuração de Armazenamento
 sidebar_label: Configuração de Armazenamento
 description: Configure backends de armazenamento em sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -244,7 +244,7 @@ upload retomável é recusado na criação, antes do seu primeiro chunk; e
 `OPTIONS /api/storage/tus` anuncia isso como `Tus-Max-Size` — para a fonte
 nomeada por `?storageId=`, ou a padrão caso contrário.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> para `STORAGE_MAX_FILE_SIZE`: na 0.23 apenas o `maxFileSize` da fonte define
+para `STORAGE_MAX_FILE_SIZE`: na 0.23 apenas o `maxFileSize` da fonte define
 o limite, e a variável não é lida.
 
 ```bash
@@ -292,8 +292,8 @@ Client                                                   Rebase Server
 | `GCS_PROJECT_ID` | ID do projeto GCP para GCS |
 | `GCS_KEY_FILENAME` | Caminho para um arquivo de chave de conta de serviço GCP (omita no GKE — Workload Identity/ADC fornece credenciais) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Variável padrão do ADC, lida pelo próprio SDK do Google (desnecessária na GCP com credenciais padrão) |
-| `STORAGE_DOWNLOAD_TOKEN_TTL` | <span class="since-badge" data-since="0.24">Since 0.24</span> Por quanto tempo a URL de download de um arquivo privado funciona, em segundos — o tempo de vida do token que `/api/storage/metadata/*` emite (padrão `300`, no máximo `604800`, uma semana). Aumente-o para vídeo e áudio privados, que continuam pedindo ranges depois que a página renderiza. A grafia de ambiente de `storageDownloadTokenTtl` |
-| `STORAGE_MAX_FILE_SIZE` | <span class="since-badge" data-since="0.24">Since 0.24</span> Maior arquivo que a fonte aceita, em bytes (padrão `52428800`, 50 MB). Sufixo `__<KEY>` para uma fonte nomeada. Um valor que não é um número inteiro de bytes recusa a inicialização. Veja [Qual o tamanho máximo de um arquivo](#qual-o-tamanho-máximo-de-um-arquivo) |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | Por quanto tempo a URL de download de um arquivo privado funciona, em segundos — o tempo de vida do token que `/api/storage/metadata/*` emite (padrão `300`, no máximo `604800`, uma semana). Aumente-o para vídeo e áudio privados, que continuam pedindo ranges depois que a página renderiza. A grafia de ambiente de `storageDownloadTokenTtl` |
+| `STORAGE_MAX_FILE_SIZE` | Maior arquivo que a fonte aceita, em bytes (padrão `52428800`, 50 MB). Sufixo `__<KEY>` para uma fonte nomeada. Um valor que não é um número inteiro de bytes recusa a inicialização. Veja [Qual o tamanho máximo de um arquivo](#qual-o-tamanho-máximo-de-um-arquivo) |
 | `FORCE_LOCAL_STORAGE` | Permitir `STORAGE_TYPE=local` em produção — veja abaixo |
 | `STORAGE_PUBLIC_READ` | Servir objetos armazenados para leitores não autenticados. A forma em variável de ambiente de `storagePublicRead`, e uma das três maneiras de satisfazer a [proteção de inicialização em produção](#autorização-por-objeto-per-object-authorization). |
 | `STORAGE_ALLOW_ANY_AUTHENTICATED` | Desativa a proteção de inicialização, restaurando o comportamento onde qualquer usuário conectado pode ler, sobrescrever, excluir ou listar qualquer chave. A forma em variável de ambiente de `storageInsecureAllowAnyAuthenticated`. Só é defensável quando todos os usuários conectados são confiáveis para acessar todos os arquivos. |
@@ -510,7 +510,7 @@ Vale a pena saber:
 
 ### Chaves de API e tokens
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Uma pessoa autenticada tem todos os escopos de storage, então o hook e as políticas acima
+Uma pessoa autenticada tem todos os escopos de storage, então o hook e as políticas acima
 decidem por ela. Uma [chave de API](/docs/backend/api-keys/) também precisa do escopo
 de storage da operação, na fonte que a requisição nomeia: `storage:read` para
 downloads, metadados e listagens, `storage:write` para uploads, pastas e cada

@@ -312,7 +312,7 @@ Save the file. That is the whole step: `rebase dev` regenerates
 collections, restarts the backend, and boot creates the new table — so your **Products** collection appears in the
 navigation.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> for the SDK types: on 0.23, `rebase dev` regenerates the schema only, so run
+for the SDK types: on 0.23, `rebase dev` regenerates the schema only, so run
 `rebase generate-sdk` after a collection change before importing its types.
 
 The same is true of a property added to a collection you already have: save,
@@ -554,7 +554,7 @@ regenerates `backend/src/schema.generated.ts` and the SDK types in
 that are missing. Outside `rebase dev` the same steps are `rebase schema generate`
 and `rebase generate-sdk`.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> for the SDK types: on 0.23, `rebase dev` regenerates the schema only, and
+for the SDK types: on 0.23, `rebase dev` regenerates the schema only, and
 `rebase generate-sdk` is a step of its own.
 
 ### Next Steps
@@ -630,9 +630,9 @@ All configuration is done via environment variables in your `.env` file at the p
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |
 | `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS, in both environments. | — |
-| `ADMIN_CONNECTION_STRING` | Admin-level database connection string (used for schema introspection and admin operations). <span class="since-badge" data-since="0.24">Since 0.24</span> The database it names is not the one the SQL console calls current, nor what a new branch copies by default: both are the database the app's own connection is on (see `REBASE_BRANCH_PARENT_DATABASE` for a server on a branch). | `DATABASE_URL` |
-| `DISABLE_DB_ROLE_SWITCHING` | Disable PostgreSQL role-switching in SQL Editor (useful for custom authentication where DB roles are not mapped). <span class="since-badge" data-since="0.24">Since 0.24</span> Studio's SQL console then says that the rows were read as the connection owner, names it, and greys out its role picker. | `false` |
-| `REBASE_BRANCH_PARENT_DATABASE` | <span class="since-badge" data-since="0.24">Since 0.24</span> The database the branch this server runs on was copied from. `rebase dev` sets it on a checkout [switched to a branch](/docs/backend/branching/#cli-integration). A server with it keeps the branch registry on that database and copies new branches from it by default, so Studio's Branches pane shows the main database's branches. | — |
+| `ADMIN_CONNECTION_STRING` | Admin-level database connection string (used for schema introspection and admin operations). The database it names is not the one the SQL console calls current, nor what a new branch copies by default: both are the database the app's own connection is on (see `REBASE_BRANCH_PARENT_DATABASE` for a server on a branch). | `DATABASE_URL` |
+| `DISABLE_DB_ROLE_SWITCHING` | Disable PostgreSQL role-switching in SQL Editor (useful for custom authentication where DB roles are not mapped). Studio's SQL console then says that the rows were read as the connection owner, names it, and greys out its role picker. | `false` |
+| `REBASE_BRANCH_PARENT_DATABASE` | The database the branch this server runs on was copied from. `rebase dev` sets it on a checkout [switched to a branch](/docs/backend/branching/#cli-integration). A server with it keeps the branch registry on that database and copies new branches from it by default, so Studio's Branches pane shows the main database's branches. | — |
 
 ##### CORS in development
 
@@ -702,8 +702,8 @@ answers.
 | `APPLE_KEY_ID` | Key ID of the private key registered with Apple. | — |
 | `APPLE_PRIVATE_KEY` | Contents of the `.p8` private key file, newlines and all (`\n` escapes are accepted). | — |
 | `REBASE_SERVICE_KEY` | Static admin API key. Bypasses normal JWT auth for server-to-server calls when passed as `Authorization: Bearer <key>`. (Auto-generated in development). | — |
-| `REBASE_PLATFORM_TOKEN_KEY` | <span class="since-badge" data-since="0.24">Since 0.24</span> The hosting platform's public key (PEM, EC P-256) that `rpt_` platform tokens are verified against; several PEM blocks during a key rotation. The platform sets it at deploy, and it holds nothing secret. Together with `REBASE_PLATFORM_TOKEN_AUDIENCE` it lets the admin gate accept a platform token for `cron:read`, and for nothing else. | — |
-| `REBASE_PLATFORM_TOKEN_AUDIENCE` | <span class="since-badge" data-since="0.24">Since 0.24</span> The project id a platform token's `aud` must equal, so a token minted for another project is refused. With only one of the two variables set, the server boots, logs a warning, and answers every `rpt_` token with `401 PLATFORM_TOKENS_OFF`. | — |
+| `REBASE_PLATFORM_TOKEN_KEY` | The hosting platform's public key (PEM, EC P-256) that `rpt_` platform tokens are verified against; several PEM blocks during a key rotation. The platform sets it at deploy, and it holds nothing secret. Together with `REBASE_PLATFORM_TOKEN_AUDIENCE` it lets the admin gate accept a platform token for `cron:read`, and for nothing else. | — |
+| `REBASE_PLATFORM_TOKEN_AUDIENCE` | The project id a platform token's `aud` must equal, so a token minted for another project is refused. With only one of the two variables set, the server boots, logs a warning, and answers every `rpt_` token with `401 PLATFORM_TOKENS_OFF`. | — |
 | `REBASE_RATE_LIMIT_STORE` | Where auth rate-limit counters live: `memory` (per-process) or `sql` (shared across replicas). A process cannot see its own replica count, so a deployment with peers has to say so — three replicas on the default enforce three times the limit. Any other value **refuses to boot** rather than falling back, `postgres` included. | `memory` |
 | `AUTH_MAGIC_LINK` | Mount the passwordless sign-in-link flow. Needs an email service configured, or the link has nowhere to go. | `false` |
 | `AUTH_EMAIL_OTP` | Mount passwordless sign-in with a six-digit code sent by email. Same email requirement as above. | `false` |
@@ -729,8 +729,8 @@ ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `STORAGE_TYPE` | Storage backend: `local`, `s3` or `gcs`. In production `local` disables storage unless `FORCE_LOCAL_STORAGE=true` | `local` |
 | `STORAGE_PATH` | Base path for local storage | `./uploads` |
 | `FORCE_LOCAL_STORAGE` | Allow local storage in production — only with a durable volume mounted at `STORAGE_PATH` | `false` |
-| `STORAGE_DOWNLOAD_TOKEN_TTL` | <span class="since-badge" data-since="0.24">Since 0.24</span> Seconds a private file's download URL works — the token `getSignedUrl()` puts in it. At most `604800` (a week) | `300` |
-| `STORAGE_MAX_FILE_SIZE` | <span class="since-badge" data-since="0.24">Since 0.24</span> Largest file the source accepts, in bytes, on every upload path — `__<KEY>` for a named source. Not a whole number of bytes refuses the boot | `52428800` (50 MB) |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | Seconds a private file's download URL works — the token `getSignedUrl()` puts in it. At most `604800` (a week) | `300` |
+| `STORAGE_MAX_FILE_SIZE` | Largest file the source accepts, in bytes, on every upload path — `__<KEY>` for a named source. Not a whole number of bytes refuses the boot | `52428800` (50 MB) |
 | `S3_BUCKET` | S3 bucket name (when `STORAGE_TYPE=s3`) | — |
 | `S3_REGION` | AWS region | — |
 | `S3_ACCESS_KEY_ID` | AWS access key | — |
@@ -784,7 +784,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_MAX_BODY_SIZE` | Maximum request body, **in bytes** (`10485760`, not `10MB` — a value that is not a number refuses to boot rather than silently removing the limit). | — |
 | `REBASE_ENABLE_SWAGGER` | The OpenAPI surface. Tri-state: unset means on in development, off in production; `false` turns both off anywhere. Note that `true` in production serves the **spec** at `/api/docs` but not the Swagger **UI** at `/api/swagger` — the UI is gated on `NODE_ENV` separately. | — |
 | `REBASE_METRICS` | Expose Prometheus metrics at `/metrics`. | `false` |
-| `REBASE_HSTS_INCLUDE_SUBDOMAINS` | <span class="since-badge" data-since="0.24">Since 0.24</span> Add `includeSubDomains` to the `Strict-Transport-Security` header, so browsers refuse plain HTTP on every subdomain of the host for six months — hosts this process does not serve included. Turn it on only when every subdomain of the domain is HTTPS-only. Anything but `true`/`false` refuses to boot. See [Security headers](/docs/deployment/self-hosting/#security-headers). | `false` |
+| `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Add `includeSubDomains` to the `Strict-Transport-Security` header, so browsers refuse plain HTTP on every subdomain of the host for six months — hosts this process does not serve included. Turn it on only when every subdomain of the domain is HTTPS-only. Anything but `true`/`false` refuses to boot. See [Security headers](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Bearer token guarding `/metrics`. Unset leaves the endpoint open to anything that can reach the port — fine on a private network, not on a public one, and the boot logs say so. | — |
 | `REBASE_MIGRATE_ON_BOOT` | What the runtime may do to the schema at boot. `ensure` (the default, everywhere — production included) runs the **additive** pass: create missing tables, columns and enum types, never drop or rewrite one. `none` touches nothing. The published image accepts only those two and **refuses to boot on `push`**. In a [split deployment](/docs/deployment/split-processes) exactly one process may provision, so every other role must set `none` or refuse to boot. | `ensure` |
 | `REBASE_REQUIRE_SCHEMA_MATCH` | Refuse to boot when the database was last provisioned from a different set of collections than this process was built from. Unset (or anything other than `true`/`1`) warns instead. | warn |
@@ -1045,7 +1045,7 @@ function Widget() {
 
 * **Symptoms:** Custom queries executed in Rebase Studio's SQL editor fail with `cause: error: permission denied for table <name>`, even though the spreadsheet CMS view loads data successfully.
 * **Cause:** By default, Rebase attempts to execute SQL Editor queries by temporarily switching database roles to match the active user's application role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom authentication where roles exist only in database tables rather than actual PostgreSQL roles, the role switch fails or database privileges are missing. The CMS spreadsheet view executes under the default connection owner user and bypasses this.
-* **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This forces Rebase to run SQL Editor queries using the connection owner's privileges (typically a superuser/owner). <span class="since-badge" data-since="0.24">Since 0.24</span> The SQL Editor then says, above the results, that they were read as the connection owner, and greys out its role picker.
+* **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This forces Rebase to run SQL Editor queries using the connection owner's privileges (typically a superuser/owner). The SQL Editor then says, above the results, that they were read as the connection owner, and greys out its role picker.
 
 #### SQL Editor Schema Fetch Failed (`Cross-database execution requires adminConnectionString`)
 
@@ -3555,6 +3555,8 @@ yet, listed so that nobody reads a promise into them:
 ## Changelog
 
 ### [Unreleased]
+
+### [0.24.0] - 2026-10-08
 
 #### Breaking
 
@@ -14298,7 +14300,7 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 
 The OpenAPI spec is auto-generated from your collection definitions: it describes the list, read, create, update, delete and bulk endpoints of every collection the backend serves, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> For a [`softDelete`](/docs/collections/soft-delete/) collection the spec says
+For a [`softDelete`](/docs/collections/soft-delete/) collection the spec says
 that a delete, single or bulk, moves the row to the trash, and documents
 `?hard=true` on both deletes and `?deleted=include|only` on the list, the single
 read, the count and the aggregate. Studio's API explorer sends only the
@@ -14354,7 +14356,7 @@ everything in this section applies to them too, except `?on_conflict=`.
 A write's body must be a JSON object. `null`, a number, a string or an array is
 a `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> An update cannot change a row's key. A body that names the key with another
+An update cannot change a row's key. A body that names the key with another
 value is a `400 KEY_IMMUTABLE`, before any hook runs and with nothing written,
 whichever way the update arrives: REST, the realtime socket, MCP or the
 in-process `rebase.data`. The key the row already has is accepted, as a form
@@ -14663,7 +14665,7 @@ const client = createRebaseClient({
 | `realtime` | `boolean` | Open the WebSocket (default `true`) — set `false` in one-shot scripts |
 | `collections` | `Record<string, string>` | Maps accessor names to collection slugs |
 | `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
-| `impersonate` | `string` | <span class="since-badge" data-since="0.24">Since 0.24</span> Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
+| `impersonate` | `string` | Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
 
 ### Typed SDK Generation
 
@@ -14677,7 +14679,7 @@ While `rebase dev` is running you do not need to: it regenerates the types in
 `generated/sdk/` on start and on every save under `config/collections/`. Run the
 command yourself in CI, in a frontend repository that has no collections
 (`rebase generate-sdk --from link`), or anywhere `rebase dev` is not running.
-<span class="since-badge" data-since="0.24">Since 0.24</span> for the regeneration: on 0.23, `rebase dev` leaves the SDK types alone, so run
+for the regeneration: on 0.23, `rebase dev` leaves the SDK types alone, so run
 the command after every collection change.
 
 Then pass the `Database` type parameter to `createRebaseClient` for full autocomplete:
@@ -16021,7 +16023,7 @@ price: {
 |----------|------|-------------|
 | `admin.readOnly` | `boolean` | Prevent editing |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Disable with optional tooltip |
-| `admin.filledByServer` | `boolean` | <span class="since-badge" data-since="0.24">Since 0.24</span> The server fills the field when a new record leaves it empty (a `beforeSave` hook). The form lets a create through without it; it stays required on edit, and the server's own checks still apply |
+| `admin.filledByServer` | `boolean` | The server fills the field when a new record leaves it empty (a `beforeSave` hook). The form lets a create through without it; it stays required on edit, and the server's own checks still apply |
 | `admin.hideFromCollection` | `boolean` | Hide from table view |
 | `admin.columnWidth` | `number` | Column width in pixels (table view) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Field width over the four-column form grid |
@@ -16217,7 +16219,7 @@ database entirely, and a deleted user must not take the audit trail with them �
 declare a [relation](/docs/collections/relations) if you want the join.
 
 :::note[Composite primary keys]
-<span class="since-badge" data-since="0.24">Since 0.24</span> Mark several properties `isId` and they are one composite key: the table gets a
+Mark several properties `isId` and they are one composite key: the table gets a
 single `PRIMARY KEY (a, b)` constraint, and a row is addressed by all of its key
 values in declaration order, joined with `:::` — `company_translation/1:::en_US`.
 Give each key column the strategy that fits it: `isId: true` for a value the
@@ -16229,7 +16231,7 @@ uniqueness constraint over several columns rather than the row's identity, that
 is a unique [index](/docs/backend/indexes). On 0.23 a second `isId` is refused at
 config load.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A collection where no property claims `isId` gets an `id` column of its own:
+A collection where no property claims `isId` gets an `id` column of its own:
 `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. The database fills it, so a
 row created from the admin panel, the REST API or the SDK needs no key, and a key
 you do send is used as given. A table created before this default existed gets
@@ -16666,7 +16668,7 @@ property a file was destined for, so `curl -F file=@payload.exe` past the picker
 put a 40 MB executable in the avatar bucket and the config that said otherwise
 was never consulted.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Both are now checked by the server against **where the file lands**. On
+Both are now checked by the server against **where the file lands**. On
 0.23 they are checked only against the property an upload names, and an upload
 that names none meets the source's own cap alone. A
 property's `storagePath` is where its files go, so it is also where its limits
@@ -16689,7 +16691,7 @@ own storage source. Placeholders match whatever the panel would fill in:
 
 #### Images in a markdown field
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A markdown property (`admin.markdown: true`) with a `storage` block takes image
+A markdown property (`admin.markdown: true`) with a `storage` block takes image
 uploads in its editor. The text stores each image as a **storage reference** —
 `![](rebase-storage:posts/abc_cover.png)` — not as a URL: a private file's URL
 carries a download token that expires in minutes, and the text is saved. The
@@ -17548,7 +17550,7 @@ The reverse is not an update. Setting the field to a value is refused with `400`
 `beforeDelete` and `afterDelete` always apply to it. An upsert may create a row
 that is already stamped, but never stamps one that was stored.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Nor does an upsert write into a row in the trash: when its key belongs to a
+Nor does an upsert write into a row in the trash: when its key belongs to a
 stamped row, it is refused with `409` `ROW_IN_TRASH` and nothing is written.
 Restore the row first, or purge it with `?hard=true` and upsert again. On 0.23
 the upsert writes its values into the hidden row and answers `201`.
@@ -18060,7 +18062,7 @@ So the triggering write and everything its callbacks wrote commit together or no
 - A throw from `afterSave` or `afterDelete` rolls the triggering write back, along with every `context.data` write the callbacks made. The caller is answered **400 `CALLBACK_REJECTED`** with `details.stage` naming the hook — or with the error's own status when it carries one: a `RebaseApiError` you threw, a unique violation's 409.
 - Realtime subscribers hear about the row only after the commit, so a write that rolled back is never announced.
 - A callback holds the transaction open while it runs, so a slow one is a lock held and a pooled connection tied up.
-- A `context.data` write runs the target collection's callbacks too, so an `afterSave` that updates its own row runs itself again. <span class="since-badge" data-since="0.24">Since 0.24</span> Writes nested more than 16 deep are refused with **500 `CALLBACK_RECURSION`**, naming the hook and the collection, and the whole write rolls back. Make such a write conditional, as the example below does.
+- A `context.data` write runs the target collection's callbacks too, so an `afterSave` that updates its own row runs itself again. Writes nested more than 16 deep are refused with **500 `CALLBACK_RECURSION`**, naming the hook and the collection, and the whole write rolls back. Make such a write conditional, as the example below does.
 
 Let a failure throw when the triggering write should not survive it. Catch it when it should, but only around a `context.data` **write**: a create, update or delete the database refuses (a unique or foreign key violation, a trigger) is undone on its own, and the rest commits.
 
@@ -20052,7 +20054,7 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 
 The OpenAPI spec is auto-generated from your collection definitions: it describes the list, read, create, update, delete and bulk endpoints of every collection the backend serves, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> For a [`softDelete`](/docs/collections/soft-delete/) collection the spec says
+For a [`softDelete`](/docs/collections/soft-delete/) collection the spec says
 that a delete, single or bulk, moves the row to the trash, and documents
 `?hard=true` on both deletes and `?deleted=include|only` on the list, the single
 read, the count and the aggregate. Studio's API explorer sends only the
@@ -20108,7 +20110,7 @@ everything in this section applies to them too, except `?on_conflict=`.
 A write's body must be a JSON object. `null`, a number, a string or an array is
 a `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> An update cannot change a row's key. A body that names the key with another
+An update cannot change a row's key. A body that names the key with another
 value is a `400 KEY_IMMUTABLE`, before any hook runs and with nothing written,
 whichever way the update arrives: REST, the realtime socket, MCP or the
 in-process `rebase.data`. The key the row already has is accepted, as a form
@@ -20364,7 +20366,7 @@ half-applied is the state with no good recovery.
 
 ### API Keys
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> An API key is a long-lived bearer credential, `rk_live_…`, for a caller that is
+An API key is a long-lived bearer credential, `rk_live_…`, for a caller that is
 not a person in a browser: a script, a CI job, an agent, an MCP client, another
 service. What a key may do is a list of [scopes](/docs/backend/roles-and-scopes/),
 such as `data:read:orders` or `cron:write`.
@@ -20394,7 +20396,7 @@ surfaces its scopes reach, the realtime WebSocket and the [`/mcp` endpoint](/doc
 
 #### Creating one
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A service key needs a name and at least one scope.
+A service key needs a name and at least one scope.
 
 ```bash
 # CLI: talks to the backend with the service key from .env
@@ -20495,7 +20497,7 @@ admin.
 
 #### Full access, for CI and migrations
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `--full-access` gives the key every scope its creator holds, less `keys:read` and
+`--full-access` gives the key every scope its creator holds, less `keys:read` and
 `keys:write`, which no key may hold. Through the CLI, which uses the service key,
 that is every data-plane and admin-plane scope. Add `--roles admin` and
 row-level security no longer limits which rows it reads, changes or deletes:
@@ -20509,7 +20511,7 @@ not the right shape for an agent.
 
 #### Rate limit
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A key's `rate_limit` is how many requests it may make in a 15-minute
+A key's `rate_limit` is how many requests it may make in a 15-minute
 window, and every door counts against it in one bucket, `api-key:<id>`:
 
 - its HTTP requests to the data, storage and functions APIs;
@@ -20526,7 +20528,7 @@ SQL editor's, are not rate limited.
 
 ### Personal keys
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A personal key acts **as its owner**: their uid, and their roles as they are at
+A personal key acts **as its owner**: their uid, and their roles as they are at
 each request. Owner-style rules match it, so it reads exactly what its owner
 would, narrowed by its scopes. It suits a person's own scripts, a CLI on their
 laptop, or a tool they connect to their own account.
@@ -20641,7 +20643,7 @@ editor and branch messages need `database:read` or `database:write`.
 
 ### Agents and MCP servers
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> An agent wants the *narrowest* key that does its job. Start scoped, and give it
+An agent wants the *narrowest* key that does its job. Start scoped, and give it
 an expiry:
 
 ```bash
@@ -20802,7 +20804,7 @@ the ID you got. Read the response header.
 | --- | --- | --- | --- |
 | `AAL2_REQUIRED` | 403 | The route needs a second factor and the session has only one. | Complete the MFA challenge, then retry. |
 | `ALREADY_VERIFIED` | 400 | The address or factor is already verified. | Nothing — the desired state is already true. |
-| `ACCOUNT_OUTRANKS_CALLER` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> The account being edited, reset or deleted holds a role or scope the caller does not. `details.beyond` names them. | Have someone who holds them make the change. |
+| `ACCOUNT_OUTRANKS_CALLER` | 403 | The account being edited, reset or deleted holds a role or scope the caller does not. `details.beyond` names them. | Have someone who holds them make the change. |
 | `ANONYMOUS_AUTH_DISABLED` | 403 | Anonymous sign-in is off on this server. | Enable it, or sign in with a real identity. |
 | `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | An API key tried to list, create, change or revoke API keys, its own kind or personal ones. | Manage keys as a person holding `keys:write`, or with the service key. |
 | `AUTH_MIDDLEWARE_MISSING` | 500 | A guarded route ran with no Rebase auth middleware before it, so the caller's credential was never looked at. | Mount the app through the functions router rather than onto your own server directly. |
@@ -20817,50 +20819,50 @@ the ID you got. Read the response header.
 | `EMAIL_NOT_VERIFIED` | 403 | The account exists and its address is unverified. | Verify the address. |
 | `FACTOR_NOT_VERIFIED` | 400 | The MFA factor was enrolled but never confirmed. | Confirm the factor. |
 | `IDENTITY_ALREADY_LINKED` | 409 | That OAuth identity belongs to another account. | Sign in with it, or unlink it there first. |
-| `IMPERSONATION_FORBIDDEN` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> A request sent `x-rebase-impersonate` and its caller may not run a request as another user. Only a signed-in administrator's own session may, never an API key or the service key. | Send it with an administrator's session, or leave the header out. |
-| `IMPERSONATION_INVALID` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> `x-rebase-impersonate` was sent empty. | Send the uid of the user to act as, or leave the header out. |
-| `IMPERSONATION_TARGET_NOT_FOUND` | 404 | <span class="since-badge" data-since="0.24">Since 0.24</span> `x-rebase-impersonate` names no active user: no account has that uid, or it is disabled. | Check the uid. |
-| `IMPERSONATION_UNAVAILABLE` | 501 | <span class="since-badge" data-since="0.24">Since 0.24</span> This backend's auth cannot run a request as another user, because its `AuthAdapter` has no `resolveUser`. | Implement `resolveUser` in the adapter, or leave the header out. |
-| `IMPERSONATION_UNSUPPORTED` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> `x-rebase-impersonate` was sent to a route that cannot run as another user. Only the data API and custom functions honour it, and the realtime socket honours `impersonate` on `AUTHENTICATE`. | Send the request without the header. |
+| `IMPERSONATION_FORBIDDEN` | 403 | A request sent `x-rebase-impersonate` and its caller may not run a request as another user. Only a signed-in administrator's own session may, never an API key or the service key. | Send it with an administrator's session, or leave the header out. |
+| `IMPERSONATION_INVALID` | 400 | `x-rebase-impersonate` was sent empty. | Send the uid of the user to act as, or leave the header out. |
+| `IMPERSONATION_TARGET_NOT_FOUND` | 404 | `x-rebase-impersonate` names no active user: no account has that uid, or it is disabled. | Check the uid. |
+| `IMPERSONATION_UNAVAILABLE` | 501 | This backend's auth cannot run a request as another user, because its `AuthAdapter` has no `resolveUser`. | Implement `resolveUser` in the adapter, or leave the header out. |
+| `IMPERSONATION_UNSUPPORTED` | 400 | `x-rebase-impersonate` was sent to a route that cannot run as another user. Only the data API and custom functions honour it, and the realtime socket honours `impersonate` on `AUTHENTICATE`. | Send the request without the header. |
 | `INVALID_ACCOUNT` | 400 | The account is in a state this operation cannot act on. | See the message. |
 | `INVALID_CHALLENGE` | 400 | The MFA challenge is unknown or expired. | Start a new one. |
 | `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |
 | `INVALID_CREDENTIALS` | 401 | Wrong email or password — deliberately not saying which. | Retry, or reset the password. |
-| `INVALID_PLATFORM_TOKEN` | 401 | <span class="since-badge" data-since="0.24">Since 0.24</span> An `rpt_` platform token was refused: a bad signature, the wrong audience, expired, or a lifetime over the ceiling. The message says which. | Have the platform mint a fresh one — on Rebase Cloud, run the command again. |
-| `INVALID_SCOPES` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> A key was asked for something that is not a scope: malformed, unknown, or with a target the scope does not take. `details.problems` says which and why; `details.validScopes` lists them all. | Use a name from the list. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
+| `INVALID_PLATFORM_TOKEN` | 401 | An `rpt_` platform token was refused: a bad signature, the wrong audience, expired, or a lifetime over the ceiling. The message says which. | Have the platform mint a fresh one — on Rebase Cloud, run the command again. |
+| `INVALID_SCOPES` | 400 | A key was asked for something that is not a scope: malformed, unknown, or with a target the scope does not take. `details.problems` says which and why; `details.validScopes` lists them all. | Use a name from the list. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | A verification, reset, magic-link or address-change token is malformed, unknown, spent or expired (400). An OAuth provider credential or a refresh token that does not verify is a 401. | Request a fresh link, or sign in again. |
-| `KEY_MANAGEMENT_SCOPE` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> A key was asked for `keys:read` or `keys:write`. No key may manage keys. `details.scopes` names them. | Leave them out. |
+| `KEY_MANAGEMENT_SCOPE` | 400 | A key was asked for `keys:read` or `keys:write`. No key may manage keys. `details.scopes` names them. | Leave them out. |
 | `LAST_ADMIN` | 403 | The change would leave the project with no admin. | Promote someone else first. |
 | `MFA_REQUIRED` | 401 | The password was right and the account has a verified second factor, so sign-in is only half done. `details` carries a short-lived token scoped to the MFA challenge — it is not a session. | Open a challenge and answer it; the challenge response issues the session. |
 | `NO_SESSION` | 401 | No session cookie or refresh token was presented. Normal on a first page load. | Sign in. |
 | `NOT_ANONYMOUS` | 400 | An upgrade-from-anonymous route was called by a real account. | Nothing to upgrade. |
 | `OAUTH_ERROR` | 401 | The OAuth provider refused, or returned an error. | Retry the flow; the message carries the provider's reason. |
-| `PERSONAL_KEYS_DISABLED` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> Personal API keys are off on this backend. | Set `personalKeys: true` in the users collection's `auth` block. |
-| `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> The service key or a guest session tried to use the personal-key routes. Neither has an account for a key to act as. | Sign in to an account, or create a service key under `/api/admin/api-keys`. |
-| `PLATFORM_TOKENS_OFF` | 401 | <span class="since-badge" data-since="0.24">Since 0.24</span> An `rpt_` platform token reached a server that does not accept them: `REBASE_PLATFORM_TOKEN_KEY` and `REBASE_PLATFORM_TOKEN_AUDIENCE` are not set. | The platform hosting the app sets both when it deploys; redeploy, or sign in to the app another way. |
+| `PERSONAL_KEYS_DISABLED` | 403 | Personal API keys are off on this backend. | Set `personalKeys: true` in the users collection's `auth` block. |
+| `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | The service key or a guest session tried to use the personal-key routes. Neither has an account for a key to act as. | Sign in to an account, or create a service key under `/api/admin/api-keys`. |
+| `PLATFORM_TOKENS_OFF` | 401 | An `rpt_` platform token reached a server that does not accept them: `REBASE_PLATFORM_TOKEN_KEY` and `REBASE_PLATFORM_TOKEN_AUDIENCE` are not set. | The platform hosting the app sets both when it deploys; redeploy, or sign in to the app another way. |
 | `RATE_LIMITED` | 429 | Too many attempts from this caller. | Back off; the message says for how long. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | The redirect target is not on the allow-list. | Add it to the provider configuration. |
 | `REGISTRATION_DISABLED` | 403 | Self-service sign-up is off. | Have an admin create the account. |
-| `ROLE_EXCEEDS_CALLER` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> The roles being granted hold a scope, or `admin`, that the caller does not. `details.beyond` names them. | Have someone who holds them grant the role. |
-| `ROLE_EXCEEDS_CREATOR` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> A service key was given an RLS role its creator does not hold. Only an admin may give any role. `details.roles` names them. | Drop the role, or have an admin create the key. |
+| `ROLE_EXCEEDS_CALLER` | 403 | The roles being granted hold a scope, or `admin`, that the caller does not. `details.beyond` names them. | Have someone who holds them grant the role. |
+| `ROLE_EXCEEDS_CREATOR` | 403 | A service key was given an RLS role its creator does not hold. Only an admin may give any role. `details.roles` names them. | Drop the role, or have an admin create the key. |
 | `ROLE_EXISTS` | 409 | That role name is taken. | Pick another name. |
 | `ROLE_LOOKUP_FAILED` | 503 | The caller's roles could not be read — on an admin route, or on a data request on a backend with `config.auth`. Fails closed rather than trusting the roles in the token. | Retry; check the database. |
-| `SCOPE_EXCEEDS_CREATOR` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> A key was asked for a scope its creator does not hold. A key never holds more than the account that makes it. `details.scopes` names them. | Drop them, or have someone who holds them create the key. |
-| `SCOPE_MISSING` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> The credential does not hold the scope this route, collection, storage source or function needs. `details.requiredScope` names it, target included. | For a person, a role that declares the scope. For a key, a key that holds it. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
+| `SCOPE_EXCEEDS_CREATOR` | 403 | A key was asked for a scope its creator does not hold. A key never holds more than the account that makes it. `details.scopes` names them. | Drop them, or have someone who holds them create the key. |
+| `SCOPE_MISSING` | 403 | The credential does not hold the scope this route, collection, storage source or function needs. `details.requiredScope` names it, target included. | For a person, a role that declares the scope. For a key, a key that holds it. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
 | `SELF_DELETE` | 400 | An admin tried to delete their own account. | Have another admin do it. |
 | `SESSION_REVOKED` | 401 | The session was signed out elsewhere, or every session was revoked, or the account was deleted. | Sign in again. |
-| `ACCOUNT_DISABLED` | 401/403 | <span class="since-badge" data-since="0.24">Since 0.24</span> An administrator switched the account off: sign-in (403), refresh and every token it holds (401) are refused. | Ask an administrator. |
-| `EMAIL_NOT_CONFIRMED` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> `requireEmailVerification` is on and the address is not verified yet. Answered only for a correct password; a new link is mailed. | Follow the link in the mail. |
-| `PROOF_REQUIRED` | 409 | <span class="since-badge" data-since="0.24">Since 0.24</span> `POST /auth/verify-email`: the account holds a password or identity nobody proved, and the request proves neither. The token is not spent. | Send `password` to keep it, or `removeUnproven: true` to verify without it. |
-| `UNDELIVERABLE_ADDRESS` | 400 / 409 | <span class="since-badge" data-since="0.24">Since 0.24</span> A verification mail was asked for an address mail cannot reach — a guest's, or X's placeholder (400) — or an account asked to move onto such an address (409, `POST /auth/change-email`). | Set a real address first. |
-| `EMAIL_UNCHANGED` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> `POST /auth/change-email` named the account's current address. | Nothing to change. |
-| `ANONYMOUS_USER` | 403 | <span class="since-badge" data-since="0.24">Since 0.24</span> A guest asked to change its email address; a guest has none of its own. | Make it an account first (`POST /auth/anonymous/link`). |
-| `MFA_NOT_ENROLLED` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> Recovery codes were asked for an account with no verified second factor. | Enrol a factor first. |
-| `HOOK_REJECTED` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> A `beforeUserCreate`, `beforeLogin`, `beforeUserDelete` or `beforeEmailChange` hook threw. The message is the hook's; a hook that chose a 4xx status answers with it. | See the message. |
-| `INVALID_JSON` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> The request body is not JSON. | Send a JSON body. |
+| `ACCOUNT_DISABLED` | 401/403 | An administrator switched the account off: sign-in (403), refresh and every token it holds (401) are refused. | Ask an administrator. |
+| `EMAIL_NOT_CONFIRMED` | 403 | `requireEmailVerification` is on and the address is not verified yet. Answered only for a correct password; a new link is mailed. | Follow the link in the mail. |
+| `PROOF_REQUIRED` | 409 | `POST /auth/verify-email`: the account holds a password or identity nobody proved, and the request proves neither. The token is not spent. | Send `password` to keep it, or `removeUnproven: true` to verify without it. |
+| `UNDELIVERABLE_ADDRESS` | 400 / 409 | A verification mail was asked for an address mail cannot reach — a guest's, or X's placeholder (400) — or an account asked to move onto such an address (409, `POST /auth/change-email`). | Set a real address first. |
+| `EMAIL_UNCHANGED` | 400 | `POST /auth/change-email` named the account's current address. | Nothing to change. |
+| `ANONYMOUS_USER` | 403 | A guest asked to change its email address; a guest has none of its own. | Make it an account first (`POST /auth/anonymous/link`). |
+| `MFA_NOT_ENROLLED` | 400 | Recovery codes were asked for an account with no verified second factor. | Enrol a factor first. |
+| `HOOK_REJECTED` | 400 | A `beforeUserCreate`, `beforeLogin`, `beforeUserDelete` or `beforeEmailChange` hook threw. The message is the hook's; a hook that chose a 4xx status answers with it. | See the message. |
+| `INVALID_JSON` | 400 | The request body is not JSON. | Send a JSON body. |
 | `SELF_DISABLE` | 400 | An administrator tried to disable their own account. | Ask another administrator. |
 | `NOT_SUPPORTED` | 501 | This backend's auth repository cannot do what was asked (disable accounts, change an address). | Restart the server so the column is added, or use a repository that supports it. |
-| `UNKNOWN_SCOPE_TARGET` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> A scope's target names a collection, storage source or function this backend does not serve. `details` lists the ones it does. | Fix the target. |
+| `UNKNOWN_SCOPE_TARGET` | 400 | A scope's target names a collection, storage source or function this backend does not serve. `details` lists the ones it does. | Fix the target. |
 | `UNVERIFIED_IDENTITIES` | 409 | A magic link, email code or password reset proved an unverified account's address, and the account carries a sign-in identity whose provider never verified that address. The auth repository cannot remove it (it has no `unlinkUserIdentity`), so the proof is refused rather than leave that way in on a verified account. | Implement `unlinkUserIdentity` in the custom auth repository, or have an admin review the account. |
 | `SETUP_REQUIRED` | 403 | The project has no admin yet, so this route is not available. | Complete first-admin setup. |
 | `TOKEN_ALREADY_USED` | 401 | A one-time token was replayed, or a refresh token that was rotated away more than `refreshTokenReuseIntervalSeconds` ago. | Request a fresh one, or sign in again. |
@@ -20879,13 +20881,13 @@ the ID you got. Read the response header.
 | `BULK_TOO_LARGE` | 400 | The bulk body exceeds the configured item limit. | Split the request. |
 | `BULK_UNSUPPORTED` | 400 | This collection or driver does not support bulk writes. | Write the rows one at a time. |
 | `CALLBACK_REJECTED` | 400 | A collection callback refused the write. A `throw` from `beforeSave`/`beforeDelete`/`after*` is a 400 carrying the author's own message; a `beforeDelete` that returns `false` is a 403. `details.stage` names which callback, `details.path` the collection. | Read the message — it was written by this project, not by Rebase. |
-| `CALLBACK_RECURSION` | 500 | <span class="since-badge" data-since="0.24">Since 0.24</span> Writes started by hooks nested more than 16 deep: a hook's `context.data` write runs that collection's hooks again, and nothing in the chain stops it — usually an `afterSave` that updates its own row unconditionally. The whole write was rolled back. The message names the hook and the collection; `details.chain` lists each hook → write step. | Make the hook's write conditional: act on `status === "new"` only, or skip it when `values` already hold what it would write. |
+| `CALLBACK_RECURSION` | 500 | Writes started by hooks nested more than 16 deep: a hook's `context.data` write runs that collection's hooks again, and nothing in the chain stops it — usually an `afterSave` that updates its own row unconditionally. The whole write was rolled back. The message names the hook and the collection; `details.chain` lists each hook → write step. | Make the hook's write conditional: act on `status === "new"` only, or skip it when `values` already hold what it would write. |
 | `CURSOR_WITH_OFFSET` | 400 | `?after=` was combined with `?offset=` or `?page=`. A cursor already says where the page starts, so an offset on top of it silently skips that many rows past the cursor — a gap the caller cannot see in the response. | Use one or the other. |
 | `DISTINCT_NOT_APPLICABLE` | 400 | `?distinct=true` was combined with a search or vector query. Both attach a per-row score, so no two rows are ever equal and `DISTINCT` would collapse nothing — it would look like it worked and change nothing. | Drop one of the two. |
 | `DISTINCT_ORDER_BY_NOT_SELECTED` | 400 | A `distinct` read is ordered by a column it does not return. A `SELECT DISTINCT` can only be ordered by columns in its select list, or the rows it collapses have no defined order. `details.fields` names them. | Add those fields to `?fields=`, or drop them from `?orderBy=`. |
-| `DB_CONNECT_TIMEOUT` | 503 | <span class="since-badge" data-since="0.24">Since 0.24</span> Opening a new database connection took longer than `DB_POOL_CONNECT_TIMEOUT`: the database is slow to accept connections, or far away. Sent with `Retry-After`. | Retry; the SDK does. Check the database's load and the network to it. |
+| `DB_CONNECT_TIMEOUT` | 503 | Opening a new database connection took longer than `DB_POOL_CONNECT_TIMEOUT`: the database is slow to accept connections, or far away. Sent with `Retry-After`. | Retry; the SDK does. Check the database's load and the network to it. |
 | `DB_PERMISSION_DENIED` | 500 | Postgres refused the statement (`42501`): either a row-level-security policy denying this role, or a missing `GRANT`. | See [Troubleshooting](/docs/troubleshooting/). |
-| `DB_POOL_EXHAUSTED` | 503 | <span class="since-badge" data-since="0.24">Since 0.24</span> Every pooled database connection stayed busy for `DB_POOL_CONNECT_TIMEOUT`, so this request never reached the database. Load, not a fault; sent with `Retry-After`. The server logs the remedy once a minute. | Retry; the SDK does. Raise `DB_POOL_MAX`, or find the slow queries or long transactions holding connections. |
+| `DB_POOL_EXHAUSTED` | 503 | Every pooled database connection stayed busy for `DB_POOL_CONNECT_TIMEOUT`, so this request never reached the database. Load, not a fault; sent with `Retry-After`. The server logs the remedy once a minute. | Retry; the SDK does. Raise `DB_POOL_MAX`, or find the slow queries or long transactions holding connections. |
 | `FIELD_NOT_READABLE` | 400 | A filter, `orderBy`, `fields`, aggregate `select` or `groupBy` names a field this caller's roles cannot read (`access.read`) — or a field operation (`$inc`, `$push`, …) targets one, where a refused bound would reveal the stored value. A field no response can carry has to be one no query can interrogate, or the value is readable one predicate at a time. `details.violations` names each field. | Drop the field from the query, or acquire the role. See [Field access](/docs/collections/field-access/). |
 | `FIELD_NOT_WRITABLE` | 400 | The body sets a field this caller's roles cannot write (`access.write`). Refused rather than dropped: a write that discards a field would report success for an edit that did not happen. The same code refuses a write through a parent that sets a relation the caller may not write, and an update that sets a `softDelete` field to a value — only a delete stamps it. `details.violations` names each field. | Remove the field, or acquire the role. A field nobody may write answers `VALIDATION_EXCLUDED_FIELDS` instead. |
 | `IDEMPOTENCY_KEY_IN_PROGRESS` | 409 | An earlier request with the same `Idempotency-Key` is still running. | Retry once it finishes. |
@@ -20917,7 +20919,7 @@ the ID you got. Read the response header.
 | `INVALID_VECTOR_DISTANCE` | 400 | `?vector_distance=` is not `cosine`, `l2` or `inner_product`. | Use one of those three. |
 | `INVALID_VECTOR_THRESHOLD` | 400 | `?vector_threshold=` is not a number. | Send a number. |
 | `INVALID_WHERE` | 400 | `?where=` is not a JSON object mapping fields to conditions. | Send `{"status":["==","active"]}`. |
-| `KEY_IMMUTABLE` | 400 | <span class="since-badge" data-since="0.24">Since 0.24</span> An update names the row's key with a value other than the one it is addressed by — in the body, or written by a `beforeSave`. A row cannot move to another key: everything after the write (the read-back, `afterSave`, history, realtime) addresses it by the key it had. Refused before any hook runs, with nothing written, on every door. `details.violations` names the field. | Create the row under the new key and delete this one. Sending the key the row already has is fine. |
+| `KEY_IMMUTABLE` | 400 | An update names the row's key with a value other than the one it is addressed by — in the body, or written by a `beforeSave`. A row cannot move to another key: everything after the write (the read-back, `afterSave`, history, realtime) addresses it by the key it had. Refused before any hook runs, with nothing written, on every door. `details.violations` names the field. | Create the row under the new key and delete this one. Sending the key the row already has is fine. |
 | `MISSING_AGGREGATE_SELECT` | 400 | The aggregate route was called with no `?select=`. | Add one, e.g. `?select=count()`. |
 | `NO_COLLECTIONS` | 404 | The project serves no collections: none declared in code, and no tables to derive them from. | Create tables — a migration, SQL, or a collection file plus `rebase db push` — and restart. |
 | `NOT_FOUND` | 404 | No row with that id in that collection — or one that row-level security hides from this caller. | Check the id, then the collection's `securityRules`. |
@@ -20931,7 +20933,7 @@ the ID you got. Read the response header.
 | `RELATION_NOT_WRITABLE` | 400 | The nested path is not a writable relation. | See [Relations](/docs/collections/relations/). |
 | `RELATION_PIVOT_UNSUPPORTED` | 400 | The relation declares junction columns, but this data source cannot write them. | The link itself still works; only the payload on it does not. Check the driver's capabilities. |
 | `RELATION_SOURCE_KEY_EMPTY` | 400 | A relation write had no source key to hang the link on. | Save the parent row first. |
-| `ROW_IN_TRASH` | 409 | <span class="since-badge" data-since="0.24">Since 0.24</span> An upsert's key belongs to a row in the trash (a soft-deleted row still holds its key). An upsert does not write into a deleted row, on any door: REST `?on_conflict=`, `/bulk` and `/_batch` upserts, the SDK and the realtime socket. Nothing was written. | Restore the row first (an update setting the soft-delete field to `null`), or purge it with `?hard=true` and upsert again. See [Soft delete](/docs/collections/soft-delete/). |
+| `ROW_IN_TRASH` | 409 | An upsert's key belongs to a row in the trash (a soft-deleted row still holds its key). An upsert does not write into a deleted row, on any door: REST `?on_conflict=`, `/bulk` and `/_batch` upserts, the SDK and the realtime socket. Nothing was written. | Restore the row first (an update setting the soft-delete field to `null`), or purge it with `?hard=true` and upsert again. See [Soft delete](/docs/collections/soft-delete/). |
 | `SCHEMA_DRIFT` | 500 | A table or column the code expects does not exist in the database. | `rebase db push` in development; redeploy on a managed tenant. |
 | `SCORE_CURSOR_UNSUPPORTED` | 400 | `startAfter` was combined with `orderBy: "_score"`. Relevance is computed per query rather than stored, so it cannot key a cursor. | Page relevance with `limit`/`offset`, or order by a column. |
 | `TENANT_IMMUTABLE` | 400 | A write would move a row from one tenant to another. A row cannot change tenant. `details.violations` names the field. | Create the row in the other tenant and delete this one, or write with a role in `tenant.bypassRoles`. |
@@ -20947,7 +20949,7 @@ the ID you got. Read the response header.
 | `UNKNOWN_RESPONSE_FIELD` | 400 | `?fields=` asks for a field the collection does not have. | Check the spelling; the message lists the known fields. |
 | `UNKNOWN_VECTOR_PROPERTY` | 400 | A vector search named a property that is not a `vector` on this collection. | The message lists the collection's vector properties. |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | The `Content-Type` is not one this route accepts. | Send the type the route documents. |
-| `UNSUPPORTED_OPTION` | — | <span class="since-badge" data-since="0.24">Since 0.24</span> Thrown, not answered: a write through the in-process accessor (`context.data` in a callback, `rebase.data` in a function or cron) was given `ifMatch` or `idempotencyKey`. That door has no precondition check or idempotency store, so the option is refused before anything is written rather than ignored. | Drop the option there, or make the write through the HTTP client, which honours both. |
+| `UNSUPPORTED_OPTION` | — | Thrown, not answered: a write through the in-process accessor (`context.data` in a callback, `rebase.data` in a function or cron) was given `ifMatch` or `idempotencyKey`. That door has no precondition check or idempotency store, so the option is refused before anything is written rather than ignored. | Drop the option there, or make the write through the HTTP client, which honours both. |
 | `UNSUPPORTED_RELATION_FILTER` | 400 | The filter crosses a `via` relation, whose join path is authored one way only, so there is nothing to correlate a subquery back to. | Filter from the owning side. |
 | `UNSUPPORTED_RELATION_FILTER_OPERATOR` | 400 | The operator is not defined for that field: a relation with no column on this row is filtered by membership, and case-insensitive matching only applies to text. | See the message; it lists what the field accepts. |
 | `VALIDATION_CONSTRAINT` | 400 | A value broke a `validation` rule the property declares — a length, a range, a pattern, a required field. | See the message; it names each violation. |
@@ -20996,7 +20998,7 @@ the message names the constraint.
 | `STORAGE_WRITE_FAILED` | 502 | The storage backend refused or dropped the write. | Check its own logs and credentials. |
 | `TRANSFORM_OVERLOADED` | 503 | Too many image transforms are in flight. | Retry; consider a CDN in front. |
 | `UNKNOWN_STORAGE_SOURCE` | 400 / 404 | The request named a storage source (`?storageId=`) this project does not declare. A `bucket` this deployment does not serve is the same code at **404** (on a listing, and on an upload, a folder or a resumable upload to S3 or GCS) — the store is what is missing, and `details` names the buckets and the sources that do exist. Both used to come back as "file not found", identical to a key that is simply absent. | Declare the source in `config/resources.ts`, or check `GET /api/storage/sources`. |
-| `UPLOAD_LOCKED` | 423 | <span class="since-badge" data-since="0.24">Since 0.24</span> A resumable upload's `PATCH` arrived while another chunk of the same upload was still being received — almost always a client retrying the chunk in flight. It is refused rather than queued, as tusd does. | Ask for the offset with `HEAD /api/storage/tus/:id` and resume from there; tus-js-client backs off and retries on its own. See [TUS resumable uploads](/docs/backend/storage/#tus-resumable-upload-protocol). |
+| `UPLOAD_LOCKED` | 423 | A resumable upload's `PATCH` arrived while another chunk of the same upload was still being received — almost always a client retrying the chunk in flight. It is refused rather than queued, as tusd does. | Ask for the offset with `HEAD /api/storage/tus/:id` and resume from there; tus-js-client backs off and retries on its own. See [TUS resumable uploads](/docs/backend/storage/#tus-resumable-upload-protocol). |
 
 ### Custom functions
 
@@ -21322,7 +21324,7 @@ Applying also needs one thing more than the scope — see [Who may apply](#who-m
 ### Plan before you apply
 
 `/plan` has no side effects. Post the change, and it tells you what the change
-means. <span class="since-badge" data-since="0.24">Since 0.24</span> A change to an existing collection is a `patch` — what changed, as
+means. A change to an existing collection is a `patch` — what changed, as
 operations on paths of keys — and a new collection is the whole `collection`:
 
 ```json
@@ -21435,7 +21437,7 @@ refused too. Each refusal names the change and what to do instead.
 The verdict is read from the schema each side produces — the same plan
 `schema.generated.ts` and `db push` are rendered from — so an edit that changes
 the database cannot be reported as no change. Two edits that look like changes
-and are not refused (<span class="since-badge" data-since="0.24">Since 0.24</span>; 0.23 reports both as needing a migration):
+and are not refused (; 0.23 reports both as needing a migration):
 
 - **Renaming a property's key while keeping its column** (`columnName` set to
   the old column) moves no data. It is `safe`; API clients read the new name.
@@ -21446,7 +21448,7 @@ and are not refused (<span class="since-badge" data-since="0.24">Since 0.24</spa
 
 A refused change can still be written to your collection source and committed,
 leaving the database as it is — removing a property you no longer serve is the
-usual case. <span class="since-badge" data-since="0.24">Since 0.24</span> Post `/apply` with `"sourceOnly": true`. Nothing runs; the commit
+usual case. Post `/apply` with `"sourceOnly": true`. Nothing runs; the commit
 message names what the database keeps, for example
 `chore(schema): remove sku from products (source only — column products.sku kept)`,
 and each change in the plan carries a `sourceOnly` sentence saying what it
@@ -21479,7 +21481,7 @@ repository, the paths are prefixed with it, found by walking up from your
 collections directory to the nearest `rebase.json`. A project with no
 `rebase.json` keeps the plain paths.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> No SQL goes in the commit. `rebase db push` and `rebase db generate` write theirs
+No SQL goes in the commit. `rebase db push` and `rebase db generate` write theirs
 from the collections on every run, into `.rebase/sql/`, which is gitignored.
 On 0.23 the commit also carries `drizzle/schema.sql`, `drizzle/policies.sql` and
 `drizzle/search.sql`, written at the project root.
@@ -21491,7 +21493,7 @@ their table edits are invisible to your repository.
 
 ### Who may apply
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Holding `schema:read` is enough to **plan**. Planning has no side effects, and a
+Holding `schema:read` is enough to **plan**. Planning has no side effects, and a
 CI job asking whether a proposed collection change is applicable is a good use of
 it.
 
@@ -21779,7 +21781,7 @@ const backend = await initializeRebaseBackend({
 | `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
 | `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | How long a refresh token that was rotated away still mints a sibling of its session, so a client that lost a refresh answer is not signed out |
-| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | <span class="since-badge" data-since="0.24">Since 0.24</span> What a refresh token presented after that window does. `"reject"` refuses it (`TOKEN_ALREADY_USED`) and logs it, and the session stands: this is not reuse detection, since whoever refreshed first keeps the session. `"revoke-session"` ends the whole sign-in on such a replay (`SESSION_REVOKED`), as GoTrue does, and the owner signs in again. `AUTH_REFRESH_TOKEN_REUSE` |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | What a refresh token presented after that window does. `"reject"` refuses it (`TOKEN_ALREADY_USED`) and logs it, and the session stands: this is not reuse detection, since whoever refreshed first keeps the session. `"revoke-session"` ends the whole sign-in on such a replay (`SESSION_REVOKED`), as GoTrue does, and the owner signs in again. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Require a session for the data API |
 | `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
@@ -21790,8 +21792,8 @@ const backend = await initializeRebaseBackend({
 | `email` | `EmailConfig` | — | SMTP, for password reset, verification, invitations and magic links |
 | `magicLink` | `boolean` | `false` | Enable passwordless email sign-in. Needs `email` configured; without it the routes answer `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Enable six-digit sign-in codes by email — see [One-time codes](#one-time-codes-by-email). Same email requirement |
-| `magicLinkCreatesUsers` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Since 0.24</span> Passwordless sign-up: a magic-link or email-code request for an address with no account creates one (no password, unverified until the link or code is used), while `allowRegistration` is on. Runs `beforeUserCreate` and the default role. Off, those requests create nothing and answer an unknown address as they answer a known one. `AUTH_MAGIC_LINK_CREATES_USERS` |
-| `requireEmailVerification` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Since 0.24</span> Refuse password sign-in until the address is verified, and register confirm-first — see [Email verification](/docs/backend/email-verification/). Needs `email`; the boot refuses it without |
+| `magicLinkCreatesUsers` | `boolean` | `false` | Passwordless sign-up: a magic-link or email-code request for an address with no account creates one (no password, unverified until the link or code is used), while `allowRegistration` is on. Runs `beforeUserCreate` and the default role. Off, those requests create nothing and answer an unknown address as they answer a known one. `AUTH_MAGIC_LINK_CREATES_USERS` |
+| `requireEmailVerification` | `boolean` | `false` | Refuse password sign-in until the address is verified, and register confirm-first — see [Email verification](/docs/backend/email-verification/). Needs `email`; the boot refuses it without |
 | `cookieAuth` | `CookieAuthConfig` | — | Deliver the refresh token as an `httpOnly` `Secure` `SameSite` cookie instead of in the JSON body — see below |
 | `providers` | `OAuthProvider[]` | `[]` | The canonical OAuth array; the named provider fields resolve into it |
 | `allowedRedirectUris` | `string[]` | — | Narrow which redirect URIs the OAuth routes accept |
@@ -21839,7 +21841,7 @@ side effects like provisioning a personal team on signup, use the auth lifecycle
 hooks (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), which
 receive the fully-populated user record.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> OAuth runs the same hooks as the other sign-ins: `beforeLogin` (with the
+OAuth runs the same hooks as the other sign-ins: `beforeLogin` (with the
 provider's address and `"oauth"`), `beforeUserCreate` when the sign-in creates
 the account, `afterUserCreate`, and `onAuthenticated`. `onAuthenticated` also
 fires on a token refresh (`"refresh"`), a password reset (`"password-reset"`) and
@@ -21848,7 +21850,7 @@ a sign-in. To stop an account that is already signed in, disable it with
 `PUT /api/admin/users/:uid { disabled: true }`: that refuses every sign-in and
 refresh and ends every session and token it holds.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `beforeEmailChange(user, newEmail)` runs when a signed-in user asks to
+`beforeEmailChange(user, newEmail)` runs when a signed-in user asks to
 move their account to another address. An address rule you enforce at sign-up
 in `beforeUserCreate` (only your own domain, say) belongs here too, or a member
 can sign up with an allowed address and then move to any other.
@@ -22172,7 +22174,7 @@ unverified emails.
 
 #### Email verification
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Registering mails the new account a
+Registering mails the new account a
 verification link, and following it keeps only what the person following it
 also proves. `requireEmailVerification` makes registration confirm-first. See
 [Email verification](/docs/backend/email-verification/).
@@ -22286,7 +22288,7 @@ When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive a
 
 ## Roles and scopes
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Every request to a Rebase backend asks one question: may this caller do this?
+Every request to a Rebase backend asks one question: may this caller do this?
 The answer is a **scope**, a string named `resource:action`: `data:read`,
 `users:write`, `cron:read`. A person's session, an API key, an MCP token and a
 role all hold scopes, and they all use the same strings. A grant reads the same
@@ -22360,7 +22362,7 @@ Admin-plane scopes take no target. An app scope takes one when it declares a
 
 ### Declaring roles
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Roles are declared on the users collection, under `auth.roles`. A role is a name
+Roles are declared on the users collection, under `auth.roles`. A role is a name
 the database sees, which RLS policies can match, plus a list of admin-plane and
 app scopes.
 
@@ -22547,7 +22549,7 @@ and the database's policies for the identity it acts as are another.
 
 ### When a scope is missing
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> The answer is `403 SCOPE_MISSING`, and `details.requiredScope` names the scope,
+The answer is `403 SCOPE_MISSING`, and `details.requiredScope` names the scope,
 with its target when there is one:
 
 ```json
@@ -22572,7 +22574,7 @@ that holds it.
 
 ## Email verification
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> When email is configured, registering
+When email is configured, registering
 mails the new account a verification link (`<frontend>/verify-email?token=…`, valid for 24 hours),
 so the owner proves the address at sign-up, on their own terms. `POST /api/auth/send-verification`
 mails it again. Nothing is mailed to the synthetic addresses of guests and X (Twitter) accounts.
@@ -22708,7 +22710,7 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/admin/users` | List users (paginated). `?search=` matches a case-insensitive part of the email or display name. <span class="since-badge" data-since="0.24">Since 0.24</span> On Postgres it also matches any role the user holds, and the uid; on MongoDB it still matches email and display name only |
+| `GET` | `/api/admin/users` | List users (paginated). `?search=` matches a case-insensitive part of the email or display name. On Postgres it also matches any role the user holds, and the uid; on MongoDB it still matches email and display name only |
 | `POST` | `/api/admin/users` | Create a user |
 | `GET` | `/api/admin/users/:uid` | Read one user |
 | `PUT` | `/api/admin/users/:uid` | Update one user. `{ disabled: true }` switches the account off without deleting it: every sign-in and refresh is refused (`ACCOUNT_DISABLED`), its sessions end and every token it holds is refused; `false` switches it back on |
@@ -22775,7 +22777,7 @@ but there is no access token" — the login was fine, the token was one level do
 
 #### Changing an email address
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A signed-in user
+A signed-in user
 moves their own account to another address in two steps:
 
 1. `POST /api/auth/change-email { newEmail }` records the change and mails a
@@ -22844,7 +22846,7 @@ guesses, each account is limited to ten verification attempts per 15 minutes
 recorded against the factor so it cannot be replayed for the rest of its
 ±1-step window.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> In the CMS users table, **Reset two-step verification**
+In the CMS users table, **Reset two-step verification**
 (`DELETE /api/admin/users/:uid/mfa`) and **Disable or enable account**
 (`PUT /api/admin/users/:uid { disabled }`) are offered to whoever holds
 `users:write`, as the routes are; the switch is never offered on your own
@@ -23528,7 +23530,7 @@ resumable upload is refused at creation, before its first chunk; and
 `OPTIONS /api/storage/tus` advertises it as `Tus-Max-Size` — for the source
 named by `?storageId=`, the default one otherwise.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> for `STORAGE_MAX_FILE_SIZE`: on 0.23 only the source's `maxFileSize` sets
+for `STORAGE_MAX_FILE_SIZE`: on 0.23 only the source's `maxFileSize` sets
 the limit, and the variable is not read.
 
 ```bash
@@ -23576,8 +23578,8 @@ Client                                                   Rebase Server
 | `GCS_PROJECT_ID` | GCP project ID for GCS |
 | `GCS_KEY_FILENAME` | Path to a GCP service account key file (omit on GKE — Workload Identity/ADC supplies credentials) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Standard ADC variable, read by the Google SDK itself (not needed on GCP with default credentials) |
-| `STORAGE_DOWNLOAD_TOKEN_TTL` | <span class="since-badge" data-since="0.24">Since 0.24</span> How long a private file's download URL works, in seconds — the lifetime of the token `/api/storage/metadata/*` mints (default `300`, at most `604800`, a week). Raise it for private video and audio, which keep requesting ranges after the page renders. The env spelling of `storageDownloadTokenTtl` |
-| `STORAGE_MAX_FILE_SIZE` | <span class="since-badge" data-since="0.24">Since 0.24</span> Largest file the source accepts, in bytes (default `52428800`, 50 MB). Suffix `__<KEY>` for a named source. A value that is not a whole number of bytes refuses the boot. See [How large a file may be](#how-large-a-file-may-be) |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | How long a private file's download URL works, in seconds — the lifetime of the token `/api/storage/metadata/*` mints (default `300`, at most `604800`, a week). Raise it for private video and audio, which keep requesting ranges after the page renders. The env spelling of `storageDownloadTokenTtl` |
+| `STORAGE_MAX_FILE_SIZE` | Largest file the source accepts, in bytes (default `52428800`, 50 MB). Suffix `__<KEY>` for a named source. A value that is not a whole number of bytes refuses the boot. See [How large a file may be](#how-large-a-file-may-be) |
 | `FORCE_LOCAL_STORAGE` | Allow `STORAGE_TYPE=local` in production — see below |
 | `STORAGE_PUBLIC_READ` | Serve stored objects to unauthenticated readers. The env spelling of `storagePublicRead`, and one of the three ways to satisfy the [production boot guard](#per-object-authorization). |
 | `STORAGE_ALLOW_ANY_AUTHENTICATED` | Opt out of the boot guard, restoring the behaviour where any signed-in user may read, overwrite, delete or list any key. The env spelling of `storageInsecureAllowAnyAuthenticated`. Only defensible when every signed-in user is trusted with every file. |
@@ -23794,7 +23796,7 @@ Worth knowing:
 
 #### API keys and tokens
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A signed-in person holds every storage scope, so the hook and the policies above
+A signed-in person holds every storage scope, so the hook and the policies above
 decide for them. An [API key](/docs/backend/api-keys/) also needs the storage
 scope for the operation, on the source the request names: `storage:read` for
 downloads, metadata and listings, `storage:write` for uploads, folders and every
@@ -24628,7 +24630,7 @@ narrower subscriptions (a page, a filter on the user's own rows) or a
 [broadcast channel](#broadcast-channels) carrying the change for clients to
 re-fetch on their own schedule.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> **One socket may hold at most 1,000 subscriptions.** The next is refused with
+**One socket may hold at most 1,000 subscriptions.** The next is refused with
 an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the
 socket already holds replaces that subscription and does not count again. The
 SDK shares identical subscriptions on a socket, so this counts the distinct
@@ -24644,7 +24646,7 @@ sender's.
 
 #### Sockets that stop answering
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A client can vanish without closing its socket: a phone loses
+A client can vanish without closing its socket: a phone loses
 signal, a laptop goes to sleep, a NAT forgets the connection. No close frame
 arrives, so nothing tells the server. The server therefore pings every socket
 every 30 seconds and terminates one that has not answered by the next ping, so
@@ -24825,7 +24827,7 @@ The typed SDK automatically reconnects when the WebSocket connection drops:
 - **Automatic resubscription** — On successful reconnect, all active subscriptions are re-registered with the server, and each one's next `onUpdate` carries whatever was written while the client was away. That update is the recovery signal. No manual intervention needed.
 - **Requests are at-most-once** — A request made while the socket is down waits for it, for up to 30 seconds from the call, and then fails with `REQUEST_TIMEOUT` without ever being sent. A request that was already sent when the connection dropped fails with `CONNECTION_LOST` and is **not** sent again: the server may or may not have run it, and only the caller knows whether running it twice is safe.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `client.ws.state` says where the connection is, and `onStateChange` is told every
+`client.ws.state` says where the connection is, and `onStateChange` is told every
 change. On 0.23 neither exists, the client stops after 5 failed attempts, and
 messages sent while disconnected are queued and sent after reconnecting:
 
@@ -24860,11 +24862,11 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies.
 
 1. The WebSocket connection authenticates using the same JWT token as the REST API.
 2. Every subscription refetch runs inside a PostgreSQL transaction with `set_config('app.user_id', ...)` and `set_config('app.user_roles', ...)` — ensuring RLS policies are enforced.
-3. <span class="since-badge" data-since="0.24">Since 0.24</span> The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame, to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame with the code `SESSION_ENDED` or `TOKEN_EXPIRED` and is closed with code `4001`. The SDK authenticates its socket again each time it refreshes its token, and after a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
+3. The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame, to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame with the code `SESSION_ENDED` or `TOKEN_EXPIRED` and is closed with code `4001`. The SDK authenticates its socket again each time it refreshes its token, and after a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
 
 This means each socket only receives updates for records its authenticated identity may see.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> An [API key](/docs/backend/api-keys/) authenticates the socket too: send the
+An [API key](/docs/backend/api-keys/) authenticates the socket too: send the
 `rk_…` key where the access token would go. The socket then checks each frame
 against the key's [scopes](/docs/backend/roles-and-scopes/): a fetch, a count or a
 subscription needs `data:read` on its collection, a save `data:write`, a delete
@@ -26053,7 +26055,7 @@ The handler can return any JSON-serializable value. It will be stored in the log
 
 ### REST API
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Reading needs the `cron:read` scope. Triggering, pausing and resuming need
+Reading needs the `cron:read` scope. Triggering, pausing and resuming need
 `cron:write`. An admin holds both. So does a person whose role declares them, and
 an API key created with them, which is what an external scheduler should carry:
 
@@ -26068,7 +26070,7 @@ See [Roles and scopes](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | List all registered cron jobs |
 | `GET` | `/api/admin/cron/:id` | Get a single job's status |
 | `POST` | `/api/admin/cron/:id/trigger` | Manually trigger a job — `409` while it is already running |
-| `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`). <span class="since-badge" data-since="0.24">Since 0.24</span> `503` when `rebase.cron_logs` cannot be read, rather than an empty history |
+| `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`). `503` when `rebase.cron_logs` cannot be read, rather than an empty history |
 | `PUT` | `/api/admin/cron/:id` | Pause or resume a job everywhere (`{ "enabled": false }`); `null` follows the code again |
 
 #### Example: List All Jobs
@@ -26175,7 +26177,7 @@ await client.cron.toggleJob("health-check", false); // pause
 await client.cron.toggleJob("health-check", true);  // resume
 ```
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `listJobs()` is typed `CronJobListing`: `jobs`, plus the `skipped`,
+`listJobs()` is typed `CronJobListing`: `jobs`, plus the `skipped`,
 `rejected` and `note` fields described under [Jobs that are not there](#jobs-that-are-not-there).
 
 ### Studio Dashboard
@@ -26185,15 +26187,15 @@ When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio und
 - **Job list** — All registered jobs with live status indicators
 - **Detail panel** — Schedule, next/last run, duration, and error information
 - **Execution history** — Expandable log entries with captured output and results
-- **Manual trigger** — Run any job on demand with one click. <span class="since-badge" data-since="0.24">Since 0.24</span> The panel waits for the run to end and says how it went: a run that failed shows its error
+- **Manual trigger** — Run any job on demand with one click. The panel waits for the run to end and says how it went: a run that failed shows its error
 - **Enable/disable** — Pause and resume jobs without restarting the server, for every process at once; a pause stays in place across restarts and deploys
-- **Jobs that are not there** — <span class="since-badge" data-since="0.24">Since 0.24</span> each job the scheduler refused, with its schedule and the reason, and how many cron files failed to load. None of them is scheduled; see [Jobs that are not there](#jobs-that-are-not-there)
+- **Jobs that are not there** — each job the scheduler refused, with its schedule and the reason, and how many cron files failed to load. None of them is scheduled; see [Jobs that are not there](#jobs-that-are-not-there)
 
 The dashboard auto-refreshes every 15 seconds.
 
 The panel shows the same thing whichever process serves it. A job another
 process is running shows as running.
-<span class="since-badge" data-since="0.24">Since 0.24</span> On every process that has a store, the run count, the failure count and the
+On every process that has a store, the run count, the failure count and the
 last run are read from `rebase.cron_logs`, one query bounded to each job's own
 rows. A process's own counters hold only the runs it made: the `api` role
 beside a worker runs nothing, and of two replicas that both schedule, neither
@@ -26900,7 +26902,7 @@ Reading `getUser(c)` is **not** a guard. An anonymous caller gets `undefined` an
 
 #### Scopes and app scopes
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `requireAdmin` admits the `admin` role and nobody else. For an action a narrower role or an API key should reach, guard the route with `requireScope`. It takes a built-in [scope](/docs/backend/roles-and-scopes/), or one the app declares under `auth.scopes` on the users collection, such as `"project:deploy": { label: "Deploy projects", target: "project" }`:
+`requireAdmin` admits the `admin` role and nobody else. For an action a narrower role or an API key should reach, guard the route with `requireScope`. It takes a built-in [scope](/docs/backend/roles-and-scopes/), or one the app declares under `auth.scopes` on the users collection, such as `"project:deploy": { label: "Deploy projects", target: "project" }`:
 
 ```typescript
 import { defineFunction, requireAuth, requireScope, hasScope } from "@rebasepro/server/functions";
@@ -27765,7 +27767,7 @@ CREATE TABLE IF NOT EXISTS rebase.branches (
 );
 ```
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A server running on a branch keeps branches in the database the branch was
+A server running on a branch keeps branches in the database the branch was
 copied from. The branch's own `rebase.branches` is only a snapshot, taken before
 its row was written. So `rebase dev` on a [switched](#cli-integration) checkout
 sets `REBASE_BRANCH_PARENT_DATABASE` to the database `.env` names, and a server
@@ -27784,7 +27786,7 @@ The branching API is exposed via the backend's `BranchService`. Below is a refer
 
 Generates a new branch database from the default database or an explicit source template.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> The default is the database the server's own connection is on, or
+The default is the database the server's own connection is on, or
 `REBASE_BRANCH_PARENT_DATABASE` when the server runs on a branch. It is never
 the database `ADMIN_CONNECTION_STRING` names, when that is another one.
 
@@ -27823,7 +27825,7 @@ Output:
 */
 ```
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `database` is the PostgreSQL database the branch is, as its record says:
+`database` is the PostgreSQL database the branch is, as its record says:
 what to connect to, and what to pass as `source` to copy the branch. It is not
 the branch's name (`staging` is the database `rb_staging`).
 
@@ -27844,7 +27846,7 @@ await admin.deleteBranch("feature_oauth");
 ```
 
 > [!CAUTION]
-> Safety Guard: The main database (default database name configured in connection strings) is protected. <span class="since-badge" data-since="0.24">Since 0.24</span> That is the database the server's own connection is on, or `REBASE_BRANCH_PARENT_DATABASE` on a branch. If you attempt to delete the parent database, the `BranchService` throws a `"Cannot delete the main database"` error and aborts.
+> Safety Guard: The main database (default database name configured in connection strings) is protected. That is the database the server's own connection is on, or `REBASE_BRANCH_PARENT_DATABASE` on a branch. If you attempt to delete the parent database, the `BranchService` throws a `"Cannot delete the main database"` error and aborts.
 
 ---
 
@@ -28209,7 +28211,7 @@ app.use(cors({
 }));
 ```
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> The Rebase runtime and the ejected backend send this list already. On 0.23
+The Rebase runtime and the ejected backend send this list already. On 0.23
 they expose none of these headers, so a frontend on another origin reads no `ETag`.
 
 ### Related
@@ -31489,7 +31491,7 @@ open costs nothing.
 | Tab | Slug | Group | What it does |
 |-----|------|-------|--------------|
 | SQL Console | `sql` | Database | Run raw SQL against your PostgreSQL database and read results in a table |
-| RLS Policies | `rls` | Database | Inspect and manage Row Level Security policies for your tables. <span class="since-badge" data-since="0.24">Since 0.24</span> A policy is listed as the database holds it, badged **Differs from code** where that is not what the project declares. A policy Rebase generates cannot be edited straight in the database, and on a table Rebase manages a banner says that each server start and `rebase db push` re-apply the declared policies |
+| RLS Policies | `rls` | Database | Inspect and manage Row Level Security policies for your tables. A policy is listed as the database holds it, badged **Differs from code** where that is not what the project declares. A policy Rebase generates cannot be edited straight in the database, and on a table Rebase manages a banner says that each server start and `rebase db push` re-apply the declared policies |
 | Schema Visualizer | `schema-visualizer` | Database | Entity diagram of your collections and their relations, drawn from the collection definitions: tables, columns, types and relations are as the collections declare them. Only the RLS markers are read from the database |
 | Branches | `branches` | Database | Create and manage [database branches](/docs/backend/branching) |
 | Backups | `backups` | Database | Browse and download database backups |
@@ -31508,7 +31510,7 @@ Two streams into one in-memory ring, held on the server process:
   collection when the request was about one, and, when the request failed, the
   error `code` and message the client received. A failed request is recorded at
   `warn` (4xx) or `error` (5xx), so the level filter finds it.
-  <span class="since-badge" data-since="0.24">Since 0.24</span> Its `source` comes from the path: `/api/auth/*` and `/api/oauth/*` are
+  Its `source` comes from the path: `/api/auth/*` and `/api/oauth/*` are
   `auth`, `/api/storage/*` is `storage`, and everything else is `api`, so the
   Source filter finds sign-ins under Auth and uploads under Storage.
 - **Everything the server reports at warn or error** — a schema warning, an
@@ -31526,7 +31528,7 @@ The ring is per process and per boot: it is not durable, it is not shared
 between replicas, and a restart empties it. For anything you need to keep, read
 the process's stdout, which carries the same lines and more.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> The explorer says so. It shows the log of the one server instance serving
+The explorer says so. It shows the log of the one server instance serving
 it and names that instance: the `snapshot` event of
 `GET /api/admin/logs/stream` carries `instance`, the process's `HOSTNAME` (the
 pod name on Kubernetes, the container id under Docker) or else `pid-<n>`. There
@@ -37010,7 +37012,7 @@ const client = createRebaseClient({
 | `realtime` | `boolean` | Open the WebSocket (default `true`) — set `false` in one-shot scripts |
 | `collections` | `Record<string, string>` | Maps accessor names to collection slugs |
 | `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
-| `impersonate` | `string` | <span class="since-badge" data-since="0.24">Since 0.24</span> Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
+| `impersonate` | `string` | Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
 
 ### Typed SDK Generation
 
@@ -37024,7 +37026,7 @@ While `rebase dev` is running you do not need to: it regenerates the types in
 `generated/sdk/` on start and on every save under `config/collections/`. Run the
 command yourself in CI, in a frontend repository that has no collections
 (`rebase generate-sdk --from link`), or anywhere `rebase dev` is not running.
-<span class="since-badge" data-since="0.24">Since 0.24</span> for the regeneration: on 0.23, `rebase dev` leaves the SDK types alone, so run
+for the regeneration: on 0.23, `rebase dev` leaves the SDK types alone, so run
 the command after every collection change.
 
 Then pass the `Database` type parameter to `createRebaseClient` for full autocomplete:
@@ -37574,7 +37576,7 @@ a bare `count()` as `count`. Letting you name them would mean checking the name
 is not also a `groupBy` field — a rule nobody would guess, and a silently
 overwritten value if it went unchecked.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Groups are paged like a listing's rows: `limit` bounds them and `offset` skips
+Groups are paged like a listing's rows: `limit` bounds them and `offset` skips
 them (grouping by a high-cardinality column is a whole table's worth of rows in
 one response). A grouped aggregate with no `limit` gets the listing default —
 **50 groups** over HTTP — so read `meta` on the result before trusting it to be
@@ -37985,7 +37987,7 @@ degrades to an ordinary update rather than throwing.
 
 From a browser on another origin — a Vite frontend on its own port, an `app.`
 host calling an `api.` host — the `ETag` is readable only because the server
-names it in `Access-Control-Expose-Headers`. <span class="since-badge" data-since="0.24">Since 0.24</span> The Rebase runtime does, along
+names it in `Access-Control-Expose-Headers`. The Rebase runtime does, along
 with `Retry-After`, `X-Request-ID`, the `X-RateLimit-*` headers and
 `Preference-Applied`; on 0.23 it exposes none of them, so `etagOf` is
 `undefined` cross-origin there. A backend that wires its own `cors()` has to expose the
@@ -38120,7 +38122,7 @@ result.meta;  // { operations: 4 }
 `op` is `create`, `update`, `upsert` or `delete`, and `collection` narrows
 `values` to that collection's generated `Insert` or `Update` shape — a column
 the collection does not have is a compile error, and so is a create missing a
-required one. <span class="since-badge" data-since="0.24">Since 0.24</span> `collection` is the accessor, the name `client.data.<accessor>`
+required one. `collection` is the accessor, the name `client.data.<accessor>`
 takes (`orderItems` for the slug `order_items`); the client sends the slug,
 through the `collections` dictionary it was created with. On 0.23 a typed batch
 sends the accessor as written, so a snake_case collection cannot be reached
@@ -38557,7 +38559,7 @@ data[0].author?.name;   // "Jane Doe"
 
 A generated `Database` types all three precisely: `Insert` and `Update` accept
 either write spelling, `Row` has `authorId` unconditionally, and `author` is
-optional on `Row` — <span class="since-badge" data-since="0.24">Since 0.24</span> `RowWith<"posts", ["author"]>` is the row with it
+optional on `Row` — `RowWith<"posts", ["author"]>` is the row with it
 **required**, for a read that asked for it. See [Typed includes](#typed-includes).
 
 The one case where the three collapse is a relation named identically to its own
@@ -38579,7 +38581,7 @@ const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
 `IncludeFor<A>` constrains an include's keys to relations that exist, at every
-level — and <span class="since-badge" data-since="0.24">Since 0.24</span> a typed client checks `include` the same way, in `find({ include })`
+level — and a typed client checks `include` the same way, in `find({ include })`
 and in `.include(...)`, so `posts.include("authr")` is a compile error rather
 than a 400 `UNKNOWN_RELATION`. The rows a read returns still type each relation
 as optional; `RowWith<A, I>` is that row with every included relation made
@@ -38781,7 +38783,7 @@ const { user, confirmationRequired } = await client.auth.signUp(
 );
 ```
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> With [`requireEmailVerification`](/docs/backend/email-verification/) on,
+With [`requireEmailVerification`](/docs/backend/email-verification/) on,
 there is no session until the address is confirmed: `confirmationRequired` is `true` and `user` is `null`, so tell the person to open the mail. Otherwise `confirmationRequired` is `false` and `user` is the signed-in account. On 0.23 `signUp` resolves `{ user, accessToken, refreshToken }` and always signs in.
 
 ### OAuth Providers
@@ -38845,7 +38847,7 @@ await client.auth.signInWithOAuth("custom-provider", {
 
 ### Magic Links
 
-A one-click sign-in link by email. The link is always `<base>/auth/magic-link?token=…`, where `<base>` is the backend's `email.magicLinkUrl`, or its reset-password base (`FRONTEND_URL` on the runtime) when that is not set. There is no per-request `redirectTo`. Serve that path in your frontend, and hand the token back to trade it for a session. <span class="since-badge" data-since="0.24">Since 0.24</span> The CMS serves it, signing in (through the code step when there is a second factor); other frontends need a landing page.
+A one-click sign-in link by email. The link is always `<base>/auth/magic-link?token=…`, where `<base>` is the backend's `email.magicLinkUrl`, or its reset-password base (`FRONTEND_URL` on the runtime) when that is not set. There is no per-request `redirectTo`. Serve that path in your frontend, and hand the token back to trade it for a session. The CMS serves it, signing in (through the code step when there is a second factor); other frontends need a landing page.
 
 ```typescript
 // 1. Ask for the link.
@@ -38950,7 +38952,7 @@ if (recoveryCodes) showRecoveryCodes(recoveryCodes);
 ```
 
 **Show the recovery codes once and never again.** Only their hashes are stored,
-so nothing can display them later. <span class="since-badge" data-since="0.24">Since 0.24</span> They come with the account's first factor.
+so nothing can display them later. They come with the account's first factor.
 Adding another factor keeps the codes the account already has, and
 `recoveryCodes` is `null`. Starting an enrolment and abandoning it never touches
 them.
@@ -39230,7 +39232,7 @@ signs in once the link is followed with its password.
 
 ### Changing the Email Address
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A signed-in user moves their own account to another address. Nothing
+A signed-in user moves their own account to another address. Nothing
 changes until the new address answers:
 
 ```typescript
@@ -39549,7 +39551,7 @@ The WebSocket client handles authentication automatically:
 - `client.ws.state` is the connection's state — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` or `closed` — and `client.ws.onStateChange(listener)` is told every change. `disconnected` is the state in which `CONNECTION_LOST` has been reported.
 - Requests sent over the socket are **at-most-once**. One that was sent when the connection dropped fails with `CONNECTION_LOST` and is never sent again, since the server may already have run it. One that is still waiting for a socket after 30 seconds fails with `REQUEST_TIMEOUT` without being sent.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> for everything in the list after sign-out. On 0.23 the client gives up after
+for everything in the list after sign-out. On 0.23 the client gives up after
 five failed reconnection attempts, queues requests made while disconnected and
 sends them on reconnect, has no `client.ws.state`, and the server never closes a
 socket whose session has ended.
@@ -39887,9 +39889,9 @@ const { online, pending, syncing, lastSyncedAt, lastError } = client.offline!.st
 | `status()` | Current connectivity, queue depth, sync activity, last error |
 | `onStatusChange(fn)` | Subscribe to the above |
 | `onQueueChange(fn)` | Just the number of unsent writes, for a badge |
-| `pending()` | The queued mutations themselves, oldest first. <span class="since-badge" data-since="0.24">Since 0.24</span> `pending({ orphaned: true })`: the ones queued while signed out — see [Users](#users) |
+| `pending()` | The queued mutations themselves, oldest first. `pending({ orphaned: true })`: the ones queued while signed out — see [Users](#users) |
 | `sync()` | Replay now — resolves with `{ flushed, remaining }` |
-| `clear()` | Discard the current user's queued writes **and** local rows. <span class="since-badge" data-since="0.24">Since 0.24</span> `clear({ orphaned: true })`: the ones queued while signed out instead |
+| `clear()` | Discard the current user's queued writes **and** local rows. `clear({ orphaned: true })`: the ones queued while signed out instead |
 
 Replay happens on its own: when the browser fires `online`, when the user signs in, and on an exponential backoff (one second, doubling to a minute) while anything is queued. `sync()` is for a "retry now" button.
 
@@ -39908,7 +39910,7 @@ const client = createRebaseClient({
 });
 ```
 
-The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A discarded write was never sent. <span class="since-badge" data-since="0.24">Since 0.24</span> It is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused. On 0.23 it carries the refused write's own error instead.
+The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A discarded write was never sent. It is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused. On 0.23 it carries the refused write's own error instead.
 
 Consecutive edits to one row while offline are merged into a single queued write, so a form being typed into does not grow the queue. If the server refuses the merged write over its contents (a 400, 403 or 422 — say, a field removed by a schema change while the user was offline), the engine splits it back into the separate edits and replays each one. Only the edit the server refuses is rolled back and reported; the others are kept.
 
@@ -39924,13 +39926,13 @@ The local database and the outbox are partitioned per signed-in user. Cached row
 
 #### While the session is being restored
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Until the client knows who is signed in, it does not know whose local database and outbox to use, so offline reads and writes wait. That is the time `auth.isInitialized()` takes: none for a stored session that is still valid, and one refresh request when the session has to come back from the server — in cookie mode, where nothing is stored on the device, that is every page load. A write made in that window is queued as whoever the session turns out to be, and a read answers from their local database. A realtime frame that arrives meanwhile is passed to your callback as the server sent it, and kept nowhere.
+Until the client knows who is signed in, it does not know whose local database and outbox to use, so offline reads and writes wait. That is the time `auth.isInitialized()` takes: none for a stored session that is still valid, and one refresh request when the session has to come back from the server — in cookie mode, where nothing is stored on the device, that is every page load. A write made in that window is queued as whoever the session turns out to be, and a read answers from their local database. A realtime frame that arrives meanwhile is passed to your callback as the server sent it, and kept nowhere.
 
 If the session cannot be restored — the refresh is refused, or in cookie mode cannot reach the server — the client is signed out, and offline reads and writes are the signed-out user's. On 0.23, cookie mode treated the whole window as signed out, so a write made in it was queued as the signed-out user's.
 
 #### Writes made while signed out
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Writes queued while nobody was signed in are not replayed when someone signs in. That user did not make them, and replaying them with their credentials would put one person's changes in another's name — on a shared device, a visitor's writes in the next user's account. They are not moved into the signed-in user's outbox either. They are kept and listed separately, so the app can decide what to do with them:
+Writes queued while nobody was signed in are not replayed when someone signs in. That user did not make them, and replaying them with their credentials would put one person's changes in another's name — on a shared device, a visitor's writes in the next user's account. They are not moved into the signed-in user's outbox either. They are kept and listed separately, so the app can decide what to do with them:
 
 ```typescript
 client.auth.onAuthStateChange(async (event) => {
@@ -40096,12 +40098,12 @@ The SDK caches signed URLs to avoid redundant server calls.
 
 #### Private vs. public URLs
 
-- **Private files** get a URL with a **short-lived, path-scoped download token** (`?token=…`, 5 minutes unless the server sets `STORAGE_DOWNLOAD_TOKEN_TTL` <span class="since-badge" data-since="0.24">Since 0.24</span>, which 0.23 does not read) — never your access token. Because it expires, **don't persist a private URL**; store the file **path** and call `getSignedUrl()` again when you render it.
+- **Private files** get a URL with a **short-lived, path-scoped download token** (`?token=…`, 5 minutes unless the server sets `STORAGE_DOWNLOAD_TOKEN_TTL`, which 0.23 does not read) — never your access token. Because it expires, **don't persist a private URL**; store the file **path** and call `getSignedUrl()` again when you render it.
 - **Public files** (stored under the `public/` prefix — set `storage: { public: true }` on the property, or pass `public: true` to `putObject`) get a **stable, token-less, permanent, CDN-cacheable** URL with no server round-trip. These are safe to store in a database and hotlink.
 
 #### Files inside text
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Text that embeds a file — the images in a markdown field — cannot hold a
+Text that embeds a file — the images in a markdown field — cannot hold a
 private URL either, so it holds a **storage reference** instead:
 `rebase-storage:posts/cover.png`, with `?storageId=media` when the file is in a
 named source. That is what the admin panel's markdown editor writes for an
@@ -40326,7 +40328,7 @@ integration — starts that copy (`pnpm exec rebase-mcp`, or `npx --no rebase-mc
 in an npm project), never a newer one from npm. An older project adds it once,
 with `rebase skills install --mcp` or `pnpm add -D @rebasepro/mcp`.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `rebase init` writes the block for each agent you pick when it
+`rebase init` writes the block for each agent you pick when it
 [sets up your AI coding agents](/docs/ai/skills#set-up-by-rebase-init), keeping
 any other servers already in the file. `rebase init --agent cursor,codex` does
 the same without asking.
@@ -40493,7 +40495,7 @@ function, and run DDL against whatever `DATABASE_URL` the project resolves.
 
 #### Giving it a narrow credential instead
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Register a scoped [API key](/docs/backend/api-keys) and the two-gate model
+Register a scoped [API key](/docs/backend/api-keys) and the two-gate model
 applies for real. A service key runs with the roles `["service"]`, which the
 injected admin policies do **not** name — so RLS grants it nothing unless one of
 your own policies says otherwise, and its scopes narrow it further:
@@ -40750,7 +40752,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` limits it
   to clients you register), and sends the person to a consent screen that signs
   them in through your existing `/auth/login`.
-- <span class="since-badge" data-since="0.24">Since 0.24</span> **Seven tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+- **Seven tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_collections`,
   `query_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
   `update_document`; `data:delete` adds `delete_document`. A client that asks for
@@ -40761,7 +40763,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
   `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and
   on tokens already issued.
-- <span class="since-badge" data-since="0.24">Since 0.24</span> **An API key works too.** `/mcp` also accepts `Authorization: Bearer rk_…`, for
+- **An API key works too.** `/mcp` also accepts `Authorization: Bearer rk_…`, for
   a client configured with a header rather than an OAuth flow. The key reaches
   the tools its `data:*` scopes cover, as whoever it acts as: a
   [personal key](/docs/backend/api-keys/#personal-keys) as its owner, a service key
@@ -40940,7 +40942,7 @@ framework will not catch for it. For tools that act on your data, see the
 
 ### Set up by `rebase init`
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A new project does not need the command. `rebase init` asks
+A new project does not need the command. `rebase init` asks
 whether to set up your AI coding agents, then lists the ones it finds on the
 machine:
 
@@ -40967,7 +40969,7 @@ rebase init my-app --yes --agent claude,cursor
 
 ### An existing project
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `rebase init` refuses a directory that already holds a project, so a project
+`rebase init` refuses a directory that already holds a project, so a project
 made before agent setup existed — or one whose author declined the prompt —
 gets the same setup from `rebase skills install --mcp`: the skills, and the
 [MCP server](/docs/ai/mcp) registered in each agent's project config. Servers
@@ -41133,7 +41135,7 @@ Please refer to and follow the instructions defined in [ai-instructions.md](./ai
 The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
 ```
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> for this third line and the `.mcp.json` below: on 0.23
+for this third line and the `.mcp.json` below: on 0.23
 the third line only tells the assistant to run `rebase skills install --agent claude`,
 and `.mcp.json` starts the server with `npx -y @rebasepro/mcp` from the registry.
 
@@ -41282,7 +41284,7 @@ Sets up the project structure with frontend, backend, and shared packages.
 | `--introspect` | Generate collections from that database. Implies `--template blank` and needs `--install` |
 | `--project <slug>` | Link the scaffold to a Rebase Cloud project |
 | `--setup-key <key>` | The one-time key authenticating that link |
-| `-a, --agent <name>` | <span class="since-badge" data-since="0.24">Since 0.24</span> Set up AI coding agents: the [skills](/docs/ai/skills) and the [MCP server](/docs/ai/mcp). Repeatable or comma-separated — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` or `all`. Without it, `init` asks and pre-ticks the agents installed on the machine; under `--yes`, none |
+| `-a, --agent <name>` | Set up AI coding agents: the [skills](/docs/ai/skills) and the [MCP server](/docs/ai/mcp). Repeatable or comma-separated — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` or `all`. Without it, `init` asks and pre-ticks the agents installed on the machine; under `--yes`, none |
 
 #### `rebase dev`
 
@@ -41292,7 +41294,7 @@ Start the development server:
 rebase dev
 ```
 
-Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save. <span class="since-badge" data-since="0.24">Since 0.24</span> for the SDK types — on 0.23 it regenerates the schema only, and `rebase generate-sdk` is yours to run.
+Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save. for the SDK types — on 0.23 it regenerates the schema only, and `rebase generate-sdk` is yours to run.
 
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
@@ -41784,7 +41786,7 @@ rebase auth reset-password --email admin@example.com --password NewPassword123!
 
 #### `rebase api-keys`
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Manage the project's service API keys — the credential an agent, script or
+Manage the project's service API keys — the credential an agent, script or
 another service uses, as opposed to an end user's session:
 
 ```bash
@@ -41910,7 +41912,7 @@ rebase schema introspect
 
 This is useful when adopting Rebase on an existing database — introspect first, then customize the generated collections.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> **Introspect, then push, changes nothing.** The generated properties say exactly what each column is — `columnType`, `precision`/`scale`, `defaultValue`, `required`, a key's `isId` (`"increment"` for an integer identity, `columnType: "serial"` for a serial, `"manual"` for a key with no default), a relation's `onDelete`, and a collection's `search` block read back from the column it built — so `rebase db push --dry-run` right after an introspection plans no changes. Where no property can state a column — a `timestamp` without time zone, an `interval`, an `inet`, an enum type not named `<table>_<column>`, a default like `CURRENT_DATE` — introspection says so, per column, on the terminal and at the top of the file, with what a push would do to it and, when there is one, the statement that makes the two agree (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). A table keyed on more than one column comes back as one composite key, every key column carrying its `isId`. It is left out, with the reason, when a key column cannot carry `isId` (a timestamp, say) or another table's foreign key points at it, which a single-column relation cannot do; `db push` leaves a table that is not a collection alone. On 0.23 the push right after an introspection can still plan type changes, dropped defaults and NOT NULLs, and a phantom `id` key.
+**Introspect, then push, changes nothing.** The generated properties say exactly what each column is — `columnType`, `precision`/`scale`, `defaultValue`, `required`, a key's `isId` (`"increment"` for an integer identity, `columnType: "serial"` for a serial, `"manual"` for a key with no default), a relation's `onDelete`, and a collection's `search` block read back from the column it built — so `rebase db push --dry-run` right after an introspection plans no changes. Where no property can state a column — a `timestamp` without time zone, an `interval`, an `inet`, an enum type not named `<table>_<column>`, a default like `CURRENT_DATE` — introspection says so, per column, on the terminal and at the top of the file, with what a push would do to it and, when there is one, the statement that makes the two agree (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). A table keyed on more than one column comes back as one composite key, every key column carrying its `isId`. It is left out, with the reason, when a key column cannot carry `isId` (a timestamp, say) or another table's foreign key points at it, which a single-column relation cannot do; `db push` leaves a table that is not a collection alone. On 0.23 the push right after an introspection can still plan type changes, dropped defaults and NOT NULLs, and a phantom `id` key.
 
 **What the generated files look like**
 
@@ -42080,7 +42082,7 @@ rebase generate-sdk
 `config/collections/`. Run it yourself in CI, in a repository that has no
 collections (see `--from` below), or anywhere `rebase dev` is not running.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> for reading every file, stopping on a broken one, `rebase dev` running it
+for reading every file, stopping on a broken one, `rebase dev` running it
 and `--collections` on this command. On 0.23 it reads the files the `index.ts`
 barrel lists, skips one that does not load with a warning, and takes the
 directory as `--collections-dir`; `rebase dev` regenerates the schema only.
@@ -42951,7 +42953,7 @@ export const relations = {  };
 
 Three things in there are worth reading twice. The `id` column you did not
 declare: every collection gets a `text` primary key unless a property claims
-`isId`, and <span class="since-badge" data-since="0.24">Since 0.24</span> the database fills it with a uuid (`gen_random_uuid()::text`), so a
+`isId`, and the database fills it with a uuid (`gen_random_uuid()::text`), so a
 row created from the admin panel, the REST API or the SDK needs no key of its
 own. A key you do send is used as given. On 0.23 the column has no default, and
 a create that sends no key fails. The `pgPolicy` block: row level security is enabled on every table, and
@@ -43054,7 +43056,7 @@ before it agrees to boot:
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.23.0", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.24.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -43105,7 +43107,7 @@ different one rather than start and misbehave later.
 This is why upgrading Rebase in a self-hosted deployment is a tag change:
 
 ```yaml
-image: rebasepro/server:0.23.0   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.24.0   # a newer tag — your bundle is untouched
 ```
 
 ### Development uses the same path
@@ -43239,7 +43241,7 @@ What knows it, does something with it:
   simply the frontend's home page.
 - **`rebase apps list`** shows it beside the app that serves it.
 
-Three shapes, and all of them are ordinary. <span class="since-badge" data-since="0.24">Since 0.24</span> for the third: on 0.23 an
+Three shapes, and all of them are ordinary. for the third: on 0.23 an
 app's `path` cannot be a URL, so the CMS shares the project's hostname.
 
 ```jsonc
@@ -43590,7 +43592,7 @@ There is no separate admin service: the admin panel is part of a frontend, so wh
 |--------------|----------------|-------------------|
 | Default scaffold (`rebase init`) | The admin panel | `/` — the frontend **is** the admin |
 | Custom product frontend | Your app | Wherever you mount it, commonly `/admin` — see [Changing the Base URL](#changing-the-base-url) |
-| Admin as an app on its own hostname | Your app | <span class="since-badge" data-since="0.24">Since 0.24</span> `https://admin.example.com/`, served by the same server — see [Changing the Base URL](#changing-the-base-url) |
+| Admin as an app on its own hostname | Your app | `https://admin.example.com/`, served by the same server — see [Changing the Base URL](#changing-the-base-url) |
 | Backend-only project | Nothing (API only) | Not deployed |
 
 :::note[First visit]
@@ -44099,7 +44101,7 @@ the restored version to serve before reporting success. Follow it with
 
 ### CI and agents
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A CI job or an agent should not carry your password. Give it a token
+A CI job or an agent should not carry your password. Give it a token
 instead: a key that acts as your account, narrowed to a few actions on one
 project. Create it from a signed-in terminal:
 
@@ -44397,7 +44399,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 
@@ -44496,7 +44498,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  image = "rebasepro/server:0.23.0"
+  image = "rebasepro/server:0.24.0"
 
 [http_service]
   internal_port = 8080
@@ -44648,7 +44650,7 @@ nosniff`, a `Referrer-Policy` and `Strict-Transport-Security: max-age=15552000`
 (180 days). The HSTS header leaves out `includeSubDomains`: that would tell
 browsers to refuse plain HTTP on every subdomain of your domain, including ones
 this server has nothing to do with, and a browser keeps it for as long as the
-header says. <span class="since-badge" data-since="0.24">Since 0.24</span>
+header says.
 Set `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` when every subdomain is HTTPS-only;
 up to and including 0.23 the header always carried `includeSubDomains`.
 
@@ -44678,7 +44680,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ### Upgrading
 
 ```yaml
-image: rebasepro/server:0.23.0
+image: rebasepro/server:0.24.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that
@@ -44906,7 +44908,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.23.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.24.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Only the tag is usually worth pinning: the repository is inherited, so this is
@@ -45074,7 +45076,7 @@ bucket, which is why it is off unless asked for. See
 Studio's Logs Explorer reads a ring of the last 10,000 log lines kept by the
 process that serves the request. Behind a load balancer each refresh may show a
 different instance's lines, and none of them shows the whole deployment.
-<span class="since-badge" data-since="0.24">Since 0.24</span> The explorer names the instance it is showing.
+The explorer names the instance it is showing.
 There is no setting that shares the ring: the runtime writes one JSON line per event to
 stdout in production, and that is what to collect — your platform's log
 service, Loki, or anything that reads container output.
@@ -45259,7 +45261,7 @@ only files whose names match the backup pattern; anything else sharing the
 bucket or prefix is left alone.
 
 The cron runs `pg_dump` inside the server process.
-<span class="since-badge" data-since="0.24">Since 0.24</span> the official
+the official
 runtime image (`rebasepro/server`, see [Self-hosting](/docs/deployment/self-hosting/))
 ships the PostgreSQL 18 client tools for it;
 on 0.23 and earlier it had none, and every scheduled run failed with
@@ -45356,12 +45358,12 @@ fetches the dump; **Roles file** fetches its `.globals.sql`. Download both and
 keep them in one directory. A backup marked **No roles file** has no sidecar:
 recreate its roles by hand before restoring it into a new Postgres.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> above the list it
+above the list it
 reports the scheduled backup job and its last run. A failed run is shown as an
 error with its message, so a nightly backup that cannot run is visible where
 the backups are listed, not only in the Cron Jobs panel.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> what it says about the job:
+what it says about the job:
 
 - **Last scheduled backup** is the last run the schedule made. A run started
   by hand since then (**Run Now** in Cron Jobs) gets a line of its own, so a
@@ -45376,7 +45378,7 @@ the backups are listed, not only in the Cron Jobs panel.
 - When the run history in `rebase.cron_logs` cannot be read, the panel says
   so, rather than that the backup has not run yet.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> the list is read
+the list is read
 by the server process that answers `GET /api/admin/backups`, and that is not
 always the process that runs the schedule:
 
@@ -45632,7 +45634,7 @@ rebase build
 For App Runner, which pulls from a registry, bake the bundle into a derived image. That is three lines and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 
@@ -45732,7 +45734,7 @@ rebase build
 Cloud Run pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 
@@ -45836,7 +45838,7 @@ rebase build
 Container Apps pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 
@@ -45963,7 +45965,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 For a real deployment, prefer one of the two shapes that do not involve copying files to a box by hand:
 
-- **Bake it into an image** — `FROM rebasepro/server:0.23.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
+- **Bake it into an image** — `FROM rebasepro/server:0.24.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
 - **Serve it over HTTP** — set `REBASE_BUNDLE_URL` and the runtime fetches and unpacks the bundle on every start. This is what the Terraform module above does, and the same mechanism the Helm chart uses.
 
 ### 4. Configure and run
@@ -46104,7 +46106,7 @@ rebase build
 Serverless Containers pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 
@@ -46215,7 +46217,7 @@ rebase build
 Commit a three-line `Dockerfile` at the repository root, so Railway's build step is a copy rather than a compilation:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 
@@ -46308,7 +46310,7 @@ rebase build
 Commit a three-line `Dockerfile` at the project root:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 

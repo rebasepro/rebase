@@ -1,5 +1,5 @@
 ---
-sourceHash: ea3185fba08977a9
+sourceHash: 32fc3b3ccab733ad
 title: Início Rápido
 sidebar_label: Início Rápido
 description: Crie um novo projeto Rebase e coloque-o para rodar localmente em menos de 2 minutos.
@@ -189,7 +189,7 @@ Salve o arquivo. Essa é toda a etapa: o `rebase dev` regenera
 collections, reinicia o backend, e a inicialização cria a nova tabela — assim, sua collection **Products** aparece na
 navegação.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> para os tipos do SDK: na versão 0.23, o `rebase dev` regenera apenas o schema, então
+para os tipos do SDK: na versão 0.23, o `rebase dev` regenera apenas o schema, então
 execute `rebase generate-sdk` depois de alterar uma collection, antes de importar os tipos dela.
 
 O mesmo vale para uma propriedade adicionada a uma collection que você já possui: salve,

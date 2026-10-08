@@ -1,5 +1,5 @@
 ---
-sourceHash: d79634002cc11c26
+sourceHash: 60c797ac2e9a363f
 title: Propriedades
 sidebar_label: Propriedades
 description: Os tipos de propriedade definem o tipo de dados, a validação e a renderização de interface do usuário para cada campo em uma coleção. O Rebase suporta os tipos string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -82,7 +82,7 @@ price: {
 |-------------|------|-----------|
 | `admin.readOnly` | `boolean` | Impede a edição |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | Desativa com tooltip opcional |
-| `admin.filledByServer` | `boolean` | <span class="since-badge" data-since="0.24">Since 0.24</span> O servidor preenche o campo quando um novo registro o deixa vazio (um hook `beforeSave`). O formulário permite criar sem ele; permanece obrigatório na edição, e as próprias verificações do servidor continuam valendo |
+| `admin.filledByServer` | `boolean` | O servidor preenche o campo quando um novo registro o deixa vazio (um hook `beforeSave`). O formulário permite criar sem ele; permanece obrigatório na edição, e as próprias verificações do servidor continuam valendo |
 | `admin.hideFromCollection` | `boolean` | Oculta da visualização em tabela |
 | `admin.columnWidth` | `number` | Largura da coluna em pixels (visualização em tabela) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Largura do campo na grade de formulário de quatro colunas |
@@ -295,7 +295,7 @@ outro banco de dados totalmente diferente, e um usuário excluído não deve lev
 de auditoria consigo — declare uma [relação](/docs/collections/relations) se quiser o join.
 
 :::note[Chaves primárias compostas]
-<span class="since-badge" data-since="0.24">Since 0.24</span> Marque várias propriedades com `isId` e elas formam uma chave composta: a tabela recebe
+Marque várias propriedades com `isId` e elas formam uma chave composta: a tabela recebe
 uma única restrição `PRIMARY KEY (a, b)`, e uma linha é endereçada por todos os seus
 valores de chave na ordem de declaração, unidos por `:::` — `company_translation/1:::en_US`.
 Dê a cada coluna da chave a estratégia adequada: `isId: true` para um valor fornecido por
@@ -307,7 +307,7 @@ desejava era uma restrição de unicidade em várias colunas, e não a identidad
 utilize um [índice](/docs/backend/indexes) único. Na 0.23, um segundo `isId` é recusado
 no carregamento da configuração.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Uma coleção em que nenhuma propriedade reivindica `isId` recebe uma coluna `id`
+Uma coleção em que nenhuma propriedade reivindica `isId` recebe uma coluna `id`
 própria: `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. O banco de dados a
 preenche, então uma linha criada pelo painel admin, pela API REST ou pelo SDK
 não precisa de chave, e uma chave que você envia é usada como está. Uma tabela

@@ -4,7 +4,7 @@ sidebar_label: Email verification
 description: "How an account proves its email address: the link mailed at registration, what following it keeps and removes, and confirm-first registration with requireEmailVerification."
 ---
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> When email is configured, registering
+When email is configured, registering
 mails the new account a verification link (`<frontend>/verify-email?token=…`, valid for 24 hours),
 so the owner proves the address at sign-up, on their own terms. `POST /api/auth/send-verification`
 mails it again. Nothing is mailed to the synthetic addresses of guests and X (Twitter) accounts.

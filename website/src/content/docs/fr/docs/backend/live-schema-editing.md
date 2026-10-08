@@ -1,5 +1,5 @@
 ---
-sourceHash: 2efe07fee7cafe0a
+sourceHash: 564c58f7bc002c6f
 title: Édition de schéma en direct
 description: Créez et modifiez des collections sur un backend en cours d'exécution — d'abord validé dans votre dépôt, puis appliqué.
 ---
@@ -19,7 +19,7 @@ Le statut et le plan exigent la portée `schema:read`, et l'application exige `s
 ## Planifier avant d'appliquer
 
 `/plan` n'a pas d'effets secondaires. Envoyez le changement, et il vous indique ce que la modification
-implique. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Un changement sur une collection existante est un `patch` — ce qui a
+implique. Un changement sur une collection existante est un `patch` — ce qui a
 changé, sous forme d'opérations sur des chemins de clés — et une nouvelle collection est la `collection`
 entière :
 
@@ -112,7 +112,7 @@ Chaque refus nomme le changement et indique quoi faire à la place.
 Le verdict est lu depuis le schéma que chaque côté produit — le même plan dont sont rendus
 `schema.generated.ts` et `db push` — si bien qu'une modification qui change la base de données ne peut pas
 être signalée comme n'étant pas un changement. Deux modifications qui ressemblent à des changements et ne
-sont pas refusées (<span class="since-badge" data-since="0.24">Depuis 0.24</span> ; la 0.23 signale les deux comme nécessitant une migration) :
+sont pas refusées (; la 0.23 signale les deux comme nécessitant une migration) :
 
 - **Renommer la clé d'une propriété en conservant sa colonne** (`columnName` réglé sur l'ancienne colonne) ne
   déplace aucune donnée. C'est `safe` ; les clients API lisent le nouveau nom.
@@ -123,7 +123,7 @@ sont pas refusées (<span class="since-badge" data-since="0.24">Depuis 0.24</spa
 
 Un changement refusé peut tout de même être écrit dans le code source de votre collection et committé, en
 laissant la base de données telle qu'elle est — retirer une propriété que vous ne servez plus est le cas
-habituel. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Envoyez `/apply` avec `"sourceOnly": true`. Rien ne s'exécute ; le message
+habituel. Envoyez `/apply` avec `"sourceOnly": true`. Rien ne s'exécute ; le message
 de commit nomme ce que la base de données conserve, par exemple
 `chore(schema): remove sku from products (source only — column products.sku kept)`,
 et chaque changement du plan porte une phrase `sourceOnly` indiquant ce qu'il laisse derrière lui —
@@ -150,7 +150,7 @@ Pas seulement le fichier de collection. Le schéma Drizzle en est généré, et 
 
 Ces chemins sont relatifs à votre **projet**, et non à votre dépôt. Lorsque les deux sont identiques — un projet `rebase init`, ce qui est le cas habituel — il n'y a pas à s'en soucier. Lorsque votre projet se trouve dans un sous-répertoire d'un dépôt plus vaste, les chemins sont préfixés par celui-ci, trouvé en remontant depuis votre répertoire de collections jusqu'au `rebase.json` le plus proche. Un projet sans `rebase.json` conserve les chemins simples.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Aucun SQL n'entre dans le commit. `rebase db push` et `rebase db generate` écrivent le leur à partir des collections à chaque exécution, dans `.rebase/sql/`, qui est ignoré par git.
+Aucun SQL n'entre dans le commit. `rebase db push` et `rebase db generate` écrivent le leur à partir des collections à chaque exécution, dans `.rebase/sql/`, qui est ignoré par git.
 Sur la 0.23 le commit porte aussi `drizzle/schema.sql`, `drizzle/policies.sql` et
 `drizzle/search.sql`, écrits à la racine du projet.
 
@@ -158,7 +158,7 @@ Le message de commit décrit la modification plutôt que d'en annoncer une, et e
 
 ## Qui peut appliquer
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Détenir `schema:read` est suffisant pour **planifier**. La planification n'a aucun effet secondaire, et un job CI demandant si un changement de collection proposé est applicable en est une bonne utilisation.
+Détenir `schema:read` est suffisant pour **planifier**. La planification n'a aucun effet secondaire, et un job CI demandant si un changement de collection proposé est applicable en est une bonne utilisation.
 
 L'application est un second privilège, car appliquer écrit un commit et un commit porte un auteur :
 

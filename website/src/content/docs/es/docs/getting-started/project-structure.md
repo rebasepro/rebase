@@ -1,5 +1,5 @@
 ---
-sourceHash: 6f5f096b10dbbdb5
+sourceHash: a2683fa13dc31db1
 title: Estructura del proyecto
 sidebar_label: Estructura del proyecto
 description: "Conozca la estructura de un proyecto Rebase: frontend, backend y configuración de colecciones."
@@ -215,7 +215,7 @@ regenera `backend/src/schema.generated.ts` y los tipos del SDK en
 que falten. Fuera de `rebase dev`, los pasos equivalentes son
 `rebase schema generate` y `rebase generate-sdk`.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> para los tipos del SDK: en 0.23, `rebase dev` solo regenera el
+para los tipos del SDK: en 0.23, `rebase dev` solo regenera el
 esquema, y `rebase generate-sdk` es un paso aparte.
 
 ## Próximos pasos

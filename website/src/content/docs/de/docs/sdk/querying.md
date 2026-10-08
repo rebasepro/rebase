@@ -1,5 +1,5 @@
 ---
-sourceHash: 42fa2047884b640a
+sourceHash: b8aea50207626bc4
 title: Daten abfragen
 sidebar_label: Daten abfragen
 description: CRUD-Operationen, Fluent Query Builder, Filteroperatoren, Sortierung, Spaltenauswahl und Aggregate mit dem typisierten SDK von Rebase.
@@ -392,7 +392,7 @@ const rows = await client.data.orders
 
 Ergebnisschlüssel werden **abgeleitet**, nicht frei gewählt: `sum(total)` wird als `sum_total` zurückgegeben, ein einfaches `count()` als `count`. Eine freie Benennung würde erfordern zu prüfen, dass der Name nicht gleichzeitig ein `groupBy`-Feld ist – eine Regel, die kaum jemand erwarten würde, und ein stillschweigend überschriebener Wert, wenn dies ungeprüft bliebe.
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Gruppen werden wie die Zeilen einer Auflistung paginiert: `limit` begrenzt sie, und `offset`
+Gruppen werden wie die Zeilen einer Auflistung paginiert: `limit` begrenzt sie, und `offset`
 überspringt sie (eine Gruppierung nach einer Spalte mit hoher Kardinalität entspräche dem
 gesamten Inhalt einer Tabelle in einer einzigen Antwort). Ein gruppiertes Aggregat ohne `limit`
 erhält den Standardwert einer Auflistung — **50 Gruppen** über HTTP —, lesen Sie daher `meta`

@@ -1,5 +1,5 @@
 ---
-sourceHash: 13c002a75ecd9ce1
+sourceHash: 8fa955ab0e0d14e2
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Clientseitige Authentifizierung mit dem Rebase SDK — E-Mail/Passwort-Anmeldung, OAuth-Anbieter, Sitzungsverwaltung und Auth-Status-Listener.
@@ -45,7 +45,7 @@ const { user, confirmationRequired } = await client.auth.signUp(
 );
 ```
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Ist [`requireEmailVerification`](/docs/backend/email-verification/) aktiv,
+Ist [`requireEmailVerification`](/docs/backend/email-verification/) aktiv,
 gibt es keine Sitzung, bis die Adresse bestätigt ist: `confirmationRequired` ist
 `true` und `user` ist `null`, also sagen Sie der Person, sie solle ihre Mails öffnen. Andernfalls
 ist `confirmationRequired` `false` und `user` ist das angemeldete Konto. Unter 0.23
@@ -116,7 +116,7 @@ Ein Ein-Klick-Anmeldelink per E-Mail. Der Link lautet immer
 `<base>/auth/magic-link?token=…`, wobei `<base>` das `email.magicLinkUrl` des Backends ist,
 oder dessen Basis für das Passwort-Reset (`FRONTEND_URL` auf der Runtime), wenn das nicht gesetzt ist.
 Es gibt kein `redirectTo` pro Anfrage. Stellen Sie diesen Pfad in Ihrem Frontend bereit und übergeben Sie
-das Token zurück, um es gegen eine Sitzung einzutauschen. <span class="since-badge" data-since="0.24">Seit 0.24</span> Das CMS stellt ihn bereit und meldet an (über den
+das Token zurück, um es gegen eine Sitzung einzutauschen. Das CMS stellt ihn bereit und meldet an (über den
 Code-Schritt, wenn es einen zweiten Faktor gibt); andere Frontends brauchen eine Landing-Page.
 
 ```typescript
@@ -202,7 +202,7 @@ showQrCode(totp.uri);        // otpauth://… — what the authenticator scans
 if (recoveryCodes) showRecoveryCodes(recoveryCodes);
 ```
 
-**Zeigen Sie die Wiederherstellungscodes einmalig und nie wieder an.** Da nur deren Hashes gespeichert werden, können sie später nicht mehr angezeigt werden. <span class="since-badge" data-since="0.24">Seit 0.24</span> Sie werden mit dem ersten Faktor des Kontos ausgegeben.
+**Zeigen Sie die Wiederherstellungscodes einmalig und nie wieder an.** Da nur deren Hashes gespeichert werden, können sie später nicht mehr angezeigt werden. Sie werden mit dem ersten Faktor des Kontos ausgegeben.
 Das Hinzufügen eines weiteren Faktors behält die Codes, die das Konto bereits hat, und
 `recoveryCodes` ist `null`. Eine begonnene und abgebrochene Registrierung rührt sie nie an.
 
@@ -458,7 +458,7 @@ meldet sich an, sobald der Link mit seinem Passwort geöffnet wurde.
 
 ## Änderung der E-Mail-Adresse
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Eine angemeldete Person verschiebt ihr eigenes Konto auf eine andere Adresse. Nichts
+Eine angemeldete Person verschiebt ihr eigenes Konto auf eine andere Adresse. Nichts
 ändert sich, bis die neue Adresse antwortet:
 
 ```typescript

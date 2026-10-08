@@ -77,7 +77,7 @@ The reverse is not an update. Setting the field to a value is refused with `400`
 `beforeDelete` and `afterDelete` always apply to it. An upsert may create a row
 that is already stamped, but never stamps one that was stored.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Nor does an upsert write into a row in the trash: when its key belongs to a
+Nor does an upsert write into a row in the trash: when its key belongs to a
 stamped row, it is refused with `409` `ROW_IN_TRASH` and nothing is written.
 Restore the row first, or purge it with `?hard=true` and upsert again. On 0.23
 the upsert writes its values into the hidden row and answers `201`.

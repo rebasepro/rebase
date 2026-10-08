@@ -1,5 +1,5 @@
 ---
-sourceHash: c1895420d8eb9878
+sourceHash: 7db64266e1a6960b
 title: Funzioni personalizzate
 sidebar_label: Funzioni personalizzate
 description: Aggiungi endpoint API Hono personalizzati accanto alle tue route CRUD di Rebase. Individuazione automatica da una directory, con accesso completo all'istanza backend.
@@ -250,7 +250,7 @@ Leggere `getUser(c)` **non** costituisce un guard. Un chiamante anonimo riceve `
 
 ### Scope e scope dell'app
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> `requireAdmin` ammette il ruolo `admin` e nessun altro. Per un'azione che un ruolo più ristretto o una chiave API deve poter raggiungere, proteggi la route con `requireScope`. Accetta uno [scope](/docs/backend/roles-and-scopes/) integrato, oppure uno che l'app dichiara sotto `auth.scopes` sulla collezione users, come `"project:deploy": { label: "Deploy projects", target: "project" }`:
+`requireAdmin` ammette il ruolo `admin` e nessun altro. Per un'azione che un ruolo più ristretto o una chiave API deve poter raggiungere, proteggi la route con `requireScope`. Accetta uno [scope](/docs/backend/roles-and-scopes/) integrato, oppure uno che l'app dichiara sotto `auth.scopes` sulla collezione users, come `"project:deploy": { label: "Deploy projects", target: "project" }`:
 
 ```typescript
 import { defineFunction, requireAuth, requireScope, hasScope } from "@rebasepro/server/functions";

@@ -1,11 +1,11 @@
 ---
-sourceHash: e89814d78c29b234
+sourceHash: 48ce9150935742b8
 title: Rollen und Scopes
 sidebar_label: Rollen und Scopes
 description: "Was ein Aufrufer darf: die Datenebene, die jede Person hält, die Admin-Ebene, die Rollen gewähren, die Scopes, die eine App für sich selbst deklariert, und wie jedes Credential sie trägt."
 ---
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Jede Anfrage an ein Rebase-Backend stellt eine Frage: Darf dieser Aufrufer das tun?
+Jede Anfrage an ein Rebase-Backend stellt eine Frage: Darf dieser Aufrufer das tun?
 Die Antwort ist ein **Scope**, ein String der Form `resource:action`: `data:read`,
 `users:write`, `cron:read`. Die Sitzung einer Person, ein API-Schlüssel, ein MCP-Token und eine
 Rolle halten alle Scopes, und alle verwenden dieselben Strings. Eine Berechtigung liest sich gleich,
@@ -79,7 +79,7 @@ Scopes der Admin-Ebene nehmen kein Ziel. Ein App-Scope nimmt eines, wenn er ein
 
 ## Rollen deklarieren
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Rollen werden in der Users-Collection unter `auth.roles` deklariert. Eine Rolle ist ein Name,
+Rollen werden in der Users-Collection unter `auth.roles` deklariert. Eine Rolle ist ein Name,
 den die Datenbank sieht und auf den RLS-Policies passen können, plus eine Liste von Scopes der Admin-Ebene
 und App-Scopes.
 
@@ -266,7 +266,7 @@ und die Policies der Datenbank für die Identität, als die er handelt, sind ein
 
 ## Wenn ein Scope fehlt
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> Die Antwort ist `403 SCOPE_MISSING`, und `details.requiredScope` nennt den Scope,
+Die Antwort ist `403 SCOPE_MISSING`, und `details.requiredScope` nennt den Scope,
 mit seinem Ziel, wenn es eines gibt:
 
 ```json

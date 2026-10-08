@@ -1,5 +1,5 @@
 ---
-sourceHash: 719f802a23cf78ec
+sourceHash: 98867dc8dd9d38a9
 title: Schéma comme Code
 sidebar_label: Schéma comme Code
 description: Comment Rebase utilise les collections TypeScript comme source unique de vérité pour votre schéma de base de données, votre interface utilisateur et votre API.
@@ -129,7 +129,7 @@ export const relations = {  };
 
 Trois choses méritent d'être lues deux fois. La colonne `id` que vous n'avez pas
 déclarée : chaque collection reçoit une clé primaire `text`, sauf si une propriété
-revendique `isId`, et <span class="since-badge" data-since="0.24">Depuis 0.24</span> la base de données la remplit avec un uuid
+revendique `isId`, et la base de données la remplit avec un uuid
 (`gen_random_uuid()::text`), si bien qu'une ligne créée depuis le panneau
 d'administration, l'API REST ou le SDK n'a besoin d'aucune clé propre. Une clé que vous
 envoyez vous-même est utilisée telle quelle. Sur la 0.23 la colonne n'a aucune

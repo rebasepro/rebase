@@ -1,5 +1,5 @@
 ---
-sourceHash: b7e862286c030911
+sourceHash: 75ae5bf75334fb86
 title: SDK tipado — Primeiros passos
 sidebar_label: Primeiros Passos
 description: Instale e configure o SDK tipado do Rebase para interagir com seu backend a partir de qualquer aplicação JavaScript ou TypeScript.
@@ -57,7 +57,7 @@ const client = createRebaseClient({
 | `realtime` | `boolean` | Abre o WebSocket (padrão `true`) — defina como `false` em scripts pontuais |
 | `collections` | `Record<string, string>` | Mapeia nomes de acessadores para slugs de coleções |
 | `offline` | `boolean \| OfflineConfig` | [Sincronização local-first](/docs/sdk/offline) — desativada por padrão |
-| `impersonate` | `string` | <span class="since-badge" data-since="0.24">Since 0.24</span> Executa cada requisição como este usuário (por uid), para verificar o que um usuário vê. Só com a sessão de um administrador: a API de dados, as funções e o realtime rodam como esse usuário, e qualquer outra rota recusa |
+| `impersonate` | `string` | Executa cada requisição como este usuário (por uid), para verificar o que um usuário vê. Só com a sessão de um administrador: a API de dados, as funções e o realtime rodam como esse usuário, e qualquer outra rota recusa |
 
 ## Geração de SDK Tipado
 
@@ -71,7 +71,7 @@ Enquanto o `rebase dev` estiver em execução, você não precisa fazer isso: el
 `generated/sdk/` ao iniciar e a cada salvamento em `config/collections/`. Execute o
 comando você mesmo no CI, em um repositório de frontend que não tem coleções
 (`rebase generate-sdk --from link`), ou onde quer que o `rebase dev` não esteja em execução.
-<span class="since-badge" data-since="0.24">Desde 0.24</span> para a regeneração: na versão 0.23, o `rebase dev` não toca nos tipos do SDK,
+para a regeneração: na versão 0.23, o `rebase dev` não toca nos tipos do SDK,
 então execute o comando após cada alteração de coleção.
 
 Em seguida, passe o parâmetro de tipo `Database` para `createRebaseClient` para obter autocompletar completo:

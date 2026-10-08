@@ -1,5 +1,5 @@
 ---
-sourceHash: ea3185fba08977a9
+sourceHash: 32fc3b3ccab733ad
 title: Guida rapida
 sidebar_label: Guida rapida
 description: Crea un nuovo progetto Rebase e avvialo localmente in meno di 2 minuti.
@@ -170,7 +170,7 @@ export const collections = [
 
 Salva il file. Non serve altro: `rebase dev` rigenera `backend/src/schema.generated.ts` e i tipi dell'SDK in `generated/sdk/` a partire dalle tue collezioni, riavvia il backend e l'avvio crea la nuova tabella — così la collezione **Products** compare direttamente nella barra di navigazione.
 
-<span class="since-badge" data-since="0.24">Dalla 0.24</span> per i tipi dell'SDK: sulla 0.23, `rebase dev` rigenera solo lo schema, quindi
+per i tipi dell'SDK: sulla 0.23, `rebase dev` rigenera solo lo schema, quindi
 esegui `rebase generate-sdk` dopo una modifica a una collezione prima di
 importare i suoi tipi.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: ea3185fba08977a9
+sourceHash: 32fc3b3ccab733ad
 title: Démarrage rapide
 sidebar_label: Démarrage rapide
 description: Créez un nouveau projet Rebase et lancez-le localement en moins de 2 minutes.
@@ -187,7 +187,7 @@ Enregistrez le fichier. C'est tout ce qu'il y a à faire : `rebase dev` régén�
 collections, redémarre le backend, et le démarrage crée la nouvelle table — votre collection
 **Products** apparaît alors dans la navigation.
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> pour les types du SDK : sur la 0.23, `rebase dev` ne régénère que le schéma, exécutez donc
+pour les types du SDK : sur la 0.23, `rebase dev` ne régénère que le schéma, exécutez donc
 `rebase generate-sdk` après une modification de collection avant d'importer ses types.
 
 Il en va de même pour une propriété ajoutée à une collection existante : sauvegardez,

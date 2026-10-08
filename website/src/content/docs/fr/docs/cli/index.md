@@ -1,5 +1,5 @@
 ---
-sourceHash: bf93b611a72a5f12
+sourceHash: 151bdf50176c7654
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -44,7 +44,7 @@ Configure la structure du projet avec le frontend, le backend et les packages pa
 | `--introspect` | Générer les collections à partir de cette base de données. Implique `--template blank` et requiert `--install` |
 | `--project <slug>` | Lier le projet généré à un projet Rebase Cloud |
 | `--setup-key <key>` | La clé à usage unique authentifiant cette liaison |
-| `-a, --agent <name>` | <span class="since-badge" data-since="0.24">Depuis 0.24</span> Configurer les agents de codage IA : les [skills](/docs/ai/skills) et le [serveur MCP](/docs/ai/mcp). Répétable ou séparé par des virgules — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` ou `all`. Sans cette option, `init` demande et pré-coche les agents installés sur la machine ; avec `--yes`, aucun |
+| `-a, --agent <name>` | Configurer les agents de codage IA : les [skills](/docs/ai/skills) et le [serveur MCP](/docs/ai/mcp). Répétable ou séparé par des virgules — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` ou `all`. Sans cette option, `init` demande et pré-coche les agents installés sur la machine ; avec `--yes`, aucun |
 
 ### `rebase dev`
 
@@ -54,7 +54,7 @@ Démarrer le serveur de développement :
 rebase dev
 ```
 
-Démarre à la fois le frontend et le backend avec le rechargement à chaud (hot reloading), et régénère le schéma Drizzle ainsi que les types du SDK (`generated/sdk/`) au démarrage et à chaque enregistrement d'une collection. <span class="since-badge" data-since="0.24">Depuis 0.24</span> pour les types du SDK — sur la 0.23 elle ne régénère que le schéma, et `rebase generate-sdk` est à votre charge.
+Démarre à la fois le frontend et le backend avec le rechargement à chaud (hot reloading), et régénère le schéma Drizzle ainsi que les types du SDK (`generated/sdk/`) au démarrage et à chaque enregistrement d'une collection. pour les types du SDK — sur la 0.23 elle ne régénère que le schéma, et `rebase generate-sdk` est à votre charge.
 
 Les deux ports sont dérivés du chemin du projet afin que plusieurs projets Rebase puissent s'exécuter côte à côte. Utilisez les URL affichées par `rebase dev`. Fixez-en un avec `rebase dev --port 3001`.
 
@@ -455,7 +455,7 @@ rebase auth reset-password --email admin@example.com --password NewPassword123!
 
 ### `rebase api-keys`
 
-<span class="since-badge" data-since="0.24">Depuis 0.24</span> Gérer les clés d'API de service du projet — l'identifiant utilisé par un agent, un script ou un autre service, par opposition à la session d'un utilisateur final :
+Gérer les clés d'API de service du projet — l'identifiant utilisé par un agent, un script ou un autre service, par opposition à la session d'un utilisateur final :
 
 ```bash
 rebase api-keys list

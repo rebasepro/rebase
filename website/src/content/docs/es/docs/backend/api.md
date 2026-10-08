@@ -1,5 +1,5 @@
 ---
-sourceHash: df4fcc013e52c859
+sourceHash: 1e8fb1164e9af606
 title: API REST
 sidebar_label: API REST
 description: Endpoints de la API REST autogenerados para cada colección, con filtrado, ordenación, paginación e inclusión de relaciones.
@@ -464,7 +464,7 @@ Cada hook se espera, y un error en cualquiera de ellos deshace toda la escritura
 
 La especificación OpenAPI se genera automáticamente a partir de las definiciones de tus colecciones: describe los endpoints de listado, lectura, creación, actualización, eliminación y operaciones masivas (bulk) de cada colección servida por el backend, junto con sus parámetros de consulta y esquemas de respuesta. No es un mapa completo de toda la superficie HTTP (las rutas de autenticación, almacenamiento, funciones y cron se documentan únicamente en este sitio), y las columnas marcadas con `excludeFromApi` quedan excluidas de ella.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Para una colección con [`softDelete`](/docs/collections/soft-delete/), la especificación indica
+Para una colección con [`softDelete`](/docs/collections/soft-delete/), la especificación indica
 que una eliminación, individual o masiva, mueve la fila a la papelera, y documenta
 `?hard=true` en ambas eliminaciones y `?deleted=include|only` en el listado, la
 lectura individual, el conteo y la agregación. El explorador de API de Studio envía

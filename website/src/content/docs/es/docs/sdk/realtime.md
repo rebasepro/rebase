@@ -1,5 +1,5 @@
 ---
-sourceHash: 0ac5189687d9eccf
+sourceHash: 62e51002f973bf74
 title: Suscripciones en tiempo real
 sidebar_label: Tiempo real
 description: Suscríbete a cambios de datos en vivo con el SDK tipado de Rebase utilizando listeners en tiempo real basados en WebSocket.
@@ -186,7 +186,7 @@ El cliente WebSocket gestiona la autenticación automáticamente:
 - `client.ws.state` es el estado de la conexión — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` o `closed` — y `client.ws.onStateChange(listener)` se notifica de cada cambio. `disconnected` es el estado en el que se ha informado `CONNECTION_LOST`.
 - Las solicitudes enviadas por el socket son **como mucho una vez**. Una que se envió cuando la conexión se cayó falla con `CONNECTION_LOST` y nunca se reenvía, ya que el servidor puede haberla ejecutado ya. Una que sigue esperando un socket tras 30 segundos falla con `REQUEST_TIMEOUT` sin llegar a enviarse.
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> para todo lo de la lista posterior a cerrar sesión. En 0.23 el cliente se rinde tras
+para todo lo de la lista posterior a cerrar sesión. En 0.23 el cliente se rinde tras
 cinco intentos de reconexión fallidos, pone en cola las solicitudes hechas mientras está desconectado y
 las envía al reconectar, no tiene `client.ws.state`, y el servidor nunca cierra un
 socket cuya sesión haya terminado.

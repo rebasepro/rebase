@@ -1,5 +1,5 @@
 ---
-sourceHash: c1895420d8eb9878
+sourceHash: 7db64266e1a6960b
 title: Benutzerdefinierte Funktionen
 sidebar_label: Benutzerdefinierte Funktionen
 description: Fügen Sie benutzerdefinierte Hono-API-Endpunkte neben Ihren Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
@@ -239,7 +239,7 @@ Das Auslesen von `getUser(c)` ist **kein** Guard. Ein anonymer Aufrufer erhält 
 
 ### Scopes und App-Scopes
 
-<span class="since-badge" data-since="0.24">Seit 0.24</span> `requireAdmin` lässt die Rolle `admin` zu und sonst niemanden. Für eine Aktion, die eine engere Rolle oder ein API-Schlüssel erreichen soll, schützen Sie die Route mit `requireScope`. Es nimmt einen integrierten [Scope](/docs/backend/roles-and-scopes/) oder einen, den die App unter `auth.scopes` in der Users-Collection deklariert, etwa `"project:deploy": { label: "Deploy projects", target: "project" }`:
+`requireAdmin` lässt die Rolle `admin` zu und sonst niemanden. Für eine Aktion, die eine engere Rolle oder ein API-Schlüssel erreichen soll, schützen Sie die Route mit `requireScope`. Es nimmt einen integrierten [Scope](/docs/backend/roles-and-scopes/) oder einen, den die App unter `auth.scopes` in der Users-Collection deklariert, etwa `"project:deploy": { label: "Deploy projects", target: "project" }`:
 
 ```typescript
 import { defineFunction, requireAuth, requireScope, hasScope } from "@rebasepro/server/functions";

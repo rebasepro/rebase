@@ -6,7 +6,7 @@ description: "Long-lived keys for scripts, CI, agents and integrations: service 
 
 ## API Keys
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> An API key is a long-lived bearer credential, `rk_live_…`, for a caller that is
+An API key is a long-lived bearer credential, `rk_live_…`, for a caller that is
 not a person in a browser: a script, a CI job, an agent, an MCP client, another
 service. What a key may do is a list of [scopes](/docs/backend/roles-and-scopes/),
 such as `data:read:orders` or `cron:write`.
@@ -36,7 +36,7 @@ surfaces its scopes reach, the realtime WebSocket and the [`/mcp` endpoint](/doc
 
 ### Creating one
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A service key needs a name and at least one scope.
+A service key needs a name and at least one scope.
 
 ```bash
 # CLI: talks to the backend with the service key from .env
@@ -137,7 +137,7 @@ admin.
 
 ### Full access, for CI and migrations
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `--full-access` gives the key every scope its creator holds, less `keys:read` and
+`--full-access` gives the key every scope its creator holds, less `keys:read` and
 `keys:write`, which no key may hold. Through the CLI, which uses the service key,
 that is every data-plane and admin-plane scope. Add `--roles admin` and
 row-level security no longer limits which rows it reads, changes or deletes:
@@ -151,7 +151,7 @@ not the right shape for an agent.
 
 ### Rate limit
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A key's `rate_limit` is how many requests it may make in a 15-minute
+A key's `rate_limit` is how many requests it may make in a 15-minute
 window, and every door counts against it in one bucket, `api-key:<id>`:
 
 - its HTTP requests to the data, storage and functions APIs;
@@ -168,7 +168,7 @@ SQL editor's, are not rate limited.
 
 ## Personal keys
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> A personal key acts **as its owner**: their uid, and their roles as they are at
+A personal key acts **as its owner**: their uid, and their roles as they are at
 each request. Owner-style rules match it, so it reads exactly what its owner
 would, narrowed by its scopes. It suits a person's own scripts, a CLI on their
 laptop, or a tool they connect to their own account.
@@ -283,7 +283,7 @@ editor and branch messages need `database:read` or `database:write`.
 
 ## Agents and MCP servers
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> An agent wants the *narrowest* key that does its job. Start scoped, and give it
+An agent wants the *narrowest* key that does its job. Start scoped, and give it
 an expiry:
 
 ```bash

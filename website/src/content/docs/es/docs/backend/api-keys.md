@@ -1,5 +1,5 @@
 ---
-sourceHash: 411eeede8d2eab1b
+sourceHash: 7c51c9877d9d0803
 title: Claves de API
 sidebar_label: Claves de API
 description: "Claves de larga duración para scripts, CI, agentes e integraciones: claves de servicio y claves personales, los alcances que tienen, cómo se combinan con la seguridad a nivel de fila y las rutas que las gestionan."
@@ -7,7 +7,7 @@ description: "Claves de larga duración para scripts, CI, agentes e integracione
 
 ## Claves de API
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Una clave de API es una credencial bearer de larga duración, `rk_live_…`, para quien
+Una clave de API es una credencial bearer de larga duración, `rk_live_…`, para quien
 llama sin ser una persona en un navegador: un script, una tarea de CI, un agente, un
 cliente MCP, otro servicio. Lo que una clave puede hacer es una lista de
 [alcances](/docs/backend/roles-and-scopes/), como `data:read:orders` o `cron:write`.
@@ -38,7 +38,7 @@ WebSocket de tiempo real y el [endpoint `/mcp`](/docs/ai/mcp/#the-remote-endpoin
 
 ### Crear una
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Una clave de servicio necesita un nombre y al menos un alcance.
+Una clave de servicio necesita un nombre y al menos un alcance.
 
 ```bash
 # CLI: talks to the backend with the service key from .env
@@ -141,7 +141,7 @@ administrador.
 
 ### Acceso completo, para CI y migraciones
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> `--full-access` da a la clave todos los alcances que tiene su creador, menos
+`--full-access` da a la clave todos los alcances que tiene su creador, menos
 `keys:read` y `keys:write`, que ninguna clave puede tener. A través de la CLI, que
 usa la clave de servicio, eso son todos los alcances del plano de datos y del plano
 de administración. Añade `--roles admin` y la seguridad a nivel de fila deja de
@@ -156,7 +156,7 @@ No es la forma adecuada para un agente.
 
 ### Límite de tasa
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> El `rate_limit` de una clave es cuántas solicitudes puede hacer en una ventana
+El `rate_limit` de una clave es cuántas solicitudes puede hacer en una ventana
 de 15 minutos, y todas las vías cuentan contra él en un mismo contador, `api-key:<id>`:
 
 - sus solicitudes HTTP a las API de datos, almacenamiento y funciones;
@@ -174,7 +174,7 @@ socket, como los del editor SQL, no tienen límite de tasa.
 
 ## Claves personales
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Una clave personal actúa **como su propietario**: su uid, y sus roles tal como
+Una clave personal actúa **como su propietario**: su uid, y sus roles tal como
 estén en cada solicitud. Las reglas de tipo propietario coinciden con ella, así que
 lee exactamente lo que leería su propietario, restringido por sus alcances. Sirve
 para los scripts de una persona, una CLI en su portátil o una herramienta que conecta
@@ -296,7 +296,7 @@ las claves. El editor SQL y los mensajes de ramas necesitan `database:read` o
 
 ## Agentes y servidores MCP
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Un agente necesita la clave *más restringida* que haga su trabajo. Empieza con un
+Un agente necesita la clave *más restringida* que haga su trabajo. Empieza con un
 alcance limitado y ponle una caducidad:
 
 ```bash

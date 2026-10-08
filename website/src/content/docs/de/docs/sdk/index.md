@@ -1,5 +1,5 @@
 ---
-sourceHash: b7e862286c030911
+sourceHash: 75ae5bf75334fb86
 title: Typisiertes SDK — Erste Schritte
 sidebar_label: Erste Schritte
 description: Installieren und konfigurieren Sie das typisierte SDK von Rebase, um von jeder JavaScript- oder TypeScript-Anwendung aus mit Ihrem Backend zu interagieren.
@@ -57,7 +57,7 @@ const client = createRebaseClient({
 | `realtime` | `boolean` | WebSocket öffnen (Standard `true`) — in Einmalskripten auf `false` setzen |
 | `collections` | `Record<string, string>` | Weist Accessor-Namen den Slugs von Collections zu |
 | `offline` | `boolean \| OfflineConfig` | [Local-First-Synchronisation](/docs/sdk/offline) — standardmäßig deaktiviert |
-| `impersonate` | `string` | <span class="since-badge" data-since="0.24">Seit 0.24</span> Jede Anfrage als dieser Benutzer ausführen (per uid), um zu prüfen, was ein Benutzer sehen kann. Nur mit der Sitzung eines Administrators: Daten-API, Functions und Realtime laufen als dieser Benutzer, jede andere Route lehnt ab |
+| `impersonate` | `string` | Jede Anfrage als dieser Benutzer ausführen (per uid), um zu prüfen, was ein Benutzer sehen kann. Nur mit der Sitzung eines Administrators: Daten-API, Functions und Realtime laufen als dieser Benutzer, jede andere Route lehnt ab |
 
 ## Generierung eines typisierten SDKs
 
@@ -72,7 +72,7 @@ Solange `rebase dev` läuft, ist das nicht nötig: Es generiert die Typen in
 Selbst ausführen müssen Sie den Befehl in CI, in einem Frontend-Repository ohne
 Collections (`rebase generate-sdk --from link`) oder überall dort, wo `rebase dev`
 nicht läuft.
-<span class="since-badge" data-since="0.24">Seit 0.24</span> für die Neugenerierung: Unter 0.23
+für die Neugenerierung: Unter 0.23
 lässt `rebase dev` die SDK-Typen unberührt, führen Sie den Befehl daher nach jeder
 Collection-Änderung aus.
 

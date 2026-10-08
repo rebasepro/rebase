@@ -1,5 +1,5 @@
 ---
-sourceHash: 42fa2047884b640a
+sourceHash: b8aea50207626bc4
 title: Consulta de datos
 sidebar_label: Consulta de datos
 description: Operaciones CRUD, constructor de consultas fluido, operadores de filtro, ordenación, selección de columnas y agregaciones con el SDK tipado de Rebase.
@@ -392,7 +392,7 @@ const rows = await client.data.orders
 
 Las claves del resultado son **derivadas**, no elegidas: `sum(total)` se devuelve como `sum_total`, y un `count()` simple como `count`. Permitir nombres personalizados requeriría validar que no coincidan con campos de `groupBy` (una regla poco intuitiva que, de omitirse, sobrescribiría valores silenciosamente).
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Los grupos se paginan como las filas de un listado: `limit` los delimita y
+Los grupos se paginan como las filas de un listado: `limit` los delimita y
 `offset` los salta (agrupar por una columna de alta cardinalidad puede generar
 el equivalente a una tabla completa en una sola respuesta). Una agregación
 agrupada sin `limit` recibe el límite por defecto del listado — **50 grupos**

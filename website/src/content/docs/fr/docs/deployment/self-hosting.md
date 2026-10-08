@@ -1,5 +1,5 @@
 ---
-sourceHash: 57da5c05731b0030
+sourceHash: ae8d9da2fa3d1e43
 title: Auto-hébergement
 sidebar_label: Auto-hébergement
 description: Exécutez Rebase n'importe où avec l'image runtime officielle et le bundle de votre projet — Docker Compose, Fly, Railway ou un simple VPS.
@@ -83,7 +83,7 @@ Comme elles sont déjà présentes, vous pouvez monter le bundle en lecture seul
 Pour un déploiement réel, préférez intégrer les deux éléments dans une image, ce qui permet également de figer exactement ce qui est exécuté :
 
 ```dockerfile
-FROM rebasepro/server:0.23.0
+FROM rebasepro/server:0.24.0
 COPY dist-bundle /bundle
 ```
 
@@ -145,7 +145,7 @@ Le runtime est un conteneur standard écoutant sur `$PORT`, donc tout environnem
 
 ```toml
 [build]
-  image = "rebasepro/server:0.23.0"
+  image = "rebasepro/server:0.24.0"
 
 [http_service]
   internal_port = 8080
@@ -246,7 +246,7 @@ Expose les métriques Prometheus sur `/metrics` : nombre de requêtes et histogr
 
 ## En-têtes de sécurité
 
-Chaque réponse porte `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, une `Referrer-Policy` et `Strict-Transport-Security: max-age=15552000` (180 jours). L'en-tête HSTS omet `includeSubDomains` : cela indiquerait aux navigateurs de refuser le HTTP non chiffré sur chaque sous-domaine de votre domaine, y compris ceux dont ce serveur ne s'occupe pas, et un navigateur le conserve pendant toute la durée indiquée par l'en-tête. <span class="since-badge" data-since="0.24">Depuis 0.24</span> Définissez `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` lorsque chaque sous-domaine est exclusivement en HTTPS ; jusqu'à la version 0.23 incluse, l'en-tête portait toujours `includeSubDomains`.
+Chaque réponse porte `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, une `Referrer-Policy` et `Strict-Transport-Security: max-age=15552000` (180 jours). L'en-tête HSTS omet `includeSubDomains` : cela indiquerait aux navigateurs de refuser le HTTP non chiffré sur chaque sous-domaine de votre domaine, y compris ceux dont ce serveur ne s'occupe pas, et un navigateur le conserve pendant toute la durée indiquée par l'en-tête. Définissez `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` lorsque chaque sous-domaine est exclusivement en HTTPS ; jusqu'à la version 0.23 incluse, l'en-tête portait toujours `includeSubDomains`.
 
 Les applications statiques — l'administration CMS et tout frontend servi par le bundle — portent aussi `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri 'self'`. Cela décide qui peut encadrer l'application dans une iframe, exclut les plugins et fixe `<base>` sur votre origine, sans rien restreindre d'autre, de sorte que les scripts inline, les workers et la connexion via un tiers continuent de fonctionner. Une réponse qui définit sa propre politique la conserve. Pour quelque chose de plus strict, placez la politique sur le reverse proxy en amont.
 
@@ -261,7 +261,7 @@ Tout ce qui précède utilise un conteneur unique pour servir l'intégralité du
 ## Mise à niveau
 
 ```yaml
-image: rebasepro/server:0.23.0
+image: rebasepro/server:0.24.0
 ```
 
 Redémarrez. Votre bundle reste inchangé. Au sein d'une même version majeure du contrat de runtime, un bundle validé continue de fonctionner — voir [Compatibilité](/docs/architecture/runtime-and-bundles/#compatibility).

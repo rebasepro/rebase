@@ -1,5 +1,5 @@
 ---
-sourceHash: c7a020bdf4f333b9
+sourceHash: 7e5bf22227544ae0
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Configura l'autenticazione JWT, i provider OAuth, le email SMTP, la protezione dai bot e la collection users sul backend Rebase.
@@ -88,7 +88,7 @@ const backend = await initializeRebaseBackend({
 | `accessExpiresIn` | `string` | `1h` | Durata dell'access token |
 | `refreshExpiresIn` | `string` | `30d` | Durata del refresh token. Scorrevole: ogni rotazione la rinnova. Il runtime passa `JWT_REFRESH_EXPIRES_IN`, il cui valore predefinito è `400d` |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | Per quanto tempo un refresh token che è stato ruotato continua a emettere un gemello della sua sessione, in modo che un client che ha perso la risposta di un refresh non venga disconnesso |
-| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | <span class="since-badge" data-since="0.24">Da 0.24</span> Cosa succede a un refresh token presentato dopo quella finestra. `"reject"` lo rifiuta (`TOKEN_ALREADY_USED`) e lo registra nei log, e la sessione resta in piedi: non si tratta di una rilevazione del riutilizzo, poiché chi ha effettuato il refresh per primo mantiene la sessione. `"revoke-session"` termina l'intero accesso in caso di un simile replay (`SESSION_REVOKED`), come fa GoTrue, e il titolare accede di nuovo. `AUTH_REFRESH_TOKEN_REUSE` |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | Cosa succede a un refresh token presentato dopo quella finestra. `"reject"` lo rifiuta (`TOKEN_ALREADY_USED`) e lo registra nei log, e la sessione resta in piedi: non si tratta di una rilevazione del riutilizzo, poiché chi ha effettuato il refresh per primo mantiene la sessione. `"revoke-session"` termina l'intero accesso in caso di un simile replay (`SESSION_REVOKED`), come fa GoTrue, e il titolare accede di nuovo. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Richiede una sessione per le API dei dati |
 | `allowRegistration` | `boolean` | `false` | Abilita `POST /api/auth/register`. Al di fuori della produzione, il primo utente su una tabella vuota viene ammesso in ogni caso; in produzione l'admin viene definito con `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: chiude anche la finestra di bootstrap del primo utente lasciata aperta da `allowRegistration: false` |
@@ -99,8 +99,8 @@ const backend = await initializeRebaseBackend({
 | `email` | `EmailConfig` | — | SMTP, per ripristino password, verifiche, inviti e magic link |
 | `magicLink` | `boolean` | `false` | Abilita l'accesso senza password via email. Richiede `email` configurata; in caso contrario le route rispondono con `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Abilita i codici di accesso a sei cifre via email — vedi [Codici monouso](#codici-monouso-via-email). Stesso requisito per l'email |
-| `magicLinkCreatesUsers` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Da 0.24</span> Registrazione senza password: una richiesta di magic link o di codice email per un indirizzo senza account ne crea uno (senza password, non verificato finché il link o il codice non vengono usati), mentre `allowRegistration` è attivo. Esegue `beforeUserCreate` e il ruolo predefinito. Disattivato, tali richieste non creano nulla e rispondono a un indirizzo sconosciuto come rispondono a uno conosciuto. `AUTH_MAGIC_LINK_CREATES_USERS` |
-| `requireEmailVerification` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Da 0.24</span> Rifiuta l'accesso con password finché l'indirizzo non è verificato, e rende la registrazione confirm-first — vedi [Verifica email](/docs/backend/email-verification/). Richiede `email`; l'avvio la rifiuta senza |
+| `magicLinkCreatesUsers` | `boolean` | `false` | Registrazione senza password: una richiesta di magic link o di codice email per un indirizzo senza account ne crea uno (senza password, non verificato finché il link o il codice non vengono usati), mentre `allowRegistration` è attivo. Esegue `beforeUserCreate` e il ruolo predefinito. Disattivato, tali richieste non creano nulla e rispondono a un indirizzo sconosciuto come rispondono a uno conosciuto. `AUTH_MAGIC_LINK_CREATES_USERS` |
+| `requireEmailVerification` | `boolean` | `false` | Rifiuta l'accesso con password finché l'indirizzo non è verificato, e rende la registrazione confirm-first — vedi [Verifica email](/docs/backend/email-verification/). Richiede `email`; l'avvio la rifiuta senza |
 | `cookieAuth` | `CookieAuthConfig` | — | Fornisce il refresh token tramite cookie `httpOnly`, `Secure` e `SameSite` invece che nel corpo JSON — vedi sotto |
 | `providers` | `OAuthProvider[]` | `[]` | L'array OAuth canonico; i campi dei provider denominati confluiscono qui |
 | `allowedRedirectUris` | `string[]` | — | Limita gli URI di reindirizzamento accettati dalle route OAuth |
@@ -129,7 +129,7 @@ Il cookie include il flag `Secure` a meno che non venga disattivato esplicitamen
 :::caution[I callback delle collection non vengono eseguiti per gli utenti auth]
 La creazione e l'aggiornamento degli utenti tramite il sistema di autenticazione — registrazione, gestione utenti admin e OAuth — scrivono **direttamente** nello store utenti e aggirano la pipeline di salvataggio della collection. Un callback `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete` sulla collection di autenticazione (users) **non** verrà eseguito per questi percorsi. Per effetti collaterali come il provisioning di un team personale alla registrazione, usa gli hook del ciclo di vita dell'autenticazione (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), che ricevono il record utente completamente popolato.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> OAuth esegue gli stessi hook degli altri accessi: `beforeLogin` (con
+OAuth esegue gli stessi hook degli altri accessi: `beforeLogin` (con
 l'indirizzo del provider e `"oauth"`), `beforeUserCreate` quando l'accesso crea
 l'account, `afterUserCreate`, e `onAuthenticated`. `onAuthenticated` viene
 eseguito anche su un refresh del token (`"refresh"`), un ripristino password
@@ -139,7 +139,7 @@ autenticato, disattivalo con `PUT /api/admin/users/:uid { disabled: true }`:
 questo rifiuta ogni accesso e refresh e termina ogni sessione e token in suo
 possesso.
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> `beforeEmailChange(user, newEmail)` viene eseguito quando un utente
+`beforeEmailChange(user, newEmail)` viene eseguito quando un utente
 autenticato richiede di spostare il proprio account su un altro indirizzo.
 Una regola sugli indirizzi che applichi alla registrazione in
 `beforeUserCreate` (solo il tuo dominio, per esempio) va ripetuta anche qui,
@@ -363,7 +363,7 @@ Questo comportamento non è configurabile — non esiste intenzionalmente alcuna
 
 ### Verifica email
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> La registrazione invia al nuovo account un
+La registrazione invia al nuovo account un
 link di verifica via email, e seguirlo mantiene solo ciò che la persona che lo
 segue dimostra anche. `requireEmailVerification` rende la registrazione
 confirm-first. Vedi [Verifica email](/docs/backend/email-verification/).

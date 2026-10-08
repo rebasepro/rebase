@@ -1,5 +1,5 @@
 ---
-sourceHash: 144c4a3958537ebb
+sourceHash: 15e127696fc3c50e
 title: Integrazione Server Personalizzato
 sidebar_label: Server Personalizzato (Express)
 description: Come integrare i servizi Rebase Database e Realtime nel tuo backend Node.js personalizzato senza utilizzare Hono o il coordinator di Rebase.
@@ -259,7 +259,7 @@ app.use(cors({
 }));
 ```
 
-<span class="since-badge" data-since="0.24">Da 0.24</span> Il runtime di Rebase e il backend ottenuto con `rebase eject` inviano già questo elenco. Sulla 0.23 non espongono nessuno di questi header, quindi un frontend su un'altra origine non legge alcun `ETag`.
+Il runtime di Rebase e il backend ottenuto con `rebase eject` inviano già questo elenco. Sulla 0.23 non espongono nessuno di questi header, quindi un frontend su un'altra origine non legge alcun `ETag`.
 
 ## Correlati
 

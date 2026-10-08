@@ -1,5 +1,5 @@
 ---
-sourceHash: 2efe07fee7cafe0a
+sourceHash: 564c58f7bc002c6f
 title: Edição de schema ao vivo
 description: Crie e altere coleções em um backend em execução — comitadas primeiro no seu repositório, depois aplicadas.
 ---
@@ -26,7 +26,7 @@ A aplicação também exige algo além do escopo — consulte [Quem pode aplicar
 ## Planeje antes de aplicar
 
 O `/plan` não tem efeitos colaterais. Envie a alteração, e ele informa o que ela
-significa. <span class="since-badge" data-since="0.24">Since 0.24</span> Uma alteração em uma coleção existente é um `patch` — o que mudou, como
+significa. Uma alteração em uma coleção existente é um `patch` — o que mudou, como
 operações sobre caminhos de chaves — e uma nova coleção é a `collection` inteira:
 
 ```json
@@ -141,7 +141,7 @@ alteração e o que fazer em vez disso.
 O veredito é lido a partir do esquema que cada lado produz — o mesmo plano a
 partir do qual o `schema.generated.ts` e o `db push` são renderizados — então
 uma edição que altera o banco de dados não pode ser relatada como nenhuma
-alteração. Duas edições que parecem alterações e não são recusadas (<span class="since-badge" data-since="0.24">Since 0.24</span>; a 0.23 relata ambas como exigindo uma migração):
+alteração. Duas edições que parecem alterações e não são recusadas (; a 0.23 relata ambas como exigindo uma migração):
 
 - **Renomear a chave de uma propriedade mantendo sua coluna** (`columnName`
   definido como a coluna antiga) não move nenhum dado. É `safe`; os clientes da
@@ -153,7 +153,7 @@ alteração. Duas edições que parecem alterações e não são recusadas (<spa
 
 Uma alteração recusada ainda pode ser escrita na origem da sua coleção e
 commitada, deixando o banco de dados como está — remover uma propriedade que
-você não serve mais é o caso comum. <span class="since-badge" data-since="0.24">Since 0.24</span> Envie `/apply` com `"sourceOnly": true`. Nada é
+você não serve mais é o caso comum. Envie `/apply` com `"sourceOnly": true`. Nada é
 executado; a mensagem do commit nomeia o que o banco de dados mantém, por
 exemplo `chore(schema): remove sku from products (source only — column products.sku kept)`,
 e cada alteração no plano carrega uma frase `sourceOnly` dizendo o que ela
@@ -187,7 +187,7 @@ um repositório maior, os caminhos recebem o prefixo dele, localizado ao subir a
 partir do diretório de coleções até o `rebase.json` mais próximo. Um projeto sem
 `rebase.json` mantém os caminhos simples.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Nenhum SQL entra no commit. `rebase db push` e `rebase db generate` gravam o próprio
+Nenhum SQL entra no commit. `rebase db push` e `rebase db generate` gravam o próprio
 SQL a partir das coleções a cada execução, em `.rebase/sql/`, que fica no gitignore.
 Na 0.23 o commit também carrega `drizzle/schema.sql`, `drizzle/policies.sql` e
 `drizzle/search.sql`, escritos na raiz do projeto.
@@ -199,7 +199,7 @@ oferecem — as edições de tabela deles são invisíveis para o seu repositór
 
 ## Quem pode aplicar
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Ter `schema:read` é suficiente para **planejar** (*plan*). O planejamento
+Ter `schema:read` é suficiente para **planejar** (*plan*). O planejamento
 não tem efeitos colaterais, e uma tarefa de CI verificando se uma alteração de
 coleção proposta é aplicável é um bom uso para ele.
 

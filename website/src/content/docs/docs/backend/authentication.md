@@ -87,7 +87,7 @@ const backend = await initializeRebaseBackend({
 | `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
 | `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
 | `refreshTokenReuseIntervalSeconds` | `number` | `10` | How long a refresh token that was rotated away still mints a sibling of its session, so a client that lost a refresh answer is not signed out |
-| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | <span class="since-badge" data-since="0.24">Since 0.24</span> What a refresh token presented after that window does. `"reject"` refuses it (`TOKEN_ALREADY_USED`) and logs it, and the session stands: this is not reuse detection, since whoever refreshed first keeps the session. `"revoke-session"` ends the whole sign-in on such a replay (`SESSION_REVOKED`), as GoTrue does, and the owner signs in again. `AUTH_REFRESH_TOKEN_REUSE` |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | What a refresh token presented after that window does. `"reject"` refuses it (`TOKEN_ALREADY_USED`) and logs it, and the session stands: this is not reuse detection, since whoever refreshed first keeps the session. `"revoke-session"` ends the whole sign-in on such a replay (`SESSION_REVOKED`), as GoTrue does, and the owner signs in again. `AUTH_REFRESH_TOKEN_REUSE` |
 | `requireAuth` | `boolean` | `true` | Require a session for the data API |
 | `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
@@ -98,8 +98,8 @@ const backend = await initializeRebaseBackend({
 | `email` | `EmailConfig` | — | SMTP, for password reset, verification, invitations and magic links |
 | `magicLink` | `boolean` | `false` | Enable passwordless email sign-in. Needs `email` configured; without it the routes answer `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Enable six-digit sign-in codes by email — see [One-time codes](#one-time-codes-by-email). Same email requirement |
-| `magicLinkCreatesUsers` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Since 0.24</span> Passwordless sign-up: a magic-link or email-code request for an address with no account creates one (no password, unverified until the link or code is used), while `allowRegistration` is on. Runs `beforeUserCreate` and the default role. Off, those requests create nothing and answer an unknown address as they answer a known one. `AUTH_MAGIC_LINK_CREATES_USERS` |
-| `requireEmailVerification` | `boolean` | `false` | <span class="since-badge" data-since="0.24">Since 0.24</span> Refuse password sign-in until the address is verified, and register confirm-first — see [Email verification](/docs/backend/email-verification/). Needs `email`; the boot refuses it without |
+| `magicLinkCreatesUsers` | `boolean` | `false` | Passwordless sign-up: a magic-link or email-code request for an address with no account creates one (no password, unverified until the link or code is used), while `allowRegistration` is on. Runs `beforeUserCreate` and the default role. Off, those requests create nothing and answer an unknown address as they answer a known one. `AUTH_MAGIC_LINK_CREATES_USERS` |
+| `requireEmailVerification` | `boolean` | `false` | Refuse password sign-in until the address is verified, and register confirm-first — see [Email verification](/docs/backend/email-verification/). Needs `email`; the boot refuses it without |
 | `cookieAuth` | `CookieAuthConfig` | — | Deliver the refresh token as an `httpOnly` `Secure` `SameSite` cookie instead of in the JSON body — see below |
 | `providers` | `OAuthProvider[]` | `[]` | The canonical OAuth array; the named provider fields resolve into it |
 | `allowedRedirectUris` | `string[]` | — | Narrow which redirect URIs the OAuth routes accept |
@@ -147,7 +147,7 @@ side effects like provisioning a personal team on signup, use the auth lifecycle
 hooks (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), which
 receive the fully-populated user record.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> OAuth runs the same hooks as the other sign-ins: `beforeLogin` (with the
+OAuth runs the same hooks as the other sign-ins: `beforeLogin` (with the
 provider's address and `"oauth"`), `beforeUserCreate` when the sign-in creates
 the account, `afterUserCreate`, and `onAuthenticated`. `onAuthenticated` also
 fires on a token refresh (`"refresh"`), a password reset (`"password-reset"`) and
@@ -156,7 +156,7 @@ a sign-in. To stop an account that is already signed in, disable it with
 `PUT /api/admin/users/:uid { disabled: true }`: that refuses every sign-in and
 refresh and ends every session and token it holds.
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> `beforeEmailChange(user, newEmail)` runs when a signed-in user asks to
+`beforeEmailChange(user, newEmail)` runs when a signed-in user asks to
 move their account to another address. An address rule you enforce at sign-up
 in `beforeUserCreate` (only your own domain, say) belongs here too, or a member
 can sign up with an allowed address and then move to any other.
@@ -480,7 +480,7 @@ unverified emails.
 
 ### Email verification
 
-<span class="since-badge" data-since="0.24">Since 0.24</span> Registering mails the new account a
+Registering mails the new account a
 verification link, and following it keeps only what the person following it
 also proves. `requireEmailVerification` makes registration confirm-first. See
 [Email verification](/docs/backend/email-verification/).

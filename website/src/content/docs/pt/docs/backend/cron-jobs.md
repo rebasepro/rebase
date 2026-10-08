@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d36f4d71bfe288e
+sourceHash: 37805343f12779ab
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Agende tarefas em segundo plano recorrentes com o sistema integrado de cron jobs do Rebase. Defina jobs como arquivos TypeScript, monitore-os no Studio e gerencie-os via REST API.
@@ -265,7 +265,7 @@ O handler pode retornar qualquer valor serializável em JSON. Ele será armazena
 
 ## REST API
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Ler requer o escopo `cron:read`. Disparar, pausar e retomar requerem
+Ler requer o escopo `cron:read`. Disparar, pausar e retomar requerem
 `cron:write`. Um administrador tem os dois. Também os tem uma pessoa cujo papel os declara, e
 uma chave de API criada com eles, que é o que um agendador externo deve carregar:
 
@@ -280,7 +280,7 @@ Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | Lista todos os cron jobs registrados |
 | `GET` | `/api/admin/cron/:id` | Obtém o status de um job individual |
 | `POST` | `/api/admin/cron/:id/trigger` | Dispara um job manualmente — `409` enquanto ele já está em execução |
-| `GET` | `/api/admin/cron/:id/logs` | Obtém o histórico de execução (`?limit=N`). <span class="since-badge" data-since="0.24">Desde 0.24</span> `503` quando `rebase.cron_logs` não pode ser lida, em vez de um histórico vazio |
+| `GET` | `/api/admin/cron/:id/logs` | Obtém o histórico de execução (`?limit=N`). `503` quando `rebase.cron_logs` não pode ser lida, em vez de um histórico vazio |
 | `PUT` | `/api/admin/cron/:id` | Pausa ou retoma um job em todos os processos (`{ "enabled": false }`); `null` volta a seguir o código |
 
 ### Exemplo: Listar Todos os Jobs
@@ -380,7 +380,7 @@ await client.cron.toggleJob("health-check", false); // pause
 await client.cron.toggleJob("health-check", true);  // resume
 ```
 
-<span class="since-badge" data-since="0.24">Desde 0.24</span> `listJobs()` é tipado como `CronJobListing`: `jobs`, mais os campos `skipped`,
+`listJobs()` é tipado como `CronJobListing`: `jobs`, mais os campos `skipped`,
 `rejected` e `note` descritos em [Jobs Que Não Estão Lá](#jobs-que-não-estão-lá).
 
 ## Painel do Studio
@@ -390,15 +390,15 @@ Quando os cron jobs estão configurados, uma ferramenta **Cron Jobs** aparece no
 - **Lista de jobs** — Todos os jobs registrados com indicadores de status em tempo real
 - **Painel de detalhes** — Agendamento, próxima/última execução, duração e detalhes de erro
 - **Histórico de execuções** — Entradas de log expansíveis com saídas e resultados capturados
-- **Disparo manual** — Execute qualquer job sob demanda com um único clique. <span class="since-badge" data-since="0.24">Desde 0.24</span> O painel aguarda o fim da execução e diz como ela foi: uma execução que falhou mostra o seu erro
+- **Disparo manual** — Execute qualquer job sob demanda com um único clique. O painel aguarda o fim da execução e diz como ela foi: uma execução que falhou mostra o seu erro
 - **Habilitar/desabilitar** — Pause e retome jobs sem reiniciar o servidor, em todos os processos de uma vez; uma pausa se mantém após reinicializações e deploys
-- **Jobs que não estão lá** — <span class="since-badge" data-since="0.24">Desde 0.24</span> cada job que o agendador recusou, com o seu agendamento e o motivo, e quantos arquivos de cron falharam ao carregar. Nenhum deles está agendado; veja [Jobs Que Não Estão Lá](#jobs-que-não-estão-lá)
+- **Jobs que não estão lá** — cada job que o agendador recusou, com o seu agendamento e o motivo, e quantos arquivos de cron falharam ao carregar. Nenhum deles está agendado; veja [Jobs Que Não Estão Lá](#jobs-que-não-estão-lá)
 
 O painel é atualizado automaticamente a cada 15 segundos.
 
 O painel mostra a mesma coisa, seja qual for o processo que o serve. Um job que
 outro processo está executando aparece como em execução.
-<span class="since-badge" data-since="0.24">Desde 0.24</span> Em todo processo que tem um armazenamento persistente, o número de execuções, o
+Em todo processo que tem um armazenamento persistente, o número de execuções, o
 número de falhas e a última execução são lidos de `rebase.cron_logs`, com uma consulta
 limitada às linhas de cada job. Os contadores do próprio processo guardam apenas as
 execuções que ele fez: o papel `api` ao lado de um worker não executa nada, e, de duas
