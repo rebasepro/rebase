@@ -53,18 +53,14 @@ export function NavigationGroup({
     const TitleContent = (
         <div className={cls("flex items-center", isPreview ? "px-1 py-0.5" : "")}
         >
+            {/* The micro tier in the muted colour: a group label names a region
+                and carries no state. In place it sits on the cards' left edge;
+                a drag preview floats free of the grid and keeps an inset. */}
             <Typography
-                variant={isPreview ? "body2" : "caption"}
+                variant="micro"
                 component={"h2"}
                 color="secondary"
-                className={cls(
-                    "px-4 py-1 rounded",
-                    // The muted tier, not a half-strength primary: a group label
-                    // names a region and carries no state, and it was the one
-                    // blue on the home page that meant nothing. Same voice as the
-                    // drawer's group labels.
-                    "font-medium text-[10px] uppercase tracking-[0.08em] text-surface-400 dark:text-surface-400"
-                )}
+                className={cls("py-1 rounded", isPreview && "px-4")}
             >
                 {currentGroupLabel}
             </Typography>
@@ -118,7 +114,10 @@ export function NavigationGroup({
                     }}
                     className={cls("mt-6")}
                     titleClassName={cls(
-                        "min-h-0 p-0 border-none",
+                        // Bleeds past the cards by the padding it adds back, so the
+                        // label and caret line up with the grid while the collapsed
+                        // fill still has room around them.
+                        "min-h-0 p-0 px-3 -mx-3 w-auto border-none",
                         "rounded flex items-center justify-between w-full",
                         "hover:bg-transparent",
                         "cursor-pointer select-none",

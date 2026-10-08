@@ -51,6 +51,13 @@ export function NavigationCardBinding({
             <IconButton
                 key={"favourite"}
                 size={"small"}
+                // An empty star on every card is a row of identical icons
+                // competing with the titles: it shows on hover or focus, and
+                // stays once the collection is a favourite. A touch screen
+                // has no hover, so there it always shows.
+                className={favourite
+                    ? undefined
+                    : "opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"}
                 onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
