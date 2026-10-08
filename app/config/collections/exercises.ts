@@ -1,4 +1,5 @@
 import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { updateRecord } from "../actions";
 
 const exercisesCollection: PostgresCollectionConfig = {
     name: "Exercises",
@@ -331,6 +332,39 @@ const exercisesCollection: PostgresCollectionConfig = {
         }
     },
     admin: {
+        // Sample record actions — see ../actions.ts.
+        entityActions: [
+            {
+                key: "publish",
+                name: "Publish",
+                icon: "Send",
+                collapsed: false,
+                isEnabled: ({ entity }) => entity?.values.status !== "published",
+                disabledReason: () => "Already published",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "published" }, "Exercise published")
+            },
+            {
+                key: "feature",
+                name: "Feature this exercise",
+                icon: "Star",
+                isEnabled: ({ entity }) => !entity?.values.is_featured && entity?.values.status === "published",
+                disabledReason: ({ entity }) => entity?.values.is_featured
+                    ? "Already featured"
+                    : "Only published exercises can be featured",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { is_featured: true }, "Exercise featured")
+            },
+            {
+                key: "archive",
+                name: "Archive",
+                icon: "Archive",
+                isEnabled: ({ entity }) => entity?.values.status !== "archived",
+                disabledReason: () => "Already archived",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "archived", is_featured: false }, "Exercise archived")
+            }
+        ],
         icon: "Dumbbell",
         group: "Fitness",
         defaultViewMode: "table",

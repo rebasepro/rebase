@@ -1,5 +1,6 @@
 import { maskEmail, maskName, maskValues } from "../masking";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { copyToClipboard, text } from "../actions";
 
 const usersCollection: PostgresCollectionConfig = {
     name: "Users",
@@ -144,6 +145,20 @@ const usersCollection: PostgresCollectionConfig = {
         }
     ],
     admin: {
+        // Sample record action — see ../actions.ts. The built-in account
+        // actions (reset password, two-step verification, disable) are added
+        // to every auth collection by the panel itself.
+        entityActions: [
+            {
+                key: "copy_email",
+                name: "Copy email address",
+                icon: "ClipboardCopy",
+                isEnabled: ({ entity }) => Boolean(text(entity?.values.email)),
+                disabledReason: () => "No email on file",
+                onClick: ({ entity, context }) => entity &&
+                    copyToClipboard(context, String(entity.values.email), "Email address copied")
+            }
+        ],
         icon: "Users",
         group: "Settings",
         openEntityMode: "dialog",

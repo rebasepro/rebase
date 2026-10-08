@@ -4,6 +4,7 @@
 import ordersCollection from "./orders";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { fullName, joinParts, money } from "../display";
+import { updateRecord, copyToClipboard, openInNewTab, text } from "../actions";
 
 const customersCollection: PostgresCollectionConfig = {
     name: "Customers",
@@ -116,6 +117,41 @@ const customersCollection: PostgresCollectionConfig = {
             }
     ],
     admin: {
+        // Sample record actions — see ../actions.ts.
+        entityActions: [
+            {
+                key: "recalculate_vip",
+                name: "Recalculate VIP",
+                icon: "Crown",
+                collapsed: false,
+                onClick: ({ entity, context, collection }) => {
+                    if (!entity) return;
+                    const isVip = Number(entity.values.lifetime_value ?? 0) >= 1000;
+                    return updateRecord(context, collection?.slug ?? entity.path, entity.id, { is_vip: isVip },
+                        isVip ? "VIP: spent $1,000 or more" : "Not VIP: spent under $1,000");
+                }
+            },
+            {
+                key: "email",
+                name: "Email customer",
+                icon: "Mail",
+                collapsed: false,
+                isEnabled: ({ entity }) => Boolean(text(entity?.values.email)),
+                disabledReason: () => "No email on file",
+                onClick: ({ entity }) => {
+                    if (entity) openInNewTab(`mailto:${String(entity.values.email)}`);
+                }
+            },
+            {
+                key: "copy_email",
+                name: "Copy email address",
+                icon: "ClipboardCopy",
+                isEnabled: ({ entity }) => Boolean(text(entity?.values.email)),
+                disabledReason: () => "No email on file",
+                onClick: ({ entity, context }) => entity &&
+                    copyToClipboard(context, String(entity.values.email), "Email address copied")
+            }
+        ],
         icon: "Users",
         group: "E-Commerce",
         defaultEntityAction: "view",

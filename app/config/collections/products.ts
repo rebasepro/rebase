@@ -3,6 +3,7 @@ import productLocalesCollection from "./product_locales";
 import { LOCALE_ENUM } from "../locales";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { joinParts, money } from "../display";
+import { updateRecord } from "../actions";
 
 const productsCollection: PostgresCollectionConfig = {
     name: "Products",
@@ -255,6 +256,53 @@ const productsCollection: PostgresCollectionConfig = {
         }
     ],
     admin: {
+        // Sample record actions — see ../actions.ts. Publish is a button in
+        // the record's bar; the rest wait in its ⋮ menu, and each says why when
+        // it does not apply.
+        entityActions: [
+            {
+                key: "publish",
+                name: "Publish",
+                icon: "Rocket",
+                collapsed: false,
+                isEnabled: ({ entity }) => entity?.values.status !== "active",
+                disabledReason: () => "Already live in the store",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "active" }, "Product published")
+            },
+            {
+                key: "restock",
+                name: "Restock 50 units",
+                icon: "PackagePlus",
+                collapsed: false,
+                isEnabled: ({ entity }) => entity?.values.status !== "archived",
+                disabledReason: () => "Archived products can't be restocked",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id,
+                        { stock_quantity: Number(entity.values.stock_quantity ?? 0) + 50 },
+                        "Added 50 units to stock")
+            },
+            {
+                key: "feature",
+                name: "Feature on the homepage",
+                icon: "Star",
+                isEnabled: ({ entity }) => !entity?.values.is_featured && entity?.values.status === "active",
+                disabledReason: ({ entity }) => entity?.values.is_featured
+                    ? "Already featured"
+                    : "Only live products can be featured",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { is_featured: true }, "Featured on the homepage")
+            },
+            {
+                key: "archive",
+                name: "Archive",
+                icon: "Archive",
+                isEnabled: ({ entity }) => entity?.values.status !== "archived",
+                disabledReason: () => "Already archived",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "archived", is_featured: false }, "Product archived")
+            }
+        ],
         icon: "Package",
         group: "E-Commerce",
         defaultViewMode: "cards",

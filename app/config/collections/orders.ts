@@ -3,6 +3,7 @@ import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { fullName, joinParts, money, relatedRecord } from "../display";
+import { updateRecord, copyToClipboard, text } from "../actions";
 
 // Helper function to extract ID from relation value (which can be primitive ID or expanded object)
 const getRelationId = (val: unknown): string | number | undefined => {
@@ -231,6 +232,65 @@ const ordersCollection: PostgresCollectionConfig = {
         }
     },
     admin: {
+        // Sample record actions — see ../actions.ts. Shipping is the job an
+        // order is opened for, so it is a button; the rest are in the ⋮ menu.
+        entityActions: [
+            {
+                key: "ship",
+                name: "Mark as shipped",
+                icon: "Truck",
+                collapsed: false,
+                isEnabled: ({ entity }) => entity?.values.payment_status === "paid"
+                    && ["pending", "confirmed", "processing"].includes(String(entity?.values.status)),
+                disabledReason: ({ entity }) => {
+                    const status = String(entity?.values.status);
+                    if (status === "shipped" || status === "delivered") return "Already shipped";
+                    if (status === "cancelled" || status === "refunded") return `This order was ${status}`;
+                    return "Waiting for payment";
+                },
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id, {
+                        status: "shipped",
+                        shipped_date: new Date(),
+                        tracking_number: text(entity.values.tracking_number)
+                            ?? `1Z${Math.random().toString(36).slice(2, 12).toUpperCase()}`
+                    }, "Order marked as shipped")
+            },
+            {
+                key: "deliver",
+                name: "Mark as delivered",
+                icon: "PackageCheck",
+                collapsed: false,
+                isEnabled: ({ entity }) => entity?.values.status === "shipped",
+                disabledReason: ({ entity }) => entity?.values.status === "delivered"
+                    ? "Already delivered"
+                    : "Ship the order first",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id,
+                        { status: "delivered", delivered_date: new Date() }, "Order marked as delivered")
+            },
+            {
+                key: "copy_tracking",
+                name: "Copy tracking number",
+                icon: "ClipboardCopy",
+                isEnabled: ({ entity }) => Boolean(text(entity?.values.tracking_number)),
+                disabledReason: () => "No tracking number yet — it is set when the order ships",
+                onClick: ({ entity, context }) => entity &&
+                    copyToClipboard(context, String(entity.values.tracking_number), "Tracking number copied")
+            },
+            {
+                key: "refund",
+                name: "Refund",
+                icon: "Undo2",
+                isEnabled: ({ entity }) => entity?.values.payment_status === "paid",
+                disabledReason: ({ entity }) => String(entity?.values.payment_status).includes("refunded")
+                    ? "Already refunded"
+                    : "Nothing to refund: the order is not paid",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id,
+                        { payment_status: "refunded", status: "refunded" }, "Order refunded")
+            }
+        ],
         icon: "ShoppingCart",
         group: "E-Commerce",
         defaultEntityAction: "view",

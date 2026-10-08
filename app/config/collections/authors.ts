@@ -5,6 +5,7 @@
 import postsCollection from "./posts";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { joinParts } from "../display";
+import { openInNewTab, text } from "../actions";
 
 const authorsCollection: PostgresCollectionConfig = {
     name: "Authors",
@@ -89,6 +90,42 @@ const authorsCollection: PostgresCollectionConfig = {
             }
     ],
     admin: {
+        // Sample record actions — see ../actions.ts.
+        entityActions: [
+            {
+                key: "email",
+                name: "Email author",
+                icon: "Mail",
+                collapsed: false,
+                isEnabled: ({ entity }) => Boolean(text(entity?.values.email)),
+                disabledReason: () => "No email on file",
+                onClick: ({ entity }) => {
+                    if (entity) openInNewTab(`mailto:${String(entity.values.email)}`);
+                }
+            },
+            {
+                key: "open_website",
+                name: "Open website",
+                icon: "Globe",
+                isEnabled: ({ entity }) => Boolean(text(entity?.values.website)),
+                disabledReason: () => "No website on this author",
+                onClick: ({ entity }) => {
+                    if (entity) openInNewTab(String(entity.values.website));
+                }
+            },
+            {
+                key: "open_github",
+                name: "Open GitHub profile",
+                icon: "ExternalLink",
+                isEnabled: ({ entity }) => Boolean(text(entity?.values.github)),
+                disabledReason: () => "No GitHub profile on this author",
+                onClick: ({ entity }) => {
+                    if (!entity) return;
+                    const handle = String(entity.values.github);
+                    openInNewTab(handle.startsWith("http") ? handle : `https://github.com/${handle.replace(/^@/, "")}`);
+                }
+            }
+        ],
         icon: "User",
         group: "Content",
         // An author is the target of every post's `author` relation, so this

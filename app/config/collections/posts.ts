@@ -5,6 +5,7 @@ import authorsCollection from "./authors";
 import tagsCollection from "./tags";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { relatedRecords } from "../display";
+import { updateRecord } from "../actions";
 
 const postsCollection: PostgresCollectionConfig = {
     name: "Blog posts",
@@ -198,6 +199,41 @@ const postsCollection: PostgresCollectionConfig = {
         }
     },
     admin: {
+        // Sample record actions — see ../actions.ts. The editorial workflow:
+        // publish from the bar, the other steps from the ⋮ menu.
+        entityActions: [
+            {
+                key: "publish",
+                name: "Publish",
+                icon: "Send",
+                collapsed: false,
+                isEnabled: ({ entity }) => entity?.values.status !== "published",
+                disabledReason: () => "Already published",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id,
+                        { status: "published", publish_date: new Date() }, "Post published")
+            },
+            {
+                key: "request_review",
+                name: "Request review",
+                icon: "MessageSquare",
+                isEnabled: ({ entity }) => entity?.values.status === "draft",
+                disabledReason: ({ entity }) => entity?.values.status === "published"
+                    ? "Already published"
+                    : "Already waiting for review",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "needs_review" }, "Sent for review")
+            },
+            {
+                key: "unpublish",
+                name: "Unpublish",
+                icon: "EyeOff",
+                isEnabled: ({ entity }) => entity?.values.status === "published",
+                disabledReason: () => "This post is not published",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "draft" }, "Post moved back to drafts")
+            }
+        ],
         icon: "FileText",
         group: "Content",
         defaultViewMode: "cards",

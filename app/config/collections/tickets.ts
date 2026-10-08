@@ -1,6 +1,7 @@
 import customersCollection from "./customers";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { fullName, joinParts, relatedRecord } from "../display";
+import { updateRecord } from "../actions";
 
 const ticketsCollection: PostgresCollectionConfig = {
     name: "Tickets",
@@ -186,6 +187,62 @@ const ticketsCollection: PostgresCollectionConfig = {
         }
     },
     admin: {
+        // Sample record actions — see ../actions.ts. Picking a ticket up and
+        // resolving it are buttons; escalating and reopening are in the menu.
+        entityActions: [
+            {
+                key: "assign_to_me",
+                name: "Assign to me",
+                icon: "UserCheck",
+                collapsed: false,
+                isEnabled: ({ entity, context }) => Boolean(context?.authController.user)
+                    && entity?.values.assigned_to !== context?.authController.user?.uid
+                    && !["resolved", "closed"].includes(String(entity?.values.status)),
+                disabledReason: ({ entity, context }) => entity?.values.assigned_to === context?.authController.user?.uid
+                    ? "Already assigned to you"
+                    : "This ticket is closed",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id, {
+                        assigned_to: context?.authController.user?.uid,
+                        status: entity.values.status === "open" ? "in_progress" : entity.values.status
+                    }, "Assigned to you")
+            },
+            {
+                key: "resolve",
+                name: "Resolve",
+                icon: "CircleCheck",
+                collapsed: false,
+                isEnabled: ({ entity }) => !["resolved", "closed"].includes(String(entity?.values.status)),
+                disabledReason: ({ entity }) => `Already ${String(entity?.values.status)}`,
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "resolved" }, "Ticket resolved")
+            },
+            {
+                key: "escalate",
+                name: "Escalate priority",
+                icon: "CircleArrowUp",
+                isEnabled: ({ entity }) => entity?.values.priority !== "urgent"
+                    && !["resolved", "closed"].includes(String(entity?.values.status)),
+                disabledReason: ({ entity }) => entity?.values.priority === "urgent"
+                    ? "Already at the highest priority"
+                    : "Closed tickets can't be escalated",
+                onClick: ({ entity, context, collection }) => {
+                    if (!entity) return;
+                    const order = ["low", "medium", "high", "urgent"];
+                    const next = order[Math.min(order.indexOf(String(entity.values.priority)) + 1, order.length - 1)];
+                    return updateRecord(context, collection?.slug ?? entity.path, entity.id, { priority: next }, `Priority raised to ${next}`);
+                }
+            },
+            {
+                key: "reopen",
+                name: "Reopen",
+                icon: "RotateCcw",
+                isEnabled: ({ entity }) => ["resolved", "closed"].includes(String(entity?.values.status)),
+                disabledReason: () => "This ticket is still open",
+                onClick: ({ entity, context, collection }) => entity &&
+                    updateRecord(context, collection?.slug ?? entity.path, entity.id, { status: "open" }, "Ticket reopened")
+            }
+        ],
         icon: "Ticket",
         group: "Support",
         defaultViewMode: "kanban",
