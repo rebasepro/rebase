@@ -794,7 +794,7 @@ export const de = {
   "studiopage.15": "Kopiere die ganze Datenbank — Schema, Zeilen, Policies —, schalte dein Projekt darauf um und lösch sie, wenn du fertig bist. Anlegen, auflisten, ansehen, umschalten, löschen — ein Merge gibt es nicht, und diese Seite tut nicht so.",
   "studiopage.16": "Führe JavaScript mit dem Rebase-SDK in einer Live-Sandbox aus. Teste Queries und automatisiere Aufgaben.",
   "studiopage.17": "Überwache und verwalte geplante Hintergrund-Jobs. Logs, Status und Lauf-Historie einsehen.",
-  "studiopage.18": "/api/users/:id",
+  "studiopage.18": "/api/data/users/:id",
   "studiopage.19": "Interaktive API-Dokumentation mit Live-Request-Test. Jeden Endpunkt durchblättern und ausprobieren.",
   "studiopage.20": "GET /api/data/orders",
   "studiopage.21": "seq scan on orders",

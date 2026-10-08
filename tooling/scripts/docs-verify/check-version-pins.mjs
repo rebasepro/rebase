@@ -139,6 +139,14 @@ const ANCHORS = [
         what: "rls-check banner"
     },
     {
+        // `rebase init`'s own line, quoted by the /cli page's terminal run:
+        // "Pinning 11 @rebasepro package(s) to 0.23.0...". It is the version a
+        // new project gets today, so it moves with the release.
+        id: "init-pin-line",
+        re: /@rebasepro package\(s\) to (\d+\.\d+\.\d+)/g,
+        what: "`rebase init` pin line"
+    },
+    {
         // `tag: "0.15.0"`, `--set image.tag=0.15.0`. Restricted to `0.x.y`:
         // the neighbouring examples pin the *reader's* own app image
         // (`tag: "1.4.0"`), and those numbers are theirs to choose.

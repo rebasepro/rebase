@@ -102,6 +102,11 @@ function proseFiles(root) {
         ...globSync("website/scripts/**/*.js", { cwd: root }),
         ...globSync("website/scripts/**/*.mjs", { cwd: root }),
         ...globSync("website/public/llms.txt", { cwd: root }),
+        // The site's own briefs (SITE-STORY.md, PRODUCT.md). Their page
+        // contracts tell whoever builds a page what it shows, so a stale count
+        // there is copied into the next page: SITE-STORY said "the 14 checks"
+        // for a month after the fifteenth shipped.
+        ...globSync("website/*.md", { cwd: root }),
         // The root `docs/` is the SOURCE `copy_repo_docs.js` mirrors into the
         // website, so a stale count here is one that comes back on the next
         // mirror run. Scanning only the mirror would catch it once and then

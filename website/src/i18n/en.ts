@@ -875,7 +875,7 @@ export const en = {
   "studiopage.15": "Copy the whole database — schema, rows, policies — switch your project onto it, and delete it when you are done. Create, list, inspect, switch, delete — there is no merge, and the page does not pretend there is.",
   "studiopage.16": "Run JavaScript with the Rebase SDK in a live sandbox. Test queries and automate tasks.",
   "studiopage.17": "Monitor and manage scheduled background tasks. View logs, status, and run history.",
-  "studiopage.18": "/api/users/:id",
+  "studiopage.18": "/api/data/users/:id",
   "studiopage.19": "Interactive API documentation with live request testing. Browse and try every endpoint.",
   "studiopage.20": "GET /api/data/orders",
   "studiopage.21": "seq scan on orders",

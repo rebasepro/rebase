@@ -794,7 +794,7 @@ export const fr = {
   "studiopage.15": "Copiez toute la base — schéma, lignes, policies —, basculez votre projet dessus, et supprimez-la quand vous avez fini. Créer, lister, inspecter, basculer, supprimer — il n'y a pas de merge, et cette page ne prétend pas le contraire.",
   "studiopage.16": "Exécutez du JavaScript avec le SDK Rebase dans un bac à sable en direct. Testez des requêtes et automatisez des tâches.",
   "studiopage.17": "Surveillez et gérez les tâches planifiées en arrière-plan. Consultez logs, statut et historique d'exécution.",
-  "studiopage.18": "/api/users/:id",
+  "studiopage.18": "/api/data/users/:id",
   "studiopage.19": "Documentation d'API interactive avec test de requêtes en direct. Parcourez et essayez chaque endpoint.",
   "studiopage.20": "GET /api/data/orders",
   "studiopage.21": "seq scan on orders",

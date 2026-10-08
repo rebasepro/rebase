@@ -10,17 +10,31 @@ import { NeatBackground } from '../../components/NeatBackground';
 
 
 
-const terminalRun = `<span class="text-surface-500">$</span> pnpm dlx @rebasepro/cli init
-<span class="text-emerald-400">✔</span> Initialized Rebase in current directory.
-<span class="text-surface-500">  backend/  frontend/  .env  rebase.config.ts</span>
+// Copied from a real run of these three commands (init.ts, db.ts, dev.ts), with
+// lines left out and none added or reworded. Re-run them to change it.
+const terminalRun = `<span class="text-surface-500">$</span> pnpm dlx @rebasepro/cli init my-app --database-url postgres://… --install
+<span class="text-white">Rebase</span> — Create a new project 🚀
 
-<span class="text-surface-500">$</span> rebase db push
-<span class="text-emerald-400">✔</span> Schema pushed to database. Tables created.
-<span class="text-emerald-400">✔</span> Row-level security enabled on every collection.
+<span class="text-surface-500">  Copying project files...
+  Pinning 11 @rebasepro package(s) to 0.23.0...
+  Installing dependencies with pnpm...</span>
 
-<span class="text-surface-500">$</span> rebase dev
-<span class="text-emerald-400">✔</span> API and realtime on :3417, panel on :5241.
-<span class="text-surface-500">  Both ports are derived from the project path — yours will differ.</span>`;
+<span class="text-emerald-400">✓</span> Project <span class="text-white">my-app</span> created successfully!
+
+<span class="text-surface-500">$</span> cd my-app &amp;&amp; pnpm run db:push
+  🗄️  Rebase DB Push
+  Step 1/3: Generating Drizzle schema &amp; Postgres DDL from collections...
+  Step 2/3: Pushing schema to database with Atlas...
+  Step 3/3: Applying RLS policies to database...
+  <span class="text-emerald-400">✓</span> RLS policies applied successfully.
+  <span class="text-emerald-400">✓</span> rebase db push completed successfully.
+
+<span class="text-surface-500">$</span> pnpm run dev
+  ↳ PORT = 3339 (derived)
+  ↳ frontend port = 5278
+  ✦ Rebase is ready!
+  ➜ Admin: http://localhost:5278
+  ➜ API:   http://localhost:3339`;
 
 import ClosingCta from "../ClosingCta.astro";
 ---

@@ -91,8 +91,8 @@ export const SAMPLE_ROWS = [
 
 /** The REST surface the collection gets. */
 export const SAMPLE_ENDPOINTS = [
-    { method: "GET",    color: "bg-blue-950 text-blue-300 border-blue-800/40",    path: "/api/products" },
-    { method: "POST",   color: "bg-green-950 text-green-300 border-green-800/40", path: "/api/products" },
-    { method: "PATCH",  color: "bg-amber-950 text-amber-300 border-amber-800/40", path: "/api/products/:id" },
-    { method: "DELETE", color: "bg-red-950 text-red-300 border-red-800/40",       path: "/api/products/:id" },
+    { method: "GET",    color: "bg-blue-950 text-blue-300 border-blue-800/40",    path: "/api/data/products" },
+    { method: "POST",   color: "bg-green-950 text-green-300 border-green-800/40", path: "/api/data/products" },
+    { method: "PATCH",  color: "bg-amber-950 text-amber-300 border-amber-800/40", path: "/api/data/products/:id" },
+    { method: "DELETE", color: "bg-red-950 text-red-300 border-red-800/40",       path: "/api/data/products/:id" },
 ];

@@ -795,7 +795,7 @@ export const es = {
   "studiopage.15": "Copia la base de datos entera — esquema, filas, políticas —, cambia tu proyecto a ella y bórrala cuando termines. Crear, listar, inspeccionar, cambiar, borrar — no hay merge, y esta página no finge que lo haya.",
   "studiopage.16": "Ejecuta JavaScript con el SDK de Rebase en un sandbox en vivo. Prueba consultas y automatiza tareas.",
   "studiopage.17": "Supervisa y gestiona las tareas programadas en segundo plano. Consulta logs, estado e historial de ejecuciones.",
-  "studiopage.18": "/api/users/:id",
+  "studiopage.18": "/api/data/users/:id",
   "studiopage.19": "Documentación de API interactiva con pruebas de petición en vivo. Explora y prueba cada endpoint.",
   "studiopage.20": "GET /api/data/orders",
   "studiopage.21": "seq scan on orders",

@@ -136,3 +136,16 @@ test("a write that leaves the English page alone leaves every stamp alone", (t) 
     assert.match(d.read(at("de")), /rebasepro\/server:0\.21\.0/);
     assert.deepEqual(d.stale(), []);
 });
+
+test("the /cli page's quoted `rebase init` pin line moves with the release", (t) => {
+    // A mock terminal, not a docs page: the line is what `rebase init` prints,
+    // and the version in it is the one a new project gets.
+    const d = tree(t, { pin: "0.21.0" });
+    const rel = "website/src/components/pages/CliContent.astro";
+    mkdirSync(path.dirname(path.join(d.root, rel)), { recursive: true });
+    writeFileSync(path.join(d.root, rel), "  Pinning 11 @rebasepro package(s) to 0.20.0...\n");
+
+    writeVersionPins(d.root, "0.21.0");
+
+    assert.equal(d.read(rel), "  Pinning 11 @rebasepro package(s) to 0.21.0...\n");
+});

@@ -269,7 +269,7 @@ its own close and drops `ClosingCta`.
 | `/sdk` | What does calling it from my code look like? | SdkMini; every snippet is checked against `packages/client` |
 | `/cli` | What does each step look like in a terminal? | One real run — init → db push → dev — plus `skills install` and `db backup` |
 | `/ui` | What do I build my custom fields with? | UIReferenceView |
-| `/rls-check` | Is my database exposed right now? | The tool's real output; the 14 checks from `src/data/rls-checks.ts` |
+| `/rls-check` | Is my database exposed right now? | The tool's real output; the 15 checks from `src/data/rls-checks.ts` |
 | `/demo` | Can I see it before I run it? | The hosted panel, in place |
 | `/compare` | Why this and not X? | comparison matrix, RLSEditor, "four times you should not pick Rebase" |
 | `/rebase-vs-*` | Why this and not X, for someone who uses X today? | The shared FAQ layer, and a visible "When to stay on X" section on every page |
