@@ -4250,3 +4250,35 @@ the action, and with the action omitted on a group that has a default.
 | `rebase telemetry` | clean — resolves its own subcommand with `parseCommandArgs`. |
 | a value equal to a subcommand word (`rebase api-keys --name list create` reads `list`) | **OPEN** (low) — unchanged from before. Only the command's spec could tell, and at the top level that spec can live in the database driver's CLI. |
 | a value flag before the command itself (`rebase --x y db push`) | **OPEN** (low) — the root parse knows only the root flags. No command documents a flag before its own name. |
+
+## 72. A name with two spellings, looked up by the one the fixtures happen to share
+
+A column has two names: the SQL column (`order_id`) and the Drizzle property it
+is keyed under (`orderId`). A table has two ways to be named in a join step: a
+`table.column` qualifier, or its position in the path. Config is written in one
+spelling; a reader looks the thing up by the other. Every test fixture used the
+spelling where both are the same — hand-written tables keyed by column name,
+join steps written qualified — so the lookup passed everywhere except on a
+generated schema, written the way the docs say.
+
+Found 2026-10-08 from the demo: opening an order from a product's Orders tab
+(`products → order_items → orders`, a `via`) failed with "Could not load data",
+while the tab listed the same order. The listing and the count that gates a
+nested read were two builders; only the listing read both names.
+
+| reader | looked up by | result |
+|---|---|---|
+| `buildJoinPathConditions` / `buildJoinPathCountQuery` — step tables | `table.column` qualifier only | **BUG** — a documented step named no table. By position now, qualifier wins. |
+| `buildSingleJoinCondition` — step columns | property key | **BUG** — fixed with `joinColumn` (SQL name or key). |
+| `joinStepCondition` (`RelationService`, includes) | property key | **BUG** — same fix. |
+| `buildJoinPathScopeCondition` — last step's target column | property key | **BUG** (latent: a one-step `via` onto a camelCase foreign key) — same fix. |
+| `countRelatedRows` for a single-key `via` | the old join builder | **BUG** — now counts through the listing's own scope condition, so the two cannot disagree. |
+| `resolveJoinPathWriteMapping` (one-to-one `via` writes) | qualifier only | **BUG** — refused every documented write. By position now. |
+| `junction-writes.ts` / `manyToMany` reads | column names | clean — the generator keys junction tables by column name, and the code resolves by `.name`. |
+
+**Sweep:** for every lookup of a column or table from config, ask which of its
+names the config holds and which the lookup uses. Then make one fixture
+realistic: a table keyed the way the generator keys it (camelCase property,
+snake_case column), reached by a step written the way `JoinStep` documents it.
+The guard is in `packages/server-postgres/test/e2e/nested-path-writes.test.ts`
+(`bylines`), red on the old code for reads, listings and one-step foreign keys.
