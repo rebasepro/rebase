@@ -52,7 +52,7 @@ const DEV: Step = {
     command: "rebase dev",
     output: [
         blank(2),
-        { text: "✦ Rebase Admin App is ready!", tone: "plain", at: 18 },
+        { text: "✦ Rebase is ready!", tone: "plain", at: 18 },
         { text: "➜ Admin:  http://localhost:5173", tone: "plain", at: 22 },
         { text: "➜ API:    http://localhost:3001", tone: "plain", at: 26 },
     ],

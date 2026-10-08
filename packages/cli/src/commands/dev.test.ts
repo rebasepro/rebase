@@ -714,7 +714,7 @@ describe("the banner's app lines", () => {
         const shape = shapeOf({ admin: { type: "static", root: "frontend", output: "frontend/dist", path: "/", cms: "/" } });
         expect(appBannerLines(LOCAL, API, shape)).toEqual([
             ["", ""],
-            ["✦ Rebase Admin App is ready!", ""],
+            ["✦ Rebase is ready!", ""],
             ["➜ Admin: ", LOCAL],
             ["➜ API:   ", API]
         ]);

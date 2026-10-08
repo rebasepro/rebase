@@ -553,7 +553,7 @@ export function appBannerLines(frontendUrl: string, api: string, shape: DevStati
     const deployedNote = (address: string): [string, string] => ["         ", `${address} when deployed`];
     const lines: Array<[string, string]> = [
         ["", ""],
-        ["✦ Rebase Admin App is ready!", ""],
+        ["✦ Rebase is ready!", ""],
         ["➜ Admin: ", frontendUrl]
     ];
     const servedDeployed = shape.served?.address.host ? formatAppAddress(shape.served.address) : undefined;
