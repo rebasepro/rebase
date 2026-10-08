@@ -1588,7 +1588,13 @@ catchUpWindowSeconds: 3600,
     describe("persisted enabled state", () => {
         let other: CronScheduler;
 
-        beforeEach(() => { other = new CronScheduler(); });
+        beforeEach(() => {
+            // Half past, so a 61-minute advance crosses exactly one hourly
+            // slot. Left on the wall clock, a run that started in an hour's
+            // last minute crossed two and saw the job run twice.
+            jest.setSystemTime(new Date(2026, 6, 29, 6, 30));
+            other = new CronScheduler();
+        });
         afterEach(() => {
             other.stop();
             jest.restoreAllMocks();
