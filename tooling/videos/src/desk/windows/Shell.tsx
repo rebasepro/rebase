@@ -14,7 +14,10 @@ import type { OutputLine, Step } from "../../components/Terminal";
  *
  * Every line is one the tools print (init.ts, introspect-db.ts,
  * server-postgres/cli.ts, dev.ts), and the file list is the real one for
- * these nine tables. Lines are left out, never made up.
+ * these nine tables. Lines are left out, never made up. The project lives at
+ * {@link ROOT}: introspection prints each file's absolute path, and `dev`
+ * derives both ports from that path (getProjectPort, getProjectFrontendPort),
+ * so the paths and the ports below are what that directory gets.
  *
  * The window is a fixed height and SCROLLS: older lines leave off the top
  * as new ones print, the way a shell behaves.
@@ -23,6 +26,8 @@ import type { OutputLine, Step } from "../../components/Terminal";
 const blank = (at: number): OutputLine => ({ text: "", tone: "plain", at });
 
 const FILES = ["authors", "customers", "order_items", "orders", "posts", "products", "tags", "tickets", "users"];
+
+const ROOT = "/Users/you/work/acme";
 
 /* The three commands, each with the few lines of its output that carry
    the point. Where each is typed is the film's business, not the shell's:
@@ -33,7 +38,7 @@ const INIT: Step = {
     output: [
         { text: "Introspecting schema 'public'...", tone: "muted", at: 4 },
         { text: "Found 9 tables.", tone: "accent", at: 10 },
-        ...FILES.map((f, i): OutputLine => ({ text: `../config/collections/${f}.ts`, tone: "ok", at: 16 + i * 3 })),
+        ...FILES.map((f, i): OutputLine => ({ text: `${ROOT}/config/collections/${f}.ts`, tone: "ok", at: 16 + i * 3 })),
         blank(44),
         { text: "Introspected 9 tables — generated 9 collection(s).", tone: "ok", at: 48 },
     ],
@@ -44,7 +49,7 @@ const PUSH: Step = {
     output: [
         { text: "  Step 3/3: Applying RLS policies to database...", tone: "muted", at: 10 },
         blank(12),
-        { text: "  RLS policies applied successfully.", tone: "ok", at: 22 },
+        { text: "RLS policies applied successfully.", tone: "ok", at: 22 },
     ],
 };
 
@@ -53,8 +58,8 @@ const DEV: Step = {
     output: [
         blank(2),
         { text: "✦ Rebase is ready!", tone: "plain", at: 18 },
-        { text: "➜ Admin:  http://localhost:5173", tone: "plain", at: 22 },
-        { text: "➜ API:    http://localhost:3001", tone: "plain", at: 26 },
+        { text: "➜ Admin: http://localhost:5255", tone: "plain", at: 22 },
+        { text: "➜ API:   http://localhost:3297", tone: "plain", at: 26 },
     ],
 };
 

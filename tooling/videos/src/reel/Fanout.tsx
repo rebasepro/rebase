@@ -24,13 +24,21 @@ import { FONT, GROUND, INK, TRACKING } from "../theme";
  * consequence.
  */
 
+/* Typechecks against `defineCollection` as written (name and slug are
+   required; securityRules is an array), and its one rule is the one the
+   RLS card's policy name is compiled from. */
 const SOURCE = `export const orders = defineCollection({
-    table: "orders",
+    name: "Orders",
+    slug: "orders",
     properties: {
-        total:  { type: "number" },
+        customer_id: { type: "string" },
+        total: { type: "number" },
         status: { type: "string" }
     },
-    securityRules: { /* … */ }
+    securityRules: [{
+        operation: "select",
+        ownerField: "customer_id"
+    }]
 });`;
 
 interface Out {
@@ -39,13 +47,16 @@ interface Out {
 }
 
 /* Every value here is real — a path this generates, a call you would write, a
-   policy name it emits. Placeholder-looking output would undo the point. */
+   policy name it emits. Placeholder-looking output would undo the point.
+   REST is `/api/data/<slug>` (api-generator.ts); the OpenAPI document is
+   served at `<basePath>/docs` (init/docs.ts); the policy name is
+   `getPolicyNamesForRule` (utils/policy-names.ts) run on SOURCE's rule. */
 const OUTS: Out[] = [
-    { label: "REST", value: "GET /api/orders" },
+    { label: "REST", value: "GET /api/data/orders" },
     { label: "Typed SDK", value: "client.data.orders.find()" },
-    { label: "OpenAPI", value: "openapi.json" },
-    { label: "RLS policy", value: "orders_select_9f2c1a4b" },
-    { label: "Realtime", value: "orders.listen()" },
+    { label: "OpenAPI", value: "GET /api/docs" },
+    { label: "RLS policy", value: "orders_select_a86d19b" },
+    { label: "Realtime", value: "client.data.orders.listen(…)" },
     { label: "Admin panel", value: "/c/orders" },
 ];
 
