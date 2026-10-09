@@ -24,6 +24,7 @@
 
 - [Rebase vs Supabase](https://rebase.pro/rebase-vs-supabase): Where each one wins, and where the other is the better call.
 - [Rebase vs Firebase](https://rebase.pro/rebase-vs-firebase): Where each one wins, and where the other is the better call.
+- [Rebase vs Appwrite](https://rebase.pro/rebase-vs-appwrite): Where each one wins, and where the other is the better call.
 - [Rebase vs Directus](https://rebase.pro/rebase-vs-directus): Where each one wins, and where the other is the better call.
 - [Rebase vs Strapi](https://rebase.pro/rebase-vs-strapi): Where each one wins, and where the other is the better call.
 - [Rebase vs Payload](https://rebase.pro/rebase-vs-payload): Where each one wins, and where the other is the better call.

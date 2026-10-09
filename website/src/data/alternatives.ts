@@ -114,7 +114,8 @@ const APPWRITE: Alternative = {
     description:
         "alt.tool.appwrite.desc",
     licence: "alt.tool.appwrite.licence",
-    hosting: "alt.tool.appwrite.hosting"
+    hosting: "alt.tool.appwrite.hosting",
+    compare: "/rebase-vs-appwrite"
 };
 
 const DIRECTUS: Alternative = {

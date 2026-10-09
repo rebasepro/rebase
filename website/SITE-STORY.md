@@ -208,7 +208,7 @@ Every major page is a variation on the same three acts:
 ├── /sdk             SDK tour
 └── /cli             CLI tour
 /compare             Comparison hub  (was /why-rebase)
-├── /rebase-vs-*     8 head-to-head pages
+├── /rebase-vs-*     9 head-to-head pages
 └── /alternatives/*  6 programmatic pages from src/data/alternatives.ts
 /rls-check           The free audit — the proof for claim 1, on its own page
 /pricing  /demo  /about  /manifesto  /contact  /pitch
@@ -630,9 +630,18 @@ changes, and replace the date here.
   Apache-2.0 two years after each release. It sits two rows from Directus on
   `/alternatives/*`, so the two labels have to be equally careful.
 - Neon: Apache-2.0 core, hosted only, part of Databricks since 2025-05.
-- Appwrite: the TablesDB API (2025-08) renamed collections/documents to
-  tables/rows, but the storage engine is unchanged — it is still a document
-  store, so "document-oriented rather than relational" stands.
+- Appwrite — re-verified **2026-10-09** at 2.4.0, for `/rebase-vs-appwrite`.
+  **2.0 (2026-09) made PostgreSQL the default** self-hosted engine; MariaDB and
+  MongoDB are still chosen at install and fixed after it. TablesDB (the 2025-08
+  rename of collections/documents to tables/rows) has relationship columns and
+  transactions, but no SQL — its query API, REST and GraphQL — and Appwrite
+  owns the schema, with no documented way to adopt existing tables. Cloud also
+  sells **native PostgreSQL/MySQL**: full SQL, paid plans, Cloud only, and in
+  its own docs' words "no Appwrite layer in between" — no SDKs, no platform
+  permissions. Permissions are enforced by Appwrite's server, not RLS; a scoped
+  server API key bypasses them. BSD-3-Clause. No SAML for end users.
+  So "document-oriented rather than relational" no longer stands as written —
+  `alt.tool.appwrite.desc` and `alt.page.supabase.f0.a` still say it.
 - None of the eight keeps a second copy of your data. "Often two databases" was
   false for all of them.
 

@@ -3,9 +3,9 @@
  *
  * ── Why this is data and not markup ──────────────────────────────────────────
  * Each comparison page is several hundred lines of hand-built layout, and that
- * is why there are eight of them rather than eighty: adding one is a design
+ * is why there are nine of them rather than ninety: adding one is a design
  * job. The questions are not. Keeping them here means a new competitor page
- * needs one array and one component, and it means all eight blocks stay in the
+ * needs one array and one component, and it means all nine blocks stay in the
  * same voice instead of drifting apart one edit at a time.
  *
  * ── The rules these answers follow ───────────────────────────────────────────
@@ -77,6 +77,30 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
         {
             q: "cfaq.firebase.4.q",
             a: "cfaq.firebase.4.a"
+        },
+        HOSTING
+    ],
+
+    appwrite: [
+        {
+            q: "cfaq.appwrite.0.q",
+            a: "cfaq.appwrite.0.a"
+        },
+        {
+            q: "cfaq.appwrite.1.q",
+            a: "cfaq.appwrite.1.a"
+        },
+        {
+            q: "cfaq.appwrite.2.q",
+            a: "cfaq.appwrite.2.a"
+        },
+        {
+            q: "cfaq.appwrite.3.q",
+            a: "cfaq.appwrite.3.a"
+        },
+        {
+            q: "cfaq.appwrite.4.q",
+            a: "cfaq.appwrite.4.a"
         },
         HOSTING
     ],

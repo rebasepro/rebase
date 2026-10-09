@@ -380,6 +380,7 @@ const PRODUCT_PAGES = [
 const COMPARISON_PAGES = [
     ["Rebase vs Supabase", "https://rebase.pro/rebase-vs-supabase"],
     ["Rebase vs Firebase", "https://rebase.pro/rebase-vs-firebase"],
+    ["Rebase vs Appwrite", "https://rebase.pro/rebase-vs-appwrite"],
     ["Rebase vs Directus", "https://rebase.pro/rebase-vs-directus"],
     ["Rebase vs Strapi", "https://rebase.pro/rebase-vs-strapi"],
     ["Rebase vs Payload", "https://rebase.pro/rebase-vs-payload"],

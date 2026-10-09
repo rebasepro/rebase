@@ -17,6 +17,7 @@ const families = [
         tools: [
             { name: "Supabase", href: "/rebase-vs-supabase", logo: "/img/competitors/supabase-logo-wordmark-dark.svg", cls: "h-4" },
             { name: "Firebase", href: "/rebase-vs-firebase", logo: "/img/competitors/firebase-lockup-dark.svg", cls: "h-5" },
+            { name: "Appwrite", href: "/rebase-vs-appwrite" },
             { name: "Hasura", href: "/rebase-vs-hasura", logo: "/img/competitors/hasura-logo-primary-darkbg.svg", cls: "h-4" },
         ],
     },
@@ -84,6 +85,7 @@ const axes = [
 const headToHead = [
     { name: "Supabase", href: "/rebase-vs-supabase" },
     { name: "Firebase", href: "/rebase-vs-firebase" },
+    { name: "Appwrite", href: "/rebase-vs-appwrite" },
     { name: "Hasura", href: "/rebase-vs-hasura" },
     { name: "Directus", href: "/rebase-vs-directus" },
     { name: "Strapi", href: "/rebase-vs-strapi" },
@@ -133,7 +135,9 @@ import { DEMO_URL } from "../../utils/links";
                                                 <a href={translatePath(tool.href)}
                                                    aria-label={`Rebase vs ${tool.name}`}
                                                    class="inline-flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
-                                                    <img src={tool.logo} {...imgDims(tool.logo)} alt={tool.name} class={`${tool.cls} w-auto`}/>
+                                                    {tool.logo
+                                                        ? <img src={tool.logo} {...imgDims(tool.logo)} alt={tool.name} class={`${tool.cls} w-auto`}/>
+                                                        : <span class="text-sm font-semibold tracking-tight text-surface-300">{tool.name}</span>}
                                                 </a>
                                         ))}
                                     </div>

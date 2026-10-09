@@ -45,7 +45,7 @@ Appwrite's pitch is breadth: auth, databases, storage, functions, messaging (pus
 
 The structural difference: **Appwrite's database is an abstraction, not your database**. Under the hood it runs MariaDB, but you don't get SQL, you can't point it at an existing Postgres, and permissions live in Appwrite's own rule system rather than in the database. If your app outgrows the abstraction — reporting queries, migrations, another service reading the same data — you're working around the platform instead of with it.
 
-Where Appwrite genuinely leads: multi-platform SDKs (Flutter, Swift, Kotlin, and more), built-in messaging campaigns, and a very polished console. Rebase is TypeScript-first on the client; if you're building Flutter apps, Appwrite is the stronger fit today. If your data model is relational and you want to own it in SQL, that's Rebase's home turf — including [pointing Rebase at an existing database](/docs) and inferring collections from it.
+Where Appwrite genuinely leads: multi-platform SDKs (Flutter, Swift, Kotlin, and more), built-in messaging campaigns, and a very polished console. Rebase is TypeScript-first on the client; if you're building Flutter apps, Appwrite is the stronger fit today. If your data model is relational and you want to own it in SQL, that's Rebase's home turf — including [pointing Rebase at an existing database](/docs) and inferring collections from it. More: [Rebase vs Appwrite](/rebase-vs-appwrite).
 
 ## Firebase: still the mobile king, still a one-way door
 

@@ -218,6 +218,12 @@ const CARDS = [
         sub: "Relational data you own, instead of documents in someone else's store."
     },
     {
+        slug: "rebase-vs-appwrite",
+        eyebrow: "Compare",
+        title: "Rebase vs Appwrite",
+        sub: "A Postgres you own, or a database behind the platform's API."
+    },
+    {
         slug: "rebase-vs-payload",
         eyebrow: "Compare",
         title: "Rebase vs Payload",
