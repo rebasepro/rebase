@@ -36,6 +36,8 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
+Local storage keeps each object's metadata beside it, as `<key>.metadata.json`, so a key whose last segment ends in `.metadata.json` is refused with `400 INVALID_STORAGE_KEY` on every route. S3 and GCS keep metadata on the object and store any key.
+
 ### S3 Storage
 
 ```typescript no-verify

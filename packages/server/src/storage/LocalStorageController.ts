@@ -71,6 +71,36 @@ interface ListingSnapshot {
 }
 const isPartialWrite = (name: string) => /^\..+\.[0-9a-f-]{36}\.partial$/.test(name);
 
+/** What the metadata kept beside an object is named: `<key>.metadata.json`. */
+const METADATA_SUFFIX = ".metadata.json";
+
+/**
+ * Refuse a key that names one of local storage's own files rather than an
+ * object: the metadata beside an object, or a write in progress.
+ *
+ * Both live in the object namespace, beside the objects they serve. A key that
+ * names one used to be stored like any other, and so overwrote another
+ * object's metadata: uploading `a.png.metadata.json` changed the content type
+ * `a.png` is served with — the authorize hook asked about the one key while
+ * the other changed — and the uploader's own file vanished from listings and
+ * went with `a.png` when that was deleted. Read, it served the metadata.
+ *
+ * Local only: S3 and GCS keep metadata on the object, so every key there is
+ * an object. A 400, at every operation, because every one resolves its path
+ * through `getFullPath`.
+ */
+export function refuseLocalReservedKey(key: string): void {
+    const name = key.split("/").pop() ?? "";
+    if (name.endsWith(METADATA_SUFFIX) || isPartialWrite(name)) {
+        throw new ApiError(
+            400,
+            "INVALID_STORAGE_KEY",
+            `"${name}" names a file local storage keeps for itself (an object's \`${METADATA_SUFFIX}\` ` +
+            "metadata, or a write in progress), not an object. Choose another name."
+        );
+    }
+}
+
 /** A file's bytes, a chunk at a time. */
 async function* blobChunks(file: Blob): AsyncGenerator<Uint8Array> {
     const reader = file.stream().getReader();
@@ -226,6 +256,7 @@ export class LocalStorageController implements StorageController {
      * depend on it having run.
      */
     private getFullPath(storagePath: string, bucket?: string): string {
+        refuseLocalReservedKey(storagePath);
         const bucketPath = path.resolve(this.basePath, bucket || DEFAULT_BUCKET);
         if (!bucketPath.startsWith(this.basePath + path.sep)) {
             throw new Error("Path traversal detected: bucket resolves outside the storage root.");
@@ -587,7 +618,7 @@ export class LocalStorageController implements StorageController {
                 scanned = i + 1;
 
                 // Skip metadata files, and writes still in progress
-                if (entry.name.endsWith(".metadata.json") || isPartialWrite(entry.name)) {
+                if (entry.name.endsWith(METADATA_SUFFIX) || isPartialWrite(entry.name)) {
                     continue;
                 }
 

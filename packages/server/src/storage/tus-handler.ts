@@ -19,6 +19,7 @@ import { UnknownStorageSourceError, type StorageRegistry } from "./storage-regis
 import { logger } from "../utils/logger.js";
 import { ApiError } from "../api/errors";
 import { triggerUser } from "./triggers";
+import { LocalStorageController, refuseLocalReservedKey } from "./LocalStorageController";
 import { canonicalStorageId } from "./keys";
 import {
     canonicalKeyOrBadRequest,
@@ -496,6 +497,8 @@ export class TusHandler {
         const target = this.targetFor(storageId);
         if (target) {
             bucket = writableBucketOrRefuse(bucket, target, knownSources);
+            // Refused before the first chunk, not by the controller at finalize.
+            if (target instanceof LocalStorageController) refuseLocalReservedKey(key);
         }
 
         if (this.uploadPathConstraints) {
