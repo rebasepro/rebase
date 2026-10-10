@@ -860,6 +860,25 @@ role: connection.role });
     /** The editor, for the selection the toolbar's buttons act on. */
     const editorHandle = useRef<MonacoEditorHandle>(null);
 
+    /**
+     * The tabs with a run or an explain in flight. A ref, not the tab's
+     * `loading`: two Cmd+Enter in a row both read the render before the first
+     * set it, and only the button was disabled — so an INSERT ran twice, and
+     * the slower answer drew over the newer one.
+     */
+    const tabsRunningRef = useRef(new Set<string>());
+
+    /** `work` on the active tab, unless that tab is already running something. */
+    const runOnce = async (tabId: string, work: () => Promise<void>): Promise<void> => {
+        if (tabsRunningRef.current.has(tabId)) return;
+        tabsRunningRef.current.add(tabId);
+        try {
+            await work();
+        } finally {
+            tabsRunningRef.current.delete(tabId);
+        }
+    };
+
     const handleExplain = async () => {
         // The selected statement when there is one, as Cmd+Enter runs it; and
         // planned, never executed — see `buildExplainSql`.
@@ -869,6 +888,10 @@ role: connection.role });
 error: t("studio_sql_explain_single_statement") });
             return;
         }
+        await runOnce(activeTab.id, () => explain(explainSql));
+    };
+
+    const explain = async (explainSql: string) => {
         // The plan replaces the rows on screen, so nothing left there is a row
         // an edit could write back.
         updateActiveTab({ loading: true,
@@ -896,7 +919,7 @@ execTime: Math.round(performance.now() - start) });
         }
     };
 
-    const executeRun = useCallback(async (sqlOverride?: string) => {
+    const executeRun = useCallback((sqlOverride?: string) => runOnce(activeTab.id, async () => {
         const written = sqlOverride || activeTab.sql;
         const sqlToRun = (autoLimit ? withAutoLimit(written, 1000) : null) ?? written;
 
@@ -947,7 +970,9 @@ truncatedFrom: null });
         } finally {
             updateActiveTab({ loading: false });
         }
-    }, [activeTab.sql, autoLimit, databaseAdmin, history, updateActiveTab, selectedDatabase, selectedRole]);
+        // `runOnce` reads only a ref.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [activeTab.id, activeTab.sql, autoLimit, databaseAdmin, history, updateActiveTab, selectedDatabase, selectedRole]);
 
     const handleRun = useCallback(async (selectedText?: string) => {
         const sqlTarget = selectedText || activeTab.sql;

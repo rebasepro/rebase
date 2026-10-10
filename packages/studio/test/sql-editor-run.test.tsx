@@ -303,3 +303,32 @@ describe("what the database says while a script runs", () => {
         expect(await screen.findByText(/did not end it/)).toBeTruthy();
     });
 });
+
+/**
+ * Only the Run button was disabled while a run was in flight. Cmd+Enter twice
+ * ran an INSERT twice, and whichever answer came back last drew over the other.
+ */
+describe("a run already in flight", () => {
+    it("is not started again by the shortcut", async () => {
+        let finish: (rows: unknown) => void = () => undefined;
+        executeSql.mockImplementation(async (statement: string) =>
+            statement.startsWith("INSERT") ? new Promise(resolve => { finish = resolve; }) : []);
+        try {
+            render(<SQLEditor/>);
+            await typeSql("INSERT INTO audit (note) VALUES ('once')");
+
+            fireEvent.click(screen.getByRole("button", { name: label("studio_sql_run") }));
+            await waitFor(() => expect(sent()).toHaveLength(1));
+            // The shortcut is the page's only while no text field has the focus.
+            if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+            fireEvent.keyDown(window, { key: "Enter", metaKey: true });
+            fireEvent.keyDown(window, { key: "Enter", metaKey: true });
+
+            finish([]);
+            await waitFor(() => expect((screen.getByRole("button", { name: label("studio_sql_run") }) as HTMLButtonElement).disabled).toBe(false));
+            expect(sent()).toEqual(["INSERT INTO audit (note) VALUES ('once')"]);
+        } finally {
+            executeSql.mockImplementation(async () => []);
+        }
+    });
+});
