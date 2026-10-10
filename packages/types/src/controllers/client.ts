@@ -582,10 +582,11 @@ export interface StorageSourceRegistry {
     getDefault(): StorageSource;
 
     /**
-     * Get a storage source by key, with fallback to default.
+     * Get a storage source by key, or the default one for no key.
      * @param key - Storage source key, or undefined/null for default
-     * @returns The StorageSource (falls back to default if key not found)
-     * @throws Error if neither the specified nor default storage exists
+     * @returns The StorageSource registered under `key` (the default for no key)
+     * @throws Error if `key` names no registered source — never the default in
+     * its place — or no key is given and no default is registered
      */
     getOrDefault(key: string | undefined | null): StorageSource;
 

@@ -159,8 +159,42 @@ describe("resolveStorageSource", () => {
         expect(resolveStorageSource({ sourceKey: "media", sources, defaultSource })).toBe(mediaSource);
     });
 
-    it("falls back to default for an unknown key", () => {
-        expect(resolveStorageSource({ sourceKey: "missing", sources, defaultSource })).toBe(defaultSource);
+    it("never answers the default source for a key that names another", async () => {
+        // The panel learns its named sources from GET /storage/sources; one
+        // failed fetch used to send a property's uploads to the default bucket.
+        const unresolved = resolveStorageSource({ sourceKey: "media", sources: {}, defaultSource });
+
+        expect(unresolved).not.toBe(defaultSource);
+        await expect(unresolved.putObject({ file: new File(["x"], "x.txt"), key: "x.txt" }))
+            .rejects.toThrow(/"media"/);
+    });
+
+    it("routes an unresolved key through the server when it can build a source", () => {
+        const routed = { id: "routed" } as unknown as StorageSource;
+        const asked: string[] = [];
+        const createSource = (key: string) => {
+            asked.push(key);
+            return routed;
+        };
+
+        expect(resolveStorageSource({ sourceKey: "media", sources: {}, defaultSource, createSource })).toBe(routed);
+        expect(asked).toEqual(["media"]);
+    });
+
+    it("does not take the default from a registry that lacks the key", () => {
+        const registry = {
+            get: () => undefined,
+            getDefault: () => defaultSource,
+            getOrDefault: () => defaultSource,
+            has: () => false,
+            list: () => ["(default)"]
+        };
+
+        expect(resolveStorageSource({ sourceKey: "media", sources: {}, registry, defaultSource })).not.toBe(defaultSource);
+    });
+
+    it("answers the default source for the default key", () => {
+        expect(resolveStorageSource({ sourceKey: "(default)", sources: {}, defaultSource })).toBe(defaultSource);
     });
 
     it("prefers an explicit registry over the sources map", () => {

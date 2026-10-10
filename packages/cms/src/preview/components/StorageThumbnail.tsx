@@ -112,7 +112,8 @@ export function StorageThumbnailInternal({
     const storage = resolveStorageSource({
         sourceKey: storageSourceKey,
         sources: storageSources.sources,
-        defaultSource: defaultStorage
+        defaultSource: defaultStorage,
+        createSource: storageSources.createSource
     });
 
     // Cache key is namespaced by source so the same path on two backends

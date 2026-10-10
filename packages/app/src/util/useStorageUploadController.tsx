@@ -69,8 +69,9 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
         sourceKey: storage?.storageSource === undefined ? undefined : resourceKeyOf(storage.storageSource),
         registry: storageSourceRegistry,
         sources: storageSources.sources,
-        defaultSource: storageSource
-    }), [storage?.storageSource, storageSourceRegistry, storageSources.sources, storageSource]);
+        defaultSource: storageSource,
+        createSource: storageSources.createSource
+    }), [storage?.storageSource, storageSourceRegistry, storageSources.sources, storageSources.createSource, storageSource]);
 
     const multipleFilesSupported = property.type === "array";
 

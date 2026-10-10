@@ -56,12 +56,14 @@ export class ClientStorageSourceRegistry implements StorageSourceRegistry {
         const source = this.sources.get(key);
         if (source) return source;
 
-        // Fallback to default
-        console.warn(
-            `[StorageSourceRegistry] Storage source "${key}" not found, ` +
-            `falling back to "${DEFAULT_STORAGE_SOURCE_KEY}".`
+        // Not the default source: a key that names another is another bucket,
+        // and answering the default wrote that source's files into the wrong
+        // one — the fallback the server registry removed. The default only for
+        // a call that names no source.
+        throw new Error(
+            `[StorageSourceRegistry] Storage source "${key}" is not registered. ` +
+            `Registered: ${this.list().map(k => `"${k}"`).join(", ") || "(none)"}.`
         );
-        return this.getDefault();
     }
 
     has(key: string): boolean {

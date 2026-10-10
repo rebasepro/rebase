@@ -1,4 +1,4 @@
-import { ArrayProperty, EntityValues, StorageConfig, StorageSource, StorageSourceRegistry, StringProperty, UploadedFileContext } from "@rebasepro/types";
+import { ArrayProperty, DEFAULT_STORAGE_SOURCE_KEY, EntityValues, StorageConfig, StorageSource, StorageSourceRegistry, StringProperty, UploadedFileContext } from "@rebasepro/types";
 import { randomString } from "@rebasepro/utils";
 
 /**
@@ -6,10 +6,20 @@ import { randomString } from "@rebasepro/utils";
  * referenced by `StorageConfig.storageSource`.
  *
  * Resolution priority:
- * 1. No `sourceKey` → the default source (backward compatible).
- * 2. An explicit {@link StorageSourceRegistry} (e.g. `client.storageRegistry`).
+ * 1. No `sourceKey` → the default source.
+ * 2. An explicit {@link StorageSourceRegistry} that has the key (e.g. `client.storageRegistry`).
  * 3. A `sources` lookup map (e.g. the `StorageSourcesContext`).
- * 4. Fall back to the default source.
+ * 4. `(default)` → the default source.
+ * 5. `createSource(key)` — a server-routed source carrying `storageId`, so the
+ *    server decides: it serves the source, or answers 400/501 naming it.
+ * 6. Otherwise a source that refuses every call, naming the key.
+ *
+ * Never the default source for a key that names another. It used to be: a
+ * named source enters the panel's map only once `GET /storage/sources` has
+ * answered, so one failed fetch (or a typo, or a `direct` source the app did
+ * not pass) silently uploaded the property's files into the default bucket —
+ * with the authorize hook asked about `(default)` and the preview looking in
+ * the wrong place. The server stopped falling back for the same reason.
  *
  * Shared by the upload hook, the markdown editor, and the read-only previews
  * so the resolution logic lives in one place.
@@ -23,15 +33,43 @@ export function resolveStorageSource(params: {
     sources?: Record<string, StorageSource>;
     /** Optional explicit registry — takes precedence over `sources`. */
     registry?: StorageSourceRegistry;
-    /** Default source, used when no key is set or the key cannot be resolved. */
+    /** Default source, used when no key is set. */
     defaultSource: StorageSource;
+    /**
+     * Builds a server-routed source for a key nothing else resolves
+     * (`client.createStorageSource`).
+     */
+    createSource?: (key: string) => StorageSource;
 }): StorageSource {
-    const { sourceKey, sources, registry, defaultSource } = params;
+    const { sourceKey, sources, registry, defaultSource, createSource } = params;
     if (!sourceKey) return defaultSource;
-    if (registry) return registry.getOrDefault(sourceKey);
+    if (registry?.has(sourceKey)) return registry.getOrDefault(sourceKey);
     const fromSources = sources?.[sourceKey];
     if (fromSources) return fromSources;
-    return defaultSource;
+    if (sourceKey === DEFAULT_STORAGE_SOURCE_KEY) return defaultSource;
+    if (createSource) return createSource(sourceKey);
+    return unavailableStorageSource(sourceKey);
+}
+
+/**
+ * A storage source for a key this app cannot reach: every call fails, naming
+ * the key — so an upload is refused instead of landing in another bucket.
+ *
+ * @group Storage
+ */
+export function unavailableStorageSource(key: string): StorageSource {
+    const refuse = (): Promise<never> => Promise.reject(new Error(
+        `Storage source "${key}" is not available in this app. Check the property's ` +
+        "`storageSource`, that the backend serves it (GET /api/storage/sources), and that a " +
+        "`direct` source is passed to <Rebase storageSources>."
+    ));
+    return {
+        putObject: refuse,
+        getSignedUrl: refuse,
+        getObject: refuse,
+        deleteObject: refuse,
+        listObjects: refuse
+    };
 }
 
 interface ResolveFilenameStringParams<M extends Record<string, unknown>> {

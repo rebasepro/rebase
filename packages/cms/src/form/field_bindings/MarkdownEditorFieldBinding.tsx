@@ -101,8 +101,9 @@ export function MarkdownEditorFieldBinding({
     const storageSource = useMemo(() => resolveStorageSource({
         sourceKey: storageSourceKey,
         sources: storageSources.sources,
-        defaultSource: defaultStorageSource
-    }), [storageSourceKey, storageSources.sources, defaultStorageSource]);
+        defaultSource: defaultStorageSource,
+        createSource: storageSources.createSource
+    }), [storageSourceKey, storageSources.sources, storageSources.createSource, defaultStorageSource]);
 
     // How the editor shows an image the text names by reference.
     const resolveImageSrc = useImageSrcResolver();

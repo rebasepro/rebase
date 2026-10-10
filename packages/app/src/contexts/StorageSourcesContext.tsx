@@ -15,6 +15,12 @@ export interface StorageSourcesContextValue {
     registry: Record<string, StorageSourceDefinition>;
     /** Built {@link StorageSource} for direct sources, keyed by key. */
     sources: Record<string, StorageSource>;
+    /**
+     * A server-routed source for a key not (yet) in `sources` — requests carry
+     * `?storageId=<key>`, so the server serves it or refuses naming it, rather
+     * than the panel guessing the default. Absent without a client.
+     */
+    createSource?: (key: string) => StorageSource;
 }
 
 const EMPTY: StorageSourcesContextValue = { registry: {}, sources: {} };

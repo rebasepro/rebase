@@ -146,6 +146,12 @@ never asked about — the hook having been asked about the source in the request
 Because a second source exists precisely to hold the same keys, the fallback
 returned plausible bytes rather than anything that looked wrong.
 
+The client keeps the same rule. A property's `storageSource` the panel has not
+learned (`/storage/sources` failed or has not answered) is still sent to the
+server under its own name, and without a client it is a source that refuses
+every call; `ClientStorageSourceRegistry.getOrDefault("media")` throws when
+`media` is not registered. Only a request that names no source gets the default.
+
 This matters: declaring a bucket usually happens well before anyone attaches
 storage to it. Treating that as a boot error would crash-loop the backend until
 someone configured it — the unreadable failure the declaration exists to prevent.

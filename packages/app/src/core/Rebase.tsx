@@ -334,7 +334,21 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         if (resolvedStorage && !sources[DEFAULT_STORAGE_SOURCE_KEY]) {
             sources[DEFAULT_STORAGE_SOURCE_KEY] = resolvedStorage;
         }
-        const value: StorageSourcesContextValue = { registry, sources };
+        // A key no source above answers — `/storage/sources` has not loaded,
+        // or failed — is still routed to the server under its own name, never
+        // to the default source. One instance per key.
+        const buildSource = client?.createStorageSource;
+        const built = new Map<string, StorageSource>();
+        const createSource = buildSource
+            ? (key: string): StorageSource => {
+                const existing = built.get(key);
+                if (existing) return existing;
+                const source = buildSource(key);
+                built.set(key, source);
+                return source;
+            }
+            : undefined;
+        const value: StorageSourcesContextValue = { registry, sources, createSource };
         storageSourcesRef.current = {
             propList: list.map((s) => ({ key: s.key, source: s.source, transport: s.transport })),
             remote: remoteStorageSources,
