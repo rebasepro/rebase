@@ -1,7 +1,6 @@
 import path from "path";
 import { type Server } from "http";
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 import { runtimeSecureHeaders } from "./security-headers";
 import { createRuntimeHttpServer } from "./http-server";
 import { getRequestListener } from "@hono/node-server";
@@ -32,6 +31,7 @@ import { installShutdownHandlers } from "../init/shutdown";
 import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
 
 import { bootEnvExtension, loadBootEnv, resolveCorsOptions, resolveEnableSwagger, type RebaseBootEnv } from "./env";
+import { runtimeCors } from "./runtime-cors";
 import { numericEnvVar } from "../env";
 import { resolveRole, RoleConfigurationError } from "./role";
 import { FunctionSelectionError } from "../functions/selection";
@@ -290,7 +290,8 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // which a client parsing `error.code` cannot read at all.
     installRootErrorHandler(app);
 
-    app.use("/*", cors(resolveCorsOptions(env)));
+    // Preflights only: a plain OPTIONS reaches its route (TUS capabilities).
+    app.use("/*", runtimeCors(resolveCorsOptions(env)));
     app.use("/*", runtimeSecureHeaders({ hstsIncludeSubDomains: env.REBASE_HSTS_INCLUDE_SUBDOMAINS }));
 
     // Classified against the configured base path, not a hardcoded "/api" — a
