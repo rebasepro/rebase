@@ -482,6 +482,19 @@ A `fixedFilter` narrows what the panel *asks for*; it is not a boundary. What a
 caller is allowed to read is a [security rule](/docs/collections/security-rules),
 which the database enforces for every caller, panel or not.
 
+## Many collections
+
+Nothing in Rebase caps the number of collections, but two costs grow with it:
+
+- **The admin's first download.** The panel needs its navigation the moment
+  someone signs in, so every collection's config is bundled into what the
+  browser fetches for the login screen — about 2.4 KB minified each, so 200
+  collections add roughly 480 KB, around 80 KB gzipped. What opening a
+  collection needs (the table, the record views, the form) loads only then.
+- **`rebase db push`.** Atlas plans a push by diffing the whole schema, and that
+  grows faster than the table count: at 400 or more tables a push takes tens of
+  seconds — see [how long a push takes](/docs/cli/schema#rebase-db-push).
+
 ## Next Steps
 
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks for syncing data between collections, validation, side effects
