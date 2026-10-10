@@ -655,6 +655,33 @@ target });
     }
 
     /**
+     * Resolve every level of an include tree against the collections, without
+     * loading anything — the 400 for an unknown relation, decided before the
+     * read rather than by it.
+     *
+     * {@link loadIncludes} resolves a level only once it has rows to load it
+     * onto. On its own that made the refusal depend on the data: a typo in
+     * `include` against an empty table, under a filter that matched nothing,
+     * or below a relation that loaded no rows answered 200, and the same
+     * request became a 400 the first time a row matched.
+     */
+    private assertIncludeResolvable(
+        collection: CollectionConfig,
+        include: NormalizedInclude,
+        depth = 1
+    ): void {
+        if (depth > MAX_INCLUDE_DEPTH) return;
+        const levels = this.resolveIncludeLevel(collection, include.tree, include.wildcard);
+        this.assertCountsAllowed(collection, levels);
+        for (const { node, relation } of levels) {
+            if (Object.keys(node.children).length === 0) continue;
+            this.assertIncludeResolvable(
+                relation.target(), { wildcard: false, tree: node.children }, depth + 1
+            );
+        }
+    }
+
+    /**
      * The extra `WHERE` an include's own `where`/`logical` puts on the target.
      *
      * Pushed into the batch query rather than applied to the rows it returns:
@@ -773,6 +800,7 @@ target });
         include: NormalizedInclude,
         depth = 1
     ): Promise<void> {
+        if (depth === 1) this.assertIncludeResolvable(collection, include);
         if (rows.length === 0 || depth > MAX_INCLUDE_DEPTH) return;
 
         const idInfoArray = getPrimaryKeys(collection, this.registry);
@@ -1597,7 +1625,11 @@ target });
         include?: NormalizedInclude,
         _idInfoArray?: { fieldName: string; type: "string" | "number" }[]
     ): Promise<Record<string, unknown>[]> {
-        if (results.length === 0) return [];
+        if (results.length === 0) {
+            // An unknown relation is a 400 whether or not a row matched.
+            if (include) this.assertIncludeResolvable(collection, include);
+            return [];
+        }
 
         // First pass: parse all rows WITHOUT per-row relation queries.
         // We deliberately omit db/registry so parseDataFromServer only does type
@@ -2172,6 +2204,11 @@ relatedTo: hop }, include
         if (!await this.isAddressableUnder(collectionPath, id)) return null;
 
         const collection = getCollectionByPath(collectionPath, this.registry);
+
+        // An unknown relation is a 400 before it is a 404: whether the row
+        // exists must not decide whether the request was well-formed.
+        const normalizedInclude = normalizeInclude(include);
+        if (normalizedInclude) this.assertIncludeResolvable(collection, normalizedInclude);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
 
@@ -2205,7 +2242,6 @@ relatedTo: hop }, include
 
         const row = toRestRow(result[0] as Record<string, unknown>, collection, this.registry);
 
-        const normalizedInclude = normalizeInclude(include);
         if (normalizedInclude) {
             await this.loadIncludes([row], collection, collectionPath, normalizedInclude);
         }

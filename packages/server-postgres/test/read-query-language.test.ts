@@ -202,6 +202,27 @@ describe("the read query language", () => {
             await expect(fetchService.fetchCollectionForRest("posts", {}, ["commets"]))
                 .rejects.toMatchObject({ code: "UNKNOWN_RELATION" });
         });
+
+        // The check used to sit behind "no rows, nothing to load", so a typo
+        // against an empty table — or under a filter that matched nothing —
+        // answered 200, and became a 400 the first time a row matched.
+        it("refuses an unknown relation when no row matched", async () => {
+            const { fetchService } = service([]);
+            await expect(fetchService.fetchCollectionForRest("posts", {}, ["commets"]))
+                .rejects.toMatchObject({ code: "UNKNOWN_RELATION" });
+        });
+
+        it("refuses an unknown nested relation when the level above loaded nothing", async () => {
+            const { fetchService } = service([{ id: 1 }]);
+            await expect(fetchService.fetchCollectionForRest("posts", {}, ["comments.nope"]))
+                .rejects.toMatchObject({ code: "UNKNOWN_RELATION" });
+        });
+
+        it("refuses an unknown relation on a single read whose row does not exist", async () => {
+            const { fetchService } = service([]);
+            await expect(fetchService.fetchOneForRest("posts", 1, ["commets"]))
+                .rejects.toMatchObject({ code: "UNKNOWN_RELATION" });
+        });
     });
 
     describe("not", () => {
