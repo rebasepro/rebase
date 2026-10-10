@@ -344,15 +344,18 @@ build them differently:
   warning, never a failed boot. A table this boot creates gets its indexes with
   the table, before anything can write to it. Under `REBASE_PROVISION_ONLY` the
   builds run before the process exits, since nothing after it would run them.
-- **`rebase db push` builds them with the rest of the push**, inside Atlas's
-  transaction, so the first push after upgrading runs one `CREATE INDEX` per
-  foreign-key column that lacks one. A plain `CREATE INDEX` blocks writes to
-  that table — reads go on — for as long as the build takes: about 0.4 s at 1M
-  rows and 6 s at 10M on a laptop SSD (`maintenance_work_mem` 64 MB), and
-  proportionally longer on slower storage or wider keys. `--dry-run` lists every
-  one. On a large production table, either let a boot build it concurrently
-  first — the push then finds it in place and plans nothing — or run the
-  push at a quiet moment.
+- **`rebase db push` builds them before it plans**, with the same builder and
+  on the same terms as the boot: `CREATE INDEX CONCURRENTLY`, one at a time,
+  so reads and writes go on while it runs (about 0.4 s at 1M rows and 6 s at
+  10M as a plain build on a laptop SSD, `maintenance_work_mem` 64 MB; a
+  concurrent one takes longer and blocks nothing). Atlas then finds each index
+  in place and plans nothing for it. An index it could not build first — a
+  table another session held for the whole lock budget — is left to Atlas,
+  which builds it inside the push's transaction and so blocks writes to that
+  table for the build; the push says which. A foreign-key column the push
+  itself adds gets its index from Atlas along with the column, before anything
+  is in it. `--dry-run` builds nothing: it names the indexes a real push would
+  build first, and the plan it prints lists them, since they do not exist yet.
 
 ## What is refused, and when
 

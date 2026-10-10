@@ -113,7 +113,26 @@ rebase db push
   schema change and before any step that can fail, so a push that stops part-way leaves a new table
   denying every request rather than open to it
 - Applies your collections' RLS policies, and **removes policies an earlier push superseded**
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Builds any
+  [foreign-key index Rebase derives](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
+  that an existing table is missing **before** planning, with
+  `CREATE INDEX CONCURRENTLY`, so writes to the table go on during the build;
+  Atlas then finds it in place. `--dry-run` names these and builds nothing
+- <span class="since-badge" data-since="0.25">Since 0.25</span> Stamps the
+  policies it applies the way the server's boot does, so the first boot after a
+  push leaves them alone instead of re-creating every one
 - Does **not** create migration files
+
+**How long it takes.** Almost all of a push is Atlas computing the plan: it
+builds your desired schema in a scratch database and diffs it against the real
+one, and that cost grows faster than the number of tables — on a quiet laptop
+about 0.25 s per plan at 11 tables, 0.9 s at 111 and 5.5 s at 411. A push that
+changes nothing plans once; one that changes something plans twice (the dry-run
+the destructive-change gate reads, then the apply). So a push on a schema of
+400 or more tables takes tens of seconds, and longer on a busy or slow machine.
+That time is Atlas's, not your database's: the steps around it — generating the
+SQL, the RLS lock, search, triggers, policies, the role — take a few seconds at
+that size, over one connection to your database.
 
 **The files it generates on the way**, all under `.rebase/sql/` in the backend
 directory. `db push` and `db generate` write all five from your collections on
