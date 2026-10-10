@@ -290,8 +290,11 @@ So a failed apply is **not an error**. The response says so:
 
 ## Where this works
 
-The dividing line is whether the running server has your **source on disk** —
-not whether it is production.
+Live schema editing rewrites your collection source with the same editor the
+panel's source-only saves use, so it runs where that editor runs: a server with
+your **collection source on disk** (`collectionsDir`) and its schema editor on.
+The schema editor is off under `NODE_ENV=production` unless the server sets
+`schemaEditor: true`, and it needs `ts-morph` installed.
 
 ### MongoDB
 
@@ -311,19 +314,21 @@ so rather than leaving you to assume the relational answer.
 | Deployment | Works |
 |---|---|
 | `rebase dev` on your machine | yes |
-| Self-host with the project mounted | yes |
-| Self-host from a built bundle | yes, with `liveSchema.repository` |
-| Rebase Cloud, or any bundle | yes, with `liveSchema.repository` |
+| Self-host with the project and its git working tree mounted | yes, when `NODE_ENV` is not `production`, or with `schemaEditor: true` |
+| A built bundle: a self-host serving a build, or Rebase Cloud | no |
 
-A bundle is compiled output, so there is no collection source in it. Configure
-`liveSchema.repository` and the source is fetched from your repository instead;
-without it the routes answer `SCHEMA_EDITING_NO_REPOSITORY` and say why.
+A bundle is compiled output, so there is no collection source in it, and the
+runtime that serves it turns the schema editor off. `/api/admin/schema/status`
+answers `enabled: false` with the code `SCHEMA_EDITOR_DISABLED`. Edit
+collections in development, commit, and deploy.
 
-### A deployment with no source on disk
+### Committing to a remote repository
 
-A bundle is compiled output — every Cloud tenant, and any self-host serving a
-build. There is no collection source for the editor to rewrite, so point it at
-the repository the source actually lives in:
+`liveSchema.repository` makes the server commit each change to a GitHub
+repository through the Git Data API instead of running `git commit` in a
+working tree. It takes effect only on a server whose schema editor is on,
+which means a server with `collectionsDir` on disk (see the table above). A
+built bundle does not read it.
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -343,9 +348,12 @@ initializeRebaseBackend({
 })
 ```
 
-The change is then read from the repository, rewritten with the same editor that
-runs locally, and committed back through the Git Data API — a blob, a tree, a
-commit and a ref update. Nothing is cloned and nothing is left on disk.
+The changed collection file is then read from the repository, rewritten with
+the same editor that runs locally, and committed back through the Git Data API:
+a blob, a tree, a commit and a ref update. Nothing is cloned and nothing is
+left on disk. Only that one file is fetched, so two changes cannot be made in
+this mode: adding a relation that targets another collection, and deleting a
+collection.
 
 `auth` takes a token or a GitHub App installation:
 
@@ -366,10 +374,9 @@ project, and no per-customer secret to rotate.
 
 The token needs `contents: read and write` on that repository, and nothing else.
 
-On a machine that has the repository, the commit is a plain `git commit` —
-nothing to authenticate, no token, no network. A deployment without one commits
-through the Git Data API instead, with no clone — see
-[A deployment with no source on disk](#a-deployment-with-no-source-on-disk).
+Without `liveSchema.repository`, the commit is a plain `git commit` in the
+working tree that holds `collectionsDir`: nothing to authenticate, no token, no
+network.
 
 Two things that make it safe to run against a repository somebody else is
 working in:

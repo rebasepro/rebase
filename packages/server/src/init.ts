@@ -2382,10 +2382,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
 
         // ── Live schema editing ───────────────────────────────────────────
-        // Not gated on NODE_ENV, unlike the source-only editor above. The
-        // question is not whether this is production, it is whether there is a
-        // repository to commit to: a deployment running from a built bundle has
-        // compiled output and no source, and answers a refusal that says so.
+        // Writing goes through the source-only editor above (`writeSource` is
+        // built only from `schemaSourceEditor`), so live editing is on exactly
+        // where that editor is: a `collectionsDir` on disk, `schemaEditor` not
+        // false, and NODE_ENV other than production unless `schemaEditor:
+        // true`. A built bundle has none of that — its runtime passes
+        // `schemaEditor: false` — and `/status` says so. A configured
+        // `liveSchema.repository` changes where the commit goes, not whether
+        // there is an editor to make it.
         //
         // Mounted either way; the routes themselves decide what is possible, so
         // the reason a change is refused arrives as a message rather than as a
@@ -2395,9 +2399,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // 401 to an operator whose actual problem is an unconfigured
         // `collectionsDir`. Being told the wrong thing is worse than a 404, and
         // both are worse than being told.
-        // Either footing will do. Local source is the developer's case; a
-        // configured repository is the bundle's, where the collection file is
-        // fetched, rewritten and committed back without a working tree.
+        // With a configured repository the collection file is fetched,
+        // rewritten and committed back through the Git Data API instead of the
+        // local working tree.
         const remoteRepo = config.liveSchema?.repository;
         const canEditSchema = Boolean(config.collectionsDir) || Boolean(remoteRepo);
 
