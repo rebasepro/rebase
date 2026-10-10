@@ -106,7 +106,12 @@ const QueryLoadingView = () => {
 const STORAGE_KEY_TABS = "rebase_sql_tabs";
 const STORAGE_KEY_ACTIVE_TAB = "rebase_sql_active_tab";
 
-const FixedEditorOverlay = ({
+/**
+ * The box a result cell is edited in. It closes once: Enter saves, Escape
+ * cancels, a click away saves — and the blur a closing box can still receive
+ * is not a second answer, which made Enter save twice and Escape save at all.
+ */
+export const FixedEditorOverlay = ({
     displayValue,
     onSave,
     onCancel
@@ -120,6 +125,14 @@ const FixedEditorOverlay = ({
     const [windowSize, setWindowSize] = useState({ width: 1000,
 height: 1000 });
     const anchorRef = useRef<HTMLDivElement>(null);
+    const closedRef = useRef(false);
+    /** Close the box, saving `typed` when it is given. Only the first call counts. */
+    const close = (typed?: string) => {
+        if (closedRef.current) return;
+        closedRef.current = true;
+        if (typed !== undefined) onSave(typed);
+        onCancel();
+    };
 
     useEffect(() => {
         if (anchorRef.current && anchorRef.current.parentElement) {
@@ -182,17 +195,13 @@ maxHeight: resolvedMaxHeight }}
                             e.target.value = "";
                             e.target.value = val;
                         }}
-                        onBlur={(e) => {
-                            onSave(e.target.value);
-                            onCancel();
-                        }}
+                        onBlur={(e) => close(e.target.value)}
                         onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault();
-                                onSave(e.currentTarget.value);
-                                onCancel();
+                                close(e.currentTarget.value);
                             }
-                            if (e.key === "Escape") onCancel();
+                            if (e.key === "Escape") close();
                         }}
                     />
                 </div>,
