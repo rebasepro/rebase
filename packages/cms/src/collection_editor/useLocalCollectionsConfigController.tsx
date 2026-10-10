@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { DEFAULT_API_PATH } from "@rebasepro/app";
 import { useLiveSchemaEditing } from "./useLiveSchemaEditing";
+import { collectionForWire } from "./collection_wire";
 
 /**
  * What the backend said about its schema editor, and how sure we are.
@@ -247,7 +248,8 @@ export function useLocalCollectionsConfigController(
      * JSON, so whatever JSON cannot carry (a handler, a shared property, an
      * imported enum) is absent from both and never appears as a change; the
      * server writes only the keys the patch names. A collection this does not
-     * recognise is a new one, and is sent whole.
+     * recognise is a new one — a duplicate among them — and is sent whole,
+     * with each relation's target as its slug (see `collectionForWire`).
      */
     const changeFor = (
         id: string,
@@ -257,7 +259,7 @@ export function useLocalCollectionsConfigController(
         const current = loaded ?? findCollection(id) as Record<string, unknown> | undefined;
         return current
             ? { patch: diffCollections(current, saving) }
-            : { collection: saving };
+            : { collection: collectionForWire(saving) };
     };
 
     /** `findCollection`, as the record a patch is computed from. */
@@ -289,7 +291,7 @@ export function useLocalCollectionsConfigController(
             const current = findCollection(id) as Record<string, unknown> | undefined;
             await write(id, current
                 ? { patch: diffCollections(current, { ...current, ...(collectionData as Record<string, unknown>) }) }
-                : { collection: collectionData as Record<string, unknown> });
+                : { collection: collectionForWire(collectionData as Record<string, unknown>) });
         },
         // Through the live door when there is one: planned (the table and its
         // rows stay, and the plan says so) and committed source-only, with the
