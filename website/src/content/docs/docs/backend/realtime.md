@@ -22,7 +22,7 @@ The realtime pipeline has three stages:
 └──────────────┘      └────────────────────┘      └──────────────┘
 ```
 
-For multi-instance deployments, Rebase uses PostgreSQL's `LISTEN/NOTIFY` to broadcast changes across server instances. This is handled automatically — a dedicated PostgreSQL connection listens on the `rebase_entity_changes` channel and relays updates to local subscribers.
+For multi-instance deployments, Rebase uses PostgreSQL's `LISTEN/NOTIFY` to carry changes across server instances. This is handled automatically. With [database-level change capture](#database-level-change-capture-cdc) on (the default wherever the database role can create triggers), every instance listens on the `rebase_cdc` channel the capture triggers publish to, so a write is heard whichever process or tool made it. Without capture, each instance announces its own writes on the `rebase_entity_changes` channel, and a dedicated connection on every other instance relays them to its local subscribers.
 
 ### Zero Configuration
 
@@ -537,7 +537,7 @@ If the connection can't support it, `auto` logs an informational line instead an
 2. **Capture** — A dedicated, unpooled `LISTEN` client per instance consumes `rebase_cdc`, maps the changed table back to its collection, and feeds the change into the same `RealtimeService` pipeline used by API mutations. Like the cross-instance listener, it prefers `DATABASE_DIRECT_URL` and auto-reconnects.
 3. **RLS-safe delivery** — The raw row from the change stream is **never** forwarded to subscribers. The change is marked invalidated, and each subscription re-reads the row under its **own** auth context. Filtering is therefore per subscriber, never per publisher: a client only ever receives rows its RLS policies permit.
 4. **Cross-instance** — Because every instance observes every commit through the change stream, CDC also *is* the cross-instance channel; the legacy per-mutation `rebase_entity_changes` broadcast is not used while CDC is active.
-5. **De-duplication** — A mutation made through the Rebase API is delivered locally the instant it commits and is also echoed back through the change stream. The originating instance suppresses that echo (a short-lived record of its own emits), so subscribers never see an API write twice.
+5. **De-duplication** — A mutation made through the Rebase API is delivered locally the instant it commits and is also echoed back through the change stream. The originating instance suppresses an echo that arrives within the refetch debounce window (a short-lived record of its own emits), so an API write normally produces one frame. An echo that arrives later than that triggers one more refetch, which delivers the same rows again: harmless, but a subscriber can see an identical frame twice.
 
 ### Requirements & Notes
 
