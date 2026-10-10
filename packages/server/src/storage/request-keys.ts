@@ -145,8 +145,25 @@ export function servedBucketOrRefuse(
 ): string | undefined {
     if (bucket === undefined) return undefined;
     const served = controller.knownBuckets?.();
-    if (!served || served.includes(bucket)) return bucket;
-    return refuseUnknownBucket(bucket, controller, sources);
+    if (!served) return bucket;
+    if (!served.includes(bucket)) return refuseUnknownBucket(bucket, controller, sources);
+    return singleBucketName(bucket, controller);
+}
+
+/**
+ * The one name a single-bucket source's bucket goes by.
+ *
+ * S3 and GCS serve one bucket under two names: `"default"` and the provider's
+ * name (`acme-media`). Both reach the same objects, but the `storageAuthorize`
+ * hook was told whichever the caller wrote — and a read path can only ever say
+ * `"default"`. A hook that judged the bucket (`bucket === "default" && …`) was
+ * passed by naming the provider's bucket on an upload, a listing, a folder or a
+ * TUS upload. Folded here, at the entry every one of those passes, the hook and
+ * the controller see one bucket by one name.
+ */
+function singleBucketName(bucket: string, controller: StorageController): string {
+    const type = controller.getType();
+    return type === "s3" || type === "gcs" ? "default" : bucket;
 }
 
 /**

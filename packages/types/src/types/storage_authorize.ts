@@ -21,6 +21,11 @@ export interface StorageAuthorizeUser {
 export interface StorageAuthorizeContext {
     /** Object key, bucket prefix stripped and traversal already sanitized. */
     key: string;
+    /**
+     * The bucket, by one name per bucket. On S3 and GCS, whose source serves a
+     * single bucket, this is always `"default"` — also when the request named
+     * the provider's bucket (`acme-media`), which reaches the same objects.
+     */
     bucket: string;
     operation: StorageOperation;
     /** Null when the route allows unauthenticated access. */

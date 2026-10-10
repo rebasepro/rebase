@@ -454,7 +454,7 @@ export class TusHandler {
         // a destination the hook below was not asked about. The header wins
         // over the query string for `storageId` because the header is what
         // `finalize` has always used — now the hook is asked about it too.
-        const bucket = canonicalBucketOrBadRequest(metadata.bucket);
+        let bucket = canonicalBucketOrBadRequest(metadata.bucket);
         const storageId = metadata.storageId || c.req.query("storageId") || undefined;
 
         // No source named, and no default one to write to: refused per request,
@@ -495,7 +495,7 @@ export class TusHandler {
         // shape was any bucket the deployment's credentials reach.
         const target = this.targetFor(storageId);
         if (target) {
-            writableBucketOrRefuse(bucket, target, knownSources);
+            bucket = writableBucketOrRefuse(bucket, target, knownSources);
         }
 
         if (this.uploadPathConstraints) {
