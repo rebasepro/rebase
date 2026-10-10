@@ -85,12 +85,12 @@ other field held the same value before and after the change, so it is in
 `values` already; storing the whole row twice cost a one-field change to a
 20-field row 1,269 bytes, where it now costs 794.
 
-Entries recorded before 0.24 keep the whole previous row. The entry's `format`
+Entries recorded before 0.25 keep the whole previous row. The entry's `format`
 says which it is:
 
 | `format` | `previous_values` on an update |
 |---|---|
-| `1` (entries from before 0.24) | The whole row before the change |
+| `1` (entries from before 0.25) | The whole row before the change |
 | `2` | The `changed_fields` only, each as the whole row had it |
 
 The admin's history view and a revert read both alike: the view shows each
@@ -172,7 +172,7 @@ every deleted one — was not pruned at all. The sweep:
   back short, skipping entries another sweep holds — so a first sweep over a
   large backlog is many short deletes, not one long one;
 - reads an index on `updated_at`, `idx_history_updated_at`. On a database
-  created before 0.24 it is built in the background after the first boot,
+  created before 0.25 it is built in the background after the first boot,
   `CREATE INDEX CONCURRENTLY`, without blocking reads or writes — about a
   second per 2 million entries.
 

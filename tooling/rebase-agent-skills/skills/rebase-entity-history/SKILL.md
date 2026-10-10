@@ -102,10 +102,11 @@ Each history entry has the following structure:
 | `entity_id` | `string` | The ID of the entity this entry belongs to |
 | `action` | `"create" \| "update" \| "delete"` | What operation was performed |
 | `changed_fields` | `string[] \| null` | Array of field names that changed (only for updates) |
-| `values` | `Record<string, unknown> \| null` | Full entity values entity at the time of the change |
-| `previous_values` | `Record<string, unknown> \| null` | Previous entity values (only for updates) |
+| `values` | `Record<string, unknown> \| null` | Full entity values at the time of the change (for a delete, the deleted entity) |
+| `previous_values` | `Record<string, unknown> \| null` | On an update, what the changed fields held before it (`null` for creates and deletes) — see `format` |
 | `updated_by` | `string \| null` | UID of the user who made the change |
 | `updated_at` | `string` (ISO 8601) | Timestamp of when the change was recorded |
+| `format` | `1 \| 2` | `2` (since 0.25): `previous_values` holds the `changed_fields` only. `1` (older entries): it holds the whole previous entity |
 
 ### Example History Entry (JSON)
 
@@ -122,12 +123,12 @@ Each history entry has the following structure:
         "status": "active"
     },
     "previous_values": {
-        "name": "Widget",
         "price": 19.99,
         "status": "draft"
     },
     "updated_by": "user-uuid-here",
-    "updated_at": "2025-01-15T10:30:00.000Z"
+    "updated_at": "2025-01-15T10:30:00.000Z",
+    "format": 2
 }
 ```
 
@@ -158,9 +159,10 @@ GET /api/data/:slug/:entityId/history
             "action": "update",
             "changed_fields": ["price"],
             "values": { "name": "Widget", "price": 29.99 },
-            "previous_values": { "name": "Widget", "price": 19.99 },
+            "previous_values": { "price": 19.99 },
             "updated_by": "user-uuid",
-            "updated_at": "2025-01-15T10:30:00.000Z"
+            "updated_at": "2025-01-15T10:30:00.000Z",
+            "format": 2
         }
     ],
     "meta": {
@@ -296,32 +298,34 @@ CREATE TABLE IF NOT EXISTS rebase.entity_history (
     entity_id TEXT NOT NULL,
     action TEXT NOT NULL,          -- 'create', 'update', or 'delete'
     changed_fields TEXT[],         -- array of changed field names (updates only)
-    "values" JSONB,               -- full entity values entity
-    previous_values JSONB,        -- previous values (updates only)
+    "values" JSONB,               -- full entity values
+    previous_values JSONB,        -- updates only: the changed fields' previous values (format 2)
     updated_by TEXT,              -- user UID who made the change
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    format SMALLINT NOT NULL DEFAULT 1  -- 2: previous_values holds the changed fields only
 );
 
--- Indexes for efficient lookups
-CREATE INDEX IF NOT EXISTS idx_history_entity
-    ON rebase.entity_history(table_name, entity_id);
-
+-- Per-entity reads and pruning (its prefix serves (table_name, entity_id) lookups)
 CREATE INDEX IF NOT EXISTS idx_history_time
     ON rebase.entity_history(table_name, entity_id, updated_at DESC);
+
+-- The hourly retention sweep; built CONCURRENTLY in the background after boot
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_history_updated_at
+    ON rebase.entity_history(updated_at);
 ```
 
 > **IMPORTANT FOR AGENTS:** The `rebase.entity_history` table is **auto-created** on server startup when history is enabled. You do NOT need to create it manually or include it in migrations. The `rebase` schema is also created automatically if it doesn't exist.
 
 ### Storage Characteristics
 
-- **Values are stored as JSONB** — full entities, not diffs. This makes revert simple and reliable but uses more storage.
+- **Values are stored as JSONB** — `values` is the full entity, not a diff, so a revert simply writes it back. An update's `previous_values` holds only the fields it changed (`format: 2`); entries recorded before 0.25 hold the whole previous entity (`format: 1`).
 - **All collections share one table** — the `table_name` column distinguishes between collections.
 - **Entity IDs are stored as text** — regardless of the original column type.
-- **Indexes** cover `(table_name, entity_id)` and `(table_name, entity_id, updated_at DESC)` for fast per-entity lookups.
+- **Indexes**: `(table_name, entity_id, updated_at DESC)` for per-entity lookups, and `(updated_at)` for the retention sweep. A database from before 0.25 also had `(table_name, entity_id)`; boot drops it, as the first index covers it.
 
 ## Retention and Automatic Pruning
 
-The history service automatically prunes old entries to prevent unbounded storage growth. Pruning happens **non-blocking** after every insert (per-entity scope).
+The history service automatically prunes old entries to prevent unbounded storage growth: **non-blocking** after every insert, for that entity, and **once an hour** for every entity (since 0.25).
 
 ### Retention Configuration
 
@@ -332,10 +336,9 @@ The history service automatically prunes old entries to prevent unbounded storag
 
 ### How Pruning Works
 
-After every history insert, two pruning passes run in the background for that specific entity:
+After every history insert, one pruning statement runs in the background for that specific entity: it deletes entries older than `ttlDays` and everything beyond the newest `maxEntries`.
 
-1. **TTL pass** — Delete entries older than `ttlDays`
-2. **Max entries pass** — Keep only the newest `maxEntries` entries, delete the rest
+Once an hour, on one instance of the fleet (claimed in `rebase.cron_claims`, on the processes that run scheduled jobs), the backend also deletes every entry older than `ttlDays`, of every entity, in batches of 5,000 — so the history of an entity that is never written again, such as a deleted one, still ages out.
 
 Pruning errors are logged but never block the main operation.
 
@@ -354,21 +357,7 @@ This sets the `ttlDays` value. The `maxEntries` default of `200` is currently no
 
 ### Global Pruning
 
-The `HistoryService` also exposes a `pruneExpired()` method for global TTL-based cleanup (deletes expired entries across ALL entities in one sweep). This is intended to be called periodically — e.g., from a cron job:
-
-```typescript
-// In a cron job handler (e.g., backend/src/crons/prune-history.ts)
-import { rebase } from "@rebasepro/server";
-
-export default {
-    schedule: "0 3 * * *",  // Daily at 3 AM
-    handler: async () => {
-        // Note: requires direct access to the history service via driver internals
-        // This is an advanced pattern — the global prune is automatic per-entity
-        console.log("History pruning handled automatically per-entity on insert");
-    }
-};
-```
+There is nothing to schedule: the hourly sweep above is the global, TTL-based cleanup. `HistoryService.pruneExpired()` is what it calls.
 
 ## Admin Panel Integration
 
