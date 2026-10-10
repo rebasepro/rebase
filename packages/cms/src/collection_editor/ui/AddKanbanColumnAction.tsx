@@ -1,8 +1,7 @@
 
 import React, { useCallback, useMemo, useState } from "react";
 import {
-    useAuthController,
-    useCustomizationController,
+    useSnackbarController,
     useTranslation
 } from "@rebasepro/app";
 import { getPropertyInPath } from "../_cms_internals";
@@ -24,6 +23,7 @@ import {
 import { useCollectionsConfigController } from "../useCollectionsConfigController";
 import { toSnakeCase } from "@rebasepro/utils";
 import type { AdminCollection } from "@rebasepro/cms-types";
+import { isSchemaChangeCancelled } from "../liveSchemaClient";
 
 /**
  * Component rendered at the end of the Kanban board to add new columns (enum values).
@@ -45,8 +45,7 @@ export function AddKanbanColumnAction({
     const [saving, setSaving] = useState(false);
 
     const configController = useCollectionsConfigController();
-    const authController = useAuthController();
-    const customizationController = useCustomizationController();
+    const snackbarController = useSnackbarController();
     const { t } = useTranslation();
 
     // Get current enum values
@@ -62,81 +61,56 @@ export function AddKanbanColumnAction({
         return resolveEnumValues(stringProperty.enum) ?? [];
     }, [collection, columnProperty]);
 
+    const newId = toSnakeCase(newValueLabel.trim());
+    /** A column whose id is already on the board: saving it would write a second value with that id. */
+    const duplicate = newId ? currentEnumValues.find(ev => String(ev.id) === newId) : undefined;
+
     const handleAddColumn = useCallback(async () => {
-        if (!newValueLabel.trim() || !configController) return;
+        if (!newValueLabel.trim() || !configController || duplicate) return;
+
+        const property = collection?.properties?.[columnProperty];
+        if (!property || typeof property === "function" || !("type" in property) || property.type !== "string") {
+            snackbarController.open({
+                type: "error",
+                message: t("studio_add_kanban_column_not_enum", { property: columnProperty })
+            });
+            return;
+        }
 
         setSaving(true);
         try {
-            // Check for property in persisted collection first, then resolved collection
-            // This handles code-defined properties that aren't in the persisted config
-            let property = collection?.properties?.[columnProperty];
-            let isCodeDefinedProperty = false;
+            // The values as they are, each kept whole — its colour and every
+            // other field — and the new one after them.
+            const updatedEnumValues: EnumValueConfig[] = [
+                ...currentEnumValues.map(ev => ({ ...ev })),
+                { id: newId, label: newValueLabel.trim() }
+            ];
 
-            // Property not in persisted config - use base collection
-            if (!property || typeof property === "function") {
-                property = collection.properties?.[columnProperty];
-                isCodeDefinedProperty = true;
-            }
-
-            // Type guard: property must be an object with type === "string"
-            if (!property || typeof property === "function" || !("type" in property) || property.type !== "string") {
-                console.error("Column property not found or not a string. Property:", property);
-                setSaving(false);
-                return;
-            }
-
-            // Now we know property is a StringProperty
-            const stringProperty = property as { type: "string"; enum?: EnumValueConfig[]; name?: string };
-
-            // Create new enum value
-            const newId = toSnakeCase(newValueLabel.trim());
-            const newEnumValue = {
-                id: newId,
-                label: newValueLabel.trim()
-            };
-
-            // Get existing enum values from the resolved property (current runtime values)
-            // Use currentEnumValues which is already computed from resolvedCollection
-            const existingEnumValues = currentEnumValues.map(ev => ({
-                id: ev.id,
-                label: ev.label
-            }));
-
-            // Add new enum value
-            const updatedEnumValues = [...existingEnumValues, newEnumValue];
-
-            // Build the property to save
-            // If it's code-defined, we create a minimal override with just enum
-            const updatedProperty = isCodeDefinedProperty
-                ? {
-                    type: "string" as const,
-                    name: stringProperty.name || columnProperty,
-                    enum: updatedEnumValues
-                }
-                : {
-                    ...property,
-                    enum: updatedEnumValues
-                };
-
-            // Save the updated property
             await configController.saveProperty({
                 path: fullPath,
                 propertyKey: columnProperty,
-                property: updatedProperty as StringProperty,
+                property: { ...property, enum: updatedEnumValues } as StringProperty,
                 parentCollectionSlugs
             });
 
             setNewValueLabel("");
             setDialogOpen(false);
         } catch (error) {
-            console.error("Error adding new column:", error);
+            // Closing the review is the person's answer, not a failure.
+            if (!isSchemaChangeCancelled(error)) {
+                console.error("Error adding new column:", error);
+                snackbarController.open({
+                    type: "error",
+                    message: error instanceof Error ? error.message : String(error)
+                });
+            }
         } finally {
             setSaving(false);
         }
-    }, [newValueLabel, configController, collection, columnProperty, fullPath, parentCollectionSlugs]);
+    }, [newValueLabel, newId, duplicate, configController, collection, columnProperty, currentEnumValues, fullPath, parentCollectionSlugs, snackbarController, t]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" && newValueLabel.trim()) {
+        if (e.key === "Enter" && newValueLabel.trim() && !duplicate) {
             handleAddColumn();
         }
     };
@@ -176,7 +150,11 @@ export function AddKanbanColumnAction({
                         onKeyDown={handleKeyDown}
                         autoFocus
                         disabled={saving}
+                        error={Boolean(duplicate)}
                     />
+                    {duplicate && <Typography variant="caption" color="error" className="mt-2 block">
+                        {t("studio_add_kanban_column_exists", { label: duplicate.label ?? String(duplicate.id) })}
+                    </Typography>}
                 </DialogContent>
                 <DialogActions>
                     <Button
@@ -188,7 +166,7 @@ export function AddKanbanColumnAction({
                     </Button>
                     <Button
                         onClick={handleAddColumn}
-                        disabled={saving || !newValueLabel.trim()}
+                        disabled={saving || !newValueLabel.trim() || Boolean(duplicate)}
                     >
                         {saving ? t("studio_add_kanban_column_adding") : t("studio_add_kanban_column_add")}
                     </Button>

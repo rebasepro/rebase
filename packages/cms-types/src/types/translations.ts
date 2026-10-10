@@ -1154,6 +1154,8 @@ export interface RebaseTranslations {
     studio_property_add_column_no_permission?: string;
     studio_add_kanban_column_desc?: string;
     studio_add_kanban_column_adding?: string;
+    studio_add_kanban_column_exists?: string;
+    studio_add_kanban_column_not_enum?: string;
     studio_collection_view_edit?: string;
     studio_editor_collection_disabled?: string;
     studio_editor_collection_edit?: string;

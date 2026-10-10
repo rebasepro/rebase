@@ -1061,6 +1061,8 @@ export const hi: RebaseTranslations = {
     studio_property_add_column_no_permission: "आपको नई प्रॉपर्टी जोड़ने की अनुमति नहीं है",
     studio_add_kanban_column_desc: "\"{{property}}\" प्रॉपर्टी में एक नया विकल्प जोड़ता है। इससे Kanban बोर्ड में एक नया स्तंभ बनेगा।",
     studio_add_kanban_column_adding: "Adding...",
+    studio_add_kanban_column_exists: "\"{{label}}\" नाम का कॉलम बोर्ड पर पहले से है।",
+    studio_add_kanban_column_not_enum: "\"{{property}}\" विकल्पों वाली प्रॉपर्टी नहीं है, इसलिए इसमें कॉलम नहीं जोड़ा जा सकता।",
     studio_collection_view_edit: "Edit",
     studio_editor_collection_disabled: "संग्रह संपादन निष्क्रिय है",
     studio_editor_collection_edit: "संग्रह संपादित करें",

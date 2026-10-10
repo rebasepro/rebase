@@ -1061,6 +1061,8 @@ export const de: RebaseTranslations = {
     studio_property_add_column_no_permission: "Sie haben keine Berechtigung, neue Eigenschaften hinzuzufügen",
     studio_add_kanban_column_desc: "Fügt der Eigenschaft „{{property}}“ eine neue Option hinzu. Dadurch entsteht eine neue Spalte im Kanban-Board.",
     studio_add_kanban_column_adding: "Adding...",
+    studio_add_kanban_column_exists: "Eine Spalte „{{label}}“ gibt es auf dem Board bereits.",
+    studio_add_kanban_column_not_enum: "„{{property}}“ ist keine Eigenschaft mit Optionen, daher kann keine Spalte hinzugefügt werden.",
     studio_collection_view_edit: "Edit",
     studio_editor_collection_disabled: "Das Bearbeiten von Sammlungen ist deaktiviert",
     studio_editor_collection_edit: "Sammlung bearbeiten",

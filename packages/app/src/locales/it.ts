@@ -1061,6 +1061,8 @@ export const it: RebaseTranslations = {
     studio_property_add_column_no_permission: "Non hai il permesso di aggiungere nuove proprietà",
     studio_add_kanban_column_desc: "Aggiunge una nuova opzione alla proprietà «{{property}}». Verrà creata una nuova colonna nella board Kanban.",
     studio_add_kanban_column_adding: "Adding...",
+    studio_add_kanban_column_exists: "Sulla bacheca c’è già una colonna \"{{label}}\".",
+    studio_add_kanban_column_not_enum: "\"{{property}}\" non è una proprietà con opzioni, quindi non si può aggiungere una colonna.",
     studio_collection_view_edit: "Edit",
     studio_editor_collection_disabled: "La modifica delle collezioni è disattivata",
     studio_editor_collection_edit: "Modifica collezione",
