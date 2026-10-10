@@ -51,6 +51,13 @@ export interface PgNotifyListenerOptions {
      * rejects, so a caller with a fallback can take it.
      */
     retryInitialConnect?: boolean;
+    /**
+     * The `application_name` the connection reports in `pg_stat_activity`.
+     * Visible to every role, which is what lets one instance count the others
+     * (see `RealtimeService.warnIfMemoryBusOnMultiplePods`). A connection
+     * string that sets its own `application_name` wins.
+     */
+    applicationName?: string;
 }
 
 /**
@@ -171,7 +178,7 @@ export class PgNotifyListener {
      *        thrown to the caller rather than retried.
      */
     private async connect({ first = false }: { first?: boolean } = {}): Promise<void> {
-        const { connectionString, channel, onPayload, logLabel } = this.options;
+        const { connectionString, channel, onPayload, logLabel, applicationName } = this.options;
         // Held here rather than only inside the `try` so the failure path can
         // still reach it: everything below `connect()` can throw, and until
         // `this.client` is assigned nothing else in this class knows the
@@ -183,7 +190,12 @@ export class PgNotifyListener {
             // TCP keepalive as well as the heartbeat below: it costs nothing,
             // and it is what eventually errors a dead socket the heartbeat
             // has already given up on.
-            const client = new PgClient({ connectionString, keepAlive: true, keepAliveInitialDelayMillis: 30_000 });
+            const client = new PgClient({
+                connectionString,
+                keepAlive: true,
+                keepAliveInitialDelayMillis: 30_000,
+                ...(applicationName ? { application_name: applicationName } : {})
+            });
             pending = client;
 
             // Events from a connection already given up on — torn down after

@@ -32,6 +32,13 @@ import { unref } from "@rebasepro/utils";
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
 
 /**
+ * How every realtime LISTEN connection names itself (`application_name`,
+ * followed by the instance id), so an instance can count the others serving
+ * realtime on the same database.
+ */
+const REALTIME_LISTENER_APPLICATION_PREFIX = "rebase-realtime:";
+
+/**
  * The id of a change that names no row — a `TRUNCATE`, a key too large to
  * notify, a table with no key. Every list on the path refetches, and so does
  * every single-row subscription on it: the change may be to any row.
@@ -505,6 +512,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
     /** So the multi-pod memory-bus warning is emitted once, not once per join. */
     private memoryBusWarned = false;
+    /** When the database was last asked whether another instance listens — see {@link warnIfMemoryBusOnMultiplePods}. */
+    private otherInstancesCheckedAt?: number;
+    /** The check in flight, so a burst of joins asks once. Awaited by tests. */
+    private otherInstancesCheck?: Promise<void>;
+    private static readonly OTHER_INSTANCES_CHECK_INTERVAL_MS = 5 * 60_000;
 
     private presenceInterval?: ReturnType<typeof setInterval>;
     private static readonly PRESENCE_TIMEOUT_MS = 30000; // 30s
@@ -587,6 +599,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     // ── Cross-instance LISTEN/NOTIFY ──
     /** Unique identifier for this process instance, used to skip own notifications. */
     private readonly instanceId = `inst_${randomUUID().slice(0, 8)}`;
+    /** What this instance's LISTEN connections report in `pg_stat_activity`. */
+    private readonly listenerApplicationName = `${REALTIME_LISTENER_APPLICATION_PREFIX}${this.instanceId}`;
     /** The LISTEN connection on {@link PG_NOTIFY_CHANNEL}, outside the Drizzle pool. */
     private crossInstanceListener?: PgNotifyListener;
     /** Whether cross-instance broadcasting is active. */
@@ -2550,7 +2564,11 @@ roles: ["anon"] };
      */
     private warnIfMemoryBusOnMultiplePods(): void {
         if (this.memoryBusWarned) return;
-        if (this.bus.kind !== "memory" || !this.foreignInstanceSeen) return;
+        if (this.bus.kind !== "memory") return;
+        if (!this.foreignInstanceSeen) {
+            this.checkForOtherInstances();
+            return;
+        }
         this.memoryBusWarned = true;
         logger.warn(
             "⚠️ [ChannelBus] Channels are in use with the in-memory bus, but notifications from another " +
@@ -2558,6 +2576,45 @@ roles: ["anon"] };
             "reach only the clients connected to this one. Set `realtime.bus` (or REALTIME_CHANNEL_BUS=postgres) " +
             "to make channels cross-instance."
         );
+    }
+
+    /**
+     * Ask the database whether another process holds a realtime LISTEN
+     * connection on it, at most once per {@link OTHER_INSTANCES_CHECK_INTERVAL_MS}.
+     *
+     * The legacy entity channel proves a second instance with every foreign
+     * `sid`, but under change capture — the default — nothing crosses that
+     * channel, so the warning above could never fire on exactly the
+     * deployments it was written for. Every LISTEN connection names itself
+     * (`application_name`, which `pg_stat_activity` shows to any role), so
+     * the count is one cheap query. Only a process that listens is asked: a
+     * single process with no LISTEN connection has nothing to compare with.
+     */
+    private checkForOtherInstances(): void {
+        if (this.otherInstancesCheck) return;
+        if (!this.cdcListener && !this.crossInstanceListener) return;
+        const now = Date.now();
+        if (this.otherInstancesCheckedAt !== undefined &&
+            now - this.otherInstancesCheckedAt < RealtimeService.OTHER_INSTANCES_CHECK_INTERVAL_MS) return;
+        this.otherInstancesCheckedAt = now;
+        this.otherInstancesCheck = (async () => {
+            try {
+                const result = await this.db.execute(drizzleSql`
+                    SELECT count(*)::int AS n FROM pg_stat_activity
+                    WHERE datname = current_database()
+                      AND starts_with(application_name, ${REALTIME_LISTENER_APPLICATION_PREFIX})
+                      AND application_name <> ${this.listenerApplicationName}`);
+                const n = Number((result.rows?.[0] as { n?: unknown } | undefined)?.n ?? 0);
+                if (n > 0) {
+                    this.foreignInstanceSeen = true;
+                    this.warnIfMemoryBusOnMultiplePods();
+                }
+            } catch (error) {
+                this.debugLog("[ChannelBus] Could not count other realtime instances", error);
+            } finally {
+                this.otherInstancesCheck = undefined;
+            }
+        })();
     }
 
     /** Drop a channel its last local member left, and what was kept per channel for it. */
@@ -3342,7 +3399,8 @@ lastSeen: Date.now() });
         this.cdcListener = new CdcListener(
             connectionString,
             (events) => this.handleCdcEvents(events),
-            () => this.resyncSubscriptions()
+            () => this.resyncSubscriptions(),
+            this.listenerApplicationName
         );
         try {
             // start() validates the initial connection; if it can't be established
@@ -3657,7 +3715,8 @@ lastSeen: Date.now() });
             logLabel: "[RealtimeService]",
             onPayload: (payload) => this.handleCrossInstanceNotification(payload),
             onReconnect: () => this.resyncSubscriptions(),
-            retryInitialConnect: true
+            retryInitialConnect: true,
+            applicationName: this.listenerApplicationName
         });
         await this.crossInstanceListener.start();
         logger.info(`📡 [RealtimeService] Cross-instance realtime enabled (instanceId: ${this.instanceId})`);

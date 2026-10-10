@@ -106,13 +106,15 @@ export class CdcListener {
     constructor(
         connectionString: string,
         onEvents: (events: CdcChangeEvent[]) => void | Promise<void>,
-        onReconnect?: () => void
+        onReconnect?: () => void,
+        applicationName?: string
     ) {
         this.listener = new PgNotifyListener({
             connectionString,
             channel: CDC_CHANNEL,
             logLabel: "[CDC]",
             onReconnect,
+            applicationName,
             onPayload: (payload) => {
                 const events = parseCdcPayload(payload);
                 if (!events) {
