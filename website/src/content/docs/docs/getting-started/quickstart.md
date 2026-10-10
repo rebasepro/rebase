@@ -121,8 +121,8 @@ This will analyze your database tables and generate corresponding TypeScript fil
 
 When you open the frontend URL `rebase dev` printed, you'll see the login screen. The **first user** to register automatically becomes an admin — this is the bootstrap flow.
 
-1. Click **Sign Up**
-2. Enter your email and password
+1. The screen opens on **Welcome!**, the form for that first account
+2. Enter your email and password, then click **Create account**
 3. You're in — with full admin access
 
 `rebase init` also wrote `REBASE_ADMIN_EMAIL` and a generated `REBASE_ADMIN_PASSWORD` into `.env`. Those are not your credentials here: `rebase dev` ignores them and says so at boot. They belong to a production boot — `docker compose up`, or anything with `NODE_ENV=production` — where this bootstrap window is closed, because the server answers on a hostname before you have typed anything. See [Your first admin](/docs/getting-started/deployment#your-first-admin).

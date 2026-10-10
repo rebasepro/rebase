@@ -694,7 +694,9 @@ async function skillsInstall(rawArgs: string[] = []) {
 
     console.log("");
     console.log(chalk.gray("  Skills are project-local. Commit them to share with your team."));
-    console.log(chalk.gray("  Re-run this command anytime to update to the latest skills."));
+    // The skills ship inside the CLI's own pinned `@rebasepro/agent-skills`,
+    // so a re-run reinstalls that version; newer ones come with a newer CLI.
+    console.log(chalk.gray("  Re-run this command to restore them. Upgrade @rebasepro/cli for newer skills."));
     if (!withMcp) {
         // Only the agents whose config does not have the server yet: on a
         // project `init --agent` set up, a refresh says nothing about it.

@@ -206,7 +206,7 @@ The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api
 1. **You define** collections in `config/collections/`
 2. **The backend** reads them to generate Drizzle schemas and mount REST routes
 3. **The frontend** reads them (via Vite plugin) to render tables, forms, and navigation
-4. **The CLI** reads them to generate migration files with `rebase schema generate`
+4. **The CLI** reads them to generate the Drizzle schema (`rebase schema generate`), the SDK types (`rebase generate-sdk`) and, from that schema, migration files (`rebase db generate`)
 
 While `rebase dev` is running, saving a file under `config/collections/`
 regenerates `backend/src/schema.generated.ts` and the SDK types in
