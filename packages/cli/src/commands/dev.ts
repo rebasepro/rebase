@@ -36,6 +36,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { createHash } from "crypto";
+import { StringDecoder } from "string_decoder";
 import { fileURLToPath } from "url";
 import {
     cmsMountOf,
@@ -115,6 +116,57 @@ const LIVENESS_INTERVAL_MS = 5_000;
  */
 // eslint-disable-next-line no-control-regex
 const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
+
+/**
+ * Calls `onLine` with each line a child process writes to `stream`.
+ *
+ * A pipe hands over whatever has been written so far, so one line can arrive
+ * in two chunks. Split chunk by chunk, "Server running at http://localhost:3001"
+ * could read as two fragments that neither matched, and `rebase dev` then
+ * never announced the backend or started the admin panel. So the piece after
+ * the last newline is held for the next chunk, decoded as UTF-8 across chunk
+ * boundaries. A held piece is handed over at the end of the stream, or after
+ * `idleFlushMs` with nothing more written, so a prompt or a progress line
+ * still shows when it is written.
+ *
+ * Exported for its test.
+ */
+export function forEachOutputLine(
+    stream: NodeJS.ReadableStream | null | undefined,
+    onLine: (line: string) => void,
+    idleFlushMs = 100
+): void {
+    if (!stream) return;
+    const decoder = new StringDecoder("utf8");
+    let pending = "";
+    let idle: NodeJS.Timeout | undefined;
+
+    const emit = (text: string) => {
+        for (const line of text.split("\n")) if (line) onLine(line);
+    };
+    // At the end of the stream the decoder gives up what it holds too; after
+    // an idle wait it keeps a character still missing its last bytes.
+    const flush = (atEnd: boolean) => {
+        clearTimeout(idle);
+        idle = undefined;
+        const rest = pending + (atEnd ? decoder.end() : "");
+        pending = "";
+        emit(rest);
+    };
+
+    stream.on("data", (data: Buffer | string) => {
+        clearTimeout(idle);
+        const text = pending + (typeof data === "string" ? data : decoder.write(data));
+        const lastNewline = text.lastIndexOf("\n");
+        pending = text.slice(lastNewline + 1);
+        if (lastNewline >= 0) emit(text.slice(0, lastNewline));
+        if (pending) {
+            idle = setTimeout(() => flush(false), idleFlushMs);
+            idle.unref?.();
+        }
+    });
+    stream.on("end", () => flush(true));
+}
 
 /**
  * The corrected banner line, when the backend says it moved port.
@@ -272,6 +324,13 @@ export function devRestartTrigger(projectRoot: string): string | null {
 }
 
 /**
+ * tsx's built-in watch ignores (tsx 4's `watch` command), which it applies
+ * relative to its cwd only. {@link devWatchArgs} repeats them under every
+ * directory it includes from outside that cwd.
+ */
+const TSX_DEFAULT_IGNORES = ["**/.*/**", "**/.*", "**/{node_modules,bower_components,vendor}/**"] as const;
+
+/**
  * The `tsx watch` argument list for the backend (unquoted).
  *
  * One save of a collection file must restart the backend once. The runtime
@@ -284,6 +343,16 @@ export function devRestartTrigger(projectRoot: string): string | null {
  * collections directory alone (`--exclude` wins over its dependency tracking),
  * and dev restarts the backend itself, once, after the regeneration — through
  * `restartTrigger`, which tsx watches.
+ *
+ * Every included directory also gets tsx's own default ignores, made absolute.
+ * tsx resolves those defaults (`**\/node_modules/**`, `**\/.*`, …) against its
+ * cwd, which is `backend/`, so they never reached `config/`, a sibling: chokidar
+ * walked `config/node_modules` — following symlinks — before tsx spawned the
+ * backend at all, and kept every file in it watched. In the monorepo's example
+ * app that was 17 s before the first backend line and 1,400 open files, and any
+ * install (or another checkout's Vite build writing `.vite-temp` deep inside
+ * that tree) restarted the backend. A `.DS_Store` or an editor swap file in
+ * `config/` restarted it too.
  */
 export function devWatchArgs(
     projectRoot: string,
@@ -295,11 +364,15 @@ export function devWatchArgs(
     // not know (`--conditions` is Node's) and hands the rest to Node, which
     // then refuses `--include` as a bad option.
     const args = ["watch"];
-    for (const dir of devWatchIncludes(projectRoot, paths)) args.push("--include", dir);
+    // Globs, so forward slashes whatever the platform's separator is.
+    const glob = (dir: string) => dir.split(path.sep).join("/");
+    for (const dir of devWatchIncludes(projectRoot, paths)) {
+        args.push("--include", dir);
+        for (const ignored of TSX_DEFAULT_IGNORES) args.push("--exclude", `${glob(dir)}/${ignored}`);
+    }
     if (restartTrigger) {
         args.push("--include", restartTrigger);
-        // A glob, so forward slashes whatever the platform's separator is.
-        args.push("--exclude", `${devCollectionsDir(projectRoot).split(path.sep).join("/")}/**`);
+        args.push("--exclude", `${glob(devCollectionsDir(projectRoot))}/**`);
     }
     args.push("--conditions", "development", entryTarget);
     return args;
@@ -769,15 +842,36 @@ function projectHasCollections(projectRoot: string): boolean {
  * problem itself. A dev server that refuses to boot because codegen failed is
  * worse than one that boots and says so.
  */
-async function ensureGeneratedSchema(projectRoot: string): Promise<void> {
-    if (!projectHasCollections(projectRoot)) return;
+async function ensureGeneratedSchema(projectRoot: string): Promise<SchemaGeneration> {
+    if (!projectHasCollections(projectRoot)) return "skipped";
     try {
         await runDriverSchemaCommand(["node", "rebase", "schema", "generate"], { quiet: true });
+        return "generated";
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.log(`  ${chalk.yellow("⚠")} ${chalk.gray(`Could not regenerate the database schema: ${message}`)}`);
         console.log(`  ${chalk.gray(`Run ${chalk.cyan("rebase schema generate")} to see why. Collection reads will fail until it succeeds.`)}`);
+        return "failed";
     }
+}
+
+/** What {@link ensureGeneratedSchema} did at startup. */
+export type SchemaGeneration = "generated" | "skipped" | "failed";
+
+/**
+ * Whether dev must still run the driver's `schema stale --fix` before the
+ * backend boots.
+ *
+ * Not after a regeneration that succeeded: that wrote `schema.generated.ts`
+ * from these collections with this driver, moments earlier, and `stale`
+ * compares the file against the same generator — it can only answer "nothing
+ * stale", and it cost a driver process (~0.6 s) on every start. The repair it
+ * exists for, a library upgrade that changed what the generator derives, is
+ * exactly what the regeneration already did. When generation was skipped or
+ * failed, the preflight is the remaining safety net and still runs.
+ */
+export function needsStaleSchemaPreflight(generation: SchemaGeneration): boolean {
+    return generation !== "generated";
 }
 
 /**
@@ -866,6 +960,48 @@ export function schemaPushArgv(databaseUrl: string | undefined): string[] {
 }
 
 /**
+ * Start-up's independent halves, overlapped rather than run one after another.
+ *
+ * `rebase dev` used to regenerate the schema and the SDK, then derive the
+ * resource graph (every collection evaluated again, in this process), then
+ * start the managed database and wait for it — about a second when it was not
+ * already running — and only then spawn the backend. None of the three reads
+ * what another writes: the generators read `config/` and write
+ * `backend/src/schema.generated.ts` and `generated/sdk/`; the derivation reads
+ * `config/resources.ts` and the collections; the database needs neither, and
+ * `schema generate` never connects to one. So `database` starts first and is
+ * collected last.
+ *
+ * `preflight` is the exception, and the reason this is not one `Promise.all`:
+ * on the `--docker` path it pushes the schema the generators have just written,
+ * so it still runs after them.
+ *
+ * A database that fails to start is reported where it always was — after the
+ * generators' and the preflight's output — rather than ahead of it, and it is
+ * never an unhandled rejection while they run.
+ *
+ * Exported for its test.
+ */
+export async function overlapDevStartup<T>(steps: {
+    generate: () => Promise<SchemaGeneration>;
+    preflight: () => Promise<void>;
+    /** Resolve and, for the managed database, start it. `null` when this run starts none. */
+    database: (() => Promise<T>) | null;
+}): Promise<{ schemaGeneration: SchemaGeneration; database: T | null }> {
+    const database = steps.database
+        ? steps.database().then(
+            (value) => ({ ok: true as const, value }),
+            (error: unknown) => ({ ok: false as const, error })
+        )
+        : null;
+    const schemaGeneration = await steps.generate();
+    await steps.preflight();
+    const settled = database ? await database : null;
+    if (settled && !settled.ok) throw settled.error;
+    return { schemaGeneration, database: settled ? settled.value : null };
+}
+
+/**
  * The database half of `rebase dev` starting up.
  *
  * Separated from `ensureDevDatabase` so that everything needing a project on
@@ -910,6 +1046,115 @@ async function runDatabasePreflight(options: {
     });
 
     if (outcome.action === "started") console.log("");
+}
+
+/**
+ * Kill a child `rebase dev` started, with everything it started in turn.
+ *
+ * Both servers run detached, in a process group of their own, behind a shell
+ * and a package manager — so the group is what has to go, not the pid.
+ */
+function killChildTree(child: ResultPromise): void {
+    if (child.killed) return;
+    try {
+        if (!child.pid) throw new Error("no pid");
+        if (process.platform === "win32") {
+            execaCommandSync(`taskkill /pid ${child.pid} /T /F`);
+        } else {
+            process.kill(-child.pid, "SIGKILL");
+        }
+    } catch {
+        try {
+            child.kill("SIGKILL");
+        } catch {
+            // Already gone.
+        }
+    }
+}
+
+/**
+ * The port the last `rebase dev` backend landed on, from `.rebase-dev-port`.
+ *
+ * Read the way the server reads it (`listenWithPortRetry`): the first number,
+ * whether the file is the server's `<bound> <requested>` or the CLI's bare
+ * `<bound>`. `null` when there is no file or no number in it.
+ */
+function rememberedDevPort(projectRoot: string): number | null {
+    try {
+        const raw = fs.readFileSync(path.join(projectRoot, DEV_PORT_FILENAME), "utf-8").trim().split(/\s+/)[0];
+        return parsePort(raw) ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Whether the admin panel can start beside the backend instead of after it.
+ *
+ * Vite has to be told the backend's URL when it starts (`VITE_API_URL`), and
+ * the backend's port is only certain once it has bound — so the admin panel
+ * used to wait for "Server running at", and the time to it was the backend's
+ * whole boot plus Vite's start. It can start beside the backend whenever the
+ * port the backend will bind is known in advance:
+ *
+ * - **named with `--port`**: the server binds it or refuses to start, never
+ *   walks past it (`REBASE_DEV_PORT_EXPLICIT`), and `pinnedPortRefusal` has
+ *   already checked that nothing answers there;
+ * - **free, and the port the backend tries first**: the server tries the port
+ *   its last run landed on before the one it is given (`.rebase-dev-port`), so
+ *   a remembered port must be this one — the "kept from the last run" rung —
+ *   or absent, which it is after every clean exit, and the derived port is
+ *   then the one tried. A port something already answers on would make the
+ *   backend move, so that case keeps the old order.
+ *
+ * Nothing here can rule out another process taking the port in the second the
+ * backend boots, so `devCommand` still compares the announced port with the
+ * one Vite was given and restarts the admin panel when they differ.
+ *
+ * Exported for its test.
+ */
+export async function frontendCanStartWithBackend(options: {
+    projectRoot: string;
+    port: number;
+    pinned: boolean;
+    probe?: (host: string, port: number) => Promise<boolean>;
+}): Promise<boolean> {
+    if (options.pinned) return true;
+    const remembered = rememberedDevPort(options.projectRoot);
+    if (remembered !== null && remembered !== options.port) return false;
+    const probe = options.probe ?? probeTcp;
+    const taken = await Promise.all([probe("127.0.0.1", options.port), probe("::1", options.port)]);
+    return !taken.some(Boolean);
+}
+
+/**
+ * The tsx the backend is watched with, or exit saying why there is none.
+ *
+ * Checked before anything is started rather than just before the backend
+ * spawns: start-up begins the database at once now, and a project whose
+ * dependencies are missing should hear that first, not after two generators
+ * have each failed on the same cause.
+ */
+function requireUsableTsx(projectRoot: string): string {
+    const tsxBin = resolveTsx(projectRoot);
+    if (!tsxBin) {
+        console.error(chalk.red(`  ✗ ${dependenciesNotInstalled(projectRoot)}`));
+        process.exit(1);
+    }
+
+    // Verify the tsx installation is intact (not just the symlink)
+    const tsxValidationError = validateTsxInstallation(tsxBin);
+    if (tsxValidationError) {
+        const pmCmdsLocal = getPMCommands(detectPackageManager(projectRoot));
+        const installCmd = pmCmdsLocal.install.join(" ");
+        console.error(chalk.red("  ✗ tsx installation appears corrupted."));
+        console.error(chalk.gray(`    ${tsxValidationError}`));
+        console.error("");
+        console.error(chalk.gray("    To fix, run:"));
+        console.error(chalk.cyan(`      rm -rf node_modules && ${installCmd}`));
+        process.exit(1);
+    }
+    return tsxBin;
 }
 
 export async function devCommand(rawArgs: string[]): Promise<void> {
@@ -986,6 +1231,13 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         }
     }
 
+    const startsBackend = !frontendOnly && Boolean(backendDir);
+
+    // Before anything is started, because the database now starts at once: a
+    // project that cannot run its backend should not be left with a database
+    // daemon it never got to use, nor wait for two generators first.
+    const tsxBin = startsBackend ? requireUsableTsx(projectRoot) : null;
+
     console.log("");
     console.log(chalk.bold("  🚀 Rebase Dev Server"));
     console.log("");
@@ -994,22 +1246,45 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // has one that is plainly local and plainly not running. Everything about
     // when it declines is in `ensureDevDatabase`; the frontend-only case is
     // decided here because there is no backend to need a database at all.
+    let schemaGeneration: SchemaGeneration = "skipped";
+    /**
+     * The database this run's backend gets. A project with a DATABASE_URL is
+     * untouched; a project without one gets a managed Postgres, which is what
+     * makes `rebase dev` the only command a new project needs.
+     *
+     * `--no-db` means start nothing, and that includes the managed database.
+     * It used to gate only the preflight, so the one path that actually starts
+     * a database on a scaffolded project — the managed PGlite — ran anyway:
+     * `rebase dev --no-db` wrote `.rebase/pglite/`, booted a daemon and served
+     * against it, which is the opposite of what a reader asking for no database
+     * expects. The backend is left to fail on the DATABASE_URL it cannot find,
+     * which is the failure the flag exists to produce.
+     */
+    let prepared: PreparedDatabase | null = null;
     if (!frontendOnly) {
-        // Before the database, because neither needs one and because the push
-        // below regenerates the schema anyway on the one path that reaches it.
-        // Side by side: they read the same collections and write different
-        // files, so the SDK costs nothing on top of the schema's two seconds.
-        await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdk(projectRoot)]);
-        await runDatabasePreflight({
-            projectRoot,
-            disabled: noDb,
-            // `--docker` names a container, not a connection string, and the
-            // preflight is what starts it. Derived from the compose file so the
-            // two halves agree on which database "the docker one" is.
-            databaseUrl: args["--docker"]
-                ? resolveComposeUrl(projectRoot, readEnvFile(projectRoot)) ?? undefined
-                : undefined
-        });
+        ({ schemaGeneration, database: prepared } = await overlapDevStartup({
+            // Side by side: they read the same collections and write different
+            // files, so the SDK costs nothing on top of the schema.
+            generate: async () => (await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdk(projectRoot)]))[0],
+            preflight: () => runDatabasePreflight({
+                projectRoot,
+                disabled: noDb,
+                // `--docker` names a container, not a connection string, and the
+                // preflight is what starts it. Derived from the compose file so the
+                // two halves agree on which database "the docker one" is.
+                databaseUrl: args["--docker"]
+                    ? resolveComposeUrl(projectRoot, readEnvFile(projectRoot)) ?? undefined
+                    : undefined
+            }),
+            database: startsBackend && !noDb
+                ? async () => prepareDatabaseEnv(projectRoot, {
+                    flagUrl: typeof args["--database-url"] === "string" ? args["--database-url"] : null,
+                    flagDocker: Boolean(args["--docker"]),
+                    onProgress: (message) => console.log(chalk.gray(`  ${message}`)),
+                    additionalKeys: await declaredAdditionalDatabases(projectRoot)
+                })
+                : null
+        }));
     }
 
     const children: ResultPromise[] = [];
@@ -1157,23 +1432,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             if (fs.existsSync(urlFile)) fs.unlinkSync(urlFile);
         } catch { /* ignore */ }
 
-        children.forEach((child) => {
-            if (child.pid && !child.killed) {
-                try {
-                    if (process.platform === "win32") {
-                        execaCommandSync(`taskkill /pid ${child.pid} /T /F`);
-                    } else {
-                        process.kill(-child.pid, "SIGKILL");
-                    }
-                } catch (e) {
-                    try {
-                        child.kill("SIGKILL");
-                    } catch (err) {
-                        // ignore
-                    }
-                }
-            }
-        });
+        children.forEach(killChildTree);
         // Not a hard-coded 0. Ctrl+C is how `rebase dev` normally ends, so
         // exiting 0 unconditionally threw away the one thing `--backend-only`
         // has to report: whether the backend it was asked to run is up. A
@@ -1182,6 +1441,10 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     };
     process.on("SIGINT", cleanup);
     process.on("SIGTERM", cleanup);
+
+    /** The running admin panel, and the backend port it was told (`VITE_API_URL`). */
+    let frontendChild: ResultPromise | null = null;
+    let frontendApiPort: number | null = null;
 
     /**
      * Start the Vite frontend, optionally injecting the backend port.
@@ -1193,6 +1456,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
         const frontendEnv: Record<string, string> = { ...process.env as Record<string, string> };
 
+        frontendApiPort = backendPort;
         // Inject the resolved backend URL so Vite picks it up
         if (backendPort) {
             frontendEnv.VITE_API_URL = `http://localhost:${backendPort}`;
@@ -1224,7 +1488,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         if (pinnedFrontendPort) runDevCmd.push("--strictPort");
         console.log(`  ${chalk.gray("↳ frontend port")} = ${chalk.white(String(frontendPort))}`);
 
-        const frontendChild = execa(
+        const child = execa(
             runDevCmd[0],
             runDevCmd.slice(1),
             {
@@ -1235,76 +1499,69 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 detached: process.platform !== "win32"
             }
         );
-        frontendChild.catch(() => {}); // prevent unhandled promise rejection on exit
+        child.catch(() => {}); // prevent unhandled promise rejection on exit
+        frontendChild = child;
 
-        frontendChild.stdout?.on("data", (data: Buffer) => {
-            const lines = data.toString().split("\n").filter(Boolean);
-            lines.forEach((line: string) => {
-                console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
-                const cleanLine = stripAnsi(line);
-                const urlMatch = cleanLine.match(/(http:\/\/(?:localhost|127\.0\.0\.1):\d+)/);
-                if (cleanLine.includes("Local:") && urlMatch) {
-                    frontendUrl = urlMatch[1];
-                    printSummary();
-                }
-            });
+        forEachOutputLine(child.stdout, (line) => {
+            console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
+            const cleanLine = stripAnsi(line);
+            const urlMatch = cleanLine.match(/(http:\/\/(?:localhost|127\.0\.0\.1):\d+)/);
+            // Only the current one: a replaced admin panel's last words are not its address.
+            if (cleanLine.includes("Local:") && urlMatch && child === frontendChild) {
+                frontendUrl = urlMatch[1];
+                printSummary();
+            }
         });
 
-        frontendChild.stderr?.on("data", (data: Buffer) => {
-            const lines = data.toString().split("\n").filter(Boolean);
-            lines.forEach((line: string) => {
-                console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
-            });
+        forEachOutputLine(child.stderr, (line) => {
+            console.log(`${chalk.magenta.bold("[admin]")} ${line}`);
         });
 
-        children.push(frontendChild);
+        children.push(child);
+    }
+
+    /**
+     * Start the admin panel again, told the port the backend actually bound.
+     *
+     * Only reachable when it was started beside the backend
+     * ({@link frontendCanStartWithBackend}) and something took that port in the
+     * second the backend booted, so the backend moved. Left alone, the admin
+     * panel would talk to whatever now answers on the old port — very often
+     * another Rebase backend, since dev ports are derived per project.
+     */
+    async function restartFrontend(backendPort: number): Promise<void> {
+        const stale = frontendChild;
+        frontendUrl = "";
+        console.log(`  ${chalk.gray(`↳ The backend moved from ${frontendApiPort} to ${backendPort}; restarting the admin panel on it.`)}`);
+        if (stale) {
+            frontendChild = null;
+            const index = children.indexOf(stale);
+            if (index >= 0) children.splice(index, 1);
+            killChildTree(stale);
+            // Settled either way — it was killed, so it rejects — and never
+            // through `finally`, whose promise would carry that rejection on
+            // with nothing to catch it.
+            await stale.then(() => undefined, () => undefined);
+            // Its port is free once the process is gone, which can trail the
+            // shell above it. Vite would otherwise take the next port — or,
+            // pinned with --strictPort, refuse to start.
+            for (let attempt = 0; attempt < 30 && await probeTcp("127.0.0.1", frontendPort, 200); attempt++) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+        }
+        if (!shuttingDown) startFrontend(backendPort);
     }
 
     // Start backend
-    if (!frontendOnly && backendDir) {
-        const tsxBin = resolveTsx(projectRoot);
-        if (!tsxBin) {
-            console.error(chalk.red(`  ✗ ${dependenciesNotInstalled(projectRoot)}`));
-            process.exit(1);
-        }
-
-        // Verify the tsx installation is intact (not just the symlink)
-        const tsxValidationError = validateTsxInstallation(tsxBin);
-        if (tsxValidationError) {
-            const pmCmdsLocal = getPMCommands(detectPackageManager(projectRoot));
-            const installCmd = pmCmdsLocal.install.join(" ");
-            console.error(chalk.red("  ✗ tsx installation appears corrupted."));
-            console.error(chalk.gray(`    ${tsxValidationError}`));
-            console.error("");
-            console.error(chalk.gray("    To fix, run:"));
-            console.error(chalk.cyan(`      rm -rf node_modules && ${installCmd}`));
-            process.exit(1);
-        }
-
+    if (startsBackend && backendDir && tsxBin) {
         const envFile = findEnvFile(projectRoot);
         const env: Record<string, string> = { ...process.env as Record<string, string> };
         if (envFile) {
             env.DOTENV_CONFIG_PATH = envFile;
         }
 
-        // The database, before anything that needs one starts. A project with a
-        // DATABASE_URL is untouched; a project without one gets a managed
-        // Postgres started here, which is what makes `rebase dev` the only
-        // command a new project needs.
-        // `--no-db` means start nothing, and that includes the managed
-        // database. It used to gate only the preflight, so the one path that
-        // actually starts a database on a scaffolded project — the managed
-        // PGlite, started here — ran anyway: `rebase dev --no-db` wrote
-        // `.rebase/pglite/`, booted a daemon and served against it, which is
-        // the opposite of what a reader asking for no database expects. The
-        // backend is left to fail on the DATABASE_URL it cannot find, which is
-        // the failure the flag exists to produce.
-        const prepared = noDb ? null : await prepareDatabaseEnv(projectRoot, {
-            flagUrl: typeof args["--database-url"] === "string" ? args["--database-url"] : null,
-            flagDocker: Boolean(args["--docker"]),
-            onProgress: (message) => console.log(chalk.gray(`  ${message}`)),
-            additionalKeys: await declaredAdditionalDatabases(projectRoot)
-        });
+        // The database was resolved — and the managed one started — beside the
+        // generators above; see `overlapDevStartup`.
         if (prepared) Object.assign(env, prepared.env);
         /**
          * Whether this run is on the managed database.
@@ -1387,6 +1644,12 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
         /** Whether the frontend has been launched (we only launch it once). */
         let frontendLaunched = false;
+        /**
+         * Whether the backend's first "Server running at" has been compared
+         * with the port an admin panel started beside it was given. Once:
+         * where a later restart lands is the watcher's business, as before.
+         */
+        let frontendPortChecked = false;
 
         // A generated schema that a *library upgrade* invalidated, repaired before
         // the backend sees it.
@@ -1406,7 +1669,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         try {
             const activePlugin = getActiveBackendPlugin(backendDir);
             const pluginCli = activePlugin ? resolvePluginCliScript(backendDir, activePlugin) : null;
-            if (pluginCli) {
+            if (pluginCli && needsStaleSchemaPreflight(schemaGeneration)) {
                 await execa(tsxBin, [pluginCli, "schema", "stale", "--fix"], {
                     cwd: backendDir,
                     stdio: "inherit",
@@ -1551,6 +1814,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     })();
                 }, 500);
             });
+        }
+
+        // The admin panel beside the backend, when the port it will bind is
+        // already known — so the time to it is the slower of the two starts,
+        // not their sum. Otherwise it waits for "Server running at" below.
+        if (!backendOnly && frontendDir
+            && await frontendCanStartWithBackend({ projectRoot, port: startPort, pinned: portIsPinned })) {
+            frontendLaunched = true;
+            startFrontend(startPort);
         }
 
         const backendChild = execa(
@@ -1709,82 +1981,84 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             if (backendOnly) process.exitCode = code ?? 1;
         });
 
-        backendChild.stdout?.on("data", (data: Buffer) => {
-            const lines = data.toString().split("\n").filter(Boolean);
-            lines.forEach((line: string) => {
-                console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
-                noticeWatcherRestart(line);
-                noticePortMoved(line);
-                const cleanLine = stripAnsi(line);
-                const swaggerMatch = cleanLine.match(/Swagger UI available.*"path":"([^"]+)"/);
-                if (swaggerMatch) swaggerPath = swaggerMatch[1];
+        forEachOutputLine(backendChild.stdout, (line) => {
+            console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
+            noticeWatcherRestart(line);
+            noticePortMoved(line);
+            const cleanLine = stripAnsi(line);
+            const swaggerMatch = cleanLine.match(/Swagger UI available.*"path":"([^"]+)"/);
+            if (swaggerMatch) swaggerPath = swaggerMatch[1];
 
-                const serverMatch = cleanLine.match(/Server running at http:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
-                if (serverMatch) {
-                    backendAnnounced = true;
-                    backendDownReported = false;
-                    missedProbes = 0;
-                    // The backend is up, so an earlier failure is no longer the
-                    // answer this run gives.
-                    if (backendOnly) process.exitCode = 0;
-                    disarmReadyDeadline();
-                    resolvedBackendPort = parseInt(serverMatch[1], 10);
-                    backendUrl = "started";
-                    printSummary();
+            const serverMatch = cleanLine.match(/Server running at http:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
+            if (serverMatch) {
+                backendAnnounced = true;
+                backendDownReported = false;
+                missedProbes = 0;
+                // The backend is up, so an earlier failure is no longer the
+                // answer this run gives.
+                if (backendOnly) process.exitCode = 0;
+                disarmReadyDeadline();
+                resolvedBackendPort = parseInt(serverMatch[1], 10);
+                backendUrl = "started";
 
-                    // Save the url to a temp file for scripts to pick up
-                    const urlFile = path.join(projectRoot, ".rebase-dev-url");
-                    fs.writeFileSync(urlFile, `http://localhost:${resolvedBackendPort}`, "utf-8");
-
-                    // Save the port to .rebase-dev-port for port affinity
-                    const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
-                    fs.writeFileSync(portFile, String(resolvedBackendPort), "utf-8");
-
-                    // Start frontend now that we know the real port
-                    if (!backendOnly && frontendDir && !frontendLaunched) {
+                // Start frontend now that we know the real port — or, when it
+                // started beside the backend, make sure it was told this one.
+                // Before the banner: a restart clears the frontend URL, and the
+                // banner then waits for the new one.
+                if (!backendOnly && frontendDir) {
+                    if (!frontendLaunched) {
                         frontendLaunched = true;
                         startFrontend(resolvedBackendPort);
+                    } else if (!frontendPortChecked && frontendApiPort !== resolvedBackendPort) {
+                        void restartFrontend(resolvedBackendPort);
                     }
+                    frontendPortChecked = true;
                 }
-            });
+                printSummary();
+
+                // Save the url to a temp file for scripts to pick up
+                const urlFile = path.join(projectRoot, ".rebase-dev-url");
+                fs.writeFileSync(urlFile, `http://localhost:${resolvedBackendPort}`, "utf-8");
+
+                // Save the port to .rebase-dev-port for port affinity
+                const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
+                fs.writeFileSync(portFile, String(resolvedBackendPort), "utf-8");
+            }
         });
 
         /** Whether we've already shown a corrupted-modules recovery hint. */
         let corruptedModulesWarned = false;
 
-        backendChild.stderr?.on("data", (data: Buffer) => {
-            const lines = data.toString().split("\n").filter(Boolean);
-            lines.forEach((line: string) => {
-                console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
+        forEachOutputLine(backendChild.stderr, (line) => {
+            console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
 
-                noticeWatcherRestart(line);
-                noticePortMoved(line);
+            noticeWatcherRestart(line);
+            noticePortMoved(line);
 
-                // Detect corrupted node_modules at runtime
-                // (covers tsx and any other dependency whose pnpm store entry is broken)
-                if (!corruptedModulesWarned) {
-                    const cleanLine = stripAnsi(line);
-                    if (
-                        cleanLine.includes("Cannot find module") &&
-                        cleanLine.includes("node_modules/.pnpm/")
-                    ) {
-                        corruptedModulesWarned = true;
-                        // Delay slightly so the full Node.js error stack prints first
-                        setTimeout(() => {
-                            const pm = detectPackageManager(projectRoot);
-                            const installCmd = getPMCommands(pm).install.join(" ");
-                            console.error("");
-                            console.error(chalk.red("  ✗ node_modules appears corrupted — a required file is missing."));
-                            console.error(chalk.gray("    This usually happens when a previous install was interrupted"));
-                            console.error(chalk.gray("    or the package manager store was cleaned."));
-                            console.error("");
-                            console.error(chalk.gray("    To fix, stop the dev server and run:"));
-                            console.error(chalk.cyan(`      rm -rf node_modules && ${installCmd}`));
-                            console.error("");
-                        }, 200);
-                    }
+            // Detect corrupted node_modules at runtime
+            // (covers tsx and any other dependency whose pnpm store entry is broken)
+            if (!corruptedModulesWarned) {
+                const cleanLine = stripAnsi(line);
+                if (
+                    cleanLine.includes("Cannot find module") &&
+                    cleanLine.includes("node_modules/.pnpm/")
+                ) {
+                    corruptedModulesWarned = true;
+                    // Delay slightly so the full Node.js error stack prints first
+                    setTimeout(() => {
+                        const pm = detectPackageManager(projectRoot);
+                        const installCmd = getPMCommands(pm).install.join(" ");
+                        console.error("");
+                        console.error(chalk.red("  ✗ node_modules appears corrupted — a required file is missing."));
+                        console.error(chalk.gray("    This usually happens when a previous install was interrupted"));
+                        console.error(chalk.gray("    or the package manager store was cleaned."));
+                        console.error("");
+                        console.error(chalk.gray("    To fix, stop the dev server and run:"));
+                        console.error(chalk.cyan(`      rm -rf node_modules && ${installCmd}`));
+                        console.error("");
+                    }, 200);
                 }
-            });
+            }
         });
 
         children.push(backendChild);
@@ -1808,15 +2082,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     console.log(chalk.gray("  Press Ctrl+C to stop all servers."));
     console.log("");
 
-    // Wait for all children to exit
-    await Promise.all(
-        children.map(
-            (child) =>
-                new Promise<void>((resolve) => {
-                    child.finally(() => resolve());
-                })
-        )
-    );
+    // Wait for all children to exit — including an admin panel restarted on
+    // the backend's real port, which joins `children` after this wait began.
+    const awaited = new Set<ResultPromise>();
+    for (let pending = [...children]; pending.length > 0; pending = children.filter((child) => !awaited.has(child))) {
+        for (const child of pending) awaited.add(child);
+        // Settled either way: a child that is killed rejects, and `finally`
+        // would hand that rejection on to a promise nothing catches.
+        await Promise.all(pending.map((child) => child.then(() => undefined, () => undefined)));
+    }
 }
 
 function printDevHelp() {
@@ -1882,8 +2156,11 @@ ${chalk.green.bold("Description")}
   Rebase instances simultaneously.
 
   If the assigned port is already in use, the server will automatically
-  try the next available port. The frontend is started only after the
-  backend is ready, and VITE_API_URL is injected automatically.
+  try the next available port. The frontend starts beside the backend
+  when the backend's port is known in advance (named with --port, or
+  free), and after the backend is ready otherwise. Either way
+  VITE_API_URL is injected with the port the backend actually bound —
+  the frontend is restarted if the backend had to move.
 
   On startup and on every save under config/collections, the Drizzle
   schema (backend/src/schema.generated.ts) and the SDK types

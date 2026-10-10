@@ -4,7 +4,6 @@ import { useLocation } from "react-router";
 
 import { useData, useRebaseContext } from "../../hooks";
 import { useDataOrder } from "../../hooks/data/useDataOrder";
-import { populateFetchCache } from "../../hooks/data/useFetch";
 import { toFindParams } from "../../hooks/data/collectionQuery";
 import { CollectionWindow } from "../../hooks/data/collectionWindow";
 import { getRelationIncludeParams } from "../../util/previews";
@@ -44,6 +43,15 @@ export type DataTableControllerProps<M extends Record<string, any> = any> = {
      */
     updateUrl?: boolean;
 
+    /**
+     * Read rows at all. Defaults to `true`. `false` closes the subscription and
+     * reads nothing — for a view that keeps the controller for its search and
+     * filters but draws its rows some other way, like the board, whose columns
+     * each read their own. The rows already held stay until it is enabled
+     * again, which reads afresh.
+     */
+    enabled?: boolean;
+
 }
 
 /**
@@ -69,7 +77,8 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         entitiesDisplayedFirst,
         lastDeleteTimestamp,
         fixedFilter: fixedFilterFromProps,
-        updateUrl
+        updateUrl,
+        enabled = true
     }: DataTableControllerProps<M>)
     : EntityTableController<M> {
 
@@ -294,6 +303,11 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
     useEffect(() => {
 
+        if (!enabled) {
+            setDataLoading(false);
+            return;
+        }
+
         // Cleared by this run's cleanup. A one-shot read has nothing to
         // unsubscribe from, so without it an answer for a superseded query
         // (the "ch" typed before "chair") landed on top of the newer one.
@@ -351,12 +365,13 @@ export function useDataTableController<M extends Record<string, any> = any, USER
             process,
             onChange: (state) => {
                 if (cancelled) return;
-                if (state.rows) {
-                    setRawData(state.rows);
-                    // Pre-populate the entity fetch cache so that navigating to an
-                    // entity detail view renders instantly with cached data.
-                    populateFetchCache(path, state.rows);
-                }
+                // The rows do not go into the record cache here. They did, all
+                // of them, on every update, so that opening one showed it at
+                // once — and a table scrolled to 100,000 rows kept every one of
+                // them alive after it closed. Opening a record from a list is a
+                // click, and the click puts that one row there
+                // (`CollectionViewBinding`'s `onEntityClick`).
+                if (state.rows) setRawData(state.rows);
                 if (state.error) console.error("ERROR", state.error);
                 setDataLoading(state.loading);
                 setDataLoadingError(state.error);
@@ -371,7 +386,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
             collectionWindow.dispose();
             if (windowRef.current === collectionWindow) windowRef.current = undefined;
         };
-    }, [dataClient, path, pageSize, sortKey, filterValues, searchString, oneShotReadKey]);
+    }, [dataClient, path, pageSize, sortKey, filterValues, searchString, oneShotReadKey, enabled]);
 
     // Scrolling asks for more rows of the same query: only the rows past the
     // ones held are read.

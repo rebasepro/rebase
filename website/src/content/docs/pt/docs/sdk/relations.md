@@ -69,10 +69,10 @@ const { data } = await client.data.posts.include({
 
 | Opção | O que faz |
 |--------|--------------|
-| `limit` | Linhas **por pai**, não na página inteira — cinco comentários em cada post, não cinco no total. |
+| `limit` | Linhas **por pai**, não na página inteira — cinco comentários em cada post, não cinco no total. Aplicado pela própria consulta, portanto as linhas além dele nunca são lidas do banco de dados. |
 | `where` | O mesmo dialeto de filtro que o `where` de nível superior usa. Enviado para dentro da consulta, de modo que o `limit` se aplica às linhas correspondentes. |
 | `logical` | Um grupo `or`/`and`/`not` sobre as linhas relacionadas. |
-| `orderBy` | A mesma sintaxe de ordenação, incluindo o [posicionamento de NULL](/docs/sdk/querying#where-nulls-sort). |
+| `orderBy` | A mesma sintaxe de ordenação, incluindo o [posicionamento de NULL](/docs/sdk/querying#where-nulls-sort). Os empates, e um `limit` sem `orderBy`, seguem a chave da linha relacionada, em ordem ascendente. |
 | `fields` | Colunas da linha *relacionada*. Sua chave sempre é mantida, garantindo que a linha permaneça endereçável. |
 | `include` | Relações da linha relacionada, por sua vez — é assim que a árvore se aninha. |
 

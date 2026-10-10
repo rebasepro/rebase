@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fa955ab0e0d14e2
+sourceHash: a1bb0a08ed6263fe
 title: Autenticação
 sidebar_label: Autenticação
 description: Autenticação no lado do cliente com o SDK Rebase — login com e-mail/senha, provedores OAuth, gerenciamento de sessão e listeners de estado de autenticação.
@@ -326,6 +326,10 @@ A atualização de token acontece automaticamente, mas você pode acioná-la man
 const session = await client.auth.refreshSession();
 ```
 
+Uma requisição nunca sai com um token que o cliente sabe estar expirado: as requisições
+compartilham uma única renovação e são enviadas uma vez, com o novo token. Um token que o servidor
+recusa antes do tempo ainda recebe uma renovação, e depois uma nova tentativa por requisição.
+
 ## Onde a Sessão Fica Armazenada: `authFlowMode`
 
 ```typescript
@@ -393,7 +397,9 @@ function useCurrentUser() {
 ```
 
 O `useRebaseAuthController` no `@rebasepro/app` já faz isso, portanto um aplicativo construído
-no template gerado recebe isso automaticamente.
+no template gerado recebe isso automaticamente. As requisições de dados não precisam esperar: uma feita
+em meio à restauração é enviada assim que ela se resolve — como o usuário restaurado, ou anonimamente — de modo que uma
+primeira renderização nunca lê uma listagem pública no lugar da do próprio usuário.
 
 Uma restauração bem-sucedida também aciona `onAuthStateChange` como `TOKEN_REFRESHED` — afinal,
 *é* uma atualização —, mas um listener sozinho não consegue informar se a restauração terminou:

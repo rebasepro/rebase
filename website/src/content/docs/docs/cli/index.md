@@ -82,6 +82,16 @@ Dependencies are vendored by default so a pod restart does not pay a 35–55 sec
 install. A tree that grows past 200 MB on disk is dropped instead, because the
 upload limit is 100 MB compressed — see the changelog for the reasoning.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> Every static app the
+bundle carries gets a brotli (`.br`) and a gzip (`.gz`) copy beside each
+content-hashed asset of 1 KB or more — the files a browser caches for a year.
+The runtime sends the one the browser accepts, so those files cost no
+compression work per request, the first visit after a deploy included, and
+browsers that accept brotli get it (about 11% smaller than gzip on the admin's
+JavaScript). Your frontend's own build output is left as it was; only the copy
+in the bundle changes. On the example app this adds under a second to the build
+and about 2.4 MB to the bundle.
+
 ### `rebase upgrade`
 
 Move every `@rebasepro/*` package the project pins to one release, then

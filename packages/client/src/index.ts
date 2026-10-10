@@ -83,7 +83,7 @@ export type { User, RebaseSession, AuthTokens, AuthChangeEvent, DeviceSession } 
 export type { CreateAdminOptions, ListUsersOptions } from "./admin";
 export type { AdminUser } from "./admin";
 export type { CreateCronOptions } from "./cron";
-export { createBackups } from "./backups";
+export { createBackups, type BackupStream } from "./backups";
 export type { CreateBackupsOptions } from "./backups";
 export type {
     ApiKeyKind,

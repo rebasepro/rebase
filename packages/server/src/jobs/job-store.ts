@@ -17,7 +17,7 @@ import type { JobRecord } from "./types.js";
 
 const TABLE = "rebase.jobs";
 
-/** How long finished jobs are kept before the boot sweep removes them. */
+/** How long finished jobs are kept before the retention sweep removes them. */
 const SUCCEEDED_RETENTION_DAYS = 3;
 /**
  * Failures outlive successes by a lot. A dead-lettered job is evidence, and the
@@ -25,6 +25,14 @@ const SUCCEEDED_RETENTION_DAYS = 3;
  * on Friday night.
  */
 const FAILED_RETENTION_DAYS = 30;
+
+/**
+ * Rows one retention statement deletes. A sweep repeats it until a batch
+ * comes back short, so a backlog — the first sweep on a table a long-lived
+ * pod let grow to millions of rows — is many short transactions rather than
+ * one that holds locks and writes a burst of WAL for seconds.
+ */
+const RETENTION_BATCH = 5_000;
 
 /** A row as Postgres returns it. */
 interface JobRow {
@@ -86,6 +94,18 @@ const ENQUEUE_FUNCTION = "rebase.enqueue_job";
 const ENQUEUE_SIGNATURE = `${ENQUEUE_FUNCTION}(text, jsonb, timestamptz, integer, text)`;
 
 /**
+ * The `NOTIFY` channel an insert announces itself on, with the job's `run_at`
+ * in epoch milliseconds as the payload. Workers listening on it are woken
+ * instead of polling; Postgres delivers it when the insert commits, and not at
+ * all if it rolls back. Frozen: workers of the previous release listen on it
+ * during a rolling deploy.
+ */
+export const JOBS_NOTIFY_CHANNEL = "rebase_jobs";
+
+/** `run_at` as the notification's payload: epoch milliseconds, as text. */
+const NOTIFY_PAYLOAD = (runAt: string) => `(extract(epoch FROM ${runAt}) * 1000)::bigint::text`;
+
+/**
  * Which claim an outcome belongs to: the worker holding the job, and the
  * attempt that claim spent.
  *
@@ -135,6 +155,22 @@ export interface JobStore {
     heartbeat?(id: string, claim: JobClaim): Promise<boolean>;
     /** Return jobs stranded by a worker that died holding them. Resolves with how many. */
     reapExpired(visibilityTimeoutMs: number): Promise<number>;
+    /**
+     * Call `onWake` whenever any process inserts a job, with the job's `run_at`
+     * in epoch milliseconds. Resolves, once listening, with the stop; rejects
+     * when this database cannot notify this process — no session connection
+     * to hold a `LISTEN` on — and the worker polls instead. `onReconnect` is
+     * called after a dropped connection is back: what was sent meanwhile is
+     * lost. A store without it leaves the worker polling.
+     */
+    subscribe?(onWake: (runAtMs?: number) => void, onReconnect: () => void): Promise<() => Promise<void>>;
+    /**
+     * Delete finished jobs past retention — succeeded ones after
+     * {@link SUCCEEDED_RETENTION_DAYS} days, failed ones after
+     * {@link FAILED_RETENTION_DAYS} — in batches. Resolves with how many went.
+     * The worker runs it on a timer; a store without it keeps every row.
+     */
+    sweepExpired?(): Promise<number>;
     fetch(id: string): Promise<JobRecord | null>;
 }
 
@@ -225,17 +261,25 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
                 WHERE idempotency_key IS NOT NULL AND status IN ('pending', 'running')
             `);
 
+            // The retention sweep's index. Partial on the finished rows — the
+            // only ones it deletes — so a sweep reads what it removes instead
+            // of the whole table; without it every sweep was a sequential scan,
+            // six seconds over two million rows.
+            await ddl.ensureObject("Creating idx_jobs_finished", `
+                CREATE INDEX IF NOT EXISTS idx_jobs_finished
+                ON ${TABLE}(status, updated_at)
+                WHERE status IN ('succeeded', 'failed')
+            `);
+
             const ready = await ddl.isReadable(TABLE);
 
             if (ready) {
-                await ddl.step("Job retention sweep", async () => {
-                    await exec(
-                        `DELETE FROM ${TABLE}
-                         WHERE (status = 'succeeded' AND updated_at < now() - make_interval(days => $1))
-                            OR (status = 'failed'    AND updated_at < now() - make_interval(days => $2))`,
-                        [SUCCEEDED_RETENTION_DAYS, FAILED_RETENTION_DAYS]
-                    );
-                });
+                // No retention sweep here. It used to run at boot and only at
+                // boot: awaited before the server served, a sequential scan of
+                // the whole table, and never again for as long as the pod lived
+                // — a worker up for three weeks held seven times the rows
+                // retention meant to keep. The worker runs `sweepExpired` on a
+                // timer instead.
 
                 // Payloads are arbitrary application data — a webhook body, a
                 // user id, whatever was passed — and a writable queue lets any
@@ -254,6 +298,7 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
                     SECURITY DEFINER
                     SET search_path = pg_catalog, pg_temp
                     AS $fn$
+                        SELECT pg_notify('${JOBS_NOTIFY_CHANNEL}', ${NOTIFY_PAYLOAD("p_run_at")});
                         INSERT INTO ${TABLE} (task, payload, run_at, max_attempts, idempotency_key)
                         VALUES (p_task, p_payload, p_run_at, p_max_attempts, p_idempotency_key)
                         ON CONFLICT DO NOTHING
@@ -312,10 +357,16 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
                 return (rows?.[0]?.id as string | null | undefined) ?? null;
             }
             try {
+                // The notification rides the insert's own statement, so it
+                // is sent exactly when the row commits.
                 const rows = await exec(
-                    `INSERT INTO ${TABLE} (task, payload, run_at, max_attempts, idempotency_key)
-                     VALUES ($1, $2::jsonb, $3, $4, $5)
-                     RETURNING id`,
+                    `WITH inserted AS (
+                         INSERT INTO ${TABLE} (task, payload, run_at, max_attempts, idempotency_key)
+                         VALUES ($1, $2::jsonb, $3, $4, $5)
+                         RETURNING id, run_at
+                     )
+                     SELECT id, pg_notify('${JOBS_NOTIFY_CHANNEL}', ${NOTIFY_PAYLOAD("run_at")}) AS notified
+                     FROM inserted`,
                     params
                 );
                 return (rows?.[0]?.id as string) ?? null;
@@ -442,6 +493,43 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
                 );
             }
             return count;
+        },
+
+        async sweepExpired(): Promise<number> {
+            // `SKIP LOCKED`, so replicas sweeping at once divide the rows
+            // rather than queue behind each other's batch. The count comes back
+            // as one row, not one id per deleted job.
+            let total = 0;
+            for (;;) {
+                const rows = await exec(
+                    `WITH swept AS (
+                         DELETE FROM ${TABLE}
+                         WHERE id IN (
+                             SELECT id FROM ${TABLE}
+                             WHERE (status = 'succeeded' AND updated_at < now() - make_interval(days => $1))
+                                OR (status = 'failed'    AND updated_at < now() - make_interval(days => $2))
+                             LIMIT $3
+                             FOR UPDATE SKIP LOCKED
+                         )
+                         RETURNING 1
+                     )
+                     SELECT count(*)::int AS deleted FROM swept`,
+                    [SUCCEEDED_RETENTION_DAYS, FAILED_RETENTION_DAYS, RETENTION_BATCH]
+                );
+                const deleted = Number(firstSqlRow<{ deleted: number }>(rows)?.deleted ?? 0);
+                total += deleted;
+                if (deleted < RETENTION_BATCH) return total;
+            }
+        },
+
+        async subscribe(onWake: (runAtMs?: number) => void, onReconnect: () => void): Promise<() => Promise<void>> {
+            if (!admin.listen) {
+                throw new Error("this database driver has no notifications");
+            }
+            return admin.listen(JOBS_NOTIFY_CHANNEL, (payload) => {
+                const runAtMs = Number(payload);
+                onWake(Number.isFinite(runAtMs) && runAtMs > 0 ? runAtMs : undefined);
+            }, { onReconnect });
         },
 
         async fetch(id: string): Promise<JobRecord | null> {

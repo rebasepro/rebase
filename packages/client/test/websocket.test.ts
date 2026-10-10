@@ -1,6 +1,7 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
 import { RebaseWebSocketClient } from "../src/websocket";
 import { RebaseRealtimeChannel } from "../src/realtime-channel";
+import { rebaseReviver } from "../src/reviver";
 // The WS client now throws the unified RebaseApiError. Aliased to `ApiError`
 // so the existing instanceof/code assertions below read unchanged.
 import { RebaseApiError as ApiError } from "@rebasepro/types";
@@ -366,6 +367,57 @@ payload: { token: "new-token" } })
 
             const result = await fetchPromise;
             expect(result).toEqual([{ id: "1" }]);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Frame decoding
+    // -----------------------------------------------------------------------
+    describe("Frame decoding", () => {
+        /** Send FETCH_COLLECTION, answer it with `rows`, and return the frame text and what the call resolved to. */
+        async function fetchAnsweredWith(rows: unknown[]) {
+            const client = createClient();
+            const fetchPromise = client.fetchCollection({ path: "posts" });
+            jest.advanceTimersByTime(10);
+            await Promise.resolve();
+            const ws = getWs();
+            const sent = JSON.parse(ws.sentMessages[0]);
+            const text = JSON.stringify({ type: "FETCH_COLLECTION", requestId: sent.requestId, payload: { rows } });
+            ws.onmessage!({ data: text });
+            return { text, result: await fetchPromise };
+        }
+
+        it("revives typed values exactly as a reviver parse does", async () => {
+            const rows = [{
+                id: "1",
+                created: { __type: "date", value: "2026-01-02T03:04:05.000Z" },
+                editor: { __type: "reference", id: 7, path: "users", driver: "postgres" },
+                home: { __type: "GeoPoint", latitude: 51.5, longitude: -0.1 },
+                broken: { __type: "date", value: "not a date" },
+                tags: ["a", { __type: "date", value: "2026-02-03T00:00:00.000Z" }],
+                title: "caf\u00e9"
+            }];
+            const { text, result } = await fetchAnsweredWith(rows);
+            const expected = (JSON.parse(text, rebaseReviver) as { payload: { rows: unknown[] } }).payload.rows;
+            expect(result).toStrictEqual(expected);
+            expect((result as Array<{ created: unknown }>)[0].created).toBeInstanceOf(Date);
+        });
+
+        it("parses a frame with no typed values without the reviver's per-value callback", async () => {
+            // A reviver takes JSON.parse off V8's fast path for every key and
+            // value in the frame — ~7x a plain parse on a 1,000-row page, for
+            // frames that have nothing to revive.
+            const parse = jest.spyOn(JSON, "parse");
+            try {
+                const rows = Array.from({ length: 20 }, (_, i) => ({ id: String(i), title: `Row ${i}`, n: i }));
+                const { text, result } = await fetchAnsweredWith(rows);
+                const frameParses = parse.mock.calls.filter(([arg]) => arg === text);
+                expect(frameParses.length).toBeGreaterThan(0);
+                for (const call of frameParses) expect(call[1]).toBeUndefined();
+                expect(result).toStrictEqual(rows);
+            } finally {
+                parse.mockRestore();
+            }
         });
     });
 
@@ -868,6 +920,10 @@ limit: 20 }, jest.fn());
             it("still sends it once when a dial in between fails", () => {
                 // A failed dial closes too, and a close marks every registration
                 // as not in flight — while its subscribe still sits in the queue.
+                //
+                // Each redial at the end of its step (2 s, then 4 s), so the
+                // one that fails and the one that comes up are the two below.
+                jest.spyOn(Math, "random").mockReturnValue(0.999999);
                 const client = createClient();
                 jest.runAllTimers();
                 MockWebSocket.failToConnect = true;
@@ -1328,13 +1384,13 @@ id: "1" }, onUpdate, onError);
             jest.runAllTimers(); // connect
 
             // The step is 1000 * 2^attempt, capped at 30s, and each delay is
-            // drawn from the last fifth below its step (jitter, so a deploy
-            // does not bring every client back at the same instant). Pinning
-            // the whole schedule is the point: "a second socket exists after
-            // 2s" holds just as well for a client that redials immediately,
-            // or on a flat interval, which is what the backoff is there to
-            // prevent. `Math.random` is pinned to the top of its range, which
-            // makes each delay exactly 80% of its step.
+            // drawn from anywhere between 250 ms and its step (full jitter, so
+            // a deploy does not bring every client back at the same instant).
+            // Pinning the whole schedule is the point: "a second socket exists
+            // after 2s" holds just as well for a client that redials
+            // immediately, or on a flat interval, which is what the backoff is
+            // there to prevent. `Math.random` is pinned to the top of its
+            // range, which makes each delay one millisecond short of its step.
             jest.spyOn(Math, "random").mockReturnValue(0.999999);
             MockWebSocket.failToConnect = true;
             try {
@@ -1343,7 +1399,7 @@ id: "1" }, onUpdate, onError);
                 const steps = [2000, 4000, 8000, 16000, 30000];
                 let sockets = 1;
                 for (const step of steps) {
-                    const delay = step - Math.floor(0.999999 * step * 0.2);
+                    const delay = 250 + Math.floor(0.999999 * (step - 250));
                     jest.advanceTimersByTime(delay - 1);
                     expect(MockWebSocket.instances).toHaveLength(sockets);
                     jest.advanceTimersByTime(1);
@@ -1356,6 +1412,32 @@ id: "1" }, onUpdate, onError);
             } finally {
                 MockWebSocket.failToConnect = false;
             }
+        });
+
+        it("spreads a redial over its whole step, and never sooner than 250 ms", () => {
+            // A deploy drops every client at the same instant. Drawn from the
+            // last fifth of the step, their first redials all landed inside
+            // one 400 ms window (1.6–2 s), each followed by an AUTHENTICATE and
+            // a re-subscribe of everything it held. Drawn from 250 ms to the
+            // step, the same arrivals are spread 4.4x thinner.
+            const firstRedialAfter = (draw: number): number => {
+                MockWebSocket.instances = [];
+                createClient();
+                jest.advanceTimersByTime(10); // connect
+                const random = jest.spyOn(Math, "random").mockReturnValue(draw);
+                getWs().close();
+                let waited = 0;
+                while (MockWebSocket.instances.length === 1 && waited < 60_000) {
+                    jest.advanceTimersByTime(1);
+                    waited++;
+                }
+                random.mockRestore();
+                return waited;
+            };
+
+            expect(firstRedialAfter(0)).toBe(250);
+            expect(firstRedialAfter(0.5)).toBe(1125);
+            expect(firstRedialAfter(0.999999)).toBe(1999);
         });
 
         it("emits reconnect event on subsequent connections", () => {

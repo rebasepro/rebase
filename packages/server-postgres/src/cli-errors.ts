@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { outWarn, outError } from "./cli-output";
-import { extractCauseMessage } from "./utils/pg-error-utils";
+import { extractCauseMessage } from "./utils/error-cause";
+import { withAppClient } from "./cli-helpers";
 
 /**
  * Detect whether an error (or AggregateError wrapping multiple attempts)
@@ -253,15 +254,11 @@ function formatDependencyDropBanner(): string {
  * On unknown errors, logs a warning and allows the caller to proceed.
  */
 export async function checkDatabaseConnectivity(databaseUrl: string): Promise<void> {
-    let client: import("pg").Client | undefined;
     try {
-        const { Client } = await import("pg");
-        client = new Client({
-            connectionString: databaseUrl,
-            connectionTimeoutMillis: 5000
-        });
-        await client.connect();
-        await client.query("SELECT 1");
+        // On the command's own connection, which every step after this uses
+        // too — so a probe that passes leaves it open rather than closing a
+        // connection the next step would reopen. See `withAppClient`.
+        await withAppClient(databaseUrl, client => client.query("SELECT 1"), { connectionTimeoutMillis: 5000 });
     } catch (err: unknown) {
         if (isEconnrefused(err)) {
             outError(formatConnectionRefusedBanner(databaseUrl, err));
@@ -278,12 +275,6 @@ export async function checkDatabaseConnectivity(databaseUrl: string): Promise<vo
         // Unknown error — warn but don't block; let the downstream tool surface details
         outWarn(chalk.yellow(`  ⚠  Could not verify database connectivity: ${err instanceof Error ? err.message : String(err)}`));
         outWarn(chalk.gray("    Proceeding anyway — the command may fail if the database is unreachable."));
-    } finally {
-        try {
-            await client?.end();
-        } catch {
-            // ignore cleanup errors
-        }
     }
 }
 

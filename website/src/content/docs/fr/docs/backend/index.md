@@ -1,5 +1,5 @@
 ---
-sourceHash: 094f9184d2977cef
+sourceHash: a6b7f50250fe821b
 title: Vue d'ensemble du backend
 sidebar_label: Backend
 description: Le backend Rebase fournit un serveur complet avec API REST, authentification, stockage, temps réel via WebSocket et historique des entités — le tout initialisé avec un seul appel de fonction.
@@ -209,7 +209,7 @@ Cinq de ces options sont faciles à négliger et modifient des comportements que
 
 | Clé | Valeur par défaut | Description |
 |---|---|---|
-| `compression` | `true` | gzip/deflate sur les réponses de l'API, négocié d'après `Accept-Encoding`. Les corps déjà compressés, streamés et avec l'en-tête `no-transform` ne sont pas modifiés, il est donc sans danger de la laisser active — une liste JSON volumineuse voit généralement sa taille réduite d'environ un facteur 20. Définissez à `false` lorsqu'un proxy comme nginx, Cloudflare ou un autre en amont effectue déjà la compression, afin d'éviter un double coût de traitement. Variable d'environnement : `REBASE_COMPRESSION`. |
+| `compression` | `true` | gzip/deflate sur les réponses de l'API, négocié d'après `Accept-Encoding`. Les corps déjà compressés, streamés et avec l'en-tête `no-transform` ne sont pas modifiés, pas plus que les corps de moins de 1 Ko (gzip y coûte plus qu'il ne rapporte), il est donc sans danger de la laisser active — une liste JSON volumineuse voit généralement sa taille réduite d'environ un facteur 20. Définissez à `false` lorsqu'un proxy comme nginx, Cloudflare ou un autre en amont effectue déjà la compression, afin d'éviter un double coût de traitement. Variable d'environnement : `REBASE_COMPRESSION`. |
 | `maxBodySize` | `10485760` (10 Mo) | Plafond pour les corps de requêtes sur les routes API ; `0` le désactive. Les téléversements de stockage utilisent le `maxFileSize` propre à la configuration de stockage (50 Mo), qui prévaut pour ces routes. Variable d'environnement : `REBASE_MAX_BODY_SIZE`. |
 | `csrf` | désactivé | **Activation explicite (Opt-in).** Une API BaaS est appelée par des applications mobiles, des SPAs sur d'autres domaines et des outils CLI, dont aucun n'envoie d'en-tête `Origin` qu'une liste fixe accepterait — ce n'est donc pas activé par défaut. Activez-le en spécifiant les origines utilisées par vos clients navigateurs. Aucune variable d'environnement : éjectez pour le configurer. |
 | `cronPersistence` | `true` | Détermine si les journaux d'exécution sont enregistrés dans `rebase.cron_logs`. `false` permet de faire tourner les tâches tout en conservant l'historique uniquement en mémoire, ce qui est alors perdu par le panneau Studio lors d'un redémarrage. |

@@ -265,6 +265,28 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             expect(diff.leaves).toEqual({});
         });
 
+        it("a heartbeat with an unchanged state sends nobody a presence_diff", () => {
+            // Every client re-sends its state every ~20 s. Each of those used
+            // to reach every member as a diff saying nothing: n² frames per
+            // round (2,500 for a room of 50, a million for a room of 1,000).
+            const sockets = Array.from({ length: 50 }, (_, i) => createClient(service, `p${i}`));
+            for (let i = 0; i < 50; i++) {
+                service.joinChannel(`p${i}`, "room:collab");
+                service.trackPresence(`p${i}`, "room:collab", { name: `user${i}` });
+            }
+            const diffs = () => sockets
+                .flatMap(ws => ws.send.mock.calls.map(([frame]) => JSON.parse(frame as string) as { type: string }))
+                .filter(frame => frame.type === "presence_diff").length;
+            for (const ws of sockets) ws.send.mockClear();
+
+            for (let i = 0; i < 50; i++) service.trackPresence(`p${i}`, "room:collab", { name: `user${i}` });
+            expect(diffs()).toBe(0);
+
+            // A state that did change still reaches every member, once.
+            service.trackPresence("p7", "room:collab", { name: "user7", typing: true });
+            expect(diffs()).toBe(50);
+        });
+
         it("trackPresence() via handleClientMessage auto-joins the channel", async () => {
             const ws1 = createClient(service, "c1");
 
@@ -467,6 +489,73 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             const state = JSON.parse(ws2.send.mock.calls[0][0] as string);
             // c1's presence should be gone
             expect(state.presences.c1).toBeUndefined();
+        });
+
+        /**
+         * A disconnect used to walk every channel and every presence channel
+         * on the instance, whatever the client had joined: with per-document
+         * channels, 5.4 ms per disconnect at 50k channels, so a deploy that
+         * dropped 1,000 sockets held the event loop for 5.4 s.
+         */
+        it("a disconnect visits only the channels the client was in, however many channels exist", async () => {
+            /** A Map that counts the entries anything iterates out of it. */
+            class CountingMap<K, V> extends Map<K, V> {
+                visited = 0;
+                *entries(): MapIterator<[K, V]> {
+                    for (const entry of super.entries()) {
+                        this.visited++;
+                        yield entry;
+                    }
+                }
+                [Symbol.iterator](): MapIterator<[K, V]> {
+                    return this.entries();
+                }
+                *keys(): MapIterator<K> {
+                    for (const [key] of this.entries()) yield key;
+                }
+                *values(): MapIterator<V> {
+                    for (const [, value] of this.entries()) yield value;
+                }
+            }
+
+            const visitedForDisconnects = async (channelCount: number): Promise<number> => {
+                const { service: svc } = createService();
+                // Busy channels the departing clients are not in, with a member each.
+                for (let i = 0; i < channelCount; i++) {
+                    const member = `bystander-${i % 20}`;
+                    if (i < 20) createClient(svc, member);
+                    svc.joinChannel(member, `doc:${i}`);
+                    if (i % 2 === 0) svc.trackPresence(member, `doc:${i}`, { here: true });
+                }
+                // 100 clients, each in two channels and present in one of them.
+                for (let c = 0; c < 100; c++) {
+                    createClient(svc, `leaving-${c}`);
+                    svc.joinChannel(`leaving-${c}`, `room:${c}`);
+                    svc.joinChannel(`leaving-${c}`, `doc:${c}`);
+                    svc.trackPresence(`leaving-${c}`, `room:${c}`, { here: true });
+                }
+                const channels = new CountingMap(Reflect.get(svc, "channels") as Map<string, Set<string>>);
+                const presence = new CountingMap(Reflect.get(svc, "presence") as Map<string, Map<string, unknown>>);
+                Reflect.set(svc, "channels", channels);
+                Reflect.set(svc, "presence", presence);
+
+                for (let c = 0; c < 100; c++) await svc.removeClient(`leaving-${c}`);
+
+                // What they were in is gone, and nothing else is.
+                expect(channels.has("room:0")).toBe(false);
+                expect(channels.get("doc:0")?.has("leaving-0")).toBe(false);
+                expect(channels.get("doc:0")?.has("bystander-0")).toBe(true);
+                expect(presence.get("doc:0")?.has("bystander-0")).toBe(true);
+                const visited = channels.visited + presence.visited;
+                await svc.destroy();
+                return visited;
+            };
+
+            const small = await visitedForDisconnects(5_000);
+            const large = await visitedForDisconnects(50_000);
+            // The same work at ten times the channels — and no channel walked.
+            expect(large).toBe(small);
+            expect(large).toBe(0);
         });
 
         it("removeClient() for non-existent client does not crash", async () => {

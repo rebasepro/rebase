@@ -68,6 +68,11 @@ export function unflattenObject(flatObj: { [key: string]: any }) {
  */
 function parseCanonicalJsonCell(cell: unknown): unknown {
     if (typeof cell !== "string") return cell;
+    // The canonical JSON of a number, boolean or array starts with `-`, a
+    // digit, `t`, `f` or `[` — nothing else can pass the round trip below. Text
+    // is most of a file, and `JSON.parse` on text throws: the throw was over
+    // half of the main-thread time of reading one.
+    if (!couldBeCanonicalJson(cell.charCodeAt(0))) return cell;
     let parsed: unknown;
     try {
         parsed = JSON.parse(cell);
@@ -76,6 +81,14 @@ function parseCanonicalJsonCell(cell: unknown): unknown {
     }
     const readable = typeof parsed === "number" || typeof parsed === "boolean" || Array.isArray(parsed);
     return readable && JSON.stringify(parsed) === cell ? parsed : cell;
+}
+
+function couldBeCanonicalJson(firstChar: number): boolean {
+    return firstChar === 45 /* - */
+        || (firstChar >= 48 && firstChar <= 57) /* 0-9 */
+        || firstChar === 116 /* t */
+        || firstChar === 102 /* f */
+        || firstChar === 91; /* [ */
 }
 
 export function mapJsonParse(obj: Record<string, any>) {

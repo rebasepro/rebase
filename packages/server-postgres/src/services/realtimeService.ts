@@ -1,10 +1,11 @@
 import { WebSocket } from "ws";
 import { EventEmitter } from "events";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { DataService } from "./dataService";
 
 import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, CollectionUpdateMeta, IncludeSpec, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, OrderByTuple, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig, DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
@@ -29,6 +30,13 @@ import { unref } from "@rebasepro/utils";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
+
+/**
+ * The id of a change that names no row — a `TRUNCATE`, a key too large to
+ * notify, a table with no key. Every list on the path refetches, and so does
+ * every single-row subscription on it: the change may be to any row.
+ */
+const ANY_ROW = "*";
 
 /**
  * Auth context stored per-subscription so real-time refetches respect RLS.
@@ -238,6 +246,13 @@ type Subscription = {
     started: number;
     /** The highest started-sequence that has already reached the subscriber. */
     delivered: number;
+    /**
+     * A socket subscriber's last data frame, as {@link frameDigest} of what
+     * follows its subscription id; unset before the first and after an error
+     * frame. A refetch that reads the same rows sends it nothing — see
+     * {@link sendDataFrame}.
+     */
+    lastFrame?: string;
 };
 
 /**
@@ -279,8 +294,49 @@ type SubscriptionGroup = {
     pending: Set<string> | "all";
     /** When the last change arrived; the refetch waits for a quiet debounce window. */
     lastChangeAt: number;
+    /**
+     * When the oldest change the next refetch answers arrived, or `undefined`
+     * with nothing pending. Bounds the debounce: see `REFETCH_MAX_WAIT_MS`.
+     */
+    firstPendingAt?: number;
     timer?: ReturnType<typeof setTimeout>;
 };
+
+/**
+ * How many group refetches may run at once: a quarter of the connection pool
+ * the service shares with every REST request, and never fewer than two.
+ *
+ * One write to a list watched by many different principals arms a refetch
+ * per principal, and they all came due in the same tick. Started together,
+ * 200 of them were 200 transactions queued on a 20-connection pool, and an
+ * unrelated request arriving meanwhile waited behind every one (measured: a
+ * `SELECT 1` took 521 ms). Capped, the refetches queue here instead, and
+ * three quarters of the pool stays free for the requests. A pool this cannot
+ * read (a test double, a client that is not a `pg` pool) is taken to be the
+ * default 20-connection one.
+ */
+export function refetchConcurrencyFor(db: object): number {
+    const pool = "$client" in db && db.$client instanceof Pool ? db.$client : undefined;
+    // `pg`'s own default when a pool is built without a `max`.
+    const poolMax = pool ? (pool.options.max ?? 10) : 20;
+    return Math.max(2, Math.floor(poolMax / 4));
+}
+
+/**
+ * Exactly what a refetch binds of its subscriber — `applyAuthContext` writes
+ * these GUCs and the JWT claims from them, and the field viewer reads the
+ * roles — and nothing else. Roles keep their order: `app.user_roles` is
+ * written in it. A subscription with no identity reads as the anonymous user.
+ */
+function principalOf(authContext: SubscriptionAuthContext | undefined): Record<string, unknown> {
+    const auth = authContext ?? { uid: ANONYMOUS_USER_ID, roles: ["anon"] };
+    return {
+        uid: auth.uid,
+        roles: auth.roles ?? [],
+        isAnonymous: auth.isAnonymous === true,
+        claims: auth.claims
+    };
+}
 
 /** `JSON.stringify` with object keys sorted, so equal requests have one spelling. */
 function canonicalJson(value: unknown): string {
@@ -361,6 +417,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private presence = new Map<string, Map<string, { state: Record<string, unknown>; lastSeen: number }>>();
 
     /**
+     * The reverse of {@link channels} and {@link presence}: the channels each
+     * client is a member of, and those it has a presence entry in. Kept in
+     * step wherever either map gains or loses a client, so a disconnect visits
+     * what the client was in. It used to walk every channel on the instance:
+     * with a channel per document, 5.4 ms per disconnect at 50k channels.
+     */
+    private channelsByClient = new Map<string, Set<string>>();
+    private presenceByClient = new Map<string, Set<string>>();
+
+    /**
      * Ordered, replayable history for channels that opt into it.
      *
      * Undefined until {@link configureChannelHistory} is called, and inert even
@@ -406,8 +472,17 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private presenceSweepInterval?: ReturnType<typeof setInterval>;
 
     /**
+     * The clients that have tracked presence through this instance — the only
+     * ones with roster rows to delete when their socket closes. Most sockets
+     * never track presence, and each of their closes was a `DELETE` too.
+     */
+    private presenceTrackers = new Set<string>();
+
+    /**
      * Channels whose oversized ephemeral broadcasts have already been reported,
      * so a hot channel logs the problem once rather than once per message.
+     * Forgotten with the channel, so it holds live channels only — not every
+     * name a client ever broadcast on.
      */
     private oversizedBroadcastWarned = new Set<string>();
 
@@ -453,8 +528,26 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     /** Each client's subscriptions, by key — for its ceiling and its disconnect. */
     private subscriptionsByClient = new Map<string, Set<string>>();
 
+    /**
+     * The in-process subscriptions — started by `startDataDriverSubscription`,
+     * `subscribeToCollection` or `subscribeToOne` — by the id their caller
+     * gave them, for {@link unsubscribe}, which has nothing else to go on. It
+     * used to walk every subscription on the server, sockets' included.
+     */
+    private inProcessKeysById = new Map<string, Set<string>>();
+
     /** Subscriptions one refetch answers — see {@link SubscriptionGroup}. */
     private groups = new Map<string, SubscriptionGroup>();
+    /**
+     * Groups whose refetch is due and waiting for a slot, in the order they
+     * came due. A group is in it at most once; changes that arrive while it
+     * waits join the read it is waiting for, which starts after them.
+     */
+    private refetchQueue = new Set<SubscriptionGroup>();
+    /** Group refetches running now — at most {@link maxConcurrentRefetches}. */
+    private refetchesRunning = 0;
+    /** See {@link refetchConcurrencyFor}. */
+    public maxConcurrentRefetches: number;
     /**
      * The collection groups on each path, and the single-row groups at each
      * `path` + id: what a change looks up, instead of walking every
@@ -462,6 +555,21 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      */
     private collectionGroupsByPath = new Map<string, Set<SubscriptionGroup>>();
     private singleGroupsByAddress = new Map<string, Set<SubscriptionGroup>>();
+    /** The single-row groups on each path, for a change that names no row ({@link ANY_ROW}). */
+    private singleGroupsByPath = new Map<string, Set<SubscriptionGroup>>();
+    /**
+     * When something on each path a list group reads last changed: the
+     * debounce clock those groups share, moved once per changed row instead
+     * of once per row per group. See {@link notifyPathUpdate}.
+     */
+    private listPathChangedAt = new Map<string, number>();
+    /**
+     * The list groups on each path that a change still has to schedule: new
+     * ones, and those whose last refetch has started. The rest already have a
+     * refetch for every member pending, which the next change only has to
+     * keep waiting — the clock above does that.
+     */
+    private unscheduledListGroups = new Map<string, Set<SubscriptionGroup>>();
     /**
      * Every path a subscription holds, with the collection it lands on and how
      * many hold it — the candidates `aliasPaths` considers, resolved once.
@@ -483,8 +591,24 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private crossInstanceListener?: PgNotifyListener;
     /** Whether cross-instance broadcasting is active. */
     private broadcasting = false;
+    /**
+     * Changes waiting to be announced on {@link PG_NOTIFY_CHANNEL}, and the
+     * send that will announce them — see {@link broadcastChange}.
+     */
+    private pendingBroadcasts = new Map<string, { p: string; eid: string; db: string | null }>();
+    private broadcastFlush?: Promise<void>;
     /** Debounce window (ms) for coalescing rapid row updates into a single correctness refetch. */
     private static readonly REFETCH_DEBOUNCE_MS = 300;
+    /**
+     * The longest a change waits for its refetch, quiet window or not.
+     *
+     * A pure debounce waits for 300 ms without a change, and a collection
+     * written more often than that — an orders, events or chat table at a few
+     * writes a second — never went quiet: its subscribers received nothing for
+     * as long as the writes continued. Under a steady stream a group now
+     * refetches once per this interval, which is the whole cost.
+     */
+    private static readonly REFETCH_MAX_WAIT_MS = 1000;
 
     // ── Database-level Change Data Capture (CDC) ──
     /** Dedicated LISTEN client for DB-level change events (undefined unless CDC is enabled). */
@@ -493,6 +617,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private cdcActive = false;
     /** Junction table → the child lists its rows belong to, built when CDC starts. */
     private junctionLinkMap?: Map<string, JunctionLink[]>;
+
+    /** Changes waiting for a turn of the event loop — see {@link handleCdcEvents}. */
+    private cdcBacklog: CdcChangeEvent[][] = [];
+    /** Changes handled in the current turn. */
+    private cdcTurnRows = 0;
+    /** How many changed rows one turn of the event loop routes: ~5–10 ms of work. */
+    private static readonly CDC_ROWS_PER_TURN = 5000;
 
     /** Reverse lookup: `schema.table` (and bare `table`) → collection, built when CDC starts. */
     private cdcTableMap?: Map<string, CollectionConfig>;
@@ -522,6 +653,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
     constructor(private db: NodePgDatabase<any>, private registry: PostgresCollectionRegistry) {
         super();
+        this.maxConcurrentRefetches = refetchConcurrencyFor(db);
         // No call-context provider, deliberately. This service is the
         // *no-driver* fallback — the branches below that cannot apply a database
         // auth context either — and without a driver there is no context to
@@ -551,9 +683,29 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * redaction lives.
      */
     private debugLog(...args: unknown[]) {
-        if (!rawQueryLoggingEnabled()) return;
+        if (!this.debugEnabled()) return;
         logger.debug(args.map(a => (typeof a === "string" ? a : JSON.stringify(a))).join(" "));
     }
+
+    /**
+     * {@link rawQueryLoggingEnabled}, read at most once a second.
+     *
+     * It reads two environment variables, and `process.env` is a getenv per
+     * read: called three or four times per changed row, it was the largest
+     * cost of a change notification here — 1.4 µs of every ~3.5 µs per row,
+     * so ~1.4 s of event loop for a 1M-row statement. A switch flipped at run
+     * time is honoured within a second.
+     */
+    private debugEnabled(): boolean {
+        const now = Date.now();
+        if (now - this.debugCheckedAt >= 1000) {
+            this.debugFlag = rawQueryLoggingEnabled();
+            this.debugCheckedAt = now;
+        }
+        return this.debugFlag;
+    }
+    private debugFlag = false;
+    private debugCheckedAt = -Infinity;
 
     setDataDriver(driver: DataDriver) {
         this.driver = driver;
@@ -587,18 +739,12 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         target: { type: "collection" | "single"; path: string; id?: string | number; collectionRequest?: StoredCollectionRequest; authContext?: SubscriptionAuthContext }
     ): string {
         if (!shared) return `listener\u0000${key}`;
-        const auth = target.authContext ?? { uid: ANONYMOUS_USER_ID, roles: ["anon"] };
         return canonicalJson({
             type: target.type,
             path: target.path,
             id: target.type === "single" ? String(target.id) : undefined,
             request: target.type === "collection" ? (target.collectionRequest ?? {}) : undefined,
-            // Exactly what the refetch binds: `applyAuthContext` and the field
-            // viewer read these and nothing else.
-            uid: auth.uid,
-            roles: auth.roles ?? [],
-            isAnonymous: auth.isAnonymous === true,
-            claims: auth.claims
+            principal: principalOf(target.authContext)
         });
     }
 
@@ -635,6 +781,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             let bucket = index.get(address);
             if (!bucket) index.set(address, bucket = new Set());
             bucket.add(group);
+            if (group.type === "collection") {
+                this.markListGroupUnscheduled(group);
+            } else {
+                let onPath = this.singleGroupsByPath.get(group.path);
+                if (!onPath) this.singleGroupsByPath.set(group.path, onPath = new Set());
+                onPath.add(group);
+            }
         }
         group.members.add(key);
 
@@ -645,12 +798,21 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         else this.subscribedPaths.set(subscription.path, { slug: this.collectionSlugAt(subscription.path), count: 1 });
     }
 
+    /** Remember an in-process subscription by its caller's id — see {@link inProcessKeysById}. */
+    private indexInProcess(subscriptionId: string, key: string): void {
+        let keys = this.inProcessKeysById.get(subscriptionId);
+        if (!keys) this.inProcessKeysById.set(subscriptionId, keys = new Set());
+        keys.add(key);
+    }
+
     /** Remove the subscription under `key` from everything that holds it. */
     private dropSubscription(key: string): void {
         const subscription = this._subscriptions.get(key);
         this.subscriptionCallbacks.delete(key);
         if (!subscription) return;
         this._subscriptions.delete(key);
+        const inProcess = this.inProcessKeysById.get(subscription.subscriptionId);
+        if (inProcess?.delete(key) && inProcess.size === 0) this.inProcessKeysById.delete(subscription.subscriptionId);
         this.leaveGroup(key, subscription);
         const owned = this.subscriptionsByClient.get(subscription.clientId);
         owned?.delete(key);
@@ -668,6 +830,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         if (group.pending !== "all") group.pending.delete(key);
         if (group.members.size > 0) return;
         if (group.timer) clearTimeout(group.timer);
+        this.refetchQueue.delete(group);
         this.groups.delete(group.key);
         const [index, address] = group.type === "collection"
             ? [this.collectionGroupsByPath, group.path]
@@ -675,11 +838,31 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         const bucket = index.get(address);
         bucket?.delete(group);
         if (bucket?.size === 0) index.delete(address);
+        if (group.type === "single") {
+            const onPath = this.singleGroupsByPath.get(group.path);
+            onPath?.delete(group);
+            if (onPath?.size === 0) this.singleGroupsByPath.delete(group.path);
+        }
+        if (group.type === "collection") {
+            this.unscheduledListGroups.get(group.path)?.delete(group);
+            if (!this.collectionGroupsByPath.has(group.path)) {
+                this.unscheduledListGroups.delete(group.path);
+                this.listPathChangedAt.delete(group.path);
+            }
+        }
+    }
+
+    /** See {@link unscheduledListGroups}. */
+    private markListGroupUnscheduled(group: SubscriptionGroup): void {
+        let unscheduled = this.unscheduledListGroups.get(group.path);
+        if (!unscheduled) this.unscheduledListGroups.set(group.path, unscheduled = new Set());
+        unscheduled.add(group);
     }
 
     /**
      * Ask for a refetch of `group` once changes have been quiet for the
-     * debounce window — for every member, or only for `member`.
+     * debounce window — for every member, or only for `member` — and in any
+     * case no later than {@link REFETCH_MAX_WAIT_MS} after the first of them.
      *
      * The window is measured from the last change, as a debounce is, but the
      * timer is not re-armed per change: a 10k-row statement is 10k changes,
@@ -690,21 +873,55 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private scheduleGroupRefetch(group: SubscriptionGroup, member?: string): void {
         if (member === undefined) group.pending = "all";
         else if (group.pending !== "all") group.pending.add(member);
-        group.lastChangeAt = Date.now();
-        if (!group.timer) this.armGroupTimer(group, RealtimeService.REFETCH_DEBOUNCE_MS);
+        const now = Date.now();
+        group.lastChangeAt = now;
+        group.firstPendingAt ??= now;
+        // A group already waiting for a slot needs no timer: its read starts
+        // after this change, and answers it.
+        if (!group.timer && !this.refetchQueue.has(group)) this.armGroupTimer(group, RealtimeService.REFETCH_DEBOUNCE_MS);
     }
 
     private armGroupTimer(group: SubscriptionGroup, delayMs: number): void {
         group.timer = setTimeout(() => {
             group.timer = undefined;
             if (this.groups.get(group.key) !== group) return;
-            const quietFor = Date.now() - group.lastChangeAt;
-            if (quietFor < RealtimeService.REFETCH_DEBOUNCE_MS) {
-                this.armGroupTimer(group, RealtimeService.REFETCH_DEBOUNCE_MS - quietFor);
+            const now = Date.now();
+            const lastChangeAt = group.type === "collection"
+                ? Math.max(group.lastChangeAt, this.listPathChangedAt.get(group.path) ?? 0)
+                : group.lastChangeAt;
+            const quietFor = now - lastChangeAt;
+            const waitedFor = now - (group.firstPendingAt ?? now);
+            if (quietFor < RealtimeService.REFETCH_DEBOUNCE_MS && waitedFor < RealtimeService.REFETCH_MAX_WAIT_MS) {
+                this.armGroupTimer(group, Math.min(
+                    RealtimeService.REFETCH_DEBOUNCE_MS - quietFor,
+                    RealtimeService.REFETCH_MAX_WAIT_MS - waitedFor
+                ));
                 return;
             }
-            void this.refetchGroup(group);
+            this.refetchQueue.add(group);
+            this.drainRefetchQueue();
         }, delayMs);
+    }
+
+    /**
+     * Start queued group refetches while fewer than
+     * {@link maxConcurrentRefetches} are running. Each one that settles starts
+     * the next, so the fan-out of one write waits its turn here rather than
+     * in the pool, ahead of every REST request.
+     */
+    private drainRefetchQueue(): void {
+        while (this.refetchesRunning < this.maxConcurrentRefetches) {
+            const next = this.refetchQueue.values().next();
+            if (next.done) return;
+            const group = next.value;
+            this.refetchQueue.delete(group);
+            if (this.groups.get(group.key) !== group) continue;
+            this.refetchesRunning++;
+            void this.refetchGroup(group).finally(() => {
+                this.refetchesRunning--;
+                this.drainRefetchQueue();
+            });
+        }
     }
 
     /**
@@ -719,6 +936,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private async refetchGroup(group: SubscriptionGroup): Promise<void> {
         const keys = group.pending === "all" ? [...group.members] : [...group.pending];
         group.pending = new Set();
+        group.firstPendingAt = undefined;
+        // A change from here on is one this read may not have seen.
+        if (group.type === "collection" && this.groups.get(group.key) === group) this.markListGroupUnscheduled(group);
 
         const targets: Array<{ key: string; subscription: Subscription; canDeliver: DeliveryCheck; callback?: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void }> = [];
         for (const key of keys) {
@@ -737,30 +957,29 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         try {
             if (group.type === "collection") {
                 const request = group.collectionRequest ?? {};
-                const rows = await this.fetchCollectionWithAuth(group.path, request, group.authContext);
                 const toSockets = targets.some((target) => !target.callback);
-                const meta = toSockets
-                    ? await this.collectionMetaWithAuth(group.path, request, rows, group.authContext)
-                    : undefined;
-                let frameTail: string | undefined;
+                const { rows, meta } = await this.fetchCollectionWithAuth(group.path, request, group.authContext, { meta: toSockets });
+                let frame: { body: string; digest: string } | undefined;
                 for (const target of targets) {
                     if (!target.canDeliver()) continue;
                     if (target.callback) {
                         target.callback(rows);
                         continue;
                     }
-                    frameTail ??= this.collectionFrameTail(rows, group.path, meta);
-                    this.sendRaw(
-                        target.subscription.clientId,
-                        `{"type":"collection_update","subscriptionId":${JSON.stringify(target.subscription.subscriptionId)},${frameTail}`
-                    );
+                    frame ??= this.dataFrame(this.collectionFrameTail(rows, group.path, meta));
+                    this.sendDataFrame(target.subscription, "collection_update", frame);
                 }
             } else {
                 const row = (await this.fetchEntityWithAuth(group.path, group.id!, group.authContext)) ?? null;
+                let frame: { body: string; digest: string } | undefined;
                 for (const target of targets) {
                     if (!target.canDeliver()) continue;
-                    if (target.callback) target.callback(row);
-                    else this.sendSingleUpdate(target.subscription.clientId, target.subscription.subscriptionId, row);
+                    if (target.callback) {
+                        target.callback(row);
+                        continue;
+                    }
+                    frame ??= this.dataFrame(this.singleFrameTail(row));
+                    this.sendDataFrame(target.subscription, "single_update", frame);
                 }
             }
         } catch (error) {
@@ -769,7 +988,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     logger.error(`❌ [RealtimeService] Error in a refetch for DataDriver subscription ${target.subscription.subscriptionId}`, { error });
                     this.reportDriverFetchFailure(target.subscription, target.canDeliver, error);
                 } else {
-                    this.reportSocketFetchFailure(target.subscription.clientId, target.subscription.subscriptionId, group.path, error, target.canDeliver);
+                    this.reportSocketFetchFailure(target.subscription.clientId, target.subscription.subscriptionId, group.path, error, target.canDeliver, target.subscription);
                 }
             }
         }
@@ -845,6 +1064,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             delivered: 0
         };
         this.registerSubscription(key, subscription);
+        this.indexInProcess(subscriptionId, key);
         this.subscriptionCallbacks.set(key, callback);
         void this.deliverFirstToDataDriver(key, subscription, callback);
     }
@@ -859,7 +1079,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         const canDeliver = this.beginDelivery(key, subscription);
         try {
             const data = subscription.type === "collection"
-                ? await this.fetchCollectionWithAuth(subscription.path, subscription.collectionRequest ?? {}, subscription.authContext)
+                ? (await this.fetchCollectionWithAuth(subscription.path, subscription.collectionRequest ?? {}, subscription.authContext, { meta: false })).rows
                 : (await this.fetchEntityWithAuth(subscription.path, String(subscription.id), subscription.authContext)) ?? null;
             if (canDeliver()) callback(data);
         } catch (error) {
@@ -905,6 +1125,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             started: 0,
             delivered: 0
         });
+        this.indexInProcess(subscriptionId, key);
 
         if (callback) {
             this.subscriptionCallbacks.set(key, callback as (data: Record<string, unknown>[] | Record<string, unknown> | null) => void);
@@ -931,6 +1152,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             started: 0,
             delivered: 0
         });
+        this.indexInProcess(subscriptionId, key);
 
         if (callback) {
             this.subscriptionCallbacks.set(key, callback as (data: Record<string, unknown>[] | Record<string, unknown> | null) => void);
@@ -945,8 +1167,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * alone. A socket ends its own through the `unsubscribe` frame.
      */
     unsubscribe(subscriptionId: string): void {
-        for (const [key, subscription] of [...this._subscriptions.entries()]) {
-            if (subscription.subscriptionId !== subscriptionId || this.clients.has(subscription.clientId)) continue;
+        for (const key of [...(this.inProcessKeysById.get(subscriptionId) ?? [])]) {
+            const subscription = this._subscriptions.get(key);
+            if (!subscription || this.clients.has(subscription.clientId)) continue;
             this.dropSubscription(key);
         }
     }
@@ -996,22 +1219,42 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // subscription and timer cleanup above stays synchronous on purpose: it
         // is what leaks if the database is slow, and it owes nothing to the
         // shared table. With no bus configured this is a no-op that never awaits
-        // a query.
-        await this.presenceStoreOp(() => this.presenceStore!.removeClient(clientId), "client removal");
+        // a query, and so is it for a client that never tracked presence here:
+        // it has no rows.
+        if (this.presenceTrackers.delete(clientId)) {
+            await this.presenceStoreOp(() => this.presenceStore!.removeClient(clientId), "client removal");
+        }
 
-        // Remove from all broadcast channels
-        for (const [channel, members] of this.channels.entries()) {
-            if (members.has(clientId)) {
+        // Remove from the broadcast channels it joined
+        for (const channel of [...(this.channelsByClient.get(clientId) ?? [])]) {
+            const members = this.channels.get(channel);
+            if (members?.has(clientId)) {
                 members.delete(clientId);
                 this.removePresence(clientId, channel, { skipStore: true });
-                if (members.size === 0) this.channels.delete(channel);
+                if (members.size === 0) this.forgetChannel(channel);
             }
         }
+        this.channelsByClient.delete(clientId);
 
-        // Remove from all presence channels
-        for (const [channel] of this.presence) {
+        // And from every presence it still holds
+        for (const channel of [...(this.presenceByClient.get(clientId) ?? [])]) {
             this.removePresence(clientId, channel, { skipStore: true });
         }
+        this.presenceByClient.delete(clientId);
+    }
+
+    /** Record that `clientId` is in `channel`, in a reverse index — see {@link channelsByClient}. */
+    private indexClientChannel(index: Map<string, Set<string>>, clientId: string, channel: string): void {
+        let channels = index.get(clientId);
+        if (!channels) index.set(clientId, channels = new Set());
+        channels.add(channel);
+    }
+
+    private unindexClientChannel(index: Map<string, Set<string>>, clientId: string, channel: string): void {
+        const channels = index.get(clientId);
+        if (!channels) return;
+        channels.delete(channel);
+        if (channels.size === 0) index.delete(clientId);
     }
 
     private async handleMessage(clientId: string, message: WebSocketMessage, authContext?: SubscriptionAuthContext) {
@@ -1209,21 +1452,19 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // Send initial data. Built from the request the subscription just
             // stored, so the first answer and every refetch after it cannot
             // describe different queries.
-            const rows = await this.fetchCollectionWithAuth(
+            const { rows, meta } = await this.fetchCollectionWithAuth(
                 request.path,
                 subscription.collectionRequest!,
-                authContext
-            );
-            const meta = await this.collectionMetaWithAuth(
-                request.path, subscription.collectionRequest!, rows, authContext
+                authContext,
+                { meta: true }
             );
 
             if (canDeliver()) {
-                this.sendCollectionUpdate(clientId, subscriptionId, rows, request.path, meta);
+                this.sendDataFrame(subscription, "collection_update", this.dataFrame(this.collectionFrameTail(rows, request.path, meta)));
             }
 
         } catch (error) {
-            this.reportSocketFetchFailure(clientId, subscriptionId, request.path, error, canDeliver);
+            this.reportSocketFetchFailure(clientId, subscriptionId, request.path, error, canDeliver, this._subscriptions.get(key));
         }
     }
 
@@ -1271,11 +1512,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             );
 
             if (canDeliver()) {
-                this.sendSingleUpdate(clientId, subscriptionId, row || null);
+                this.sendDataFrame(subscription, "single_update", this.dataFrame(this.singleFrameTail(row || null)));
             }
 
         } catch (error) {
-            this.reportSocketFetchFailure(clientId, subscriptionId, request.path, error, canDeliver);
+            this.reportSocketFetchFailure(clientId, subscriptionId, request.path, error, canDeliver, this._subscriptions.get(key));
         }
     }
 
@@ -1297,11 +1538,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         subscriptionId: string,
         path: string,
         error: unknown,
-        canDeliver: DeliveryCheck | undefined
+        canDeliver: DeliveryCheck | undefined,
+        subscription?: Subscription
     ) {
         const sanitized = sanitizeErrorForClient(error, path);
         if (canDeliver && !canDeliver.mayReportFailure()) return;
         this.sendError(clientId, sanitized.message, subscriptionId, sanitized.code);
+        // The subscriber now shows an error: the rows it last had are news again.
+        if (subscription && subscription.subscriptionId === subscriptionId && subscription.clientId === clientId) {
+            subscription.lastFrame = undefined;
+        }
     }
 
     /**
@@ -1323,6 +1569,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * again, when one is installed, and left when it refuses.
      */
     async rescopeClient(clientId: string, authContext: SubscriptionAuthContext): Promise<void> {
+        const principal = canonicalJson(principalOf(authContext));
         for (const key of [...(this.subscriptionsByClient.get(clientId) ?? [])]) {
             const subscription = this._subscriptions.get(key);
             if (!subscription) continue;
@@ -1353,6 +1600,14 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 }
             }
 
+            // The same principal — a token refresh, which the SDK sends about
+            // hourly — reads the same rows: the subscription stays as it is,
+            // in its group, with nothing to refetch. Everything a refetch
+            // binds is in the comparison, so this decides only whether to
+            // look again, never what is shown. The readability check above
+            // still ran: the collection's rules may have changed since.
+            if (canonicalJson(principalOf(subscription.authContext)) === principal) continue;
+
             // A new identity is a new group: the read it shares is now the one
             // its new principal's subscriptions run.
             const rescoped: Subscription = {
@@ -1369,8 +1624,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
         const authorizer = this.channelAuthorizer;
         if (!authorizer) return;
-        for (const [channel, members] of [...this.channels.entries()]) {
-            if (!members.has(clientId)) continue;
+        for (const channel of [...(this.channelsByClient.get(clientId) ?? [])]) {
+            if (!this.channels.get(channel)?.has(clientId)) continue;
             let allowed: boolean;
             try {
                 allowed = await authorizer({ channel, action: "join", clientId, user: authContext });
@@ -1460,12 +1715,15 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // When CDC is active it IS the cross-instance channel — every instance
         // observes every commit through the change stream — so the legacy
         // per-mutation broadcast is redundant (and would double-deliver). Skip it.
+        //
+        // Not awaited: the changes of one burst — a bulk save announces each
+        // row after commit, one `notifyUpdate` at a time — go out together, a
+        // few notifications instead of one round trip per row ahead of the
+        // response.
         if (broadcast && this.broadcasting && !this.cdcActive) {
-            try {
-                await this.broadcastChange(path, id, databaseId);
-            } catch (err) {
+            this.broadcastChange(path, id, databaseId).catch((err) => {
                 logger.error("❌ [RealtimeService] Failed to broadcast change via pg_notify", { error: err });
-            }
+            });
         }
 
         this.debugLog("🔔 [RealtimeService] notifyUpdate completed for path:", path);
@@ -1509,14 +1767,30 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private notifyPathUpdate(notifyPath: string, originalPath: string, id: string) {
         this.debugLog(`📡 [RealtimeService] Notifying path: ${notifyPath} (original: ${originalPath})`);
 
-        // Every list on the path may have changed. A single-row subscription
-        // is asked only at the written path, and only for its own row: a
-        // parent path is a different record.
-        for (const group of this.collectionGroupsByPath.get(notifyPath) ?? []) {
-            this.scheduleGroupRefetch(group);
+        // Every list on the path may have changed — but every changed row of a
+        // statement says so, and the lists' answer is one refetch each however
+        // many rows asked. A row only moves the path's debounce clock and
+        // schedules the groups that have no refetch pending yet; it used to
+        // visit every group on the path, so a 100k-row UPDATE on a list open
+        // as 1,000 principals was 100M visits, ~3.9 s of event loop no socket
+        // or request on this instance got past.
+        if (this.collectionGroupsByPath.has(notifyPath)) {
+            this.listPathChangedAt.set(notifyPath, Date.now());
+            const unscheduled = this.unscheduledListGroups.get(notifyPath);
+            if (unscheduled?.size) {
+                for (const group of unscheduled) this.scheduleGroupRefetch(group);
+                unscheduled.clear();
+            }
         }
+        // A single-row subscription is asked only at the written path, and
+        // only for its own row: a parent path is a different record. Its
+        // bucket is per row already.
         if (notifyPath !== originalPath) return;
-        for (const group of this.singleGroupsByAddress.get(`${notifyPath}\u0000${id}`) ?? []) {
+        // A change that names no row may be to any of them.
+        const singles = id === ANY_ROW
+            ? this.singleGroupsByPath.get(notifyPath)
+            : this.singleGroupsByAddress.get(`${notifyPath}\u0000${id}`);
+        for (const group of singles ?? []) {
             this.scheduleGroupRefetch(group);
         }
     }
@@ -1548,15 +1822,21 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     }
 
     /**
-     * Fetch a collection with optional RLS auth context.
+     * Fetch a collection with optional RLS auth context, and with `meta: true`
+     * the `meta` a socket frame carries beside the rows.
+     *
      * When authContext is provided, the fetch runs inside a transaction
-     * with set_config calls so PostgreSQL RLS policies are enforced.
+     * with set_config calls so PostgreSQL RLS policies are enforced. The count
+     * behind `meta` runs in that same transaction — one pool acquisition and
+     * one `applyAuthContext` per refetch, where it used to take a second
+     * transaction of its own — see {@link collectionMeta}.
      */
     private async fetchCollectionWithAuth(
         notifyPath: string,
         collectionRequest: StoredCollectionRequest,
-        authContext?: SubscriptionAuthContext
-    ): Promise<Record<string, unknown>[]> {
+        authContext: SubscriptionAuthContext | undefined,
+        options: { meta: boolean }
+    ): Promise<{ rows: Record<string, unknown>[]; meta?: CollectionUpdateMeta }> {
         if (this.driver) {
             const collection = this.registry.getCollectionByPath(notifyPath);
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
@@ -1639,13 +1919,14 @@ roles: ["anon"] };
                     const globalCallbacks = this.registry?.getGlobalCallbacks();
                     const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
+                    let rows = fetchedEntities;
                     if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
                         // Bound to THIS transaction — the subscriber's — see
                         // callbackContextWithin below for what this used to be.
                         const contextForCallback = callbackContextWithin(this.driver, tx, activeAuth);
 
                         const callbackCollection = requireCallbackCollection(resolvedCollection, notifyPath);
-                        return await Promise.all(fetchedEntities.map(async (fetchedRow) => {
+                        rows = await Promise.all(fetchedEntities.map(async (fetchedRow) => {
                             let processedEntity = fetchedRow;
                             // 1. Global callbacks first
                             if (globalCallbacks?.afterRead) {
@@ -1678,7 +1959,12 @@ roles: ["anon"] };
                         }));
                     }
 
-                    return fetchedEntities;
+                    // Last, after every hook has had the transaction: a count
+                    // that fails leaves it aborted, and its rows are already read.
+                    return {
+                        rows,
+                        meta: options.meta ? await this.collectionMeta(txEntityService, notifyPath, collectionRequest, rows) : undefined
+                    };
                 }, { accessMode: "read only" })
             );
         }
@@ -1694,8 +1980,8 @@ roles: ["anon"] };
         // served to everybody — a fallback that hands out *more* than the path
         // it stands in for, which is the defect the paragraph above describes
         // one clause at a time.
-        return await withFieldViewer({ roles: authContext?.roles ?? [] }, async () =>
-            await this.dataService.fetchCollectionForRest(notifyPath, {
+        return await withFieldViewer({ roles: authContext?.roles ?? [] }, async () => {
+            const rows = await this.dataService.fetchCollectionForRest(notifyPath, {
                 filter: collectionRequest.filter as FilterValues<string>,
                 logical: collectionRequest.logical,
                 orderBy: collectionRequest.orderBy,
@@ -1708,12 +1994,18 @@ roles: ["anon"] };
                 databaseId: collectionRequest.databaseId,
                 fields: collectionRequest.fields,
                 distinct: collectionRequest.distinct
-            }, collectionRequest.include)
-        );
+            }, collectionRequest.include);
+            return {
+                rows,
+                meta: options.meta ? await this.collectionMeta(this.dataService, notifyPath, collectionRequest, rows) : undefined
+            };
+        });
     }
 
     /**
-     * The `meta` a `collection_update` frame carries beside its rows.
+     * The `meta` a `collection_update` frame carries beside its rows, counted
+     * through `service` — the subscriber's own transaction, read only, with
+     * its auth context and `beforeQuery` narrowing already bound.
      *
      * Frames used to carry rows and primary keys and nothing else, so the
      * client issued a `GET /count` **per push** to fill in a total it needed to
@@ -1721,60 +2013,44 @@ roles: ["anon"] };
      * write, per subscriber, forever. The refetch already knows the query; it
      * counts once, here, under the same RLS transaction that read the rows, so
      * the total describes the same set they came from.
+     *
+     * A first page that came back short of its limit *is* the whole set — the
+     * same filter, the same narrowing, read as the same principal — so its
+     * length is the total and nothing is counted. Not for a later page, a
+     * cursor page, a search (whose page and count are not the same query) or
+     * a `distinct` read (whose count counts rows, not values): those count.
      */
-    private async collectionMetaWithAuth(
+    private async collectionMeta(
+        service: DataService,
         notifyPath: string,
         collectionRequest: StoredCollectionRequest,
-        rows: Record<string, unknown>[],
-        authContext?: SubscriptionAuthContext
+        rows: Record<string, unknown>[]
     ): Promise<CollectionUpdateMeta> {
         const limit = collectionRequest.limit ?? rows.length;
         const offset = collectionRequest.offset ?? 0;
 
-        const countOnce = async (service: DataService) => service.count(notifyPath, {
-            filter: collectionRequest.filter as FilterValues<string>,
-            logical: collectionRequest.logical,
-            searchString: collectionRequest.searchString,
-            databaseId: collectionRequest.databaseId
-        });
+        const wholeSet = collectionRequest.limit !== undefined && rows.length < collectionRequest.limit &&
+            offset === 0 && !collectionRequest.startAfter && !collectionRequest.searchString && !collectionRequest.distinct;
 
         let total: number;
-        try {
-            if (this.driver) {
-                const activeAuth = authContext || { uid: ANONYMOUS_USER_ID, roles: ["anon"] };
-                total = await this.db.transaction(async (tx) => {
-                    await applyAuthContext(
-                        tx,
-                        {
-                            uid: activeAuth.uid,
-                            roles: activeAuth.roles,
-                            isAnonymous: activeAuth.isAnonymous === true,
-                            // A refetch is a read under the same identity, and a
-                            // tenancy policy reads a claim — without these a
-                            // subscriber would receive rows the initial GET hid.
-                            claims: activeAuth.claims
-                        },
-                        this.rlsUserRole
-                    );
-                    // The same narrowing as the rows it is counting: a frame
-                    // whose `meta.total` came from an unnarrowed count says
-                    // "1 of 4 results".
-                    let hookContext: RebaseCallContext | undefined;
-                    return countOnce(new DataService(
-                        tx, this.registry,
-                        () => (hookContext ??= callbackContextWithin(this.driver, tx, activeAuth))
-                    ));
-                }, { accessMode: "read only" });
-            } else {
-                total = await countOnce(this.dataService);
+        if (wholeSet) {
+            total = rows.length;
+        } else {
+            try {
+                total = await service.count(notifyPath, {
+                    filter: collectionRequest.filter as FilterValues<string>,
+                    logical: collectionRequest.logical,
+                    searchString: collectionRequest.searchString,
+                    databaseId: collectionRequest.databaseId
+                });
+            } catch (error) {
+                // A count that failed says nothing about the size of the
+                // collection, and a frame with no `meta` is one the client can fall
+                // back on. Reporting `rows.length` would claim a page read at
+                // offset 10 held two rows.
+                logger.warn(`[RealtimeService] Could not count '${notifyPath}' for a subscription frame`, { error });
+                return { limit, offset, hasMore: false, partial: true };
             }
-        } catch (error) {
-            // A count that failed says nothing about the size of the
-            // collection, and a frame with no `meta` is one the client can fall
-            // back on. Reporting `rows.length` would claim a page read at
-            // offset 10 held two rows.
-            logger.warn(`[RealtimeService] Could not count '${notifyPath}' for a subscription frame`, { error });
-            return { limit, offset, hasMore: false, partial: true };
         }
 
         const last = rows[rows.length - 1];
@@ -1897,45 +2173,59 @@ roles: ["anon"] };
         );
     }
 
-    private sendCollectionUpdate(
-        clientId: string,
-        subscriptionId: string,
-        rows: Record<string, unknown>[],
-        path: string,
-        meta?: CollectionUpdateMeta
-    ) {
-        const message: CollectionUpdateMessage = {
-            type: "collection_update",
-            subscriptionId,
-            rows: rows,
-            pks: this.primaryKeysForPath(path),
-            // Beside the rows rather than fetched afterwards — see
-            // {@link CollectionUpdateMeta} for the round trip this removes.
-            ...(meta && { meta })
-        };
-        this.sendMessage(clientId, message);
-    }
-
     /**
      * Everything in a `collection_update` frame after its subscription id,
-     * serialised once for every member of a group: the same rows, keys and
-     * meta as {@link sendCollectionUpdate} sends, in the same order.
+     * serialised once for every member of a group: the rows, the collection's
+     * key columns, and the `meta` beside them (see {@link CollectionUpdateMeta}
+     * for the round trip that removes). The order is the one
+     * {@link CollectionUpdateMessage} declares.
      */
     private collectionFrameTail(rows: Record<string, unknown>[], path: string, meta?: CollectionUpdateMeta): string {
-        return JSON.stringify({
+        const tail: Omit<CollectionUpdateMessage, "type" | "subscriptionId"> = {
             rows,
             pks: this.primaryKeysForPath(path),
             ...(meta && { meta })
-        }).slice(1);
+        };
+        return JSON.stringify(tail).slice(1);
     }
 
-    private sendSingleUpdate(clientId: string, subscriptionId: string, row: Record<string, unknown> | null) {
-        const message: SingleUpdateMessage = {
-            type: "single_update",
-            subscriptionId,
-            row: row
-        };
-        this.sendMessage(clientId, message);
+    /** Everything in a `single_update` frame after its subscription id. */
+    private singleFrameTail(row: Record<string, unknown> | null): string {
+        const tail: Omit<SingleUpdateMessage, "type" | "subscriptionId"> = { row };
+        return JSON.stringify(tail).slice(1);
+    }
+
+    /** A frame tail with its {@link frameDigest}, computed once for every member it goes to. */
+    private dataFrame(body: string): { body: string; digest: string } {
+        return { body, digest: this.frameDigest(body) };
+    }
+
+    /**
+     * What a subscriber was last sent, in 44 bytes: holding the frames
+     * themselves would keep a page of rows per subscriber in memory.
+     */
+    private frameDigest(body: string): string {
+        return createHash("sha256").update(body).digest("base64");
+    }
+
+    /**
+     * Send a data frame to a socket subscriber — unless it is exactly the one
+     * the subscriber was last sent.
+     *
+     * A write anywhere in a collection refetches every list of it, and the
+     * first 50 rows of a 10k-row list come back the same for 99.5% of writes.
+     * Each of those frames was sent anyway: ~30 KB per viewer per write,
+     * parsed, merged and re-rendered by every client to change nothing. The
+     * comparison is per subscriber, because the members of one group need not
+     * have been sent the same frame last — one may have joined since.
+     */
+    private sendDataFrame(subscription: Subscription, type: "collection_update" | "single_update", frame: { body: string; digest: string }): void {
+        if (subscription.lastFrame === frame.digest) return;
+        subscription.lastFrame = frame.digest;
+        this.sendRaw(
+            subscription.clientId,
+            `{"type":"${type}","subscriptionId":${JSON.stringify(subscription.subscriptionId)},${frame.body}`
+        );
     }
 
     /**
@@ -2243,6 +2533,7 @@ roles: ["anon"] };
             this.channels.set(channel, new Set());
         }
         this.channels.get(channel)!.add(clientId);
+        this.indexClientChannel(this.channelsByClient, clientId, channel);
         this.warnIfMemoryBusOnMultiplePods();
         this.debugLog(`📡 [Broadcast] Client ${clientId} joined channel: ${channel}`);
     }
@@ -2269,13 +2560,20 @@ roles: ["anon"] };
         );
     }
 
+    /** Drop a channel its last local member left, and what was kept per channel for it. */
+    private forgetChannel(channel: string): void {
+        this.channels.delete(channel);
+        this.oversizedBroadcastWarned.delete(channel);
+    }
+
     /** Leave a broadcast channel */
     leaveChannel(clientId: string, channel: string): void {
         const members = this.channels.get(channel);
         if (members) {
             members.delete(clientId);
-            if (members.size === 0) this.channels.delete(channel);
+            if (members.size === 0) this.forgetChannel(channel);
         }
+        this.unindexClientChannel(this.channelsByClient, clientId, channel);
         // Also remove presence
         this.removePresence(clientId, channel);
     }
@@ -2694,18 +2992,23 @@ roles: ["anon"] };
         }
 
         const channelPresence = this.presence.get(channel)!;
+        this.presenceTrackers.add(clientId);
         const previous = channelPresence.get(clientId);
         const changed = !previous || JSON.stringify(previous.state) !== JSON.stringify(state);
         channelPresence.set(clientId, { state,
 lastSeen: Date.now() });
+        this.indexClientChannel(this.presenceByClient, clientId, channel);
 
         // Refresh the shared roster on every heartbeat — that timestamp is what
         // tells other instances this client is still here.
         void this.presenceStoreOp(() => this.presenceStore!.track(channel, clientId, state), "track");
 
-        // Broadcast join / state update to channel
-        this.deliverPresenceDiff(channel, { [clientId]: state }, {});
+        // Announce a join or a state change, here and to the other instances —
+        // and nothing else. An unchanged heartbeat used to be delivered to
+        // every local member regardless: n² frames per heartbeat round, each
+        // copying the roster on the client, to change no roster anywhere.
         if (changed) {
+            this.deliverPresenceDiff(channel, { [clientId]: state }, {});
             this.publishPresenceDiff(channel, { [clientId]: state }, {});
         }
 
@@ -2727,6 +3030,7 @@ lastSeen: Date.now() });
         const entry = channelPresence.get(clientId);
         if (entry) {
             channelPresence.delete(clientId);
+            this.unindexClientChannel(this.presenceByClient, clientId, channel);
             this.deliverPresenceDiff(channel, {}, { [clientId]: entry.state });
             this.publishPresenceDiff(channel, {}, { [clientId]: entry.state });
             if (!options?.skipStore) {
@@ -2911,17 +3215,25 @@ lastSeen: Date.now() });
         }
 
         // 2. Clear subscriptions, callbacks and the groups and indexes over them
+        this.unscheduledListGroups.clear();
+        this.listPathChangedAt.clear();
+        this.refetchQueue.clear();
         this._subscriptions.clear();
         this.subscriptionCallbacks.clear();
         this.subscriptionsByClient.clear();
         this.groups.clear();
         this.collectionGroupsByPath.clear();
         this.singleGroupsByAddress.clear();
+        this.singleGroupsByPath.clear();
+        this.inProcessKeysById.clear();
         this.subscribedPaths.clear();
 
         // 3. Clear broadcast channels and presence
         this.channels.clear();
         this.presence.clear();
+        this.channelsByClient.clear();
+        this.presenceByClient.clear();
+        this.presenceTrackers.clear();
         // Pending history writes hold the pool open; let them settle before the
         // caller closes it, but never let a rejected one break shutdown.
         await Promise.allSettled([...this.channelSendQueues.values(), ...this.channelReceiveQueues.values()]);
@@ -2950,7 +3262,9 @@ lastSeen: Date.now() });
             this.presenceStore = undefined;
         }
 
-        // 4. Disconnect the dedicated LISTEN client(s)
+        // 4. Disconnect the dedicated LISTEN client(s), once any changes still
+        // waiting to be announced have gone out.
+        await this.broadcastFlush?.catch(() => undefined);
         await this.stopListening();
         await this.stopCdc();
         await this.bus.stop().catch((error) =>
@@ -3027,7 +3341,7 @@ lastSeen: Date.now() });
         this.junctionLinkMap = buildJunctionLinkMap(this.registry);
         this.cdcListener = new CdcListener(
             connectionString,
-            (event) => this.handleCdcEvent(event),
+            (events) => this.handleCdcEvents(events),
             () => this.resyncSubscriptions()
         );
         try {
@@ -3078,6 +3392,7 @@ lastSeen: Date.now() });
         this.cdcTableMap = undefined;
         this.junctionLinkMap = undefined;
         this.recentAppEmits.clear();
+        this.cdcBacklog = [];
     }
 
     /**
@@ -3114,6 +3429,46 @@ lastSeen: Date.now() });
      * therefore only ever receives rows its RLS policies permit — filtering is per
      * subscriber, never per publisher.
      */
+    /**
+     * Route the rows one notification names — a statement's batch, or one row.
+     *
+     * Each is handled as a change on its own (the app-emit de-duplication and
+     * single-row addressing are per row), at most {@link CDC_ROWS_PER_TURN} in
+     * one turn of the event loop; the rest wait in order for the next turns. A
+     * socket read hands the listener up to 2 MB of notifications at once, and
+     * batched that is ~250k rows: handled in one go, the event loop stalled
+     * for ~400 ms. Sliced, a 1M-row statement is ~200 short turns that timers,
+     * sockets and requests run between.
+     */
+    private handleCdcEvents(events: CdcChangeEvent[]): void {
+        if (events.length === 0) return;
+        this.cdcBacklog.push(events);
+        this.drainCdcBacklog();
+    }
+
+    private drainCdcBacklog(): void {
+        while (this.cdcBacklog.length > 0) {
+            const room = RealtimeService.CDC_ROWS_PER_TURN - this.cdcTurnRows;
+            if (room <= 0) return;
+            const head = this.cdcBacklog[0];
+            const slice = head.length <= room ? head : head.splice(0, room);
+            if (slice === head) this.cdcBacklog.shift();
+            if (this.cdcTurnRows === 0) {
+                // The next turn starts a new budget, and carries on with what is left.
+                setImmediate(() => {
+                    this.cdcTurnRows = 0;
+                    this.drainCdcBacklog();
+                });
+            }
+            this.cdcTurnRows += slice.length;
+            for (const event of slice) {
+                this.handleCdcEvent(event).catch((error) => {
+                    logger.error("❌ [CDC] Failed to route a change notification", { error });
+                });
+            }
+        }
+    }
+
     private async handleCdcEvent(event: CdcChangeEvent): Promise<void> {
         const collection = this.resolveCollectionForTable(event.schema, event.table);
         if (!collection) {
@@ -3128,11 +3483,12 @@ lastSeen: Date.now() });
 
         const path = collection.slug;
         const databaseId = (collection as { databaseId?: string }).databaseId;
-        const id = this.extractIdFromCdcRow(collection, event.row);
+        // A TRUNCATE names no row: it changed every one.
+        const id = event.op === "TRUNCATE" ? ANY_ROW : this.extractIdFromCdcRow(collection, event.row);
 
         // Deletes carry a null row (subscribers drop the id); inserts/updates carry
         // an invalidation marker that forces a per-subscriber RLS-bound refetch.
-        const row = event.op === "DELETE" ? null : { _rebase_invalidated: true };
+        const row = event.op === "DELETE" || event.op === "TRUNCATE" ? null : { _rebase_invalidated: true };
 
         await this.notifyUpdate(path, id, row, databaseId, /* broadcast */ false, /* origin */ "cdc");
     }
@@ -3157,6 +3513,21 @@ lastSeen: Date.now() });
         const links = this.junctionLinkMap?.get(`${event.schema}.${event.table}`)
             ?? this.junctionLinkMap?.get(event.table);
         if (!links?.length) return false;
+
+        if (event.op === "TRUNCATE") {
+            // Every link is gone, so every list of this relation that is
+            // subscribed to has changed — whichever parent it belongs to.
+            for (const link of links) {
+                const prefix = `${link.parentCollection.slug}/`;
+                const suffix = `/${link.relationKey}`;
+                const lists = [...this.subscribedPaths.keys()].filter((path) =>
+                    path.startsWith(prefix) && path.endsWith(suffix) && path.split("/").length === 3);
+                for (const path of lists) {
+                    await this.notifyUpdate(path, ANY_ROW, null, (link.parentCollection as { databaseId?: string }).databaseId, /* broadcast */ false, /* origin */ "cdc");
+                }
+            }
+            return true;
+        }
 
         for (const link of links) {
             const sourceId = event.row?.[link.sourceColumn];
@@ -3186,11 +3557,15 @@ lastSeen: Date.now() });
         return true;
     }
 
-    /** Compute the canonical (possibly composite) id string from a captured row. */
+    /**
+     * Compute the canonical (possibly composite) id string from a captured row,
+     * or {@link ANY_ROW} when it names none — a key too large to notify, a
+     * table with no key.
+     */
     private extractIdFromCdcRow(collection: CollectionConfig, row: Record<string, unknown>): string {
-        // Unaddressable falls back to a collection-level invalidation: single-row
-        // subs won't match, but collection subs still refetch.
-        return deriveRowAddress(this.cdcRowByKeyFields(collection, row), collection, this.registry) || "*";
+        // Unaddressable is a change to the whole collection. It used to reach
+        // its lists only: a single-row subscriber of the row it was never heard.
+        return deriveRowAddress(this.cdcRowByKeyFields(collection, row), collection, this.registry) || ANY_ROW;
     }
 
     /**
@@ -3217,17 +3592,28 @@ lastSeen: Date.now() });
         return `${databaseId ?? ""}::${path}::${id}`;
     }
 
-    /** Record that this instance just delivered `key` via the app path. */
+    /**
+     * Record that this instance just delivered `key` via the app path.
+     *
+     * Expired entries are purged so the map cannot grow unbounded under write
+     * load — once it holds over 1,000, and at most once per dedup window. The
+     * purge walks the whole map, and it used to run on every write past 1,000:
+     * inside one window nothing has expired yet, so a burst of writes walked
+     * all of it each time (703 ms of event loop for 20,000 marks). Once a
+     * window, the map holds at most two windows' writes.
+     */
     private markAppEmit(key: string): void {
         const now = Date.now();
         this.recentAppEmits.set(key, now + RealtimeService.CDC_DEDUP_WINDOW_MS);
-        // Opportunistic purge so the map cannot grow unbounded under write load.
-        if (this.recentAppEmits.size > 1000) {
+        if (this.recentAppEmits.size > 1000 && now >= this.nextAppEmitPurgeAt) {
+            this.nextAppEmitPurgeAt = now + RealtimeService.CDC_DEDUP_WINDOW_MS;
             for (const [k, expiry] of this.recentAppEmits) {
                 if (expiry <= now) this.recentAppEmits.delete(k);
             }
         }
     }
+    /** When {@link markAppEmit} may next purge expired entries. */
+    private nextAppEmitPurgeAt = 0;
 
     /** Consume a matching app-emit record if present and unexpired; true ⇒ suppress the CDC echo. */
     private consumeAppEmit(key: string): boolean {
@@ -3290,69 +3676,102 @@ lastSeen: Date.now() });
     }
 
     /**
-     * Broadcast a change notification to other instances via pg_notify.
-     * Uses the main Drizzle connection (pooled) — NOT the LISTEN client.
+     * Announce a change to the other instances on {@link PG_NOTIFY_CHANNEL},
+     * with the rest of its burst. Resolves once the notification carrying it
+     * has been sent. Uses the main Drizzle connection (pooled), not the LISTEN
+     * client.
+     *
+     * Changes queued in the same turn of the event loop go out together, as
+     * many to a notification as fit under the NOTIFY ceiling: a 1,000-row save
+     * used to be 1,000 round trips. A burst of one keeps the single-change
+     * shape `{ sid, p, eid, db }`, which an older instance in a rolling deploy
+     * still reads; a batch is `{ sid, c: [[p, eid, db], …] }`. Both carry
+     * addresses and nothing else.
      */
-    private async broadcastChange(path: string, id: string, databaseId?: string): Promise<void> {
-        const payload = JSON.stringify({
-            sid: this.instanceId,
-            p: path,
-            eid: id,
-            db: databaseId ?? null
-        });
-        await this.db.execute(drizzleSql`SELECT pg_notify(${PG_NOTIFY_CHANNEL}, ${payload})`);
+    private broadcastChange(path: string, id: string, databaseId?: string): Promise<void> {
+        const change = { p: path, eid: id, db: databaseId ?? null };
+        this.pendingBroadcasts.set(JSON.stringify([change.p, change.eid, change.db]), change);
+        this.broadcastFlush ??= new Promise<void>((resolve) => setImmediate(resolve)).then(() => this.flushBroadcasts());
+        return this.broadcastFlush;
     }
 
-    /** One change another instance published on {@link PG_NOTIFY_CHANNEL}. */
+    private async flushBroadcasts(): Promise<void> {
+        this.broadcastFlush = undefined;
+        const changes = [...this.pendingBroadcasts.values()];
+        this.pendingBroadcasts.clear();
+        for (const payload of packEntityChanges(this.instanceId, changes)) {
+            await this.db.execute(drizzleSql`SELECT pg_notify(${PG_NOTIFY_CHANNEL}, ${payload})`);
+        }
+    }
+
+    /** One notification another instance published on {@link PG_NOTIFY_CHANNEL}: one change, or a batch. */
     private async handleCrossInstanceNotification(payload: string): Promise<void> {
         try {
-            const { sid, p, eid, db } = JSON.parse(payload) as {
+            const parsed = JSON.parse(payload) as {
                 sid: string;
-                p: string;
-                eid: string;
-                db: string | null;
+                p?: string;
+                eid?: string;
+                db?: string | null;
+                c?: Array<[string, string, string | null]>;
             };
 
             // Skip our own notifications — already processed locally
-            if (sid === this.instanceId) return;
+            if (parsed.sid === this.instanceId) return;
 
             // A foreign sid is proof of a second process. Nothing here
             // needs that fact, but the channel path does — see
             // `warnIfMemoryBusOnMultiplePods`.
             this.foreignInstanceSeen = true;
 
-            this.debugLog(`📡 [RealtimeService] Received cross-instance notification: path=${p}, id=${eid}, from=${sid}`);
+            const changes: Array<[string, string, string | null]> = Array.isArray(parsed.c)
+                ? parsed.c
+                : [[parsed.p!, parsed.eid!, parsed.db ?? null]];
+            this.debugLog(`📡 [RealtimeService] Received ${changes.length} cross-instance change(s) from ${parsed.sid}`);
 
-            // Refetch the row from the DB so row subscriptions
-            // receive the actual data instead of null (which the client
-            // would interpret as "deleted").
-            let refetchedRow: Record<string, unknown> | null = null;
-            try {
-                if (this.driver) {
-                    const collection = this.registry.getCollectionByPath(p);
-                    const fetched = await this.driver.fetchOne({
-                        path: p,
-                        id: eid,
-                        collection: collection
-                    });
-                    refetchedRow = fetched ?? null;
-                } else {
-                    const fetched = await this.dataService.fetchOne(
-                        p, eid, db ?? undefined
-                    );
-                    refetchedRow = fetched ?? null;
-                }
-            } catch (fetchErr) {
-                // If the fetch fails (e.g. row was deleted), refetchedRow stays null
-                this.debugLog(`📡 [RealtimeService] Could not refetch row ${eid} from ${p} — treating as deleted`, fetchErr);
+            // Local fan-out only (broadcast=false, so nothing is re-announced).
+            // The row is not read here: every subscriber's frame is a refetch
+            // under its own scope, so the marker is all a change has to say.
+            for (const [path, id, db] of changes) {
+                await this.notifyUpdate(path, id, { _rebase_invalidated: true }, db ?? undefined, false);
             }
-
-            // Trigger local fan-out with broadcast=false to avoid re-broadcasting
-            await this.notifyUpdate(p, eid, refetchedRow, db ?? undefined, false);
         } catch (err) {
             logger.error("❌ [RealtimeService] Error processing cross-instance notification", { error: err });
         }
     }
+}
+
+/**
+ * The bytes a notification on the entity channel may take. `pg_notify` refuses
+ * 8000 and over; the rest is headroom.
+ */
+const ENTITY_NOTIFY_MAX_BYTES = 7500;
+
+/**
+ * Pack `changes` into as few payloads as fit under
+ * {@link ENTITY_NOTIFY_MAX_BYTES}. One change keeps the single-change shape.
+ */
+export function packEntityChanges(sid: string, changes: Array<{ p: string; eid: string; db: string | null }>): string[] {
+    if (changes.length === 1) {
+        const [{ p, eid, db }] = changes;
+        return [JSON.stringify({ sid, p, eid, db })];
+    }
+    const payloads: string[] = [];
+    const head = `{"sid":${JSON.stringify(sid)},"c":[`;
+    let batch: string[] = [];
+    let bytes = Buffer.byteLength(head) + 2;
+    for (const { p, eid, db } of changes) {
+        const entry = JSON.stringify([p, eid, db]);
+        const entryBytes = Buffer.byteLength(entry) + 1;
+        if (batch.length > 0 && bytes + entryBytes > ENTITY_NOTIFY_MAX_BYTES) {
+            payloads.push(`${head}${batch.join(",")}]}`);
+            batch = [];
+            bytes = Buffer.byteLength(head) + 2;
+        }
+        batch.push(entry);
+        bytes += entryBytes;
+    }
+    if (batch.length > 0) payloads.push(`${head}${batch.join(",")}]}`);
+    return payloads;
 }
 
 /**

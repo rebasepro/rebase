@@ -29,6 +29,16 @@ const result = await client.storage.putObject({
 // result: { key: string; bucket: string; storageUrl: string }
 ```
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> A file over 8 MiB goes up through the server's resumable (TUS)
+endpoint, 8 MiB per request, instead of as one multipart request the server
+parses whole — so a large upload costs the server one chunk of memory, not three
+to five times the file. A chunk that fails on the way is sent again from where
+the server got to. The result, the stored object and the server's checks are
+the same either way. When the resumable endpoint cannot take the file (an older
+server, or several instances that do not share uploads), it goes as one
+`POST /api/storage/upload`, and so does every later file from that client. See
+[Resumable uploads (TUS)](/docs/backend/storage-resumable-uploads/).
+
 ### From a File Input
 
 ```typescript
@@ -74,7 +84,14 @@ const { url } = await client.storage.getSignedUrl(
 );
 ```
 
-The SDK caches signed URLs to avoid redundant server calls.
+The SDK caches signed URLs to avoid redundant server calls, until each one's
+download token expires. <span class="since-badge" data-since="0.25">Since 0.25</span> Lookups made together — a page of previews
+calling `getSignedUrl()` in the same tick — go to the server as one
+`POST /api/storage/metadata` per 100 files, which the rate limiter counts as a
+tenth of the requests it replaces; a file that one caller may not read fails
+that call alone. The cache belongs to the credential that asked: when
+the access token changes — a sign-out, another user signing in, a refresh — it
+starts over, so one user is never handed a URL minted for another.
 
 ### Private vs. public URLs
 
@@ -151,7 +168,7 @@ const result = await client.storage.listObjects("products/images/", {
 });
 
 for (const item of result.items) {
-    console.log(item.fullPath, item.name);
+    console.log(item.fullPath, item.name, item.size, item.updated, item.contentType);
 }
 
 // Paginate
@@ -161,6 +178,12 @@ if (result.nextPageToken) {
     });
 }
 ```
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> Each item carries its `size` in bytes and `updated` (an ISO 8601
+timestamp) on local storage, S3 and GCS, and its `contentType` on local storage
+and GCS — enough to show a folder without a `getSignedUrl()` per file. An S3
+listing has no content type; folders (`result.prefixes`) carry none of the
+three.
 
 ## Storage Key Formats
 

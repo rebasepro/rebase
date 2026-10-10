@@ -9,6 +9,7 @@ import {
     getCollectionByPath,
     getTableForCollection,
     getPrimaryKeys,
+    idCanAddressTable,
     requirePrimaryKeys,
     rowIdentityCondition,
     parseIdValues,
@@ -32,6 +33,8 @@ import { ApiError, logger, splitFieldOps } from "@rebasepro/server";
 import { brokenFieldOpBounds, compileFieldOpBounds, compileFieldOps, fieldOpBoundsError } from "./field-op-sql";
 import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, isRowLevelSecurityDenial } from "../utils/pg-error-utils";
 import { explainZeroRowWrite } from "./write-denial";
+import { currentWriteDepth } from "./write-depth";
+import { currentWriteScope } from "./write-transaction-scope";
 import { resolveSoftDelete, rowInTrashError, softDeleteColumn } from "./soft-delete";
 
 /**
@@ -70,6 +73,26 @@ export interface PersistSaveOptions {
      * without being named here.
      */
     insertOnlyKeys?: readonly string[];
+}
+
+/**
+ * Run `write` in a transaction of its own — a SAVEPOINT inside a write — or,
+ * when nothing could catch its failure and carry on, straight on `db`.
+ *
+ * The savepoint exists for a write a hook started (`context.data`): a hook may
+ * catch the database refusing it, and the write it runs inside must stay
+ * usable. A write a caller started directly inside a request's transaction
+ * (frame depth 1, an open write scope) has no such catcher — the REST route,
+ * the socket handler and the bulk and batch loops all rethrow, and the
+ * request's transaction rolls back whole — so its savepoint only cost two
+ * round trips per row: 2,000 of a 1,000-row bulk's statements. Outside a
+ * request's transaction (`db` is the pool) a real transaction is still opened,
+ * so the row and its relation writes land together.
+ */
+function inOwnTransactionUnlessTopLevel<T>(db: DrizzleClient, write: (tx: DrizzleClient) => Promise<T>): Promise<T> {
+    // `rollback` is what a transaction handle has and the pool does not.
+    if ("rollback" in db && currentWriteDepth() === 1 && currentWriteScope()?.tx !== undefined) return write(db);
+    return db.transaction(tx => write(tx));
 }
 
 /**
@@ -161,6 +184,33 @@ export class PersistService {
     }
 
     /**
+     * Lock one row against every other write to it until this transaction
+     * ends: `FOR NO KEY UPDATE`, the lock an UPDATE of it takes anyway.
+     *
+     * For a conditional write (`If-Match`): taken before the row is read and
+     * compared, so a write that lands meanwhile is either already committed and
+     * read, or waits for this one. Without it two writes carrying the same tag
+     * both read the old row, both passed, and the second overwrote the first.
+     *
+     * Under row-level security the lock reads through the caller's UPDATE
+     * policies as well as their SELECT ones, so a row they may read but not
+     * update is simply not locked — and their write is refused by the database
+     * all the same. A nested address locks the row it ends in.
+     */
+    async lockRow(collectionPath: string, id: string | number): Promise<void> {
+        const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
+        const collection = hop ? hop.targetCollection : getCollectionByPath(collectionPath, this.registry);
+        const table = getTableForCollection(collection, this.registry);
+        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        // An id the key cannot hold names no row, and the read after this
+        // answers that as a 404 — sent to Postgres it is a 22P02 that aborts
+        // the write's transaction instead.
+        if (!idCanAddressTable(id, table, idInfoArray)) return;
+        const condition = rowIdentityCondition(table, idInfoArray, id, collectionPath);
+        await this.db.select({ locked: sql`1` }).from(table).where(condition).for("no key update");
+    }
+
+    /**
      * Delete an row by ID
      */
     async delete(collectionPath: string, id: string | number, _databaseId?: string): Promise<void> {
@@ -206,7 +256,7 @@ export class PersistService {
         // TRANSACTION_ABORTED (or a 25P02 from the history entry after it).
         let result;
         try {
-            result = await this.db.transaction(tx => tx
+            result = await inOwnTransactionUnlessTopLevel(this.db, tx => tx
                 .delete(table)
                 .where(condition));
         } catch (error: unknown) {
@@ -426,6 +476,8 @@ export class PersistService {
         }
 
         let savedId: string | number;
+        /** The row a plain INSERT handed back, already rendered as the read-back would render it. */
+        let returnedRow: Record<string, unknown> | undefined;
         try {
             // Transform relations to IDs, then sanitize
             const serializedResult = serializeDataToServer(otherValues as M, collection.properties as Properties, collection, this.registry);
@@ -433,6 +485,11 @@ export class PersistService {
             // Extract relation updates from the typed result
             const inverseRelationUpdates = serializedResult.inverseRelationUpdates;
             const joinPathRelationUpdates = serializedResult.joinPathRelationUpdates;
+            // Whether the INSERT is the last thing this save writes. Anything
+            // written after it — a relation, a junction row — may change the
+            // row (a self-reference, a trigger), so then it is read back.
+            const rowIsWrittenLast = inverseRelationUpdates.length === 0 && joinPathRelationUpdates.length === 0
+                && Object.keys(relationValues).length === 0 && !junctionTableInfo;
 
             const entityData = sanitizeAndConvertDates(serializedResult.scalarData);
 
@@ -453,7 +510,7 @@ export class PersistService {
                 );
             }
 
-            savedId = await this.db.transaction(async (tx) => {
+            savedId = await inOwnTransactionUnlessTopLevel(this.db, async (tx) => {
                 let currentId: string | number;
 
                 if (id && !options?.upsert) {
@@ -629,7 +686,11 @@ export class PersistService {
                             if (result.length === 0) throw ApiError.notFound(missing);
                         }
                     } else {
-                        result = await insertQuery.returning(returningKeys);
+                        // The whole row, when it can stand in for the read
+                        // back below — see `FetchService.insertReturning`.
+                        const returning = rowIsWrittenLast ? this.fetchService.insertReturning(collection.slug) : undefined;
+                        result = await insertQuery.returning(returning?.columns ?? returningKeys);
+                        if (returning && result[0]) returnedRow = returning.render(result[0]);
                     }
 
                     // DO NOTHING returns no row when it skipped, and an upsert whose
@@ -701,6 +762,11 @@ export class PersistService {
         // wrote this row is the one party who must be able to see the result of
         // their own write, whatever its deleted state — and an ordinary save is
         // unaffected, because an undeleted row is visible either way.
+        //
+        // A plain INSERT that was the last thing written already handed this
+        // row back: the same columns of the same row, rendered the same way.
+        // A bulk create of 1,000 rows was 1,000 of these reads.
+        if (returnedRow) return returnedRow;
         const finalEntity = await this.fetchService.fetchOneForRest(
             collection.slug, savedId, undefined, databaseId, { withDeleted: true }
         );

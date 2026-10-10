@@ -75,11 +75,21 @@ async function claimedSlots(jobId: string): Promise<string[]> {
     return rows.map(r => new Date(r.slot).toISOString());
 }
 
-/** A redeploy: a fresh store, and the boot-time `ensureTable` that sweeps. */
+/**
+ * A redeploy: a fresh store, its boot-time `ensureTable` (which releases
+ * stranded future claims), and the first retention sweep a started scheduler
+ * runs.
+ */
 async function redeploy(): Promise<CronStore> {
     const store = createCronStore(pgliteDriver(db))!;
     await store.ensureTable();
+    await store.sweepClaims!();
     return store;
+}
+
+/** The hourly sweep of a scheduler that has been up for a while: no boot. */
+async function sweepWhileRunning(): Promise<number> {
+    return createCronStore(pgliteDriver(db))!.sweepClaims!();
 }
 
 describe("the claim retention sweep", () => {
@@ -119,6 +129,39 @@ describe("the claim retention sweep", () => {
         await redeploy();
 
         expect(await claimedSlots("monthly-invoices")).toEqual([latest.toISOString()]);
+    });
+
+    it("prunes without a boot, and keeps the latest real claim behind a stranded future one", async () => {
+        // The sweep used to run only at boot, right after the future-slot
+        // release. On the scheduler's timer the stranded future claim is still
+        // there when it runs, and must not count as the job's latest.
+        const latest = slotDaysAgo(9);
+        await claim("monthly-invoices", slotDaysAgo(40));
+        await claim("monthly-invoices", latest);
+        await claim("monthly-invoices", slotDaysAgo(-3));
+
+        expect(await sweepWhileRunning()).toBe(1);
+
+        expect(await claimedSlots("monthly-invoices")).toEqual([latest.toISOString(), slotDaysAgo(-3).toISOString()]);
+    });
+
+    it("works through a backlog bigger than one batch", async () => {
+        // A per-minute job whose scheduler was never restarted: two weeks of
+        // claims, more than one 5,000-row batch past retention.
+        await db.query(
+            `INSERT INTO rebase.cron_claims (job_id, slot, claimed_at)
+             SELECT 'every-minute', s, s FROM generate_series(
+                 date_trunc('minute', now()) - interval '14 days', date_trunc('minute', now()), interval '1 minute') AS s`
+        );
+        const before = (await claimedSlots("every-minute")).length;
+
+        const swept = await sweepWhileRunning();
+
+        const after = await claimedSlots("every-minute");
+        expect(swept).toBeGreaterThan(5_000);
+        expect(after.length).toBe(before - swept);
+        // Everything inside the seven days is kept.
+        expect(Date.parse(after[0])).toBeGreaterThan(Date.now() - 7 * DAY - 2 * 60_000);
     });
 });
 

@@ -1,5 +1,6 @@
 import { createHmac, randomUUID } from "crypto";
-import { assertAllowedOutboundUrl, BlockedUrlError } from "./outbound-url-guard";
+import { BlockedUrlError } from "./outbound-url-guard";
+import { createOutboundPost, type OutboundPost, type OutboundResponse } from "./outbound-post";
 import { logger } from "../utils/logger";
 import { currentAmbientTransaction } from "../db/ambient-transaction";
 import type { JobQueueClient } from "../jobs/types";
@@ -31,6 +32,11 @@ export interface WebhookDeliveryResult {
     statusCode: number;
     responseBody: string;
     success: boolean;
+    /**
+     * The attempt this result is from, counting from 1. `0` for a delivery
+     * refused before any attempt: an in-process queue that was full, with
+     * `statusCode: 0` and `responseBody: "queue full"`.
+     */
     attemptNumber: number;
 }
 
@@ -57,7 +63,8 @@ export interface WebhookDispatcherOptions {
      */
     onDelivery?: (result: WebhookDeliveryResult) => void;
     /**
-     * Hostname resolver used by the destination guard. Defaults to
+     * Hostname resolver used by the destination guard — once per new
+     * connection, and its answer is where the connection goes. Defaults to
      * `dns.lookup`; injected by tests so a unit suite never asks a resolver.
      */
     lookup?: (hostname: string) => Promise<string[]>;
@@ -87,21 +94,58 @@ interface QueuedDelivery {
     payload: Record<string, unknown>;
 }
 
+/**
+ * One webhook's in-process deliveries, in the order they were queued, and the
+ * loop working through them. Each webhook has its own, so a receiver that is
+ * down — six seconds of backoff per delivery when it refuses, thirty-six when
+ * it times out — only ever delays itself.
+ */
+interface DeliveryLane {
+    queue: QueuedDelivery[];
+    running: Promise<void>;
+    /** Deliveries refused since the lane last had room, while it is full. */
+    refused: number;
+}
+
 /** Read at most this much of a response before cancelling the rest. */
 const MAX_RESPONSE_BYTES = 64 * 1024;
 
+/**
+ * Deliveries one webhook's in-process lane holds waiting, beside the one in
+ * flight. Past it, a new delivery is refused and reported through
+ * `onDelivery` rather than queued.
+ *
+ * Without a bound, a receiver that stayed down kept every change queued for it
+ * — each holding the row it describes — and at one write a second that is
+ * about 7,000 deliveries an hour, until the process ran out of memory. The
+ * `jobQueue` path has no such limit: its queue is rows.
+ */
+const MAX_QUEUED_DELIVERIES_PER_WEBHOOK = 10_000;
+
 export class WebhookDispatcher {
     private webhooks: WebhookConfig[] = [];
+    /** Attempts per in-process delivery, the first included. */
     private maxRetries = 3;
-    private retryDelays = [1000, 5000, 15000]; // Exponential backoff
+    /**
+     * The wait before each attempt after the first: 1 s before the second, 5 s
+     * before the third. One per retry — a third entry here was never reached.
+     */
+    private retryDelays = [1000, 5000];
     private readonly options: WebhookDispatcherOptions;
     private readonly timeoutMs: number;
-    private queue: QueuedDelivery[] = [];
-    private draining: Promise<void> | null = null;
+    /** In-process deliveries, one lane per webhook id. A lane is removed when it empties. */
+    private lanes = new Map<string, DeliveryLane>();
+
+    /** Sends one attempt, through the destination guard — see `outbound-post.ts`. */
+    private readonly post: OutboundPost;
 
     constructor(options: WebhookDispatcherOptions = {}) {
         this.options = options;
         this.timeoutMs = options.timeoutMs ?? 10000;
+        this.post = createOutboundPost({
+            allowPrivateNetworks: options.allowPrivateNetworks,
+            lookup: options.lookup
+        });
     }
 
     /** Register webhooks to watch */
@@ -111,14 +155,16 @@ export class WebhookDispatcher {
 
     /**
      * Called when a entity changes — checks if any webhook matches, and awaits
-     * every delivery, retries included.
+     * every delivery, retries included. The matching webhooks are delivered to
+     * at the same time, so the wait is the slowest receiver's, not the sum of
+     * all of them; the results come back in webhook order either way.
      *
      * **Do not await this inside a collection callback.** `afterSave` and
      * `afterDelete` run inside the write's Postgres transaction, so awaiting a
      * delivery here holds a pooled connection and the row's locks for as long
-     * as the receiver takes to answer — up to ~36s across three attempts, per
-     * matching webhook. Use {@link enqueueEntityChange} there; this method is
-     * for a custom function or a job that wants the results.
+     * as the slowest receiver takes to answer — up to ~36s across three
+     * attempts. Use {@link enqueueEntityChange} there; this method is for a
+     * custom function or a job that wants the results.
      */
     async onEntityChange(
         table: string,
@@ -129,14 +175,13 @@ export class WebhookDispatcher {
     ): Promise<WebhookDeliveryResult[]> {
         const jobs = this.buildDeliveries(table, event, entity, previousEntity);
 
-        const results: WebhookDeliveryResult[] = [];
-        for (const job of jobs) {
+        // One delivery per matching webhook, so nothing here has an order to
+        // keep but the results', which `Promise.all` keeps.
+        return Promise.all(jobs.map(async (job) => {
             const result = await this.deliverWithRetry(job.webhook, job.event, job.payload);
             this.options.onDelivery?.(result);
-            results.push(result);
-        }
-
-        return results;
+            return result;
+        }));
     }
 
     /**
@@ -201,15 +246,69 @@ export class WebhookDispatcher {
                         // memory one, so it does not fail silently — and the
                         // delivery still goes out rather than being lost.
                         logger.error("[webhooks] Could not queue a delivery; falling back to in-process", { error });
-                        this.queue.push(job);
-                        this.startDraining();
+                        this.enqueueInProcess([job]);
                     });
             }
             return;
         }
 
-        this.queue.push(...jobs);
-        this.startDraining();
+        this.enqueueInProcess(jobs);
+    }
+
+    /**
+     * Append each delivery to its webhook's lane, starting the lane if it is
+     * idle. Deliveries to one webhook keep their order; deliveries to
+     * different webhooks no longer wait for each other — one serial queue for
+     * every webhook meant a receiver that refused connections held every
+     * other receiver six seconds per queued event.
+     */
+    private enqueueInProcess(jobs: QueuedDelivery[]): void {
+        for (const job of jobs) {
+            const id = job.webhook.id;
+            const lane = this.lanes.get(id);
+            if (lane) {
+                if (lane.queue.length >= MAX_QUEUED_DELIVERIES_PER_WEBHOOK) {
+                    this.refuse(lane, job);
+                    continue;
+                }
+                lane.queue.push(job);
+                continue;
+            }
+            const started: DeliveryLane = { queue: [job], running: Promise.resolve(), refused: 0 };
+            this.lanes.set(id, started);
+            started.running = this.drainLane(id, started);
+        }
+    }
+
+    /**
+     * Turn a delivery away from a full lane, and say so: through `onDelivery`
+     * for each one — the hook a caller of {@link enqueueEntityChange} already
+     * watches for failures — and in the server log once per burst.
+     */
+    private refuse(lane: DeliveryLane, job: QueuedDelivery): void {
+        if (lane.refused === 0) {
+            logger.warn(
+                `[webhooks] Webhook "${job.webhook.id}" has ${MAX_QUEUED_DELIVERIES_PER_WEBHOOK} deliveries ` +
+                "waiting in this process; refusing new ones until it drains. Each is reported to onDelivery " +
+                "as \"queue full\". Pass a jobQueue to keep deliveries as rows instead."
+            );
+        }
+        lane.refused++;
+        try {
+            this.options.onDelivery?.({
+                webhookId: job.webhook.id,
+                event: job.event,
+                payload: job.payload,
+                statusCode: 0,
+                responseBody: "queue full",
+                success: false,
+                attemptNumber: 0
+            });
+        } catch (error) {
+            // This runs inside the caller's `enqueueEntityChange` — a
+            // collection callback, or a commit hook — which must not throw.
+            logger.error("[webhooks] onDelivery threw while reporting a refused delivery", { error });
+        }
     }
 
     /**
@@ -256,33 +355,62 @@ export class WebhookDispatcher {
      * Wait for every queued delivery to finish. For graceful shutdown, and for
      * tests that need to observe what {@link enqueueEntityChange} sent.
      *
+     * `timeoutMs` bounds the wait: a receiver that is down costs each of its
+     * queued deliveries up to ~36 seconds of retries, which a shutdown cannot
+     * always afford. Resolves `true` when everything finished, `false` when
+     * the budget ran out first — those deliveries carry on in the background
+     * for as long as the process does. Without it, waits however long the
+     * deliveries take.
+     *
      * In-process deliveries only — with a `jobQueue` configured there is
      * nothing here to wait for, because the deliveries are rows.
      */
-    async flush(): Promise<void> {
-        while (this.draining) {
-            await this.draining;
-        }
-    }
-
-    private startDraining(): void {
-        if (this.draining) return;
-        const run = this.drainQueue().finally(() => {
-            if (this.draining === run) this.draining = null;
-        });
-        this.draining = run;
-    }
-
-    private async drainQueue(): Promise<void> {
-        while (this.queue.length > 0) {
-            const job = this.queue.shift() as QueuedDelivery;
-            try {
-                const result = await this.deliverWithRetry(job.webhook, job.event, job.payload);
-                this.options.onDelivery?.(result);
-            } catch {
-                // `deliverWithRetry` converts everything to a result, but a
-                // throw from `onDelivery` must not take the queue down with it.
+    async flush(timeoutMs?: number): Promise<boolean> {
+        const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
+        // A loop, not one wait: a delivery can queue another (a fallback from
+        // the job queue, an `onDelivery` that enqueues) while this waits.
+        while (this.lanes.size > 0) {
+            const lanes = Promise.all([...this.lanes.values()].map(lane => lane.running));
+            if (deadline === undefined) {
+                await lanes;
+                continue;
             }
+            const remaining = deadline - Date.now();
+            if (remaining <= 0) return false;
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const expired = new Promise<true>(resolve => {
+                timer = setTimeout(() => resolve(true), remaining);
+            });
+            const ranOut = await Promise.race([lanes.then(() => false), expired]);
+            clearTimeout(timer);
+            if (ranOut) return false;
+        }
+        return true;
+    }
+
+    private async drainLane(id: string, lane: DeliveryLane): Promise<void> {
+        try {
+            while (lane.queue.length > 0) {
+                const job = lane.queue.shift() as QueuedDelivery;
+                if (lane.refused > 0) {
+                    logger.warn(
+                        `[webhooks] Webhook "${id}" is taking deliveries again; ${lane.refused} were refused ` +
+                        "while its queue was full."
+                    );
+                    lane.refused = 0;
+                }
+                try {
+                    const result = await this.deliverWithRetry(job.webhook, job.event, job.payload);
+                    this.options.onDelivery?.(result);
+                } catch {
+                    // `deliverWithRetry` converts everything to a result, but a
+                    // throw from `onDelivery` must not take the lane down with it.
+                }
+            }
+        } finally {
+            // Same tick as the empty check above, so nothing can be appended
+            // to a lane that is about to be dropped.
+            if (this.lanes.get(id) === lane) this.lanes.delete(id);
         }
     }
 
@@ -372,28 +500,19 @@ export class WebhookDispatcher {
         const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
         try {
             // The destination is a string from a config, and configs are loaded
-            // from environment *and* from databases. Validate it here rather
-            // than trusting every caller to: unchecked, `fetch` will happily
-            // POST to 169.254.169.254 and hand the response back through
-            // `responseBody`.
-            const url = await assertAllowedOutboundUrl(webhook.url, {
-                allowPrivateNetworks: this.options.allowPrivateNetworks,
-                lookup: this.options.lookup
-            });
-
-            const response = await fetch(url.href, {
-                method: "POST",
-                headers,
-                body,
-                signal: controller.signal,
-                // Following a redirect would send this POST — signature, custom
-                // headers and all — to an address the guard above never saw.
-                // A webhook receiver has no reason to redirect.
-                redirect: "manual"
-            });
+            // from environment *and* from databases. The guard judges it rather
+            // than trusting every caller to: unchecked, this would happily POST
+            // to 169.254.169.254 and hand the response back through
+            // `responseBody`. On Node it judges the address the connection is
+            // made to. Redirects are never followed: that would send this POST
+            // — signature, custom headers and all — to an address the guard
+            // never saw. A webhook receiver has no reason to redirect.
+            const response = await this.post(webhook.url, { headers, body, signal: controller.signal });
 
             if (response.status >= 300 && response.status < 400) {
-                const location = typeof response.headers?.get === "function" ? response.headers.get("location") : null;
+                const location = response.header("location");
+                // Unread, the body would hold its pooled connection.
+                await response.body?.cancel().catch(() => undefined);
                 return {
                     terminal: true,
                     result: {
@@ -457,9 +576,9 @@ export class WebhookDispatcher {
      * rest, so a receiver cannot buffer a 10 GB body into the pod before the
      * caller truncates it to 1000 characters.
      */
-    private async readCappedBody(response: Response): Promise<string> {
+    private async readCappedBody(response: OutboundResponse): Promise<string> {
         const stream = response.body;
-        if (!stream || typeof stream.getReader !== "function") {
+        if (!stream) {
             // A non-streaming Response — a test double, or a polyfilled fetch.
             // The abort signal is still armed, so a stalled body still fails;
             // only the size cap is unavailable here.

@@ -48,6 +48,7 @@ type Socket = { readyState: number; send: jest.Mock; on: jest.Mock; close: jest.
 
 let service: RealtimeService;
 let statements: string[];
+let transaction: jest.Mock;
 
 async function flush() {
     for (let i = 0; i < 40; i++) await Promise.resolve();
@@ -63,10 +64,10 @@ const frames = (ws: Socket) => ws.send.mock.calls.map(([frame]) => JSON.parse(fr
     type: string; subscriptionId?: string; rows?: unknown[]; row?: unknown; payload?: { error?: { code?: string } };
 });
 
-function subscribeList(clientId: string, subscriptionId: string, auth?: SubscriptionAuthContext, filter?: Record<string, unknown>) {
+function subscribeList(clientId: string, subscriptionId: string, auth?: SubscriptionAuthContext, filter?: Record<string, unknown>, page?: { limit: number }) {
     return service.handleClientMessage(clientId, {
         type: "subscribe_collection",
-        payload: { path: "posts", subscriptionId, ...(filter ? { filter } : {}) }
+        payload: { path: "posts", subscriptionId, ...(filter ? { filter } : {}), ...page }
     }, auth);
 }
 
@@ -83,6 +84,7 @@ beforeEach(() => {
         }),
         transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db))
     } as unknown as NodePgDatabase<Record<string, never>>;
+    transaction = (db as unknown as { transaction: jest.Mock }).transaction;
     const registry = new PostgresCollectionRegistry();
     registry.registerMultiple([posts]);
     service = new RealtimeService(db, registry);
@@ -90,7 +92,20 @@ beforeEach(() => {
     fetchCollectionForRest.mockClear();
     fetchOneForRest.mockClear();
     count.mockClear();
+    fetchCollectionForRest.mockImplementation(async () => [{ id: 1, title: "Row" }]);
+    fetchOneForRest.mockImplementation(async () => ({ id: 1, title: "Row" }));
 });
+
+/**
+ * Every read from here on returns a row it has not returned before, so each
+ * refetch has news to send: a refetch that finds the rows its subscribers
+ * were last sent sends them nothing (see "a refetch that finds nothing new").
+ */
+function everyReadIsNew() {
+    let version = 0;
+    fetchCollectionForRest.mockImplementation(async () => [{ id: 1, title: `Row ${++version}` }]);
+    fetchOneForRest.mockImplementation(async () => ({ id: 1, title: `Row ${++version}` }));
+}
 
 afterEach(async () => {
     await service.destroy();
@@ -101,12 +116,14 @@ describe("one write, many identical subscribers", () => {
     it("is one read and one count for all of them, and every one of them gets the frame", async () => {
         const sockets = Array.from({ length: 10 }, (_, i) => connect(`c${i}`));
         for (let i = 0; i < 10; i++) {
-            for (let j = 0; j < 5; j++) await subscribeList(`c${i}`, `s${j}`, ALICE);
+            // A full page, so there is something to count.
+            for (let j = 0; j < 5; j++) await subscribeList(`c${i}`, `s${j}`, ALICE, undefined, { limit: 1 });
         }
         await flush();
         fetchCollectionForRest.mockClear();
         count.mockClear();
         for (const ws of sockets) ws.send.mockClear();
+        everyReadIsNew();
 
         await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
         jest.advanceTimersByTime(350);
@@ -159,6 +176,7 @@ describe("one write, many identical subscribers", () => {
         await flush();
         fetchOneForRest.mockClear();
         for (const ws of sockets) ws.send.mockClear();
+        everyReadIsNew();
 
         // A numeric id on the subscription and the string a write reports are
         // one row.
@@ -180,6 +198,7 @@ describe("a subscription id", () => {
         await flush();
         a.send.mockClear();
         b.send.mockClear();
+        everyReadIsNew();
 
         await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
         jest.advanceTimersByTime(350);
@@ -195,6 +214,7 @@ describe("a subscription id", () => {
         await subscribeList("a", "sub-1", ALICE);
         await flush();
         a.send.mockClear();
+        everyReadIsNew();
 
         await service.handleClientMessage("b", { type: "unsubscribe", subscriptionId: "sub-1" });
         await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
@@ -286,5 +306,304 @@ describe("a statement that changes many rows", () => {
         // is loose for a slow runner and still an order of magnitude under
         // the walk it replaced.
         expect(elapsed).toBeLessThan(1500);
+    });
+
+    it("costs the same per row however many principals watch the list", async () => {
+        // Every changed row used to visit every list group on its path: a
+        // 100k-row UPDATE on a list open as 1,000 principals was 100M visits,
+        // ~3.9 s of event loop no socket or request on the instance got
+        // past. The groups are visited once per burst now. Two sizes, the
+        // same 10,000 changes: the time must not grow with the groups.
+        jest.useRealTimers();
+        const timeFor = async (principals: number) => {
+            await service.destroy();
+            service = new RealtimeService(service["db"], service["registry"]);
+            service.setDataDriver({ callContextWithin: () => ({}) } as never);
+            for (let i = 0; i < principals; i++) {
+                connect(`c${i}`);
+                await subscribeList(`c${i}`, "s", { uid: `user${i}`, roles: ["editor"] });
+            }
+            await flush();
+            const started = performance.now();
+            for (let i = 0; i < 10_000; i++) {
+                await service.notifyUpdate("posts", String(i), { _rebase_invalidated: true }, undefined, false, "cdc");
+            }
+            await new Promise((resolve) => setImmediate(resolve));
+            return performance.now() - started;
+        };
+        await timeFor(10);
+        const few = Math.min(await timeFor(10), await timeFor(10));
+        const many = Math.min(await timeFor(2000), await timeFor(2000));
+
+        // Measured on a laptop: 2,000 groups took 44x as long as 10 before,
+        // about as long now.
+        expect(many / few).toBeLessThan(4);
+    });
+});
+
+describe("a steady stream of writes", () => {
+    it("still reaches the subscribers, at least once a second", async () => {
+        // The refetch waits for 300 ms without a change. A collection written
+        // more often than that — an orders or events table at a few writes a
+        // second — never went quiet, so its subscribers got nothing for as
+        // long as the writes went on (measured: 0 frames during a 3 s stream
+        // of one write per 100 ms; the first one after the writes stopped).
+        const ws = connect("a");
+        await subscribeList("a", "s", ALICE);
+        await flush();
+        ws.send.mockClear();
+        everyReadIsNew();
+
+        const start = Date.now();
+        const deliveredAt: number[] = [];
+        for (let i = 0; i < 30; i++) {
+            await service.notifyUpdate("posts", String(i), { _rebase_invalidated: true });
+            jest.advanceTimersByTime(100);
+            await flush();
+            const updates = frames(ws).filter(f => f.type === "collection_update").length;
+            while (deliveredAt.length < updates) deliveredAt.push(Date.now() - start);
+        }
+
+        // 3 s of writes: a frame at least every ~1 s, from the first write on.
+        expect(deliveredAt.length).toBeGreaterThanOrEqual(3);
+        const gaps = deliveredAt.map((at, i) => at - (i === 0 ? 0 : deliveredAt[i - 1]));
+        expect(Math.max(...gaps, 3000 - deliveredAt[deliveredAt.length - 1])).toBeLessThanOrEqual(1100);
+    });
+});
+
+describe("one write to a list many different principals watch", () => {
+    it("refetches a few groups at a time, so the fan-out cannot take the whole pool", async () => {
+        // Every group armed by one change used to start its refetch in the
+        // same tick: 200 principals on a list were 200 transactions queued on
+        // the 20-connection pool every REST request shares (measured: an
+        // unrelated `SELECT 1` waited 521 ms behind one write's fan-out).
+        const users = Array.from({ length: 40 }, (_, i): SubscriptionAuthContext => ({ uid: `user${i}`, roles: ["editor"] }));
+        const sockets = users.map((_, i) => connect(`c${i}`));
+        for (let i = 0; i < users.length; i++) await subscribeList(`c${i}`, "s", users[i]);
+        await flush();
+        for (const ws of sockets) ws.send.mockClear();
+
+        let inFlight = 0;
+        let peak = 0;
+        const held: Array<() => void> = [];
+        fetchCollectionForRest.mockClear();
+        fetchCollectionForRest.mockImplementation(async () => {
+            peak = Math.max(peak, ++inFlight);
+            await new Promise<void>((release) => held.push(release));
+            inFlight--;
+            return [{ id: 1, title: "Edited" }];
+        });
+        try {
+            await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
+            jest.advanceTimersByTime(350);
+            await flush();
+            for (let round = 0; held.length > 0 && round < 100; round++) {
+                for (const release of held.splice(0)) release();
+                await flush();
+            }
+        } finally {
+            fetchCollectionForRest.mockImplementation(async () => [{ id: 1, title: "Row" }]);
+        }
+
+        // A quarter of the default 20-connection pool, and every group still served.
+        expect(peak).toBeLessThanOrEqual(5);
+        expect(fetchCollectionForRest).toHaveBeenCalledTimes(40);
+        for (const ws of sockets) expect(frames(ws).filter(f => f.type === "collection_update")).toHaveLength(1);
+    });
+});
+
+describe("a list refetch for sockets", () => {
+    const subscribePage = (clientId: string, subscriptionId: string, payload: Record<string, unknown>) =>
+        service.handleClientMessage(clientId, { type: "subscribe_collection", payload: { path: "posts", subscriptionId, ...payload } }, ALICE);
+    const lastMeta = (ws: Socket) => (frames(ws).filter(f => f.type === "collection_update").pop() as { meta?: Record<string, unknown> } | undefined)?.meta;
+
+    it("reads its rows and counts them in one transaction, as one principal", async () => {
+        // The count ran in a second transaction of its own: two pool
+        // acquisitions and two rounds of BEGIN / set_config / COMMIT per group
+        // per write (801 statements for one write with 100 principals).
+        const ws = connect("a");
+        await subscribePage("a", "s", { limit: 1 });
+        await flush();
+        expect(transaction).toHaveBeenCalledTimes(1);
+        transaction.mockClear();
+        count.mockClear();
+
+        await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
+        jest.advanceTimersByTime(350);
+        await flush();
+
+        expect(transaction).toHaveBeenCalledTimes(1);
+        expect(count).toHaveBeenCalledTimes(1);
+        expect(lastMeta(ws)).toMatchObject({ total: 1, limit: 1, offset: 0, hasMore: false });
+    });
+
+    it("does not count a first page that came back short: its length is the total", async () => {
+        const ws = connect("a");
+        await subscribePage("a", "s", { limit: 10 });
+        await flush();
+        expect(count).not.toHaveBeenCalled();
+        expect(lastMeta(ws)).toEqual({ total: 1, limit: 10, offset: 0, hasMore: false });
+    });
+
+    it.each([
+        ["a later page", { limit: 10, offset: 10 }],
+        ["a search", { limit: 10, searchString: "row" }],
+        ["a cursor page", { limit: 10, startAfter: { id: 0 } }]
+    ])("still counts %s that came back short", async (_label, payload) => {
+        connect("a");
+        await subscribePage("a", "s", payload);
+        await flush();
+        expect(count).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports a failed count as a partial frame, with its rows", async () => {
+        const ws = connect("a");
+        count.mockRejectedValueOnce(new Error("statement timeout"));
+        await subscribePage("a", "s", { limit: 1 });
+        await flush();
+        expect(frames(ws).filter(f => f.type === "collection_update")).toHaveLength(1);
+        expect(lastMeta(ws)).toEqual({ limit: 1, offset: 0, hasMore: false, partial: true });
+    });
+});
+
+/**
+ * A write anywhere in a collection refetches every list of it, and a list
+ * showing the first 50 of 10k rows comes back unchanged for 99.5% of them. The
+ * frame was sent anyway — ~30 KB per viewer per write, parsed, merged and
+ * re-rendered by every client for nothing.
+ */
+describe("a refetch that finds nothing new", () => {
+    const updates = (ws: Socket) => frames(ws).filter(f => f.type === "collection_update" || f.type === "single_update");
+    const write = async () => {
+        await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
+        jest.advanceTimersByTime(350);
+        await flush();
+    };
+
+    it("sends a list's subscribers nothing, and the next real change to each of them", async () => {
+        const a = connect("a");
+        const b = connect("b");
+        await subscribeList("a", "s", ALICE);
+        await subscribeList("b", "s", ALICE);
+        await flush();
+        expect(updates(a)).toHaveLength(1);
+        a.send.mockClear();
+        b.send.mockClear();
+
+        await write();
+        expect(fetchCollectionForRest).toHaveBeenCalled();
+        expect(updates(a)).toHaveLength(0);
+        expect(updates(b)).toHaveLength(0);
+
+        fetchCollectionForRest.mockResolvedValueOnce([{ id: 1, title: "Edited" }]);
+        await write();
+        expect(updates(a).map(f => f.rows)).toEqual([[{ id: 1, title: "Edited" }]]);
+        expect(updates(b).map(f => f.rows)).toEqual([[{ id: 1, title: "Edited" }]]);
+    });
+
+    it("compares each subscriber with what it was last sent, not with the group", async () => {
+        const a = connect("a");
+        await subscribeList("a", "s", ALICE);
+        await flush();
+        fetchCollectionForRest.mockResolvedValueOnce([{ id: 1, title: "Edited" }]);
+        await write();
+        // Joins the same group after the change: its first frame is the
+        // current rows, and only a change after that is news to it.
+        const b = connect("b");
+        fetchCollectionForRest.mockResolvedValueOnce([{ id: 1, title: "Edited" }]);
+        await subscribeList("b", "s", ALICE);
+        await flush();
+        a.send.mockClear();
+        b.send.mockClear();
+
+        fetchCollectionForRest.mockResolvedValueOnce([{ id: 1, title: "Edited" }]);
+        await write();
+        expect(updates(a)).toHaveLength(0);
+        expect(updates(b)).toHaveLength(0);
+    });
+
+    it("sends the same rows again after a failed refetch told the subscriber something else", async () => {
+        const a = connect("a");
+        await subscribeList("a", "s", ALICE);
+        await flush();
+        fetchCollectionForRest.mockRejectedValueOnce(new Error("connection reset"));
+        await write();
+        expect(frames(a).at(-1)?.type).toBe("error");
+        a.send.mockClear();
+
+        await write();
+        expect(updates(a)).toHaveLength(1);
+    });
+
+    it("sends a single-row subscriber nothing when its row reads the same", async () => {
+        const a = connect("a");
+        await service.handleClientMessage("a", { type: "subscribe_one", payload: { path: "posts", id: "1", subscriptionId: "one" } }, ALICE);
+        await flush();
+        a.send.mockClear();
+
+        await write();
+        expect(updates(a)).toHaveLength(0);
+
+        fetchOneForRest.mockResolvedValueOnce(null);
+        await write();
+        expect(updates(a).map(f => f.row)).toEqual([null]);
+    });
+});
+
+/**
+ * An in-process listener's teardown (`listenCollection` / `listenOne` in the
+ * driver, a function's `listen()`) called `unsubscribe(id)`, which walked every
+ * subscription on the server to find it: ~2 ms per teardown at 100k socket
+ * subscriptions, and the routed provider fans each one out to every provider.
+ */
+describe("ending an in-process subscription", () => {
+    class CountingMap<K, V> extends Map<K, V> {
+        visited = 0;
+        *entries(): MapIterator<[K, V]> {
+            for (const entry of super.entries()) {
+                this.visited++;
+                yield entry;
+            }
+        }
+        [Symbol.iterator](): MapIterator<[K, V]> {
+            return this.entries();
+        }
+        *values(): MapIterator<V> {
+            for (const [, value] of this.entries()) yield value;
+        }
+        *keys(): MapIterator<K> {
+            for (const [key] of this.entries()) yield key;
+        }
+    }
+
+    it("goes straight to it, whatever else the server holds, and leaves a socket's subscription of the same id alone", async () => {
+        const ws = connect("sock");
+        for (let i = 0; i < 300; i++) await subscribeList("sock", `s${i}`, ALICE, { n: ["==", i] });
+        // A socket's own "listener-1", which an in-process unsubscribe must not end.
+        await subscribeList("sock", "listener-1", ALICE);
+        const rows: unknown[] = [];
+        service.startDataDriverSubscription("listener-1", { type: "collection", path: "posts", collectionRequest: {}, authContext: ALICE }, (data) => rows.push(data));
+        service.subscribeToOne("listener-2", { clientId: "function:digest", path: "posts", id: "1" }, () => undefined);
+        await flush();
+
+        const subscriptions = new CountingMap(Reflect.get(service, "_subscriptions") as Map<string, unknown>);
+        Reflect.set(service, "_subscriptions", subscriptions);
+        service.unsubscribe("listener-1");
+        service.unsubscribe("listener-2");
+        service.unsubscribe("nobody");
+        expect(subscriptions.visited).toBe(0);
+
+        const left = [...(Reflect.get(service, "_subscriptions") as Map<string, { subscriptionId: string; clientId: string }>).values()];
+        expect(left.filter(s => s.subscriptionId === "listener-1").map(s => s.clientId)).toEqual(["sock"]);
+        expect(left.some(s => s.subscriptionId === "listener-2")).toBe(false);
+        expect(ws.readyState).toBe(1);
+
+        // Ended, it hears nothing more.
+        rows.length = 0;
+        everyReadIsNew();
+        await service.notifyUpdate("posts", "1", { _rebase_invalidated: true });
+        jest.advanceTimersByTime(350);
+        await flush();
+        expect(rows).toEqual([]);
     });
 });

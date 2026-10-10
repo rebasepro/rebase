@@ -60,6 +60,20 @@ export function isUncountedPath(pathname: string): boolean {
 const LATENCY_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
 
 /**
+ * How long a query waited for a pooled database connection, in milliseconds —
+ * opening one included, when the pool had to. Labelled by data source. See
+ * `pool-wait.ts`, which records it, and why it matters there.
+ */
+export const DB_POOL_WAIT_METRIC = "rebase_db_pool_wait_ms";
+
+/**
+ * Buckets for {@link DB_POOL_WAIT_METRIC}. A checkout from a pool with an idle
+ * connection takes well under a millisecond, so the low end is finer than a
+ * request's: the interesting number is how much of the tail is above zero.
+ */
+export const POOL_WAIT_BUCKETS_MS = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+
+/**
  * Separators for the composite map keys used internally.
  *
  * ASCII unit/record separators, which cannot appear in a Prometheus metric name
@@ -74,6 +88,11 @@ interface HistogramState {
     counts: number[];
     sum: number;
     total: number;
+}
+
+/** A named histogram series: its own bucket bounds, so families can differ. */
+interface NamedHistogramState extends HistogramState {
+    buckets: readonly number[];
 }
 
 /**
@@ -100,6 +119,7 @@ export class MetricsRegistry {
     private latency = new Map<string, HistogramState>();
     private gauges = new Map<string, number>();
     private counters = new Map<string, number>();
+    private histograms = new Map<string, NamedHistogramState>();
     readonly startedAt = Date.now();
 
     private static labelKey(labels: Record<string, string>): string {
@@ -181,6 +201,25 @@ total: 0 };
         this.gauges.set(key, value);
     }
 
+    /**
+     * Record one observation in a named histogram. `buckets` are its upper
+     * bounds, fixed by the first observation of the series.
+     */
+    observe(name: string, value: number, labels: Record<string, string> = {}, buckets: readonly number[] = LATENCY_BUCKETS_MS): void {
+        const key = MetricsRegistry.namedKey(name, labels);
+        let hist = this.histograms.get(key);
+        if (!hist) {
+            if (this.histograms.size >= MAX_SERIES) return;
+            hist = { buckets, counts: new Array(buckets.length + 1).fill(0), sum: 0, total: 0 };
+            this.histograms.set(key, hist);
+        }
+        hist.sum += value;
+        hist.total += 1;
+        let bucket = hist.buckets.findIndex(upper => value <= upper);
+        if (bucket === -1) bucket = hist.buckets.length;
+        hist.counts[bucket] += 1;
+    }
+
     /** Prometheus escaping: backslash, quote and newline, in that order. */
     private static formatLabels(labels: Record<string, string>, extra?: Record<string, string>): string {
         const all = { ...labels,
@@ -233,6 +272,29 @@ total: 0 };
             lines.push(`rebase_request_duration_ms_bucket${MetricsRegistry.formatLabels(labels, { le: "+Inf" })} ${cumulative}`);
             lines.push(`rebase_request_duration_ms_sum${MetricsRegistry.formatLabels(labels)} ${hist.sum.toFixed(3)}`);
             lines.push(`rebase_request_duration_ms_count${MetricsRegistry.formatLabels(labels)} ${hist.total}`);
+        }
+
+        const histogramNames = new Map<string, [string, NamedHistogramState][]>();
+        for (const [key, hist] of this.histograms) {
+            const [name, labelKey] = MetricsRegistry.splitNamedKey(key);
+            const list = histogramNames.get(name) ?? [];
+            list.push([labelKey, hist]);
+            histogramNames.set(name, list);
+        }
+        for (const [name, entries] of histogramNames) {
+            lines.push(`# TYPE ${name} histogram`);
+            for (const [labelKey, hist] of entries) {
+                const labels = MetricsRegistry.parseLabels(labelKey);
+                let cumulative = 0;
+                for (let i = 0; i < hist.buckets.length; i++) {
+                    cumulative += hist.counts[i];
+                    lines.push(`${name}_bucket${MetricsRegistry.formatLabels(labels, { le: String(hist.buckets[i]) })} ${cumulative}`);
+                }
+                cumulative += hist.counts[hist.buckets.length];
+                lines.push(`${name}_bucket${MetricsRegistry.formatLabels(labels, { le: "+Inf" })} ${cumulative}`);
+                lines.push(`${name}_sum${MetricsRegistry.formatLabels(labels)} ${hist.sum.toFixed(3)}`);
+                lines.push(`${name}_count${MetricsRegistry.formatLabels(labels)} ${hist.total}`);
+            }
         }
 
         for (const [name, entries] of MetricsRegistry.group(this.counters)) {

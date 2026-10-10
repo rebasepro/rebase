@@ -21,6 +21,7 @@ For each collection, the following endpoints are generated. Every other route th
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/data/:slug` | List entities |
+| `POST` | `/api/data/:slug/query` | <span class="since-badge" data-since="0.25">Since 0.25</span> The same listing, its query parameters in a JSON body — for a query too long for a URL. See [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | Count entities |
 | `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, optionally grouped. Takes the same filters as the list endpoint, and RLS applies to the rows being aggregated — see [Querying](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
@@ -38,6 +39,8 @@ Nested relations are accessible via URL paths:
 
 ```
 GET    /api/data/authors/42/posts         → list author's posts
+POST   /api/data/authors/42/posts/query   → the same listing, parameters in the body (0.24+)
+POST   /api/data/authors/42/posts/count   → the same count, parameters in the body (0.24+)
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
 PATCH  /api/data/authors/42/posts/7       → update the post
@@ -278,6 +281,15 @@ itself: `INVALID_LIMIT`, `INVALID_OFFSET` (a whole number of 0 or more) and
 the one asked for cannot be told apart from having reached the end of the
 collection, which is why none of them is clamped or ignored.
 
+### Skipping the count
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> `meta.total` is a `COUNT(*)` over every matching row — on a large table, most of
+what a list request costs. `?count=none` (`GET /api/data/orders?count=none`)
+skips it: no `meta.total`, while `meta.hasMore` stays exact (the read asks for one
+row past the page). `?count=exact` is the default; any other value is a 400
+`INVALID_COUNT`. A `?distinct=true` read is never counted, and neither is a
+vector search with a `vector_threshold` (see [Vector Search](/docs/backend/vector-search/)).
+
 ### Cursor pagination
 
 `offset` re-counts rows on every request, so a row inserted or deleted between
@@ -437,20 +449,16 @@ GET /api/data/products?searchString=wireless%20keyboard
 
 ## Vector Search
 
-If a collection defines a property with a type of `vector`, you can perform high-speed similarity searches using pgvector distance operations compiled directly in the database query.
+A collection with a `vector` property takes a nearest-neighbour search on the
+listing: `?vector_search=embedding&vector=[0.15,0.22,-0.05]`, with an optional
+`vector_distance` and `vector_threshold`. The parameters, thresholds and how
+filters behave on the index are on [Vector Search](/docs/backend/vector-search/).
 
-```bash
-GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_distance=cosine&vector_threshold=0.8
-```
+## Queries too long for a URL
 
-### Vector Query Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `vector_search` | `string` | The name of the vector property to query against. |
-| `vector` | `string` | A JSON-serialized array of floats representing the query vector. |
-| `vector_distance` | `string` | The distance metric to evaluate. Supported values: `cosine` (default, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
-| `vector_threshold` | `number` | Maximum distance threshold. Only records with distance less than this threshold are returned. |
+<span class="since-badge" data-since="0.25">Since 0.25</span> `POST /api/data/:slug/query` (this listing) and `POST /api/data/:slug/count`
+take the query parameters in a JSON body, for a query whose URL would not fit — an embedding, a long `in` list.
+See [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url).
 
 ## Relation Inclusion
 
@@ -484,16 +492,16 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 
 | Key | Meaning |
 |-----|---------|
-| `limit` | Rows **per parent row**, not across the page |
+| `limit` | Rows **per parent row**, not across the page. Applied by the query, so the rows past it are never read out of the database |
 | `where` | The same filter dialect the top-level `where` uses |
 | `logical` | An `or`/`and`/`not` group over the related rows |
-| `orderBy` | The same sort spelling, including the NULL placement |
+| `orderBy` | The same sort spelling, including the NULL placement. Ties, and a `limit` with no `orderBy`, go by the related row's key, ascending |
 | `fields` | Columns of the *related* row; its key always survives |
 | `include` | Relations of the related row, in turn |
+| `count` | <span class="since-badge" data-since="0.25">Since 0.25</span> `true` also returns each parent's total under `_count` (`"_count":{"comments":37}`), counted by the same statement. To-many relations only. See [Counting what a limit leaves out](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
 
-`true` means "load it whole", so `{"author":true}` and `author` are the same
-request. Both spellings work on the list route, the get-by-id route and the
-nested subcollection routes.
+`true` means "load it whole", so `{"author":true}` and `author` are the same request.
+Both spellings work on the list route, the get-by-id route and the nested subcollection routes.
 
 Each hop is one batched query for the whole page, never one per row.
 
@@ -507,10 +515,14 @@ Included relations are embedded directly in the response:
     "author": {
         "id": 42,
         "name": "Jane Doe",
-        "email": "jane@example.com"
+        "email": "jane@example.com",
+        "companyId": 7
     }
 }
 ```
+
+An included row is what the target's own route (`GET /api/data/authors/42`)
+serves: the same columns and encodings, foreign keys as columns, no reference objects.
 
 ## Writing
 

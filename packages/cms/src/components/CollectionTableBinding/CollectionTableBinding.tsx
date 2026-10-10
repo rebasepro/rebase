@@ -1,6 +1,6 @@
 import type { AdditionalFieldDelegate, AdminCollection } from "@rebasepro/cms-types";
 import { AdditionalFieldValue } from "../AdditionalFieldValue";
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useContext, useMemo, useRef } from "react";
 import { Entity, User, Property } from "@rebasepro/types";
 import { CollectionSize, RebaseContext } from "@rebasepro/cms-types";
 import { PropertyTableCell } from "./PropertyTableCell";
@@ -19,6 +19,7 @@ import { SelectableTable } from "../SelectableTable/SelectableTable";
 import { cls } from "@rebasepro/ui";
 import { getRowHeight, isDisabled } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
+import { deepEqual as equal } from "fast-equals";
 
 /**
  * This component is in charge of rendering a collection table with a high
@@ -99,13 +100,22 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         return Boolean(highlightedEntities?.some(e => e && e.id === entity.id && e.path === entity.path));
     }, [hasSelection, selectionController, highlightedEntities]);
 
-    // Memo-busting key for the cell renderer: it has to change whenever what is
-    // selected changes. The selection object is exactly that in both modes, and
-    // it is compared deeply.
-    const cellExtraData = useMemo(() => ({
-        selection: selectionController?.selection,
-        highlightedEntityIds: highlightedEntities?.map(e => e?.id)
-    }), [selectionController?.selection, highlightedEntities]);
+    // What the row actions are drawn from besides their row. Handed down by
+    // context rather than through the cell renderer, so that a change here
+    // draws the id column of each row and nothing else: it used to be the
+    // cells' memo key, and ticking one checkbox re-ran the renderer of every
+    // cell on screen (~460) to redraw the one column that shows a selection.
+    //
+    // The selection and the highlighted rows are dependencies, not fields: a
+    // builder may read either from its closure, and a change to them has to
+    // reach the actions it built. The highlighted rows by identity, not by
+    // array: a caller passing a new `[]` each render changes nothing.
+    const highlightedKey = JSON.stringify(highlightedEntities?.map(e => e ? [e.path, e.id] : null) ?? []);
+    const rowActionsContext: RowActionsContextValue<M> = useMemo(() => ({
+        tableRowActionsBuilder,
+        openEntityMode
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [tableRowActionsBuilder, openEntityMode, selectionController?.selection, highlightedKey]);
 
     const context: RebaseContext<USER> = useRebaseContext<USER>();
 
@@ -259,7 +269,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
             </EntityTableCell>
         );
 
-    }, [size]);
+    }, [size, additionalFieldsMap, context]);
 
     // Same source the filter fields read their engine from, so the header's
     // filter control and the field it opens cannot disagree about what the
@@ -294,6 +304,15 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         return [...columnsResult, ...additionalTableColumns];
     }, [properties, sortable, fixedFilter, engine, AdditionalHeaderWidget, additionalFields]);
 
+    // Held by value: the widget is an element, and a caller that builds it
+    // inline hands over a new one on every render. Each new one rebuilt the
+    // id column, so the table's columns, so every cell on screen.
+    const idHeaderWidgetRef = useRef(additionalIDHeaderWidget);
+    if (idHeaderWidgetRef.current !== additionalIDHeaderWidget && !equal(idHeaderWidgetRef.current, additionalIDHeaderWidget)) {
+        idHeaderWidgetRef.current = additionalIDHeaderWidget;
+    }
+    const stableIdHeaderWidget = idHeaderWidgetRef.current;
+
     const idColumn: VirtualTableColumn = useMemo(() => ({
         key: "id_ewcfedcswdf3",
         width: getIdColumnWidth?.() ?? (largeLayout ? 140 : 120),
@@ -302,8 +321,8 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
         frozen: largeLayout,
         headerAlign: "center",
         align: "center",
-        AdditionalHeaderWidget: () => additionalIDHeaderWidget
-    }), [getIdColumnWidth, largeLayout, additionalIDHeaderWidget]);
+        AdditionalHeaderWidget: () => stableIdHeaderWidget
+    }), [getIdColumnWidth, largeLayout, stableIdHeaderWidget]);
 
     const columns: VirtualTableColumn[] = useMemo(() => [
         idColumn,
@@ -322,25 +341,15 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
 
         try {
             if (props.columnIndex === 0) {
-                if (tableRowActionsBuilder)
-                    return tableRowActionsBuilder({
-                        entity: props.rowData!,
-                        size,
-                        width: column.width,
-                        frozen: column.frozen
-                    });
-                else
-                    return <CollectionRowActions entity={props.rowData!}
-                        width={column.width}
-                        frozen={column.frozen}
-                        isSelected={false}
-                        size={size}
-                        openEntityMode={openEntityMode}
-                        sortableNodeRef={props.sortableNodeRef}
-                        sortableStyle={props.sortableStyle}
-                        sortableAttributes={props.sortableAttributes}
-                        isDragging={props.isDragging}
-                        isDraggable={props.isDraggable}/>;
+                return <TableRowActions entity={props.rowData!}
+                    size={size}
+                    width={column.width}
+                    frozen={column.frozen}
+                    sortableNodeRef={props.sortableNodeRef}
+                    sortableStyle={props.sortableStyle}
+                    sortableAttributes={props.sortableAttributes}
+                    isDragging={props.isDragging}
+                    isDraggable={props.isDraggable}/>;
             } else if (additionalFieldsMap[columnKey]) {
                 return additionalCellRenderer(props);
             } else if (props.columnIndex < columns.length + 1) {
@@ -367,7 +376,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 <ErrorView error={e instanceof Error ? e : new Error(String(e))}/>
             </EntityTableCell>;
         }
-    }, [tableRowActionsBuilder, additionalCellRenderer, propertyCellRenderer, size]);
+    }, [additionalFieldsMap, additionalCellRenderer, propertyCellRenderer, size]);
 
     return (
 
@@ -383,6 +392,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 viewModeToggle={viewModeToggle}
                 loading={tableController.dataLoading}/>}
 
+            <RowActionsContext.Provider value={rowActionsContext as RowActionsContextValue<Record<string, unknown>>}>
             <SelectableTable columns={columns}
                 size={size}
                 inlineEditing={inlineEditing}
@@ -399,10 +409,68 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 emptyComponent={emptyComponent}
                 endAdornment={endAdornment}
                 AddColumnComponent={AddColumnComponent}
-                onColumnsOrderChange={onColumnsOrderChange}
-                extraData={cellExtraData}/>
+                onColumnsOrderChange={onColumnsOrderChange}/>
+            </RowActionsContext.Provider>
 
         </div>
     );
 
 };
+
+type RowActionsContextValue<M extends Record<string, unknown>> = {
+    tableRowActionsBuilder: CollectionTableBindingProps<M>["tableRowActionsBuilder"];
+    openEntityMode: NonNullable<CollectionTableBindingProps<M>["openEntityMode"]>;
+};
+
+const RowActionsContext = React.createContext<RowActionsContextValue<Record<string, unknown>>>({
+    tableRowActionsBuilder: undefined,
+    openEntityMode: "side_panel"
+});
+
+/**
+ * The first cell of a row: its actions, from the table's builder or the
+ * default ones. Reads the builder from context, so a new builder or a new
+ * selection redraws this cell in every row and leaves the property cells
+ * alone.
+ */
+function TableRowActions<M extends Record<string, unknown>>({
+    entity,
+    size,
+    width,
+    frozen,
+    sortableNodeRef,
+    sortableStyle,
+    sortableAttributes,
+    isDragging,
+    isDraggable
+}: {
+    entity: Entity<M>;
+    size: CollectionSize;
+    width: number;
+    frozen?: boolean;
+    sortableNodeRef?: (node: HTMLElement | null) => void;
+    sortableStyle?: React.CSSProperties;
+    sortableAttributes?: Record<string, unknown>;
+    isDragging?: boolean;
+    isDraggable?: boolean;
+}) {
+    const { tableRowActionsBuilder, openEntityMode } = useContext(RowActionsContext) as RowActionsContextValue<M>;
+    if (tableRowActionsBuilder)
+        return <>{tableRowActionsBuilder({
+            entity,
+            size,
+            width,
+            frozen
+        })}</>;
+    return <CollectionRowActions entity={entity}
+        width={width}
+        frozen={frozen}
+        isSelected={false}
+        size={size}
+        openEntityMode={openEntityMode}
+        sortableNodeRef={sortableNodeRef}
+        sortableStyle={sortableStyle}
+        sortableAttributes={sortableAttributes}
+        isDragging={isDragging}
+        isDraggable={isDraggable}/>;
+}

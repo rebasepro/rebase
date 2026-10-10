@@ -1,5 +1,5 @@
 ---
-sourceHash: 22cf5bf2953fb715
+sourceHash: 9531407dffbf3092
 title: Sicherheitsregeln (RLS)
 sidebar_label: Sicherheitsregeln
 description: Definieren Sie Row-Level-Security-Richtlinien für Ihre Collections mithilfe praktischer Shortcuts oder reiner SQL-Ausdrücke.
@@ -52,7 +52,8 @@ securityRules: [
 ]
 ```
 
-Dies generiert: `USING (user_id = rebase.uid())`
+Dies generiert: `USING ((user_id)::text = (SELECT rebase.uid()))` — zum `SELECT` siehe
+[Einmal pro Statement ausgewertet](#einmal-pro-statement-ausgewertet).
 
 ### Öffentlicher Zugriff
 
@@ -142,6 +143,25 @@ Wird aus `@rebasepro/types` importiert. Ausdrücke lassen sich zusammensetzen; O
 | `policy.literal(value)` | Ein String, eine Zahl, ein Boolean oder `null` |
 | `policy.authUid()` | `rebase.uid()` |
 | `policy.authRoles()` | `rebase.roles()` |
+
+#### Einmal pro Statement ausgewertet
+
+Jeder Teil einer Regel, der die Zeile nicht liest — die ID des Aufrufers, eine
+Rollenprüfung, ein Claim, `serverContext()` — wird innerhalb einer skalaren
+Unterabfrage kompiliert. Eine Besitzerregel wird zu
+`(user_id)::text = (SELECT rebase.uid())`, und der standardmäßige Admin-Read wird zu
+`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`.
+
+Postgres berechnet eine solche Unterabfrage einmal pro Statement (ein *initPlan*)
+statt einmal pro Zeile und plant so, als ließe die Prüfung die Hälfte der Tabelle
+durch statt 1,5%. Diese Schätzung hält eine tiefe Seite einer großen Tabelle auf
+ihrem Primärschlüssel: Ohne sie waren es bei Seite 401 von einer Million Zeilen ein
+sequenzieller Scan und eine Sortierung mit 640 MB. Wer was lesen oder schreiben
+darf, bleibt unverändert.
+
+Rohes `using` / `withCheck`-SQL erhält dieselbe Behandlung, wenn Rebase seine Struktur
+lesen kann (`owner_id = rebase.uid()` gehört dazu). Alles andere wird unverändert
+eingefügt, umschließen Sie die Aufrufe also selbst: `(SELECT rebase.uid())`.
 
 ### `authenticated()` und `registered()`
 

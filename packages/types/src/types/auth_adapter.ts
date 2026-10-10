@@ -347,6 +347,16 @@ export interface UserCreationWriteContract {
      * deletes it before the row is ever built.
      */
     extraFields: string[];
+    /**
+     * Each body's `prepareUserCreation` touches nothing but its own result —
+     * no hook, no email, no write — so a bulk create may prepare several at
+     * once. The built-in adapter's path with no `onCreateUser`, no
+     * `onAdminCreateUser` and the default `hashPassword` is: it hashes a
+     * password and normalizes an email, and a 1,000-row bulk spent half a
+     * minute hashing one password at a time. Leave it unset when a hook runs:
+     * preparations then run one at a time, in the order the rows were given.
+     */
+    independent?: boolean;
 }
 
 /**

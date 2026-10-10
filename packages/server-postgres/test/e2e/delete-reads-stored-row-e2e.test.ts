@@ -166,8 +166,8 @@ describe("a delete reads the row it deletes (E2E)", () => {
         // Boot order, as the bootstrapper runs it: the restricted role, then
         // history — which routes a write's entry through its own transaction.
         await ensureAppRole(async (text) => (await pool.query(text)).rows as Record<string, unknown>[], ["public", "rebase"]);
-        const historyInTransaction = await ensureHistoryTableExists(db as never);
-        expect(historyInTransaction).toBe(true);
+        const historyTable = await ensureHistoryTableExists(db as never);
+        expect(historyTable.inTransaction).toBe(true);
 
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([contractsCollection]);
@@ -176,7 +176,7 @@ describe("a delete reads the row it deletes (E2E)", () => {
         realtime = new RealtimeService(db as never, registry);
         driver = new PostgresBackendDriver(
             db as never, realtime as never, registry,
-            undefined, undefined, new HistoryService(db as never, undefined, { inTransaction: historyInTransaction })
+            undefined, undefined, new HistoryService(db as never, undefined, historyTable)
         );
         driver.rlsUserRole = REBASE_USER_ROLE;
         realtime.setDataDriver(driver);

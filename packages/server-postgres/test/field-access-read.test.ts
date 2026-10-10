@@ -15,7 +15,8 @@
  * thirteenth. These tests establish it the way the driver does.
  */
 import { CollectionConfig } from "@rebasepro/types";
-import { toFlatRow, toRestRow, stripUnreadable } from "../src/services/row-pipeline";
+import { resolveCollectionRelations } from "@rebasepro/common";
+import { toFlatRow, toRestRow, stripUnreadable, canReadRelation } from "../src/services/row-pipeline";
 import { withFieldViewer, currentFieldViewer } from "../src/services/field-viewer";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
@@ -178,6 +179,42 @@ describe("`_matches`, the list of fields a search hit", () => {
     });
 });
 
+describe("`_count`, the totals of counted relations", () => {
+    /**
+     * `include: { reviews: { limit, count: true } }` serves the total beside
+     * the rows. A relation property the caller may not read is withheld whole,
+     * and its total says as much about it as its rows: it goes with them.
+     */
+    const team = {
+        name: "Teams",
+        slug: "teams",
+        properties: {
+            id: { name: "Id", type: "number", isId: "increment" },
+            members: { name: "Members", type: "relation", relationName: "members" },
+            reviews: { name: "Reviews", type: "relation", relationName: "reviews", access: { read: ["hr"] } }
+        }
+    } as unknown as CollectionConfig;
+
+    it("loses the total of a relation the caller cannot read, and keeps the rest", () => {
+        const raw = { id: 1, members: [], reviews: [], _count: { members: 12, reviews: 3 } };
+        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, team));
+        expect(served).not.toHaveProperty("reviews");
+        expect(served._count).toEqual({ members: 12 });
+    });
+
+    it("goes altogether when every counted relation is withheld", () => {
+        const raw = { id: 1, reviews: [], _count: { reviews: 3 } };
+        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, team));
+        expect(served).not.toHaveProperty("_count");
+    });
+
+    it("is untouched for a caller who can read them all", () => {
+        const raw = { id: 1, members: [], reviews: [], _count: { members: 12, reviews: 3 } };
+        const served = withFieldViewer({ roles: ["hr"] }, () => stripUnreadable(raw, team));
+        expect(served._count).toEqual({ members: 12, reviews: 3 });
+    });
+});
+
 describe("the trusted server plane", () => {
     /**
      * No viewer means no request: an in-process `rebase.data` read, a migration,
@@ -255,5 +292,62 @@ describe("a withheld to-one relation", () => {
     it("keeps it for a caller who may read the relation", () => {
         const rest = withFieldViewer({ roles: ["hr"] }, () => toRestRow(person(), people, registry));
         expect(rest.bandId).toBe(7);
+    });
+});
+
+describe("a relation an include may load (`canReadRelation`)", () => {
+    /**
+     * The include loader asks this before it loads a relation, because the
+     * REST rows are stripped before it runs: a withheld relation property it
+     * loaded anyway was written back onto the stripped row, `_count` beside it
+     * (pinned end to end in `test/e2e/include-field-access-e2e.test.ts`). Here,
+     * the three ways a property can name the relation it withholds.
+     */
+    const tags = {
+        name: "Tags", slug: "tags",
+        properties: { id: { name: "Id", type: "number", isId: "increment" } }
+    } as unknown as CollectionConfig;
+
+    const projects = {
+        name: "Projects",
+        slug: "projects",
+        properties: {
+            id: { name: "Id", type: "number", isId: "increment" },
+            // Inline: the include key is the property key.
+            labels: {
+                name: "Labels", type: "relation", access: { read: ["hr"] },
+                relation: { kind: "manyToMany", target: () => tags }
+            },
+            // Addresses an entry of `relations` under a name of its own.
+            owner: {
+                name: "Owner", type: "relation", access: { read: ["hr"] },
+                relation: { kind: "belongsTo", relationName: "manager", target: () => staff, localKey: "manager_id" }
+            },
+            // Named exactly as the `relations` entry it stands for.
+            reviewer: { name: "Reviewer", type: "relation", relationName: "reviewer", access: { read: ["hr"] } }
+        },
+        relations: [
+            { kind: "belongsTo", relationName: "manager", target: () => staff, localKey: "manager_id" },
+            { kind: "belongsTo", relationName: "reviewer", target: () => staff, localKey: "reviewer_id" },
+            // No property at all: a record tab, with no field rule to apply.
+            { kind: "belongsTo", relationName: "sponsor", target: () => staff, localKey: "sponsor_id" }
+        ]
+    } as unknown as CollectionConfig;
+
+    const relations = resolveCollectionRelations(projects);
+    const readable = (key: string, roles: string[]) =>
+        withFieldViewer({ roles }, () => canReadRelation(projects, key, relations[key]));
+
+    it.each(["labels", "manager", "reviewer"])("withholds '%s' from a caller without the role", (key) => {
+        expect(relations[key]).toBeDefined();
+        expect(readable(key, ["staff"])).toBe(false);
+    });
+
+    it.each(["labels", "manager", "reviewer", "sponsor"])("serves '%s' to a caller holding it", (key) => {
+        expect(readable(key, ["hr"])).toBe(true);
+    });
+
+    it("serves a relation no property declares", () => {
+        expect(readable("sponsor", ["staff"])).toBe(true);
     });
 });

@@ -1,6 +1,6 @@
 import type { OrderByTuple, Property } from "@rebasepro/types";
 import { serializeOrderBy } from "@rebasepro/common";
-import type { AdditionalFieldDelegate, EntityAction, AdminCollection } from "@rebasepro/cms-types";
+import type { AdditionalFieldDelegate, EntityAction, AdminCollection, SlotContribution } from "@rebasepro/cms-types";
 import {
     Entity,
     EntityReference,
@@ -42,6 +42,7 @@ import {
     useData,
     useDataTableController,
     useLargeLayout,
+    populateFetchCache,
     usePermissions,
     useScrollRestoration,
     useSlot,
@@ -90,6 +91,70 @@ import { resolveComponentRef, saveEntityWithCallbacks } from "@rebasepro/app";
 
 const EMPTY_ARRAY: never[] = [];
 
+/** What the plugins contributed to the table's add-column slot, for {@link PluginAddColumnComponents}. */
+const PluginAddColumnsContext = React.createContext<React.ReactNode[]>(EMPTY_ARRAY);
+
+function PluginAddColumnComponents() {
+    const components = React.useContext(PluginAddColumnsContext);
+    return (
+        <div className="flex flex-row items-center gap-2">
+            {components}
+        </div>
+    );
+}
+
+/**
+ * What the plugins' column-header actions are handed besides their column:
+ * this render's collection and table controller. `null` when no plugin
+ * contributes one.
+ */
+type HeaderActionsScope = {
+    contributions: SlotContribution<"collection.header.action">[],
+    path: string,
+    collection: AdminCollection,
+    tableController: EntityTableController,
+    parentCollectionSlugs: string[],
+    parentEntityIds: string[]
+};
+const PluginHeaderActionsContext = React.createContext<HeaderActionsScope | null>(null);
+
+/**
+ * The `collection.header.action` contributions for one column. One component
+ * type for the life of the view, like {@link PluginAddColumnComponents}: the
+ * table's columns are built once, and their headers re-render only when their
+ * own props change, so what the actions are handed reaches them through
+ * context. It was closed over when the header was built — the table controller
+ * of the first render (a search, filter or sort typed since never reached a
+ * header action) and the collection of the render before.
+ */
+function PluginHeaderActions({
+    property,
+    propertyKey,
+    onHover
+}: {
+    property: Property,
+    propertyKey: string,
+    onHover: boolean
+}) {
+    const scope = React.useContext(PluginHeaderActionsContext);
+    if (!scope) return null;
+    const headerSlotProps = {
+        property,
+        propertyKey,
+        onHover,
+        path: scope.path,
+        collection: scope.collection,
+        tableController: scope.tableController,
+        parentCollectionSlugs: scope.parentCollectionSlugs,
+        parentEntityIds: scope.parentEntityIds
+    };
+    return <>{scope.contributions.map((s, i) => (
+        <ErrorBoundary key={`header_action_${propertyKey}_${i}`}>
+            <s.Component {...headerSlotProps} {...(s.props ?? {})}/>
+        </ErrorBoundary>
+    ))}</>;
+}
+
 /**
  * @group Components
  */
@@ -135,6 +200,41 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
     selectedTab?: string;
 
 } & AdminCollection<M>;
+
+/**
+ * Props a caller commonly rebuilds on every render — a parent path array, a
+ * properties object, an `Actions` list made with `toArray` — compared by value,
+ * so a re-render that builds the same ones again does not redraw the view.
+ */
+const PROPS_COMPARED_BY_VALUE = new Set<string>([
+    "path", "parentCollectionSlugs", "parentEntityIds", "isSubCollection", "className",
+    "properties", "propertiesOrder", "hideIdFromCollection", "inlineEditing", "selectionEnabled",
+    "selectionController", "Actions", "defaultSize", "includeJsonView", "additionalFields",
+    "sideDialogWidth", "openEntityMode", "exportable", "history", "fixedFilter",
+    "selectedEntityId", "selectedTab"
+]);
+
+/**
+ * Whether the view would draw the same thing with these props.
+ *
+ * Every prop counts: the listed ones by value, every other one — the name, the
+ * entity actions, the custom views, the callbacks, anything a collection
+ * carries — by reference. It used to compare the listed ones only, so a
+ * collection passed as props (one not in the registry, where the view reads it
+ * from) that changed anything else was never redrawn. A caller spreading a
+ * registry collection hands over the same references each render.
+ */
+function collectionViewPropsEqual(a: CollectionViewBindingProps<any>, b: CollectionViewBindingProps<any>): boolean {
+    const previous = a as Record<string, unknown>;
+    const next = b as Record<string, unknown>;
+    const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+    for (const key of keys) {
+        if (previous[key] === next[key]) continue;
+        if (PROPS_COMPARED_BY_VALUE.has(key) && equal(previous[key], next[key])) continue;
+        return false;
+    }
+    return true;
+}
 
 /**
  * This component is in charge of binding a driver path with an {@link AdminCollection}
@@ -265,16 +365,15 @@ const CollectionViewBindingInner = React.memo(
             }, 2400);
         }, [highlightedEntity]);
 
-        const checkInlineEditing = useCallback((entity?: Entity<M>): boolean => {
-            const collection = collectionRef.current;
-            if (!canEdit(collection, path, entity ?? null)) {
-                return false;
-            }
-            return collection.inlineEditing === undefined || collection.inlineEditing;
-        }, [canEdit, path]);
+        // From this render's collection. It was read from `collectionRef`,
+        // which an effect updates after the render that reads it, so a change
+        // to `inlineEditing` (or to what the user may edit) reached the table
+        // one render late — or never, if nothing rendered again.
+        const inlineEditingEnabled = canEdit(collection, path, null) &&
+            (collection.inlineEditing === undefined || collection.inlineEditing);
 
         const selectionEnabled = collection.selectionEnabled === undefined || collection.selectionEnabled;
-        const hoverRow = !checkInlineEditing();
+        const hoverRow = !inlineEditingEnabled;
 
         const [popOverOpen, setPopOverOpen] = useState(false);
 
@@ -414,7 +513,11 @@ const CollectionViewBindingInner = React.memo(
             collection,
             lastDeleteTimestamp,
             scrollRestoration,
-            updateUrl
+            updateUrl,
+            // The board reads only the search and filters from it; each of its
+            // columns runs its own window. A live first page here would be one
+            // more subscription nothing draws.
+            enabled: viewMode !== "kanban"
         });
 
         const tableKey = React.useRef<string>(Math.random().toString(36));
@@ -441,6 +544,9 @@ const CollectionViewBindingInner = React.memo(
             }
 
             const entityPath = path ?? clickedEntity.path;
+            // The row on screen is what the record opens with, while its own
+            // read catches up — the one row clicked, not every row held.
+            populateFetchCache(entityPath, [clickedEntity]);
             navigateToEntity({
                 navigation: urlController,
                 path: entityPath,
@@ -864,6 +970,10 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             return (largeLayout ? (80 + actionsWidth) : (70 + actionsWidth)) + (collapsedActions.length > 0 ? (largeLayout ? 40 : 30) : 0);
         }, [getActionsForEntity, largeLayout]);
 
+        const customEntityActions = useMemo(() => (collection.entityActions ?? EMPTY_ARRAY)
+            .map(action => resolveEntityAction(action, customizationController.entityActions))
+            .filter(Boolean) as EntityAction<M>[], [collection.entityActions, customizationController.entityActions]);
+
         const tableRowActionsBuilder = useCallback(({
             entity,
             size,
@@ -877,9 +987,6 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         }) => {
 
             const isSelected = usedSelectionController.isEntitySelected(entity);
-            const customEntityActions = (collection.entityActions ?? EMPTY_ARRAY)
-                .map(action => resolveEntityAction(action, customizationController.entityActions))
-                .filter(Boolean) as EntityAction<M>[];
 
             const actions = getActionsForEntity({
                 entity,
@@ -906,7 +1013,25 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                 />
             );
 
-        }, [updateLastDeleteTimestamp, usedSelectionController]);
+            // Everything it reads. It listed two of them, so the row actions
+            // kept the first collection, actions, open mode and
+            // `selectionEnabled` they were built with.
+        }, [updateLastDeleteTimestamp, usedSelectionController, customEntityActions, getActionsForEntity,
+            activeSelectionEnabled, unselectNavigatedEntity, collection, path, openEntityMode]);
+
+        // Built once per change rather than once per render: each of these is a
+        // prop of the table (and of the other views), and a new array or a new
+        // element on every render of this component re-rendered every row of the
+        // table — twice, the second time for the columns the id header widget
+        // rebuilt — on each window emit, count arrival and popover toggle.
+        const highlightedEntities = useMemo(
+            () => highlightedEntity ? [highlightedEntity] : EMPTY_ARRAY,
+            [highlightedEntity]);
+        const idHeaderWidget = useMemo(() => <EntityIdHeaderWidget
+            path={path}
+            idPath={path}
+            collection={collection}
+            openEntityMode={openEntityMode}/>, [path, collection, openEntityMode]);
 
         // EntitiesCount fetches the count and reports it — the toolbar renders it
         const countFetcher = <EntitiesCount
@@ -949,41 +1074,26 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             .filter(s => s.slot === "collection.header.action")
             .sort((a, b) => (a.order ?? 50) - (b.order ?? 50)), [resolvedSlots]);
 
-        const buildAdditionalHeaderWidget = useCallback(({
-            property,
-            propertyKey,
-            onHover
-        }: {
-            property: Property,
-            propertyKey: string,
-            onHover: boolean
-        }) => {
-            const collection = collectionRef.current;
-            const headerSlotProps = {
-                property,
-                propertyKey,
-                onHover,
+        // This render's values, for PluginHeaderActions. Null when no plugin
+        // contributes a header action, so the headers have nothing to follow.
+        const headerActionsScope = useMemo<HeaderActionsScope | null>(() => headerActionContributions.length > 0
+            ? {
+                contributions: headerActionContributions,
                 path,
                 collection: collection as AdminCollection,
                 tableController: tableController as EntityTableController,
                 parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
-parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
-            };
-            return <>{headerActionContributions.map((s, i) => (
-                <ErrorBoundary key={`header_action_${propertyKey}_${i}`}>
-                    <s.Component {...headerSlotProps} {...(s.props ?? {})}/>
-                </ErrorBoundary>
-            ))}</>;
-        }, [headerActionContributions, path, parentCollectionSlugs]);
-
-        const addColumnComponentInternal = pluginAddColumnComponents.length > 0
-            ? function () {
-                return (
-                    <div className="flex flex-row items-center gap-2">
-                        {pluginAddColumnComponents}
-                    </div>
-                );
+                parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
             }
+            : null, [headerActionContributions, path, collection, tableController, parentCollectionSlugs, parentEntityIds]);
+
+        // One component type for the life of the view: the plugins' controls
+        // reach it through context. A function declared here was a new
+        // component type on every render — the table's columns changed with
+        // it, and the header remounted whatever the plugins had drawn, closing
+        // anything they had open, on every row update.
+        const addColumnComponentInternal = pluginAddColumnComponents.length > 0
+            ? PluginAddColumnComponents
             : undefined;
 
         const onColumnsOrderChange = useCallback((newColumns: VirtualTableColumn[]) => {
@@ -1145,7 +1255,7 @@ parentEntityIds,
                     canCreate={canCreateEntities}
                     selectionController={usedSelectionController}
                     selectionEnabled={selectionEnabled}
-                    highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                    highlightedEntities={highlightedEntities}
                     deletedEntities={deletedEntities}
                     emptyComponent={emptyComponent}
                     size={activeCustomView!.sizeable ? customViewSize : undefined}
@@ -1163,7 +1273,7 @@ parentEntityIds,
                 onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
-                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                highlightedEntities={highlightedEntities}
                 deletedEntities={deletedEntities}
                 emptyComponent={emptyComponent}
             />
@@ -1175,7 +1285,7 @@ parentEntityIds,
                 onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
-                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                highlightedEntities={highlightedEntities}
                 onScroll={tableController.onScroll}
                 initialScroll={tableController.initialScroll}
                 size={cardSize}
@@ -1189,7 +1299,7 @@ parentEntityIds,
                 onEntityClick={onEntityClick}
                 selectionController={usedSelectionController}
                 selectionEnabled={selectionEnabled}
-                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                highlightedEntities={highlightedEntities}
                 size={listSize}
                 emptyComponent={emptyComponent}
                 selectedEntityId={selectedEntityIdProp}
@@ -1198,6 +1308,8 @@ parentEntityIds,
                 openEntityMode={openEntityMode}
             />
         ) : (
+            <PluginAddColumnsContext.Provider value={pluginAddColumnComponents}>
+            <PluginHeaderActionsContext.Provider value={headerActionsScope}>
             <ResolvedCollectionTable
                 key={`collection_table_${path}`}
                 hideToolbar={true}
@@ -1213,7 +1325,7 @@ parentEntityIds,
                 tableRowActionsBuilder={tableRowActionsBuilder}
                 uniqueFieldValidator={uniqueFieldValidator}
                 selectionController={usedSelectionController}
-                highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                highlightedEntities={highlightedEntities}
                 defaultSize={tableSize}
                 properties={resolvedCollection.properties}
                 getPropertyFor={getPropertyFor}
@@ -1221,18 +1333,16 @@ parentEntityIds,
                 initialScroll={tableController.initialScroll}
                 emptyComponent={emptyComponent}
                 hoverRow={hoverRow}
-                inlineEditing={checkInlineEditing()}
-                AdditionalHeaderWidget={buildAdditionalHeaderWidget}
+                inlineEditing={inlineEditingEnabled}
+                AdditionalHeaderWidget={PluginHeaderActions}
                 AddColumnComponent={addColumnComponentInternal}
                 getIdColumnWidth={getIdColumnWidth}
-                additionalIDHeaderWidget={<EntityIdHeaderWidget
-                    path={path}
-                    idPath={path}
-                    collection={collection}
-                    openEntityMode={openEntityMode}/>}
+                additionalIDHeaderWidget={idHeaderWidget}
                 openEntityMode={openEntityMode}
                 onColumnsOrderChange={onColumnsOrderChange}
             />
+            </PluginHeaderActionsContext.Provider>
+            </PluginAddColumnsContext.Provider>
         );
 
         const detailOpen = selectedEntityIdProp !== undefined;
@@ -1313,7 +1423,7 @@ parentEntityIds,
                         onNewClick={onNewClick}
                         selectionController={usedSelectionController}
                         selectionEnabled={selectionEnabled}
-                        highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                        highlightedEntities={highlightedEntities}
                         onScroll={tableController.onScroll}
                         initialScroll={tableController.initialScroll}
                         size={listSize}
@@ -1379,29 +1489,7 @@ parentEntityIds,
         );
 
         return mainContent;
-    }, (a, b) => {
-        return equal(a.path, b.path) &&
-            equal(a.parentCollectionSlugs, b.parentCollectionSlugs) && equal(a.parentEntityIds, b.parentEntityIds) &&
-            equal(a.isSubCollection, b.isSubCollection) &&
-            equal(a.className, b.className) &&
-            equal(a.properties, b.properties) &&
-            equal(a.propertiesOrder, b.propertiesOrder) &&
-            equal(a.hideIdFromCollection, b.hideIdFromCollection) &&
-            equal(a.inlineEditing, b.inlineEditing) &&
-            equal(a.selectionEnabled, b.selectionEnabled) &&
-            equal(a.selectionController, b.selectionController) &&
-            equal(a.Actions, b.Actions) &&
-            equal(a.defaultSize, b.defaultSize) &&
-            equal(a.includeJsonView, b.includeJsonView) &&
-            equal(a.additionalFields, b.additionalFields) &&
-            equal(a.sideDialogWidth, b.sideDialogWidth) &&
-            equal(a.openEntityMode, b.openEntityMode) &&
-            equal(a.exportable, b.exportable) &&
-            equal(a.history, b.history) &&
-            equal(a.fixedFilter, b.fixedFilter) &&
-            equal(a.selectedEntityId, b.selectedEntityId) &&
-            equal(a.selectedTab, b.selectedTab);
-    }) as React.FunctionComponent<CollectionViewBindingProps<any>>;
+    }, collectionViewPropsEqual) as React.FunctionComponent<CollectionViewBindingProps<any>>;
 
 export const CollectionViewBinding = React.memo(
     function CollectionViewBinding<M extends Record<string, unknown>>(props: CollectionViewBindingProps<M>) {

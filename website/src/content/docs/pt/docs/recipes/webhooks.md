@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d8f8d760d14c7f4
+sourceHash: 39e76a1b431b1678
 title: "Receita: Integração de Webhook"
 sidebar_label: Webhooks
 description: Utilize callbacks de entidade para enviar webhooks a serviços externos quando os dados mudam, sem manter aberta a transação da escrita.
@@ -73,7 +73,10 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
 ```
 
 A fila é em processo e em memória: uma falha do processo ou um deploy entre a confirmação e a
-entrega perde o evento. Chame `await dispatcher.flush()` no encerramento. Se as entregas precisam
+entrega perde o evento. Cada webhook tem a sua própria fila, então um receptor fora do ar atrasa apenas
+as suas próprias entregas, nunca as de outro webhook. Chame `await dispatcher.flush(10_000)` no encerramento: ele espera
+o que está na fila e resolve `false` se o orçamento de tempo acabar antes, porque um receptor que
+está fora do ar pode reter cada uma das suas entregas por até ~36 segundos de tentativas. Se as entregas precisam
 sobreviver a um reinício, escreva uma linha de outbox na mesma transação e esvazie-a a partir de um
 job.
 

@@ -42,6 +42,28 @@ describe("DatabasePoolManager", () => {
         mockPoolInstances = [];
     });
 
+    /**
+     * A per-database pool (cross-database admin SQL, a branch's registry)
+     * waited forever for a connection and set no statement timeout: pg's
+     * `connectionTimeoutMillis` defaults to 0. Ten long queries against a branch
+     * and the eleventh hung with no answer, where the main pool gives a 503.
+     */
+    describe("per-database pool limits", () => {
+        it("gives each pool the main pool's connect, statement and read timeouts", async () => {
+            const { Pool } = await import("pg");
+            new DatabasePoolManager(VALID_CONNECTION_STRING).getPool("branch_db");
+
+            expect(Pool).toHaveBeenCalledWith(expect.objectContaining({
+                connectionTimeoutMillis: 10_000,
+                statement_timeout: 30_000,
+                query_timeout: 60_000,
+                keepAlive: true,
+                max: 10,
+                idleTimeoutMillis: 10_000
+            }));
+        });
+    });
+
     // ── Constructor ────────────────────────────────────────────────────────
     describe("constructor", () => {
         it("should extract the default database name from the connection string", () => {

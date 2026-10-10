@@ -47,9 +47,16 @@ the difference between a working player and a broken one.
 - Revalidation wins over a range: a request carrying both `If-None-Match` and
   `Range` gets the `304`.
 
-On local storage only the requested slice is read from disk. On S3 and GCS the
-object is still fetched whole — a `StorageController` has no ranged read — so the
-saving is on the response, not upstream.
+<span class="since-badge" data-since="0.25">Since 0.25</span> Only the requested bytes are read — from disk on local storage, and with a
+ranged read from S3 and GCS — and every object is streamed to the client as it
+is read rather than held in memory first, so serving a large video costs the
+server the same memory as serving a thumbnail. A revalidation that ends in a
+`304`, a `HEAD`, a `416` and a cached image rendition are answered from the
+object's metadata without reading its bytes at all.
+
+A custom `StorageController` gets the same by implementing the optional
+`statObject` and `getObjectStream` methods. One without them is served through
+`getObject`, which reads the whole object for every request, ranges included.
 
 ## Putting a CDN in front
 

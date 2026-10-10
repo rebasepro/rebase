@@ -328,10 +328,10 @@ Rules an agent needs before writing one:
   what makes the order total, and paging over a non-total order repeats and
   skips rows. Do not add an id key yourself unless you want a different
   direction or rank for it.
-- **`cursor` on `iterate()`/`findAll()` cannot be combined with a multi-key
-  sort** — it throws `RebasePaginationError` with code `cursor-order-mismatch`.
-  Keyset pagination advances with one comparison along one column. Order by the
-  cursor column alone, or page by `offset`.
+- `iterate()`/`findAll()` seek with the server's `meta.nextCursor` on their
+  own, multi-key sorts included, and fall back to `offset` only where the server
+  issues no cursor. `cursor` makes seeking a requirement: a listing with no
+  cursor throws `RebasePaginationError` with code `cursor-missing`.
 - `orderBy('_score')` cannot key a cursor either, for the same reason: relevance
   is computed per query rather than stored.
 - A field the collection does not have is a 400, not a silently unsorted 200.

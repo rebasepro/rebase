@@ -1,4 +1,4 @@
-import { createPublicKey, createPrivateKey, type KeyObject } from "crypto";
+import { createPublicKey, createPrivateKey, createSecretKey, type KeyObject } from "crypto";
 
 /**
  * Asymmetric signing keys for access tokens, and the JWKS built from them.
@@ -209,4 +209,60 @@ export function toJwks(keys: ResolvedJwtKey[]): { keys: PublicJwk[] } {
             use: "sig" as const
         }))
     };
+}
+
+/**
+ * Key strings handed to the JWT library, imported once each.
+ *
+ * `jsonwebtoken` turns every key that is not a `KeyObject` into one on every
+ * call: `createPublicKey` (verify) or `createPrivateKey` (sign) first, and
+ * when that throws — as it does for every HMAC secret, which is not PEM —
+ * `createSecretKey`. The failed parse and its exception were about 15 of the
+ * 21 µs of each access-token verify. These are that same conversion, in the
+ * same order, done once per string; `jwt-crypto.ts` hands the library the
+ * `KeyObject` it produces. Here rather than there because key parsing lives
+ * here (see `jwt-crypto.ts`), and so does this module's `node:crypto`.
+ *
+ * Keyed by the key string itself, so a rotated secret (`configureJwt`) is a
+ * new entry and the old one is simply no longer asked for; bounded, oldest
+ * first, so a process cycling through secrets does not keep all of them. Only
+ * keys live here — never a verification result. Empty strings and anything
+ * not a string pass through untouched, so `jsonwebtoken` refuses them exactly
+ * as it did ("secret or public key must be provided" and the like), and so
+ * does a string no conversion accepts.
+ */
+const IMPORTED_KEY_LIMIT = 16;
+const importedVerificationKeys = new Map<string, KeyObject>();
+const importedSigningKeys = new Map<string, KeyObject>();
+
+function importedKey<K>(key: K, cache: Map<string, KeyObject>, asymmetric: (pem: string) => KeyObject): K | KeyObject {
+    if (typeof key !== "string" || key === "") return key;
+    const cached = cache.get(key);
+    if (cached) return cached;
+    let keyObject: KeyObject;
+    try {
+        keyObject = asymmetric(key);
+    } catch {
+        try {
+            keyObject = createSecretKey(Buffer.from(key));
+        } catch {
+            return key;
+        }
+    }
+    if (cache.size >= IMPORTED_KEY_LIMIT) {
+        const oldest = cache.keys().next();
+        if (!oldest.done) cache.delete(oldest.value);
+    }
+    cache.set(key, keyObject);
+    return keyObject;
+}
+
+/** A verification key, as `jsonwebtoken.verify` would import it, once per string. */
+export function importedVerificationKey<K>(key: K): K | KeyObject {
+    return importedKey(key, importedVerificationKeys, createPublicKey);
+}
+
+/** A signing key, as `jsonwebtoken.sign` would import it, once per string. */
+export function importedSigningKey<K>(key: K): K | KeyObject {
+    return importedKey(key, importedSigningKeys, createPrivateKey);
 }

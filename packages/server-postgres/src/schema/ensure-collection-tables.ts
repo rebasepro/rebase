@@ -26,17 +26,22 @@ import {
     REBASE_SCHEMA,
     type CollectionConfig
 } from "@rebasepro/types";
-import { relationalCollections } from "@rebasepro/common";
+import { getTableName, relationalCollections } from "@rebasepro/common";
 import { logger, isConcurrentDdlRace, isDuplicateObjectRace } from "@rebasepro/server";
 import { SEARCH_STAMP_PREFIX } from "./search-column";
 import { vectorExtensionHint } from "./vector-index";
 import { planJunctionTables, quoteSqlLiteral } from "./generate-postgres-ddl-logic";
 import { quoteRelation } from "./introspect-db-queries";
 import { planSchema } from "./plan/plan-schema";
+import type { SchemaPlan } from "./plan/types";
 import {
     assertSafeIdentifier,
+    describeHelperFunction,
     diffPlanAgainstCatalogue,
+    helperFunctionKey,
+    HELPER_FUNCTIONS,
     type ConstraintPolicy,
+    type DeferredIndexBuild,
     type DiffOptions,
     type EnsureAction,
     type EnsurePlan,
@@ -47,10 +52,18 @@ import {
     type WithheldConstraint
 } from "./plan/diff-plan";
 import { extractCauseMessage, extractPgError } from "../utils/pg-error-utils";
+import { atomicBatch, isLockTimeout, isMultiStatementRefusal, joinStatements, sleep } from "./boot-ddl";
+import {
+    buildDeferredIndexes,
+    TABLE_BUSY_REASON,
+    type DeferredIndexOutcome,
+    type OpenIndexBuildSession
+} from "./deferred-index-build";
 import { columnTypeDriftMessage, type ColumnTypeDrift } from "./column-type-drift";
 
 export type {
     ConstraintPolicy,
+    DeferredIndexBuild,
     EnsureAction,
     EnsurePlan,
     ExistingSchema,
@@ -86,7 +99,44 @@ export interface EnsureOptions extends DiffOptions {
      * reads the world.
      */
     databaseExtensions?: readonly string[];
+    /**
+     * Run each statement that changes an existing table under this
+     * `lock_timeout` (ms), retrying a timeout with backoff — see
+     * `schema/boot-ddl`. The boot sets it; absent, statements wait on locks for
+     * as long as the connection's `statement_timeout` allows, as the live schema
+     * editor's confirmed changes do.
+     */
+    lockTimeoutMs?: number;
+    /**
+     * Apply the statements that build tables this run creates — and the enum
+     * types they use — in transactions of up to {@link NEW_TABLE_BATCH}
+     * statements instead of one autocommit each. The boot sets it; see
+     * `ensureCollectionTables`.
+     */
+    batchNewTables?: boolean;
+    /**
+     * Leave the indexes a live table is missing (or holds INVALID) to the
+     * caller, in {@link EnsureOutcome.deferredIndexes}, instead of building
+     * them before returning. The boot sets it and builds them in the
+     * background once it serves — see `deferred-index-build`. A UNIQUE one is
+     * built before returning either way: see {@link DeferredIndexBuild.unique}.
+     */
+    deferIndexBuilds?: boolean;
+    /**
+     * The connection those builds run on when they are not deferred. Absent,
+     * they share `client` — fine for a small table, and cut short by the
+     * pool's `statement_timeout` on a large one, which is why the boot hands
+     * over a dedicated connection.
+     */
+    openIndexBuildSession?: OpenIndexBuildSession;
 }
+
+/**
+ * Most statements in one new-table transaction. Bounds how many locks one
+ * transaction holds — each new table is several relations (the heap, its TOAST
+ * table, its key index) — well inside the default `max_locks_per_transaction`.
+ */
+const NEW_TABLE_BATCH = 100;
 
 export interface EnsureOutcome extends EnsurePlan {
     /**
@@ -100,6 +150,14 @@ export interface EnsureOutcome extends EnsurePlan {
      * detection on the next boot, not the deployment. Both are reported loudly.
      */
     failures: { kind: EnsureAction["kind"]; target: string; error: string }[];
+    /**
+     * What happened to the indexes built here rather than left to the caller —
+     * every one of {@link EnsurePlan.deferredIndexes}, or under
+     * `deferIndexBuilds` the UNIQUE ones only; absent when there were none.
+     * An index on a table that already exists reports here, not in
+     * {@link failures}.
+     */
+    indexBuilds?: DeferredIndexOutcome;
 }
 
 /** The schema a collection lives in, validated before it reaches any DDL. */
@@ -129,10 +187,26 @@ export function planCollectionSchemaEnsure(
     return diffPlanAgainstCatalogue(plan, existing, { constraints: options.constraints });
 }
 
+export interface ReadSchemaOptions {
+    /**
+     * The existing tables worth probing for rows, given every table's columns.
+     *
+     * Whether a table holds rows decides one thing: whether a NOT NULL or a
+     * UNIQUE can be added with a column *being added* to it. So the boot asks
+     * only about tables gaining a column — none at all on a boot that changes
+     * nothing — rather than probing every table in the schema, adopted and
+     * unmanaged ones included, on every boot. A table that is not probed is
+     * reported as holding rows: the answer that never plans a constraint that
+     * could fail against data. Absent, every table is probed.
+     */
+    probeTables?: (tables: ReadonlyMap<string, ReadonlySet<string>>) => Iterable<string>;
+}
+
 /** Read what the database has, for the schemas the collections live in. */
 export async function readExistingSchema(
     client: Queryable,
-    schemas: string[]
+    schemas: string[],
+    options: ReadSchemaOptions = {}
 ): Promise<ExistingSchema> {
     const tables = new Map<string, Set<string>>();
     const enums = new Set<string>();
@@ -215,13 +289,33 @@ export async function readExistingSchema(
     // Restricted to ordinary and partitioned tables: `information_schema.columns`
     // also lists views and materialized views, and probing those runs whatever
     // query defines them.
+    //
+    // Indexes come back from the same read: an index already in the catalogue
+    // under its planned name is not planned again (see `diffPlanAgainstCatalogue`).
     const populatedTables = new Set<string>();
-    const { rows: realTables } = await client.query<{ schema: string; name: string }>(
-        `SELECT n.nspname AS schema, c.relname AS name
+    const indexes = new Set<string>();
+    const { rows: relations } = await client.query<{ schema: string; name: string; kind: string }>(
+        `SELECT n.nspname AS schema, c.relname AS name, c.relkind::text AS kind
          FROM pg_class c
          JOIN pg_namespace n ON c.relnamespace = n.oid
-         WHERE c.relkind IN ('r', 'p') AND n.nspname IN (${inList})`
+         WHERE c.relkind IN ('r', 'p', 'i', 'I') AND n.nspname IN (${inList})`
     );
+    const allRealTables = relations.filter(row => row.kind === "r" || row.kind === "p");
+    for (const row of relations) {
+        if (row.kind === "i" || row.kind === "I") indexes.add(`${row.schema}.${row.name}`);
+    }
+    // Only the tables the caller will ask about; every other one reads as
+    // holding rows — see `ReadSchemaOptions.probeTables`.
+    const wanted = options.probeTables ? new Set(options.probeTables(tables)) : undefined;
+    const realTables = wanted
+        ? allRealTables.filter(row => wanted.has(`${row.schema}.${row.name}`))
+        : allRealTables;
+    if (wanted) {
+        for (const row of allRealTables) {
+            const key = `${row.schema}.${row.name}`;
+            if (!wanted.has(key)) populatedTables.add(key);
+        }
+    }
     // The names come from `pg_class`, not from the configuration, so on an
     // adopted database they include tables nobody declared — `2024_archive`,
     // `order-items`, `Sales Data`. Those are quoted, not refused: refusing a
@@ -285,6 +379,19 @@ export async function readExistingSchema(
     );
     for (const row of constraintRows) constraints.add(`${row.schema}.${row.table}.${row.name}`);
 
+    // Indexes a `CREATE INDEX CONCURRENTLY` left INVALID. They are in
+    // `indexes` under their name, so without this a husk reads as built and
+    // `IF NOT EXISTS` keeps skipping it — see `deferred-index-build`.
+    const invalidIndexes = new Set<string>();
+    const { rows: invalidRows } = await client.query<{ schema: string; name: string }>(
+        `SELECT n.nspname AS schema, c.relname AS name
+         FROM pg_index i
+         JOIN pg_class c ON c.oid = i.indexrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE NOT i.indisvalid AND n.nspname IN (${inList})`
+    );
+    for (const row of invalidRows) invalidIndexes.add(`${row.schema}.${row.name}`);
+
     // Column comments, which is where a generated search column records the
     // expression it was built from. `objsubid > 0` is what makes a row a
     // *column* comment rather than the table's own.
@@ -307,10 +414,78 @@ export async function readExistingSchema(
         columnComments.set(`${row.schema}.${row.table}.${row.column}`, row.comment);
     }
 
+    // The helper functions the plan `CREATE OR REPLACE`s, as the catalogue has
+    // them, so an unchanged one is not rewritten on every boot. Looked up by
+    // qualified name rather than by the schemas read above: `set_updated_at`
+    // lives in `rebase`, which is auth's schema and not in that list.
+    const functions = new Map<string, string>();
+    const helperNames = HELPER_FUNCTIONS
+        .map(qualified => qualified.split("."))
+        .map(([schema, name]) => `(${quoteSqlLiteral(schema)}, ${quoteSqlLiteral(name)})`)
+        .join(", ");
+    const { rows: functionRows } = await client.query<{
+        schema: string;
+        name: string;
+        args: string;
+        returns: string;
+        language: string;
+        volatility: string;
+        strict: boolean;
+        parallel: string;
+        security_definer: boolean;
+        leakproof: boolean;
+        cost: number | string;
+        has_config: boolean;
+        body: string;
+    }>(
+        `SELECT n.nspname AS schema, p.proname AS name, pg_get_function_identity_arguments(p.oid) AS args,
+                format_type(p.prorettype, NULL) AS returns, l.lanname AS language,
+                p.provolatile::text AS volatility, p.proisstrict AS strict, p.proparallel::text AS parallel,
+                p.prosecdef AS security_definer, p.proleakproof AS leakproof, p.procost AS cost,
+                p.proconfig IS NOT NULL AS has_config, p.prosrc AS body
+         FROM pg_proc p
+         JOIN pg_namespace n ON p.pronamespace = n.oid
+         JOIN pg_language l ON p.prolang = l.oid
+         WHERE (n.nspname, p.proname) IN (${helperNames})`
+    );
+    for (const row of functionRows) {
+        functions.set(helperFunctionKey(row.schema, row.name, row.args), describeHelperFunction({
+            returns: row.returns,
+            language: row.language,
+            volatility: row.volatility,
+            strict: row.strict,
+            parallel: row.parallel,
+            securityDefiner: row.security_definer,
+            leakproof: row.leakproof,
+            cost: Number(row.cost),
+            hasConfig: row.has_config,
+            body: row.body
+        }));
+    }
+
+    const extensions = new Set<string>();
+    const { rows: extensionRows } = await client.query<{ name: string }>("SELECT extname AS name FROM pg_extension");
+    for (const row of extensionRows) extensions.add(row.name);
+
     return {
         tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables, columnTypes,
-        columnDefaults, triggers
+        columnDefaults, triggers, indexes, invalidIndexes, extensions, functions
     };
+}
+
+/**
+ * The planned tables that exist and lack at least one planned column — the
+ * only ones whose emptiness the diff consults (a NOT NULL or UNIQUE arriving
+ * with a new column). A superset, never a subset: a column the plan renames
+ * from a legacy name reads as missing here too.
+ */
+function tablesGainingColumns(plan: SchemaPlan, catalogue: ReadonlyMap<string, ReadonlySet<string>>): string[] {
+    const gaining: string[] = [];
+    for (const table of plan.tables) {
+        const columns = catalogue.get(table.qualified);
+        if (columns && table.columns.some(column => !columns.has(column.column))) gaining.push(table.qualified);
+    }
+    return gaining;
 }
 
 /**
@@ -356,11 +531,18 @@ export async function readSchemaFactsFor(
     collections: CollectionConfig[]
 ): Promise<ExistingSchema> {
     const relational = relationalCollections(collections);
+    const junctions = planJunctionTables(relational);
     const schemas = Array.from(new Set([
         ...relational.map(schemaOf),
-        ...planJunctionTables(relational).map(junction => junction.schema)
+        ...junctions.map(junction => junction.schema)
     ]));
-    return readExistingSchema(client, schemas);
+    // Row probes for the declared tables only: the classifier asks about the
+    // collections it is given, never about a table nobody declared.
+    const declared = [
+        ...relational.map(collection => `${schemaOf(collection)}.${getTableName(collection)}`),
+        ...junctions.map(junction => `${junction.schema}.${junction.table}`)
+    ];
+    return readExistingSchema(client, schemas, { probeTables: () => declared });
 }
 
 /**
@@ -408,8 +590,12 @@ export async function ensureCollectionTables(
         await client.query(`CREATE SCHEMA IF NOT EXISTS "${REBASE_SCHEMA}";`);
     }
 
-    const existing = await readExistingSchema(client, schemas);
-    const plan = diffPlanAgainstCatalogue(schema, existing, { constraints: options.constraints });
+    const existing = await readExistingSchema(client, schemas, {
+        probeTables: catalogue => tablesGainingColumns(schema, catalogue)
+    });
+    // Every index on a table that already exists goes to the index builder,
+    // which this function runs or hands to the caller — see `buildIndexes`.
+    const plan = diffPlanAgainstCatalogue(schema, existing, { constraints: options.constraints, deferLiveIndexes: true });
     const failures: EnsureOutcome["failures"] = [];
 
     // Reported, not warned: this is a rename the ensure is about to perform, and
@@ -501,14 +687,85 @@ export async function ensureCollectionTables(
         log?.(message);
     }
 
+    // The indexes of tables that already exist. Built here unless the caller
+    // defers them — and a UNIQUE one is built here regardless, before this
+    // returns, so nothing serves the collection without the promise it makes.
+    const builtHere = options.deferIndexBuilds
+        ? plan.deferredIndexes.filter(index => index.unique === true)
+        : plan.deferredIndexes;
+    const leftToCaller = options.deferIndexBuilds
+        ? plan.deferredIndexes.filter(index => index.unique !== true)
+        : plan.deferredIndexes;
+
+    // After every action, so the columns they index exist — whether this run
+    // added them or a previous one did.
+    const buildIndexes = async (): Promise<DeferredIndexOutcome | undefined> => {
+        if (builtHere.length === 0) return undefined;
+        const outcome = await buildDeferredIndexes(
+            options.openIndexBuildSession ?? (async () => ({
+                query: <T>(sql: string) => client.query<T>(sql),
+                dedicated: false,
+                release: () => undefined
+            })),
+            builtHere,
+            { log, lockTimeoutMs: options.lockTimeoutMs }
+        );
+        assertUniqueIndexesBuilt(builtHere, outcome);
+        return outcome;
+    };
+    const finish = async (): Promise<EnsureOutcome> => {
+        const indexBuilds = await buildIndexes();
+        return { ...plan, deferredIndexes: leftToCaller, failures, indexBuilds };
+    };
+
     if (plan.actions.length === 0) {
-        log?.("Schema is up to date; nothing to create.");
-        return { ...plan, failures };
+        if (plan.deferredIndexes.length === 0) log?.("Schema is up to date; nothing to create.");
+        return finish();
     }
 
-    for (const action of plan.actions) {
+    const lockBudget = options.lockTimeoutMs !== undefined
+        ? { lockTimeoutMs: options.lockTimeoutMs, atomic: true }
+        : undefined;
+    // Whether the handle takes a multi-statement string; shared with the lock
+    // budget, which needs the same thing.
+    const multi = lockBudget ?? { atomic: true };
+
+    // A table this run creates has no rows, no readers and no writers, so its
+    // statements — the CREATE, the ENABLE, every column, its triggers, the
+    // indexes on it — can share a transaction: one commit instead of one per
+    // statement. A first deploy of 200 collections was 3,767 autocommits, 11.7 s
+    // on a disk that really flushes. If a batch fails for any reason, its
+    // statements are applied again one at a time below, exactly as before, so
+    // the races and survivable failures that path handles end the same way.
+    const createdTables = new Set(plan.actions.filter(a => a.kind === "create-table").map(a => a.target));
+    const batchable = (action: EnsureAction): boolean =>
+        options.batchNewTables === true &&
+        multi.atomic &&
+        (action.kind === "create-enum" || createdTables.has(action.target.split(".").slice(0, 2).join("."))) &&
+        action.kind !== "add-enum-value" &&
+        !CONCURRENTLY_RE.test(action.sql);
+
+    const applyBatch = async (group: EnsureAction[]): Promise<boolean> => {
+        const statements = group.map(action => action.sql);
         try {
-            if (await applyAction(client, action)) {
+            await client.query(lockBudget
+                ? atomicBatch(statements, lockBudget.lockTimeoutMs)
+                : joinStatements(statements));
+            return true;
+        } catch (err) {
+            if (isMultiStatementRefusal(err)) {
+                multi.atomic = false;
+            } else {
+                log?.(`${group.length} statement(s) for new tables failed as one transaction ` +
+                    `(${describeDriverError(err).split("\n")[0]}); applying them one at a time`);
+            }
+            return false;
+        }
+    };
+
+    const applyOne = async (action: EnsureAction): Promise<void> => {
+        try {
+            if (await applyAction(client, action, lockBudget)) {
                 log?.(`${action.kind}: ${action.target}`);
             } else {
                 log?.(`${action.kind}: ${action.target} (already created by a peer)`);
@@ -543,14 +800,51 @@ export async function ensureCollectionTables(
                 (action.kind === "create-index" && !/CREATE\s+UNIQUE\s+INDEX/i.test(action.sql));
             if (survivable) {
                 failures.push({ kind: action.kind, target: action.target, error: message });
-                continue;
+                return;
             }
+            const lockHint = isLockTimeout(err)
+                ? "\n  hint: another session held this table's lock for every attempt (a long transaction, a " +
+                  "report or a dump). Nothing was changed; boot again once it has finished."
+                : "";
             throw new Error(
-                `Failed to ${action.kind} ${action.target}: ${message}${vectorExtensionHint(message)}\n  ${action.sql}`
+                `Failed to ${action.kind} ${action.target}: ${message}${vectorExtensionHint(message)}${lockHint}\n  ${action.sql}`
             );
         }
+    };
+
+    for (let i = 0; i < plan.actions.length;) {
+        let end = i;
+        while (end < plan.actions.length && end - i < NEW_TABLE_BATCH && batchable(plan.actions[end])) end++;
+        if (end - i > 1 && await applyBatch(plan.actions.slice(i, end))) {
+            for (const action of plan.actions.slice(i, end)) log?.(`${action.kind}: ${action.target}`);
+            i = end;
+            continue;
+        }
+        const last = Math.max(end, i + 1);
+        for (; i < last; i++) await applyOne(plan.actions[i]);
     }
-    return { ...plan, failures };
+    return finish();
+}
+
+/**
+ * Fail the ensure for a UNIQUE index on a live table that could not be built,
+ * exactly as a failed UNIQUE `create-index` action always has (see `applyOne`).
+ *
+ * "Another index on the table is being built" counts: the table's lock is
+ * held by a build that may run for minutes, and serving the collection
+ * meanwhile would be serving a promise the database is not keeping. Another
+ * instance building *this* index does not: once its build commits the
+ * constraint holds, which is also what a peer's `IF NOT EXISTS` race meant.
+ */
+function assertUniqueIndexesBuilt(indexes: readonly DeferredIndexBuild[], outcome: DeferredIndexOutcome): void {
+    for (const index of indexes) {
+        if (index.unique !== true) continue;
+        const qualified = `${index.schema}.${index.indexName}`;
+        const reason = outcome.failed.find(failure => failure.index === qualified)?.error
+            ?? outcome.skipped.find(skip => skip.index === qualified && skip.reason === TABLE_BUSY_REASON)?.reason;
+        if (reason === undefined) continue;
+        throw new Error(`Failed to create-index ${index.schema}.${index.table}: ${qualified}: ${reason}\n  ${index.sql}`);
+    }
 }
 
 /**
@@ -613,6 +907,27 @@ function isTransactionBlockRefusal(err: unknown): boolean {
 const DDL_ATTEMPTS = 4;
 
 /**
+ * Attempts at an action whose table lock is held, including the first.
+ *
+ * Unlike a policy, a schema change cannot be deferred — the collection's code
+ * expects the column — so a lock that never frees still fails the boot, as a
+ * statement timeout did. Ten one-second attempts with backoff between them wait
+ * about as long as the old 30 s statement timeout did, but a live query on that
+ * table now waits at most one second at a time instead of thirty.
+ */
+const LOCK_ATTEMPTS = 10;
+
+/**
+ * Whether an action may be sent as `SET LOCAL lock_timeout; <statement>` — one
+ * implicit transaction. Not `CREATE INDEX CONCURRENTLY`, which Postgres refuses
+ * inside any transaction block (and which waits on no lock a reader holds), and
+ * not `ALTER TYPE … ADD VALUE`, which Postgres before 12 refuses there too and
+ * which locks a type, not a table.
+ */
+const takesLockBudget = (action: EnsureAction, sql: string): boolean =>
+    action.kind !== "add-enum-value" && !CONCURRENTLY_RE.test(sql);
+
+/**
  * Run one planned statement, surviving a simultaneous boot.
  *
  * Every statement in a plan is written to be idempotent, and that is not the
@@ -635,14 +950,37 @@ const DDL_ATTEMPTS = 4;
  */
 async function applyAction(
     client: Queryable,
-    action: EnsureAction
+    action: EnsureAction,
+    lockBudget?: { lockTimeoutMs: number; atomic: boolean }
 ): Promise<boolean> {
     let sqlText = action.sql;
+    let lockAttempts = 0;
     for (let attempt = 1; ; attempt++) {
+        const budgeted = lockBudget?.atomic === true && takesLockBudget(action, sqlText);
         try {
-            await client.query(sqlText);
+            await client.query(budgeted ? atomicBatch([sqlText], lockBudget.lockTimeoutMs) : sqlText);
             return true;
         } catch (err) {
+            // A handle that takes one statement per query (extended protocol)
+            // cannot carry the `SET LOCAL`. Nothing ran; say it once and send
+            // every statement as it is from here on.
+            if (budgeted && isMultiStatementRefusal(err)) {
+                lockBudget.atomic = false;
+                attempt--;
+                continue;
+            }
+            // Something held the table for longer than the budget — a long
+            // transaction, a report, a dump. The statement did nothing; let
+            // the queue behind it drain, then ask again.
+            if (budgeted && isLockTimeout(err) && ++lockAttempts < LOCK_ATTEMPTS) {
+                logger.debug(
+                    `[schema] ${action.kind} ${action.target}: the table's lock is held by another session ` +
+                    `(attempt ${lockAttempts}/${LOCK_ATTEMPTS}) — retrying`
+                );
+                attempt--;
+                await sleep(Math.min(500 * lockAttempts, 2_000) * (1 + Math.random()));
+                continue;
+            }
             // `CREATE INDEX CONCURRENTLY` is the one statement here Postgres
             // refuses inside a transaction block (25001), and whether we are in
             // one is not ours to know: the client is whatever handle the caller

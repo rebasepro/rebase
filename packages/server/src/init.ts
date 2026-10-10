@@ -8,7 +8,6 @@ import {
     CollectionCallbacks,
     AnyCollectionConfig,
     CollectionConfig,
-    CollectionPatch,
     HealthCheckResult,
     HistoryConfig,
     InitializedDriver,
@@ -72,6 +71,8 @@ import {
 } from "./schema-edit/project-root";
 import { createGitHubRepository } from "./schema-edit/github-repository";
 import { rewriteRemoteCollection } from "./schema-edit/remote-source";
+import { editCollectionSource, writeLocalCollectionSource } from "./schema-edit/local-source";
+import type { SchemaSourceEditor } from "./schema-edit/source-editor";
 import type { SchemaEditPolicy, RemoteRepositoryConfig } from "./schema-edit/schema-edit-permissions";
 
 /**
@@ -98,9 +99,9 @@ export interface LiveSchemaConfig extends SchemaEditPolicy {
 }
 import { createLocalGitRepository, findRepositoryRoot } from "./schema-edit/local-git-repository";
 import nodePath from "node:path";
-import nodeFs from "node:fs/promises";
 import { createRlsAudit, type RlsAuditConfig, type RlsAudit } from "./rls-audit";
 import { startExpiredTokenSweep } from "./auth/expired-token-sweep";
+import { startHistoryRetentionSweep } from "./history/retention-sweep";
 import type { CaptchaConfig } from "./auth/captcha";
 import {
     ALL_RUNTIME_SURFACES,
@@ -132,6 +133,7 @@ import {
     StorageController,
     StorageRegistry
 } from "./storage";
+import { storageRateLimitCost } from "./storage/routes";
 import type { ApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRoutes, createPersonalKeyRoutes } from "./auth/api-keys/api-key-routes";
@@ -139,7 +141,7 @@ import { createApiKeyPreAuth, createFunctionScopeGuard, createTusScopeGuard, res
 import type { KeyTargets } from "./auth/api-keys/key-grant";
 import { createPlatformTokenPreAuth, platformTokensFromEnv } from "./auth/platform-token";
 import { createRequireAuth } from "./auth/middleware";
-import { accessModelFromCollections, callerScopes, configureAccess, requireScope, requireScopeByMethod } from "./auth/access";
+import { accessModelFromCollections, callerScopes, configureAccess, keyOwnerResolverFor, requireScope, requireScopeByMethod } from "./auth/access";
 import { createScopeRoutes } from "./auth/scope-routes";
 import { configureCredentialStore } from "./auth/verify-credential";
 import { createDataRateLimiter, createDataRateLimitCheck, defaultAuthLimiter, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, setSharedRateLimitStore, type DataRateLimitConfig } from "./auth/rate-limiter";
@@ -1750,15 +1752,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // does to the keys already minted.
     if (personalKeysEnabled) {
         if (typeof adminIdentityRepo?.getUserById === "function" && typeof adminIdentityRepo.getUserRoleIds === "function") {
-            const ownerRepo = adminIdentityRepo;
             configureAccess({
                 model: accessModel,
-                resolveKeyOwner: async (uid) => {
-                    const user = await ownerRepo.getUserById(uid);
-                    // A disabled owner's keys stop with them.
-                    if (!user || user.disabled) return null;
-                    return { roles: await ownerRepo.getUserRoleIds(uid) };
-                }
+                // One read of the owner per request: exists, not disabled, roles.
+                resolveKeyOwner: keyOwnerResolverFor(adminIdentityRepo)
             });
         } else {
             logger.warn(
@@ -1798,6 +1795,20 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const platformTokenPreAuth = createPlatformTokenPreAuth(await platformTokensFromEnv(process.env));
     if (surfaces.admin) {
         config.app.use(`${basePath}/admin/*`, platformTokenPreAuth);
+    }
+
+    // A backup download link — `GET /admin/backups/download?key=…&token=…`,
+    // minted behind the Backups gate by `POST /admin/backups/download-url` —
+    // stands in for the admin's header on that one request, for one backup and
+    // 60 seconds, so a browser can stream a dump to disk. It is answered here,
+    // ahead of every gate on `/admin/*`: the auth adapter's admin routers,
+    // mounted below, authenticate everything under that prefix. A request
+    // without `token` passes through to them untouched.
+    if (surfaces.admin) {
+        const { createBackupLinkRoutes, backupDestinationFromEnv } = await import("./backup");
+        config.app.route(`${basePath}/admin/backups`, createBackupLinkRoutes({
+            getDestination: () => backupDestinationFromEnv(process.env)
+        }));
     }
 
     if (apiKeyStore && surfaces.admin) {
@@ -2306,13 +2317,17 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     let schemaEditorOff = schemaEditorUnavailable();
     let schemaEditorRoutes: Hono<HonoEnv> | undefined;
+    // The one editor of `collectionsDir` in this process, shared by the
+    // source-only editor's routes and live schema editing's `/apply`.
+    let schemaSourceEditor: SchemaSourceEditor | undefined;
 
     if (!schemaEditorOff && config.collectionsDir) {
         // ts-morph is an optional peer dependency, so it can legitimately be
         // absent — run without the schema editor instead of failing startup.
         try {
             const editorModule = await import("./api/schema-editor-routes");
-            schemaEditorRoutes = editorModule.createSchemaEditorRoutes(config.collectionsDir);
+            schemaSourceEditor = editorModule.createSchemaSourceEditor(config.collectionsDir);
+            schemaEditorRoutes = editorModule.createSchemaEditorRoutes(schemaSourceEditor);
         } catch (err) {
             if ((err as { code?: string })?.code === "ERR_MODULE_NOT_FOUND") {
                 schemaEditorOff = {
@@ -2407,8 +2422,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         if (canEditSchema) {
             const collectionsDir = config.collectionsDir;
             // Resolved once, at boot. A deployment either has a working tree or
-            // it does not, and asking git on every request would be a process
-            // spawn per keystroke in the panel.
+            // it does not, and asking git on every request would spawn a
+            // process for every plan the panel asks for.
             const repositoryRoot = collectionsDir
                 ? await findRepositoryRoot(collectionsDir)
                 : undefined;
@@ -2490,42 +2505,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 // `SCHEMA_EDITOR_MISSING_DEPENDENCY`, the panel never offers the
                 // control, and a caller that asks anyway gets a refusal that
                 // names the missing dependency.
-                writeSource: schemaEditorRoutes ? async (change) => {
-                    // Applies the edit the one way it is implemented, wherever
-                    // the file came from. `ts-morph` is what knows how to keep a
-                    // collection file's imports, comments and formatting, and a
-                    // second implementation of that for the remote case would be
-                    // a second thing to get wrong.
-                    //
-                    // An existing collection arrives as a patch — what the
-                    // person changed — and only those keys are written; a new
-                    // one arrives whole.
-                    const applyEdit = async (
-                        dir: string,
-                        collectionId: string,
-                        edit: { collection?: Record<string, unknown>; patch?: CollectionPatch }
-                    ) => {
-                        const { AstSchemaEditor } = await import("./api/ast-schema-editor");
-                        const editor = new AstSchemaEditor(dir);
-                        if (edit.patch) await editor.applyPatch(collectionId, edit.patch);
-                        else await editor.saveCollection(collectionId, edit.collection ?? {}, { partial: false });
-                    };
-
-                    // A removal deletes the file and edits `index.ts`; both
-                    // go in the commit, the file as a deletion.
-                    if (change.remove) {
-                        if (remoteRepo) {
-                            throw new Error("Deleting a collection is not available with a remote repository yet. Delete it in the repository instead.");
-                        }
-                        const { AstSchemaEditor } = await import("./api/ast-schema-editor");
-                        const { deleted, changed } = await new AstSchemaEditor(collectionsDir!).deleteCollection(change.collectionId);
-                        return [
-                            { path: nodePath.relative(repositoryRoot!, deleted), contents: "", deleted: true },
-                            ...await Promise.all(changed.map(async file => ({
-                                path: nodePath.relative(repositoryRoot!, file),
-                                contents: await nodeFs.readFile(file, "utf8")
-                            })))
-                        ];
+                writeSource: schemaSourceEditor ? async (change) => {
+                    // The edit is applied the one way it is implemented,
+                    // wherever the file came from (`editCollectionSource`):
+                    // a second implementation of keeping a collection file's
+                    // imports, comments and formatting for the remote case
+                    // would be a second thing to get wrong.
+                    if (change.remove && remoteRepo) {
+                        throw new Error("Deleting a collection is not available with a remote repository yet. Delete it in the repository instead.");
                     }
 
                     // No source on this machine: fetch it, rewrite it in a
@@ -2547,24 +2534,25 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                             {
                                 repository,
                                 collectionsPath: remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH,
-                                edit: applyEdit
+                                // A scratch directory holding the one file:
+                                // an editor of its own costs a single parse.
+                                edit: async (dir, collectionId, edit) => {
+                                    const { AstSchemaEditor } = await import("./api/ast-schema-editor");
+                                    await editCollectionSource(new AstSchemaEditor(dir), collectionId, edit);
+                                }
                             },
                             change.collectionId,
                             change
                         );
                     }
 
-                    await applyEdit(collectionsDir!, change.collectionId, change);
-
-                    // Read back what it wrote. The editor resolves
-                    // `<collectionsDir>/<id>.ts`, and the commit needs the
-                    // contents rather than a promise that a file changed.
-                    const file = nodePath.join(collectionsDir!, `${change.collectionId}.ts`);
-                    const contents = await nodeFs.readFile(file, "utf8");
-                    return [{
-                        path: nodePath.relative(repositoryRoot!, file),
-                        contents
-                    }];
+                    // This machine's source: through the process's editor,
+                    // queued behind any edit already running in either router.
+                    return writeLocalCollectionSource(
+                        schemaSourceEditor,
+                        { collectionsDir: collectionsDir!, repositoryRoot: repositoryRoot! },
+                        change
+                    );
                 } : undefined,
                 // The same path `writeSource` resolves, derived without writing
                 // anything — the dirty-tree check has to know it before the
@@ -2742,7 +2730,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // the context and the limiter buckets by caller rather than by IP, and
         // before `route("/")` for the ordering reason the comment above records.
         if (rateLimitConfig) {
-            storageRouter.use("/*", createDataRateLimiter(rateLimitConfig));
+            // A batched `POST /metadata` of N keys counts as ⌈N/10⌉ requests.
+            storageRouter.use("/*", createDataRateLimiter(rateLimitConfig, { cost: storageRateLimitCost }));
         }
 
         // The upload endpoint's own body limit. The same path is exempted from
@@ -3547,7 +3536,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // the S3_* environment as the backup cron builds its own — not through the
     // app's file storage, which is another bucket, a local directory, or none.
     if (surfaces.admin) {
-        const { createBackupRoutes, parseBackupDestination, readBackupSchedule } = await import("./backup");
+        const { createBackupRoutes, backupDestinationFromEnv, readBackupSchedule } = await import("./backup");
         const backupRouter = new Hono<HonoEnv>();
 
         applyAdminGate(backupRouter, "Backup", "backups:read");
@@ -3557,10 +3546,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // without starting them and reads their runs from `cron_logs`.
         const scheduler = cronScheduler;
         backupRouter.route("/", createBackupRoutes({
-            getDestination: () => {
-                const out = process.env.BACKUP_DESTINATION?.trim();
-                return out ? parseBackupDestination(out) : null;
-            },
+            getDestination: () => backupDestinationFromEnv(process.env),
             getSchedule: scheduler ? () => readBackupSchedule(scheduler) : undefined,
             scheduledElsewhere: !ownership.cronScheduler
         }));
@@ -3588,6 +3574,20 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         ));
         config.app.route(`${basePath}/admin/rls-audit`, rlsAuditRouter);
         logger.debug("RLS audit admin routes mounted", { path: `${basePath}/admin/rls-audit` });
+    }
+
+    // 6b-ii-a. The SQL console's "Download full result as CSV".
+    //
+    // `database:write`: the scope the socket's `EXECUTE_SQL` asks of the same
+    // console, so whoever may run the query may download its whole result,
+    // and nobody else.
+    if (surfaces.admin) {
+        const { createSqlExportRoutes } = await import("./api/sql-export-routes");
+        const sqlExportRouter = new Hono<HonoEnv>();
+        applyAdminGate(sqlExportRouter, "SQL export", "database:write");
+        sqlExportRouter.route("/", createSqlExportRoutes({ getAdmin: () => defaultDriver.admin }));
+        config.app.route(`${basePath}/admin/sql`, sqlExportRouter);
+        logger.debug("SQL export admin routes mounted", { path: `${basePath}/admin/sql` });
     }
 
     // 6b-iii. The development mailbox.
@@ -3783,6 +3783,17 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         persistClaims: config.cronPersistence !== false
     });
 
+    // ── History retention ─────────────────────────────────────────────────
+    // The same kind of housekeeping: entries past `retention` deleted once an
+    // hour, fleet-wide, so a row nobody writes again does not keep its history
+    // for good. The inline prune after each write still caps a busy row.
+    const historyRetentionSweep = startHistoryRetentionSweep({
+        historyService: historyConfigResult?.historyService,
+        driver: defaultDriver,
+        ownsTimers: ownership.cronScheduler,
+        persistClaims: config.cronPersistence !== false
+    });
+
     // ── Graceful Shutdown ─────────────────────────────────────────────────
     const shutdown = createShutdown({
         server: config.server,
@@ -3790,9 +3801,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         jobQueue,
         rlsAudit,
         authTokenSweep,
+        historyRetentionSweep,
         stopMetricsSampler,
         realtimeServices,
-        closeLongLivedResponses: () => longLivedResponses.abort()
+        closeLongLivedResponses: () => longLivedResponses.abort(),
+        emailService
     });
 
     /**

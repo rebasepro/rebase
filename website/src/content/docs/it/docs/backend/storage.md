@@ -165,6 +165,13 @@ Un parametro al di fuori di questi limiti restituisce un **400**, non un valore
 limitato silenziosamente — in passato `?width=99999` restituiva un'immagine a 4096px
 e `?format=tiff` una webp, senza alcun avviso.
 
+Le miniature delle immagini archiviate nel pannello di amministrazione usano questo endpoint: l'anteprima
+di una tabella o di una card richiede una rendition webp di circa il doppio della dimensione a cui viene
+visualizzata (96–800px) anziché l'originale. `sharp` è una dipendenza facoltativa; senza di essa la
+trasformazione risponde 500, quindi il pannello verifica una sola volta per caricamento di pagina, con una
+singola richiesta di rendition, e mostra gli originali se il server non può ridimensionare. I file SVG e GIF
+vengono sempre mostrati così come sono.
+
 ### Prestazioni e Caching LRU
 
 La trasformazione è onerosa in termini di CPU e memoria, e su un oggetto pubblico

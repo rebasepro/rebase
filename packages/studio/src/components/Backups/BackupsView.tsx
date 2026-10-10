@@ -36,14 +36,6 @@ function formatDate(iso: string | undefined): string {
 }
 
 /**
- * The name the roles sidecar is saved under: the dump's, with the suffix
- * `rebase db restore` looks for beside it.
- */
-function rolesFileName(dumpName: string): string {
-    return dumpName.replace(/\.dump$/, "") + ".globals.sql";
-}
-
-/**
  * How the scheduled backup is doing, above the list — and, apart from it, a run
  * someone started by hand since, which is not the schedule's.
  */
@@ -204,20 +196,16 @@ export function BackupsView() {
         load();
     }, [load]);
 
-    const handleDownload = async (key: string, fileName: string) => {
+    const handleDownload = async (key: string) => {
         const c = clientRef.current;
         if (!c?.backups) return;
         setDownloading(key);
         try {
-            const blob = await c.backups.download(key);
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
+            // The browser is sent to a 60-second link and streams the file to
+            // disk under its own name — the `.globals.sql` beside its dump is
+            // the name `rebase db restore` looks for. Fetched into a Blob here,
+            // the whole database sat in the tab's memory.
+            await c.backups.download(key);
         } catch (e: unknown) {
             snackbarRef.current.open({
                 type: "error",
@@ -341,7 +329,7 @@ export function BackupsView() {
                                                     <Button
                                                         size="small"
                                                         variant="text"
-                                                        onClick={() => handleDownload(globalsKey, rolesFileName(backup.name))}
+                                                        onClick={() => handleDownload(globalsKey)}
                                                         disabled={downloading === globalsKey}
                                                         startIcon={downloading === globalsKey
                                                             ? <CircularProgress size="smallest"/>
@@ -358,7 +346,7 @@ export function BackupsView() {
                                             <Button
                                                 size="small"
                                                 variant="outlined"
-                                                onClick={() => handleDownload(backup.key, backup.name)}
+                                                onClick={() => handleDownload(backup.key)}
                                                 disabled={downloading === backup.key}
                                                 startIcon={downloading === backup.key
                                                     ? <CircularProgress size="smallest"/>

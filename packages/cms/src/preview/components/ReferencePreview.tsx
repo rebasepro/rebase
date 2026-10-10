@@ -3,7 +3,7 @@ import * as React from "react";
 
 import { EntityReference } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
-import { useCustomizationController, useFetch, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
+import { useCustomizationController, useBatchedFetch, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { Skeleton } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/app";
@@ -158,15 +158,19 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     // card only makes sense where there is room for it. See {@link InlineEntityPreview}.
     const inline = nested || Boolean(textOnly) || size === "small";
 
+    // Batched with every other reference shown in the same tick: one read and
+    // one live subscription for a column of 23 distinct targets, where each
+    // preview used to open its own `listenById` (23 subscriptions, and 23
+    // server refetches per write to the target collection). An array of
+    // references in a form is one batch for the whole array.
     const {
         entity,
         dataLoading,
         dataLoadingError
-    } = useFetch({
+    } = useBatchedFetch({
         path,
         entityId: reference.id,
-        collection,
-        useCache: true
+        collection
     });
 
     // Only what the fetch currently reports — see the note in RelationPreview:

@@ -1,11 +1,21 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { MarkerType } from "@xyflow/react";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import type { Relation, ResolvedRelation } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
-import { getLayoutedElements, getCardinalityLabel, NODE_WIDTH } from "./schema-visualizer.utils";
+import {
+    cachedLayout,
+    getCardinalityLabel,
+    layOutInBackground,
+    layOutNow,
+    NODE_WIDTH,
+    placeNodes,
+    planLayout
+} from "./schema-visualizer.utils";
 import type { RelationEdgeData } from "./schema-visualizer.utils";
+import type { LayoutPositions } from "./dagre-layout";
+import { canLayOutOffThread } from "./layout-runner";
 import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/cms-types";
 
 // ─── Column info extracted from a collection ──────────────────────────
@@ -123,10 +133,20 @@ const extractColumns = (collection: AdminCollection): ColumnInfo[] => {
 
 // ─── Build graph from collections ─────────────────────────────────────
 
+/**
+ * Every table and relation the collections declare, not yet placed. Edges
+ * carry their column handles without a side; {@link placeGraph} picks the
+ * side once it knows where the tables are.
+ */
+interface SchemaGraph {
+    nodes: Node[];
+    edges: Edge[];
+}
+
 const buildGraph = (
     collections: AdminCollection[],
     liveRls: Set<string> | null
-): { nodes: Node[]; edges: Edge[] } => {
+): SchemaGraph => {
     /**
      * Is RLS on for this table?
      *
@@ -341,50 +361,142 @@ height: 16 }
             }
         }
     }
-    // 3. Apply dagre layout first to get node positions
-    const layoutResult = getLayoutedElements(nodes, edges);
+    return {
+        nodes,
+        edges
+    };
+};
 
-    // 4. Build a position lookup from the laid-out nodes
-    const nodePositions = new Map<string, { x: number }>();
-    for (const node of layoutResult.nodes) {
-        nodePositions.set(node.id, { x: node.position.x });
+/**
+ * The graph at its laid-out positions, with each edge's handles on the sides
+ * that face each other: a source left of its target exits right and enters
+ * the target from the left, and the other way round.
+ */
+const placeGraph = (graph: SchemaGraph, positions: LayoutPositions): SchemaGraph => {
+    const nodes = placeNodes(graph.nodes, positions);
+    const edges = graph.edges.map((edge) => {
+        const srcPos = positions[edge.source];
+        const tgtPos = positions[edge.target];
+        const srcBaseHandle = edge.sourceHandle ?? "source-default";
+        const tgtBaseHandle = edge.targetHandle ?? "target-default";
+        if (!srcPos || !tgtPos) {
+            return {
+                ...edge,
+                sourceHandle: `${srcBaseHandle}-right`,
+                targetHandle: `${tgtBaseHandle}-left`
+            };
+        }
+        const sourceIsLeft = srcPos.x + NODE_WIDTH / 2 <= tgtPos.x + NODE_WIDTH / 2;
+        return {
+            ...edge,
+            sourceHandle: `${srcBaseHandle}-${sourceIsLeft ? "right" : "left"}`,
+            targetHandle: `${tgtBaseHandle}-${sourceIsLeft ? "left" : "right"}`
+        };
+    });
+    return {
+        nodes,
+        edges
+    };
+};
+
+// ─── Large schemas: one table's neighbourhood ─────────────────────────
+
+/**
+ * Above this many tables the diagram draws one table's neighbourhood, not
+ * the whole schema. Laying out 300 cross-linked tables takes dagre several
+ * seconds even in a worker, and a canvas of that many tables is no longer
+ * something anyone reads.
+ */
+export const LARGE_SCHEMA_TABLES = 300;
+
+/** How far from the focused table the drawn neighbourhood reaches. */
+export type NeighbourhoodDepth = 1 | 2;
+
+const isJunctionNode = (node: Node): boolean => Boolean((node.data as TableNodeData).isJunction);
+
+/**
+ * The tables within `depth` relations of `focus`, and every relation between
+ * them.
+ *
+ * A junction table is not a step of its own: a many-to-many is one relation,
+ * drawn through its junction. So distances are counted in half steps — an edge
+ * that touches a junction is one, a foreign key between two tables is two.
+ */
+const neighbourhoodOf = (graph: SchemaGraph, focus: string, depth: NeighbourhoodDepth): SchemaGraph => {
+    const junctions = new Set(graph.nodes.filter(isJunctionNode).map((node) => node.id));
+    const adjacent = new Map<string, string[]>();
+    for (const edge of graph.edges) {
+        adjacent.set(edge.source, [...(adjacent.get(edge.source) ?? []), edge.target]);
+        adjacent.set(edge.target, [...(adjacent.get(edge.target) ?? []), edge.source]);
     }
-
-    // 5. Resolve handle sides based on relative node positions.
-    //    If source is left of target → source exits Right, target enters Left.
-    //    If source is right of target → source exits Left, target enters Right.
-    for (const edge of layoutResult.edges) {
-        const srcPos = nodePositions.get(edge.source);
-        const tgtPos = nodePositions.get(edge.target);
-
-        const srcBaseHandle = (edge.sourceHandle ?? "source-default") as string;
-        const tgtBaseHandle = (edge.targetHandle ?? "target-default") as string;
-
-        if (srcPos && tgtPos) {
-            const srcCenterX = srcPos.x + NODE_WIDTH / 2;
-            const tgtCenterX = tgtPos.x + NODE_WIDTH / 2;
-            const sourceIsLeft = srcCenterX <= tgtCenterX;
-
-            edge.sourceHandle = `${srcBaseHandle}-${sourceIsLeft ? "right" : "left"}`;
-            edge.targetHandle = `${tgtBaseHandle}-${sourceIsLeft ? "left" : "right"}`;
-        } else {
-            edge.sourceHandle = `${srcBaseHandle}-right`;
-            edge.targetHandle = `${tgtBaseHandle}-left`;
+    const limit = depth * 2;
+    const distance = new Map<string, number>([[focus, 0]]);
+    const byDistance: string[][] = Array.from({ length: limit + 1 }, () => []);
+    byDistance[0].push(focus);
+    for (let reached = 0; reached <= limit; reached++) {
+        for (const id of byDistance[reached]) {
+            if (distance.get(id) !== reached) continue;
+            for (const next of adjacent.get(id) ?? []) {
+                const step = junctions.has(id) || junctions.has(next) ? 1 : 2;
+                const nextDistance = reached + step;
+                if (nextDistance > limit || (distance.get(next) ?? Infinity) <= nextDistance) continue;
+                distance.set(next, nextDistance);
+                byDistance[nextDistance].push(next);
+            }
         }
     }
+    return {
+        nodes: graph.nodes.filter((node) => distance.has(node.id)),
+        edges: graph.edges.filter((edge) => distance.has(edge.source) && distance.has(edge.target))
+    };
+};
 
-    return layoutResult;
+/** The table with the most relations: where a large schema opens. */
+const mostConnectedTable = (graph: SchemaGraph): string | undefined => {
+    const degree = new Map<string, number>();
+    for (const edge of graph.edges) {
+        degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
+        degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
+    }
+    let best: Node | undefined;
+    for (const node of graph.nodes) {
+        if (isJunctionNode(node)) continue;
+        if (!best || (degree.get(node.id) ?? 0) > (degree.get(best.id) ?? 0)) best = node;
+    }
+    return best?.id;
 };
 
 // ─── Hook ─────────────────────────────────────────────────────────────
 
 export interface UseSchemaGraphResult {
+    /**
+     * The tables and relations on the canvas, placed. Empty while
+     * {@link layingOut} — the layout of a graph not seen before runs in a
+     * worker, never in render.
+     */
     nodes: Node[];
     edges: Edge[];
+    /** Every table and junction table in the schema, drawn or not. */
+    allNodes: Node[];
     relayout: () => void;
+    /** Tables and relations in the whole schema. */
     tableCount: number;
     relationCount: number;
+    /** The layout is running off the main thread. */
+    layingOut: boolean;
+    /**
+     * Set when the schema has more than {@link LARGE_SCHEMA_TABLES} tables:
+     * which table's neighbourhood is drawn, how far it reaches, how many
+     * tables that is, and how many there are in all.
+     */
+    neighbourhood: { focus: string; depth: NeighbourhoodDepth; shown: number; total: number } | null;
 }
+
+const EMPTY_GRAPH: SchemaGraph = {
+    nodes: [],
+    edges: []
+};
+const NO_POSITIONS: LayoutPositions = {};
 
 export const useSchemaGraph = (
     collections: AdminCollection[] | undefined,
@@ -392,33 +504,99 @@ export const useSchemaGraph = (
      * `schema.table` for every table the database reports RLS on, or `null`
      * when there is no SQL capability to ask. See {@link useLiveRlsTables}.
      */
-    liveRls: Set<string> | null = null
+    liveRls: Set<string> | null = null,
+    /**
+     * The table whose neighbourhood a large schema draws, by node id. When it
+     * is absent, or not a table of this schema, the most connected one. Not
+     * read for a schema of {@link LARGE_SCHEMA_TABLES} tables or fewer, which
+     * is drawn whole.
+     */
+    focus: string | null = null,
+    depth: NeighbourhoodDepth = 1
 ): UseSchemaGraphResult => {
     const [version, setVersion] = useState(0);
 
     const relayout = useCallback(() => setVersion((v) => v + 1), []);
 
-    const { nodes, edges, tableCount, relationCount } = useMemo(() => {
-        if (!collections || collections.length === 0) {
-            return { nodes: [],
-edges: [],
-tableCount: 0,
-relationCount: 0 };
-        }
-        const result = buildGraph(collections, liveRls);
-        return {
-            ...result,
-            tableCount: result.nodes.length,
-            relationCount: result.edges.length
+    const graph = useMemo(
+        () => (collections && collections.length > 0 ? buildGraph(collections, liveRls) : EMPTY_GRAPH),
+        [collections, liveRls]
+    );
+
+    const tables = graph.nodes.filter((node) => !isJunctionNode(node)).length;
+    const large = tables > LARGE_SCHEMA_TABLES;
+    const focused = large
+        ? (focus && graph.nodes.some((node) => node.id === focus) ? focus : mostConnectedTable(graph)) ?? null
+        : null;
+
+    const drawn = useMemo(
+        () => (focused ? neighbourhoodOf(graph, focused, depth) : graph),
+        [graph, focused, depth]
+    );
+    const plan = useMemo(() => planLayout(drawn.nodes, drawn.edges), [drawn]);
+
+    /**
+     * Where the layout runs. Off the main thread wherever a worker can start;
+     * in tests and on a server, here, as the visualizer always did.
+     */
+    const offThread = canLayOutOffThread();
+    const [laidOut, setLaidOut] = useState<{ signature: string; positions: LayoutPositions } | null>(null);
+    const [layoutError, setLayoutError] = useState<unknown>(null);
+
+    const positions = drawn.nodes.length === 0
+        ? NO_POSITIONS
+        : cachedLayout(plan)
+            ?? (laidOut?.signature === plan.signature ? laidOut.positions : undefined)
+            ?? (offThread ? undefined : layOutNow(plan));
+
+    useEffect(() => {
+        if (!offThread || drawn.nodes.length === 0 || cachedLayout(plan)) return;
+        let current = true;
+        layOutInBackground(plan).then(
+            (result) => {
+                if (current) {
+                    setLaidOut({
+                        signature: plan.signature,
+                        positions: result
+                    });
+                }
+            },
+            (error: unknown) => {
+                if (current) setLayoutError(error);
+            }
+        );
+        return () => {
+            current = false;
         };
+    }, [plan, offThread, drawn]);
+
+    const placed = useMemo(
+        () => (positions ? placeGraph(drawn, positions) : EMPTY_GRAPH),
+        // `version` is the relayout button: new node objects put back every
+        // table a person dragged.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [collections, version, liveRls]);
+        [drawn, positions, version]
+    );
+
+    // The layout failing is the diagram failing, as it was when the layout
+    // ran in render: the view's error boundary says so.
+    if (layoutError) throw layoutError;
 
     return {
-        nodes,
-        edges,
+        nodes: placed.nodes,
+        edges: placed.edges,
+        allNodes: graph.nodes,
         relayout,
-        tableCount,
-        relationCount
+        tableCount: graph.nodes.length,
+        relationCount: graph.edges.length,
+        layingOut: positions === undefined,
+        neighbourhood: focused
+            ? {
+                focus: focused,
+                depth,
+                shown: drawn.nodes.length,
+                total: tables
+            }
+            : null
     };
 };

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9a7137f85a2187fd
+sourceHash: 81ca845faa40b4f5
 title: Trabajos en segundo plano
 sidebar_label: Trabajos en segundo plano
 description: Una cola de trabajos duradera respaldada por Postgres — trabajo que sobrevive a un reinicio, reintentado con retroceso, donde los fallos se conservan en lugar de descartarse.
@@ -69,7 +69,9 @@ FROM rebase.jobs WHERE status = 'failed'
 ORDER BY updated_at DESC;
 ```
 
-Las filas fallidas se conservan 30 días; las exitosas, 3.
+Las filas fallidas se conservan 30 días; las exitosas, 3. Cada worker elimina las
+filas caducadas al arrancar y después cada hora, por lotes y fuera de la ruta de
+las solicitudes.
 
 ## Qué sucede cuando un worker muere
 

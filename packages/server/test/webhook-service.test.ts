@@ -1,5 +1,17 @@
-import { WebhookDispatcher, WebhookConfig } from "../src/services/webhook-service";
+import { WebhookDispatcher, WebhookConfig, type WebhookDeliveryResult } from "../src/services/webhook-service";
 import { createHmac } from "crypto";
+import { logger } from "../src/utils/logger";
+
+// This suite is about the dispatcher — matching, payloads, signatures,
+// retries, deadlines, lanes — and stubs the network at `fetch`. So it sends
+// through the validate-then-fetch transport, the one a runtime without
+// `node:http` uses, with the guard and its resolver as they are. The Node
+// transport, which judges the address it connects to, is exercised over real
+// sockets in `webhook-connect-guard.test.ts`.
+jest.mock("../src/services/outbound-post", () => {
+    const actual = jest.requireActual<typeof import("../src/services/outbound-post")>("../src/services/outbound-post");
+    return { ...actual, createOutboundPost: actual.createFetchPost };
+});
 
 // Mock global fetch
 const mockFetch = jest.fn();
@@ -210,6 +222,29 @@ name: "Original" };
             expect(results[0].success).toBe(false);
             expect(results[0].responseBody).toContain("Network error");
         }, 30000);
+
+        it("makes three attempts, waiting 1 s and then 5 s between them", async () => {
+            jest.useFakeTimers();
+            try {
+                const dispatcher = makeDispatcher();
+                dispatcher.setWebhooks([makeWebhook()]);
+                const at: number[] = [];
+                mockFetch.mockImplementation(async () => {
+                    at.push(Date.now());
+                    throw new Error("Network error");
+                });
+                const start = Date.now();
+
+                const delivering = dispatcher.onEntityChange("users", "INSERT", "id_1", { id: "id_1" });
+                await jest.advanceTimersByTimeAsync(60_000);
+                const [result] = await delivering;
+
+                expect(at.map(t => t - start)).toEqual([0, 1_000, 6_000]);
+                expect(result.attemptNumber).toBe(3);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
 
         it("returns success: false for non-2xx status codes", async () => {
             const dispatcher = makeDispatcher();
@@ -450,6 +485,38 @@ url: "https://b.com/hook" })
         });
     });
 
+    describe("onEntityChange with several matching webhooks", () => {
+        it("delivers to them at once, and returns the results in webhook order", async () => {
+            // One after another, three receivers that each take ten seconds
+            // to answer held the caller thirty, and one timing out on all
+            // three attempts held it thirty-six per webhook.
+            const dispatcher = makeDispatcher();
+            dispatcher.setWebhooks(["a", "b", "c"].map(id =>
+                makeWebhook({ id: `wh_${id}`, url: `https://${id}.example.com/hook` })));
+            const started: string[] = [];
+            const answer = new Map<string, (response: Response) => void>();
+            mockFetch.mockImplementation((url: string) => {
+                const host = new URL(url).hostname;
+                started.push(host);
+                return new Promise<Response>(resolve => answer.set(host, resolve));
+            });
+
+            const delivering = dispatcher.onEntityChange("users", "INSERT", "id_1", { id: "id_1" });
+            for (let i = 0; i < 100 && started.length < 3; i++) await new Promise(r => setTimeout(r, 1));
+
+            // All three are open before any has answered.
+            expect(started.sort()).toEqual(["a.example.com", "b.example.com", "c.example.com"]);
+
+            // Answered out of order; the results are not.
+            answer.get("c.example.com")!(respond(202));
+            answer.get("a.example.com")!(respond(200));
+            answer.get("b.example.com")!(respond(201));
+
+            const results = await delivering;
+            expect(results.map(r => `${r.webhookId}:${r.statusCode}`)).toEqual(["wh_a:200", "wh_b:201", "wh_c:202"]);
+        });
+    });
+
     describe("enqueueEntityChange", () => {
         it("returns before the delivery runs", async () => {
             // The point of the method: `afterSave` is awaited inside the write's
@@ -517,7 +584,142 @@ url: "https://b.com/hook" })
             dispatcher.setWebhooks([makeWebhook({ url: "http://127.0.0.1/hook" })]);
 
             dispatcher.enqueueEntityChange("users", "INSERT", "id_1", { id: "id_1" });
-            await expect(dispatcher.flush()).resolves.toBeUndefined();
+            await expect(dispatcher.flush()).resolves.toBe(true);
+        });
+
+        describe("with a receiver that is down", () => {
+            /**
+             * Two webhooks on one table. `dead.example.com` holds every POST
+             * open until `release()`; `ok.example.com` answers at once.
+             */
+            function twoReceivers() {
+                const delivered: string[] = [];
+                const dispatcher = makeDispatcher({
+                    onDelivery: r => delivered.push(`${r.webhookId}:${(r.payload.record as { id: string }).id}`)
+                });
+                dispatcher.setWebhooks([
+                    makeWebhook({ id: "wh_dead", url: "https://dead.example.com/hook" }),
+                    makeWebhook({ id: "wh_ok", url: "https://ok.example.com/hook" })
+                ]);
+                let release: () => void = () => undefined;
+                const outage = new Promise<void>(resolve => {
+                    release = resolve;
+                });
+                mockFetch.mockImplementation(async (url: string) => {
+                    if (url.includes("dead.example.com")) await outage;
+                    return respond(200);
+                });
+                return { dispatcher, delivered, release: () => release() };
+            }
+
+            async function until(check: () => boolean): Promise<void> {
+                for (let i = 0; i < 200 && !check(); i++) await new Promise(r => setTimeout(r, 5));
+            }
+
+            it("still delivers to the healthy one, in order", async () => {
+                // One serial queue for every webhook: a receiver that refused
+                // connections cost every other receiver six seconds per queued
+                // event (three attempts, 1s and 5s apart), and one that timed
+                // out cost thirty-six. Here the dead one never answers at all,
+                // and the healthy one heard nothing.
+                const { dispatcher, delivered, release } = twoReceivers();
+                for (const id of ["1", "2", "3"]) dispatcher.enqueueEntityChange("users", "INSERT", id, { id });
+
+                await until(() => delivered.length >= 3);
+                expect(delivered).toEqual(["wh_ok:1", "wh_ok:2", "wh_ok:3"]);
+
+                release();
+                await dispatcher.flush();
+                expect(delivered.filter(d => d.startsWith("wh_dead"))).toEqual(["wh_dead:1", "wh_dead:2", "wh_dead:3"]);
+            });
+
+            it("lets flush give up after its budget, and finish once the receiver answers", async () => {
+                const { dispatcher, delivered, release } = twoReceivers();
+                dispatcher.enqueueEntityChange("users", "INSERT", "1", { id: "1" });
+
+                await expect(dispatcher.flush(20)).resolves.toBe(false);
+                expect(delivered).toEqual(["wh_ok:1"]);
+
+                release();
+                await expect(dispatcher.flush(5_000)).resolves.toBe(true);
+                expect(delivered).toEqual(["wh_ok:1", "wh_dead:1"]);
+            });
+
+            it("holds at most 10,000 waiting deliveries for it, and reports each one it refuses", async () => {
+                // Unbounded, the dead receiver's lane kept every change queued
+                // — each holding the row it describes — until the process ran
+                // out of memory: about 7,000 an hour at one write a second.
+                const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+                try {
+                    const delivered: string[] = [];
+                    const refused: WebhookDeliveryResult[] = [];
+                    const dispatcher = makeDispatcher({
+                        onDelivery: r => {
+                            if (r.responseBody === "queue full") refused.push(r);
+                            else delivered.push((r.payload.record as { id: string }).id);
+                        }
+                    });
+                    dispatcher.setWebhooks([makeWebhook({ id: "wh_dead", url: "https://dead.example.com/hook" })]);
+                    let release: () => void = () => undefined;
+                    const outage = new Promise<void>(resolve => {
+                        release = resolve;
+                    });
+                    mockFetch.mockImplementation(async () => {
+                        await outage;
+                        return respond(200);
+                    });
+
+                    // One in flight, 10,000 waiting, then 5 over.
+                    for (let i = 0; i < 10_006; i++) dispatcher.enqueueEntityChange("users", "INSERT", String(i), { id: String(i) });
+
+                    expect(refused).toHaveLength(5);
+                    expect(refused.map(r => (r.payload.record as { id: string }).id))
+                        .toEqual(["10001", "10002", "10003", "10004", "10005"]);
+                    expect(refused.every(r => r.webhookId === "wh_dead" && !r.success
+                        && r.statusCode === 0 && r.attemptNumber === 0)).toBe(true);
+                    // Said once for the burst, not once per refusal.
+                    expect(warn.mock.calls.filter(([m]) => String(m).includes("refusing new ones"))).toHaveLength(1);
+
+                    // Once it answers and drains, it takes deliveries again.
+                    release();
+                    await expect(dispatcher.flush(30_000)).resolves.toBe(true);
+                    expect(delivered).toHaveLength(10_001);
+                    expect(warn.mock.calls.filter(([m]) => String(m).includes("5 were refused"))).toHaveLength(1);
+                    dispatcher.enqueueEntityChange("users", "INSERT", "late", { id: "late" });
+                    await dispatcher.flush(5_000);
+                    expect(delivered.at(-1)).toBe("late");
+                    expect(refused).toHaveLength(5);
+                } finally {
+                    warn.mockRestore();
+                }
+            }, 60_000);
+
+            it("does not let a throwing onDelivery reach the caller of enqueueEntityChange", async () => {
+                jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+                const error = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+                try {
+                    const dispatcher = makeDispatcher({
+                        onDelivery: r => { if (r.responseBody === "queue full") throw new Error("bad hook"); }
+                    });
+                    dispatcher.setWebhooks([makeWebhook()]);
+                    let release: () => void = () => undefined;
+                    const outage = new Promise<void>(resolve => {
+                        release = resolve;
+                    });
+                    mockFetch.mockImplementation(async () => {
+                        await outage;
+                        return respond(200);
+                    });
+                    expect(() => {
+                        for (let i = 0; i < 10_002; i++) dispatcher.enqueueEntityChange("users", "INSERT", String(i), { id: String(i) });
+                    }).not.toThrow();
+                    expect(error).toHaveBeenCalledTimes(1);
+                    release();
+                    await dispatcher.flush(30_000);
+                } finally {
+                    jest.restoreAllMocks();
+                }
+            }, 60_000);
         });
     });
 });

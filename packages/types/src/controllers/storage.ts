@@ -539,4 +539,25 @@ export declare interface StorageReference {
      * this reference is the root.
      */
     parent: StorageReference | null;
+
+    /**
+     * The object's size in bytes, as the listing read it. Set on the objects
+     * of a listing from the built-in local, S3 and GCS sources; absent on
+     * folders and from a source that cannot list it without a request per
+     * object. Since 0.24.
+     */
+    size?: number;
+
+    /**
+     * When the object was last written, as an ISO 8601 timestamp — set where
+     * {@link size} is.
+     */
+    updated?: string;
+
+    /**
+     * The object's stored content type, as the listing read it: set by local
+     * storage and GCS. An S3 listing does not carry it, so on S3 it is absent
+     * and `getSignedUrl()` (or the metadata route) still says.
+     */
+    contentType?: string;
 }

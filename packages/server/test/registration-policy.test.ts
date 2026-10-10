@@ -532,3 +532,89 @@ describe("the first-user check", () => {
         expect(repo.listUsers).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * "Is there any user?" asks for ids, not a count.
+ *
+ * `GET /auth/config` is anonymous and fetched on every admin-panel load and
+ * login screen; closed registration rejects anonymous callers all day. Both
+ * asked `listUsersPaginated`, which counts and sorts the whole users table.
+ * A repository that offers `firstUserIds` is asked that instead, and the
+ * answers must not move: the agreement matrix above, run again over it.
+ */
+describe("the user-presence checks", () => {
+    function fastRepo(existingUsers: number) {
+        const { repo, users } = createRepo(existingUsers);
+        (repo.listUsersPaginated as jest.Mock).mockImplementation(async () => {
+            throw new Error("listUsersPaginated() counts and sorts the whole table");
+        });
+        const firstUserIds = jest.fn(async (limit: number) => users.slice(0, limit).map(u => u.id));
+        Object.assign(repo, { firstUserIds });
+        return { repo, firstUserIds };
+    }
+
+    const register = (app: Hono<HonoEnv>) => app.request("/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "newcomer@test.dev", password: "a-sufficiently-long-password" })
+    });
+
+    it.each(SCENARIOS.map(s => [label(s), s] as const))("%s answers as before", async (_label, scenario) => {
+        configureJwt({ secret: TEST_SECRET, accessExpiresIn: "15m", refreshExpiresIn: "7d" });
+        (validatePasswordStrength as jest.Mock).mockReturnValue({ valid: true, errors: [] });
+        (hashPassword as jest.Mock).mockResolvedValue("hashed-pw");
+        const { repo } = fastRepo(scenario.existingUsers);
+        const adapter = createBuiltinAuthAdapter({
+            authRepository: repo,
+            allowRegistration: scenario.allowRegistration,
+            disableSelfRegistration: scenario.disableSelfRegistration
+        });
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.route("/auth", adapter.createAuthRoutes()!);
+
+        const capabilities = await adapter.getCapabilities();
+        const response = await register(app);
+        const accepted = response.status < 400;
+
+        expect(capabilities.needsSetup).toBe(scenario.existingUsers === 0);
+        expect(capabilities.registrationEnabled).toBe(accepted);
+        expect(accepted).toBe(isRegistrationOpen({ ...scenario, needsSetup: scenario.existingUsers === 0 }));
+        if (accepted) {
+            expect(repo.setUserRoles).toHaveBeenCalledTimes(scenario.existingUsers === 0 ? 1 : 0);
+        }
+        expect(repo.listUsersPaginated).not.toHaveBeenCalled();
+    });
+
+    describe("in production", () => {
+        const previous = process.env.NODE_ENV;
+        beforeEach(() => { process.env.NODE_ENV = "production"; });
+        afterEach(() => { process.env.NODE_ENV = previous; });
+
+        it.each([0, 1])("GET /auth/config does not ask the table (%i users): the window is shut whatever it holds", async (existingUsers) => {
+            const { repo, firstUserIds } = fastRepo(existingUsers);
+            const adapter = createBuiltinAuthAdapter({ authRepository: repo });
+
+            expect((await adapter.getCapabilities()).needsSetup).toBe(false);
+            expect(firstUserIds).not.toHaveBeenCalled();
+            expect(repo.listUsersPaginated).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            [0, "SETUP_REQUIRED"],
+            [1, "REGISTRATION_DISABLED"]
+        ])("closed registration with %i users still says which refusal it is (%s)", async (existingUsers, code) => {
+            const { repo, firstUserIds } = fastRepo(existingUsers);
+            const adapter = createBuiltinAuthAdapter({ authRepository: repo, allowRegistration: false });
+            const app = new Hono<HonoEnv>();
+            app.onError(errorHandler);
+            app.route("/auth", adapter.createAuthRoutes()!);
+
+            const response = await register(app);
+
+            expect(response.status).toBe(403);
+            expect((await response.json() as { error?: { code?: string } }).error?.code).toBe(code);
+            expect(firstUserIds).toHaveBeenCalledWith(1);
+        });
+    });
+});

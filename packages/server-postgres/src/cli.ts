@@ -4,8 +4,8 @@ import { execa } from "execa";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { logger } from "@rebasepro/server";
 import { out, outWarn, outError } from "./cli-output";
+import { resolveTsxLoader } from "./tsx-loader";
 import { formatRelativeTime } from "@rebasepro/utils";
 import {
     diagnoseMissingBin,
@@ -34,7 +34,9 @@ import {
     queryGeneratedColumnDependencies,
     queryColumnTypes,
     dropGeneratedColumns,
-    loadCollectionsForCli
+    loadCollectionsForCli,
+    withAppClient,
+    closeAppClients
 } from "./cli-helpers";
 import {
     checkDatabaseConnectivity,
@@ -57,12 +59,14 @@ import {
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { acceptsExcludeFlag, buildAtlasArgs, migrateApplyArgs, takesDevUrl } from "./schema/atlas-argv";
 import { ScratchDatabase } from "./cli-scratch-database";
+import { applyPoliciesFile, applyPushPlan, stampableTables, type PolicyStamping } from "./cli-push";
 import { unexpectedBranchArgs } from "./branch-argv";
 import { assertKnownFlags, collectionsPathIn, parseDriverLine } from "./cli-flags";
 import { assertCollectionsPathExists } from "./cli-collections-path";
 import { DESIRED_STATE_URL, GENERATED_SQL_DIR, generatedSqlDir, prepareGeneratedSqlDir } from "./generated-sql";
 import { backupActionOf } from "./backup-argv";
 import type { TableLockResult } from "./schema/ensure-collection-policies";
+import type { DeferredIndexBuild } from "./schema/plan/diff-plan";
 
 import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
 
@@ -92,19 +96,27 @@ const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
  * tsx maps it back. Running the built `.js` under plain `node` therefore fails
  * on the user's code rather than on ours, one directory further from anything
  * the error mentions.
+ *
+ * tsx's loader in one Node (`node --import`) when it resolves, rather than the
+ * `tsx` binary, which is a shell shim and a relay Node in front of that same
+ * loader (see `tsx-loader.ts`). The binary stays the fallback — a global tsx.
+ * `args` is everything after `bin`, the script included.
  */
 function resolveChildScript(name: string):
-    | { ok: true; bin: string; script: string }
+    | { ok: true; bin: string; args: string[] }
     | { ok: false; reason: "script" | "tsx" } {
     const built = path.join(__cliDirname, "schema", `${name}.js`);
     const source = path.join(__cliDirname, "schema", `${name}.ts`);
     const script = fs.existsSync(built) ? built : fs.existsSync(source) ? source : null;
     if (!script) return { ok: false, reason: "script" };
 
+    const tsxLoader = resolveTsxLoader();
+    if (tsxLoader) return { ok: true, bin: process.execPath, args: ["--import", tsxLoader, script] };
+
     const tsxBin = resolveLocalBin("tsx");
     if (!tsxBin) return { ok: false, reason: "tsx" };
 
-    return { ok: true, bin: tsxBin, script };
+    return { ok: true, bin: tsxBin, args: [script] };
 }
 
 /** What to print when {@link resolveChildScript} cannot produce a command. */
@@ -115,6 +127,50 @@ function childScriptError(what: string, reason: "script" | "tsx"): string {
     }
     return `✗ The driver's ${what} is missing. This copy of @rebasepro/server-postgres is `
         + "incomplete — reinstall it, or run its build if you are working in the monorepo.";
+}
+
+/**
+ * Whether this process can run the generators itself — that is, whether it
+ * runs under tsx, the interpreter the project's collection files need (see
+ * {@link resolveChildScript}). `rebase` always starts the driver that way when
+ * tsx is installed, which a scaffold guarantees; a driver started with plain
+ * `node` keeps the child process, which brings its own tsx.
+ */
+function generatesInProcess(): boolean {
+    const flags = [...process.execArgv, process.env.NODE_OPTIONS ?? ""];
+    return flags.some(flag => /(?:^|[\s\\/=])tsx(?:$|[\s\\/@])/.test(flag));
+}
+
+/**
+ * Run one of the generators in this process — see `schema/generate-files.ts`
+ * for why a one-shot generation no longer gets a process of its own.
+ *
+ * The messages and the exit code are the child's: a generator that failed has
+ * printed its own error, and this adds the one-line verdict; one that could not
+ * even be loaded is reported the way a child that never started was.
+ */
+async function generateInProcess(
+    what: string,
+    label: string,
+    run: (generators: typeof import("./schema/generate-files")) => Promise<void>
+): Promise<void> {
+    let generators: typeof import("./schema/generate-files");
+    try {
+        generators = await import("./schema/generate-files");
+    } catch (err) {
+        outError(chalk.red(`✗ Failed to run ${what}: ${err instanceof Error ? err.message : String(err)}`));
+        process.exit(1);
+    }
+    try {
+        await run(generators);
+    } catch (err) {
+        if (err instanceof generators.GenerationFailed) {
+            outError(chalk.red(`✗ ${label} generation failed — nothing was applied.`));
+        } else {
+            outError(chalk.red(`✗ Failed to run ${what}: ${err instanceof Error ? err.message : String(err)}`));
+        }
+        process.exit(1);
+    }
 }
 
 
@@ -180,15 +236,21 @@ export async function runPluginCommand(args: string[]) {
     // exist" — and the answer was already known before the first write.
     assertCollectionsPathExists(collectionsPathIn(args));
 
-    if (domain === "db") {
-        await scratchDatabase.around(() => dbCommand(subcommand, args));
-    } else if (domain === "schema") {
-        await schemaCommand(subcommand, args);
-    } else if (domain === "doctor") {
-        await doctorPluginCommand(args);
-    } else {
-        outError(chalk.red(`Unknown domain command: ${domain}`));
-        process.exit(1);
+    try {
+        if (domain === "db") {
+            await scratchDatabase.around(() => dbCommand(subcommand, args));
+        } else if (domain === "schema") {
+            await schemaCommand(subcommand, args);
+        } else if (domain === "doctor") {
+            await doctorPluginCommand(args);
+        } else {
+            outError(chalk.red(`Unknown domain command: ${domain}`));
+            process.exit(1);
+        }
+    } finally {
+        // The one connection every step shared (see `withAppClient`). Open, it
+        // would keep this process alive after the command has finished.
+        await closeAppClients();
     }
 }
 
@@ -515,6 +577,13 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 await ensureAuthSchemaAndFunctions(databaseUrl);
             }
 
+            // Before Atlas plans: the foreign-key indexes an existing table is
+            // missing, built CONCURRENTLY — so the plan finds them, and the
+            // push's one transaction never builds one while holding the
+            // table's writes. See `schema/push-index-prebuild.ts`. A dry-run
+            // only names them.
+            const prebuilt = databaseUrl ? await prebuildForeignKeyIndexes(databaseUrl, collectionsPath, dryRun) : [];
+
             // Preview the plan before touching data. `atlas schema apply` with
             // --auto-approve will silently DROP COLUMN on a field removal and
             // drop+add on a rename, so we first dry-run to obtain the planned
@@ -587,6 +656,15 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     out(chalk.green("  ✓ No changes: the database already matches these collections."));
                 }
                 out("");
+                if (prebuilt.length > 0) {
+                    out(chalk.gray(`  ${prebuilt.length} foreign-key index(es) on existing tables would be built first,`));
+                    out(chalk.gray("  CONCURRENTLY, so the apply would not build them under a write lock (the plan"));
+                    out(chalk.gray("  above lists them because they do not exist yet):"));
+                    for (const name of prebuilt) {
+                        out(chalk.gray(`       ${name}`));
+                    }
+                    out("");
+                }
                 if (rebuildable.length > 0) {
                     out(chalk.gray(`  ${rebuildable.length} generated column(s) would be dropped before the apply and`));
                     out(chalk.gray("  rebuilt from search.sql after it — Postgres cannot retype a column"));
@@ -658,50 +736,52 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 }
             }
 
-            if (rebuildable.length > 0 && databaseUrl) {
-                for (const conflict of rebuildable) {
-                    out(chalk.gray(`  Dropping ${describeConflict(conflict)} — it reads a column this push retypes.`));
-                }
-                await dropGeneratedColumns(databaseUrl, dropGeneratedColumnStatements(rebuildable));
-            }
-
-            try {
-                // Thrown, not exited: an exit from inside runAtlas skipped this
-                // catch entirely, so a failed apply left the search columns it
-                // had just dropped dropped.
-                await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], collectionsPath, { throwOnFailure: true });
-            } catch (err) {
-                // Atlas rolled its transaction back, so the columns those
-                // expressions read are as they were and the definitions in
-                // search.sql still fit. Put them back before surfacing the
-                // failure: a push that fails must not also leave search broken.
-                if (rebuildable.length > 0 && databaseUrl) {
+            // Without a database URL there is nothing to drop or rebuild: runAtlas
+            // refuses to run without one anyway.
+            const rebuildCount = databaseUrl ? rebuildable.length : 0;
+            await applyPushPlan({ dryRun: plan, rebuildable: rebuildCount }, {
+                dropRebuildable: async () => {
+                    if (!databaseUrl) return;
+                    for (const conflict of rebuildable) {
+                        out(chalk.gray(`  Dropping ${describeConflict(conflict)} — it reads a column this push retypes.`));
+                    }
+                    await dropGeneratedColumns(databaseUrl, dropGeneratedColumnStatements(rebuildable));
+                },
+                // Thrown, not exited: an exit from inside runAtlas skipped the
+                // rebuild below entirely, so a failed apply left the search
+                // columns it had just dropped dropped.
+                atlasApply: async () => {
+                    await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], collectionsPath, { throwOnFailure: true });
+                },
+                reportSynced: () => out("Schema is synced, no changes to be made"),
+                rebuildAfterFailure: async () => {
+                    if (!databaseUrl) return;
                     out(chalk.gray("  The apply failed — rebuilding the generated columns it needed out of the way."));
                     await applySearchDdl(databaseUrl);
+                },
+                afterApply: async () => {
+                    out("");
+                    if (!databaseUrl) {
+                        outWarn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
+                        return;
+                    }
+                    // First, before anything below can fail. Atlas has just
+                    // committed any new table with RLS off and the user role
+                    // already holding DML on it; every later step may refuse.
+                    await lockManagedTables(databaseUrl, collectionsPath);
+                    await ensureAuthTables(databaseUrl, collectionsPath);
+                    // After the tables exist and before the policies: the vector and
+                    // search columns are `ALTER TABLE ... ADD COLUMN`, and a policy
+                    // may reference the table they are added to.
+                    await applyVectorDdl(databaseUrl);
+                    await applySearchDdl(databaseUrl);
+                    await applyTriggersDdl(databaseUrl);
+                    await applyPolicies(databaseUrl, collectionsPath);
+                    await reconcilePolicies(databaseUrl, collectionsPath);
+                    await ensureRlsUserRole(databaseUrl);
+                    await retireLegacyAuthSchema(databaseUrl);
                 }
-                throw err;
-            }
-            out("");
-
-            if (databaseUrl) {
-                // First, before anything below can fail. Atlas has just
-                // committed any new table with RLS off and the user role
-                // already holding DML on it; every later step may refuse.
-                await lockManagedTables(databaseUrl, collectionsPath);
-                await ensureAuthTables(databaseUrl, collectionsPath);
-                // After the tables exist and before the policies: the vector and
-                // search columns are `ALTER TABLE ... ADD COLUMN`, and a policy
-                // may reference the table they are added to.
-                await applyVectorDdl(databaseUrl);
-                await applySearchDdl(databaseUrl);
-                await applyTriggersDdl(databaseUrl);
-                await applyPolicies(databaseUrl);
-                await reconcilePolicies(databaseUrl, collectionsPath);
-                await ensureRlsUserRole(databaseUrl);
-                await retireLegacyAuthSchema(databaseUrl);
-            } else {
-                outWarn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
-            }
+            });
         } else if (subcommand === "migrate") {
             const databaseUrl = process.env.DATABASE_URL;
             if (databaseUrl) {
@@ -730,12 +810,61 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     }
 }
 
+/**
+ * Build, CONCURRENTLY and before Atlas plans, the derived foreign-key indexes
+ * an existing table is missing — see `schema/push-index-prebuild.ts`. With
+ * `dryRun`, only find them.
+ *
+ * Never fatal: an index not built here is one Atlas builds inside the push, as
+ * it always did.
+ *
+ * @returns `schema.index` of each one missing when this started.
+ */
+async function prebuildForeignKeyIndexes(databaseUrl: string, collectionsPath: string, dryRun: boolean): Promise<string[]> {
+    let missing: DeferredIndexBuild[];
+    try {
+        const { loadCollections } = await import("./schema/doctor");
+        const { missingForeignKeyIndexes } = await import("./schema/push-index-prebuild");
+        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        missing = await withAppClient(databaseUrl, client => missingForeignKeyIndexes(
+            { query: async (text) => ({ rows: (await client.query(text)).rows }) },
+            collections
+        ));
+    } catch {
+        // Not knowing changes nothing that matters: Atlas plans whatever is missing.
+        return [];
+    }
+    const names = missing.map(index => `${index.schema}.${index.indexName}`);
+    if (missing.length === 0 || dryRun) return names;
+
+    out(chalk.gray(`  Building ${missing.length} foreign-key index(es) on existing tables first — CONCURRENTLY, so writes go on:`));
+    try {
+        const { buildDeferredIndexes } = await import("./schema/deferred-index-build");
+        // This process's one connection, which is the dedicated session the
+        // builder needs: it lifts `statement_timeout` and resets it, and takes
+        // and releases its claims, on the same backend.
+        const outcome = await withAppClient(databaseUrl, client => buildDeferredIndexes(
+            async () => ({
+                dedicated: true,
+                query: async (text) => ({ rows: (await client.query(text)).rows }),
+                release: () => undefined
+            }),
+            missing,
+            { log: message => out(chalk.gray(`    ${message}`)) }
+        ));
+        for (const failure of outcome.failed) {
+            outWarn(chalk.yellow(`  ⚠️  ${failure.index} was not built ahead (${failure.error}); the push builds it inside its transaction instead.`));
+        }
+    } catch (err) {
+        outWarn(chalk.yellow(`  ⚠️  The foreign-key indexes were not built ahead (${err instanceof Error ? err.message : String(err)}); the push builds them inside its transaction instead.`));
+    }
+    out("");
+    return names;
+}
+
 async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> {
     try {
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
+        await withAppClient(databaseUrl, async client => {
             // Creates the `rebase` schema as its first statement, which also
             // covers the schema Atlas puts its revision table in
             // (`--revisions-schema rebase`). That used to need a separate,
@@ -745,9 +874,7 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
             // now always declares `rebase` in the desired schema, so there is
             // nothing to keep out.
             await client.query(RLS_BOOTSTRAP_SQL);
-        } finally {
-            await client.end();
-        }
+        });
     } catch (err) {
         outWarn(chalk.yellow(`  ⚠️  Failed to bootstrap the RLS helper functions: ${err instanceof Error ? err.message : String(err)}`));
     }
@@ -779,17 +906,10 @@ async function lockManagedTables(databaseUrl: string, collectionsPath: string): 
         const { loadCollections } = await import("./schema/doctor");
         userRole = (await import("./security/rls-enforcement")).REBASE_USER_ROLE;
         const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
-            ({ unsecured } = await lockCollectionTables(
-                { query: async (text) => ({ rows: (await client.query(text)).rows }) },
-                collections
-            ));
-        } finally {
-            await client.end();
-        }
+        ({ unsecured } = await withAppClient(databaseUrl, client => lockCollectionTables(
+            { query: async (text) => ({ rows: (await client.query(text)).rows }) },
+            collections
+        )));
     } catch (err) {
         outError(chalk.red(
             `\n  ✗ The schema was applied, but row-level security could not be switched on for its tables: ` +
@@ -835,7 +955,6 @@ async function ensureAuthTables(databaseUrl: string, collectionsPath: string): P
         const { drizzle } = await import("drizzle-orm/node-postgres");
         const { ensureAuthTablesExist } = await import("./auth/ensure-tables");
         const { loadCollections } = await import("./schema/doctor");
-        const { Client } = await import("pg");
 
         const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
         // The auth collection is flagged with `auth: true` or `auth: { enabled: true }`.
@@ -844,13 +963,7 @@ async function ensureAuthTables(databaseUrl: string, collectionsPath: string): P
             return a === true || (typeof a === "object" && a !== null && a.enabled === true);
         });
 
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
-            await ensureAuthTablesExist(drizzle(client), authCollection);
-        } finally {
-            await client.end();
-        }
+        await withAppClient(databaseUrl, client => ensureAuthTablesExist(drizzle(client), authCollection));
     } catch (err) {
         outWarn(chalk.yellow(`  ⚠️  Failed to ensure framework auth tables: ${err instanceof Error ? err.message : String(err)}`));
     }
@@ -890,19 +1003,14 @@ async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
     }
 
     try {
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
+        await withAppClient(databaseUrl, async client => {
             const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
             const posture = await rls.detectConnectionPosture(runSql);
             if (posture.privileged) {
                 await rls.ensureAppRole(runSql, schemas);
                 out(chalk.gray(`  ✓ RLS role "${rls.REBASE_USER_ROLE}" provisioned/refreshed.`));
             }
-        } finally {
-            await client.end();
-        }
+        });
     } catch (err) {
         outError(chalk.red(
             `\n  ✗ The schema change was applied, but the "${rls.REBASE_USER_ROLE}" role could not be ` +
@@ -923,26 +1031,19 @@ async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
  */
 async function retireLegacyAuthSchema(databaseUrl: string): Promise<void> {
     try {
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
-            await dropLegacyAuthSchema(
-                async (text) => (await client.query(text)).rows as Record<string, unknown>[],
-                {
-                    info: (m) => out(chalk.gray(`  ${m}`)),
-                    warn: (m) => outWarn(chalk.yellow(`  ⚠️  ${m}`))
-                }
-            );
-        } finally {
-            await client.end();
-        }
+        await withAppClient(databaseUrl, client => dropLegacyAuthSchema(
+            async (text) => (await client.query(text)).rows as Record<string, unknown>[],
+            {
+                info: (m) => out(chalk.gray(`  ${m}`)),
+                warn: (m) => outWarn(chalk.yellow(`  ⚠️  ${m}`))
+            }
+        ));
     } catch {
         // Connection-level failure only; the schema is inert either way.
     }
 }
 
-async function applyPolicies(databaseUrl: string): Promise<void> {
+async function applyPolicies(databaseUrl: string, collectionsPath: string): Promise<void> {
     try {
         const policiesPath = path.join(generatedSqlDir(), "policies.sql");
         if (!fs.existsSync(policiesPath)) return;
@@ -951,14 +1052,12 @@ async function applyPolicies(databaseUrl: string): Promise<void> {
         out("");
         
         const policiesContent = fs.readFileSync(policiesPath, "utf-8");
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
-            await client.query(policiesContent);
-            out(chalk.green("  ✓ RLS policies applied successfully."));
-        } finally {
-            await client.end();
+        const stamping = await policyStamping(databaseUrl, collectionsPath, policiesContent);
+        const { stampError } = await withAppClient(databaseUrl, client => applyPoliciesFile(client, policiesContent, stamping));
+        out(chalk.green("  ✓ RLS policies applied successfully."));
+        if (stampError) {
+            // The policies are in; only the boot's shortcut is not. See applyPoliciesFile.
+            outWarn(chalk.yellow(`  ⚠️  The policies could not be stamped (${stampError}); the next boot applies them again.`));
         }
     } catch (err) {
         const hint = diagnoseDbError(err, databaseUrl);
@@ -968,6 +1067,29 @@ async function applyPolicies(databaseUrl: string): Promise<void> {
             outError(chalk.red(`  ✗ Failed to apply RLS policies: ${err instanceof Error ? err.message : String(err)}`));
         }
         process.exit(1);
+    }
+}
+
+/**
+ * The stamps a boot looks for, for the policies `policies.sql` is about to
+ * create — see `applyPoliciesFile`. None when the collections cannot be read
+ * here, which costs only the shortcut: the next boot re-applies, as before.
+ */
+async function policyStamping(databaseUrl: string, collectionsPath: string, policiesSql: string): Promise<PolicyStamping> {
+    try {
+        const { loadCollections } = await import("./schema/doctor");
+        const { planCollectionPolicies } = await import("./schema/generate-postgres-ddl-logic");
+        const { policyStampSql } = await import("./schema/ensure-collection-policies");
+        // The rule the boot's connections follow: `search_path=public` unless
+        // the URL pins one of its own, in which case this connection has it too.
+        const { pinSearchPath } = await import("./connection");
+        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const statements = stampableTables(planCollectionPolicies(collections), policiesSql)
+            .map(plan => policyStampSql(plan))
+            .filter((statement): statement is string => statement !== undefined);
+        return { statements, searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public" };
+    } catch {
+        return { statements: [] };
     }
 }
 
@@ -991,10 +1113,7 @@ async function reconcilePolicies(databaseUrl: string, collectionsPath: string): 
         const { loadCollections } = await import("./schema/doctor");
 
         const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
+        await withAppClient(databaseUrl, async client => {
             const drift = await checkPolicyDrift(client as never, collections);
             const { dropped, kept } = await dropOrphanedPolicies(client as never, drift, collections);
 
@@ -1022,9 +1141,7 @@ async function reconcilePolicies(databaseUrl: string, collectionsPath: string): 
                 outWarn(chalk.yellow("  ⚠️  RLS policies do not match your collections:"));
                 outWarn(formatPolicyDrift({ ...remaining, orphaned: [] }));
             }
-        } finally {
-            await client.end();
-        }
+        });
     } catch (err) {
         outWarn(chalk.yellow(`  ⚠️  Could not reconcile RLS policies: ${err instanceof Error ? err.message : String(err)}`));
     }
@@ -1620,8 +1737,9 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
         }
     );
 
-    const ddl = resolveChildScript("generate-postgres-ddl");
-    if (!ddl.ok) {
+    const inProcess = generatesInProcess();
+    const ddl = inProcess ? undefined : resolveChildScript("generate-postgres-ddl");
+    if (ddl && !ddl.ok) {
         outError(chalk.red(childScriptError("DDL generator", ddl.reason)));
         process.exit(1);
     }
@@ -1641,9 +1759,19 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
         }
     }
 
+    if (!ddl) {
+        await generateInProcess("Postgres DDL generator", "Postgres DDL", async ({ writePostgresDdl }) => {
+            await writePostgresDdl({
+                collectionsPath: path.resolve(process.cwd(), collectionsPath),
+                outputPath: path.resolve(process.cwd(), outputPath)
+            });
+        });
+        return;
+    }
+
     const cmdParts = [
         ddl.bin,
-        ddl.script,
+        ...ddl.args,
         `--collections=${collectionsPath}`,
         `--output=${outputPath}`
     ];
@@ -1736,6 +1864,11 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
             // this does. Said out loud all the same — this command used to exit
             // 0 in silence here, which is indistinguishable from a clean run.
             unreadable = err instanceof Error ? err.message : String(err);
+            // Imported here, not at the top: the server is a 1.2 MB bundle plus
+            // hono, drizzle and zod, and every driver command — `db push`, the
+            // two runs in each `rebase dev` start — paid ~0.4 s under tsx to
+            // load it before parsing its argv, for this one debug line.
+            const { logger } = await import("@rebasepro/server");
             logger.debug(`schema stale: skipped (${unreadable})`);
         }
     }
@@ -1799,6 +1932,26 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
             }
         );
 
+        const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
+        const outputPath = argsList["--output"] || path.join("src", "schema.generated.ts");
+        const watch = argsList["--watch"] || false;
+
+        // One-shot generation runs here, in this process: see `generate-files.ts`.
+        // `--watch` keeps its own process, which re-imports the collections on
+        // every save — this process's module cache would not.
+        if (!watch && generatesInProcess()) {
+            out("");
+            out(chalk.bold("  🔧 Rebase Schema Generator"));
+            out("");
+            await generateInProcess("schema generator", "Drizzle schema", async ({ writeDrizzleSchema }) => {
+                await writeDrizzleSchema({
+                    collectionsPath: path.resolve(process.cwd(), collectionsPath),
+                    outputPath: path.resolve(process.cwd(), outputPath)
+                });
+            });
+            return;
+        }
+
         // Here we just invoke the local generate-drizzle-schema.ts since we are inside the postgresql-backend
         // If installed in node_modules, __cliDirname is node_modules/@rebasepro/server-postgres/dist or src.
         const generator = resolveChildScript("generate-drizzle-schema");
@@ -1807,17 +1960,13 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
             process.exit(1);
         }
 
-        const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
-        const outputPath = argsList["--output"] || path.join("src", "schema.generated.ts");
-        const watch = argsList["--watch"] || false;
-
         out("");
         out(chalk.bold("  🔧 Rebase Schema Generator"));
         out("");
 
         const cmdParts = [
             generator.bin,
-            generator.script,
+            ...generator.args,
             `--collections=${collectionsPath}`,
             `--output=${outputPath}`
         ];
@@ -1873,7 +2022,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
 
         const cmdParts = [
             introspect.bin,
-            introspect.script,
+            ...introspect.args,
             `--output=${outputPath}`,
             ...(argsList["--force"] ? ["--force"] : []),
             ...(argsList["--schema"] ? [`--schema=${argsList["--schema"]}`] : [])
@@ -1924,7 +2073,7 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
 
     const cmdParts = [
         doctor.bin,
-        doctor.script,
+        ...doctor.args,
         `--collections=${collectionsPath}`,
         `--schema=${schemaPath}`,
         `--sdk=${sdkPath}`,

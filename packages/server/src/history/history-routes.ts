@@ -155,6 +155,13 @@ function isPlainValues(value: unknown): value is Record<string, unknown> {
 export interface HistoryService {
     fetchHistory(tableName: string, id: string, options: { limit: number, offset: number }): Promise<{ data: Record<string, unknown>[], total: number }>;
     fetchHistoryEntry(historyId: string): Promise<Record<string, unknown> | null>;
+    /**
+     * Delete every entry past the retention period, of every row; resolves to
+     * how many went. Run hourly by the backend — see `retention-sweep.ts`. A
+     * service without it is pruned only inline, after each write. `signal`
+     * asks it to stop between batches.
+     */
+    pruneExpired?(options?: { signal?: AbortSignal }): Promise<number>;
 }
 
 /** Entries returned when the caller names no `?limit`. */
@@ -224,7 +231,14 @@ export function createHistoryRoutes(params: {
         const scoped = c.get("driver") as DataDriver | undefined;
         if (!scoped) throw ApiError.internal("Scoped driver not available");
 
-        const row = await scoped.fetchOne({ path: collection.slug, id, collection, withDeleted: true });
+        // The REST read of the row: its columns, through the same policies.
+        // `fetchOne` is the admin's view-model walk, which loaded every
+        // declared relation of the row — every comment of a post — to answer
+        // whether one row may be read. It is also the rendering a history
+        // entry is stored in, which is what a revert compares it against.
+        const row = scoped.restFetchService
+            ? await scoped.restFetchService.fetchOneForRest(collection.slug, id, undefined, undefined, { withDeleted: true }) ?? undefined
+            : await scoped.fetchOne({ path: collection.slug, id, collection, withDeleted: true });
         if (!row) {
             throw ApiError.notFound(`Entity '${id}' not found in collection '${collection.slug}'`);
         }

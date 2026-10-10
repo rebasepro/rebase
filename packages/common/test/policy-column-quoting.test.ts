@@ -56,7 +56,7 @@ describe("policyToPostgres — column identifiers", () => {
             policy.compare(policy.field("ownerId"), "eq", policy.authUid()),
             legacyDocs
         );
-        expect(sql).toBe(`("ownerId")::text = rebase.uid()`);
+        expect(sql).toBe(`("ownerId")::text = (SELECT rebase.uid())`);
     });
 
     it("quotes a column named after a bare SQL expression", () => {
@@ -129,7 +129,7 @@ describe("policyToPostgres — column identifiers", () => {
             ),
             plainDocs
         );
-        expect(sql).toBe(`((owner_id)::text = rebase.uid()) AND (team_id != 'none')`);
+        expect(sql).toBe(`((owner_id)::text = (SELECT rebase.uid())) AND (team_id != 'none')`);
     });
 
     it("leaves a snake_cased property key unquoted", () => {

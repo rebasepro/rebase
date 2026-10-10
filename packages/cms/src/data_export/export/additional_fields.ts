@@ -36,32 +36,29 @@ export async function resolveAdditionalExportValues<M extends Record<string, unk
 
     const resolvedExportColumnsValues: Record<string, unknown>[] = exportFields
         ? await mapInChunks(entities, async (entity) => {
-            return (await Promise.all(exportFields.map(async (column) => {
-                return {
-                    [column.key]: await column.builder({
-                        entity,
-                        context
-                    })
-                };
-            }))).reduce((a, b) => ({ ...a,
-...b }), {});
+            // `fromEntries`, not a pairwise spread, which copied the row once
+            // per column.
+            return Object.fromEntries(await Promise.all(exportFields.map(async (column) => [
+                column.key,
+                await column.builder({
+                    entity,
+                    context
+                })
+            ])));
         })
         : [];
 
     const resolvedColumnsValues: Record<string, unknown>[] = additionalFields
         ? await mapInChunks(entities, async (entity) => {
-            return (await Promise.all(additionalFields
-                .map(async (field) => {
-                    if (!field.value)
-                        return {};
-                    return {
-                        [field.key]: await field.value({
-                            entity,
-                            context
-                        })
-                    };
-                }))).reduce((a, b) => ({ ...a,
-...b }), {});
+            return Object.fromEntries(await Promise.all(additionalFields
+                .filter((field) => field.value)
+                .map(async (field) => [
+                    field.key,
+                    await field.value!({
+                        entity,
+                        context
+                    })
+                ])));
         })
         : [];
     // One record per entity, index for index — the export merges

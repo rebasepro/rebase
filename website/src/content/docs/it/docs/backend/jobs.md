@@ -1,5 +1,5 @@
 ---
-sourceHash: 9a7137f85a2187fd
+sourceHash: 81ca845faa40b4f5
 title: Job in background
 sidebar_label: Job in background
 description: Una coda di job persistente basata su Postgres — lavoro che sopravvive a un riavvio, ritentato con backoff, con i fallimenti conservati anziché eliminati.
@@ -69,7 +69,8 @@ FROM rebase.jobs WHERE status = 'failed'
 ORDER BY updated_at DESC;
 ```
 
-Le righe con esito negativo vengono conservate per 30 giorni; quelle riuscite per 3.
+Le righe con esito negativo vengono conservate per 30 giorni; quelle riuscite per 3. Ogni worker elimina
+le righe scadute quando si avvia e poi ogni ora, a lotti, fuori dal percorso delle richieste.
 
 ## Cosa succede quando un worker si arresta
 

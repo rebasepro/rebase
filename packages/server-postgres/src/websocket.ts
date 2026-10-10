@@ -1,12 +1,13 @@
 import type { SubscriptionAuthContext } from "./services/realtimeService";
 import { BranchingUnsupportedError } from "./services/BranchService";
+import { SQL_RESULT_BYTE_BUDGET, SqlResultTooLargeError } from "./services/sql-script";
 import { PostgresBackendDriver, effectiveSqlRole, sqlRoleRanAs } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
 import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketOptions, WebSocketMessage } from "@rebasepro/types";
 import type { SqlScriptResult } from "@rebasepro/types";
-import { redactSqlLiterals } from "./utils/sql-redaction";
-import { reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
+import { redactSqlLiterals } from "@rebasepro/common";
+import { budgetSendBuffers, reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
 import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AdminScope } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
@@ -142,6 +143,13 @@ interface ClientSession {
     /** The same window, counted separately for channel frames. */
     channelMessageCount: number;
     channelWindowStart: number;
+    /**
+     * How many more fetching realtime frames this socket may send before
+     * they count in its caller's data bucket, and when that was last topped
+     * up. See {@link SOCKET_FETCH_ALLOWANCE}.
+     */
+    fetchAllowance: number;
+    fetchAllowanceAt: number;
 }
 
 
@@ -167,6 +175,35 @@ const WS_RATE_WINDOW_MS = 60_000;
 const WS_CHANNEL_RATE_LIMIT = 7200;
 
 /**
+ * Realtime frames that read the database as they arrive: a subscription's
+ * first frame is a fetch and a count, run as the subscriber, and a history
+ * request reads the channel's retained messages. Each is a data request by
+ * another name, and counts in the caller's data bucket like a
+ * `FETCH_COLLECTION` — past the socket's own allowance.
+ */
+const FETCHING_REALTIME_TYPES = new Set(["subscribe_collection", "subscribe_one", "channel_history"]);
+
+/**
+ * How many fetching realtime frames one socket may send without counting them
+ * in its caller's data bucket: at least as many as a socket may hold
+ * subscriptions, so a reconnect that re-subscribes everything it held is
+ * never refused, and never spends the budget the person's next request needs.
+ * The default data bucket is 1,000 requests per 15 minutes, so counting a
+ * reconnect against it would have refused most of one, or locked the person
+ * out of the data API until the window turned.
+ */
+const SOCKET_FETCH_ALLOWANCE = 1000;
+
+/**
+ * How long a spent allowance takes to come back in full, in ms — the data
+ * API's default window. A socket churning subscriptions gets its allowance
+ * once, and then this much a quarter-hour; past that, every subscribe is a
+ * request in its person's bucket, which their HTTP requests and other sockets
+ * share.
+ */
+const SOCKET_FETCH_ALLOWANCE_REFILL_MS = 15 * 60_000;
+
+/**
  * The largest frame a socket that has not authenticated may send, in bytes.
  *
  * All such a socket can usefully say is `AUTHENTICATE` with a token — a few
@@ -188,6 +225,14 @@ const MAX_UNAUTHENTICATED_FRAME_BYTES = 64 * 1024;
  * connection lasted.
  */
 const DEFAULT_IDENTITY_RECHECK_MS = 30_000;
+
+/**
+ * How many auth-store lookups the sweep runs at once. It shares the pool with
+ * every REST request — 20 connections by default — so it takes a few of them,
+ * however many sockets are due: 5,000 sockets at ~0.3 ms a lookup is under
+ * half a second of sweep, rather than a burst that held the whole pool.
+ */
+const IDENTITY_SWEEP_CONCURRENCY = 4;
 
 /**
  * Channel frames are re-checked at most this often, in ms. They are the
@@ -639,13 +684,16 @@ export function createPostgresWebSocket(
      * - `"unavailable"`: the store could not answer. The frame is refused,
      *   the session kept, and the next frame or sweep asks again.
      */
-    async function recheckIdentity(clientId: string): Promise<"live" | "ended" | "unavailable"> {
+    async function recheckIdentity(
+        clientId: string,
+        resolve: (token: string, impersonate?: string) => ReturnType<typeof resolveIdentity> = resolveIdentity
+    ): Promise<"live" | "ended" | "unavailable"> {
         const session = clientSessions.get(clientId);
         const credential = session?.credential;
         if (!session?.user || !credential) return "live";
         let outcome: Awaited<ReturnType<typeof resolveIdentity>>;
         try {
-            outcome = await resolveIdentity(credential, session.impersonate);
+            outcome = await resolve(credential, session.impersonate);
         } catch {
             return "unavailable";
         }
@@ -667,16 +715,96 @@ export function createPostgresWebSocket(
         return "live";
     }
 
+    /**
+     * A socket's whole allowance of fetching realtime frames: the default, or
+     * the realtime service's subscription ceiling where a deployment raised
+     * it, so a full socket still re-subscribes without being charged.
+     */
+    function fetchAllowanceCapacity(): number {
+        const ceiling: unknown = Reflect.get(realtimeService, "maxSubscriptionsPerSocket");
+        return typeof ceiling === "number" && Number.isFinite(ceiling)
+            ? Math.max(SOCKET_FETCH_ALLOWANCE, ceiling)
+            : SOCKET_FETCH_ALLOWANCE;
+    }
+
+    /**
+     * Take one fetching realtime frame from the socket's own allowance,
+     * topped up for the time since it was last asked. False when none is
+     * left: the frame then counts in the caller's data bucket.
+     */
+    function spendFetchAllowance(clientId: string): boolean {
+        const session = clientSessions.get(clientId);
+        if (!session) return false;
+        const now = Date.now();
+        const capacity = fetchAllowanceCapacity();
+        const refilled = Math.max(0, now - session.fetchAllowanceAt) * capacity / SOCKET_FETCH_ALLOWANCE_REFILL_MS;
+        session.fetchAllowance = Math.min(capacity, session.fetchAllowance + refilled);
+        session.fetchAllowanceAt = now;
+        if (session.fetchAllowance < 1) return false;
+        session.fetchAllowance -= 1;
+        return true;
+    }
+
     // The sweep: a socket that only listens sends nothing to be re-checked
     // before, so it is re-checked on a timer instead.
     const identityRecheckMs = Math.max(250, options?.identityRecheckIntervalMs ?? DEFAULT_IDENTITY_RECHECK_MS);
-    const identitySweep = setInterval(() => {
+
+    /**
+     * Re-check every socket that is due, asking the auth store once per
+     * question.
+     *
+     * Each socket used to be asked about on its own, all in the same tick: S
+     * listening sockets were S concurrent lookups on the pool REST shares,
+     * and a person with five tabs was five identical lookups of one token.
+     * Sockets are grouped by what they would ask — their credential and the
+     * user they impersonate — and each group asks once, at most
+     * {@link IDENTITY_SWEEP_CONCURRENCY} groups at a time.
+     *
+     * The answer is the group's alone, made when the group's turn comes and
+     * dropped when it is done; nothing is kept from one sweep to the next, so
+     * a credential revoked after a sweep is asked about afresh, and refused,
+     * by the next one. A socket that authenticated again while its group
+     * waited is asked about the credential it holds now — see `answerFor`.
+     */
+    async function sweepIdentities(): Promise<void> {
         const now = Date.now();
+        const groups = new Map<string, { credential: string; impersonate?: string; clientIds: string[] }>();
         for (const [id, session] of clientSessions) {
-            if (session.user && session.credential && now - session.checkedAt >= identityRecheckMs / 2) {
-                void recheckIdentity(id).catch(() => undefined);
-            }
+            if (!session.user || !session.credential || now - session.checkedAt < identityRecheckMs / 2) continue;
+            const key = JSON.stringify([session.credential, session.impersonate ?? null]);
+            const group = groups.get(key);
+            if (group) group.clientIds.push(id);
+            else groups.set(key, { credential: session.credential, impersonate: session.impersonate, clientIds: [id] });
         }
+        const queue = [...groups.values()];
+        const work = async (): Promise<void> => {
+            for (let group = queue.shift(); group; group = queue.shift()) {
+                let answer: ReturnType<typeof resolveIdentity> | undefined;
+                // The group's question is answered once. Any other — a socket
+                // that has since authenticated with another token, or asked to
+                // act as someone else — is asked on its own.
+                const answerFor = (token: string, impersonate?: string): ReturnType<typeof resolveIdentity> => {
+                    if (token !== group!.credential || impersonate !== group!.impersonate) return resolveIdentity(token, impersonate);
+                    answer ??= resolveIdentity(token, impersonate);
+                    return answer;
+                };
+                for (const id of group.clientIds) {
+                    await recheckIdentity(id, answerFor).catch(() => undefined);
+                }
+            }
+        };
+        await Promise.all(Array.from({ length: Math.min(IDENTITY_SWEEP_CONCURRENCY, queue.length) }, work));
+    }
+
+    // A sweep still working through a large number of sockets when the next
+    // is due lets that one pass, rather than asking about them twice at once.
+    let sweeping = false;
+    const identitySweep = setInterval(() => {
+        if (sweeping) return;
+        sweeping = true;
+        void sweepIdentities().catch(() => undefined).finally(() => {
+            sweeping = false;
+        });
     }, identityRecheckMs);
     // Unref'd, so it never holds a process open; stopped with whichever goes
     // first, the socket server or the HTTP server it is attached to.
@@ -697,7 +825,9 @@ checkedAt: Date.now(),
 messageCount: 0,
 messageWindowStart: Date.now(),
 channelMessageCount: 0,
-channelWindowStart: Date.now() });
+channelWindowStart: Date.now(),
+fetchAllowance: fetchAllowanceCapacity(),
+fetchAllowanceAt: Date.now() });
         realtimeService.addClient(clientId, ws);
 
         ws.on("close", () => {
@@ -921,7 +1051,12 @@ roles: verifiedUser.roles }
                 // address's — shared with their HTTP requests and their other
                 // sockets. The counter above is per connection, so on its own
                 // a caller bought budget by opening sockets.
-                if (options?.dataRateLimit && PUBLIC_TYPES.has(type)) {
+                //
+                // A subscribe and a history read are reads too, and count the
+                // same way once the socket's own allowance is spent — see
+                // SOCKET_FETCH_ALLOWANCE for why a socket has one.
+                if (options?.dataRateLimit && (PUBLIC_TYPES.has(type)
+                    || (FETCHING_REALTIME_TYPES.has(type) && !spendFetchAllowance(clientId)))) {
                     const decision = await options.dataRateLimit({
                         ...origin,
                         uid: clientSessions.get(clientId)?.user?.uid,
@@ -1317,9 +1452,13 @@ colors: true }));
                             // A session of its own, reset before it goes back
                             // to the pool: what a person types may `SET ROLE`,
                             // and that must not reach the next request on
-                            // that connection. Set here, after the client's
-                            // options, so a frame cannot turn it off.
-                            const result = script ? script.rows : await admin.executeSql(sql, { ...options, isolateSession: true });
+                            // that connection. And a result past the byte
+                            // budget refused, never sent in part. Both set
+                            // here, after the client's options, so a frame
+                            // cannot turn them off.
+                            const result = script
+                                ? script.rows
+                                : await admin.executeSql(sql, { ...options, isolateSession: true, maxResultBytes: SQL_RESULT_BYTE_BUDGET });
                             // Which role the rows were read as, said beside them:
                             // the role picked, unless the server runs every
                             // statement as the connection owner.
@@ -1382,6 +1521,17 @@ colors: true }));
                             };
                             ws.send(JSON.stringify(response));
                         } catch (sqlError: unknown) {
+                            // A refusal, not a failure of the SQL: its own code,
+                            // and a message that names the limit and the way
+                            // round it.
+                            if (sqlError instanceof SqlResultTooLargeError) {
+                                ws.send(JSON.stringify({
+                                    type: "ERROR",
+                                    requestId,
+                                    payload: { error: { message: sqlError.message, code: "RESULT_TOO_LARGE" } }
+                                }));
+                                break;
+                            }
                             // This is a query execution error (e.g., syntax error, permission denied).
                             // We return it cleanly to the client without logging a server stack trace.
                             const errMsg = extractErrorMessage(sqlError);
@@ -1675,4 +1825,10 @@ code: "BRANCHING_UNSUPPORTED" } }
     const stopReaping = reapSilentSockets(wss);
     wss.on("close", stopReaping);
     if (typeof server.on === "function") server.on("close", stopReaping);
+
+    // And what its sockets hold unread counts in the budget for all of the
+    // process's sockets, not only in each one's own ceiling.
+    const stopBudgeting = budgetSendBuffers(wss);
+    wss.on("close", stopBudgeting);
+    if (typeof server.on === "function") server.on("close", stopBudgeting);
 }

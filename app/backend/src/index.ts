@@ -53,7 +53,11 @@ const postgresResources = createPostgresDatabaseConnection(env.DATABASE_URL, und
 
 // ─── Start ───────────────────────────────────────────────────────────
 async function startServer() {
-    const server = createServer(getRequestListener(app.fetch));
+    // 64 KB of request line plus headers, as the Rebase runtime takes, not
+    // Node's 16 KB: a vector search's embedding travels in `?vector=`, and
+    // 768 dimensions of it are already 17 KB of URL. (The SDK sends a vector
+    // search in a POST body; this is for a URL built by hand.)
+    const server = createServer({ maxHeaderSize: 64 * 1024 }, getRequestListener(app.fetch));
 
     // Local disk is what `storage` below falls back to for anything but s3.
     if (isProduction && env.STORAGE_TYPE !== "s3" && !env.FORCE_LOCAL_STORAGE) {

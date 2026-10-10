@@ -26,6 +26,47 @@ function nameFromTitle(children: React.ReactNode, title: React.ReactNode): React
     return React.cloneElement(children, { "aria-label": title });
 }
 
+/** Whether a {@link TooltipProvider} is above: a tooltip under one does not mount its own. */
+const SharedTooltipProvider = React.createContext(false);
+
+export type TooltipProviderProps = {
+    children: React.ReactNode,
+    /**
+     * How long, in ms, the pointer rests on a trigger before its tooltip opens.
+     * A `Tooltip`'s own `delayDuration` wins over it.
+     */
+    delayDuration?: number,
+    /**
+     * How long, in ms, after one tooltip closes the next one opens without the
+     * delay — so moving along a row of icons does not wait on each.
+     */
+    skipDelayDuration?: number
+};
+
+/**
+ * One provider for every `Tooltip` below it. `<Rebase>` mounts one around the
+ * whole admin; mount one yourself around a screen that renders kit tooltips
+ * outside it. A `Tooltip` with no provider above still works: it brings its
+ * own, as before.
+ *
+ * Without one, every tooltip mounted a provider of its own — hundreds on a
+ * page of table rows — and the skip-delay between neighbouring tooltips never
+ * applied, since each provider timed only its own tooltip.
+ */
+export function TooltipProvider({
+    children,
+    delayDuration = 200,
+    skipDelayDuration = 300
+}: TooltipProviderProps) {
+    return (
+        <TooltipPrimitive.Provider delayDuration={delayDuration} skipDelayDuration={skipDelayDuration}>
+            <SharedTooltipProvider.Provider value={true}>
+                {children}
+            </SharedTooltipProvider.Provider>
+        </TooltipPrimitive.Provider>
+    );
+}
+
 export type TooltipProps = {
     open?: boolean,
     defaultOpen?: boolean,
@@ -64,6 +105,8 @@ export const Tooltip = ({
 
     useInjectStyles("Tooltip", styles);
 
+    const sharedProvider = React.useContext(SharedTooltipProvider);
+
     // Get the portal container from context
     const contextContainer = usePortalContainer();
 
@@ -85,25 +128,32 @@ export const Tooltip = ({
             </div>
         </TooltipPrimitive.Trigger>;
 
+    const root = (
+        <TooltipPrimitive.Root {...(open !== undefined ? { open,
+onOpenChange } : {})} defaultOpen={defaultOpen} delayDuration={delayDuration}>
+            {trigger}
+            <TooltipPrimitive.Portal container={finalContainer}>
+                <TooltipPrimitive.Content
+                    className={cls("TooltipContent",
+                        "max-w-lg leading-relaxed",
+                        "z-50 rounded-md px-3 py-2 text-xs leading-none bg-surface-800/95 dark:bg-surface-raised-hover font-medium text-white shadow-2xl select-none duration-400 ease-in transform opacity-100",
+                        tooltipClassName)}
+                    style={tooltipStyle}
+                    sideOffset={sideOffset === undefined ? 4 : sideOffset}
+                    align={align}
+                    side={side}>
+                    {title}
+                </TooltipPrimitive.Content>
+            </TooltipPrimitive.Portal>
+        </TooltipPrimitive.Root>
+    );
+
+    // Under a TooltipProvider the shared one times this tooltip; alone, it
+    // brings its own, as every tooltip used to.
+    if (sharedProvider) return root;
     return (
         <TooltipPrimitive.Provider delayDuration={delayDuration}>
-            <TooltipPrimitive.Root {...(open !== undefined ? { open,
-onOpenChange } : {})} defaultOpen={defaultOpen}>
-                {trigger}
-                <TooltipPrimitive.Portal container={finalContainer}>
-                    <TooltipPrimitive.Content
-                        className={cls("TooltipContent",
-                            "max-w-lg leading-relaxed",
-                            "z-50 rounded-md px-3 py-2 text-xs leading-none bg-surface-800/95 dark:bg-surface-raised-hover font-medium text-white shadow-2xl select-none duration-400 ease-in transform opacity-100",
-                            tooltipClassName)}
-                        style={tooltipStyle}
-                        sideOffset={sideOffset === undefined ? 4 : sideOffset}
-                        align={align}
-                        side={side}>
-                        {title}
-                    </TooltipPrimitive.Content>
-                </TooltipPrimitive.Portal>
-            </TooltipPrimitive.Root>
+            {root}
         </TooltipPrimitive.Provider>
     );
 };

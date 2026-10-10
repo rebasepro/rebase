@@ -51,10 +51,28 @@ await initializeRebaseBackend({
 });
 ```
 
-Off unless you ask for it: a worker polls the database forever, which is not a
-default anyone chose. It needs a driver that can run SQL — on one that cannot
-(MongoDB), the queue is unavailable and you are told at boot rather than at the
-first enqueue.
+Off unless you ask for it: a worker keeps looking for work for as long as the
+process lives, which is not a default anyone chose. It needs a driver that can
+run SQL — on one that cannot (MongoDB), the queue is unavailable and you are
+told at boot rather than at the first enqueue.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> An idle worker does not poll every two seconds. Each enqueue sends a
+`NOTIFY` on the `rebase_jobs` channel when it commits, and a worker holding a
+`LISTEN` on it claims at once — a job enqueued by another process (the `api`
+role, another replica) starts within milliseconds, and a delayed one when it
+comes due. Behind that it looks every 30 seconds anyway. A job this process
+enqueues, a retry it scheduled and a job it reclaimed wake it without a
+notification.
+
+The `LISTEN` needs a connection of its own, found the way realtime finds one:
+`DATABASE_DIRECT_URL` when set, else `DATABASE_URL`. Behind a transaction-mode
+pooler such as PgBouncer, set `DATABASE_DIRECT_URL`: a pooler does not keep a
+`LISTEN`, and jobs from other processes would then wait for the 30-second look.
+Where there is no such connection at all (the in-process development database),
+an idle worker backs off instead: it looks after `pollIntervalMs` (2 seconds),
+then twice as long after each look that found nothing, up to 30 seconds, and
+starts over whenever it finds work. An idle worker makes about 2,900 claims a
+day instead of 43,200.
 
 ## Enqueueing
 
@@ -99,7 +117,9 @@ FROM rebase.jobs WHERE status = 'failed'
 ORDER BY updated_at DESC;
 ```
 
-Failed rows are kept 30 days; successful ones 3.
+Failed rows are kept 30 days; successful ones 3. Each worker deletes the
+expired rows when it starts and then every hour, in batches, off the request
+path.
 
 ## What happens when a worker dies
 
@@ -118,7 +138,7 @@ is logged and dropped, and whichever attempt holds the claim decides.
 jobs: {
     enabled: true,
     concurrency: 5,              // jobs at once, per instance
-    pollIntervalMs: 2_000,       // when the last look found nothing
+    pollIntervalMs: 2_000,       // the first wait after a look that found nothing; it doubles up to 30 s
     visibilityTimeoutMs: 300_000 // how long an unrenewed claim holds
 }
 ```

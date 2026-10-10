@@ -136,6 +136,11 @@ Il controller di storage viene passato invece di essere preso dal contesto
 del job, perché `rebase.storage` nel contesto è l'API di storage lato
 client, non un controller per il bucket dei backup.
 
+Un backup non è soggetto ai limiti di caricamento del controller. `maxFileSize` (50 MB se non
+impostato) e `allowedMimeTypes` valgono per ciò che caricano gli utenti, quindi un dump di qualsiasi
+dimensione viene caricato, e lo stesso vale per uno scritto tramite il controller che serve i file
+della tua app.
+
 | Variabile | Significato |
 | --- | --- |
 | `BACKUP_SCHEDULE` | Espressione cron, ad es. `0 3 * * *` per le 03:00 ogni giorno. Non impostata disattiva i backup pianificati. |

@@ -60,9 +60,27 @@ const INSTANCES = 5;
 let container: PgContainer;
 const clients: pg.Client[] = [];
 
+/**
+ * The two ways the ensure runs: one statement at a time (what the live schema
+ * editor and a hand-built adapter get), and as the boot runs it — new tables
+ * built in shared transactions, changes under a lock budget. A batch that loses
+ * a race is replayed one statement at a time, so both must end the same way.
+ * Each gets its own database, so each starts empty.
+ */
+const MODES = [
+    { label: "one statement at a time", database: "postgres", options: {} },
+    { label: "as the boot runs it", database: "boot_mode", options: { lockTimeoutMs: 1000, batchNewTables: true } }
+] as const;
+
+const urlFor = (database: string): string => {
+    const url = new URL(container.connectionString);
+    url.pathname = `/${database}`;
+    return url.toString();
+};
+
 /** One connection per "instance", so they genuinely contend in the catalog. */
-async function instance(): Promise<Queryable> {
-    const client = new pg.Client({ connectionString: container.connectionString });
+async function instance(database: string): Promise<Queryable> {
+    const client = new pg.Client({ connectionString: urlFor(database) });
     await client.connect();
     clients.push(client);
     return {
@@ -75,6 +93,13 @@ async function instance(): Promise<Queryable> {
 
 beforeAll(async () => {
     container = await startPgContainer();
+    const admin = new pg.Client({ connectionString: container.connectionString });
+    await admin.connect();
+    try {
+        await admin.query("CREATE DATABASE boot_mode");
+    } finally {
+        await admin.end();
+    }
 }, 180_000);
 
 afterAll(async () => {
@@ -82,13 +107,13 @@ afterAll(async () => {
     if (container) await stopPgContainer(container.containerName);
 }, 120_000);
 
-describe("five instances booting into one empty database", () => {
+describe.each(MODES)("five instances booting into one empty database, $label", ({ database, options }) => {
     it("all complete, and none abandons its plan", async () => {
         const configs = collections();
-        const instances = await Promise.all(Array.from({ length: INSTANCES }, () => instance()));
+        const instances = await Promise.all(Array.from({ length: INSTANCES }, () => instance(database)));
 
         const results = await Promise.allSettled(
-            instances.map(client => ensureCollectionTables(client, configs))
+            instances.map(client => ensureCollectionTables(client, configs, undefined, options))
         );
 
         const rejected = results.filter(r => r.status === "rejected");
@@ -100,7 +125,7 @@ describe("five instances booting into one empty database", () => {
     }, 180_000);
 
     it("leaves every table, column and enum in place", async () => {
-        const probe = new pg.Client({ connectionString: container.connectionString });
+        const probe = new pg.Client({ connectionString: urlFor(database) });
         await probe.connect();
         try {
             for (const config of collections()) {
@@ -129,9 +154,9 @@ describe("five instances booting into one empty database", () => {
     it("is a no-op when run again against the finished schema", async () => {
         // Re-running is what every restart does. It must apply nothing rather
         // than treat the existing schema as a race it lost.
-        const client = await instance();
+        const client = await instance(database);
 
-        const plan = await ensureCollectionTables(client, collections());
+        const plan = await ensureCollectionTables(client, collections(), undefined, options);
 
         expect(plan.actions).toEqual([]);
     }, 120_000);

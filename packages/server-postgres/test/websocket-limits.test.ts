@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "@jest/globals";
+import { describe, it, expect, afterEach, jest } from "@jest/globals";
 import http from "http";
 import WebSocket from "ws";
 import type { AuthAdapter } from "@rebasepro/types";
@@ -37,8 +37,9 @@ async function start(options: {
     auth?: { requireAuth?: boolean; jwtSecret?: string };
     adapter?: AuthAdapter;
     limits?: Parameters<typeof createPostgresWebSocket>[5];
-}): Promise<{ port: number; fetched: () => number }> {
+}): Promise<{ port: number; fetched: () => number; handled: () => number }> {
     let fetched = 0;
+    let handled = 0;
     const driver = {
         key: "postgres",
         initialised: true,
@@ -50,7 +51,9 @@ async function start(options: {
     } as unknown as PostgresBackendDriver;
     const realtime = {
         addClient: () => undefined,
-        handleClientMessage: async () => undefined,
+        handleClientMessage: async () => {
+            handled++;
+        },
         rescopeClient: async () => undefined
     } as unknown as RealtimeService;
 
@@ -59,7 +62,7 @@ async function start(options: {
     createPostgresWebSocket(server, realtime, driver, options.auth, options.adapter, options.limits);
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
     const { port } = server.address() as { port: number };
-    return { port, fetched: () => fetched };
+    return { port, fetched: () => fetched, handled: () => handled };
 }
 
 async function open(port: number): Promise<WebSocket> {
@@ -232,4 +235,135 @@ describe("socket rate limits", () => {
         expect(codes.filter(code => code === "UNAUTHORIZED")).toHaveLength(2000);
         expect(codes.filter(code => code === "RATE_LIMITED")).toHaveLength(1);
     }, 30_000);
+});
+
+/**
+ * A subscription reads before it listens: its first frame is a fetch and a
+ * count, run as the subscriber. `subscribe_collection` and `subscribe_one`
+ * were counted only against the connection's own frame budget, so a client
+ * could churn subscribe after subscribe — 2,000 reads a minute per socket,
+ * across as many sockets as it opened — and never meet the per-person limit
+ * a `FETCH_COLLECTION` over the same socket meets.
+ *
+ * They count in the caller's data bucket now, past an allowance each socket
+ * has of its own: as many as a socket may hold, so a reconnect that
+ * re-subscribes everything it held is never refused — and never spends the
+ * budget the person's next request needs.
+ */
+describe("subscriptions and the data rate limit", () => {
+    const adapter = {
+        verifyToken: async (token: string) => ({ uid: token, roles: ["user"], isAdmin: false }),
+        verifyRequest: async () => null
+    } as unknown as AuthAdapter;
+
+    /** A signed-in socket, and the error codes the server has sent it, keyed by request id. */
+    const signIn = async (port: number, uid: string) => {
+        const ws = await open(port);
+        const answer = await exchange(ws, { type: "AUTHENTICATE", requestId: "auth", payload: { token: uid } });
+        expect(answer.kind === "message" && answer.frame.type).toBe("AUTH_SUCCESS");
+        const refused = new Map<string, string | undefined>();
+        ws.on("message", (data) => {
+            const frame = JSON.parse(data.toString()) as { requestId?: string; channel?: string; payload?: { error?: { code?: string } } };
+            if (frame.payload?.error) refused.set(frame.requestId ?? `channel:${frame.channel}`, frame.payload.error.code);
+        });
+        return { ws, refused };
+    };
+
+    const subscribe = (ws: WebSocket, id: string) => ws.send(JSON.stringify({
+        type: "subscribe_collection",
+        // The SDK names a subscribe's request by its subscription, so a
+        // refusal reaches that subscription's `onError`.
+        requestId: id,
+        payload: { path: "posts", subscriptionId: id }
+    }));
+
+    /** Let the server work through what it has been sent until `condition` holds. */
+    const until = async (condition: () => boolean, what: string): Promise<void> => {
+        for (let i = 0; i < 3_000; i++) {
+            if (condition()) return;
+            await new Promise<void>(resolve => setTimeout(resolve, 2));
+        }
+        throw new Error(`never happened: ${what}`);
+    };
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
+    it("lets a reconnect re-subscribe the 1,000 subscriptions a socket can hold, without touching the person's budget", async () => {
+        const { port, handled, fetched } = await start({
+            adapter,
+            limits: { dataRateLimit: createDataRateLimitCheck({ user: 3, store: new MemoryRateLimitStore(60_000) }) }
+        });
+        const { ws, refused } = await signIn(port, "u1");
+
+        for (let i = 0; i < 1000; i++) subscribe(ws, `sub-${i}`);
+        await until(() => handled() + refused.size === 1000, "every subscribe answered");
+
+        expect(handled()).toBe(1000);
+        expect([...refused.values()]).toEqual([]);
+        // The person's three requests are still theirs.
+        for (const id of ["a", "b", "c"]) expect(errorCode(await exchange(ws, fetchFrame(id)))).toBeUndefined();
+        expect(fetched()).toBe(3);
+    });
+
+    it("counts a socket's subscribes past its allowance in the person's bucket, and refuses them when it is spent", async () => {
+        const { port, handled, fetched } = await start({
+            adapter,
+            limits: { dataRateLimit: createDataRateLimitCheck({ user: 3, store: new MemoryRateLimitStore(60_000) }) }
+        });
+        const { ws, refused } = await signIn(port, "u1");
+
+        // The allowance, then a client that keeps going: subscribe, and
+        // subscribe again — each one a read.
+        for (let i = 0; i < 1005; i++) subscribe(ws, `churn-${i}`);
+        await until(() => handled() + refused.size === 1005, "every subscribe answered");
+
+        // Three more reads were the person's whole budget; the rest were refused,
+        // each to the subscription it named.
+        expect(handled()).toBe(1003);
+        expect([...refused.entries()]).toEqual([["churn-1003", "RATE_LIMITED"], ["churn-1004", "RATE_LIMITED"]]);
+        // One budget: the person's next fetch, on another socket, is refused too.
+        const other = await signIn(port, "u1");
+        expect(errorCode(await exchange(other.ws, fetchFrame("f")))).toBe("RATE_LIMITED");
+        expect(fetched()).toBe(0);
+    });
+
+    it("counts a channel's history read too", async () => {
+        const { port, handled } = await start({
+            adapter,
+            limits: { dataRateLimit: createDataRateLimitCheck({ user: 1, store: new MemoryRateLimitStore(60_000) }) }
+        });
+        const { ws, refused } = await signIn(port, "u1");
+        for (let i = 0; i < 1000; i++) subscribe(ws, `sub-${i}`);
+        await until(() => handled() === 1000, "the allowance spent");
+
+        ws.send(JSON.stringify({ type: "channel_history", payload: { channel: "doc:1", sinceSeq: 0 } }));
+        await until(() => handled() === 1001, "the first history read");
+        ws.send(JSON.stringify({ type: "channel_history", payload: { channel: "doc:2", sinceSeq: 0 } }));
+        await until(() => refused.size === 1, "the second refused");
+
+        expect(handled()).toBe(1001);
+        // Refused to the channel it was about, where `channel.onError()` hears it.
+        expect([...refused.entries()]).toEqual([["channel:doc:2", "RATE_LIMITED"]]);
+    });
+
+    it("gives the allowance back over fifteen minutes", async () => {
+        const { port, handled } = await start({
+            adapter,
+            limits: { dataRateLimit: createDataRateLimitCheck({ user: 3, store: new MemoryRateLimitStore(60_000) }) }
+        });
+        const { ws, refused } = await signIn(port, "u1");
+        for (let i = 0; i < 1000; i++) subscribe(ws, `first-${i}`);
+        await until(() => handled() === 1000, "the allowance spent");
+
+        // Fifteen minutes on, the socket re-subscribes everything again.
+        const later = Date.now() + 15 * 60_000;
+        jest.spyOn(Date, "now").mockReturnValue(later);
+        for (let i = 0; i < 1000; i++) subscribe(ws, `again-${i}`);
+        await until(() => handled() + refused.size === 2000, "every subscribe answered");
+
+        expect([...refused.values()]).toEqual([]);
+        expect(handled()).toBe(2000);
+    });
 });

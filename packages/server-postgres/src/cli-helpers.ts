@@ -366,6 +366,99 @@ export async function loadCollectionsForCli(collectionsPath: string): Promise<Co
     return collections;
 }
 
+/**
+ * The app database connections this process has open, by URL — one each.
+ *
+ * `rebase db push` used to open a connection per step: the auth bootstrap, the
+ * connectivity probe, each catalogue read behind the Atlas excludes, the
+ * column types, the generated-column edges, and then every post-step — RLS
+ * lock, auth tables, vector, search, triggers, policies, reconcile, role,
+ * legacy schema. 18 of them on a push that changed nothing. Locally each costs
+ * a few milliseconds; against a hosted Postgres over TLS a connect is four or
+ * five round trips (TCP, TLS 1.3, startup, SCRAM twice) — about 4 s of every
+ * push at 40 ms, and more on a serverless database that wakes per connection.
+ *
+ * Opened on first use and closed by {@link closeAppClients} when the command
+ * ends. The scratch database Atlas plans in is created and dropped through the
+ * `postgres` database, on a connection of its own: it is not this one.
+ */
+const appClients = new Map<string, Promise<PgClient>>();
+
+type PgClient = import("pg").Client;
+
+async function openAppClient(databaseUrl: string, connectionTimeoutMillis?: number): Promise<PgClient> {
+    const open = appClients.get(databaseUrl);
+    if (open) return open;
+    const opening = (async () => {
+        const { Client } = await import("pg");
+        const client = new Client({
+            connectionString: databaseUrl,
+            ...(connectionTimeoutMillis ? { connectionTimeoutMillis } : {})
+        });
+        // A connection can die while it sits idle between steps — Atlas runs
+        // for seconds with this one open. Unheard, that `error` is an uncaught
+        // exception and kills the process; heard, the next step opens another,
+        // and a step running on it fails with its own error, as before.
+        const forget = (): void => {
+            if (appClients.get(databaseUrl) === opening) appClients.delete(databaseUrl);
+        };
+        client.on("error", forget);
+        client.on("end", forget);
+        await client.connect();
+        return client;
+    })();
+    appClients.set(databaseUrl, opening);
+    try {
+        return await opening;
+    } catch (err) {
+        // Not kept: the next step tries again, and reports its own failure the
+        // way it did when every step connected for itself.
+        appClients.delete(databaseUrl);
+        throw err;
+    }
+}
+
+/**
+ * Run one step on this process's connection to the app database.
+ *
+ * Every step leaves the session as it found it, which is what a connection of
+ * its own used to guarantee by being closed. None of them sets anything for
+ * the session — `SET LOCAL` inside their own transaction, or `RESET` — and one
+ * that fails part-way through a transaction it opened is rolled back here, so
+ * the next step does not meet `current transaction is aborted`.
+ *
+ * @param options.connectionTimeoutMillis applies only when this call is the one
+ *        that connects.
+ */
+export async function withAppClient<T>(
+    databaseUrl: string,
+    step: (client: PgClient) => Promise<T>,
+    options: { connectionTimeoutMillis?: number } = {}
+): Promise<T> {
+    const client = await openAppClient(databaseUrl, options.connectionTimeoutMillis);
+    try {
+        return await step(client);
+    } catch (err) {
+        // Outside a transaction this is a warning Postgres sends and nobody
+        // reads; on a dead connection it fails too, which changes nothing.
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw err;
+    }
+}
+
+/** Close every connection {@link withAppClient} opened. Called once, as the command ends. */
+export async function closeAppClients(): Promise<void> {
+    const open = [...appClients.values()];
+    appClients.clear();
+    await Promise.all(open.map(async opening => {
+        try {
+            await (await opening).end();
+        } catch {
+            // Already gone, or never connected: nothing to close.
+        }
+    }));
+}
+
 export function getDevDatabaseUrl(databaseUrl: string): string {
     try {
         const parsed = new URL(databaseUrl);
@@ -519,14 +612,7 @@ export async function applySearchDdl(
     const sql = readSearchDdl(sqlDir);
     if (!sql) return;
 
-    const { Client } = await import("pg");
-    const client = new Client({ connectionString: databaseUrl });
-    await client.connect();
-    try {
-        await client.query(sql);
-    } finally {
-        await client.end();
-    }
+    await withAppClient(databaseUrl, client => client.query(sql));
     out(chalk.gray("  ✓ Applied full-text search columns and indexes"));
 }
 
@@ -556,10 +642,7 @@ export async function getSearchExcludes(collectionsPath: string): Promise<string
 export async function queryGeneratedColumnDependencies(
     databaseUrl: string
 ): Promise<GeneratedColumnDependency[]> {
-    const { Client } = await import("pg");
-    const client = new Client({ connectionString: databaseUrl });
-    await client.connect();
-    try {
+    return withAppClient(databaseUrl, async client => {
         const res = await client.query(`
             SELECT n.nspname       AS "schema",
                    c.relname       AS "table",
@@ -580,9 +663,7 @@ export async function queryGeneratedColumnDependencies(
               AND NOT dep.attisdropped;
         `);
         return res.rows as GeneratedColumnDependency[];
-    } finally {
-        await client.end();
-    }
+    });
 }
 
 /**
@@ -590,15 +671,7 @@ export async function queryGeneratedColumnDependencies(
  * gate to tell a widening `ALTER COLUMN … TYPE` from one that loses data.
  */
 export async function queryColumnTypes(databaseUrl: string): Promise<ExistingColumnType[]> {
-    const { Client } = await import("pg");
-    const client = new Client({ connectionString: databaseUrl });
-    await client.connect();
-    try {
-        const res = await client.query<ExistingColumnType>(COLUMN_TYPES_SQL);
-        return res.rows;
-    } finally {
-        await client.end();
-    }
+    return withAppClient(databaseUrl, async client => (await client.query<ExistingColumnType>(COLUMN_TYPES_SQL)).rows);
 }
 
 /**
@@ -613,16 +686,11 @@ export async function dropGeneratedColumns(
     statements: string[]
 ): Promise<void> {
     if (statements.length === 0) return;
-    const { Client } = await import("pg");
-    const client = new Client({ connectionString: databaseUrl });
-    await client.connect();
-    try {
+    await withAppClient(databaseUrl, async client => {
         for (const statement of statements) {
             await client.query(statement);
         }
-    } finally {
-        await client.end();
-    }
+    });
 }
 
 /**
@@ -660,11 +728,8 @@ export async function applyVectorDdl(
     if (!sql) return;
 
     const { vectorExtensionHint } = await import("./schema/vector-index");
-    const { Client } = await import("pg");
-    const client = new Client({ connectionString: databaseUrl });
-    await client.connect();
     try {
-        await client.query(sql);
+        await withAppClient(databaseUrl, client => client.query(sql));
     } catch (err) {
         // The boot ensure explains this failure and the push has to as well —
         // it is the same missing extension, and a push is the *more* likely
@@ -675,8 +740,6 @@ export async function applyVectorDdl(
         const hint = vectorExtensionHint(message);
         if (!hint) throw err;
         throw new Error(`${message}${hint}`, { cause: err });
-    } finally {
-        await client.end();
     }
     out(chalk.gray("  ✓ Applied vector columns and ANN indexes"));
 }
@@ -726,14 +789,7 @@ export async function applyTriggersDdl(
     const sql = readTriggersDdl(sqlDir);
     if (!sql) return;
 
-    const { Client } = await import("pg");
-    const client = new Client({ connectionString: databaseUrl });
-    await client.connect();
-    try {
-        await client.query(sql);
-    } finally {
-        await client.end();
-    }
+    await withAppClient(databaseUrl, client => client.query(sql));
     out(chalk.gray("  ✓ Applied `updated_at` triggers"));
 }
 
@@ -757,10 +813,7 @@ export async function getTriggerExcludes(collectionsPath: string): Promise<strin
  * index in an exclude would shield the constraint itself.
  */
 export async function queryExistingIndexes(databaseUrl: string): Promise<string[]> {
-    const { Client } = await import("pg");
-    const client = new Client({ connectionString: databaseUrl });
-    await client.connect();
-    try {
+    return withAppClient(databaseUrl, async client => {
         const res = await client.query(`
             SELECT n.nspname || '.' || t.relname || '.' || i.relname AS full_name
             FROM pg_index x
@@ -774,9 +827,7 @@ export async function queryExistingIndexes(databaseUrl: string): Promise<string[
               );
         `);
         return res.rows.map((row: { full_name: string }) => row.full_name);
-    } finally {
-        await client.end();
-    }
+    });
 }
 
 /**
@@ -866,10 +917,7 @@ async function managedIndexNames(collectionsPath: string): Promise<Set<string>> 
 }
 
 export async function queryExistingTables(databaseUrl: string): Promise<string[]> {
-    const { Client } = await import("pg");
-    const client = new Client({ connectionString: databaseUrl });
-    await client.connect();
-    try {
+    return withAppClient(databaseUrl, async client => {
         const res = await client.query(`
             SELECT table_schema || '.' || table_name AS full_name
             FROM information_schema.tables
@@ -877,9 +925,7 @@ export async function queryExistingTables(databaseUrl: string): Promise<string[]
               AND table_type IN ('BASE TABLE', 'VIEW');
         `);
         return res.rows.map((row: { full_name: string }) => row.full_name);
-    } finally {
-        await client.end();
-    }
+    });
 }
 
 /**

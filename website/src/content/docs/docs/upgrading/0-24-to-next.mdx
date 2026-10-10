@@ -1,0 +1,73 @@
+---
+slug: docs/upgrading/0-24-to-next
+title: Upgrading 0.24 to the next release
+sidebar_label: 0.24 → next
+description: The breaking changes already merged on main and live in these docs, before the release that carries them exists — the REST count switch, the MCP collection listing, and the admin's translations.
+---
+
+# Upgrading 0.24 → next
+
+**Nothing here is released yet.** These are the `### Breaking` entries of the
+changelog's [`[Unreleased]`](/docs/changelog/) section: they are on `main`, and
+this documentation site publishes from `main`, so they are described here before
+the version that carries them exists on npm. If you installed from npm you are
+on 0.24 and none of this has reached you — read it to know what is coming, and
+come back when you move.
+
+All three come with the performance work: the count switch on REST lists, the
+MCP collection listing, and the admin's translations.
+
+---
+
+## 68. A filter on a column named `count` goes inside `?where=`
+
+`?count=` on a REST list is now the switch for the count behind `meta.total`:
+`?count=none` skips it and `?count=exact` is the default. Any other value is
+refused with `400 INVALID_COUNT`. Before, `?count=5` filtered the rows whose
+`count` column was 5.
+
+**What to change:** nothing with the SDK, which already sends a filter on a
+column named `count` inside `?where=`. A hand-written REST call that filters on
+such a column moves the filter there:
+
+```diff lang="http"
+- GET /api/data/products?count=5
++ GET /api/data/products?where={"count":["==",5]}
+```
+
+**A new SDK against an old server:** `iterate()` and `findAll()` send
+`?count=none` on every page, and so does `find({ count: "none" })`. A 0.24
+server reads it as a filter on a column named `count`. Where the collection has
+no such column it answers `400 UNKNOWN_FILTER_FIELD`, and the SDK sends the read
+again without it. Where the collection has a **text** column named `count`, the
+old server filters to the rows whose `count` is `'none'` instead, with no error:
+the page comes back short or empty and a walk ends early. Upgrade the server
+before the SDK when a collection has such a column.
+
+See [Skipping the count](/docs/backend/api/#skipping-the-count).
+
+## 69. The remote MCP's `list_collections` has no `structuredContent`
+
+`list_collections` sent its listing twice: pretty-printed in the text block, and
+again as `structuredContent`. On a large project the two together were more than
+a model's context. It now sends the listing once, in the text block, as compact
+JSON. The other tools keep their `structuredContent`.
+
+**What to change:** nothing for an assistant, which reads the text. A program
+that read the listing from `structuredContent` parses the text block instead;
+its content is the same. See [The remote endpoint](/docs/ai/mcp/#the-remote-endpoint).
+
+## 70. `@rebasepro/app` no longer exports `es`
+
+The package's entry re-exported the Spanish translation table, `es`, which put
+the Spanish strings into every bundle built from it. Translations other than
+English are now fetched when a user picks their language, and `es` is no longer
+exported. `en` still is.
+
+**What to change:** nothing, unless you imported `es`. To change the admin's
+strings, pass overrides to `<Rebase translations={…}>`; to pin the language,
+pass `locale`.
+
+```bash
+grep -rnE "import \{[^}]*\bes\b[^}]*\} from \"@rebasepro/app\"" --exclude-dir=node_modules .
+```

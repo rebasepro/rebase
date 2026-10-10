@@ -104,6 +104,16 @@ large: 32 },
         React.createElement("label", { htmlFor,
             ...props }, children),
     CircularProgressCenter: () => React.createElement("div", { "data-testid": "loading" }),
+    // A segmented control: one pressable button per option.
+    ToggleButtonGroup: ({ value, onValueChange, options }) =>
+        React.createElement("div", { role: "group" }, options.map((option) =>
+            React.createElement("button", {
+                key: option.value,
+                type: "button",
+                "aria-pressed": value === option.value,
+                onClick: () => onValueChange(option.value)
+            }, option.label))),
+    useIsDarkMode: () => false,
     // The real one adds retry and chunk-error handling around React.lazy. A test
     // that renders a Studio view is not exercising any of that, and the loader
     // is never called unless the route is visited.

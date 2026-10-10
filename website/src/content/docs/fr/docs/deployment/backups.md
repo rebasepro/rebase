@@ -138,6 +138,11 @@ Le contrôleur de stockage est transmis en paramètre plutôt que récupéré de
 contexte de la tâche, car le `rebase.storage` du contexte est l'API de stockage côté
 client, pas un contrôleur pour le bucket de sauvegarde.
 
+Une sauvegarde n'est pas soumise aux limites d'envoi du contrôleur. `maxFileSize` (50 Mo sauf
+configuration contraire) et `allowedMimeTypes` s'appliquent à ce que les utilisateurs envoient : un
+dump de n'importe quelle taille est donc envoyé, y compris lorsqu'il est écrit par le contrôleur qui
+sert les fichiers de votre application.
+
 | Variable | Signification |
 | --- | --- |
 | `BACKUP_SCHEDULE` | Expression cron, par ex. `0 3 * * *` pour 03h00 chaque jour. Non définie désactive les sauvegardes planifiées. |

@@ -143,6 +143,14 @@ GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 
 Ein Parameter außerhalb dieser Grenzen führt zu einem **400**-Fehler, nicht zu einem stillschweigend gekappten Wert — `?width=99999` lieferte früher ein 4096px großes Bild zurück und `?format=tiff` ein WebP-Bild, ohne dass dies mitgeteilt wurde.
 
+Die Vorschaubilder gespeicherter Bilder im Admin-Panel nutzen diesen Endpunkt: Eine
+Tabellen- oder Kartenvorschau fordert statt des Originals eine WebP-Rendition an, die
+etwa doppelt so groß ist wie die dargestellte Größe (96–800px). `sharp` ist eine
+optionale Abhängigkeit; ohne sie antwortet die Transformation mit 500, weshalb das
+Panel einmal pro Seitenaufruf mit einer einzigen Rendition-Anfrage prüft und die
+Originale zeigt, wenn der Server die Größe nicht ändern kann. SVG- und GIF-Dateien
+werden immer unverändert angezeigt.
+
 ### Performance & LRU-Caching
 
 Das Transformieren ist CPU- und speicherintensiv, und bei einem öffentlichen Objekt ist der Endpunkt anonym erreichbar. Daher ist der Arbeitsaufwand begrenzt und nicht bloß zwischengespeichert:

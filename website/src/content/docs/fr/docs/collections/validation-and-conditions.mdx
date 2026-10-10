@@ -1,5 +1,5 @@
 ---
-sourceHash: 94d3f5bd886e2894
+sourceHash: 7e7cf627ef1d34b8
 title: Validation et conditions
 sidebar_label: Validation & conditions
 description: "Valeurs d'énumération, règles de validation par propriété et champs conditionnels qui rendent une propriété requise, désactivée ou masquée en fonction des valeurs de l'entité elle-même."
@@ -70,7 +70,7 @@ Le serveur vérifie `validation` à la frontière de la requête — REST, le so
 |------|------|-------------|
 | `required` | `boolean` | La valeur doit être présente |
 | `requiredMessage` | `string` | Le message affiché par le formulaire lorsqu'elle est absente. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
-| `unique` | `boolean` | Une seule ligne dans la table peut avoir cette valeur |
+| `unique` | `boolean` | Une seule ligne dans la table peut avoir cette valeur. Le formulaire d'administration la vérifie aussi lors de l'enregistrement d'une valeur que la modification a changée, de sorte qu'un doublon est signalé sur son champ avant l'écriture |
 | `uniqueInArray` | `boolean` | Une seule entrée *par tableau* peut l'avoir. S'applique à un enfant direct d'une propriété `array`, ou à un enfant de premier niveau d'un `map` à l'intérieur de celui-ci. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
 
 ### Chaînes

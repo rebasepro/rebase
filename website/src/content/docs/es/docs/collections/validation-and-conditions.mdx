@@ -1,5 +1,5 @@
 ---
-sourceHash: 94d3f5bd886e2894
+sourceHash: 7e7cf627ef1d34b8
 title: Validación y condiciones
 sidebar_label: Validación y condiciones
 description: "Valores enum, reglas de validación por propiedad y los campos condicionales que hacen que una propiedad sea requerida, deshabilitada u oculta en función de los propios valores de la entidad."
@@ -80,7 +80,7 @@ escribe.
 |------|------|-------------|
 | `required` | `boolean` | El valor debe estar presente |
 | `requiredMessage` | `string` | Lo que muestra el formulario cuando no lo está. **Solo en el formulario de administración; no lo impone la API ni la base de datos.** |
-| `unique` | `boolean` | Solo una fila de la tabla puede contener este valor |
+| `unique` | `boolean` | Solo una fila de la tabla puede contener este valor. El formulario de administración también lo comprueba al guardar un valor que la edición cambió, de modo que un duplicado se señala en su campo antes de la escritura |
 | `uniqueInArray` | `boolean` | Solo una entrada *por array* puede contenerlo. Se aplica a un hijo directo de una propiedad `array`, o a un hijo de primer nivel de un `map` dentro de uno. **Solo en el formulario de administración; no lo impone la API ni la base de datos.** |
 
 ### Strings

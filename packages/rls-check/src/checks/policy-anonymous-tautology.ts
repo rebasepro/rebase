@@ -381,6 +381,13 @@ export interface TautologyMatch {
      * here, which is why the policy that actually shipped passed silently.
      */
     guardsSentinel: boolean;
+    /**
+     * Whether the clause also keeps guests out — `NOT rebase.is_anonymous()`,
+     * the conjunct `policy.registered()` adds to `authenticated()`. It scopes
+     * no rows, so it does not change which finding this is; only the sentence
+     * that describes who is admitted.
+     */
+    excludesGuests: boolean;
 }
 
 /**
@@ -429,6 +436,7 @@ export function callerIdOnlyClause(clause: string | null | undefined): Tautology
         let sawNullTest = false;
         const decoys: string[] = [];
         let cleared = false;
+        let excludesGuests = false;
 
         for (const raw of splitTopLevelAnd(substituted)) {
             const conjunct = canon(raw);
@@ -439,6 +447,15 @@ export function callerIdOnlyClause(clause: string | null | undefined): Tautology
                 continue;
             }
 
+            // Accounted for, and narrows nothing: whether the *caller* is a
+            // guest says nothing about which rows they reach. It also keeps no
+            // signed-out caller out — one arrives with `is_anonymous()` false —
+            // so it is not a guard either.
+            if (GUEST_EXCLUSION.test(conjunct)) {
+                excludesGuests = true;
+                continue;
+            }
+
             const excluded = excludedLiterals(conjunct);
             if (!excluded) return null; // something we do not understand: stay quiet
             if (excluded.some((lit) => call.sentinels.includes(lit))) cleared = true;
@@ -446,11 +463,23 @@ export function callerIdOnlyClause(clause: string | null | undefined): Tautology
         }
 
         if (!sawNullTest) continue;
-        return { shape: label(first), call, decoyGuards: [...new Set(decoys)], guardsSentinel: cleared };
+        return { shape: label(first), call, decoyGuards: [...new Set(decoys)], guardsSentinel: cleared, excludesGuests };
     }
 
     return null;
 }
+
+/**
+ * "The caller is not a guest" — `policy.registered()`'s conjunct, in the
+ * spellings it reaches a policy in, after {@link canon}: the compiler's
+ * `NOT (SELECT rebase.is_anonymous())`, the stored
+ * `(NOT ( SELECT rebase.is_anonymous() AS is_anonymous))`, the unwrapped
+ * `NOT rebase.is_anonymous()`, and the comparisons a hand-written policy
+ * uses. `auth.` as well as `rebase.`, for the reason {@link CALLER_ID_CALLS}
+ * gives.
+ */
+const GUEST_EXCLUSION =
+    /^(?:not \(? ?(?:rebase|auth)\.is_anonymous\(\s*\) ?\)?|\(? ?(?:rebase|auth)\.is_anonymous\(\s*\) ?\)? (?:= false|is false|is not true))$/;
 
 /**
  * The subset of {@link callerIdOnlyClause} that *this* check reports: a bare
@@ -562,7 +591,10 @@ function excludedLiterals(conjunct: string): string[] | null {
     m = /^'([^']*)' (?:<>|!=) callerid$/.exec(conjunct);
     if (m) return [m[1]];
 
-    m = /^callerid (?:<>|!=) all \( ?array \[(.*)\] ?\)$/.exec(conjunct);
+    // `ARRAY[` with no space is how Postgres stores it; `NOT IN (…)` reads
+    // back as this. Requiring `array [` missed every stored list, Rebase's own
+    // `authenticated()` included.
+    m = /^callerid (?:<>|!=) all \( ?array ?\[(.*)\] ?\)$/.exec(conjunct);
     if (m) return literalList(m[1]);
 
     m = /^callerid not in \((.*)\)$/.exec(conjunct);

@@ -70,6 +70,16 @@ export interface CollectionIndexSpec {
     reason: string;
     /** Derived by {@link deriveIndexName}. Frozen — see the module comment. */
     indexName: string;
+    /**
+     * Set when Rebase derived this index for a foreign key rather than anybody
+     * declaring it — see {@link foreignKeyIndexSpec}. Never enters the name, so
+     * the derived index and a declared one over the same column are one object.
+     *
+     * Read by exactly one consumer: boot-ensure, which builds these in the
+     * background on a table that already exists instead of holding the boot
+     * for the build. Every renderer treats them like any other index.
+     */
+    derived?: "foreign-key";
 }
 
 /**
@@ -434,3 +444,57 @@ export const sortIndexSpecs = (specs: readonly CollectionIndexSpec[]): Collectio
         a.schema.localeCompare(b.schema) ||
         a.table.localeCompare(b.table) ||
         a.indexName.localeCompare(b.indexName));
+
+// ── Foreign-key indexes ──────────────────────────────────────────────────────
+
+/**
+ * The `reason` a derived foreign-key index carries. Never part of the name —
+ * see {@link indexFingerprint} — so rewording it renames nothing.
+ */
+export const FOREIGN_KEY_INDEX_REASON =
+    "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.";
+
+/**
+ * Whether an index already serves an equality lookup on `column` alone.
+ *
+ * A btree whose *leading* key is the column does, unique or not — that is the
+ * prefix rule, and it is why a composite `(author_id, created_at)` makes a
+ * second index on `author_id` pure write amplification. A partial index does
+ * not: it serves only the rows its predicate admits, and a foreign-key lookup
+ * has to reach every row. Nor does GIN or BRIN, which answer different
+ * questions than "the rows whose key is one of these".
+ */
+export const leadsWithColumn = (spec: Pick<CollectionIndexSpec, "method" | "predicate" | "keys">, column: string): boolean =>
+    spec.method === "btree" && spec.predicate === null && spec.keys[0]?.column === column;
+
+/**
+ * The btree a foreign-key column gets when nothing else already leads with it.
+ *
+ * Postgres creates the index a foreign key *references* (the target's primary
+ * key) and never the one on the column *holding* it. Every read from the other
+ * side of the link filters on that column — a `hasMany`/`hasOne` include, a
+ * nested listing (`/authors/5/posts`, page and count), the reverse side of a
+ * many-to-many — and so does the `ON DELETE` check when a target row goes. With
+ * no index each of those is a sequential scan of the child table: measured at
+ * 13 ms for 25 parents over 100k children, and about 250 ms per nested listing
+ * at a million.
+ *
+ * Named by {@link deriveIndexName} like every other index, so it is a
+ * Rebase-managed name (`_ix_<fingerprint>`), it is in the Atlas diff, and it
+ * is byte-for-byte the name an author's own plain index on the column would
+ * derive. That identity is what makes the derived index and a declared one the
+ * same object rather than two.
+ */
+export const foreignKeyIndexSpec = (schema: string, table: string, column: string): CollectionIndexSpec => {
+    const withoutName = {
+        schema,
+        table,
+        method: "btree" as const,
+        unique: false,
+        keys: [{ column, direction: "asc" as const, nulls: "last" as const }],
+        include: [],
+        predicate: null,
+        reason: FOREIGN_KEY_INDEX_REASON
+    };
+    return { ...withoutName, indexName: deriveIndexName(withoutName), derived: "foreign-key" };
+};

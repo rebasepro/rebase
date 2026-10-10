@@ -1,5 +1,5 @@
 ---
-sourceHash: 8fa955ab0e0d14e2
+sourceHash: a1bb0a08ed6263fe
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Autenticazione lato client con l'SDK di Rebase — accesso con email/password, provider OAuth, gestione delle sessioni e listener dello stato di autenticazione.
@@ -310,6 +310,10 @@ L'aggiornamento del token avviene automaticamente, ma puoi avviarlo manualmente:
 const session = await client.auth.refreshSession();
 ```
 
+Una richiesta non parte mai con un token che il client sa essere scaduto: le richieste condividono un
+unico refresh e vengono inviate una sola volta, con il nuovo token. Un token che il server rifiuta in
+anticipo ottiene comunque un refresh, poi un solo nuovo tentativo per richiesta.
+
 ## Dove risiede la sessione: `authFlowMode`
 
 ```typescript
@@ -370,7 +374,7 @@ function useCurrentUser() {
 }
 ```
 
-`useRebaseAuthController` in `@rebasepro/app` esegue già questa operazione, quindi un'applicazione creata sul template generato ne dispone automaticamente.
+`useRebaseAuthController` in `@rebasepro/app` esegue già questa operazione, quindi un'applicazione creata sul template generato ne dispone automaticamente. Le richieste di dati non devono attendere: una effettuata durante il ripristino viene inviata non appena questo si assesta — come utente ripristinato, oppure in forma anonima — così un primo render non legge mai un elenco pubblico al posto di quello dell'utente.
 
 Un ripristino riuscito raggiunge anche `onAuthStateChange` come `TOKEN_REFRESHED` — *è* a tutti gli effetti un refresh — ma un listener da solo non può indicare che il ripristino è terminato: un avvio senza sessione non emette alcunché, risultando indistinguibile da un avvio ancora in corso. Attendi `isInitialized()` per verificare questo stato e usa il listener per le modifiche successive.
 

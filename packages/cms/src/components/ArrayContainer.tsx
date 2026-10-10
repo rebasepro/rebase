@@ -1,5 +1,5 @@
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     closestCenter,
     DndContext,
@@ -60,18 +60,20 @@ export interface ArrayContainerProps<T> {
     max?: number;
 }
 
-const buildIdsMap = (value: unknown[]) =>
-    value && Array.isArray(value) && value.length > 0
-        ? value
-            .map((v, index) => {
-                if (!v) return {};
-                return {
-                    [getHashValue(v) ?? String(index) + index]: getRandomId()
-                };
-            })
-            .reduce((a, b) => ({ ...a,
-...b }), {})
-        : {};
+/**
+ * One internal id per item, keyed by the item's hash. Built once, at mount
+ * (see the lazy initialiser below): it hashes every item, object-hash for
+ * anything without an `id`.
+ */
+const buildIdsMap = (value: unknown[]): Record<string, number> => {
+    const ids: Record<string, number> = {};
+    if (!value || !Array.isArray(value)) return ids;
+    value.forEach((v, index) => {
+        if (!v) return;
+        ids[getHashValue(v) ?? String(index) + index] = getRandomId();
+    });
+    return ids;
+};
 
 type SortableItemProps = {
     id: number;
@@ -115,8 +117,10 @@ function SortableItem({
         transform: CSS.Transform.toString(transform),
         transition
     } : {};
-    const dragHandleProps = { ...listeners,
-...attributes };
+    // dnd-kit memoises both; a fresh spread per render would re-draw the
+    // item's options on every render of the list.
+    const dragHandleProps = useMemo(() => ({ ...listeners,
+        ...attributes }), [listeners, attributes]);
 
     return (
         <ArrayContainerItem
@@ -177,6 +181,12 @@ export function ArrayContainerItem({
     storedProps,
     updateItemCustomProps
 }: ArrayContainerItemProps) {
+    // One function per item for as long as it lives, so the field it builds
+    // does not see a new `onPropertyChange` on every render of the list.
+    const storeProps = useCallback(
+        (props: object) => updateItemCustomProps(internalId, props),
+        [updateItemCustomProps, internalId]
+    );
     return (
         <div
             ref={nodeRef}
@@ -190,7 +200,7 @@ export function ArrayContainerItem({
                         internalId,
                         isDragging,
                         storedProps,
-                        storeProps: (props: object) => updateItemCustomProps(internalId, props)
+                        storeProps
                     })}
                 </div>
                 <ArrayItemOptions
@@ -209,7 +219,13 @@ export function ArrayContainerItem({
     );
 }
 
-export function ArrayItemOptions({
+/**
+ * The handle and menu beside each item. Memoised, and every prop the list hands
+ * it is stable, so a list of 500 does not re-draw 500 tooltips, buttons and
+ * menus on each of its renders — which in a record form was each keystroke in
+ * the array.
+ */
+export const ArrayItemOptions = React.memo(function ArrayItemOptions({
     dragHandleProps,
     direction,
     disabled,
@@ -233,9 +249,12 @@ export function ArrayItemOptions({
     const [menuOpen, setMenuOpen] = useState(false);
     const iconRef = useRef<HTMLDivElement>(null);
     const { t } = useTranslation();
-    useOutsideAlerter(iconRef, () => {
-        if (menuOpen) setMenuOpen(false);
-    });
+    // Listening only while the menu is open. It listened always, with a new
+    // callback per render: every item kept a `mousedown` listener on the
+    // document, every click anywhere ran all of them, and every render of the
+    // list removed and re-added each one.
+    const closeMenu = useCallback(() => setMenuOpen(false), []);
+    useOutsideAlerter(iconRef, closeMenu, menuOpen);
 
     const showMenu = canAddElements ?? false;
 
@@ -332,7 +351,7 @@ export function ArrayItemOptions({
             )}
         </div>
     );
-}
+});
 
 export function ArrayContainer<T>({
     droppableId,
@@ -353,9 +372,12 @@ export function ArrayContainer<T>({
     const canAddElements = canAddElementsProp;
 
     const hasValue = value && Array.isArray(value) && value.length > 0;
-    const internalIdsRef = useRef<Record<string, number>>(buildIdsMap(value));
+    // Built by a lazy initialiser: `useRef(buildIdsMap(value))` evaluated its
+    // argument on every render and discarded it, hashing every item each time.
+    const [initialIdsMap] = useState(() => buildIdsMap(value));
+    const internalIdsRef = useRef<Record<string, number>>(initialIdsMap);
     const [internalIds, setInternalIds] = useState<number[]>(
-        hasValue ? Object.values(internalIdsRef.current) : []
+        () => hasValue ? Object.values(initialIdsMap) : []
     );
     const itemCustomPropsRef = useRef<Record<number, object>>({});
 
@@ -363,12 +385,10 @@ export function ArrayContainer<T>({
         itemCustomPropsRef.current[internalId] = customProps;
     }, []);
 
-    const pointerSensor = useSensor(PointerSensor, {
-        activationConstraint: {
-            distance: 5
-        }
-    });
-    const keyboardSensor = useSensor(KeyboardSensor, {});
+    // Options hoisted: dnd-kit memoises sensors on their options' identity, and
+    // a new object per render gave every drag handle new listeners each time.
+    const pointerSensor = useSensor(PointerSensor, POINTER_SENSOR_OPTIONS);
+    const keyboardSensor = useSensor(KeyboardSensor, KEYBOARD_SENSOR_OPTIONS);
     const sensors = useSensors(pointerSensor, keyboardSensor);
 
     useEffect(() => {
@@ -397,15 +417,22 @@ export function ArrayContainer<T>({
         onValueChange([...(value ?? []), newDefaultEntry]);
     };
 
-    const remove = (index: number) => {
+    // The item actions read the list as it is when they run, through a ref,
+    // so they keep one identity and the memoised item options stay put.
+    const latestRef = useRef({ value, internalIds, onValueChange, onInternalIdAdded, newDefaultEntry, min, max });
+    latestRef.current = { value, internalIds, onValueChange, onInternalIdAdded, newDefaultEntry, min, max };
+
+    const remove = useCallback((index: number) => {
+        const { value, internalIds, onValueChange, min } = latestRef.current;
         if ((value ?? []).length <= min) return;
         const newIds = [...internalIds];
         newIds.splice(index, 1);
         setInternalIds(newIds);
         onValueChange((value ?? []).filter((_, i) => i !== index));
-    };
+    }, []);
 
-    const copy = (index: number) => {
+    const copy = useCallback((index: number) => {
+        const { value, internalIds, onValueChange, onInternalIdAdded, max } = latestRef.current;
         if ((value ?? []).length >= max) return;
         const id = getRandomId();
         const copyingItem = (value ?? [])[index];
@@ -417,9 +444,10 @@ export function ArrayContainer<T>({
         if (onInternalIdAdded) onInternalIdAdded(id);
         setInternalIds(newIds);
         onValueChange([...(value ?? []).slice(0, index + 1), copyingItem, ...(value ?? []).slice(index + 1)]);
-    };
+    }, []);
 
-    const addInIndex = (index: number) => {
+    const addInIndex = useCallback((index: number) => {
+        const { value, internalIds, onValueChange, onInternalIdAdded, newDefaultEntry, max } = latestRef.current;
         if ((value ?? []).length >= max) return;
         const id = getRandomId();
         const newIds: number[] = [
@@ -430,7 +458,7 @@ export function ArrayContainer<T>({
         if (onInternalIdAdded) onInternalIdAdded(id);
         setInternalIds(newIds);
         onValueChange([...(value ?? []).slice(0, index), newDefaultEntry, ...(value ?? []).slice(index)]);
-    };
+    }, []);
 
     const onDragEnd = (event: DragEndEvent) => {
         const {
@@ -494,10 +522,9 @@ export function ArrayContainer<T>({
                 internalIds.map((internalId: number, index: number) => (
                     <ArrayContainerItem
                         key={`array_field_${internalId}`}
-                        nodeRef={(node: HTMLElement | null) => {
-                        }}
-                        style={{}}
-                        dragHandleProps={{}}
+                        nodeRef={NO_NODE_REF}
+                        style={NO_STYLE}
+                        dragHandleProps={NO_DRAG_HANDLE}
                         internalId={internalId}
                         index={index}
                         size={size}
@@ -529,6 +556,16 @@ export function ArrayContainer<T>({
         </div>
     );
 }
+
+const POINTER_SENSOR_OPTIONS = {
+    activationConstraint: {
+        distance: 5
+    }
+};
+const KEYBOARD_SENSOR_OPTIONS = {};
+const NO_NODE_REF = (_node: HTMLElement | null) => undefined;
+const NO_STYLE: React.CSSProperties = {};
+const NO_DRAG_HANDLE: Record<string, unknown> = {};
 
 function arrayMove<T>(value: T[], sourceIndex: number, destinationIndex: number): T[] {
     const result = Array.from(value);

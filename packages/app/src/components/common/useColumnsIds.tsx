@@ -22,8 +22,8 @@ export function getSubcollectionColumnId(collection: AdminCollection<any>) {
  * Every child view gets a 200px button column that opens its tab. For a relation
  * declared in `relations` that button is the relation's only presence in the
  * table. For one declared as a property it is the second: the property's own
- * column is already there, hydrated by the list fetch's `include: ["*"]`, showing
- * the child rows themselves — and carrying the *same heading*, because the tab
+ * column is already there, hydrated by the list fetch's `include`
+ * (`getRelationIncludeParams`), showing the child rows themselves — and carrying the *same heading*, because the tab
  * takes its name from the declaring property. Two columns called "Applications",
  * one of them a button, and nothing in the header to tell them apart.
  *

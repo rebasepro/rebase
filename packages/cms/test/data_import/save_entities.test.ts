@@ -2,6 +2,9 @@ import { describe, expect, test } from "@jest/globals";
 import { Entity, RebaseApiError, RebaseData } from "@rebasepro/types";
 import { ImportSaveError, saveImportedEntities } from "../../src/data_import/utils/save_entities";
 
+/** The body a common reverse proxy accepts by default (nginx: `1m`). */
+const ONE_MIB = 1024 * 1024;
+
 /** Await an import that must fail, and hand back the error it failed with. */
 async function importFailure(promise: Promise<void>): Promise<ImportSaveError> {
     try {
@@ -29,12 +32,16 @@ function makeClient(options: {
     bulk?: boolean;
     failOnId?: string;
     bulkUnsupported?: boolean;
+    /** Refuse a bulk body with more rows than this, as a 413 would. */
+    maxRowsPerRequest?: number;
 } = {}) {
     const stored = new Map<string, Record<string, unknown>>();
     (options.existingIds ?? []).forEach(id => stored.set(id, {}));
     const calls = { create: 0,
         createMany: 0,
-        update: 0 };
+        update: 0,
+        // UTF-8 size of each bulk body, as the server's body limit counts it.
+        bodyBytes: [] as number[] };
 
     const accessor: Record<string, unknown> = {
         async create(values: Record<string, unknown>, id?: string) {
@@ -61,6 +68,10 @@ function makeClient(options: {
     if (options.bulk !== false) {
         accessor.createMany = async (batch: Record<string, unknown>[], writeOptions?: { upsert?: boolean }) => {
             calls.createMany++;
+            calls.bodyBytes.push(unescape(encodeURIComponent(JSON.stringify({ rows: batch, upsert: writeOptions?.upsert }))).length);
+            if (options.maxRowsPerRequest !== undefined && batch.length > options.maxRowsPerRequest) {
+                throw new RebaseApiError("Request body too large.", { status: 413 });
+            }
             if (options.bulkUnsupported) {
                 throw new RebaseApiError("This collection's data source does not support bulk writes.", {
                     status: 400
@@ -157,6 +168,65 @@ describe("saveImportedEntities", () => {
         });
 
         expect(progress).toEqual([25, 50, 60, 60]);
+    });
+
+    describe("batch size", () => {
+
+        test("a 10,000-row import makes at most 20 requests, none over the byte cap", async () => {
+            const { dataClient, stored, calls } = makeClient();
+
+            await saveImportedEntities(dataClient, "orders", rows(10_000));
+
+            expect(stored.size).toEqual(10_000);
+            expect(calls.createMany).toBeLessThanOrEqual(20);
+            expect(Math.max(...calls.bodyBytes)).toBeLessThan(ONE_MIB);
+        });
+
+        test("wide rows make smaller batches rather than an oversized body", async () => {
+            const { dataClient, stored, calls } = makeClient();
+            // ~10 KB a row, multi-byte characters included: 500 of them would
+            // be a 5 MB body.
+            const wide = rows(1_000).map(row => ({ ...row,
+                values: { ...row.values,
+                    text: "é".repeat(5_000) } }));
+
+            await saveImportedEntities(dataClient, "orders", wide);
+
+            expect(stored.size).toEqual(1_000);
+            expect(Math.max(...calls.bodyBytes)).toBeLessThan(ONE_MIB);
+            expect(calls.createMany).toBeLessThanOrEqual(12);
+        });
+
+        test("a failing batch names the row the server named, counted from the file's first row", async () => {
+            const { dataClient, stored, options } = makeClient({ failOnId: "row-4321" });
+            const data = rows(10_000);
+
+            const error = await importFailure(saveImportedEntities(dataClient, "orders", data));
+
+            expect(error.committed).toEqual(4_000);
+            expect(error.failedFrom).toEqual(4_000);
+            expect(error.failedTo).toEqual(4_500);
+            expect(error.failedRow).toEqual(4_321);
+            // The server counts within the batch, from 0; the user's file
+            // counts from its first row, from 1.
+            expect(error.message).toMatch(/^Row 4322 \(id "row-4321"\) failed: null value/);
+            expect(stored.size).toEqual(4_000);
+
+            options.failOnId = undefined;
+            await saveImportedEntities(dataClient, "orders", data, { offset: error.committed });
+            expect(stored.size).toEqual(10_000);
+        });
+
+        test("a server that refuses the batch size gets smaller batches, not a failed import", async () => {
+            const { dataClient, stored, calls } = makeClient({ maxRowsPerRequest: 100 });
+
+            await saveImportedEntities(dataClient, "orders", rows(1_000));
+
+            expect(stored.size).toEqual(1_000);
+            // 500 and 250 refused once each, then 125-row batches... until
+            // one fits: 62.
+            expect(calls.createMany).toBeLessThanOrEqual(1_000 / 62 + 4);
+        });
     });
 
     describe("data sources without bulk writes", () => {

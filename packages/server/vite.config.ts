@@ -67,7 +67,6 @@ export default defineConfig(() => ({
             external: isExternal,
             onwarn(warning, warn) {
                 if (warning.code === "MISSING_GLOBAL_NAME") return;
-                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
                 warn(warning);
             },
             output: {

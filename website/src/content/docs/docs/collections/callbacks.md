@@ -172,7 +172,9 @@ are worth knowing:
 - **A write to a row it excludes is a 404.** An update or a delete addressed at
   a row outside the scope is refused before the write, with the same "no row …"
   answer a read gives — so a scope is a scope for writes too, not only for
-  reads. What it does *not* gate is the values being written: refusing a write
+  reads. A one-to-many membership write (`comments: [ids]` on a post) leaves a
+  child the target's scope hides where it is, as it leaves an id that names no
+  row. What it does *not* gate is the values being written: refusing a write
   on its contents is `beforeSave`.
 
 One read is deliberately not narrowed: the uniqueness check behind
@@ -196,6 +198,9 @@ where this sits among the other options.
 ### `beforeSave`
 
 Called before a record is written to the database. Return the modified values.
+On Postgres it runs inside the write's transaction, which has already begun, so
+it holds a pooled connection for as long as it runs — see [A callback holds a
+connection](#a-callback-holds-a-connection).
 
 ```typescript
 beforeSave: async ({
@@ -491,7 +496,7 @@ So the triggering write and everything its callbacks wrote commit together or no
 
 - A throw from `afterSave` or `afterDelete` rolls the triggering write back, along with every `context.data` write the callbacks made. The caller is answered **400 `CALLBACK_REJECTED`** with `details.stage` naming the hook — or with the error's own status when it carries one: a `RebaseApiError` you threw, a unique violation's 409.
 - Realtime subscribers hear about the row only after the commit, so a write that rolled back is never announced.
-- A callback holds the transaction open while it runs, so a slow one is a lock held and a pooled connection tied up.
+- A callback holds the transaction open while it runs, so a slow one is a lock held and a pooled connection tied up — `beforeSave` and `beforeDelete` as much as the `after` hooks. See [A callback holds a connection](#a-callback-holds-a-connection).
 - A `context.data` write runs the target collection's callbacks too, so an `afterSave` that updates its own row runs itself again. Writes nested more than 16 deep are refused with **500 `CALLBACK_RECURSION`**, naming the hook and the collection, and the whole write rolls back. Make such a write conditional, as the example below does.
 
 Let a failure throw when the triggering write should not survive it. Catch it when it should, but only around a `context.data` **write**: a create, update or delete the database refuses (a unique or foreign key violation, a trigger) is undone on its own, and the rest commits.
@@ -518,6 +523,40 @@ afterSave: async ({ values, id, status, context }) => {
 Work that has to leave the database — an email, a webhook, a call to a third-party API — does not belong in the callback body. It would hold the transaction open for a network round trip, and nothing can take it back when the write rolls back. Enqueue a [job](/docs/backend/jobs) for it, or do it after the write returns: publish on a [realtime channel](/docs/backend/realtime), or use `waitUntil` in a [custom function](/docs/backend/custom-functions). [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) says which fits.
 
 On MongoDB none of this holds. That driver runs the same callbacks without a transaction, so the write is already stored when `afterSave` runs, and a throw there reports the failure without undoing it.
+
+### A callback holds a connection
+
+On Postgres a write runs on one connection checked out of the database pool,
+and every callback runs on it: `beforeSave` and `beforeDelete` after the
+transaction has begun, `afterSave` and `afterDelete` before it commits. For as
+long as a callback runs — awaiting a lookup, a computation, anything — that
+connection serves nothing else, and the locks the write has taken stay taken:
+in `afterSave`, the row just written; in a bulk or [`_batch`](/docs/backend/writes/#cross-collection-batches)
+write, every row the transaction wrote before it.
+
+The cost is the callback's own duration, and concurrent writes add it up:
+
+- The pool holds 20 connections by default (`DB_POOL_MAX`). 25 saves at once
+  whose `beforeSave` awaited 300 ms made an unrelated one-row read take 290 ms,
+  nearly all of it spent waiting for a connection.
+- A bulk create of 100 rows whose `beforeSave` awaits 50 ms is one transaction
+  open for 5.3 s, holding its connection and the locks of every row written so
+  far for all of it.
+
+So:
+
+- Keep anything slow out of callbacks. A call to another service belongs in a
+  [job](/docs/backend/jobs), or after the write returns.
+- Look up what a hook needs before the write when you can — in the client, or
+  in a [custom function](/docs/backend/custom-functions) that then writes.
+- Send rows whose hooks are slow in smaller bulks.
+- If many slow hooks run at once by design, raise `DB_POOL_MAX`, within what
+  the database's `max_connections` allows for every instance.
+- <span class="since-badge" data-since="0.25">Since 0.25</span> With
+  `REBASE_METRICS=true`, `/metrics` reports `rebase_db_pool_wait_ms`: how long
+  each query waited for a connection. A healthy pool keeps it near zero; a tail
+  that grows with traffic is requests queueing for connections that callbacks
+  hold. See [Metrics](/docs/deployment/self-hosting/#metrics).
 
 ## Syncing Data Between Collections
 

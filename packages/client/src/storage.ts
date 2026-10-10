@@ -1,5 +1,16 @@
-import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, isPublicStoragePath, storageObjectPath } from "@rebasepro/types";
-import { Transport } from "./transport";
+import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, RebaseApiError, isPublicStoragePath, storageObjectPath } from "@rebasepro/types";
+import {
+    DOWNLOAD_URL_CONCURRENCY,
+    RESUMABLE_UPLOAD_THRESHOLD,
+    createBatchLoader,
+    createConcurrencyLimit,
+    createDownloadUrlCache,
+    uploadResumable,
+    type DownloadMetadataBatchEntry,
+    type ResolvedDownload,
+    type ResumableUploadSend
+} from "@rebasepro/common";
+import { Transport, type ResponseMeta } from "./transport";
 
 /**
  * Create a StorageSource that talks to the Rebase backend REST API.
@@ -31,8 +42,62 @@ export function encodeStorageKey(key: string): string {
     return key.split("/").map(encodeURIComponent).join("/");
 }
 
+/**
+ * The fields of an upload's form, as the resumable endpoint's
+ * `Upload-Metadata`: the same names, plus the file's own name and type, which
+ * the form carries in the file part. A Blob travels in a form as `blob`.
+ */
+function resumableMetadataOf(form: FormData): Record<string, string> {
+    const entries: Record<string, string> = {};
+    for (const [name, value] of form.entries()) {
+        if (typeof value === "string") {
+            entries[name] = value;
+        } else if (name === "file") {
+            const filename = value instanceof File ? value.name : "blob";
+            if (filename) entries.filename = filename;
+            entries.filetype = value.type || "application/octet-stream";
+        }
+    }
+    if (!entries.key && !entries.filename) entries.key = "unnamed";
+    return entries;
+}
+
 export function createStorage(transport: Transport, storageId?: string): StorageSource {
-    const urlsCache = new Map<string, { config: DownloadConfig; expiresAt?: number }>();
+    // Keyed by `[bucket/]keyOrUrl`; an entry lives until its download token
+    // expires (public URLs: until evicted), is dropped by `deleteObject`, and
+    // is bounded LRU. One per source instance, i.e. per client, and owned by
+    // the credential its URLs were minted with (see `getSignedUrl`), so a
+    // sign-out or another user's sign-in empties it. Concurrent lookups of one
+    // key share one `/metadata` request, and at most
+    // DOWNLOAD_URL_CONCURRENCY of those are open at once.
+    const urlsCache = createDownloadUrlCache();
+    const limitMetadata = createConcurrencyLimit(DOWNLOAD_URL_CONCURRENCY);
+
+    /**
+     * A private file's metadata and download token. The lookups a page starts
+     * together — a table of thumbnails — go as one `POST /storage/metadata`
+     * per hundred files, which the server charges a tenth of the requests it
+     * replaces; one asked for alone is the `GET` it always was. A server
+     * without the batch route (404) is asked one file at a time from then on.
+     */
+    const describe = createBatchLoader<DownloadMetadata>({
+        loadOne: async (filePath) => (await limitMetadata(() =>
+            transport.request<{ data: DownloadMetadata }>(withStorageId(`/storage/metadata/${encodeStorageKey(filePath)}`)))).data,
+        loadMany: async (filePaths) => {
+            const result = await limitMetadata(() => transport.request<{ data: Record<string, DownloadMetadataBatchEntry> }>("/storage/metadata", {
+                method: "POST",
+                body: JSON.stringify({ keys: filePaths, ...(storageId ? { storageId } : {}) })
+            }));
+            const answers = new Map<string, DownloadMetadata | Error>();
+            for (const [filePath, entry] of Object.entries(result.data ?? {})) {
+                answers.set(filePath, "error" in entry
+                    ? new RebaseApiError(entry.error.message, { status: entry.error.status, code: entry.error.code })
+                    : entry);
+            }
+            return answers;
+        },
+        isUnsupported: (error) => error instanceof Error && "status" in error && (error.status === 404 || error.status === 405)
+    });
 
     /**
      * Base for URLs the *browser* will fetch on its own (file downloads,
@@ -47,6 +112,30 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         if (!storageId) return path;
         const sep = path.includes("?") ? "&" : "?";
         return `${path}${sep}storageId=${encodeURIComponent(storageId)}`;
+    };
+
+    /**
+     * Whether this source sends large files through the resumable endpoint.
+     * Turned off for the rest of its life by the first upload that finds it
+     * cannot — a server without the endpoint, or several instances that do
+     * not share an upload — so only that one upload pays for finding out.
+     */
+    let resumable = true;
+
+    /** One request of a resumable upload, through the transport (its token, its refresh). */
+    const sendResumable: ResumableUploadSend = async (method, path, headers, body) => {
+        const meta: ResponseMeta = {};
+        try {
+            await transport.request(`/storage/tus${path}`, { method, headers, ...(body ? { body } : {}) }, meta);
+            return { status: meta.status ?? 200, header: (name) => meta.headers?.get(name) ?? null };
+        } catch (error: unknown) {
+            // An HTTP answer is the protocol's to read; a dropped connection
+            // (status 0) is thrown, and the upload asks where it got to.
+            if (error instanceof RebaseApiError && typeof error.status === "number" && error.status > 0) {
+                return { status: error.status, header: () => null, error };
+            }
+            throw error;
+        }
     };
 
     async function putObject({
@@ -104,6 +193,16 @@ export function createStorage(transport: Transport, storageId?: string): Storage
             }
         }
 
+        // A large file goes up a chunk at a time: the multipart request is
+        // parsed whole by the server, three to five times the file in its
+        // memory. Same fields, so the same object, the same checks and the
+        // same triggers — only the transport differs.
+        if (resumable && file.size > RESUMABLE_UPLOAD_THRESHOLD) {
+            const outcome = await uploadResumable({ file, metadata: resumableMetadataOf(formData), send: sendResumable });
+            if ("stored" in outcome) return outcome.stored;
+            resumable = false;
+        }
+
         const result = await transport.request<{ data: UploadFileResult }>(withStorageId("/storage/upload"), {
             method: "POST",
             body: formData,
@@ -118,18 +217,26 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         bucket?: string
     ): Promise<DownloadConfig> {
         const cacheKey = bucket ? `${bucket}/${keyOrUrl}` : keyOrUrl;
-        const cachedEntry = urlsCache.get(cacheKey);
-        if (cachedEntry) {
-            if (!cachedEntry.expiresAt || cachedEntry.expiresAt > Date.now()) {
-                return cachedEntry.config;
-            }
-            urlsCache.delete(cacheKey);
-        }
+        // A private file's URL carries a download token the server minted for
+        // whoever asked, and this source outlives them: after a sign-out, or
+        // another user signing in in the same tab, the next preview of the
+        // path was handed the previous user's URL. The credential the request
+        // goes out with is the owner — the access token, in cookie mode too
+        // (only the refresh token is a cookie) — so a different one empties
+        // the cache first. A token refresh empties it as well, which costs one
+        // request per file shown afterwards, once per access-token lifetime.
+        urlsCache.claim((await transport.resolveToken()) ?? "");
+        return urlsCache.get(cacheKey, () => resolveDownload(keyOrUrl, bucket));
+    }
 
+    async function resolveDownload(
+        keyOrUrl: string,
+        bucket?: string
+    ): Promise<ResolvedDownload> {
         const filePath = storageObjectPath(keyOrUrl, bucket);
 
         if (!filePath || filePath.trim() === "" || filePath === "/") {
-            return { url: null, fileNotFound: true };
+            return { config: { url: null, fileNotFound: true }, noStore: true };
         }
 
         // ── Public objects ────────────────────────────────────────────────
@@ -137,31 +244,31 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         // stable, permanent, CDN-cacheable URL. No metadata round-trip and no
         // token are needed — build the URL directly and cache it forever.
         if (isPublicStoragePath(filePath)) {
-            const publicConfig: DownloadConfig = {
-                url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}`)
+            return {
+                config: { url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}`) }
+                // no expiry
             };
-            urlsCache.set(cacheKey, { config: publicConfig }); // no expiry
-            return publicConfig;
         }
 
         try {
-            const result = await transport.request<{ data: DownloadMetadata }>(withStorageId(`/storage/metadata/${encodeStorageKey(filePath)}`));
+            const metadata = await describe(filePath);
 
             // Public object (server-confirmed): token-less permanent URL.
-            if (result.data.public) {
-                const publicConfig: DownloadConfig = {
-                    url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}`),
-                    metadata: result.data
+            if (metadata.public) {
+                return {
+                    config: {
+                        url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}`),
+                        metadata
+                    }
+                    // no expiry
                 };
-                urlsCache.set(cacheKey, { config: publicConfig }); // no expiry
-                return publicConfig;
             }
 
             // Private object: use the short-lived, file-scoped download token
             // minted by the server. We deliberately do NOT fall back to the
             // caller's access token — a URL must never carry a full-privilege
             // credential. If no scoped token is present the URL fails closed.
-            const scopedToken = result.data.token;
+            const scopedToken = metadata.token;
             const tokenQuery = scopedToken ? `?token=${scopedToken}` : "";
 
             const downloadConfig: DownloadConfig = {
@@ -169,18 +276,17 @@ export function createStorage(transport: Transport, storageId?: string): Storage
                 // query is already present, so the URL stays valid even when
                 // there is no token.
                 url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}${tokenQuery}`),
-                metadata: result.data
+                metadata
             };
 
-            const expiresAt = result.data.tokenExpiresIn
-                ? Date.now() + (result.data.tokenExpiresIn - 10) * 1000 // subtract 10s buffer
+            const expiresAt = metadata.tokenExpiresIn
+                ? Date.now() + (metadata.tokenExpiresIn - 10) * 1000 // subtract 10s buffer
                 : undefined;
 
-            urlsCache.set(cacheKey, { config: downloadConfig, expiresAt });
-            return downloadConfig;
+            return { config: downloadConfig, expiresAt };
         } catch (e: unknown) {
             if (e instanceof Error && "status" in e && (e as { status: number }).status === 404) {
-                return { url: null, fileNotFound: true };
+                return { config: { url: null, fileNotFound: true }, noStore: true };
             }
             throw e;
         }

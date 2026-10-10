@@ -198,12 +198,13 @@ async function cdcFunctionExists(): Promise<boolean> {
     return Boolean(rows[0]?.present);
 }
 
-/** The change-capture triggers installed on the project's own tables. */
+/** The tables carrying change-capture triggers — the row trigger, or the statement ones a plain table gets. */
 async function cdcTriggers(): Promise<string[]> {
     const rows = await query<{ tgrelid: string }>(
-        `SELECT c.relname AS tgrelid FROM pg_trigger t
+        `SELECT DISTINCT c.relname AS tgrelid FROM pg_trigger t
            JOIN pg_class c ON c.oid = t.tgrelid
-          WHERE NOT t.tgisinternal AND t.tgname = 'rebase_cdc_trigger'`
+          WHERE NOT t.tgisinternal
+            AND t.tgname IN ('rebase_cdc_trigger', 'rebase_cdc_insert', 'rebase_cdc_update', 'rebase_cdc_delete', 'rebase_cdc_truncate')`
     );
     return rows.map(r => r.tgrelid).sort();
 }

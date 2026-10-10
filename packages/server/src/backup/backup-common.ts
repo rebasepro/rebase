@@ -128,17 +128,21 @@ export async function listBackupObjects(
     storage?: StorageController
 ): Promise<BackupInfo[]> {
     if (dest.kind === "local") {
-        if (!fs.existsSync(dest.path)) return [];
-        const stat = fs.statSync(dest.path);
+        // Asynchronous throughout, a few stats at a time. This runs on the
+        // Backups panel's request path, and a year of hourly backups is 8,760
+        // dumps: stat'ed synchronously, the server answered nothing else
+        // while it listed them.
+        const stat = await fs.promises.stat(dest.path).catch(() => null);
+        if (!stat) return [];
         const dir = stat.isDirectory() ? dest.path : path.dirname(dest.path);
-        if (!fs.existsSync(dir)) return [];
-        const files = fs.readdirSync(dir);
+        const files = await fs.promises.readdir(dir);
         const present = new Set(files);
-        return files
-            .filter((f) => f.endsWith(DUMP_SUFFIX))
-            .map((f): BackupInfo => {
+        const dumps = files.filter((f) => f.endsWith(DUMP_SUFFIX));
+        const stats = await mapBounded(dumps, LOCAL_STAT_CONCURRENCY, (f) => fs.promises.stat(path.join(dir, f)));
+        return dumps
+            .map((f, i): BackupInfo => {
                 const full = path.join(dir, f);
-                const st = fs.statSync(full);
+                const st = stats[i];
                 const createdAt = parseBackupTimestamp(f) ?? st.mtime;
                 const globals = globalsKeyFor(f);
                 return {
@@ -173,6 +177,23 @@ export async function listBackupObjects(
             };
         })
         .sort(byNewest);
+}
+
+/** Stats in flight at once while listing a local backup folder. */
+const LOCAL_STAT_CONCURRENCY = 32;
+
+/** `fn` over `items`, at most `limit` at a time; results in input order. */
+async function mapBounded<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let next = 0;
+    const worker = async () => {
+        while (next < items.length) {
+            const i = next++;
+            results[i] = await fn(items[i]);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+    return results;
 }
 
 function noControllerFor(dest: { kind: "s3" | "gcs"; bucket: string; prefix: string }): string {
@@ -223,6 +244,27 @@ export async function readBackupBytes(
 }
 
 /**
+ * Whether `key` names a backup the download route would serve, without
+ * opening it: the same guards as {@link openBackupStream}, and the file or
+ * object is there. An object store without `statObject` is taken at its key —
+ * reading the object to find out would be the download itself.
+ */
+export async function findBackup(
+    dest: BackupDestination,
+    key: string,
+    storage?: StorageController
+): Promise<{ name: string } | null> {
+    if (dest.kind === "local") {
+        const resolved = resolveLocalBackupFile(dest, key);
+        return resolved ? { name: path.basename(resolved) } : null;
+    }
+    if (!storage) throw new Error(noControllerFor(dest));
+    if (!isObjectBackupKey(dest, key)) return null;
+    if (storage.statObject && !(await storage.statObject(key, dest.bucket))) return null;
+    return { name: key.split("/").pop() || key };
+}
+
+/**
  * A single backup, opened for streaming, with its size. Same guards as
  * {@link readBackupBytes}.
  *
@@ -232,9 +274,11 @@ export async function readBackupBytes(
  * buffer for object storage — and a file over 2 GiB never downloaded at all:
  * `readFileSync` throws `ERR_FS_FILE_TOO_LARGE` there.
  *
- * A local file is read from disk as the response is written. Object storage
- * still arrives through {@link StorageController.getObject}, which is a
- * buffered `File` by contract; streaming that avoids the second copy.
+ * A local file is read from disk as the response is written, and so is an
+ * object through a controller with `getObjectStream` (the built-in S3 and GCS
+ * ones). A custom controller without it still arrives through
+ * {@link StorageController.getObject}, a buffered `File` by contract;
+ * streaming that avoids the second copy.
  */
 export async function openBackupStream(
     dest: BackupDestination,
@@ -250,9 +294,14 @@ export async function openBackupStream(
 
     if (!storage) throw new Error(noControllerFor(dest));
     if (!isObjectBackupKey(dest, key)) return null;
+    const name = key.split("/").pop() || key;
+    if (storage.getObjectStream) {
+        const object = await storage.getObjectStream(key, { bucket: dest.bucket });
+        return object ? { stream: object.stream, size: object.size, name } : null;
+    }
     const file = await storage.getObject(key, dest.bucket);
     if (!file) return null;
-    return { stream: file.stream(), size: file.size, name: key.split("/").pop() || key };
+    return { stream: file.stream(), size: file.size, name };
 }
 
 /** A file on disk as a web stream, read a chunk at a time as the response is written. */

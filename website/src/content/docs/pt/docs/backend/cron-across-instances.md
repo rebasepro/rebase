@@ -1,5 +1,5 @@
 ---
-sourceHash: e38cb2eddd8b623a
+sourceHash: cd43978985b8b565
 title: Cron entre instâncias
 sidebar_label: Cron entre instâncias
 description: "Como os cron jobs se comportam com mais de um processo de servidor: uma execução por slot, um slot perdido em uma reinicialização, uma pausa que toda réplica respeita e execuções que nunca se sobrepõem."
@@ -45,7 +45,7 @@ Três pontos importantes:
 
 No caso comum — uma reinicialização minutos após um slot ter sido executado normalmente —, o slot mais recente já foi reivindicado, de modo que o catch-up custa apenas uma verificação por job a cada inicialização e não realiza ação adicional.
 
-Na inicialização, as reivindicações com mais de sete dias são apagadas, mas a mais recente de cada job é sempre mantida, qualquer que seja a sua idade. Essa reivindicação é o registro de que o slot já foi executado, então um job mensal com uma janela de catch-up de um mês não é executado de novo por um deploy no dia 10.
+O agendador apaga as reivindicações com mais de sete dias ao iniciar e depois a cada hora, mas a mais recente de cada job é sempre mantida, qualquer que seja a sua idade. Essa reivindicação é o registro de que o slot já foi executado, então um job mensal com uma janela de catch-up de um mês não é executado de novo por um deploy no dia 10.
 
 Uma execução recuperada é uma entrada comum em `cron_logs` (`manual` é `false`), com uma primeira linha de log registrando o slot recuperado e o tempo de atraso:
 

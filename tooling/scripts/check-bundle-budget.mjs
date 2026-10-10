@@ -52,19 +52,37 @@
  *   4. It shrank a lot, which means the baseline now describes a build that no
  *      longer exists. Bank it: a stale budget is a gate that has stopped
  *      measuring anything.
+ *   5. A module that is meant to load on demand sits in the eager set — see
+ *      FORBIDDEN_IN_EAGER below. Bytes alone cannot say this: the lucide map,
+ *      six translations and the /debug/ui reference all rode in `rebase-core`
+ *      for months, banked as its baseline, because a budget only knows sizes.
+ *      This reads the eager chunks' sourcemaps and names the module.
  *
  * Chunk file names carry a content hash, which changes on every build. Budgets
  * are keyed on the name with the hash stripped, so an unrelated edit does not
  * churn the baseline.
+ *
+ * ## Probes: what an app built on the published packages gets
+ *
+ * A target that is not a directory is a PROBE (see PROBES below): a few lines
+ * of app code bundled against the built `packages/<name>/dist` the way a
+ * consumer's Vite bundles them — through each package's `exports` and its
+ * `sideEffects` — and budgeted the same way. `sdk-minimal` is the smallest
+ * useful client app (create a client, read a page). It also fails when the
+ * bundle carries a module it must not: `object-hash` and `json-logic-js` rode
+ * in every client app (43 kB minified, almost a quarter of it) because
+ * @rebasepro/utils and @rebasepro/common shipped as one file each.
  *
  *     pnpm check:bundle            # verify
  *     pnpm check:bundle --update   # bank the current measurement
  *     node tooling/scripts/check-bundle-budget.mjs --dist path/to/dist   # ad-hoc
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASELINE = path.join(ROOT, "tooling", "scripts", "bundle-budget.json");
@@ -148,12 +166,107 @@ export function eagerChunks(distDir) {
         const raw = fs.readFileSync(file);
         chunks.push({
             key: chunkKey(file),
+            file,
             bytes: raw.length,
             gzipBytes: zlib.gzipSync(raw, { level: 9 }).length
         });
     }
     chunks.sort((a, b) => b.bytes - a.bytes);
     return chunks;
+}
+
+/**
+ * Source modules that must never be in the eager set, whatever it weighs.
+ *
+ * Each one is loaded on demand on purpose, and each one came back to the login
+ * screen at least once through a change that broke no test: a static import, a
+ * barrel re-export, a `manualChunks` name that welded a lazy module to a
+ * static one. `pending` marks a rule whose fix has not landed yet: reported,
+ * not failed, until it does — then delete the flag.
+ */
+export const FORBIDDEN_IN_EAGER = [
+    {
+        test: /packages\/app\/src\/locales\/(?!en\.ts)[^/]+$/,
+        label: "a translation other than English",
+        why: "RebaseI18nProvider fetches the other six when their language is picked"
+    },
+    {
+        test: /packages\/app\/src\/debug\//,
+        label: "the /debug/ui design reference",
+        why: "a hidden dev route; the app lazy-loads @rebasepro/app/debug"
+    },
+    {
+        test: /packages\/cms\/src\/(form\/EntityForm\.tsx|components\/CollectionViewBinding\/CollectionViewBinding\.tsx|components\/(Edit|Detail)ViewBinding\.tsx|components\/SidePanelBinding\.tsx)$/,
+        label: "the collection table, record views or entity form",
+        why: "loaded when a collection opens (cms components/lazy_record_views.ts)"
+    },
+    {
+        test: /node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?prism-react-renderer\//,
+        label: "prism-react-renderer",
+        why: "syntax highlighting is only used by lazy Studio and editor views"
+    },
+    {
+        test: /node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?markdown-it\//,
+        label: "markdown-it",
+        why: "only markdown cells and previews render it; the kit's Markdown component imports it on first render"
+    }
+];
+
+/** Chunks the bundler writes itself, with no source modules and so no sourcemap. */
+const BUNDLER_RUNTIME_CHUNKS = /^(rolldown-runtime|preload-helper|commonjsHelpers)$/;
+
+/** More lucide icon modules than this in the eager set means the whole by-name map is there. */
+export const MAX_EAGER_LUCIDE_ICONS = 400;
+
+/**
+ * Which FORBIDDEN_IN_EAGER modules, and how many lucide icons, the eager
+ * chunks carry — read from their sourcemaps' `sources`. A chunk without a map
+ * is reported rather than skipped: a check that cannot see is not a pass.
+ */
+export function forbiddenInEager(chunks) {
+    const hits = new Map();
+    const unmapped = [];
+    let lucideIcons = 0;
+    for (const chunk of chunks) {
+        const mapFile = `${chunk.file}.map`;
+        if (!fs.existsSync(mapFile)) {
+            // The bundler's own runtime has no sources to map.
+            if (!BUNDLER_RUNTIME_CHUNKS.test(chunk.key)) unmapped.push(chunk.key);
+            continue;
+        }
+        const { sources = [] } = JSON.parse(fs.readFileSync(mapFile, "utf-8"));
+        for (const source of sources) {
+            const normalized = source.replace(/\\/g, "/");
+            if (/lucide-react\/dist\/esm\/icons\//.test(normalized)) lucideIcons++;
+            for (const rule of FORBIDDEN_IN_EAGER) {
+                if (!rule.test.test(normalized)) continue;
+                if (!hits.has(rule)) hits.set(rule, new Set());
+                hits.get(rule).add(chunk.key);
+            }
+        }
+    }
+    return { hits, unmapped, lucideIcons };
+}
+
+/** Failure and warning lines for the check above. */
+function forbiddenReport(chunks) {
+    const { hits, unmapped, lucideIcons } = forbiddenInEager(chunks);
+    const failures = [];
+    const warnings = [];
+    for (const [rule, keys] of hits) {
+        const line = `${bold(rule.label)} is in the eager set (${[...keys].join(", ")}): ${rule.why}.`;
+        if (rule.pending) warnings.push(`${line} Pending: ${rule.pending}.`);
+        else failures.push(line);
+    }
+    if (lucideIcons > MAX_EAGER_LUCIDE_ICONS) {
+        failures.push(`${bold(`${lucideIcons} lucide icon modules`)} are in the eager set — that is the whole ` +
+            `by-name map, which loadLucideIcons() fetches on demand (more than ${MAX_EAGER_LUCIDE_ICONS} fails).`);
+    }
+    if (unmapped.length > 0) {
+        failures.push(`no sourcemap for ${unmapped.join(", ")}, so the forbidden-module check cannot read ` +
+            `${unmapped.length === 1 ? "it" : "them"}. Build with \`build.sourcemap: true\`.`);
+    }
+    return { failures, warnings };
 }
 
 function measure(distDir) {
@@ -164,16 +277,153 @@ function measure(distDir) {
         // normal state; summing keeps the total honest either way.
         byKey[chunk.key] = (byKey[chunk.key] ?? 0) + chunk.bytes;
     }
-    return {
+    const measured = {
         chunks: byKey,
         totalBytes: chunks.reduce((sum, c) => sum + c.bytes, 0),
         totalGzipBytes: chunks.reduce((sum, c) => sum + c.gzipBytes, 0)
     };
+    // Not banked: the files behind the numbers, for the forbidden-module check.
+    Object.defineProperty(measured, "files", { value: chunks, enumerable: false });
+    return measured;
+}
+
+/**
+ * App code bundled against the built packages, as a consumer's Vite bundles
+ * them (see "Probes" at the top). `source` is the app; `forbidden` names
+ * modules that must not be in what it downloads, whatever it weighs.
+ */
+export const PROBES = {
+    "sdk-minimal": {
+        packages: ["client", "common", "utils", "types"],
+        source: (root) => [
+            `import { createRebaseClient } from ${JSON.stringify(path.join(root, "packages", "client", "dist", "index.es.js"))};`,
+            `const client = createRebaseClient({ baseUrl: "https://api.example.com", realtime: false });`,
+            `client.data.collection("posts").find({ limit: 10, where: { status: ["==", "published"] } }).then((r) => console.log(r));`
+        ].join("\n"),
+        forbidden: [
+            {
+                test: /node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?object-hash\//,
+                label: "object-hash",
+                why: "only `getHashValue` (@rebasepro/utils objects) uses it; the package must stay one file per " +
+                    "module (preserveModules) with `\"sideEffects\": false`, so a client that never hashes leaves it out"
+            },
+            {
+                test: /node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?json-logic-js\//,
+                label: "json-logic-js",
+                why: "only the conditions module of @rebasepro/common uses it; the package must stay one file per " +
+                    "module (preserveModules) with `\"sideEffects\": false`, so a client that evaluates no condition leaves it out"
+            }
+        ]
+    },
+    "cms-shell": {
+        packages: ["cms", "app", "ui", "client", "common", "utils", "types", "cms-types"],
+        source: (root) => [
+            `import { RebaseShell } from ${JSON.stringify(path.join(root, "packages", "cms", "dist", "index.js"))};`,
+            // A side effect, so the build keeps the import.
+            `globalThis.__rebaseProbe = RebaseShell;`
+        ].join("\n"),
+        // The app supplies React; its size is not the package's.
+        external: [/^react($|\/)/, /^react-dom($|\/)/],
+        forbidden: [
+            {
+                // The modules themselves in the per-module layout, and the lib chunks the
+                // single-file layout split them into.
+                test: /packages\/cms\/dist\/(?:(?:components\/(?:CollectionViewBinding\/CollectionViewBinding|EditViewBinding|DetailViewBinding|SidePanelBinding)|form\/(?:EntityForm|PropertyFieldBinding))\.js|(?:CollectionViewBinding|EditViewBinding|DetailViewBinding|SidePanelBinding|PropertyFieldBinding)-[\w-]+\.js)$/,
+                label: "the collection table, record views or entity form",
+                why: "RebaseShell reaches them through components/lazy_record_views.ts; the cms dist must stay one " +
+                    "file per module (preserveModules), or a static import of a single-file `index.js` brings them along"
+            }
+        ]
+    }
+};
+
+/** Builds a probe with the client package's own Vite: minified, nothing written. */
+async function measureProbe(name) {
+    const probe = PROBES[name];
+    const missing = probe.packages.filter((pkg) => !fs.existsSync(path.join(ROOT, "packages", pkg, "dist")));
+    if (missing.length > 0) {
+        throw new Error(`${name} bundles the built packages, and ${missing.map((pkg) => `packages/${pkg}`).join(", ")} ` +
+            `${missing.length === 1 ? "is" : "are"} not built. Run pnpm run build first.`);
+    }
+    const clientDir = path.join(ROOT, "packages", "client");
+    const vite = await import(pathToFileURL(createRequire(path.join(clientDir, "package.json")).resolve("vite")).href);
+    const id = `rebase-${name}-probe`;
+    const result = await vite.build({
+        configFile: false,
+        logLevel: "silent",
+        root: clientDir,
+        cacheDir: path.join(os.tmpdir(), id),
+        plugins: [{
+            name: id,
+            resolveId: (source) => (source === id ? `\0${id}` : null),
+            load: (moduleId) => (moduleId === `\0${id}` ? probe.source(ROOT) : null)
+        }],
+        build: {
+            write: false,
+            minify: true,
+            target: "es2022",
+            modulePreload: false,
+            reportCompressedSize: false,
+            rollupOptions: {
+                input: id,
+                external: probe.external,
+                output: { entryFileNames: `${name}.js`, chunkFileNames: "[name].js" }
+            }
+        }
+    });
+    const chunks = (Array.isArray(result) ? result : [result])
+        .flatMap((r) => r.output)
+        .filter((o) => o.type === "chunk");
+    const byFile = new Map(chunks.map((c) => [c.fileName, c]));
+    // The entry and what it imports statically: a lazy chunk is not downloaded up front.
+    const eager = [];
+    const queue = chunks.filter((c) => c.isEntry).map((c) => c.fileName);
+    while (queue.length > 0) {
+        const chunk = byFile.get(queue.shift());
+        if (!chunk || eager.includes(chunk)) continue;
+        eager.push(chunk);
+        queue.push(...chunk.imports);
+    }
+    const byKey = {};
+    let totalBytes = 0;
+    let totalGzipBytes = 0;
+    const failures = new Set();
+    for (const chunk of eager) {
+        const bytes = Buffer.byteLength(chunk.code);
+        // One key per probe: which shared module names a split-off chunk is
+        // the bundler's choice and changes with unrelated edits; the total and
+        // the forbidden modules are what a probe measures.
+        byKey[name] = (byKey[name] ?? 0) + bytes;
+        totalBytes += bytes;
+        totalGzipBytes += zlib.gzipSync(chunk.code, { level: 9 }).length;
+        for (const [moduleId, info] of Object.entries(chunk.modules)) {
+            if (info.renderedLength === 0) continue;
+            const normalized = moduleId.replace(/\\/g, "/");
+            for (const rule of probe.forbidden) {
+                if (rule.test.test(normalized)) failures.add(`${bold(rule.label)} is in the bundle: ${rule.why}.`);
+            }
+        }
+    }
+    const measured = { chunks: byKey, totalBytes, totalGzipBytes };
+    Object.defineProperty(measured, "forbidden", { value: { failures: [...failures], warnings: [] }, enumerable: false });
+    return measured;
+}
+
+/** A dist directory is measured from its files; a probe is built. */
+async function measureTarget(target) {
+    if (PROBES[target]) return measureProbe(target);
+    const dist = path.join(ROOT, target);
+    if (!fs.existsSync(dist)) throw new Error(`${target} is not built — this gate runs after the build. Run pnpm run build.`);
+    return measure(dist);
 }
 
 function report(target, measured, budget) {
     const failures = [];
     const notes = [];
+
+    const forbidden = measured.forbidden ?? forbiddenReport(measured.files);
+    failures.push(...forbidden.failures);
+    for (const warning of forbidden.warnings) console.warn(yellow(`! ${target}: ${warning}`));
 
     const budgetFor = (bytes) => Math.round(bytes * (1 + HEADROOM));
 
@@ -242,7 +492,13 @@ function report(target, measured, budget) {
 if (adHocDist) {
     const measured = measure(path.resolve(ROOT, adHocDist));
     console.log(JSON.stringify(measured, null, 4));
-    process.exit(0);
+    // The forbidden-module check holds for any build of the admin — a
+    // scaffolded project's included — so it runs here too, on stderr, and
+    // fails the command; the JSON on stdout is unchanged.
+    const forbidden = forbiddenReport(measured.files);
+    for (const warning of forbidden.warnings) console.error(yellow(`! ${warning}`));
+    for (const failure of forbidden.failures) console.error(red(`✖ ${failure}`));
+    process.exit(forbidden.failures.length > 0 ? 1 : 0);
 }
 
 const baseline = JSON.parse(fs.readFileSync(BASELINE, "utf-8"));
@@ -250,12 +506,12 @@ const targets = Object.keys(baseline.targets);
 
 if (update) {
     for (const target of targets) {
-        const dist = path.join(ROOT, target);
-        if (!fs.existsSync(dist)) {
-            console.error(red(`✖ ${target} is not built. Run pnpm run build first.`));
+        try {
+            baseline.targets[target] = await measureTarget(target);
+        } catch (error) {
+            console.error(red(`✖ ${error.message}`));
             process.exit(1);
         }
-        baseline.targets[target] = measure(dist);
         const t = baseline.targets[target];
         console.log(green(`banked ${target}: ${kB(t.totalBytes)} eager JS (${kB(t.totalGzipBytes)} gzipped)`));
     }
@@ -265,18 +521,21 @@ if (update) {
 
 let ok = true;
 for (const target of targets) {
-    const dist = path.join(ROOT, target);
-    if (!fs.existsSync(dist)) {
-        console.error(red(`✖ ${target} is not built — this gate runs after the build. Run pnpm run build.`));
+    let measured;
+    try {
+        measured = await measureTarget(target);
+    } catch (error) {
+        console.error(red(`✖ ${error.message}`));
         ok = false;
         continue;
     }
-    ok = report(target, measure(dist), baseline.targets[target]) && ok;
+    ok = report(target, measured, baseline.targets[target]) && ok;
 }
 
 if (!ok) {
     console.error(yellow(
-        "\n  The eager set is everything a browser downloads before the login screen paints.\n" +
+        "\n  The eager set is everything a browser downloads before the login screen paints\n" +
+        "  (for a probe such as sdk-minimal: before a client app built on the packages runs).\n" +
         "  If the growth is deliberate, bank it with `pnpm check:bundle --update` and say so in\n" +
         "  the commit. If it is not, the usual causes are a top-level import of something that\n" +
         "  should be `await import(...)`, a barrel re-export that reaches one, or a manualChunks\n" +

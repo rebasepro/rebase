@@ -174,8 +174,10 @@ fkValue: p.userId }));
         setupDb(makeProfiles(30), makeCustomers(30));
         await dataService.fetchCollection("user_profiles", { include: ["*"] });
 
-        // One base select plus a fixed pair per relation — never one per row.
-        expect(callsForThreeRows).toBe(3);
+        // One base select plus one per relation — never one per row. A
+        // belongsTo takes each foreign key off the base rows rather than
+        // selecting them again, so it is the targets' select alone.
+        expect(callsForThreeRows).toBe(2);
         expect(selectCalls).toBe(callsForThreeRows);
     });
 });

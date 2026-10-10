@@ -45,7 +45,7 @@ const dispatcher = new WebhookDispatcher({
 | `onDelivery` | `(result: WebhookDeliveryResult) => void` | — | Called with the final result of every delivery, queued ones included. |
 | `timeoutMs` | `number` | `10000` | Deadline for one attempt, covering the response body. |
 | `allowPrivateNetworks` | `boolean` | `false` | Permit destinations that resolve to loopback/private/link-local addresses. Re-opens SSRF — only for a receiver you run yourself. |
-| `lookup` | `(hostname: string) => Promise<string[]>` | `dns.lookup` | Resolver used by the destination guard. For tests. |
+| `lookup` | `(hostname: string) => Promise<string[]>` | `dns.lookup` | Resolver used by the destination guard, once per new connection; the connection goes to the address it returns. For tests. |
 | `jobQueue` | `JobQueueClient` | — | Where `enqueueEntityChange` puts deliveries. Without it, an in-memory array a crash empties; with it, rows retried with backoff by a worker. See **Durable delivery** below. |
 
 ### Register Webhooks
@@ -359,7 +359,7 @@ The `WebhookDispatcher` automatically retries failed deliveries with **exponenti
 | 3 | 5,000 ms (5s) | ~6s |
 
 - **Max retries:** 3 attempts total
-- **Backoff delays:** `[1000, 5000, 15000]` ms (the 15s delay is defined but never used since the 3rd attempt is the last)
+- **Backoff delays:** `[1000, 5000]` ms — one per retry: 1s before the 2nd attempt, 5s before the 3rd
 - A delivery is **successful** if the HTTP response status code is `>= 200 && < 300`
 - A delivery **fails** if the status code is outside 2xx range OR if a network/timeout error occurs
 - If any attempt succeeds, retries stop immediately and the successful result is returned
@@ -392,16 +392,16 @@ A receiver that answers `200 OK` and then trickles one byte a minute is aborted 
 
 ### Destination Validation
 
-The URL is a string from a config, and configs get loaded from databases — so the dispatcher validates it before every attempt rather than trusting the caller:
+The URL is a string from a config, and configs get loaded from databases — so the dispatcher validates it rather than trusting the caller. On Node it judges the address each new connection is made to, inside the connection's own DNS lookup: the address checked is the address connected to, and a keep-alive connection's name is not resolved again for every delivery.
 
 - the scheme must be `http:` or `https:`;
 - the host must not be `localhost` or end in `.local` / `.internal` / `.localhost` / `.home.arpa`;
 - **every** address the host resolves to must be public — loopback, link-local (`169.254.0.0/16`, the cloud metadata range), RFC1918, CGNAT, multicast and their IPv6 equivalents are refused, including IPv4-mapped forms like `::ffff:127.0.0.1`;
-- redirects are not followed (`redirect: "manual"`), because a `307` would replay the POST — signature, custom headers and all — at an address the guard never saw.
+- redirects are not followed, because a `307` would replay the POST — signature, custom headers and all — at an address the guard never saw.
 
 A refused destination comes back as `success: false` with the reason in `responseBody`. `allowPrivateNetworks: true` turns the address check off for a receiver you run yourself; it re-opens SSRF for any caller who can choose a URL, so do not set it on a dispatcher whose configs come from user data.
 
-> **WARNING FOR AGENTS**: this is validate-then-fetch. The runtime resolves the name a second time when it connects, so a TTL-0 name that flips answers between the two can still land on a blocked address. Do not treat the guard as a licence to accept arbitrary URLs from untrusted users.
+> **WARNING FOR AGENTS**: on a runtime without `node:http`, and with `allowPrivateNetworks`, the dispatcher is validate-then-fetch: the runtime resolves the name a second time when it connects, so a TTL-0 name that flips answers between the two can still land on a blocked address. Do not treat the guard as a licence to accept arbitrary URLs from untrusted users.
 
 ## Integration Patterns
 
@@ -409,7 +409,7 @@ A refused destination comes back as `success: false` with the reason in `respons
 
 The most common pattern is to wire the dispatcher into Rebase collection callbacks so webhooks fire automatically on CRUD operations. Use `enqueueEntityChange()` here, never `await onEntityChange()`:
 
-> **IMPORTANT FOR AGENTS**: `afterSave` and `afterDelete` are awaited **inside the write's Postgres transaction**. Awaiting a delivery there holds a pooled connection and the row's locks until the receiver answers — up to ~36 seconds across three attempts, per matching webhook — and a throw from the callback rolls the customer's write back. `enqueueEntityChange()` returns `void` immediately and queues the deliveries once the write commits — never for a write that rolls back — which is why it is the pattern for callbacks.
+> **IMPORTANT FOR AGENTS**: `afterSave` and `afterDelete` are awaited **inside the write's Postgres transaction**. Awaiting a delivery there holds a pooled connection and the row's locks until the receiver answers — up to ~36 seconds across three attempts for the slowest matching webhook — and a throw from the callback rolls the customer's write back. `enqueueEntityChange()` returns `void` immediately and queues the deliveries once the write commits — never for a write that rolls back — which is why it is the pattern for callbacks.
 
 ```typescript
 // config/collections/orders.ts
@@ -616,9 +616,9 @@ Checks all registered webhooks for matching `table` + `event`, and dispatches to
 
 ### `enqueueEntityChange(table, event, id, entity, previousEntity?): void`
 
-Same matching and same payload, queued instead of awaited. Returns `void` immediately. Called inside a write (from a callback), the deliveries are held until that write commits and dropped if it rolls back; then they run on an in-process drain loop, so a collection callback does not hold its transaction open on HTTP and a receiver's outage cannot roll a write back. Results are reported through the `onDelivery` option.
+Same matching and same payload, queued instead of awaited. Returns `void` immediately. Called inside a write (from a callback), the deliveries are held until that write commits and dropped if it rolls back; then they run on an in-process drain loop — one per webhook, so a receiver that is down delays only its own deliveries — so a collection callback does not hold its transaction open on HTTP and a receiver's outage cannot roll a write back. Results are reported through the `onDelivery` option.
 
-By default the queue is **in memory**: a crash or a deploy between the commit and the delivery drops the event.
+By default the queue is **in memory**: a crash or a deploy between the commit and the delivery drops the event. Each webhook's in-memory queue holds at most **10,000** deliveries waiting; past that a new delivery is refused and reported to `onDelivery` as `success: false`, `statusCode: 0`, `attemptNumber: 0`, `responseBody: "queue full"`. **Prefer the job queue below for anything that matters** — it is the recipe's primary example.
 
 #### Durable delivery
 
@@ -637,9 +637,9 @@ jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx
 
 Only the webhook's **id** goes on the job, never the webhook itself: its signing secret would otherwise sit in `rebase.jobs` in cleartext for as long as retention keeps the row, and a webhook edited between the enqueue and the delivery should go out as it is now.
 
-### `flush(): Promise<void>`
+### `flush(timeoutMs?): Promise<boolean>`
 
-Resolves when every queued delivery has finished. Call it on graceful shutdown so a deploy does not drop what is in flight, and in tests that need to observe what `enqueueEntityChange` sent.
+Resolves `true` when every queued delivery has finished. Call it on graceful shutdown so a deploy does not drop what is in flight, and in tests that need to observe what `enqueueEntityChange` sent. With `timeoutMs`, it resolves `false` once that budget runs out with deliveries still pending (they carry on in the background) — a receiver that is down can hold each of its deliveries for ~36 seconds of retries, so a shutdown should pass one.
 
 ## Event Types
 
@@ -705,7 +705,7 @@ afterSave: async ({ id, values, collection }) => {
 | **Receiver streams a huge body** | Read stops at 64 KB and the rest is cancelled. |
 | **URL points at a private or link-local address** | Refused before connecting. Terminal — not retried. |
 | **Receiver answers a redirect** | Not followed. Terminal — not retried. |
-| **Multiple webhooks match same event** | All matching webhooks are dispatched **sequentially** (not in parallel). |
+| **Multiple webhooks match same event** | `onEntityChange` delivers to all of them **at once** and resolves when the slowest finishes; results stay in webhook order. `enqueueEntityChange` gives each webhook its own queue. |
 | **Disabled webhook in `setWebhooks()`** | Silently filtered out. Never dispatched. |
 | **`setWebhooks()` called multiple times** | Replaces the entire list each time. Previous webhooks are discarded. |
 | **`secret` is not set** | No `X-Webhook-Signature` header is sent. Payload is not signed. |
@@ -713,9 +713,10 @@ afterSave: async ({ id, values, collection }) => {
 | **Response body very large** | Truncated to **1000 characters** in the `WebhookDeliveryResult`. |
 | **`entity` is `null` for DELETE** | Sent as `"record": null` in the payload. |
 | **`previousEntity` not passed for UPDATE** | `old_record` is `undefined` (omitted from JSON). |
-| **`onEntityChange` is async** | The entire retry sequence is awaited: up to 10s per attempt plus 1s and 5s of backoff, so **~36s** worst case per matching webhook — not the ~6s the backoffs alone suggest. Inside a collection callback that is transaction time; use `enqueueEntityChange`. |
+| **`onEntityChange` is async** | The entire retry sequence is awaited: up to 10s per attempt plus 1s and 5s of backoff, so **~36s** worst case for the slowest matching webhook — not the ~6s the backoffs alone suggest. Inside a collection callback that is transaction time; use `enqueueEntityChange`. |
 | **`enqueueEntityChange` returns `void`** | Deliveries run after the caller returns. Nothing awaits them but `flush()`, and results arrive only through `onDelivery`. |
-| **Process exits with deliveries queued** | They are lost. `await dispatcher.flush()` on shutdown. |
+| **Process exits with deliveries queued** | They are lost. `await dispatcher.flush(10_000)` on shutdown. |
+| **One receiver is down** | Each webhook has its own in-process queue: its deliveries wait out their retries, every other webhook's go out as usual. Order is kept per webhook. Past 10,000 waiting, new ones are refused as `"queue full"` through `onDelivery`; with `jobQueue` they are rows instead, with no such bound. |
 
 ## References
 

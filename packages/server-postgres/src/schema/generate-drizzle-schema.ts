@@ -1,58 +1,26 @@
-import { promises as fsPromises } from "fs";
-import * as fs from "fs";
 import path from "path";
-import { pathToFileURL } from "url";
-import { generateSchema } from "./generate-drizzle-schema-logic";
-import { CollectionConfig } from "@rebasepro/types";
-import { loadCollectionsFromDirectory } from "@rebasepro/server";
-import { out, outError } from "../cli-output";
-import { nextStepAfterGenerate } from "./generate-next-step";
+import { out } from "../cli-output";
+import { writeDrizzleSchema } from "./generate-files";
 
 
 // --- Execution and Watch Logic ---
 
+/**
+ * The generator as its own process — what `--watch` runs, because a watch has
+ * to re-import the collections on every save and Node's module cache would
+ * serve it the first version forever. One-shot generation runs in the driver's
+ * own process instead; see `generate-files.ts`.
+ */
 const runGeneration = async (collectionsFilePath?: string, outputPath?: string) => {
+    if (!collectionsFilePath) {
+        throw new Error("No collections file path provided.");
+    }
     try {
-        if (!collectionsFilePath) {
-            throw new Error("No collections file path provided.");
-        }
-
-        const resolvedPath = path.resolve(collectionsFilePath);
-
-        // Shared with the runtime and the doctor: what gets generated here must
-        // be exactly what the server serves, including directory-level defaults.
-        let collections: CollectionConfig[] = await loadCollectionsFromDirectory(resolvedPath);
-
-
-        // If collections directory is empty but exists, or failed to find any, we still want to inject defaults
-        if (!collections || !Array.isArray(collections)) {
-            collections = [];
-        }
-
-
-        // Sort collections by slug alphabetically to ensure deterministic schema generation
-        collections.sort((a, b) => a.slug.localeCompare(b.slug));
-
-        const schemaContent = generateSchema(collections);
-
-        if (outputPath) {
-            const outputDir = path.dirname(outputPath);
-            await fsPromises.mkdir(outputDir, { recursive: true });
-            await fsPromises.writeFile(outputPath, schemaContent);
-            out(`✅ Drizzle schema generated successfully at ${outputPath}`);
-        } else {
-            out("✅ Drizzle schema generated successfully.");
-            out(String(schemaContent));
-        }
-
-        out(nextStepAfterGenerate());
-
+        await writeDrizzleSchema({ collectionsPath: path.resolve(collectionsFilePath), outputPath });
     } catch (error) {
-        outError(`Error generating schema: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
         // The same contract its sibling `generate-postgres-ddl.ts` keeps, and
-        // for the same reason: `rebase db push` runs both as step 1 and reads
-        // nothing but their exit codes. Exiting 0 after printing an error made
-        // the push apply whatever `src/schema.generated.ts` was already there.
+        // for the same reason: a caller that reads nothing but this process's
+        // exit code must not see 0 after an error was printed.
         process.exitCode = 1;
         throw error;
     }

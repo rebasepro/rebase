@@ -101,6 +101,7 @@ image: {
 | `GET` | `/api/storage/file/*` | Retrieve a file — everything after `/file/` is the object key |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Retrieve a file from a specific backend |
 | `GET` | `/api/storage/metadata/*` | Size, content type and last modification of one object, without its bytes |
+| `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Since 0.25</span> The same for up to 100 objects of one source: body `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Delete a file |
 | `GET` | `/api/storage/list` | List objects under a prefix (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). A `maxResults` below 1, or a `pageToken` the source never issued, is `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Create an empty folder marker |
@@ -119,12 +120,22 @@ is the exception, because its payload is the file — it answers the bytes, with
 
 ```json
 // GET /api/storage/list?prefix=products/images/
-{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg",
+  "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> A listing describes each file it returns: its `size` in bytes and
+`updated`, when it was last written, on local storage, S3 and GCS, and its
+`contentType` on local storage and GCS. An S3 listing does not carry the type,
+so on S3 it is absent and `/api/storage/metadata/*` still says. A folder in
+`prefixes` carries none of them, nor does a custom `StorageController` that
+does not set them.
 
 `POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }`
 of the stored object under `data`; `GET /api/storage/metadata/*` the object's
 metadata and, for a private object, the short-lived `token`;
+`POST /api/storage/metadata` an object keyed by the paths it was sent, each
+holding what the `GET` would have answered for it (see below);
 `GET /api/storage/sources` the array of configured sources, with
 `configured: true`. On a deployment with no storage at all, it answers
 `200 {"data": [], "configured": false}`, while every other route answers
@@ -137,6 +148,29 @@ On S3 and GCS, a `bucket` has to be one the source serves, on writes as on
 reads: an upload, a `POST /api/storage/folder` or a TUS upload naming any other
 bucket answers `404 UNKNOWN_STORAGE_SOURCE`, as the listing does. Local storage
 still creates a bucket on its first write.
+
+**Many objects at once.** <span class="since-badge" data-since="0.25">Since 0.25</span> `POST /api/storage/metadata` takes
+`{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — up to 100
+object paths of one source, each spelled as `GET /api/storage/metadata/<key>`
+takes it — and answers one entry per key:
+
+```json
+{ "data": {
+  "photos/a.png": { "fullPath": "photos/a.png", "size": 48213, "contentType": "image/png", "token": "…", "tokenExpiresIn": 300 },
+  "photos/b.png": { "error": { "code": "FORBIDDEN", "message": "Not authorized for this object", "status": 403 } }
+} }
+```
+
+Each key is judged exactly as the `GET` judges it — the same `storageAuthorize`
+hook and storage scope, the same public rule, a download token of its own — and a
+key that is refused, missing or malformed answers its own `error` without failing
+or revealing the others. A caller with no session in a deployment that requires
+one gets the `401` the `GET` would answer, unless every key is public. More than
+100 keys, or a body without `keys`, is `400 BAD_REQUEST`. The rate limiter counts
+the request as ⌈N/10⌉ requests for N keys, so a page of 100 thumbnails costs 10.
+`client.storage.getSignedUrl()` and the admin panel send the lookups a page makes
+together this way, and fall back to one `GET` per file on a server without the
+route.
 
 **How a file read is authorized.** The read routes — `/api/storage/file/*` and
 `/api/storage/metadata/*` — take the short-lived signed token that
@@ -166,6 +200,13 @@ GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 A parameter outside these bounds is a **400**, not a silently clamped value —
 `?width=99999` used to return a 4096px image and `?format=tiff` a webp one, and
 neither said so.
+
+The admin panel's thumbnails of stored images use this endpoint: a table or card
+preview asks for a webp rendition about twice its rendered size (96–800px)
+rather than the original. `sharp` is an optional dependency; without it the
+transform answers 500, so the panel checks once per page load, with a single
+rendition request, and shows originals if the server cannot resize. SVG and GIF
+files are always shown as they are.
 
 ### Performance & LRU Caching
 
@@ -234,11 +275,7 @@ on every response, transformed URLs and download-token URLs included. Opened
 directly, it renders with scripts disabled and an opaque origin, so it cannot
 reach the API's cookies or endpoints.
 
-## TUS Resumable Upload Protocol
-
-For uploading large files or handling unstable network conditions, Rebase implements the **TUS v1.0.0** open protocol including the `Creation` and `Termination` extensions.
-
-### How large a file may be
+## How large a file may be
 
 Each storage source accepts files up to its own limit: **50 MB** unless
 `STORAGE_MAX_FILE_SIZE` (bytes, suffixed `__<KEY>` for a named source) or the
@@ -256,29 +293,13 @@ STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
 STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
 ```
 
-A completed file is held in the server's memory while it is written to the
-store, on every upload path, so size the limit to the memory the server has.
-
-```
-Client                                                   Rebase Server
-  │                                                           │
-  │─── POST /api/storage/tus (Upload-Length: 50000000) ──────>│ (Generates session ID)
-  │<── 201 Created (Location: /api/storage/tus/uuid-abc) ────│
-  │                                                           │
-  │─── PATCH /api/storage/tus/uuid-abc (Upload-Offset: 0) ───>│ (Appends chunk via open/write)
-  │<── 204 No Content (Upload-Offset: 1500000) ───────────────│
-  │                                                           │
-  │─── PATCH /api/storage/tus/uuid-abc (Upload-Offset: 1.5M) ─>│ (Upload finishes)
-  │<── 204 No Content (Upload-Offset: 50000000) ──────────────│ (Copies to storage, unlinks temp)
-```
-
-### Upload Lifecycle Mechanics
-
-1. **Session Initialisation (`POST`)**: The client sends the total file size in the `Upload-Length` header and base64 metadata via `Upload-Metadata`. The server creates an empty placeholder file under a hidden temporary directory `.tus-uploads/` and returns the upload URL.
-2. **Progress Inquiries (`HEAD`)**: If an upload is interrupted, the client queries the upload URL using a `HEAD` request. The server returns the current byte position in the `Upload-Offset` header.
-3. **Data Appending (`PATCH`)**: The client resumes sending binary data starting at the returned offset with `Content-Type: application/offset+octet-stream`. The server writes each chunk to the temporary file at the byte offset the request declares, which must be the offset the server holds (`409` otherwise). One chunk is received at a time: a `PATCH` that arrives while another for the same upload is still being received — typically a client re-sending a chunk that stalled — is answered `423 UPLOAD_LOCKED`, and the client resumes from the offset `HEAD` reports.
-4. **Finalisation**: When the accumulated `Upload-Offset` matches the declared `Upload-Length`, Rebase reads the completed temporary file, wraps it as a standard JavaScript `File` object, and saves it to the configured storage backend (local disk or S3). The temporary file is then deleted.
-5. **Periodic Sweep**: A background cleaner runs every **60 seconds** to delete orphaned, incomplete temporary uploads that have exceeded the **24-hour** retention threshold.
+How much of a file the server holds at once depends on the door.
+`POST /api/storage/upload` is one multipart body, which the server parses whole:
+three to five times the file in its memory. A resumable (TUS) upload holds one
+chunk at a time. <span class="since-badge" data-since="0.25">Since 0.25</span> `client.storage.putObject()` and the admin panel send a file
+over 8 MiB the resumable way. See
+[Resumable uploads (TUS)](/docs/backend/storage-resumable-uploads/) for the
+protocol, what it answers and how it behaves across instances.
 
 ## Environment Variables
 

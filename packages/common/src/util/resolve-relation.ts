@@ -74,7 +74,8 @@ export function resolveRelation(
                 cardinality: "one",
                 writable: true,
                 shared: false,
-                localKey: relation.localKey ?? generateForeignKeyName(relationName)
+                localKey: relation.localKey ?? generateForeignKeyName(relationName),
+                index: relation.index !== false
             };
 
         case "hasOne":

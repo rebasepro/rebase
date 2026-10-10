@@ -90,6 +90,10 @@ describe("rescopeClient", () => {
         await flush();
         ws.send.mockClear();
         const before = statements.length;
+        // What the narrower identity reads. (Rows that read the same as the
+        // ones a subscriber was last sent are not sent again.)
+        mockFetchCollection.mockResolvedValueOnce([{ id: 1, title: "Row, as a viewer" }]);
+        mockFetchEntity.mockResolvedValueOnce({ id: 1, title: "Row, as a viewer" });
 
         await service.rescopeClient("c1", VIEWER);
         jest.advanceTimersByTime(350);
@@ -98,6 +102,50 @@ describe("rescopeClient", () => {
         expect(rolesSince(before)).toContain("viewer");
         expect(rolesSince(before)).not.toContain("editor");
         expect(frames().map(f => f.subscriptionId).sort()).toEqual(["list", "one"]);
+    });
+
+    /**
+     * The SDK re-authenticates its socket on every token refresh, about
+     * hourly, with the same principal. Each one refetched every subscription
+     * the socket held — 20k refetches an hour for 1,000 clients with 20
+     * subscriptions each — to read the same rows as the same identity.
+     */
+    it("refetches nothing for a token refresh that keeps the identity, and refetches for one that changes it", async () => {
+        const TENANT_A: SubscriptionAuthContext = { uid: "u1", roles: ["editor", "author"], isAnonymous: false, claims: { tenant: "a", plan: { tier: 1 } } };
+        await service.handleClientMessage("c1", { type: "subscribe_collection", payload: { path: "posts", subscriptionId: "list" } }, TENANT_A);
+        await service.handleClientMessage("c1", { type: "subscribe_one", payload: { path: "posts", id: "1", subscriptionId: "one" } }, TENANT_A);
+        await flush();
+        ws.send.mockClear();
+        mockFetchCollection.mockClear();
+        mockFetchEntity.mockClear();
+        const subscriptionsBefore = [...service.subscriptions.values()];
+
+        // The same principal, freshly built from the refreshed token: claims in another key order.
+        await service.rescopeClient("c1", { uid: "u1", roles: ["editor", "author"], claims: { plan: { tier: 1 }, tenant: "a" }, isAnonymous: false });
+        jest.advanceTimersByTime(1500);
+        await flush();
+        expect(mockFetchCollection).not.toHaveBeenCalled();
+        expect(mockFetchEntity).not.toHaveBeenCalled();
+        expect(frames()).toEqual([]);
+        // Not even replaced: a refetch already in flight still delivers.
+        expect([...service.subscriptions.values()]).toEqual(subscriptionsBefore);
+
+        // Anything a refetch binds that differs is a new identity.
+        for (const changed of [
+            { ...TENANT_A, claims: { tenant: "b", plan: { tier: 1 } } },
+            { ...TENANT_A, claims: { tenant: "b", plan: { tier: 2 } } },
+            { ...TENANT_A, roles: ["author", "editor"] },
+            { ...TENANT_A, isAnonymous: true },
+            { ...TENANT_A, uid: "u2" }
+        ] satisfies SubscriptionAuthContext[]) {
+            mockFetchCollection.mockClear();
+            mockFetchEntity.mockClear();
+            await service.rescopeClient("c1", changed);
+            jest.advanceTimersByTime(1500);
+            await flush();
+            expect(mockFetchCollection).toHaveBeenCalledTimes(1);
+            expect(mockFetchEntity).toHaveBeenCalledTimes(1);
+        }
     });
 
     it("keeps refetching as the new identity on the next write", async () => {

@@ -102,6 +102,10 @@ collezione ne dichiara una — quella colonna già *è* una versione — e da un
 stabile della riga in caso contrario. `If-Match: *` verifica solo che la riga
 esista. Se la precondizione fallisce, non viene scritto nulla.
 
+Il tag viene confrontato all'interno della transazione della scrittura stessa, dopo che la riga è stata
+bloccata. Due scritture con lo stesso tag non possono passare entrambe: la seconda attende il commit della
+prima, legge ciò che ha scritto e viene rifiutata con `412`.
+
 ### Operazioni sui campi
 
 Nel corpo di una richiesta `PATCH`, il valore di una proprietà può essere

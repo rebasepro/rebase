@@ -1,9 +1,10 @@
 "use client";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useSyncExternalStore } from "react";
 import { deepEqual as equal } from "fast-equals"
 
-import MarkdownIt from "markdown-it";
+import type MarkdownIt from "markdown-it";
 import { cls } from "../util";
+import { loadChunk } from "../util/lazy_chunk";
 
 export interface MarkdownProps {
     source: string,
@@ -34,7 +35,46 @@ const proseWeightOverrides = [
     "prose-a:font-normal"
 ].join(" ");
 
-const md = new MarkdownIt({ html: false });
+/**
+ * The parser, fetched the first time a `Markdown` mounts and shared after that.
+ *
+ * markdown-it and its dependencies are ~100 kB minified (44 kB gzipped), and
+ * every admin evaluates this module on boot — the login screen included —
+ * while only markdown cells and previews ever render one. A static import put
+ * all of it in the chunk the login screen preloads. So it is imported on
+ * demand; until it lands, `Markdown` shows its source as plain text in the
+ * same container. Once loaded it is reused for the session, and every later
+ * render is synchronous.
+ *
+ * Read through `useSyncExternalStore` with an empty server snapshot, so a
+ * server render and the hydration that follows it both show the plain text,
+ * whatever the server process had loaded before.
+ */
+let md: MarkdownIt | undefined;
+let loading: Promise<MarkdownIt> | undefined;
+const parserListeners = new Set<() => void>();
+
+function loadParser(): Promise<MarkdownIt> {
+    loading ??= loadChunk(() => import("markdown-it")).then(({ default: MarkdownItParser }) => {
+        md = new MarkdownItParser({ html: false });
+        parserListeners.forEach(listener => listener());
+        return md;
+    }, (error: unknown) => {
+        // The next `Markdown` to mount tries again; this one stays plain text.
+        loading = undefined;
+        throw error;
+    });
+    return loading;
+}
+
+function subscribeToParser(listener: () => void): () => void {
+    parserListeners.add(listener);
+    return () => parserListeners.delete(listener);
+}
+
+const loadedParser = () => md;
+const noParserOnTheServer = () => undefined;
+
 /**
  * @group Preview components
  */
@@ -43,12 +83,26 @@ export const Markdown = React.memo<MarkdownProps>(function Markdown({
                                                                         className,
                                                                         size = "medium"
                                                                     }: MarkdownProps) {
-        const html = useMemo(() => {
-            return md.render(typeof source === "string" ? source : "");
-        }, [source]);
+        const parser = useSyncExternalStore(subscribeToParser, loadedParser, noParserOnTheServer);
+        const text = typeof source === "string" ? source : "";
+
+        useEffect(() => {
+            if (parser) return;
+            loadParser().catch(error => console.error("[rebase] could not load the markdown renderer", error));
+        }, [parser]);
+
+        const html = useMemo(() => parser?.render(text), [parser, text]);
+        const classes = cls(proseClasses[size], "dark:prose-invert prose-headings:font-title", proseWeightOverrides, className);
+
+        if (html === undefined) {
+            // Until the parser arrives: the source as text, line breaks kept,
+            // in the same box, so the space the rendered markdown takes is
+            // roughly held and nothing is hidden.
+            return <div className={cls(classes, "whitespace-pre-line")}>{text}</div>;
+        }
 
         return <div
-            className={cls(proseClasses[size], "dark:prose-invert prose-headings:font-title", proseWeightOverrides, className)}
+            className={classes}
             dangerouslySetInnerHTML={{ __html: html }}
         />;
     }

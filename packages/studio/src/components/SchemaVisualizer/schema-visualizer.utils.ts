@@ -1,5 +1,6 @@
-import dagre from "dagre";
 import type { Node, Edge } from "@xyflow/react";
+import { runDagre, type LayoutInput, type LayoutPositions } from "./dagre-layout";
+import { layOutOffThread } from "./layout-runner";
 
 // ─── Layout Constants ─────────────────────────────────────────────────
 export const NODE_WIDTH = 280;
@@ -38,68 +39,102 @@ export const getColumnRowY = (rowIndex: number, headerHeight: number = HEADER_HE
 
 // ─── Auto-Layout via Dagre ────────────────────────────────────────────
 
+/** A graph's layout input, and the key its positions are kept under. */
+export interface LayoutPlan {
+    input: LayoutInput;
+    signature: string;
+}
+
 /**
- * Compute node positions using the dagre graph layout engine.
- * Returns a new array of nodes with updated `position`.
- *
- * The graph always ranks top to bottom: an ERD read as a column of tables
- * fits the tall, narrow canvas the visualizer is given, and it is the only
- * layout the visualizer offers.
+ * What dagre will be given for these nodes and edges: each node's id and
+ * box, each edge's ends, in order. The signature is all of it, so a changed
+ * schema — a table, a column count, a relation — is a different key.
  */
-export const getLayoutedElements = (
-    nodes: Node[],
-    edges: Edge[]
-): { nodes: Node[]; edges: Edge[] } => {
-    const g = new dagre.graphlib.Graph();
-    g.setGraph({
-        rankdir: "TB",
-        nodesep: 100,
-        ranksep: 180,
-        edgesep: 60,
-        marginx: 60,
-        marginy: 60
-    });
-    g.setDefaultEdgeLabel(() => ({}));
-
-    const nodeHeights = new Map<string, number>();
-
-    nodes.forEach((node) => {
-        const data = node.data as { columns?: unknown[]; isJunction?: boolean; collectionName?: string; tableName?: string };
-        const columnCount = data.columns?.length ?? 3;
-        const headerH = getHeaderHeight({
-            isJunction: Boolean(data.isJunction),
-            collectionName: data.collectionName ?? "",
-            tableName: data.tableName ?? ""
-        });
-        const h = estimateNodeHeight(columnCount, headerH);
-        nodeHeights.set(node.id, h);
-        g.setNode(node.id, {
-            width: NODE_WIDTH,
-            height: h
-        });
-    });
-
-    edges.forEach((edge) => {
-        g.setEdge(edge.source, edge.target);
-    });
-
-    dagre.layout(g);
-
-    const layoutedNodes = nodes.map((node) => {
-        const nodeWithPosition = g.node(node.id);
-        const h = nodeHeights.get(node.id) ?? estimateNodeHeight(3);
-        return {
-            ...node,
-            position: {
-                x: nodeWithPosition.x - NODE_WIDTH / 2,
-                y: nodeWithPosition.y - h / 2
-            }
-        };
-    });
-
-    return { nodes: layoutedNodes,
-edges };
+export const planLayout = (nodes: Node[], edges: Edge[]): LayoutPlan => {
+    const input: LayoutInput = {
+        nodes: nodes.map((node) => {
+            const data = node.data as { columns?: unknown[]; isJunction?: boolean; collectionName?: string; tableName?: string };
+            const headerH = getHeaderHeight({
+                isJunction: Boolean(data.isJunction),
+                collectionName: data.collectionName ?? "",
+                tableName: data.tableName ?? ""
+            });
+            return {
+                id: node.id,
+                width: NODE_WIDTH,
+                height: estimateNodeHeight(data.columns?.length ?? 3, headerH)
+            };
+        }),
+        edges: edges.map((edge) => ({
+            source: edge.source,
+            target: edge.target
+        }))
+    };
+    const signature = `${input.nodes.map(node => `${node.id}:${node.height}`).join("|")}#${input.edges.map(edge => `${edge.source}>${edge.target}`).join("|")}`;
+    return {
+        input,
+        signature
+    };
 };
+
+/**
+ * Positions of the graphs laid out in this page's life, by
+ * {@link LayoutPlan.signature}: the most recent few.
+ *
+ * Dagre takes 4.5–5 s at 200 cross-linked tables and 90 s at 500, so a graph
+ * is laid out once: not again when the live RLS answer arrives (a badge, not
+ * the graph), nor when the view is reopened. The layout is deterministic, so
+ * an entry never goes stale. Holds geometry only, nothing read from the
+ * database.
+ */
+const layoutCache = new Map<string, LayoutPositions>();
+const LAYOUT_CACHE_SIZE = 16;
+
+const rememberLayout = (signature: string, positions: LayoutPositions): LayoutPositions => {
+    layoutCache.set(signature, positions);
+    if (layoutCache.size > LAYOUT_CACHE_SIZE) {
+        const oldest = layoutCache.keys().next().value;
+        if (oldest !== undefined) layoutCache.delete(oldest);
+    }
+    return positions;
+};
+
+/** The positions for this plan, if it has been laid out before. */
+export const cachedLayout = (plan: LayoutPlan): LayoutPositions | undefined =>
+    layoutCache.get(plan.signature);
+
+/** Lay the plan out here, on the calling thread. */
+export const layOutNow = (plan: LayoutPlan): LayoutPositions =>
+    cachedLayout(plan) ?? rememberLayout(plan.signature, runDagre(plan.input));
+
+/** Layouts running in a worker, by signature, so a second ask waits for the first. */
+const layoutsInFlight = new Map<string, Promise<LayoutPositions>>();
+
+/**
+ * Lay the plan out in a worker; the main thread stays free while it runs.
+ * See {@link layOutOffThread}.
+ */
+export const layOutInBackground = (plan: LayoutPlan): Promise<LayoutPositions> => {
+    const cached = cachedLayout(plan);
+    if (cached) return Promise.resolve(cached);
+    const running = layoutsInFlight.get(plan.signature);
+    if (running) return running;
+    const job = layOutOffThread(plan.input)
+        .then((positions) => rememberLayout(plan.signature, positions))
+        .finally(() => layoutsInFlight.delete(plan.signature));
+    layoutsInFlight.set(plan.signature, job);
+    return job;
+};
+
+/** The nodes at their laid-out positions, as new objects. */
+export const placeNodes = (nodes: Node[], positions: LayoutPositions): Node[] =>
+    nodes.map((node) => ({
+        ...node,
+        position: { ...(positions[node.id] ?? {
+            x: 0,
+            y: 0
+        }) }
+    }));
 
 // ─── Edge styling by relation type ────────────────────────────────────
 

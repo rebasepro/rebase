@@ -94,7 +94,8 @@ export function SelectFieldBinding({
                 {enumValues && enumValues.map((option) => {
                     return <SelectItem
                         key={option.id}
-                        value={String(option.id)}>
+                        value={String(option.id)}
+                        textValue={option.label}>
                         <EnumValuesChip
                             enumKey={String(option.id)}
                             enumValues={enumValues}

@@ -11,10 +11,19 @@ import { Hono, type MiddlewareHandler } from "hono";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import type { Stats } from "node:fs";
-import { StorageController, type StorageAuthorize, type StorageAuthorizeData, type StorageOperation } from "./types";
+import {
+    StorageController,
+    type StorageAuthorize,
+    type StorageAuthorizeData,
+    type StorageAuthorizeUser,
+    type StorageOperation,
+    type StoredObjectInfo,
+    type StoredObjectStream
+} from "./types";
+import { bytesView, fileWebStream, readStreamFully } from "./streams";
 import { LocalStorageController } from "./LocalStorageController";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
-import { DEFAULT_STORAGE_SOURCE_KEY, isAnonymousUid, isPublicStorageKey, scopeGrants, type DownloadConfig, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
+import { DEFAULT_STORAGE_SOURCE_KEY, isAnonymousUid, isPublicStorageKey, scopeGrants, type DownloadConfig, type DownloadMetadata, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
 import {
     assertUploadWithinPathLimits,
     assertUploadWithinPropertyLimits,
@@ -26,9 +35,10 @@ import { objectValidators, isNotModified, applyCacheHeaders, buildEntityTag } fr
 import { parseRange, contentRange, unsatisfiableContentRange } from "./range";
 import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTokenAuth, fileTokenAuth, publicObjectAuth } from "../auth/middleware";
 import { generateDownloadToken } from "../auth";
-import { ApiError, errorHandler } from "../api/errors";
+import { ApiError, declaredErrorAnswer, errorHandler } from "../api/errors";
+import { logger } from "../utils/logger";
 import { HonoEnv } from "../api/types";
-import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
+import { parseTransformOptions, transformImage, transformContentType, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
 import { storageRequestWildcard } from "./requested-object";
 import { canonicalStorageId, InvalidListOptionsError } from "./keys";
@@ -103,7 +113,7 @@ async function transformOnce(
             // does, so a burst of requests for one cold variant makes one
             // round trip to the bucket rather than one each.
             if (durable) {
-                const stored = await durable.cache.get(durable.controller, cacheKey, durable.bucket);
+                const stored = await durable.cache.get(durable.controller, cacheKey, durable.bucket, transformContentType(options));
                 if (stored) {
                     memory.cache.set(cacheKey, stored.data, stored.contentType);
                     return stored;
@@ -377,7 +387,11 @@ function buildAdapterAuthMiddleware(
     adapter: AuthAdapter,
     requireAuth: boolean,
     publicRead: boolean
-): { writeAuthMiddleware: MiddlewareHandler<HonoEnv>; readAuthMiddleware: MiddlewareHandler<HonoEnv> } {
+): {
+    writeAuthMiddleware: MiddlewareHandler<HonoEnv>;
+    readAuthMiddleware: MiddlewareHandler<HonoEnv>;
+    optionalAuthMiddleware: MiddlewareHandler<HonoEnv>;
+} {
     /**
      * Core middleware: verifies the request via the adapter. When `enforce`
      * is true, returns 401 if no authenticated user is resolved.
@@ -414,8 +428,126 @@ function buildAdapterAuthMiddleware(
 
     return {
         writeAuthMiddleware: createMiddleware(requireAuth),
-        readAuthMiddleware: createMiddleware(!publicRead && requireAuth)
+        readAuthMiddleware: createMiddleware(!publicRead && requireAuth),
+        optionalAuthMiddleware: createMiddleware(false)
     };
+}
+
+/** Who a storage request acts for, as `checkAuthorized` judges it. */
+interface StorageCaller {
+    user: StorageAuthorizeUser | undefined;
+    scopes: string[] | undefined;
+}
+
+/** What `checkAuthorized` reads off a request: a Hono context, or the TUS handler's. */
+interface StorageRequestContext {
+    get(k: "user"): StorageAuthorizeUser | undefined;
+    get(k: "scopes"): string[] | undefined;
+}
+
+/** The caller a request acts for. The one place a route reads it off the context. */
+const callerOf = (c: StorageRequestContext): StorageCaller => ({ user: c.get("user"), scopes: c.get("scopes") });
+
+/** Who `publicObjectAuth` lets read a public object anonymously. */
+const PUBLIC_OBJECT_PRINCIPAL: StorageAuthorizeUser = { uid: "public", roles: ["public"] };
+
+/** Most keys `POST /metadata` takes in one request. */
+export const DOWNLOAD_METADATA_BATCH_MAX = 100;
+
+/** Keys of one `POST /metadata` described at once — each an authorize hook and a store request. */
+const METADATA_BATCH_CONCURRENCY = 8;
+
+/** Keys a request is charged for per unit of the rate limit, on `POST /metadata`. */
+const METADATA_KEYS_PER_CHARGE = 10;
+
+/** What `POST /metadata` answers for a key it could not describe. */
+interface MetadataBatchError {
+    error: { code: string; message: string; status: number };
+}
+
+/**
+ * A `POST /metadata` body — its keys deduplicated — or a 400.
+ *
+ * At least one key and at most {@link DOWNLOAD_METADATA_BATCH_MAX}, each a
+ * non-empty string; a body that says something else is refused whole rather
+ * than half-answered.
+ */
+function metadataBatchOrBadRequest(body: unknown): { keys: string[]; storageId?: string } {
+    if (typeof body !== "object" || body === null) {
+        throw new ApiError(400, "BAD_REQUEST", "The body must be { keys: string[], storageId?: string }.", undefined, true);
+    }
+    const keys = "keys" in body ? body.keys : undefined;
+    if (!Array.isArray(keys) || keys.length === 0 || !keys.every((key): key is string => typeof key === "string" && key.length > 0)) {
+        throw new ApiError(400, "BAD_REQUEST", "The body must be { keys: string[] }: one or more object paths.", undefined, true);
+    }
+    const unique = [...new Set(keys)];
+    if (unique.length > DOWNLOAD_METADATA_BATCH_MAX) {
+        throw new ApiError(400, "BAD_REQUEST",
+            `At most ${DOWNLOAD_METADATA_BATCH_MAX} keys per request, got ${unique.length}.`,
+            { maxKeys: DOWNLOAD_METADATA_BATCH_MAX }, true);
+    }
+    const storageId = "storageId" in body ? body.storageId : undefined;
+    if (storageId !== undefined && typeof storageId !== "string") {
+        throw new ApiError(400, "BAD_REQUEST", "storageId must be a string.", undefined, true);
+    }
+    return { keys: unique, ...(storageId !== undefined ? { storageId } : {}) };
+}
+
+/** The key a batch entry names, or null when it names none (the entry answers its own 400). */
+function objectKeyOrNull(path: string): string | null {
+    try {
+        return objectOfPathOrBadRequest(path).key;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * One key's error, as the single route would have answered it: an `ApiError`
+ * keeps its status, code and message; anything else is a server fault,
+ * logged here and answered as a 500 that says nothing of its cause.
+ */
+function metadataBatchError(err: unknown, key: string): MetadataBatchError {
+    const answer = declaredErrorAnswer(err);
+    if (answer) return { error: { code: answer.code, message: answer.message, status: answer.status } };
+    logger.error("[storage] Describing an object for a batched metadata request failed", {
+        key,
+        error: err instanceof Error ? err.message : String(err)
+    });
+    return { error: { code: "INTERNAL_ERROR", message: "The object could not be described.", status: 500 } };
+}
+
+/** `work` for each of `items`, at most `limit` at once. `work` must not throw. */
+async function forEachLimited<T>(items: readonly T[], limit: number, work: (item: T) => Promise<void>): Promise<void> {
+    let next = 0;
+    const lane = async (): Promise<void> => {
+        while (next < items.length) await work(items[next++]);
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
+}
+
+/**
+ * What a storage request costs against the data rate limit: one, except a
+ * `POST /metadata` of N keys, which costs ⌈N/10⌉.
+ *
+ * One request per key let a page of thumbnails spend a hundred requests of a
+ * caller's allowance; one per batch would make a batch of a hundred keys a
+ * hundred times cheaper to scrape with than the route it replaces. A tenth
+ * keeps a budget against enumeration while a page of thumbnails costs ten.
+ * Read before the route runs (the limiter is ahead of it); the body is parsed
+ * once, and the route reads Hono's cached copy.
+ */
+export async function storageRateLimitCost(c: { req: { method: string; path: string; json(): Promise<unknown> } }): Promise<number> {
+    if (c.req.method !== "POST" || !c.req.path.endsWith("/storage/metadata")) return 1;
+    let body: unknown;
+    try {
+        body = await c.req.json();
+    } catch {
+        return 1;
+    }
+    const keys = typeof body === "object" && body !== null && "keys" in body && Array.isArray(body.keys) ? body.keys : [];
+    const counted = Math.min(new Set(keys).size, DOWNLOAD_METADATA_BATCH_MAX);
+    return Math.max(1, Math.ceil(counted / METADATA_KEYS_PER_CHARGE));
 }
 
 /**
@@ -449,10 +581,16 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * fall open.
      */
     const checkAuthorized = async (
-        c: {
-            get(k: "user"): { uid: string; email?: string; roles?: string[] } | undefined;
-            get(k: "scopes"): string[] | undefined;
-        },
+        c: StorageRequestContext,
+        operation: StorageOperation,
+        key: string,
+        bucket: string,
+        storageId?: string | null
+    ): Promise<void> => checkAuthorizedAs(callerOf(c), operation, key, bucket, storageId);
+
+    /** {@link checkAuthorized}, for a caller named outright rather than read off a request. */
+    const checkAuthorizedAs = async (
+        caller: StorageCaller,
         operation: StorageOperation,
         key: string,
         bucket: string,
@@ -468,7 +606,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // scope for this operation on this source. Here, because only here is
         // the source known: it may arrive in the query, a form field or the
         // upload's metadata, and this is where every route has resolved it.
-        const narrowed = c.get("scopes");
+        const narrowed = caller.scopes;
         if (narrowed) {
             const scope = `storage:${operation === "list" ? "read" : operation}`;
             if (!scopeGrants(narrowed, scope, source)) {
@@ -480,7 +618,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         if (!authorize) return;
 
-        const user = c.get("user") ?? null;
+        const user = caller.user ?? null;
 
         // A scoped download token *is* the authorization: it was minted by
         // `/metadata`, which ran this same hook, and it is valid only for the
@@ -605,12 +743,15 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     // (mirroring the data-routes pattern). This avoids calling the JWT
     // module which may not have been configured (e.g. custom auth).
     // When no adapter is present, fall back to the built-in JWT middleware.
-    const { writeAuthMiddleware, readAuthMiddleware } = authAdapter
+    const { writeAuthMiddleware, readAuthMiddleware, optionalAuthMiddleware: optionalReadAuthMiddleware } = authAdapter
         ? buildAdapterAuthMiddleware(authAdapter, requireAuth, publicRead)
         : {
             writeAuthMiddleware: requireAuth ? jwtRequireAuth : jwtOptionalAuth,
-            readAuthMiddleware: (publicRead || !requireAuth) ? jwtOptionalAuth : jwtRequireAuth
+            readAuthMiddleware: (publicRead || !requireAuth) ? jwtOptionalAuth : jwtRequireAuth,
+            optionalAuthMiddleware: jwtOptionalAuth
         };
+    /** Whether `readAuthMiddleware` refuses a caller it cannot identify. */
+    const readAuthRequired = requireAuth && !publicRead;
 
     /**
      * POST /upload - Upload a file
@@ -818,7 +959,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 applyCacheHeaders(c, validators, cachePolicy(TRANSFORM_MAX_AGE));
                 if (isNotModified(c, validators)) return c.body(null, 304);
                 c.header("Content-Type", transformed.contentType);
-                return c.body(new Uint8Array(transformed.data));
+                return c.body(bytesView(transformed.data));
             }
 
             const validators = objectValidators(localStat.size, localStat.mtimeMs);
@@ -845,22 +986,20 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 return c.body(null, 416);
             }
 
+            // A HEAD is answered from the `stat`: Hono runs this handler for it
+            // and discards the body, so a body opened here would be read (or
+            // left holding a file descriptor) for nothing.
+            const isHead = c.req.method === "HEAD";
+
             if (localRange.kind === "range") {
-                // `end` is not read here: a positioned read takes an offset and a
-                // length, and `contentRange` renders the range from the spec itself.
-                const { start, length } = localRange.range;
-                // Only the requested slice leaves the disk. Reading the whole
-                // file to answer a range would give up the reason ranges exist.
-                const handle = await fsp.open(absolutePath, "r");
-                try {
-                    const buffer = Buffer.alloc(length);
-                    await handle.read(buffer, 0, length, start);
-                    c.header("Content-Range", contentRange(localRange.range, localStat.size));
-                    c.header("Content-Length", String(length));
-                    return c.body(new Uint8Array(buffer), 206);
-                } finally {
-                    await handle.close();
-                }
+                const { start, end, length } = localRange.range;
+                c.header("Content-Range", contentRange(localRange.range, localStat.size));
+                c.header("Content-Length", String(length));
+                // Only the requested slice leaves the disk, a chunk at a time.
+                // Reading the whole file to answer a range would give up the
+                // reason ranges exist.
+                if (isHead) return c.body(null, 206);
+                return c.body(fileWebStream(absolutePath, { start, end }), 206);
             }
 
             // Declared on the full response too, not only on a 206. A player
@@ -869,14 +1008,142 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             // it has no way to take up.
             c.header("Content-Length", String(localStat.size));
 
-            const fileContent = await fsp.readFile(absolutePath);
-            return c.body(new Uint8Array(fileContent));
+            // Streamed from disk as the response is written. Read whole, the
+            // file sat in memory twice (the read, then a copy of it) for as
+            // long as the slowest client took to drain it.
+            if (isHead) return c.body(null, 200);
+            return c.body(fileWebStream(absolutePath));
         }
 
         // For remote storage (S3, GCS, etc.), proxy the file through the backend.
         // We avoid redirecting to signed URLs because:
         //  1. Mixed-content (HTTPS page → HTTP MinIO) is blocked by browsers
         //  2. Internal IPs / VPC endpoints are unreachable from the browser
+        const statObject = resolved.statObject?.bind(resolved);
+        const getObjectStream = resolved.getObjectStream?.bind(resolved);
+        if (statObject && getObjectStream) {
+            const isHead = c.req.method === "HEAD";
+            const conditional = c.req.header("if-none-match") !== undefined || c.req.header("if-modified-since") !== undefined;
+            const ranged = c.req.header("range") !== undefined;
+
+            // A plain GET reads the object once and serves what it reads, as it
+            // arrives. Everything else is described first and read only if it
+            // has to be: a revalidation and a HEAD need no body, a cached
+            // rendition needs none of the source, and a range is computed
+            // against the size. Reading first answered each of those with a
+            // full download of the object, held in memory three or four times.
+            let opened: StoredObjectStream | null = null;
+            let info: StoredObjectInfo | null;
+            if (transformOpts || conditional || ranged || isHead) {
+                info = await statObject(resolvedPath, bucket);
+            } else {
+                opened = await getObjectStream(resolvedPath, { bucket });
+                info = opened;
+            }
+            if (!info) {
+                throw ApiError.notFound("File not found");
+            }
+
+            if (transformOpts && isTransformableImage(info.contentType)) {
+                const sourceVersion = buildEntityTag(info.size, info.lastModified);
+                const cacheKey = transformMemory.cache.buildKey(`${transformKeyPrefix}@${sourceVersion}`, transformOpts);
+                const transformed = await transformOnce(
+                    transformMemory,
+                    cacheKey,
+                    transformOpts,
+                    // Called on a real miss only. Should the object be replaced
+                    // between the describe and this read, the newer bytes are
+                    // cached under the older version's key — which no later
+                    // request computes, so they are never served as current.
+                    async () => {
+                        const source = await getObjectStream(resolvedPath, { bucket });
+                        if (!source) throw ApiError.notFound("File not found");
+                        return readStreamFully(source.stream, source.size);
+                    },
+                    durableRenditions
+                        ? { cache: durableRenditions, controller: resolved, bucket }
+                        : undefined
+                );
+                const validators = objectValidators(transformed.data.byteLength, info.lastModified);
+                applyCacheHeaders(c, validators, cachePolicy(TRANSFORM_MAX_AGE));
+                if (isNotModified(c, validators)) return c.body(null, 304);
+                c.header("Content-Type", transformed.contentType);
+                return c.body(bytesView(transformed.data));
+            }
+
+            /** The headers that describe an object version; set again if a read finds a newer one. */
+            const describe = (object: StoredObjectInfo) => {
+                const served = resolveServedContentType(object.contentType);
+                c.header("Content-Type", served.contentType);
+                c.header("Content-Disposition", served.attachment ? "attachment" : undefined);
+                c.header("Content-Security-Policy", served.contentSecurityPolicy);
+                const validators = objectValidators(object.size, object.lastModified);
+                applyCacheHeaders(c, validators, cachePolicy(OBJECT_MAX_AGE));
+                c.header("Accept-Ranges", "bytes");
+                return validators;
+            };
+            const sameVersion = (a: StoredObjectInfo, b: StoredObjectInfo) =>
+                a.size === b.size && a.lastModified === b.lastModified;
+
+            const validators = describe(info);
+            if (isNotModified(c, validators)) {
+                await opened?.stream.cancel();
+                return c.body(null, 304);
+            }
+
+            const remoteRange = parseRange(c.req.header("range"), info.size);
+            if (remoteRange.kind === "unsatisfiable") {
+                await opened?.stream.cancel();
+                c.header("Content-Range", unsatisfiableContentRange(info.size));
+                return c.body(null, 416);
+            }
+
+            if (isHead) {
+                if (remoteRange.kind === "range") {
+                    c.header("Content-Range", contentRange(remoteRange.range, info.size));
+                    c.header("Content-Length", String(remoteRange.range.length));
+                    return c.body(null, 206);
+                }
+                c.header("Content-Length", String(info.size));
+                return c.body(null, 200);
+            }
+
+            if (remoteRange.kind === "range") {
+                const { start, end, length } = remoteRange.range;
+                // Only these bytes are asked of the store.
+                const part = await getObjectStream(resolvedPath, { bucket, range: { start, end } });
+                if (!part) {
+                    throw ApiError.notFound("File not found");
+                }
+                if (part.range && sameVersion(part, info)) {
+                    c.header("Content-Range", contentRange(remoteRange.range, info.size));
+                    c.header("Content-Length", String(length));
+                    return c.body(part.stream, 206);
+                }
+                // Replaced since it was described, or the store answered the
+                // range with the whole object. Served whole, as what was read:
+                // a 200 is a legal answer to any range request, while a range
+                // computed against another version's size is a corrupt one.
+                if (part.range) {
+                    await part.stream.cancel();
+                    opened = await getObjectStream(resolvedPath, { bucket });
+                    if (!opened) throw ApiError.notFound("File not found");
+                } else {
+                    opened = part;
+                }
+                describe(opened);
+            } else if (!opened) {
+                opened = await getObjectStream(resolvedPath, { bucket });
+                if (!opened) throw ApiError.notFound("File not found");
+                if (!sameVersion(opened, info)) describe(opened);
+            }
+
+            c.header("Content-Length", String(opened.size));
+            return c.body(opened.stream);
+        }
+
+        // A controller without the streamed reads: the whole object, through
+        // `getObject`, for every request.
         const fileObject = await resolved.getObject(resolvedPath, bucket);
         if (!fileObject) {
             throw ApiError.notFound("File not found");
@@ -901,7 +1168,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             applyCacheHeaders(c, validators, cachePolicy(TRANSFORM_MAX_AGE));
             if (isNotModified(c, validators)) return c.body(null, 304);
             c.header("Content-Type", transformed.contentType);
-            return c.body(new Uint8Array(transformed.data));
+            return c.body(bytesView(transformed.data));
         }
 
         const servedRemote = resolveServedContentType(remoteContentType);
@@ -924,11 +1191,11 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         if (remoteRange.kind === "range") {
             const { start, end, length } = remoteRange.range;
-            // The whole object still comes from the remote store — a
-            // `StorageController` has no ranged read — so this saves the
-            // response body, not the upstream fetch. Worth it anyway: it is what
-            // makes a player seek instead of restarting, and it is the half of
-            // the cost that is on the user's connection.
+            // The whole object still comes from the remote store — this
+            // controller has no ranged read (`getObjectStream`) — so this saves
+            // the response body, not the upstream fetch. Worth it anyway: it is
+            // what makes a player seek instead of restarting, and it is the half
+            // of the cost that is on the user's connection.
             c.header("Content-Range", contentRange(remoteRange.range, fileObject.size));
             c.header("Content-Length", String(length));
             return c.body(new Uint8Array(buf.slice(start, end + 1)), 206);
@@ -939,43 +1206,46 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     });
 
     /**
-     * GET /metadata/* - Get file metadata
+     * A download token cannot buy another download token.
+     *
+     * The metadata routes mint them, and `checkAuthorized` deliberately does
+     * not re-run the hook for the synthetic `download-token` principal — it
+     * cannot answer an ownership question, and re-asking would break every
+     * `<img>` a client has already rendered. Together those two facts made the
+     * 300-second token self-renewing: present one here, receive a fresh one,
+     * forever. For a key ending in `/` the grant is path-prefixed, so what
+     * renewed itself was read access to a whole folder.
+     *
+     * A download token is evidence of one past authorization for one path, not
+     * a session. Minting needs the credential that was authorized.
      */
-    router.get("/metadata/*", fileTokenAuth, publicObjectAuth, readAuthMiddleware, async (c) => {
-        const rawPath = storageRequestWildcard(c);
-        if (!rawPath) {
-            return c.json({ data: null, fileNotFound: true }, 404);
-        }
-
-        const storageId = c.req.query("storageId");
-        const resolved = resolveController(storageId);
-        const { bucket, key: resolvedPath } = requestedObjectOrBadRequest(rawPath);
-
-        // A download token cannot buy another download token.
-        //
-        // This route mints them, and `checkAuthorized` deliberately does not
-        // re-run the hook for the synthetic `download-token` principal — it
-        // cannot answer an ownership question, and re-asking would break every
-        // `<img>` a client has already rendered. Together those two facts made
-        // the 300-second token self-renewing: present one here, receive a fresh
-        // one, forever. For a key ending in `/` the grant is path-prefixed, so
-        // what renewed itself was read access to a whole folder.
-        //
-        // A download token is evidence of one past authorization for one path,
-        // not a session. Minting needs the credential that was authorized.
-        const principal = c.get("user") as { uid?: string } | undefined;
+    const refuseDownloadTokenPrincipal = (principal: { uid?: string } | undefined): void => {
         if (principal?.uid === "download-token") {
             throw ApiError.forbidden(
                 "A download token cannot be used to mint another. Request metadata with the " +
                     "session or key the object was authorized against."
             );
         }
+    };
 
+    /**
+     * What `GET /metadata/*` answers for one object — authorized for this
+     * caller, described, and given a download token when private — or the
+     * `ApiError` it answers instead. One function for the single and the
+     * batched route, so a key is judged the same way whichever asked.
+     */
+    const describeForDownload = async (
+        caller: StorageCaller,
+        resolved: StorageController,
+        storageId: string | null | undefined,
+        bucket: string,
+        resolvedPath: string
+    ): Promise<DownloadMetadata | undefined> => {
         // The load-bearing check. This route mints the short-lived path-scoped
         // download token that `/file/*` then trusts, and it used to mint one
         // for any authenticated caller for any path — which is exactly why
         // "reject full-access JWTs on file routes" did not close the gap.
-        await checkAuthorized(c, "read", resolvedPath, bucket, storageId);
+        await checkAuthorizedAs(caller, "read", resolvedPath, bucket, storageId);
 
         // Only the metadata goes back — the client builds the `/file/*` URL
         // itself — so a controller that can describe an object without signing
@@ -1007,18 +1277,99 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 // would spend against the same key in every other one.
                 // Minted for this user, so the reads it buys are charged to
                 // their rate-limit allowance and not to the reader's address.
-                const minter = principal?.uid;
+                const minter = caller.user?.uid;
                 downloadConfig.metadata.token = await generateDownloadToken(
                     `${bucket}/${resolvedPath}`,
                     downloadTokenTtl,
-                    storageId,
+                    storageId ?? undefined,
                     minter && minter !== "public" && !isAnonymousUid(minter) ? minter : undefined
                 );
                 downloadConfig.metadata.tokenExpiresIn = downloadTokenTtl;
             }
         }
 
-        return c.json({ data: downloadConfig.metadata });
+        return downloadConfig.metadata;
+    };
+
+    /**
+     * GET /metadata/* - Get file metadata
+     */
+    router.get("/metadata/*", fileTokenAuth, publicObjectAuth, readAuthMiddleware, async (c) => {
+        const rawPath = storageRequestWildcard(c);
+        if (!rawPath) {
+            return c.json({ data: null, fileNotFound: true }, 404);
+        }
+
+        const storageId = c.req.query("storageId");
+        const resolved = resolveController(storageId);
+        const { bucket, key: resolvedPath } = requestedObjectOrBadRequest(rawPath);
+
+        const caller = callerOf(c);
+        refuseDownloadTokenPrincipal(caller.user);
+
+        return c.json({ data: await describeForDownload(caller, resolved, storageId, bucket, resolvedPath) });
+    });
+
+    /**
+     * POST /metadata — `GET /metadata/*` for up to
+     * {@link DOWNLOAD_METADATA_BATCH_MAX} objects of one source in one request.
+     *
+     * Body: `{ storageId?: string, keys: string[] }`, each key the object path
+     * `GET /metadata/<key>` takes (decoded). Answers
+     * `{ data: { [key]: DownloadMetadata | { error: { code, message, status } } } }`.
+     *
+     * A page of private thumbnails was one request per file against the
+     * caller's rate-limit allowance. Each key is still judged exactly as the
+     * single route judges it — the same `checkAuthorized`, the same public
+     * rule, its own download token — and a key refused, missing or failing
+     * answers its own error without failing or revealing the others. The
+     * limiter charges ⌈N/10⌉ requests for N keys (see
+     * {@link storageRateLimitCost}).
+     */
+    router.post("/metadata", (c, next) =>
+        // A caller who presents a credential is held to it as the single
+        // route holds them — an expired one is a 401, which is what makes a
+        // client refresh it. One who presents none may still read public keys.
+        readAuthRequired && c.req.header("authorization") !== undefined
+            ? readAuthMiddleware(c, next)
+            : optionalReadAuthMiddleware(c, next),
+    async (c) => {
+        const batch = metadataBatchOrBadRequest(await c.req.json());
+        const keys = batch.keys;
+        const storageId = batch.storageId ?? c.req.query("storageId");
+        const resolved = resolveController(storageId);
+
+        const caller = callerOf(c);
+        const principal = caller.user;
+        refuseDownloadTokenPrincipal(principal);
+
+        // The single route lets an anonymous caller through for a public
+        // object only (`publicObjectAuth`) and answers 401 for anything else
+        // when reads need a session. Answered for the whole request, as that
+        // 401 is: it is what makes a client refresh an expired session and
+        // ask again, and an anonymous caller is told nothing per key.
+        if (!principal && readAuthRequired && keys.some(key => !isPublicStorageKey(objectKeyOrNull(key) ?? ""))) {
+            const refused = await readAuthMiddleware(c, async () => undefined);
+            if (refused) return refused;
+        }
+
+        const data: Record<string, DownloadMetadata | MetadataBatchError> = {};
+        await forEachLimited(keys, METADATA_BATCH_CONCURRENCY, async (raw) => {
+            try {
+                const { bucket, key } = objectOfPathOrBadRequest(raw);
+                // Who the single route would ask about this key: the caller,
+                // or — anonymous, on a public key — `publicObjectAuth`'s
+                // principal, which the hook is not asked about.
+                const asked = principal ?? (isPublicStorageKey(key) ? PUBLIC_OBJECT_PRINCIPAL : undefined);
+                const metadata = await describeForDownload({ user: asked, scopes: caller.scopes }, resolved, storageId, bucket, key);
+                if (metadata) data[raw] = metadata;
+                else data[raw] = { error: { code: "NOT_FOUND", message: "File not found", status: 404 } };
+            } catch (err) {
+                data[raw] = metadataBatchError(err, raw);
+            }
+        });
+
+        return c.json({ data });
     });
 
     /**

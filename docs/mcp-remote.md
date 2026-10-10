@@ -112,14 +112,16 @@ and no others — `MCP_SCOPES` in `mcp/oauth-metadata.ts`:
 
 | Scope | What it grants |
 |---|---|
-| `data:read` | `list_collections`, `query_collection`, `count_documents`, `get_document` |
+| `data:read` | `list_collections`, `describe_collection`, `query_collection`, `count_documents`, `get_document` |
 | `data:write` | `create_document`, `update_document` |
 | `data:delete` | `delete_document` |
 
 A client that asks for nothing gets `data:read`. Each scope can be narrowed to a
 collection — `data:read:posts` — and then the tools it offers reach that
-collection only (`list_collections` lists only what `data:read` covers). An
-unknown scope in a request is dropped, not refused.
+collection only (`list_collections` lists only what `data:read` covers, and
+`describe_collection` describes exactly those: both gate on `SCHEMA_SCOPE`
+through the one `reaches` check). An unknown scope in a request is dropped, not
+refused.
 
 Grants made before the shared vocabulary are read as what they granted:
 `mcp:read` → `data:read`, `mcp:write` → `data:write data:delete`
@@ -150,9 +152,14 @@ SDK would send. The reads then go through REST's own read path
   lets a model send a row it read back in `update_document`;
 - `query_collection` answers REST's list body, `{ data, meta }`, and
   `count_documents` answers `/count`'s `{ count }`;
-- `list_collections` gives each collection's `row` and `create` JSON Schemas,
-  built by the OpenAPI generator's own `buildCollectionSchema` /
-  `buildCollectionInputSchema`, and its `softDeleteField`;
+- `list_collections` gives each collection's `name`, `title` and
+  `description`, and nothing else: with every schema in it, 200 collections of
+  20 fields were ~150k tokens of a model's context, and as a summary they are
+  ~5k. `describe_collection { collection }` gives one collection's `row` and
+  `create` JSON Schemas, built by the OpenAPI generator's own
+  `buildCollectionSchema` / `buildCollectionInputSchema`, and its
+  `softDeleteField` (~0.7k tokens). The write tools' descriptions and the
+  `initialize` instructions tell the model to call it before writing;
 - every refusal is REST's, in REST's words: an unknown field or operator, a
   field the caller's roles cannot read, a `limit` past the ceiling (refused,
   not clamped).
@@ -170,8 +177,11 @@ A result's `content[0].text` is fenced in `untrustedEnvelope`
 (`@rebasepro/common`), the marking the local MCP server puts on every data
 result: a row was written by somebody, and it reaches the model on the channel
 the model takes its instructions from. `structuredContent` stays the plain
-result. The `initialize` instructions and each row-returning tool's description
-say so.
+result, except on `list_collections` and `describe_collection`: what they say
+is for the model alone and is sent once, in the text (`structuredContent: false`
+on the tool). The text is
+compact JSON — indentation was half of it. The `initialize` instructions and
+each row-returning tool's description say so.
 
 ## The consent screen
 

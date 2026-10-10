@@ -1,5 +1,5 @@
 ---
-sourceHash: 094f9184d2977cef
+sourceHash: a6b7f50250fe821b
 title: Visão Geral do Backend
 sidebar_label: Backend
 description: O backend do Rebase fornece um servidor completo com API REST, autenticação, armazenamento, tempo real com WebSocket e histórico de entidades — tudo inicializado com uma única chamada de função.
@@ -240,7 +240,7 @@ de outra forma, você só conseguiria observar:
 
 | Chave | Padrão | O que faz |
 |---|---|---|
-| `compression` | `true` | gzip/deflate em respostas da API, negociado a partir de `Accept-Encoding`. Corpos já comprimidos, transmitidos por streaming e com `no-transform` são mantidos inalterados, por isso é seguro mantê-lo ativado — uma listagem JSON grande normalmente é reduzida em cerca de 20x. Defina como `false` quando o nginx, Cloudflare ou outro proxy à frente já realizar a compactação, evitando processamento duplicado. Variável de ambiente: `REBASE_COMPRESSION`. |
+| `compression` | `true` | gzip/deflate em respostas da API, negociado a partir de `Accept-Encoding`. Corpos já comprimidos, transmitidos por streaming e com `no-transform` são mantidos inalterados, e os corpos com menos de 1 KB também (ali o gzip custa mais do que poupa), por isso é seguro mantê-lo ativado — uma listagem JSON grande normalmente é reduzida em cerca de 20x. Defina como `false` quando o nginx, Cloudflare ou outro proxy à frente já realizar a compactação, evitando processamento duplicado. Variável de ambiente: `REBASE_COMPRESSION`. |
 | `maxBodySize` | `10485760` (10MB) | Limite máximo para corpos de requisição nas rotas da API; `0` desativa. Uploads de armazenamento utilizam o `maxFileSize` próprio da configuração de armazenamento (50MB), que tem precedência nessas rotas. Variável de ambiente: `REBASE_MAX_BODY_SIZE`. |
 | `csrf` | desativado | **Opcional (Opt-in).** Uma API BaaS é consumida por aplicativos móveis, SPAs em outros domínios e ferramentas CLI, nenhum dos quais envia um `Origin` aceito por uma lista fixa — portanto, isso não vem ativado por padrão. Ative informando as origens utilizadas pelos clientes do seu navegador. Sem formato por variável de ambiente: execute eject para configurá-lo. |
 | `cronPersistence` | `true` | Define se os logs de execução são gravados em `rebase.cron_logs`. `false` mantém as tarefas em execução e o histórico apenas na memória, o qual o painel do Studio perde após uma reinicialização. |

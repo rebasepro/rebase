@@ -162,6 +162,16 @@ export function extractPlanStatements(plan: string): string[] {
     return readPlan(plan).statements;
 }
 
+/**
+ * Whether Atlas answered the dry-run with "Schema is synced" and nothing else.
+ *
+ * Positive evidence only: an empty or unreadable report also yields no
+ * statements, and is not the same answer.
+ */
+export function isSyncedPlan(plan: string): boolean {
+    return PLAN_SYNCED_RE.test(plan);
+}
+
 export interface DestructiveStatement {
     /** The offending statement (trimmed, without the trailing `;`). */
     statement: string;

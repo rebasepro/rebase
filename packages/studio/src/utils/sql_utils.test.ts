@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "@jest/globals";
-import { acceptsAutoLimit, buildExplainSql, formatSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, withAutoLimit, type ResultProvenance } from "./sql_utils";
+import { acceptsAutoLimit, buildExplainSql, COLUMN_WIDTHS_REMEMBERED, formatSql, groupSchemaRows, keepLatestColumnWidths, rememberColumnWidth, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, toCsv, withAutoLimit, type ResultProvenance } from "./sql_utils";
 import type { SqlScriptColumn, SqlScriptTable } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
@@ -371,5 +371,184 @@ describe("withAutoLimit", () => {
         expect(withAutoLimit("SELECT * FROM posts LIMIT 5", 1000)).toBeNull();
         expect(withAutoLimit("INSERT INTO archive SELECT * FROM posts", 1000)).toBeNull();
         expect(withAutoLimit("SELECT 1; DELETE FROM posts WHERE id = 1", 1000)).toBeNull();
+    });
+});
+
+/**
+ * "Export CSV" quoted a value only when it held a comma, and never doubled a
+ * quote or quoted a line break: `say "hi"` and a two-line note each broke the
+ * row they were in, and a spreadsheet read the file with columns shifted.
+ */
+/**
+ * Column widths are kept per query text in localStorage, and used to be kept
+ * forever: every query anybody resized a column of stayed in the origin's
+ * storage, which the console's tabs, snippets and history share.
+ */
+describe("the column widths the console remembers", () => {
+    it("keeps the 50 queries most recently resized, and forgets the oldest", () => {
+        let widths = {};
+        for (let index = 0; index < 60; index++) widths = rememberColumnWidth(widths, `SELECT ${index}`, "a", 100 + index);
+
+        expect(Object.keys(widths)).toHaveLength(COLUMN_WIDTHS_REMEMBERED);
+        expect(Object.keys(widths)[0]).toBe("SELECT 10");
+        expect(widths).toMatchObject({ "SELECT 59": { a: 159 } });
+        expect(widths).not.toHaveProperty("SELECT 9");
+    });
+
+    it("makes a query resized again the newest, keeping its other columns", () => {
+        let widths = rememberColumnWidth({}, "SELECT old", "a", 120);
+        for (let index = 0; index < 49; index++) widths = rememberColumnWidth(widths, `SELECT ${index}`, "a", 100);
+        widths = rememberColumnWidth(widths, "SELECT old", "b", 80);
+        widths = rememberColumnWidth(widths, "SELECT new", "a", 90);
+
+        expect(widths["SELECT old"]).toEqual({ a: 120, b: 80 });
+        expect(widths).not.toHaveProperty("SELECT 0");
+    });
+
+    it("trims a store written before the bound, and drops what is not a width", () => {
+        const stored: Record<string, unknown> = { broken: "x", list: [1], odd: { a: "wide", b: 70 } };
+        for (let index = 0; index < 500; index++) stored[`SELECT ${index}`] = { a: index };
+
+        const kept = keepLatestColumnWidths(stored);
+        expect(Object.keys(kept)).toHaveLength(COLUMN_WIDTHS_REMEMBERED);
+        expect(kept["SELECT 499"]).toEqual({ a: 499 });
+        expect(keepLatestColumnWidths({ broken: "x", list: [1], odd: { a: "wide", b: 70 } })).toEqual({ odd: { b: 70 } });
+    });
+});
+
+describe("resultsToCsv", () => {
+    const parseCsv = (text: string): string[][] => {
+        // RFC 4180, as a spreadsheet reads it: quoted fields may hold commas,
+        // doubled quotes and line breaks.
+        const records: string[][] = [];
+        let record: string[] = [];
+        let field = "";
+        let quoted = false;
+        for (let index = 0; index < text.length; index++) {
+            const char = text[index];
+            if (quoted) {
+                if (char === "\"" && text[index + 1] === "\"") { field += "\""; index++; }
+                else if (char === "\"") quoted = false;
+                else field += char;
+            } else if (char === "\"") quoted = true;
+            else if (char === ",") { record.push(field); field = ""; }
+            else if (char === "\n") { record.push(field); records.push(record); record = []; field = ""; }
+            else if (char !== "\r") field += char;
+        }
+        // A line break ends the last record; it does not start another.
+        if (field !== "" || record.length > 0) {
+            record.push(field);
+            records.push(record);
+        }
+        return records;
+    };
+
+    /**
+     * One CSV format in the console. "Download full result as CSV" streams
+     * RFC 4180 records each ended by CRLF (`POST /api/admin/sql/csv`), and
+     * "Export CSV" wrote the same records joined by LF — two files from one
+     * result that a diff, a checksum or a strict reader told apart.
+     */
+    it("ends every record with CRLF, as the streamed download does", () => {
+        expect(resultsToCsv([{ id: 1, note: "two\nlines" }, { id: 2, note: null }]))
+            .toBe("id,note\r\n1,\"two\nlines\"\r\n2,\r\n");
+    });
+
+    it("writes the columns it is given, in that order, for a result that names them", () => {
+        expect(toCsv(["b", "a"], [{ a: 1, b: "x,y" }, { a: { k: 1 }, b: "say \"hi\"" }]))
+            .toBe("b,a\r\n\"x,y\",1\r\n\"say \"\"hi\"\"\",\"{\"\"k\"\":1}\"\r\n");
+    });
+
+    it("reads back as the values it was given, quotes, commas and line breaks included", () => {
+        const rows = [
+            { id: "1", note: "say \"hi\"", tags: "a,b" },
+            { id: "2", note: "line one\nline two", tags: "\"" },
+            { id: "3", note: "plain", tags: "carriage\r\nreturn" }
+        ];
+
+        expect(parseCsv(resultsToCsv(rows))).toEqual([
+            ["id", "note", "tags"],
+            ["1", "say \"hi\"", "a,b"],
+            ["2", "line one\nline two", "\""],
+            ["3", "plain", "carriage\r\nreturn"]
+        ]);
+    });
+
+    it("writes SQL NULL as an empty field, not the word null", () => {
+        expect(parseCsv(resultsToCsv([{ a: null, b: "null" }]))).toEqual([["a", "b"], ["", "null"]]);
+    });
+
+    it("quotes a column name that needs it", () => {
+        expect(parseCsv(resultsToCsv([{ "a,b": "1", "say \"x\"": "2" }]))[0]).toEqual(["a,b", "say \"x\""]);
+    });
+
+    it("puts each value under its own column whatever order a row lists its keys in", () => {
+        expect(parseCsv(resultsToCsv([{ a: "1", b: "2" }, { b: "4", a: "3" }]))).toEqual([["a", "b"], ["1", "2"], ["3", "4"]]);
+    });
+
+    it("writes an object value as JSON", () => {
+        expect(parseCsv(resultsToCsv([{ plan: { Plan: { "Node Type": "Seq Scan" } } }]))[1]).toEqual(["{\"Plan\":{\"Node Type\":\"Seq Scan\"}}"]);
+    });
+});
+
+/**
+ * The SQL console's schema browser groups `information_schema.columns` rows
+ * into tables. Each row looked its table up with `find` over every table of
+ * its schema, and the rows come in table order, so the match was always the
+ * last: 142 ms of main thread at 2,000 tables, 923 ms at 5,000, on every
+ * open and every database switch.
+ */
+describe("groupSchemaRows", () => {
+    const rowsFor = (tables: number, columns = 20) => {
+        const rows: Record<string, unknown>[] = [];
+        for (let table = 0; table < tables; table++) {
+            for (let column = 0; column < columns; column++) {
+                rows.push({ schema: "public", table: `t${table}`, column: `c${column}`, data_type: "integer", is_pk: column === 0 });
+            }
+        }
+        return rows;
+    };
+
+    it("groups columns under their table and schema, in order", () => {
+        const grouped = groupSchemaRows([
+            { schema: "public", table: "posts", column: "id", data_type: "integer", is_pk: true },
+            { schema: "public", table: "posts", column: "title", data_type: "text", is_pk: false },
+            { schema: "archive", table: "posts", column: "id", data_type: "bigint", is_pk: "true" },
+            { schema: "public", table: "tags", column: "name", data_type: "text", is_pk: false }
+        ]);
+
+        expect(grouped).toEqual({
+            public: [
+                { schemaName: "public", tableName: "posts", columns: [{ name: "id", dataType: "integer", isPrimaryKey: true }, { name: "title", dataType: "text", isPrimaryKey: false }] },
+                { schemaName: "public", tableName: "tags", columns: [{ name: "name", dataType: "text", isPrimaryKey: false }] }
+            ],
+            archive: [
+                { schemaName: "archive", tableName: "posts", columns: [{ name: "id", dataType: "bigint", isPrimaryKey: true }] }
+            ]
+        });
+    });
+
+    it("keeps a table's columns together when its rows are not adjacent", () => {
+        const grouped = groupSchemaRows([
+            { schema: "public", table: "a", column: "x", data_type: "int", is_pk: false },
+            { schema: "public", table: "b", column: "y", data_type: "int", is_pk: false },
+            { schema: "public", table: "a", column: "z", data_type: "int", is_pk: false }
+        ]);
+        expect(grouped.public.map(table => [table.tableName, table.columns.map(column => column.name)])).toEqual([["a", ["x", "z"]], ["b", ["y"]]]);
+    });
+
+    it("grows linearly with the number of tables, not with its square", () => {
+        // Best of three, so a collection or a JIT tier change lands in one run
+        // and not in the answer. Linear is ~10x for 10x the tables; the old
+        // lookup was ~100x.
+        const best = (rows: Record<string, unknown>[]) => Math.min(...[0, 1, 2].map(() => {
+            const start = performance.now();
+            groupSchemaRows(rows);
+            return performance.now() - start;
+        }));
+        const small = rowsFor(500);
+        const large = rowsFor(5_000);
+        best(small);
+        expect(best(large) / Math.max(best(small), 0.5)).toBeLessThan(30);
     });
 });

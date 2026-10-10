@@ -206,7 +206,7 @@ ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `DB_POOL_MAX` | Maximum pooled connections | `20` |
 | `DB_POOL_IDLE_TIMEOUT` | Milliseconds an idle connection is kept | `30000` |
 | `DB_POOL_CONNECT_TIMEOUT` | Milliseconds to wait for a connection | `10000` |
-| `DATABASE_DIRECT_URL` | Direct (non-pooled) connection. [Realtime](/docs/backend/realtime) needs one: `LISTEN`/`NOTIFY` does not survive a transaction pooler such as PgBouncer, and without it change notifications are disabled with a warning rather than silently lost. | — |
+| `DATABASE_DIRECT_URL` | Direct (non-pooled) connection. [Realtime](/docs/backend/realtime) needs one: `LISTEN`/`NOTIFY` does not survive a transaction pooler such as PgBouncer, and without it change notifications are disabled with a warning rather than silently lost. The [job worker](/docs/backend/jobs) holds its wake-up `LISTEN` on it too. | — |
 | `DATABASE_READ_URL` | Read replica. Reads go there when it is set and differs from `DATABASE_URL`; if the connection fails, everything falls back to the primary with a warning. | — |
 | `REBASE_DB_POOL_MAX` | A ceiling on every pool in the process, applied whatever each one asked for. Plain digits only: a malformed value is ignored rather than silently serializing the server. | — |
 

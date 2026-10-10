@@ -27,6 +27,7 @@ import { useSideDialogContext } from "../SideDialogs";
 import { useAnalyticsController } from "@rebasepro/app";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { useSidePanel } from "../../hooks/useSidePanel";
+import { findEntitiesByIds } from "../../util/find_entities_by_ids";
 
 /** Stable identity, so the effect that propagates the picks does not re-fire. */
 const EMPTY_ENTITIES: Entity<any>[] = [];
@@ -185,13 +186,14 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
         let unmounted = false;
         const selectedEntityIds = selectedEntityIdsProp?.map(id => id?.toString()).filter(Boolean);
         if (selectedEntityIds && selectedEntityIds.length > 0 && collection) {
-            Promise.all(
-                selectedEntityIds.map((entityId) =>
-                    dataClient.collection(path).findById(entityId))
-                )
-                .then((entities) => {
+            // One request per 1,000 ids, not one per id (see findEntitiesByIds).
+            findEntitiesByIds(dataClient.collection<M>(path), collection, selectedEntityIds)
+                .then((found) => {
                     if (!unmounted) {
-                        const result = entities.filter((e): e is Entity<any> => !!e);
+                        // In the order given; an id with no row is dropped.
+                        const result = selectedEntityIds
+                            .map(id => found.get(id))
+                            .filter((e): e is Entity<any> => !!e);
                         selectionController.setSelectedEntities(result);
                         setEntitiesDisplayedFirst(result);
                         // Mark initialized after the initial fetch completes

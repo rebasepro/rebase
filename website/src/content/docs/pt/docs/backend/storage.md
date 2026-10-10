@@ -164,6 +164,13 @@ Um parâmetro fora desses limites resulta em um erro **400**, e não em um valor
 `?width=99999` costumava retornar uma imagem de 4096px e `?format=tiff` uma imagem webp, e
 nenhum deles avisava sobre isso.
 
+As miniaturas que o painel admin mostra de imagens armazenadas usam este endpoint: uma
+pré-visualização em tabela ou em cartão pede uma versão webp com cerca do dobro do seu
+tamanho renderizado (96–800px) em vez do original. O `sharp` é uma dependência opcional; sem ele, a
+transformação responde 500, então o painel verifica uma vez por carregamento de página, com uma única
+requisição de versão redimensionada, e mostra os originais se o servidor não puder redimensionar. Arquivos SVG e GIF
+são sempre mostrados como estão.
+
 ### Desempenho e Cache LRU
 
 A transformação consome muita CPU e memória e, em um objeto público, o endpoint pode ser

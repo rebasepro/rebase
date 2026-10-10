@@ -14,6 +14,7 @@ export { sanitizeUrl };
  */
 export function UrlComponentPreview({
     url,
+    previewUrl,
     previewType,
     size,
     hint,
@@ -21,6 +22,8 @@ export function UrlComponentPreview({
     fill
 }: {
     url: string,
+    /** For an image: a smaller rendition of `url` to display instead (see {@link ImagePreviewProps.previewUrl}). */
+    previewUrl?: string,
     previewType?: PreviewType,
     size: PreviewSize,
     hint?: string,
@@ -47,6 +50,7 @@ export function UrlComponentPreview({
 
     if (previewType === "image") {
         return <ImagePreview url={url}
+            previewUrl={previewUrl}
             size={size}
             fill={fill}/>;
     } else if (previewType === "audio") {

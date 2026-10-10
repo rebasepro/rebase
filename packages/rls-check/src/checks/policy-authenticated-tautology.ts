@@ -66,6 +66,12 @@ export const policyAuthenticatedTautology: Check = {
             if (clauses.length === 0) continue;
 
             const shape = (usingMatch?.guardsSentinel ? usingMatch.shape : checkMatch?.shape) ?? "the caller id";
+            // `policy.registered()`: the same finding, one notch narrower —
+            // guests are kept out too, and every other account still reads
+            // every row.
+            const matched = [usingMatch, checkMatch].filter((m) => m?.guardsSentinel);
+            const excludesGuests = matched.every((m) => m?.excludesGuests);
+            const admitted = excludesGuests ? "account that is not a guest" : "signed-in caller";
 
             findings.push(
                 finding({
@@ -74,13 +80,16 @@ export const policyAuthenticatedTautology: Check = {
                     confidence: "heuristic",
                     title:
                         `Policy "${policy.name}" on ${policy.schema}.${policy.table} admits every ` +
-                        "signed-in caller to every row",
+                        `${admitted} to every row`,
                     target: { schema: policy.schema, table: policy.table, policy: policy.name },
                     detail:
                         `The ${listAnd(clauses)} expression of this ${policy.command} policy tests that ` +
-                        `${shape} exists and is not the anonymous sentinel, and tests nothing else. That ` +
-                        "correctly excludes signed-out callers — and it compares nothing to a column, so " +
-                        "every row of the table satisfies it equally for every account that does sign in.",
+                        `${shape} exists and is not the anonymous sentinel` +
+                        (excludesGuests ? ", and that the caller is not a guest (an anonymous sign-in)," : ",") +
+                        " and tests nothing else. That correctly excludes signed-out callers" +
+                        (excludesGuests ? " and guests" : "") +
+                        " — and it compares nothing to a column, so every row of the table satisfies it " +
+                        `equally for every ${excludesGuests ? "account that is not a guest" : "account that does sign in"}.`,
                     impact:
                         "Any user with an account reaches every row this policy covers, including rows " +
                         "belonging to other users and other tenants. Where registration is open, \"any " +

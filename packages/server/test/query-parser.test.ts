@@ -241,7 +241,17 @@ describe("parseQueryOptions — PostgREST filters", () => {
     });
 
     it("parses lt operator", () => {
-        const result = parseQueryOptions({ count: "lt.100" });
+        const result = parseQueryOptions({ stock: "lt.100" });
+        expect(result.where?.stock).toEqual(["<", "100"]);
+    });
+
+    // `?count=` is the count switch (`exact` | `none`), so it is a reserved
+    // key: a filter on a column named `count` travels inside `?where=`, which
+    // is what the SDK sends for one.
+    it("reads `?count=` as the count switch, and a `count` column's filter from `?where=`", () => {
+        expect(() => parseQueryOptions({ count: "lt.100" })).toThrow(/count/);
+        const result = parseQueryOptions({ count: "none", where: JSON.stringify({ count: "lt.100" }) });
+        expect(result.count).toBe("none");
         expect(result.where?.count).toEqual(["<", "100"]);
     });
 

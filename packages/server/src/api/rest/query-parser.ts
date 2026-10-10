@@ -613,6 +613,22 @@ export function parseQueryOptions(
         options.distinct = text === "true" || text === "1";
     }
 
+    // `?count=exact|none` — whether a listing counts `meta.total`. Refused
+    // rather than read as the default when it is neither: a `?count=nnone`
+    // typo would otherwise pay for the count it was written to skip, and say
+    // nothing.
+    const countVal = getLastValue(query.count);
+    if (countVal !== undefined && countVal !== null && String(countVal) !== "") {
+        const text = String(countVal).trim().toLowerCase();
+        if (text !== "exact" && text !== "none") {
+            throw invalidParam(
+                `Invalid \`count\` parameter: expected \`exact\` or \`none\`, got ${JSON.stringify(String(countVal))}.`,
+                "INVALID_COUNT"
+            );
+        }
+        options.count = text;
+    }
+
     // ── Keyset cursor ──────────────────────────────────────────────────
     //
     // `?after=<meta.nextCursor>`. Decoded here so a malformed cursor is one

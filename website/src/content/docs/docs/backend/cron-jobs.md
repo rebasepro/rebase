@@ -184,6 +184,8 @@ interface CronJobContext {
 
 Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API. Each line is also written to the server log at `info` level with a `cron` field holding the job ID, so it shows up wherever your container's output is collected, including Rebase Cloud's debug logs. That copy is redacted the way the server's own log lines are: the values of keys such as `password` or `apiKey`, and the SQL and parameters of a failed query, are replaced. The execution log stores the line without that redaction.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> The execution log keeps a run's first 500 lines or 64 KB of them, whichever comes first, and then one line saying how many more there were: `… 9500 more lines not kept — see the server log`. The server log gets every line. A job that logs one line per item it processes should expect its history to show the start of the run.
+
 ### `ctx.signal` — stop the work when the run stops
 
 The timeout ends the *run*: the scheduler stops waiting and records a failure.
@@ -303,7 +305,7 @@ See [Roles and scopes](/docs/backend/roles-and-scopes/).
 | `GET` | `/api/admin/cron` | List all registered cron jobs |
 | `GET` | `/api/admin/cron/:id` | Get a single job's status |
 | `POST` | `/api/admin/cron/:id/trigger` | Manually trigger a job — `409` while it is already running |
-| `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`). `503` when `rebase.cron_logs` cannot be read, rather than an empty history |
+| `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`), the last 30 days of it. `503` when `rebase.cron_logs` cannot be read, rather than an empty history |
 | `PUT` | `/api/admin/cron/:id` | Pause or resume a job everywhere (`{ "enabled": false }`); `null` follows the code again |
 
 ### Example: List All Jobs
@@ -428,13 +430,9 @@ The dashboard auto-refreshes every 15 seconds.
 
 The panel shows the same thing whichever process serves it. A job another
 process is running shows as running.
-On every process that has a store, the run count, the failure count and the
-last run are read from `rebase.cron_logs`, one query bounded to each job's own
-rows. A process's own counters hold only the runs it made: the `api` role
-beside a worker runs nothing, and of two replicas that both schedule, neither
-sees the slots the other one claimed. Only when `cron_logs` cannot be read does
-the card fall back to this process's own counters, with a warning in the server
-log.
+On every process that has a store, the run count, the failure count and the last run are read from the database, where every process's runs are counted. A process's own counters hold only the runs it made: the `api` role beside a worker runs nothing, and of two replicas that both schedule, neither sees the slots the other one claimed. Only when the database cannot be read does the card fall back to this process's own counters, with a warning in the server log.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The counts are all-time; the history is the last 30 days. Each run's row in `rebase.cron_logs` is deleted 30 days after it started, by an hourly sweep, while the run and failure counts keep counting it. A skipped run counts as a run, as it always has: it is a row of the history.
 
 ## Schedule Validation & AST Parsing
 
@@ -470,7 +468,7 @@ runs beside a scheduled run are on [Cron across instances](/docs/backend/cron-ac
   `Error: Cron job "<id>" timed out after <N>ms`
   The abort is the half that stops the *work*; the rejection only stops the scheduler waiting. A handler that ignores `ctx.signal` keeps running past its own run.
 - **Shutdown**: `backend.shutdown()` waits for a run in flight, within the same budget as the job queue (two-thirds of the shutdown timeout). A run still going when it runs out has `ctx.signal` aborted and is recorded as failed, with the reason. Its slot stays claimed, so no other instance re-runs it.
-- **Fail-Safe Try/Catch**: Each job handler runs inside an isolated wrapper. Any uncaught exceptions are intercepted, formatting the error traceback into a string, setting the job status to `"error"`, and updating the `rebase.cron_logs` failure counters. A crash inside a single cron task will never crash the scheduler loop or the primary Hono HTTP web server.
+- **Fail-Safe Try/Catch**: Each job handler runs inside an isolated wrapper. Any uncaught exceptions are intercepted, formatting the error traceback into a string, setting the job status to `"error"`, and updating the job's failure counter. A crash inside a single cron task will never crash the scheduler loop or the primary Hono HTTP web server.
 - **In-Memory Ring Buffer**: The scheduler maintains a ring buffer containing the last **50 runs** per job. This buffer is kept in memory to allow near-instant reads from Rebase Studio.
 
 ---
@@ -495,16 +493,25 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
     manual       BOOLEAN NOT NULL DEFAULT false        -- True if triggered from Studio/REST
 );
 
+ALTER TABLE rebase.cron_logs ADD COLUMN IF NOT EXISTS counted BOOLEAN;  -- the run is in the counters below
+
 CREATE INDEX IF NOT EXISTS idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
-CREATE INDEX IF NOT EXISTS idx_cron_logs_job_failures ON rebase.cron_logs(job_id) WHERE NOT success;
+CREATE INDEX IF NOT EXISTS idx_cron_logs_started ON rebase.cron_logs(started_at);
+CREATE INDEX IF NOT EXISTS idx_cron_logs_uncounted ON rebase.cron_logs(job_id, started_at DESC) WHERE counted IS NULL;
 
 CREATE TABLE IF NOT EXISTS rebase.cron_job_state (
-    job_id         TEXT PRIMARY KEY,
-    enabled        BOOLEAN,       -- NULL: follow the job's own `enabled`
-    updated_at     TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
-    updated_by     TEXT,
-    running_until  TIMESTAMPTZ,   -- the run lease: live while in the future
-    running_by     TEXT
+    job_id            TEXT PRIMARY KEY,
+    enabled           BOOLEAN,       -- NULL: follow the job's own `enabled`
+    updated_at        TIMESTAMPTZ,   -- when `enabled` was last set, and by whom
+    updated_by        TEXT,
+    running_until     TIMESTAMPTZ,   -- the run lease: live while in the future
+    running_by        TEXT,
+    total_runs        BIGINT NOT NULL DEFAULT 0,   -- all-time, skips included
+    total_failures    BIGINT NOT NULL DEFAULT 0,
+    last_run_at       TIMESTAMPTZ,                 -- the most recently started run
+    last_duration_ms  INTEGER,
+    last_success      BOOLEAN,
+    last_error        TEXT
 );
 ```
 
@@ -514,7 +521,9 @@ it on its next deploy. None of them is a collection, and the end-user role
 let a signed-in user pause a job for everyone, or hold its lease so that nothing
 runs it.
 
-On startup, the scheduler reads stats from this table via aggregate queries (`COUNT(*)`, `SUM(CASE WHEN success = false THEN 1 ELSE 0 END)`) to populate `totalRuns` and `totalFailures` history. Log insertions are executed in a non-blocking asynchronous sweep; if a database flush fails, the scheduler logs the error and continues normal execution using the in-memory ring buffer as a fallback.
+<span class="since-badge" data-since="0.25">Since 0.25</span> A run's row and its count are written in one statement: the insert into `cron_logs` and an upsert of the job's counters on `cron_job_state`. A listing reads one `cron_job_state` row per job, however long the history, and so does the scheduler when it seeds `totalRuns` and `totalFailures` on startup. Log writes do not hold up the run; if one fails, the scheduler logs the error and carries on, with the run still in the in-memory ring buffer.
+
+Once an hour, and when it starts, the scheduler deletes the history rows older than 30 days and counts any run that is not counted yet, both in batches of 5,000 rows. A history written before 0.24 is counted by the first of these sweeps, off the boot path. Until it has finished, a listing adds the runs it has not counted yet to the counters, so the numbers do not change on upgrade. The same goes for a run an older server logs during a rolling deploy.
 
 ## Example: Daily Cleanup Job
 

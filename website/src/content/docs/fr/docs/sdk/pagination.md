@@ -1,5 +1,5 @@
 ---
-sourceHash: 4449046fbaa30bb3
+sourceHash: 0db20d62bf304b74
 title: Pagination
 sidebar_label: Pagination
 description: Parcourir une collection par pagination limit/offset, numéros de page ou curseur keyset — et quand chacune cesse d'être exacte.
@@ -95,6 +95,23 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100
 GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 ```
 
+#### Ignorer le comptage
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `meta.total` est un `COUNT(*)` sur toutes les lignes correspondant à la requête, exécuté à côté de la
+page — et sur une grande table, il coûte plus cher que la page elle-même. Une lecture qui ne fait
+qu'avancer n'en a jamais besoin, car `meta.hasMore` n'en dépend pas : passez `count: "none"` et la lecture
+demande à la place une ligne de plus que la page.
+
+```typescript
+const { data, meta } = await client.data.orders.find({ limit: 100, count: "none" });
+meta.hasMore; // exact
+```
+
+Sans comptage, il n'y a pas de total à indiquer : en HTTP, `meta.total` est absent, et en processus il
+s'agit des lignes jusqu'à la fin de la page (`offset` plus la page). En HTTP, c'est `?count=none` ;
+`?count=exact` est la valeur par défaut, et toute autre valeur renvoie une erreur 400 `INVALID_COUNT`.
+`iterate()` et `findAll()` l'envoient d'eux-mêmes à chaque page, puisqu'un parcours n'indique aucun total.
+
 #### Quelles lectures sont enveloppées et lesquelles ne le sont pas
 
 Deux formes, et une seule règle : **une fenêtre est enveloppée, une réponse complète ne l'est pas.**
@@ -147,25 +164,29 @@ Trois options définissent le parcours :
 | Option | Par défaut | Description |
 |--------|---------|--------------|
 | `pageSize` | 200 | Nombre de lignes par requête. |
-| `cursor` | — | Recherche par curseur sur une colonne au lieu d'une pagination par offset. Voir ci-dessous. |
+| `cursor` | — | Exiger la recherche par curseur : lever une erreur au lieu de se rabattre sur l'offset. Voir ci-dessous. |
 | `maxPages` | 10 000 | Plafond de requêtes, pour éviter qu'un serveur qui répond indéfiniment `hasMore` ne tourne en boucle sans fin. |
 | `maxRows` | 10 000 | `findAll()` uniquement. Tout dépassement **lève une exception** plutôt que de renvoyer un tableau tronqué comme s'il s'agissait de la réponse complète. Passez `Infinity` pour désactiver cette limite, ou utilisez `iterate()`. |
 
-**Privilégiez `cursor` dès que la collection possède une colonne unique et triable.**
-La pagination par offset recompte les lignes à chaque requête, de sorte qu'une ligne insérée ou supprimée
-*pendant l'exécution du parcours* décale la fenêtre et le parcours saute ou répète silencieusement
-des lignes. La recherche par curseur demande les lignes strictement postérieures à la dernière vue, ce que
-les écritures simultanées situées avant le curseur ne peuvent pas décaler :
+**Le parcours cherche par curseur de lui-même.** Après la première page, il renvoie
+[le curseur du serveur](#pagination-par-curseur) — `meta.nextCursor` — sous forme de `after`,
+de sorte que chaque requête demande les lignes strictement postérieures à la dernière vue. Les écritures
+simultanées situées avant cette ligne ne peuvent pas décaler la fenêtre, et la base de données n'a jamais
+à sauter des lignes par comptage, ce qui rendait lents les longs parcours par offset : chaque page coûtait
+plus cher que la précédente.
+
+Lorsque le serveur n'émet aucun curseur — une recherche triée par pertinence, une recherche vectorielle,
+une lecture `distinct`, une projection `fields` qui omet un champ de tri — le parcours pagine par offset
+à la place, et une ligne insérée ou supprimée *pendant l'exécution du parcours* peut lui faire sauter ou
+répéter une ligne. Passez `cursor` pour faire de la recherche par curseur une exigence plutôt qu'une préférence :
 
 ```typescript
 for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
 ```
 
-`cursor` signifie ici « chercher par curseur plutôt que paginer par offset », et indique la colonne selon
-laquelle trier lorsque la requête ne le précise pas déjà. La recherche elle-même correspond
-[au curseur du serveur](#pagination-par-curseur) : le parcours renvoie `meta.nextCursor` sous forme
-de `after` et ne construit aucune comparaison propre, c'est pourquoi un tri multi-clés
-fonctionne —
+`cursor` indique la colonne selon laquelle trier lorsque la requête ne le précise pas déjà, et transforme le
+repli sur l'offset en erreur. Le parcours ne construit aucune comparaison propre, c'est pourquoi un tri
+multi-clés fonctionne —
 
 ```typescript
 for await (const job of client.data.jobs.iterate({
@@ -177,10 +198,10 @@ for await (const job of client.data.jobs.iterate({
 — et pourquoi une clé de tri pouvant être nulle fonctionne aussi.
 
 Le tri doit tout de même être **total**, ce qui en pratique signifie unique : l'identifiant de ligne
-départage en dernier recours, de sorte que n'importe quelle colonne peut servir à départager, mais un parcours dont
-le curseur cesse d'avancer lève une erreur `cursor-stalled` plutôt que de boucler indéfiniment. Une
-requête qu'aucun curseur ne peut décrire (pertinence) lève une erreur `cursor-missing` ; supprimez `cursor`
-et effectuez une pagination par offset.
+départage en dernier recours, de sorte que n'importe quelle colonne peut servir à départager. Avec `cursor`, un
+parcours dont le curseur cesse d'avancer lève une erreur `cursor-stalled` plutôt que de boucler indéfiniment,
+et une requête qu'aucun curseur ne peut décrire (pertinence) lève une erreur `cursor-missing` ; supprimez
+`cursor` et le parcours pagine celles-ci par offset.
 
 ## Voir aussi
 

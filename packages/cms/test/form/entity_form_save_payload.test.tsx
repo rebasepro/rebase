@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
 import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 import type { EntityFormProps } from "../../src/types/components/EntityFormProps";
@@ -239,6 +239,9 @@ describe("EntityForm: a record changed elsewhere while the form is open", () => 
         const v2: Post = { title: "T", price: 20 };
         const { onSubmit } = recordingSubmit(() => v2);
         const view = render(formFor(v1, onSubmit, false, "it"));
+        // Only English is bundled: the provider renders nothing until the
+        // Italian table has been fetched.
+        await waitFor(() => expect(view.container.firstChild).not.toBeNull());
 
         await act(async () => {
             context.setFieldValue("price", 15);

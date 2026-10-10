@@ -76,21 +76,17 @@ export function DataEnhancementControllerProvider({
     const [serviceAvailable, setServiceAvailable] = useState(false);
     const [review, setReview] = useState<AutofillReview | null>(null);
 
-    const properties = useMemo(
-        () => getSimplifiedProperties(collection.properties, formContext?.values ?? {}),
-        [collection.properties, formContext?.values]
-    );
-
     /**
-     * Read inside the streaming callbacks, which outlive the render that
-     * started the run.
+     * The form's values as of the latest render, which the property map of a
+     * run is built from (a block list contributes one entry per block).
      *
-     * The operator is free to keep typing while the model works — nothing here
-     * writes to the form — so the callbacks must not close over a stale
-     * property map from whichever render happened to kick the run off.
+     * Built in `generate`, once per run, rather than memoised on the values:
+     * that rebuilt it on every keystroke of every form, whether or not anybody
+     * ever pressed Autofill. The run's callbacks keep the map they started
+     * with — the operator is free to keep typing while the model works.
      */
-    const propertiesRef = useRef(properties);
-    propertiesRef.current = properties;
+    const formValuesRef = useRef(formContext?.values);
+    formValuesRef.current = formContext?.values;
 
     /**
      * The host app's own opt-out.
@@ -177,7 +173,7 @@ fields };
 
     const generate = useCallback(async (params: GenerateParams<Record<string, unknown>>): Promise<void> => {
 
-        const currentProperties = propertiesRef.current;
+        const currentProperties = getSimplifiedProperties(collection.properties, formValuesRef.current ?? {});
         const flatValues = omitDisabledValues(
             flatMapEntityValues(params.values ?? {}),
             currentProperties

@@ -25,6 +25,70 @@ immediately — the POST happens once the write commits, never for one that roll
 dispatcher validates the destination, signs the payload, bounds every attempt with a deadline and
 retries failures.
 
+Give it the backend's job queue and each delivery becomes a row in `rebase.jobs`: it survives a
+deploy or a crash, it is retried with backoff by whichever instance's worker claims it, and a
+receiver that is down for a day costs rows, not memory. Turn the queue on with
+`jobs: { enabled: true }` in `initializeRebaseBackend`, and wire the dispatcher once it has
+returned:
+
+```typescript
+import { WebhookDispatcher, WEBHOOK_DELIVERY_TASK, type RebaseBackendInstance } from "@rebasepro/server";
+
+/** What a queued delivery carries: the webhook's id, never its secret. */
+type QueuedDelivery = Parameters<WebhookDispatcher["deliverQueuedJob"]>[0];
+
+// Call once, with what `initializeRebaseBackend({ …, jobs: { enabled: true } })` returned.
+export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
+    const dispatcher = new WebhookDispatcher({
+        // Each delivery is a job: kept across deploys, retried by the queue.
+        jobQueue: backend.jobQueue,
+        // Queued deliveries return nothing to the caller, so this is where their
+        // failures surface. Without it, a receiver that has been down for a week
+        // looks exactly like one that is working.
+        onDelivery: (result) => {
+            if (!result.success) {
+                console.error(`Webhook ${result.webhookId} failed: ${result.statusCode} ${result.responseBody}`);
+            }
+        }
+    });
+
+    dispatcher.setWebhooks([
+        {
+            id: "wh_orders_slack",
+            url: process.env.SLACK_WEBHOOK_URL!,
+            secret: process.env.WEBHOOK_SECRET,
+            events: ["INSERT"],
+            table: "orders",
+            enabled: true
+        }
+    ]);
+
+    // The worker side: one attempt per job, and the queue's retries.
+    backend.jobQueue?.register<QueuedDelivery>(WEBHOOK_DELIVERY_TASK, (ctx) => dispatcher.deliverQueuedJob(ctx.payload));
+
+    backend.setCollectionCallbacks("orders", {
+        afterSave: async ({ values, id, status }) => {
+            if (status === "new") {
+                // Returns void, immediately. The job is written after the
+                // write commits, so the transaction is not waiting on it.
+                dispatcher.enqueueEntityChange("orders", "INSERT", String(id), values);
+            }
+        }
+    });
+}
+```
+
+Only the webhook's id is stored on the job, so its signing secret never sits in `rebase.jobs`. A
+destination the dispatcher refuses, or a receiver that answers with a redirect, is dead-lettered
+after one attempt with the reason; anything else is retried like any job. See
+[Durable webhooks](/docs/backend/jobs#durable-webhooks).
+
+### Without a job queue
+
+Leave out `jobQueue` — or run on a driver with no SQL, where the backend has none — and the
+deliveries are queued in memory, in the process that made the change. That is simpler, and it is
+enough for a notification you can afford to lose:
+
 ```typescript
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { WebhookDispatcher } from "@rebasepro/server";
@@ -33,9 +97,6 @@ import { WebhookDispatcher } from "@rebasepro/server";
 type Order = { customer_name: string; total: number };
 
 const dispatcher = new WebhookDispatcher({
-    // Queued deliveries return nothing to the caller, so this is where their
-    // failures surface. Without it, a receiver that has been down for a week
-    // looks exactly like one that is working.
     onDelivery: (result) => {
         if (!result.success) {
             console.error(`Webhook ${result.webhookId} failed: ${result.statusCode} ${result.responseBody}`);
@@ -61,8 +122,6 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
     callbacks: {
         afterSave: async ({ values, id, status }) => {
             if (status === "new") {
-                // Returns void, immediately. The delivery runs after this
-                // callback returns, so the transaction is not waiting on it.
                 dispatcher.enqueueEntityChange("orders", "INSERT", String(id), values);
             }
         }
@@ -71,9 +130,14 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
 };
 ```
 
-The queue is in-process and in-memory: a crash or a deploy between the commit and the delivery
-drops the event. Call `await dispatcher.flush()` on shutdown. If you need deliveries to survive a
-restart, write an outbox row in the same transaction and drain it from a job instead.
+A crash or a deploy between the commit and the delivery drops the event. Each webhook has its own
+queue, so a receiver that is down delays only its own deliveries, never another webhook's.
+<span class="since-badge" data-since="0.25">Since 0.25</span> Each webhook's queue holds at most
+10,000 deliveries waiting; while it is full, a new delivery is refused and reported to `onDelivery`
+with `success: false`, `statusCode: 0`, `attemptNumber: 0` and `responseBody: "queue full"`, and
+the server log says so once. Call `await dispatcher.flush(10_000)` on shutdown: it waits for what
+is queued and resolves `false` if the budget runs out first, because a receiver that is down can
+hold each of its deliveries for up to ~36 seconds of retries.
 
 ### Calling an endpoint directly
 
@@ -110,6 +174,10 @@ const callbacks: CollectionCallbacks<Order> = {
 Never put a URL that came from your database into a bare `fetch`. The dispatcher rejects loopback,
 link-local, private and non-`http(s)` destinations before it connects, and refuses to follow
 redirects, precisely because a stored URL is attacker-controlled input.
+<span class="since-badge" data-since="0.25">Since 0.25</span> On Node it judges the address each
+connection is actually made to, inside the connection's own DNS lookup, so a name whose record
+changes between a check and the connection cannot slip past it; a receiver's name is resolved
+once per connection, not once per delivery.
 
 ## Sync to External API
 

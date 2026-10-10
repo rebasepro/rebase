@@ -238,6 +238,13 @@ La limite par défaut est de **50**, le maximum est de **1000**. Ces deux valeur
 
 Ces trois paramètres de fenêtre sont rejetés plutôt que corrigés automatiquement, et chacun renvoie une erreur explicite : `INVALID_LIMIT`, `INVALID_OFFSET` (un entier supérieur ou égal à 0) et `INVALID_PAGE` (un entier supérieur ou égal à 1). Une fenêtre silencieusement différente de celle demandée ne peut pas être distinguée de la fin de la collection, c'est pourquoi aucun d'eux n'est tronqué ni ignoré.
 
+### Ignorer le comptage
+
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `meta.total` est un `COUNT(*)` sur toutes les lignes correspondantes — sur une grande table, l'essentiel du coût
+d'une requête de liste. `?count=none` (`GET /api/data/orders?count=none`) l'ignore : pas de `meta.total`, tandis que
+`meta.hasMore` reste exact (la lecture demande une ligne de plus que la page). `?count=exact` est la valeur par
+défaut ; toute autre valeur renvoie une erreur 400 `INVALID_COUNT`. Une lecture `?distinct=true` n'est jamais comptée.
+
 ### Pagination par curseur
 
 `offset` recompte les lignes à chaque requête, de sorte qu'une ligne insérée ou supprimée entre deux pages décale la fenêtre et le parcours saute ou répète silencieusement des lignes. `?after=` effectue plutôt une recherche directe : la page suivante commence strictement après la dernière ligne servie.
@@ -406,10 +413,10 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 
 | Clé | Signification |
 |-----|---------|
-| `limit` | Lignes **par ligne parente**, et non sur l'ensemble de la page |
+| `limit` | Lignes **par ligne parente**, et non sur l'ensemble de la page. Appliquée par la requête : les lignes au-delà ne sont jamais lues dans la base de données |
 | `where` | Le même dialecte de filtre que celui utilisé par le `where` de premier niveau |
 | `logical` | Un groupe `or`/`and`/`not` sur les lignes liées |
-| `orderBy` | La même syntaxe de tri, y compris le positionnement des NULL |
+| `orderBy` | La même syntaxe de tri, y compris le positionnement des NULL. En cas d'égalité, ou pour une `limit` sans `orderBy`, l'ordre suit la clé de la ligne liée, croissante |
 | `fields` | Colonnes de la ligne *liée* ; sa clé primaire est toujours conservée |
 | `include` | Relations de la ligne liée, à leur tour |
 
@@ -427,10 +434,14 @@ Les relations incluses sont intégrées directement dans la réponse :
     "author": {
         "id": 42,
         "name": "Jane Doe",
-        "email": "jane@example.com"
+        "email": "jane@example.com",
+        "companyId": 7
     }
 }
 ```
+
+Une ligne incluse est celle que sert la route propre à sa cible (`GET /api/data/authors/42`) : mêmes colonnes et mêmes
+encodages, clés étrangères sous forme de colonnes, sans objets de référence.
 
 ## Écriture
 

@@ -2,7 +2,7 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
-import { guardPoolAgainstDirtyRelease, pinSearchPath, cappedPoolMax } from "./connection";
+import { guardPoolAgainstDirtyRelease, pinSearchPath, cappedPoolMax, defaultPoolTimeouts } from "./connection";
 
 export class DatabasePoolManager {
     private pools: Map<string, Pool> = new Map();
@@ -50,7 +50,10 @@ export class DatabasePoolManager {
             // overlapping transactions deadlock there.
             max: cappedPoolMax(10),
             idleTimeoutMillis: 10000, // Reduced from 30000 for aggressive cleanup
-            allowExitOnIdle: true // Prevent idle clients from hanging the Node.js process
+            allowExitOnIdle: true, // Prevent idle clients from hanging the Node.js process
+            // The main pool's limits: a full pool answers 503 after 10 s rather
+            // than queueing forever, and a statement stops at 30 s server-side.
+            ...defaultPoolTimeouts()
         });
 
         // Prevent idle client errors from crashing the Node.js process

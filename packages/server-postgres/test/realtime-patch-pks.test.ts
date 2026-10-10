@@ -46,6 +46,8 @@ isId: true },
     let realtimeService: RealtimeService;
     let registry: PostgresCollectionRegistry;
     let ws: MockWebSocket;
+    /** What the mocked database reads, for every query. */
+    let rowsRead: unknown[] = [];
 
     const table = (name: string, columns: string[]) => {
         const t: Record<string, unknown> = { _def: { tableName: name } };
@@ -78,8 +80,9 @@ isId: true },
         } as unknown as jest.Mocked<NodePgDatabase<Record<string, unknown>>>;
         (db as unknown as { transaction: unknown }).transaction =
             jest.fn((callback: (tx: unknown) => unknown) => callback(db));
+        rowsRead = [];
         (db as unknown as { then: unknown }).then =
-            jest.fn((resolve: (rows: unknown[]) => void) => resolve([]));
+            jest.fn((resolve: (rows: unknown[]) => void) => resolve(rowsRead));
 
         registry = new PostgresCollectionRegistry();
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
@@ -126,6 +129,8 @@ subscriptionId: "sub-1" }
     it("includes the resolved key columns in the update", async () => {
         await subscribe("sku_items");
         ws.send.mockClear(); // drop the initial subscribe payload
+        // A refetch that reads what was last sent sends nothing: give it a row.
+        rowsRead = [{ sku: "ABC-1", label: "Widget" }];
 
         await realtimeService.notifyUpdate(
             "sku_items", "ABC-1", { sku: "ABC-1",
@@ -170,6 +175,7 @@ isUUID: false }]);
         // and is now the rule.
         await subscribe("sku_items");
         ws.send.mockClear();
+        rowsRead = [{ sku: "ABC-1", label: "Widget" }];
 
         await realtimeService.notifyUpdate(
             "sku_items", "ABC-1", { _rebase_invalidated: true }, undefined, false

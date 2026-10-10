@@ -1,5 +1,5 @@
 ---
-sourceHash: 9a7137f85a2187fd
+sourceHash: 81ca845faa40b4f5
 title: Tâches en arrière-plan
 sidebar_label: Tâches en arrière-plan
 description: Une file d'attente de tâches durable, basée sur Postgres — des traitements qui survivent à un redémarrage, réessayés avec un backoff, avec conservation des échecs plutôt que leur abandon.
@@ -69,7 +69,8 @@ FROM rebase.jobs WHERE status = 'failed'
 ORDER BY updated_at DESC;
 ```
 
-Les lignes en échec sont conservées 30 jours ; celles ayant réussi, 3 jours.
+Les lignes en échec sont conservées 30 jours ; celles ayant réussi, 3 jours. Chaque worker supprime les lignes
+expirées à son démarrage, puis toutes les heures, par lots, en dehors du chemin des requêtes.
 
 ## Que se passe-t-il lorsqu'un worker s'arrête brutalement
 

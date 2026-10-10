@@ -96,7 +96,7 @@ Questo è il passaggio che fa sembrare guasta una chiave con gli scope corretti.
 che Rebase aggiunge per impostazione predefinita a ogni collezione compila in:
 
 ```sql
-rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
+(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))
 ```
 
 Cioè il contesto del server, oppure un admin. Una chiave di servizio senza il ruolo `admin`

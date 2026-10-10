@@ -53,6 +53,8 @@ Ohne dies gilt bei Read-Modify-Write das Prinzip „Last-Writer-Wins“ für all
 
 Das Tag wird aus einer `date`-Eigenschaft mit `autoValue: "on_update"` abgeleitet, sofern die Collection eine solche deklariert – diese Spalte *ist* bereits eine Version – andernfalls aus einem stabilen Hash der Zeile. `If-Match: *` stellt lediglich sicher, dass die Zeile existiert. Es wird nichts geschrieben, wenn die Vorbedingung fehlschlägt.
 
+Das Tag wird innerhalb der eigenen Transaktion des Schreibvorgangs verglichen, nachdem die Zeile gesperrt wurde. Zwei Schreibvorgänge mit demselben Tag können nicht beide durchkommen: Der zweite wartet, bis der erste committet hat, liest, was dieser geschrieben hat, und wird mit `412` abgelehnt.
+
 ### Feldoperationen
 
 Der Wert einer Eigenschaft im Body eines `PATCH` kann anstelle eines statischen Werts auch eine Operation auf dem gespeicherten Wert sein:

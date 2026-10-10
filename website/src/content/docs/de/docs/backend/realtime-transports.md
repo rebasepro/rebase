@@ -1,5 +1,5 @@
 ---
-sourceHash: cba58e3dbe87b090
+sourceHash: 22ec003847a742c2
 title: Echtzeit über mehrere Instanzen
 sidebar_label: Echtzeit über mehrere Instanzen
 description:"\"Wie Broadcast-Channels und Presence mehr als einen Server-Prozess überstehen: der LISTEN/NOTIFY-Bus, was jede Instanz besitzt, und das Schreiben eines eigenen Transports.\""
@@ -30,8 +30,19 @@ Wenn ein Datensatz auf Instanz A geändert wird, sendet sie eine Benachrichtigun
 
 *Hinweis: `sid` steht für die eindeutige, zufällige Instanz-ID des Servers, die beim Start generiert wird, `p` ist der Collection-Slug (Pfad) und `eid` ist die Ziel-Entitäts-ID.*
 
+Änderungen im selben Moment — ein Bulk-Save meldet jede geschriebene Zeile — gehen gemeinsam hinaus, in so wenigen Benachrichtigungen, wie unter das NOTIFY-Limit von 8000 Byte in Postgres passen, jede mit ihren Änderungen als `[p, eid, db]`-Tripel:
+
+```json
+{
+  "sid": "inst_7a9c1b",
+  "c": [["posts", "45", null], ["posts", "46", null]]
+}
+```
+
+Eine einzelne Änderung behält die obige Form, sodass eine ältere Instanz sie während eines Rolling Deploys weiterhin liest.
+
 - **Selbstfilterung**: Beim Empfang einer Nachricht liest jede Instanz die `sid`. Entspricht diese der eigenen Instanz-ID, verwirft der Server die Benachrichtigung, um Endlosschleifen beim Routing zu verhindern.
-- **Relay und Fan-out**: Stammt die Benachrichtigung von einer anderen Instanz, plant der Server ein debounctes Refetch und leitet das Update an seine lokal verbundenen WebSocket-Abonnenten weiter.
+- **Relay und Fan-out**: Stammt die Benachrichtigung von einer anderen Instanz, plant der Server für seine lokal verbundenen Abonnenten jeder Änderung ein debounctes Refetch. Beim Empfang liest er nichts: Jeder Frame ist ein Refetch unter dem Scope seines Abonnenten.
 - **Supervisor-Wiederverbindungsschleife**: Bricht die Datenbankverbindung ab, überwacht ein Hintergrund-Verbindungs-Supervisor den Status und löst nach einer festen Verzögerung von **3 Sekunden** eine automatische Wiederverbindungssequenz aus. Dadurch wird die `LISTEN`-Schleife wiederhergestellt, ohne den Lebenszyklus der Hono-Hauptanwendung zu beeinträchtigen. Danach wird jedes aktive Abonnement der Instanz neu abgefragt, denn was veröffentlicht wurde, während die Verbindung unterbrochen war, hat niemanden erreicht. Ist die Datenbank beim Start nicht erreichbar, wird die Verbindung auf dieselbe Weise erneut versucht.
 - **Heartbeat**: Eine `LISTEN`-Verbindung ist naturgemäß untätig, und ein Leerlauf-Timeout eines Load Balancers oder eines NAT kann sie trennen, ohne dass eine der beiden Seiten einen Fehler sieht (eine halboffene Verbindung). Deshalb läuft sie mit TCP-Keepalive und muss alle 30 Sekunden ein `SELECT 1` innerhalb von 10 Sekunden beantworten. Eine Verbindung, die das versäumt, wird wie oben ersetzt. Solange die Verbindung unterbrochen ist, führt `/health` sie als `cross-instance` auf, und nach 60 Sekunden Ausfall schlägt die Prüfung fehl.
 

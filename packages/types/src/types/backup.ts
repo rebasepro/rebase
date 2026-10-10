@@ -110,6 +110,26 @@ export interface BackupScheduleStatus {
     historyError?: string;
 }
 
+/**
+ * A short-lived link to one backup's bytes, from `POST /admin/backups/download-url`.
+ *
+ * The URL needs no `Authorization` header — the token in it stands in for one,
+ * for this backup only — so a browser can be sent to it and stream the dump to
+ * disk instead of holding it in the page.
+ */
+export interface BackupDownloadLink {
+    /**
+     * `…/admin/backups/download?key=…&token=…`. The server answers it as a
+     * path on itself; the SDK's `downloadUrl()` answers it absolute, on the
+     * client's own base URL.
+     */
+    url: string;
+    /** The token in {@link url}, on its own. */
+    token: string;
+    /** Seconds until the link stops working (60). */
+    expiresIn: number;
+}
+
 /** What the backup listing (`GET /admin/backups`) answers. */
 export interface BackupListing {
     /** Backups at the destination, newest first. */

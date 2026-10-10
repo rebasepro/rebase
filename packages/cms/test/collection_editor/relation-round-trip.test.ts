@@ -112,6 +112,27 @@ targetColumn: "tag_id" }
         });
     });
 
+    // The opt-out from the foreign-key index the planner derives. Dropped on
+    // save, it would silently put the index back on the next push.
+    it("keeps `index: false` across the trip, and writes nothing for the default", () => {
+        const optedOut = {
+            ...posts,
+            properties: {
+                ...posts.properties,
+                author: { name: "Author", type: "relation",
+                    relation: { kind: "belongsTo", target: () => users, localKey: "author_id", index: false } }
+            }
+        };
+        const [serialized] = JSON.parse(JSON.stringify([toSerializableCollectionConfig(optedOut as never)]));
+        expect(serialized.properties.author.relation).toEqual({
+            kind: "belongsTo", target: "users", localKey: "author_id", index: false
+        });
+        const [restored] = fromSerializableCollectionConfigs([serialized, ...wire().slice(1)]);
+        expect(linkOf(restored, "author")).toMatchObject({ kind: "belongsTo", index: false });
+
+        expect(wire()[0].properties.author.relation).not.toHaveProperty("index");
+    });
+
     it("resolves targets in any order, including circular references", () => {
         // `users` is deserialized after `posts`, which points at it.
         const [restoredPosts] = fromSerializableCollectionConfigs(wire());

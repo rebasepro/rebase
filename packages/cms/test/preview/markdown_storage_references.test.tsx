@@ -54,8 +54,13 @@ describe("the markdown preview", () => {
         }
     });
 
-    it("renders markdown with no references at once", () => {
+    it("renders markdown with no references without resolving anything", async () => {
+        getSignedUrl.mockClear();
         const { container } = render(<StorageMarkdown source={"Hello ![x](https://cdn.example.com/x.png)"} size="small"/>);
-        expect(container.querySelector("img")?.getAttribute("src")).toBe("https://cdn.example.com/x.png");
+        // Awaited for the kit's markdown renderer, which is fetched on first
+        // use; there is nothing of the preview's own to wait for.
+        await waitFor(() => expect(container.querySelector("img")?.getAttribute("src"))
+            .toBe("https://cdn.example.com/x.png"));
+        expect(getSignedUrl).not.toHaveBeenCalled();
     });
 });

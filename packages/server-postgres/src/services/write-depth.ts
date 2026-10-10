@@ -56,6 +56,15 @@ export function inWriteFrame<T>(
     return frames.run(frame, () => fn(frame));
 }
 
+/**
+ * How deep in hook-started writes the code running now is: 0 outside any
+ * write, 1 inside a write a caller started, 2 or more inside a write a hook of
+ * another write started (`context.data`).
+ */
+export function currentWriteDepth(): number {
+    return frames.getStore()?.depth ?? 0;
+}
+
 function recursionError(frame: WriteFrame): ApiError {
     const starter = frame.parent;
     const hook = starter?.stage ?? "a hook";

@@ -26,7 +26,7 @@ import { useRailVisible } from "./components/useRailVisible";
 import { PropertyFieldBinding } from "./PropertyFieldBinding";
 import { flattenKeys } from "@rebasepro/app";
 import { ErrorFocus } from "./components/ErrorFocus";
-import { applyValueTransforms, CustomFieldValidator, getEntitySchema } from "./validation";
+import { applyValueTransforms, CustomFieldValidator, getEntitySchema, uniqueValueErrors } from "./validation";
 import { resolveFormProperty, resolvePropertiesForValidation } from "./resolve_form_properties";
 import { EntityFormActions } from "./EntityFormActions";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
@@ -217,17 +217,25 @@ export function EntityForm<M extends Record<string, unknown>>({
             : undefined
     ).current;
 
+    /**
+     * Every key of the handed-over edit, marked touched. Read once, at mount,
+     * like the edit itself: it was rebuilt on every render — a key-value map
+     * of 1,000 entries cost ~60 ms per keystroke — by a spread that copied the
+     * map once per key.
+     */
+    const [initialTouched] = useState<Record<string, boolean>>(() => {
+        const touched: Record<string, boolean> = {};
+        if (initialDirtyValues) {
+            for (const key of flattenKeys(initialDirtyValues)) touched[key] = true;
+        }
+        return touched;
+    });
+
     const internalFormex = useCreateFormex<M>({
         initialValues: baseInitialValues as M,
         initialModifiedValues: initialModifiedValues as M | undefined,
         debugId: `EntityForm:${path}/${entityIdProp}`,
-        initialTouched: initialDirtyValues ?
-            flattenKeys(initialDirtyValues!)
-                .reduce((previousValue, currentValue) => ({
-                    ...previousValue,
-                    [currentValue]: true
-                }), {})
-            : {},
+        initialTouched,
         onSubmit,
         onReset: () => {
             setUnderlyingChanges({});
@@ -375,6 +383,46 @@ export function EntityForm<M extends Record<string, unknown>>({
         isSaving: formex.isSubmitting || isSavingAutoSave
     };
 
+    /**
+     * The context the fields get. Not `formContext`: that one is a new object
+     * per render, and a field memoised on its own value would re-render for it
+     * on every keystroke anywhere in the form.
+     *
+     * This one changes identity only with what a field may draw from it — the
+     * record, its status, the form's `version` (a reset or re-seed) — and reads
+     * `values`, `formex` and `save` through a ref, so a field that did not
+     * re-render still sees the current ones from its callbacks (a storage path
+     * builder, a markdown file name). A field that reads another field's value
+     * *while rendering* has to re-render with it; `PropertyFieldBinding` keeps
+     * those — custom `Field`s, `dynamicProps`, `conditions` — on that path.
+     */
+    const latestRef = useRef({ formex, save });
+    latestRef.current = { formex, save };
+    const isSaving = formex.isSubmitting || isSavingAutoSave;
+    const fieldContext: FormContext<M> = useMemo(() => ({
+        get values() {
+            return latestRef.current.formex.values;
+        },
+        get formex() {
+            return latestRef.current.formex;
+        },
+        setFieldValue: formContext.setFieldValue,
+        save: (values: M) => latestRef.current.save(values),
+        submit: () => latestRef.current.formex.handleSubmit(),
+        collection,
+        entityId: entityId as string,
+        path,
+        entity,
+        savingError,
+        status,
+        openEntityMode,
+        disabled,
+        isSaving
+        // `formex.version` is a key, not an input: a reset or re-seed has to
+        // hand the fields a new context even though nothing above reads it.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [formContext.setFieldValue, collection, entityId, path, entity, savingError, status, openEntityMode, disabled, isSaving, formex.version]);
+
     useEffect(() => {
         onFormContextReady?.(formContext);
         // `formex.version` only moves on `resetForm`, so these deps used to hand
@@ -422,8 +470,21 @@ export function EntityForm<M extends Record<string, unknown>>({
     const { t } = useTranslation();
 
     async function validationErrorsFor(values: M): Promise<Record<string, string>> {
-        const result = await validationSchemaFor(values).safeParseAsync(values);
-        return result.success ? {} : zodToFormErrors(result.error);
+        const properties = validationPropertiesFor(values);
+        const result = await getEntitySchema(entityId, properties, uniqueFieldValidator).safeParseAsync(values);
+        const errors: Record<string, string> = result.success ? {} : zodToFormErrors(result.error);
+        // `validation.unique` asks the data source, so it runs here — on
+        // submit — and only for values this edit changed that are otherwise
+        // valid. It was built and threaded through, and never called.
+        const notUnique = await uniqueValueErrors({
+            properties,
+            values,
+            storedValues: status === "existing" ? entity?.values : undefined,
+            entityId,
+            errors,
+            validator: uniqueFieldValidator
+        });
+        return { ...errors, ...notUnique };
     }
 
     /**
@@ -432,20 +493,17 @@ export function EntityForm<M extends Record<string, unknown>>({
      * the ones the user can change. Built per call because both depend on the
      * values being judged.
      */
-    function validationSchemaFor(values: M) {
-        return getEntitySchema(
+    function validationPropertiesFor(values: M) {
+        return resolvePropertiesForValidation<M>({
+            properties: collection.properties,
+            isNew: status === "new" || status === "copy",
+            values,
+            previousValues: baseInitialValues as Partial<M>,
+            path,
             entityId,
-            resolvePropertiesForValidation<M>({
-                properties: collection.properties,
-                isNew: status === "new" || status === "copy",
-                values,
-                previousValues: baseInitialValues as Partial<M>,
-                path,
-                entityId,
-                propertyConfigs: customizationController.propertyConfigs,
-                authController
-            }),
-            uniqueFieldValidator);
+            propertyConfigs: customizationController.propertyConfigs,
+            authController
+        });
     }
 
     useOnAutoSave(autoSave, formex, lastSavedValues, save);
@@ -635,7 +693,7 @@ export function EntityForm<M extends Record<string, unknown>>({
             includeDescription: false,
             hideLabel: !selfLabelling,
             underlyingValueHasChanged: underlyingValueHasChanged && !autoSave,
-            context: formContext,
+            context: fieldContext,
             partOfArray: false,
             minimalistView: false,
             // One height for every control in the form. Left to their own

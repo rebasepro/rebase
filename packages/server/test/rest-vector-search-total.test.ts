@@ -14,8 +14,15 @@
  *
  * The fake driver below is the contract the Postgres driver now honours: its
  * `count` applies the same threshold its `fetchCollection` does. The assertions
- * are on the envelope, not on the SQL — the point is that `total` describes the
+ * are on the envelope, not on the SQL — the point is that `meta` describes the
  * rows in `data`.
+ *
+ * Since 0.24 a thresholded listing is not counted at all: that count computes
+ * the distance for every row of the table, beside a page an index serves in a
+ * millisecond. It has no `meta.total`, and `hasMore` comes from reading one row
+ * past the page — so the old failure, `hasMore` true over empty pages, is
+ * asserted against the probe now rather than against the count. `/count` with
+ * a threshold still answers the narrowed count.
  */
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
@@ -97,31 +104,31 @@ function vectorUrl(extra = ""): string {
 }
 
 describe("GET /api/data/<collection> with a vector-search threshold", () => {
-    it("forwards vectorSearch to the driver's count, not just its fetch", async () => {
+    it("runs no count — its count is a distance per row of the table", async () => {
         const res = await get(vectorUrl("&vector_threshold=0.2"));
 
         expect(res.status).toBe(200);
-        expect(res.recorded.counts).toHaveLength(1);
-        expect((res.recorded.counts[0] as { vectorSearch?: VectorSearchParams }).vectorSearch)
-            .toEqual({ property: "embedding", vector: [0.1, 0.2, 0.3], distance: "cosine", threshold: 0.2 });
+        expect(res.recorded.counts).toHaveLength(0);
+        // The fetch carries the threshold, and asks for one row past the page.
+        expect((res.recorded.fetches[0] as { vectorSearch?: VectorSearchParams; limit?: number }))
+            .toMatchObject({ vectorSearch: { threshold: 0.2 }, limit: 11 });
     });
 
-    it("reports the size of the similarity-filtered set, not the unfiltered one", async () => {
+    it("serves the similarity-filtered set, with no total to disagree with it", async () => {
         const res = await get(vectorUrl("&vector_threshold=0.2"));
 
         expect(res.json.data).toHaveLength(3);
-        // 25 was the old answer: every row matching the plain filter.
-        expect(res.json.meta.total).toBe(3);
+        // 25 was the oldest answer: every row matching the plain filter.
+        expect(res.json.meta).not.toHaveProperty("total");
         expect(res.json.meta.hasMore).toBe(false);
     });
 
     it("does not claim another page exists once the threshold is exhausted", async () => {
-        // Under the old behaviour this page was empty and `hasMore` was still
-        // true, because `0 + 0 < 25`.
+        // Under the oldest behaviour this page was empty and `hasMore` was
+        // still true, because `0 + 0 < 25`.
         const res = await get(vectorUrl("&vector_threshold=0.2&limit=3&offset=3"));
 
         expect(res.json.data).toHaveLength(0);
-        expect(res.json.meta.total).toBe(3);
         expect(res.json.meta.hasMore).toBe(false);
     });
 
@@ -130,12 +137,10 @@ describe("GET /api/data/<collection> with a vector-search threshold", () => {
         // more behind it, and `hasMore` has to keep saying so.
         const first = await get(vectorUrl("&vector_threshold=0.5&limit=3"));
         expect(first.json.data).toHaveLength(3);
-        expect(first.json.meta.total).toBe(7);
         expect(first.json.meta.hasMore).toBe(true);
 
         const last = await get(vectorUrl("&vector_threshold=0.5&limit=3&offset=6"));
         expect(last.json.data).toHaveLength(1);
-        expect(last.json.meta.total).toBe(7);
         expect(last.json.meta.hasMore).toBe(false);
     });
 

@@ -165,6 +165,35 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
         expect(revalidated.status).toBe(304);
     });
 
+    it("serves a range as exactly those bytes, and a HEAD with the size and no body", async () => {
+        const body = "0123456789abcdefghijklmnopqrstuvwxyz";
+        await h.controller.putObject({ file: textFile("clip.bin", body, "video/mp4"), key: "media/clip.bin" });
+
+        const ranged = await request("/api/storage/file/media/clip.bin", { headers: { Range: "bytes=10-14" } });
+        expect(ranged.status).toBe(206);
+        expect(await ranged.text()).toBe("abcde");
+        expect(ranged.headers.get("Content-Range")).toBe(`bytes 10-14/${body.length}`);
+        expect(ranged.headers.get("Content-Length")).toBe("5");
+
+        const suffix = await request("/api/storage/file/media/clip.bin", { headers: { Range: "bytes=-6" } });
+        expect(await suffix.text()).toBe(body.slice(-6));
+
+        const whole = await request("/api/storage/file/media/clip.bin");
+        expect(whole.status).toBe(200);
+        expect(whole.headers.get("Content-Length")).toBe(String(body.length));
+        expect(await whole.text()).toBe(body);
+
+        const head = await request("/api/storage/file/media/clip.bin", { method: "HEAD" });
+        expect(head.status).toBe(200);
+        expect(head.headers.get("Content-Length")).toBe(String(body.length));
+        expect(head.headers.get("ETag")).toBe(whole.headers.get("ETag"));
+        expect(await head.text()).toBe("");
+
+        const beyond = await request("/api/storage/file/media/clip.bin", { headers: { Range: "bytes=999-" } });
+        expect(beyond.status).toBe(416);
+        expect(beyond.headers.get("Content-Range")).toBe(`bytes */${body.length}`);
+    });
+
     it("computes a transform once, and stores one rendition for it", async () => {
         await h.controller.putObject({
             file: new File([new Uint8Array(await png())], "a.png", { type: "image/png" }),
@@ -217,6 +246,37 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
         const root = await h.controller.listObjects("");
         expect(root.items).toEqual([]);
         expect(root.prefixes.map(p => p.fullPath)).toEqual(["docs"]);
+    });
+
+    it("describes each listed file — size, version and, where the store lists it, type — so a folder needs no metadata request per file", async () => {
+        await h.controller.putObject({ file: textFile("a.txt", "hello"), key: "described/a.txt" });
+        await h.controller.putObject({ file: textFile("b.png", "png-bytes", "image/png"), key: "described/b.png" });
+        await h.controller.putObject({ file: textFile("c.txt", "x"), key: "described/sub/c.txt" });
+
+        const listing = await h.controller.listObjects("described");
+        const facts = await Promise.all(listing.items.map(async item => {
+            const stat = await h.controller.statObject!(item.fullPath);
+            return {
+                fullPath: item.fullPath,
+                size: item.size,
+                // The listing's version is the object's own: the instant
+                // `statObject` (and so the ETag) reports, to the second —
+                // S3's HEAD floors it.
+                updatedSecond: item.updated === undefined ? undefined : Math.floor(Date.parse(item.updated) / 1000),
+                versionSecond: Math.floor(stat!.lastModified / 1000),
+                contentType: item.contentType
+            };
+        }));
+
+        // An S3 listing (ListObjectsV2) carries no content type.
+        const typed = (type: string) => kind === "s3" ? undefined : type;
+        expect(facts).toEqual([
+            expect.objectContaining({ fullPath: "described/a.txt", size: 5, contentType: typed("text/plain") }),
+            expect.objectContaining({ fullPath: "described/b.png", size: 9, contentType: typed("image/png") })
+        ]);
+        for (const fact of facts) expect(fact.updatedSecond).toBe(fact.versionSecond);
+        // A folder is a prefix: nothing to describe.
+        expect(listing.prefixes).toEqual([expect.not.objectContaining({ size: expect.anything() })]);
     });
 
     it("pages a listing so every entry comes back exactly once", async () => {
@@ -320,5 +380,52 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
         expect(object!.type).toBe("text/plain");
         expect(await h.controller.getObject("rt/missing.txt")).toBeNull();
         await expect(h.controller.deleteObject("rt/missing.txt")).resolves.toBeUndefined();
+    });
+});
+
+/**
+ * `maxFileSize` and `allowedMimeTypes` are a policy for what users upload. The
+ * server's own writes (a database backup) opt out with `uploadLimits: false`;
+ * every other write, and every write that names no option, is held to them.
+ */
+describe.each<Kind>(["local", "s3", "gcs"])("storage controller upload limits — %s", (kind) => {
+    let controller: StorageController;
+    let cleanup: () => Promise<void> = async () => undefined;
+
+    beforeEach(async () => {
+        const limits = { maxFileSize: 8, allowedMimeTypes: ["image/png"] };
+        if (kind === "local") {
+            const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-storage-limits-"));
+            controller = new LocalStorageController({ type: "local", basePath: dir, ...limits });
+            cleanup = () => fs.promises.rm(dir, { recursive: true, force: true });
+        } else if (kind === "s3") {
+            s3World.reset([S3_BUCKET]);
+            controller = new S3StorageController({ type: "s3", bucket: S3_BUCKET, accessKeyId: "test", secretAccessKey: "test", ...limits });
+        } else {
+            gcsWorld.reset([GCS_BUCKET]);
+            controller = new GCSStorageController({ type: "gcs", bucket: GCS_BUCKET, ...limits });
+        }
+    });
+
+    afterEach(async () => {
+        await cleanup();
+        cleanup = async () => undefined;
+    });
+
+    it("holds an upload to maxFileSize and allowedMimeTypes", async () => {
+        await expect(controller.putObject({ file: textFile("big.png", "0123456789", "image/png"), key: "u/big.png" }))
+            .rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+        await expect(controller.putObject({ file: textFile("a.txt", "hi"), key: "u/a.txt" }, { uploadLimits: true }))
+            .rejects.toThrow(/not allowed/);
+        expect(await controller.getObject("u/big.png")).toBeNull();
+        expect(await controller.getObject("u/a.txt")).toBeNull();
+    });
+
+    it("stores a server write that opts out of them, whatever its size and type", async () => {
+        const body = "x".repeat(64);
+        await controller.putObject({ file: textFile("db.dump", body, "application/octet-stream"), key: "b/db.dump" }, { uploadLimits: false });
+
+        const stored = await controller.getObject("b/db.dump");
+        expect(Buffer.from(await stored!.arrayBuffer()).toString()).toBe(body);
     });
 });

@@ -72,7 +72,7 @@ Se incluyen con Studio y **`RebaseStudio` las carga de forma diferida** — cada
 
 | Pestaña | Slug | Grupo | Qué hace |
 |---------|------|-------|----------|
-| Consola SQL | `sql` | Base de datos | Ejecuta SQL directo contra tu base de datos PostgreSQL y lee los resultados en una tabla |
+| Consola SQL | `sql` | Base de datos | Ejecuta SQL directo contra tu base de datos PostgreSQL y lee los resultados en una tabla. La tabla muestra el resultado de la última sentencia, hasta sus primeras 10.000 filas o 32 MB de valores; un resultado más largo indica cuántas filas había, y copiar y exportar incluyen solo las filas mostradas |
 | Políticas RLS | `rls` | Base de datos | Inspecciona y gestiona las políticas de Row Level Security de tus tablas. Una política se lista tal como la tiene la base de datos, con la insignia **Differs from code** donde eso no es lo que declara el proyecto. Una política que genera Rebase no se puede editar directamente en la base de datos, y en una tabla que gestiona Rebase un banner indica que cada arranque del servidor y cada `rebase db push` vuelven a aplicar las políticas declaradas |
 | Visualizador de esquema | `schema-visualizer` | Base de datos | Diagrama de entidades de tus colecciones y sus relaciones, trazado a partir de las definiciones de las colecciones: tablas, columnas, tipos y relaciones son tal como los declaran las colecciones. Solo los marcadores de RLS se leen de la base de datos |
 | Ramas | `branches` | Base de datos | Crea y gestiona [ramas de base de datos](/docs/backend/branching) |

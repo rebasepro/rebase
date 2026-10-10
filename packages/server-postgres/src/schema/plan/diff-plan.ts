@@ -102,7 +102,129 @@ export interface ExistingSchema {
     columnTypes?: Map<string, string>;
     /** `schema.table.trigger` of every trigger that already exists. */
     triggers?: Set<string>;
+    /**
+     * `schema.name` of every index (any relation of kind `i`/`I`) that already
+     * exists. Absent means unknown, and every index is planned as before —
+     * `IF NOT EXISTS` makes that correct, just not free.
+     */
+    indexes?: Set<string>;
+    /**
+     * `schema.name` of every index whose `pg_index.indisvalid` is false — the
+     * husk a `CREATE INDEX CONCURRENTLY` leaves behind when it is cancelled,
+     * times out, or loses a race with a peer. Such an index is in
+     * {@link indexes} too, maintained on every write and used by no query, and
+     * `IF NOT EXISTS` skips it by name forever. Absent means unknown.
+     */
+    invalidIndexes?: Set<string>;
+    /**
+     * Names of the extensions installed in the database. `CREATE EXTENSION IF
+     * NOT EXISTS` skips by name whatever schema the extension is in, so the name
+     * is the whole test. Absent means unknown.
+     */
+    extensions?: Set<string>;
+    /**
+     * {@link HELPER_FUNCTIONS} as they are in the catalogue: `schema.name(args)`
+     * → {@link describeHelperFunction} of what `CREATE OR REPLACE` would set.
+     * Absent means unknown, and every helper is re-created as before.
+     */
+    functions?: Map<string, string>;
 }
+
+/**
+ * The functions the plan creates with `CREATE OR REPLACE`, which the catalogue
+ * reader looks up so a boot that finds them unchanged plans nothing.
+ *
+ * A helper missing from this list is not wrong, only re-created on every boot,
+ * which is what all of them were before.
+ */
+export const HELPER_FUNCTIONS: readonly string[] = [SEARCH_TEXT_FN, SEARCH_UNACCENT_FN, SET_UPDATED_AT_FN];
+
+/**
+ * Everything `CREATE OR REPLACE FUNCTION` sets on a function, as one string.
+ *
+ * Built from the catalogue by the reader and from the statement by
+ * {@link parseHelperFunction}, so the two meet in one shape. It covers every
+ * attribute a `CREATE OR REPLACE` resets — body, language, volatility,
+ * strictness, parallel safety, security, leakproofness, cost and `SET` options —
+ * so a function someone altered by hand (`ALTER FUNCTION … VOLATILE`) still
+ * compares unequal and is re-created, exactly as the unconditional statement
+ * used to re-create it.
+ */
+export interface HelperFunctionFacts {
+    returns: string;
+    language: string;
+    /** `provolatile`: `i`mmutable, `s`table, `v`olatile. */
+    volatility: string;
+    strict: boolean;
+    /** `proparallel`: `s`afe, `r`estricted, `u`nsafe. */
+    parallel: string;
+    securityDefiner: boolean;
+    leakproof: boolean;
+    cost: number;
+    /** Whether the function carries any `SET` options (`proconfig`). */
+    hasConfig: boolean;
+    /** `prosrc`: the text between the dollar quotes, exactly. */
+    body: string;
+}
+
+export const helperFunctionKey = (schema: string, name: string, args: string): string =>
+    `${schema}.${name}(${args.replace(/\s+/g, " ").trim().toLowerCase()})`;
+
+export const describeHelperFunction = (facts: HelperFunctionFacts): string =>
+    JSON.stringify([
+        facts.returns.toLowerCase(), facts.language.toLowerCase(), facts.volatility, facts.strict, facts.parallel,
+        facts.securityDefiner, facts.leakproof, Number(facts.cost), facts.hasConfig, facts.body
+    ]);
+
+const HELPER_FUNCTION_RE = new RegExp(
+    "^\\s*CREATE OR REPLACE FUNCTION\\s+([A-Za-z_]\\w*)\\.([A-Za-z_]\\w*)\\(([^)]*)\\)" +
+    "\\s+RETURNS\\s+([\\w\\[\\]]+)\\s+LANGUAGE\\s+(\\w+)" +
+    "((?:\\s+(?:IMMUTABLE|STABLE|VOLATILE|STRICT|PARALLEL\\s+(?:SAFE|RESTRICTED|UNSAFE)))*)" +
+    "\\s+AS\\s+\\$\\$([\\s\\S]*)\\$\\$;?\\s*$",
+    "i"
+);
+
+/**
+ * What a helper's `CREATE OR REPLACE FUNCTION` statement would leave in the
+ * catalogue, or `undefined` for a statement this does not recognise — which is
+ * then planned unconditionally, as every statement was before.
+ *
+ * Only ever given statements this package renders (`searchHelperFunctions`,
+ * `setUpdatedAtFunction`), so a strict pattern is the right tool: anything it
+ * does not match exactly falls back to the safe behaviour.
+ */
+export function parseHelperFunction(statement: string): { key: string; definition: string } | undefined {
+    const match = HELPER_FUNCTION_RE.exec(statement);
+    if (!match) return undefined;
+    const [, schema, name, args, returns, language, attributes, body] = match;
+    const words = attributes.toUpperCase();
+    const parallel = /PARALLEL\s+SAFE/.test(words) ? "s" : /PARALLEL\s+RESTRICTED/.test(words) ? "r" : "u";
+    const volatility = /\bIMMUTABLE\b/.test(words) ? "i" : /\bSTABLE\b/.test(words) ? "s" : "v";
+    return {
+        key: helperFunctionKey(schema, name, args),
+        definition: describeHelperFunction({
+            returns,
+            language,
+            volatility,
+            strict: /\bSTRICT\b/.test(words),
+            parallel,
+            securityDefiner: false,
+            leakproof: false,
+            // Postgres's default for every language but C and internal.
+            cost: 100,
+            hasConfig: false,
+            body
+        })
+    };
+}
+
+/** The name a rendered `CREATE [UNIQUE] INDEX [CONCURRENTLY] IF NOT EXISTS "<name>"` creates. */
+const indexNameOf = (statement: string): string | undefined =>
+    /^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?IF\s+NOT\s+EXISTS\s+"([^"]+)"/i.exec(statement)?.[1];
+
+/** The extension a rendered `CREATE EXTENSION IF NOT EXISTS <name> …` installs. */
+const extensionNameOf = (statement: string): string | undefined =>
+    /^\s*CREATE\s+EXTENSION\s+IF\s+NOT\s+EXISTS\s+"?([\w-]+)"?/i.exec(statement)?.[1];
 
 /**
  * How far the planner may go in making the database's constraints match the
@@ -123,6 +245,18 @@ export type ConstraintPolicy = "additive" | "converge";
 export interface DiffOptions {
     /** Defaults to `additive`. See {@link ConstraintPolicy}. */
     constraints?: ConstraintPolicy;
+    /**
+     * Plan every index a table that already exists needs — declared, search
+     * and vector, missing or left INVALID under its name — as a
+     * {@link DeferredIndexBuild} rather than an action, as the derived
+     * foreign-key indexes always are. `ensureCollectionTables` sets it: it
+     * hands them to `buildDeferredIndexes`, which builds them on a connection
+     * of its own with no `statement_timeout`, and drops and rebuilds a husk.
+     *
+     * Absent — the live schema editor, which applies `statements` as text —
+     * they stay `CREATE INDEX CONCURRENTLY IF NOT EXISTS` actions, as before.
+     */
+    deferLiveIndexes?: boolean;
 }
 
 export interface EnsureAction {
@@ -197,6 +331,43 @@ export interface LegacyForeignKey {
     legacy: string;
 }
 
+/**
+ * An index a table that already exists is missing, or holds INVALID — a
+ * derived foreign-key index always, and under
+ * {@link DiffOptions.deferLiveIndexes} a declared, search or vector one too.
+ *
+ * Not an {@link EnsureAction}, because it must not hold the boot: on a table
+ * with millions of rows `CREATE INDEX CONCURRENTLY` takes minutes, and every
+ * minute of it would be a minute the deployment is not serving. The caller
+ * builds these after the fact — boot in the background once it serves, every
+ * other caller inline after the actions — through `buildDeferredIndexes`. A
+ * {@link unique} one is the exception: it is built before the ensure returns.
+ *
+ * Kept out of {@link EnsurePlan.statements} for the same reason: a caller that
+ * applies statements as text (the live schema editor) may run them inside a
+ * transaction, which `CONCURRENTLY` refuses.
+ */
+export interface DeferredIndexBuild {
+    schema: string;
+    /** Bare table name. */
+    table: string;
+    indexName: string;
+    /** `CREATE [UNIQUE] INDEX CONCURRENTLY IF NOT EXISTS …;` */
+    sql: string;
+    /**
+     * The catalogue already holds an INVALID index under this name, which has
+     * to be dropped before the build — `IF NOT EXISTS` would skip it.
+     */
+    invalid: boolean;
+    /**
+     * A declared `unique: true` index. Not an optimization but the collection
+     * promising two rows cannot share a value, so `ensureCollectionTables`
+     * builds it before it returns — never after the server is serving — and
+     * fails when it cannot, as it did when this was an action. Absent is false.
+     */
+    unique?: boolean;
+}
+
 export interface EnsurePlan {
     actions: EnsureAction[];
     /** Every statement, in dependency order. Empty when the schema is current. */
@@ -245,6 +416,8 @@ export interface EnsurePlan {
      * exactly once, which is not a decision to take unattended.
      */
     orphanedRequiredColumns: OrphanedRequiredColumn[];
+    /** @see DeferredIndexBuild */
+    deferredIndexes: DeferredIndexBuild[];
 }
 
 /**
@@ -342,9 +515,14 @@ export function diffPlanAgainstCatalogue(
     //     reference them: a generated column's expression is resolved when the
     //     column is created, so a table whose search column calls
     //     `rebase_search_text` cannot be added before that function exists.
-    //     Both forms are idempotent, so a boot against a database that already
-    //     has them plans nothing.
+    //     Both forms are idempotent, and a boot against a database that already
+    //     has them plans nothing: each is looked up in the catalogue first. An
+    //     unconditional `CREATE OR REPLACE` rewrote the function's `pg_proc` row
+    //     and invalidated every cached plan that calls it, on every replica, on
+    //     every boot — and was reported as a change applied.
     for (const statement of plan.extensions) {
+        const extension = extensionNameOf(statement);
+        if (extension && existing.extensions?.has(extension)) continue;
         actions.push({
             kind: "create-extension",
             target: statement.replace(/^CREATE EXTENSION IF NOT EXISTS |;$/g, ""),
@@ -352,6 +530,8 @@ export function diffPlanAgainstCatalogue(
         });
     }
     for (const statement of plan.functions) {
+        const helper = parseHelperFunction(statement);
+        if (helper && existing.functions?.get(helper.key) === helper.definition) continue;
         actions.push({ kind: "create-function", target: functionTarget(statement), sql: statement });
     }
 
@@ -772,9 +952,42 @@ export function diffPlanAgainstCatalogue(
     //    withholding rather than merely harmless, because CONCURRENTLY is the
     //    one index form Postgres refuses inside a transaction block.
     const concurrent = (schema: string, table: string): boolean => !created.has(`${schema}.${table}`);
+    //    An index already in the catalogue under its name is not planned:
+    //    `IF NOT EXISTS` would skip it by that same name, so the outcome is the
+    //    same — minus a lock on the table to find that out, and minus a change
+    //    reported on a database that has none.
+    const indexExists = (schema: string, name: string | undefined): boolean =>
+        name !== undefined && existing.indexes?.has(`${schema}.${name}`) === true;
+    //    ...except on a table that already exists, where an index goes to the
+    //    builder instead (`deferredIndexes`, see `DeferredIndexBuild`): a
+    //    derived foreign-key index always, and under `deferLiveIndexes` every
+    //    other kind too. The builder also repairs the one case `IF NOT EXISTS`
+    //    cannot see — an index that is there by name and INVALID, because a
+    //    concurrent build of it was cancelled — so it is planned again.
+    const deferredIndexes: DeferredIndexBuild[] = [];
+    const toBuilder = (schema: string, table: string, derived: boolean): boolean =>
+        concurrent(schema, table) && (derived || options.deferLiveIndexes === true);
+    const deferIndex = (build: Omit<DeferredIndexBuild, "invalid">): void => {
+        const invalid = existing.invalidIndexes?.has(`${build.schema}.${build.indexName}`) === true;
+        if (indexExists(build.schema, build.indexName) && !invalid) return;
+        deferredIndexes.push({ ...build, invalid });
+    };
+    /** A search or vector statement in its concurrent form, or undefined if it has no plain `CREATE INDEX IF NOT EXISTS`. */
+    const concurrentForm = (statement: string): string | undefined => {
+        const rewritten = statement.replace("CREATE INDEX IF NOT EXISTS", "CREATE INDEX CONCURRENTLY IF NOT EXISTS");
+        return rewritten === statement ? undefined : rewritten;
+    };
     for (const table of collectionTables) {
         if (!table.search) continue;
+        const { schema, table: tableName } = table.search;
         for (const statement of searchIndexStatements(table.search)) {
+            const name = indexNameOf(statement);
+            const sql = concurrentForm(statement);
+            if (name !== undefined && sql !== undefined && toBuilder(schema, tableName, false)) {
+                deferIndex({ schema, table: tableName, indexName: name, sql });
+                continue;
+            }
+            if (indexExists(table.schema, name)) continue;
             actions.push({
                 kind: "create-index",
                 target: table.qualified,
@@ -792,6 +1005,12 @@ export function diffPlanAgainstCatalogue(
     for (const table of collectionTables) {
         if (!table.vector) continue;
         for (const spec of table.vector.specs) {
+            const sql = concurrentForm(vectorIndexStatement(spec));
+            if (sql !== undefined && toBuilder(spec.schema, spec.table, false)) {
+                deferIndex({ schema: spec.schema, table: spec.table, indexName: spec.indexName, sql });
+                continue;
+            }
+            if (indexExists(spec.schema, spec.indexName)) continue;
             actions.push({
                 kind: "create-index",
                 target: `${spec.schema}.${spec.table}`,
@@ -812,7 +1031,23 @@ export function diffPlanAgainstCatalogue(
     //    `concurrently` is a parameter rather than a string replacement on the
     //    rendered SQL: the `.replace(…)` above silently does nothing for a
     //    UNIQUE index, whose text is `CREATE UNIQUE INDEX …`.
-    for (const spec of sortIndexSpecs(collectionTables.flatMap(t => t.indexes))) {
+    //
+    //    The foreign-key indexes the plan derives go through here too, and on a
+    //    table that already exists they go to the builder whoever plans them
+    //    (see `toBuilder`). A junction table carries one — its target column —
+    //    which is why this walks both kinds of table.
+    for (const spec of sortIndexSpecs([...collectionTables, ...junctionTables].flatMap(t => t.indexes))) {
+        if (toBuilder(spec.schema, spec.table, spec.derived === "foreign-key")) {
+            deferIndex({
+                schema: spec.schema,
+                table: spec.table,
+                indexName: spec.indexName,
+                sql: collectionIndexStatement(spec, { concurrently: true, ifNotExists: true }),
+                ...(spec.unique ? { unique: true } : {})
+            });
+            continue;
+        }
+        if (indexExists(spec.schema, spec.indexName)) continue;
         actions.push({
             kind: "create-index",
             target: `${spec.schema}.${spec.table}`,
@@ -881,7 +1116,8 @@ export function diffPlanAgainstCatalogue(
         vectorIndexSkipped,
         withheldConstraints,
         columnTypeDrift,
-        orphanedRequiredColumns
+        orphanedRequiredColumns,
+        deferredIndexes
     };
 }
 

@@ -908,6 +908,10 @@ export const fr: RebaseTranslations = {
     studio_sql_update_failed: "Échec de la mise à jour : {{message}}",
     studio_sql_update_no_row: "Aucune ligne n'a été mise à jour : la ligne a été modifiée ou supprimée depuis sa lecture, ou le rôle sélectionné ne peut pas la modifier. Exécutez à nouveau la requête pour voir ce qui est enregistré.",
     studio_sql_ran_as_other_role: "Ces lignes ont été lues en tant que {{ranAs}}, et non {{role}} : le changement de rôle est désactivé sur ce serveur (DISABLE_DB_ROLE_SWITCHING), donc chaque instruction s'exécute en tant que propriétaire de la connexion.",
+    studio_sql_result_truncated: "Affichage des {{shown}} premières lignes sur {{total}} : la console conserve au plus 10 000 lignes, ou 32 Mo de valeurs, d'un résultat. Restreignez la requête, ou parcourez-la par pages avec LIMIT et OFFSET, pour voir le reste. La copie et l'export ne contiennent que les lignes affichées.",
+    studio_sql_download_full_csv: "Télécharger le résultat complet en CSV",
+    studio_sql_downloading_full_csv: "Téléchargement…",
+    studio_sql_download_full_failed: "Impossible de télécharger le résultat complet : {{message}}",
     studio_sql_role_switching_disabled: "Le changement de rôle est désactivé sur ce serveur : chaque instruction s'exécute en tant que {{role}}, quel que soit le rôle choisi ici.",
     studio_sql_execution_not_supported: "La source de données actuelle ne prend pas en charge l'exécution de SQL.",
     studio_sql_error_executing: "Une erreur s'est produite lors de l'exécution de la requête.",
@@ -1347,6 +1351,10 @@ export const fr: RebaseTranslations = {
     studio_schema_no_collections_body: "Il n'y a encore rien à dessiner. Ajoutez une collection dans config/collections/, ou ouvrez « Modifier les collections » pour en ajouter une ici.",
     studio_schema_introspect_hint: "Sur une base de données qui a déjà des tables, rebase schema introspect écrit les fichiers de collection pour vous.",
     studio_schema_visualizer_source: "Dessiné à partir de vos collections : tables, colonnes, types et relations tels qu'elles les déclarent. Seuls les indicateurs RLS sont lus dans la base de données.",
+    studio_schema_laying_out: "Disposition du diagramme…",
+    studio_schema_neighbourhood: "{{shown}} tables sur {{total}} affichées : {{table}} et les tables autour. Choisissez-en une autre dans la liste pour vous déplacer.",
+    studio_schema_neighbourhood_depth_1: "À 1 relation",
+    studio_schema_neighbourhood_depth_2: "À 2 relations",
 
 
     // ─── Studio: RLS editor confirmations ───────────────────────

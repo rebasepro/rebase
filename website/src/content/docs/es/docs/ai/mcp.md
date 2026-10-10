@@ -365,6 +365,9 @@ tenga forma de marcador se divide con un espacio de ancho cero, por lo que una f
 
 El [endpoint remoto](#el-endpoint-remoto) marca los resultados de sus herramientas de la misma
 forma y se lo indica al cliente; su `structuredContent` transporta el resultado sin marcar.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `list_collections` es la
+excepción: solo un modelo lee su listado, así que se envía una sola vez, en el texto.
+Antes de la 0.24 llevaba además una copia en `structuredContent`.
 
 Es un marcador, no un entorno aislado (sandbox). Un asistente que disponga de estas herramientas
 es tan seguro como el contenido que le permitas leer.

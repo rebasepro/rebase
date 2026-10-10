@@ -1,5 +1,5 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
-import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, ResolvedRelation, getCollectionDataPath, isManyToMany, scopeGrants, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
+import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, ResolvedRelation, getCollectionDataPath, isManyToMany, scopeGrants, type RowPrecondition, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
@@ -33,6 +33,7 @@ import {
     type IdempotencyStore
 } from "./idempotency";
 import { HARD_DELETE_QUERY_PARAM, parseHardDelete } from "./soft-delete-params";
+import { queryDictFromBody } from "./query-body";
 
 /**
  * Parse a JSON request body for a create/update. An empty body yields `{}`
@@ -987,20 +988,35 @@ export class RestApiGenerator {
         }
 
         const narrowed = queryOptions.fields !== undefined || queryOptions.include !== undefined;
-        // Read before the narrowed row, not after: a write landing between the
-        // two then leaves the tag older than the body — a 412 the caller
-        // recovers from by reading again — and never newer, which would pass a
-        // write made against the older body over the change it never saw.
-        const tagged = narrowed ? await RestApiGenerator.rowForETag(driver, address, id, undefined, withDeleted) : undefined;
         // `fields` reaches the driver as a projection: the same columns a list
         // read would select, so one row and a page of them cost the same per
         // row rather than the get route paying for every column.
-        const row = await fetchService.fetchOneForRest(
+        const readNarrowed = (reader: DataDriver) => (reader.restFetchService ?? fetchService).fetchOneForRest(
             address.path, id, queryOptions.include, undefined,
             { fields: queryOptions.fields, withDeleted }
         );
+        if (!narrowed) {
+            const row = await readNarrowed(driver);
+            return row ? { row, etag: await rowETag(row, address.collection) } : undefined;
+        }
+
+        // Both reads in one transaction where the driver can run them so: they
+        // were two, each with its own checkout, identity setup and commit, and
+        // a write could land between them. On one snapshot the tag names the
+        // version the body was rendered from. Where they stay two, the tag is
+        // read first: a write landing between them then leaves the tag older
+        // than the body — a 412 the caller recovers from by reading again —
+        // and never newer, which would pass a write made against the older
+        // body over the change it never saw.
+        const readBoth = async (reader: DataDriver) => {
+            const tagged = await RestApiGenerator.rowForETag(reader, address, id, undefined, withDeleted);
+            return { tagged, row: await readNarrowed(reader) };
+        };
+        const { tagged, row } = driver.readTogether
+            ? await driver.readTogether(readBoth)
+            : await readBoth(driver);
         if (!row) return undefined;
-        return { row, etag: await rowETag(narrowed ? tagged : row, address.collection) };
+        return { row, etag: await rowETag(tagged, address.collection) };
     }
 
     /**
@@ -1144,26 +1160,8 @@ export class RestApiGenerator {
         const restoring = restoresSoftDeletedRow(collection, body) ? true : undefined;
 
         return this.runIdempotent(c, body, async () => {
-            const existingEntity = await driver.fetchOne({
-                path,
-                id,
-                collection: address.driverCollection,
-                withDeleted: restoring
-            });
-
-            if (!existingEntity) {
-                throw this.entityNotFound(address.name, id);
-            }
-
             const ifMatch = c.req.header(IF_MATCH_HEADER);
-            if (ifMatch) {
-                await assertIfMatch(
-                    ifMatch,
-                    await RestApiGenerator.rowForETag(driver, address, id, existingEntity, restoring),
-                    collection,
-                    { collection: collection.slug, id }
-                );
-            }
+            const precondition = await this.storedRowPrecondition(driver, address, id, restoring, ifMatch);
 
             const [values] = await this.prepareUserUpdates(collection, [{ uid: id, values: body }]);
             const entity = await driver.save({
@@ -1171,12 +1169,70 @@ export class RestApiGenerator {
                 id,
                 values,
                 collection: address.driverCollection,
-                status: "existing"
+                status: "existing",
+                ...(precondition ? { precondition } : {})
             });
             return this.formatResponse(entity);
         }, (result) => prefersMinimal(c)
             ? minimalResponse()
             : c.json(result as never));
+    }
+
+    /**
+     * The 404 and the `If-Match` of an update or a delete, as a precondition
+     * the driver runs inside the write — or, for a driver that cannot, and for
+     * the auth collection, the same judgement made here on a read first.
+     *
+     * Inside the write is the point. The route used to read the row in a
+     * transaction of its own, through the admin's view-model walk, before
+     * writing it: every declared relation of the row was loaded — all 200,000
+     * comments of a post, for a PATCH of its title — and thrown away, and the
+     * write's own read of the row then repeated the lookup. And two writes
+     * carrying the same tag could both pass: each compared before either had
+     * written. Judged on the write's own read, after the row is locked when a
+     * tag is sent, the second one reads what the first wrote and is a 412.
+     *
+     * The auth collection is still read here first, without relations: the
+     * adapter's steps run before the write (`prepareUserUpdates`, and a
+     * deletion's `beforeUserDelete` veto, a hook of the application's), and an
+     * unknown uid must be the 404 before them, as it always was.
+     *
+     * @returns The precondition to hand the driver, or `undefined` for a driver
+     *   that does not run one (the row was judged here).
+     */
+    private async storedRowPrecondition(
+        driver: DataDriver,
+        address: RowAddress,
+        id: string,
+        withDeleted: true | undefined,
+        ifMatch: string | undefined
+    ): Promise<RowPrecondition | undefined> {
+        const { collection } = address;
+        const judge = async (stored: Record<string, unknown> | undefined): Promise<void> => {
+            if (!stored) throw this.entityNotFound(address.name, id);
+            if (ifMatch) {
+                await assertIfMatch(ifMatch, stored, collection, { collection: collection.slug, id });
+            }
+        };
+
+        if (!driver.checksRowPreconditions) {
+            // Read as it always was. A driver without a REST read hashes the
+            // row `fetchOne` returns, which is what its `GET` hashed too.
+            const existing = await driver.fetchOne({
+                path: address.path,
+                id,
+                collection: address.driverCollection,
+                withDeleted
+            });
+            if (!existing) throw this.entityNotFound(address.name, id);
+            if (ifMatch) await judge(await RestApiGenerator.rowForETag(driver, address, id, existing, withDeleted));
+            return undefined;
+        }
+
+        if (isAuthCollection(collection)) {
+            await judge(await RestApiGenerator.rowForETag(driver, address, id, undefined, withDeleted));
+        }
+        return { lock: ifMatch !== undefined, check: judge };
     }
 
     /**
@@ -1203,38 +1259,23 @@ export class RestApiGenerator {
             // `?hard=true` — a real DELETE on a soft-delete collection. Same
             // permission as the delete it replaces; see `soft-delete-params.ts`.
             const hardDelete = parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM));
-            const existingEntity = await driver.fetchOne({
-                path,
-                id,
-                collection: address.driverCollection,
-                // `withDeleted` when the caller asked to purge: a hard delete of an
-                // ALREADY soft-deleted row is the "empty trash" operation, and the
-                // default read hides exactly the rows it is meant to remove. Without
-                // this the route answered 404 for a row `?deleted=only` was listing a
-                // moment earlier, so a trashed row could never be purged at all.
-                withDeleted: hardDelete ? true : undefined
-            });
-
-            if (!existingEntity) {
-                throw this.entityNotFound(address.name, id);
-            }
-
-            const ifMatch = c.req.header(IF_MATCH_HEADER);
-            if (ifMatch) {
-                // A conditional delete is the one that matters most:
-                // "remove the row I read" is a different instruction from
-                // "remove whatever is there now", and only the first is
-                // safe once somebody else has edited it in between.
-                await assertIfMatch(
-                    ifMatch,
-                    await RestApiGenerator.rowForETag(driver, address, id, existingEntity, hardDelete ? true : undefined),
-                    collection,
-                    { collection: collection.slug, id }
-                );
-            }
+            // `withDeleted` when the caller asked to purge: a hard delete of an
+            // ALREADY soft-deleted row is the "empty trash" operation, and the
+            // default read hides exactly the rows it is meant to remove. Without
+            // this the route answered 404 for a row `?deleted=only` was listing a
+            // moment earlier, so a trashed row could never be purged at all.
+            //
+            // A conditional delete is the one that matters most: "remove the
+            // row I read" is a different instruction from "remove whatever is
+            // there now", and only the first is safe once somebody else has
+            // edited it in between. See `storedRowPrecondition`.
+            const precondition = await this.storedRowPrecondition(
+                driver, address, id, hardDelete ? true : undefined, c.req.header(IF_MATCH_HEADER)
+            );
 
             await this.deletingUsers(collection, [id], () => driver.delete({
                 hard: hardDelete,
+                ...(precondition ? { precondition } : {}),
                 row: {
                     // The address is the one in the URL, not something read
                     // back off the row: a row is only its columns, so
@@ -1248,6 +1289,77 @@ export class RestApiGenerator {
             }));
             return null;
         }, () => new Response(null, { status: 204 }));
+    }
+
+    /**
+     * A listing — `GET /<collection>` and `POST /<collection>/query`, and the
+     * same two through a parent — from the parameters as the `GET` reads them
+     * off its URL.
+     *
+     * One method for both verbs is the whole contract of the POST route: the
+     * same parser, the same field-access refusals, the same page, count,
+     * cursor and include, the same errors. The caller has already checked the
+     * credential's scope for `collection`.
+     *
+     * @param collectionPath a nested listing's `parent/:id/child` path; unset
+     *   for the collection's own.
+     */
+    private async listRows(
+        c: Context<HonoEnv>,
+        collection: CollectionConfig,
+        queryDict: Record<string, string[]>,
+        collectionPath?: string
+    ): Promise<Response> {
+        const queryOptions = this.parseQuery(queryDict, { collection, c });
+        const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
+        // `?searchExplain=true` asks each row which declared field matched.
+        // Opt-in per request because it costs a `ts_headline` per field per
+        // row; any value other than "true" is a no.
+        const searchExplainRaw = Array.isArray(queryDict.searchExplain) ? queryDict.searchExplain[queryDict.searchExplain.length - 1] : undefined;
+
+        const page = await RestApiGenerator.readPage(
+            this.getScopedDriver(c),
+            collection,
+            queryOptions,
+            searchString,
+            searchExplainRaw === "true",
+            collectionPath
+        );
+
+        return c.json({
+            data: page.rows,
+            meta: page.meta
+        });
+    }
+
+    /**
+     * A collection's count, from the query parameters in `queryDict`: the
+     * URL's for `GET …/count`, a body's for `POST …/count`. One method for
+     * both, as {@link listRows} is for the listing — the same parser, the same
+     * field-access refusals, the same count. The caller has already checked
+     * the credential's scope for `collection`.
+     *
+     * @param collectionPath a nested count's `parent/:id/child` path; unset
+     *   for the collection's own.
+     */
+    private async countRows(
+        c: Context<HonoEnv>,
+        collection: CollectionConfig,
+        queryDict: Record<string, string[]>,
+        collectionPath?: string
+    ): Promise<Response> {
+        const queryOptions = this.parseQuery(queryDict, { collection, c });
+        const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
+        const total = await RestApiGenerator.countRawEntities(
+            this.getScopedDriver(c), collection, queryOptions, searchString, collectionPath
+        );
+        return c.json({ count: total });
+    }
+
+    /** A `POST …/query` or `POST …/count` body, as the dictionary {@link listRows} and {@link countRows} read. See `query-body.ts`. */
+    private async queryDictFromRequest(c: Context<HonoEnv>): Promise<Record<string, string[]>> {
+        const body = await parseJsonBody(c);
+        return queryDictFromBody(body, Object.keys(c.req.queries()));
     }
 
     /**
@@ -1270,13 +1382,16 @@ export class RestApiGenerator {
         // GET /collection/count - Count entities (with optional filters)
         this.router.get(`${basePath}/count`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
-            const queryDict = c.req.queries();
-            const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
-            const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-            const driver = this.getScopedDriver(c);
+            return this.countRows(c, resolvedCollection, c.req.queries());
+        });
 
-            const total = await RestApiGenerator.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
-            return c.json({ count: total });
+        // POST /collection/count — the same count, its parameters in the body,
+        // as `POST …/query` is the listing's. A count carries the filters of
+        // the `find()` it describes, so a vector search's embedding or a long
+        // `in` list makes its URL just as long. A read: `data:read`, as the GET.
+        this.router.post(`${basePath}/count`, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug, "read");
+            return this.countRows(c, resolvedCollection, await this.queryDictFromRequest(c));
         });
 
         // GET /collection/aggregate - count/sum/avg/min/max, optionally grouped
@@ -1364,25 +1479,19 @@ export class RestApiGenerator {
         // GET /collection - List entities
         this.router.get(basePath, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
-            const queryDict = c.req.queries();
-            const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
-            const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-            // `?searchExplain=true` asks each row which declared field matched.
-            // Opt-in per request because it costs a `ts_headline` per field per
-            // row; any value other than "true" is a no.
-            const searchExplainRaw = Array.isArray(queryDict.searchExplain) ? queryDict.searchExplain[queryDict.searchExplain.length - 1] : undefined;
-            const searchExplain = searchExplainRaw === "true";
+            return this.listRows(c, resolvedCollection, c.req.queries());
+        });
 
-            const driver = this.getScopedDriver(c);
-
-            const page = await RestApiGenerator.readPage(
-                driver, resolvedCollection, queryOptions, searchString, searchExplain
-            );
-
-            return c.json({
-                data: page.rows,
-                meta: page.meta
-            });
+        // POST /collection/query — the same listing, its parameters in the
+        // body. For a query whose URL would not fit: a vector search's
+        // embedding, a long `in` list. See `query-body.ts`.
+        //
+        // A read, so it needs `data:read` and not the `data:write` its verb
+        // would map to: a key scoped to read must be able to search, and one
+        // scoped to write must not read through it.
+        this.router.post(`${basePath}/query`, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug, "read");
+            return this.listRows(c, resolvedCollection, await this.queryDictFromRequest(c));
         });
 
         // GET /collection/:id - Get single entity
@@ -1798,21 +1907,14 @@ id };
             this.enforceSubcollectionApiKeyPermission(c, nested);
 
             if (parsed.id === "count") {
-                // GET /parent/:parentId/child/count — count child entities
-                const queryDict = c.req.queries();
-                const queryOptions = this.parseQuery(queryDict, nestedAccess);
-                const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-
+                // GET /parent/:parentId/child/count — count child entities.
+                //
                 // The count the root route and both listings take, not a copy
                 // of its option list. This one kept its own, and each option
                 // added to the others was missed here in turn — the logical
                 // group first, then `?deleted=`, so a trash view's count
                 // reported the live rows.
-                const total = await RestApiGenerator.countRawEntities(
-                    driver, nestedCollection, queryOptions, searchString, nested.path
-                );
-
-                return c.json({ count: total });
+                return this.countRows(c, nestedCollection, c.req.queries(), nested.path);
             } else if (parsed.id) {
                 // GET /parent/:parentId/child/:id — single entity
                 const queryOptions = this.parseQuery(c.req.queries(), nestedAccess);
@@ -1846,27 +1948,11 @@ id };
                 // filter would have excluded. Rewriting it to match was not
                 // enough: every parameter added afterwards had to be remembered
                 // in two places, and this is the copy that kept being missed.
-                const queryDict = c.req.queries();
-                const queryOptions = this.parseQuery(queryDict, nestedAccess);
-                const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-                const searchExplainRaw = Array.isArray(queryDict.searchExplain) ? queryDict.searchExplain[queryDict.searchExplain.length - 1] : undefined;
-
-                const page = await RestApiGenerator.readPage(
-                    driver,
-                    // The collection hoisted above, not a second lookup of the
-                    // same path: one resolve, so the access check and the read
-                    // are answered about the same collection.
-                    nestedCollection,
-                    queryOptions,
-                    searchString,
-                    searchExplainRaw === "true",
-                    nested.path
-                );
-
-                return c.json({
-                    data: page.rows,
-                    meta: page.meta
-                });
+                //
+                // The collection hoisted above, not a second lookup of the
+                // same path: one resolve, so the access check and the read
+                // are answered about the same collection.
+                return this.listRows(c, nestedCollection, c.req.queries(), nested.path);
             }
         });
 
@@ -1876,7 +1962,27 @@ id };
             if (!rest || rest === "undefined") return next();
             const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${rest}`;
             const parsed = parseSubPath(rawPath);
-            if (!parsed || parsed.id) return next();
+            if (!parsed) return next();
+
+            // POST /parent/:parentId/child/query — the nested listing, its
+            // parameters in the body, as `POST /<collection>/query` is the
+            // root one. A POST to a row's address is otherwise no route, so
+            // `query` in the id position names nothing else.
+            if (parsed.id === "query") {
+                const nested = this.resolveNestedPath(parsed.collectionPath);
+                this.enforceSubcollectionApiKeyPermission({ get: (key: string) => c.get(key as never), req: { method: "GET" } }, nested);
+                return this.listRows(c, nested.chain[nested.chain.length - 1], await this.queryDictFromRequest(c), nested.path);
+            }
+            // POST /parent/:parentId/child/count — the nested count, its
+            // parameters in the body, as `POST /<collection>/count` is the
+            // root one. `count` in the id position already names the count on
+            // the GET, so it names nothing else here either.
+            if (parsed.id === "count") {
+                const nested = this.resolveNestedPath(parsed.collectionPath);
+                this.enforceSubcollectionApiKeyPermission({ get: (key: string) => c.get(key as never), req: { method: "GET" } }, nested);
+                return this.countRows(c, nested.chain[nested.chain.length - 1], await this.queryDictFromRequest(c), nested.path);
+            }
+            if (parsed.id) return next();
 
             const driver = this.getScopedDriver(c);
 
@@ -2009,54 +2115,83 @@ id };
         const startAfter = queryOptions.cursor ? cursorToStartAfter(queryOptions.cursor) : undefined;
         const seeking = startAfter !== undefined;
 
-        // One row past the page when seeking. `hasMore` on an offset page is
-        // `offset + rows.length < total`, and under a cursor that arithmetic is
-        // simply false: every seeked page runs at offset 0, so it compares one
-        // page against the whole collection and says "more" forever.
-        const limit = queryOptions.limit;
-        const probeLimit = (seeking && limit !== undefined) ? limit + 1 : limit;
+        // A distinct read collapses rows, and `count` counts them — so a
+        // `total` would describe a different set from the one served, which is
+        // the trap `countRawEntities` documents for `vectorSearch` and soft
+        // delete. It cannot be answered without a `COUNT(DISTINCT …)` the
+        // driver does not have, so it is not answered — and not counted:
+        // the count used to run anyway and be thrown away. `?count=none` asks
+        // for the same thing on any listing.
+        //
+        // A vector search with a threshold is not counted either. Its count is
+        // a distance computed for every row of the table — no index serves
+        // `distance < t` — beside a page the index serves in a millisecond:
+        // 7.2 ms against 1.2 on 20,000 rows × 256 dimensions, and it grows with
+        // both (est. ~2 s at 1M × 1,536). Without a threshold the count is the
+        // ordinary filtered one, and stays.
+        const distinctRead = queryOptions.distinct === true;
+        const thresholdedVectorRead = queryOptions.vectorSearch?.threshold !== undefined;
+        const counting = !distinctRead && !thresholdedVectorRead && queryOptions.count !== "none";
 
+        // One row past the page wherever `hasMore` cannot come from a count.
+        // Under a cursor `offset + rows.length < total` is simply false: every
+        // seeked page runs at offset 0, so it compares one page against the
+        // whole collection and says "more" forever. Without a count there is
+        // nothing to compare against at all. Either way the probe row answers.
+        const limit = queryOptions.limit;
+        const probing = (seeking || !counting) && limit !== undefined;
+        const probeLimit = probing ? limit + 1 : limit;
+
+        // The page and its count, in one transaction where the driver can run
+        // them so: one checkout, one identity setup, one snapshot — so `total`
+        // counts the rows the page was taken from.
+        const read = async (reader: DataDriver) => {
+            const fetchService = reader.restFetchService;
+            const fetched = fetchService
+                ? await fetchService.fetchCollectionForRest(
+                    path,
+                    {
+                        filter: queryOptions.where,
+                        // `?or=`/`?and=` were parsed and then dropped right here,
+                        // so a filtered read returned every row RLS allowed.
+                        logical: queryOptions.logical,
+                        limit: probeLimit,
+                        // A cursor and an offset describe the same window two
+                        // incompatible ways. The parser refuses both together, so
+                        // reaching here with a cursor means there is no offset.
+                        offset: seeking ? undefined : queryOptions.offset,
+                        startAfter,
+                        orderBy,
+                        searchString,
+                        searchExplain,
+                        vectorSearch: queryOptions.vectorSearch,
+                        fields: queryOptions.fields,
+                        distinct: queryOptions.distinct,
+                        // `?deleted=include|only`. Unset hides soft-deleted rows.
+                        // The root list route used to pass this itself; every
+                        // listing goes through here now, the nested one included,
+                        // and `countRawEntities` below reads the same flag — a
+                        // listing that hides four rows beside a total that counts
+                        // them is a page saying "1 of 5".
+                        withDeleted: queryOptions.withDeleted
+                    },
+                    queryOptions.include
+                )
+                : await RestApiGenerator.fetchRawCollection(
+                    reader, collection, { ...queryOptions, limit: probeLimit }, searchString, searchExplain, path, startAfter
+                );
+            const total = counting
+                ? await RestApiGenerator.countRawEntities(reader, collection, queryOptions, searchString, path)
+                : undefined;
+            return { fetched, total };
+        };
+        const { fetched, total } = driver.readTogether
+            ? await driver.readTogether(read)
+            : await read(driver);
         const fetchService = driver.restFetchService;
-        const fetched = fetchService
-            ? await fetchService.fetchCollectionForRest(
-                path,
-                {
-                    filter: queryOptions.where,
-                    // `?or=`/`?and=` were parsed and then dropped right here,
-                    // so a filtered read returned every row RLS allowed.
-                    logical: queryOptions.logical,
-                    limit: probeLimit,
-                    // A cursor and an offset describe the same window two
-                    // incompatible ways. The parser refuses both together, so
-                    // reaching here with a cursor means there is no offset.
-                    offset: seeking ? undefined : queryOptions.offset,
-                    startAfter,
-                    orderBy,
-                    searchString,
-                    searchExplain,
-                    vectorSearch: queryOptions.vectorSearch,
-                    fields: queryOptions.fields,
-                    distinct: queryOptions.distinct,
-                    // `?deleted=include|only`. Unset hides soft-deleted rows.
-                    // The root list route used to pass this itself; every
-                    // listing goes through here now, the nested one included,
-                    // and `countRawEntities` below reads the same flag — a
-                    // listing that hides four rows beside a total that counts
-                    // them is a page saying "1 of 5".
-                    withDeleted: queryOptions.withDeleted
-                },
-                queryOptions.include
-            )
-            : await RestApiGenerator.fetchRawCollection(
-                driver, collection, { ...queryOptions, limit: probeLimit }, searchString, searchExplain, path, startAfter
-            );
 
         // The probe row is evidence, not data — it is never served.
-        const entities = (seeking && limit !== undefined)
-            ? (fetched as Record<string, unknown>[]).slice(0, limit)
-            : fetched as Record<string, unknown>[];
-
-        const total = await RestApiGenerator.countRawEntities(driver, collection, queryOptions, searchString, path);
+        const entities = probing ? fetched.slice(0, limit) : fetched;
 
         const rows = projectResponseFields(
             entities,
@@ -2066,19 +2201,12 @@ id };
         );
 
         const offset = queryOptions.offset ?? 0;
-        // A distinct read collapses rows, and `count` counts them — so `total`
-        // describes a different set from the one served, which is the trap
-        // `countRawEntities` documents for `vectorSearch` and soft delete. It
-        // cannot be answered without a `COUNT(DISTINCT …)` the driver does not
-        // have, so it is not answered: no `total`, and `hasMore` from the page
-        // itself. Reporting the row count instead left `hasMore` true beside a
-        // complete two-row result, which is a client paging forever.
-        const distinctRead = queryOptions.distinct === true;
-        const hasMore = seeking
-            ? (fetched as unknown[]).length > (limit ?? 0)
-            : distinctRead
-                ? (limit !== undefined && entities.length === limit)
-                : offset + entities.length < total;
+        // From the probe row wherever one was asked for; from the count
+        // otherwise. A read with neither — no count and no limit — returned
+        // every row there is.
+        const hasMore = probing
+            ? fetched.length > (limit ?? 0)
+            : total !== undefined && offset + entities.length < total;
 
         // The cursor for the *next* page, from the last row served. Issued by
         // the driver, which is the only layer that knows which columns address
@@ -2093,7 +2221,7 @@ id };
         return {
             rows,
             meta: {
-                ...(distinctRead ? {} : { total }),
+                ...(total !== undefined && { total }),
                 limit: queryOptions.limit,
                 // Always a number, as `PaginationMeta` types it and the
                 // in-process door sends it: left off when the request named

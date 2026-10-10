@@ -95,7 +95,7 @@ This is the step that makes a correctly scoped key look broken. The RLS policy
 Rebase adds to every collection by default compiles to:
 
 ```sql
-rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
+(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))
 ```
 
 That is the server context, or an admin. A service key with no `admin` role
@@ -155,7 +155,9 @@ A key's `rate_limit` is how many requests it may make in a 15-minute
 window, and every door counts against it in one bucket, `api-key:<id>`:
 
 - its HTTP requests to the data, storage and functions APIs;
-- its data frames on the realtime socket: fetches, counts, saves and deletes;
+- its data frames on the realtime socket: fetches, counts, saves and deletes,
+  and subscriptions and channel-history requests past each socket's
+  [allowance](/docs/backend/realtime/#what-a-write-costs-and-the-limits);
 - its requests to [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
 
 Without a `rate_limit` the bucket holds the server's API-key default, 1000. A

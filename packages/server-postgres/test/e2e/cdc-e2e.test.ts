@@ -255,4 +255,88 @@ table: l.table }))
         const row = single.row as { title?: string; values?: { title?: string } } | null;
         expect(row?.title ?? row?.values?.title).toBe("single-row raw edit");
     });
+
+    it("announces a multi-row statement in batches, and each changed row's subscriber hears it", async () => {
+        // One statement, many rows: the triggers fire once and name the rows
+        // in a few notifications, not one per row.
+        await adminClient.query(`INSERT INTO public.posts (id, title) SELECT g, 'bulk ' || g FROM generate_series(1000, 3999) g`);
+        const spy = new pg.Client({ connectionString: container.connectionString });
+        await spy.connect();
+        const heard: string[] = [];
+        spy.on("notification", (msg) => { if (msg.payload) heard.push(msg.payload); });
+        await spy.query("LISTEN rebase_cdc");
+
+        const ws = new CollectingSocket();
+        realtime.addClient("client-bulk", ws as never);
+        for (const id of ["1000", "3999"]) {
+            await realtime.handleClientMessage("client-bulk", {
+                type: "subscribe_one",
+                payload: { path: "posts", id, subscriptionId: `sub-bulk-${id}` }
+            } as never);
+        }
+        ws.clear();
+        try {
+            await adminClient.query(`UPDATE public.posts SET title = 'bulk edit' WHERE id >= 1000`);
+
+            for (const id of ["1000", "3999"]) {
+                const single = await waitFor(() =>
+                    ws.parsed().find((m) => m.type === "single_update" && m.subscriptionId === `sub-bulk-${id}`)
+                );
+                const row = single.row as { title?: string; values?: { title?: string } } | null;
+                expect(row?.title ?? row?.values?.title).toBe("bulk edit");
+            }
+            expect(heard.length).toBeGreaterThan(0);
+            expect(heard.length).toBeLessThanOrEqual(5);
+        } finally {
+            await spy.end();
+        }
+    });
+
+    it("delivers several links written in one statement to each child list", async () => {
+        await adminClient.query(`INSERT INTO public.tags (id, label) VALUES (2, 'two'), (3, 'three')`);
+        const ws = new CollectingSocket();
+        realtime.addClient("client-links", ws as never);
+        for (const tag of [2, 3]) {
+            await realtime.handleClientMessage("client-links", {
+                type: "subscribe_collection",
+                payload: { path: `tags/${tag}/posts`, subscriptionId: `sub-links-${tag}` }
+            } as never);
+        }
+        ws.clear();
+
+        await adminClient.query(`INSERT INTO public.posts_tags (post_id, tag_id) VALUES (1, 2), (1, 3)`);
+
+        for (const tag of [2, 3]) {
+            const update = await waitFor(() =>
+                ws.parsed().find((m) => m.type === "collection_update" && m.subscriptionId === `sub-links-${tag}`)
+            );
+            const ids = (update.rows as Array<{ id?: number; values?: { id?: number } }>).map((r) => r.id ?? r.values?.id);
+            expect(ids).toContain(1);
+        }
+    });
+
+    it("delivers a TRUNCATE to the lists and the single-row subscribers of the table", async () => {
+        const ws = new CollectingSocket();
+        realtime.addClient("client-truncate", ws as never);
+        await realtime.handleClientMessage("client-truncate", {
+            type: "subscribe_collection",
+            payload: { path: "posts", subscriptionId: "sub-truncate-list" }
+        } as never);
+        await realtime.handleClientMessage("client-truncate", {
+            type: "subscribe_one",
+            payload: { path: "posts", id: "1", subscriptionId: "sub-truncate-one" }
+        } as never);
+        ws.clear();
+
+        await adminClient.query(`TRUNCATE public.posts CASCADE`);
+
+        const list = await waitFor(() =>
+            ws.parsed().find((m) => m.type === "collection_update" && m.subscriptionId === "sub-truncate-list")
+        );
+        expect(list.rows).toEqual([]);
+        const single = await waitFor(() =>
+            ws.parsed().find((m) => m.type === "single_update" && m.subscriptionId === "sub-truncate-one")
+        );
+        expect(single.row).toBeNull();
+    });
 });

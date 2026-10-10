@@ -132,6 +132,11 @@ The storage controller is passed in rather than taken from the job's context,
 because the context's `rebase.storage` is the client-side storage API, not a
 controller for the backup bucket.
 
+A backup is not held to the controller's upload limits. `maxFileSize` (50 MB
+unless set) and `allowedMimeTypes` apply to what users upload, so a dump of any
+size uploads, and so does one written through the controller that serves your
+app's files.
+
 | Variable | Meaning |
 | --- | --- |
 | `BACKUP_SCHEDULE` | Cron expression, e.g. `0 3 * * *` for 03:00 daily. Unset turns scheduled backups off. |
@@ -284,6 +289,40 @@ Downloads stream through `GET /api/admin/backups/download?key=…`, admin-only,
 so the bucket never has to be public; a key outside the destination's prefix is
 refused. With `BACKUP_DESTINATION` unset the panel says backups are not
 configured.
+
+### Download a backup
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> A browser cannot
+put an `Authorization` header on a download, so Studio and the SDK ask for a
+link first. `POST /api/admin/backups/download-url` with `{ "key": "…" }` (same
+admin scope and key checks as the download) answers
+`{ url, token, expiresIn }`: a URL whose token stands in for the header, for
+that one backup at the current destination, for 60 seconds. The token is
+refused anywhere else — as a session, as a storage download token, for another
+backup — and once it expires. The browser then streams the dump straight to
+disk, so a backup the size of your database never has to fit in a tab.
+
+```ts
+// In a browser: the browser saves the file.
+await client.backups.download(key);
+
+// Anywhere: a link that needs no header, for 60 seconds.
+const { url } = await client.backups.downloadUrl(key);
+
+// In Node: stream the bytes to a file.
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+
+const { stream, name } = await client.backups.stream(key);
+await pipeline(Readable.fromWeb(stream), createWriteStream(name));
+```
+
+Before 0.24, `backups.download(key)` answered a `Blob` holding the whole dump.
+It now saves the file in a browser and throws elsewhere; use `stream(key)`
+in Node. Against a server without download links (one older than 0.24, or one
+with no JWT secret to sign them), `download()` falls back to reading the bytes
+itself.
 
 ## Keep backups private
 

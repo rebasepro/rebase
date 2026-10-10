@@ -26,9 +26,17 @@ import { resolveCorsOptions, type RebaseBootEnv } from "../src/boot/env";
 
 const REPO = path.resolve(__dirname, "..", "..", "..");
 const CLIENT_SRC = path.join(REPO, "packages", "client", "src");
+/**
+ * The resumable upload the SDK sends a large file through. It lives in
+ * `@rebasepro/common`, shared with the admin panel, and reads its responses
+ * through a `header("X")` accessor.
+ */
+const RESUMABLE_UPLOAD_SRC = path.join(REPO, "packages", "common", "src", "util", "resumable-upload.ts");
 
 /** `headers.get("X")`, `headers?.get("X")`, `headers?.get?.("X")`. */
 const HEADER_READ = /headers\??\.get\??\.?\(\s*["'`]([A-Za-z0-9-]+)["'`]/g;
+/** `response.header("X")`, the resumable upload's accessor. */
+const RESUMABLE_HEADER_READ = /\.header\(\s*["'`]([A-Za-z0-9-]+)["'`]/g;
 
 /**
  * Headers a cross-origin script can read without being exposed. Listed so the
@@ -55,6 +63,9 @@ function headersTheClientReads(): string[] {
         }
     };
     walk(CLIENT_SRC);
+    for (const match of fs.readFileSync(RESUMABLE_UPLOAD_SRC, "utf-8").matchAll(RESUMABLE_HEADER_READ)) {
+        names.add(match[1].toLowerCase());
+    }
     return [...names].filter(name => !SAFELISTED.has(name)).sort();
 }
 
@@ -65,7 +76,7 @@ describe("CORS exposes every response header the SDK reads", () => {
         // A pattern that silently matched nothing would make every assertion
         // below vacuous. These three are read today, and losing any of them is
         // the bug this file exists for.
-        expect(read).toEqual(expect.arrayContaining(["etag", "retry-after", "x-request-id"]));
+        expect(read).toEqual(expect.arrayContaining(["etag", "retry-after", "x-request-id", "location", "upload-offset", "rebase-upload-result"]));
     });
 
     it("the runtime's CORS config names each one", async () => {

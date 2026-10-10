@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { deepEqual } from "fast-equals";
 import type { User, AuthChangeEvent, RebaseSession } from "@rebasepro/types";
 import type { AuthConfigResponse } from "./api";
 import { RebaseAuthController, RebaseAuthControllerProps } from "./types";
@@ -81,8 +82,14 @@ export function useRebaseAuthController(
 
             if (update !== latestUpdate) return;
             if (isMountedRef.current) {
-                if (userToSet) bindSessionCachesToUser(userToSet.uid);
-                setUser(userToSet);
+                const nextUser = userToSet;
+                if (nextUser) bindSessionCachesToUser(nextUser.uid);
+                // A token refresh (hourly, and a few times at boot) hands over a
+                // freshly mapped user every time. The same user, field for field,
+                // keeps the object the app already holds: as a new one it changed
+                // the controller, and with it every context consumer, and re-ran
+                // every effect keyed on the user.
+                setUser(previous => (previous && nextUser && deepEqual(previous, nextUser)) ? previous : nextUser);
             }
         };
 
@@ -422,7 +429,14 @@ export function useRebaseAuthController(
         await auth.revokeAllSessions();
     }, [auth]);
 
-    return {
+    const baseUrl = client?.baseUrl;
+    const getApiUrl = useCallback(() => baseUrl, [baseUrl]);
+    const googleClientId = props.googleClientId;
+
+    // One object per state, not per render: the controller is the auth
+    // context's value, and `useRebaseContext()` is rebuilt — for every consumer
+    // in the app — whenever it changes. Every field it carries is in the deps.
+    return useMemo<RebaseAuthController>(() => ({
         user,
         authLoading,
         initialLoading,
@@ -432,7 +446,7 @@ export function useRebaseAuthController(
         needsSetup: authConfig?.needsSetup ?? false,
         registrationEnabled: authConfig?.registrationEnabled ?? false,
         getAuthToken,
-        getApiUrl: () => client?.baseUrl,
+        getApiUrl,
         signOut,
         emailPasswordLogin,
         register,
@@ -472,7 +486,7 @@ export function useRebaseAuthController(
         // backend that might omit the field. The backend always sends all of them.
         capabilities: {
             emailPasswordLogin: true,
-            googleLogin: !!(props.googleClientId),
+            googleLogin: !!(googleClientId),
             registrationEnabled: authConfig?.registrationEnabled ?? false,
             passwordReset: authConfig?.passwordReset ?? false,
             // True while loading: the admin UI's "Reset Password" action is worth
@@ -483,5 +497,12 @@ export function useRebaseAuthController(
             emailVerification: authConfig?.emailVerification ?? false,
             enabledProviders: authConfig?.enabledProviders ?? []
         }
-    };
+    }), [
+        user, authLoading, initialLoading, authError, authProviderError, loginSkipped,
+        authConfig, authConfigFailed, heldScopes, extra, auth, googleClientId,
+        getAuthToken, getApiUrl, signOut, emailPasswordLogin, register, googleLogin, oauthLogin,
+        skipLogin, forgotPassword, resetPassword, verifyEmail, changePassword, changeEmail,
+        magicLinkLogin, confirmEmailChange, updateProfile, fetchSessions, revokeSession,
+        revokeAllSessions, clearError, startMfaChallenge, verifyMfaChallenge
+    ]);
 }

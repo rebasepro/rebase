@@ -1,5 +1,5 @@
 ---
-sourceHash: 094f9184d2977cef
+sourceHash: a6b7f50250fe821b
 title: Backend-Übersicht
 sidebar_label: Backend
 description: Das Rebase-Backend bietet einen vollständigen Server mit REST-API, Authentifizierung, Storage, WebSocket-Echtzeit und Entitätshistorie – alles initialisiert mit einem einzigen Funktionsaufruf.
@@ -209,7 +209,7 @@ Fünf davon werden leicht übersehen und verändern Verhaltensweisen, die Sie so
 
 | Schlüssel | Standard | Funktion |
 |---|---|---|
-| `compression` | `true` | gzip/deflate für API-Antworten, ausgehandelt über `Accept-Encoding`. Bereits komprimierte, gestreamte und mit `no-transform` versehene Payloads bleiben unberührt, sodass es sicher aktiviert bleiben kann – eine große JSON-Liste schrumpft typischerweise um das ~20-Fache. Setzen Sie dies auf `false`, wenn nginx, Cloudflare oder ein anderer vorgeschalteter Proxy bereits komprimiert, um doppelte Verarbeitung zu vermeiden. Umgebungsvariable: `REBASE_COMPRESSION`. |
+| `compression` | `true` | gzip/deflate für API-Antworten, ausgehandelt über `Accept-Encoding`. Bereits komprimierte, gestreamte und mit `no-transform` versehene Payloads bleiben unberührt, ebenso Payloads unter 1 KB (gzip kostet dort mehr, als es einspart), sodass es sicher aktiviert bleiben kann – eine große JSON-Liste schrumpft typischerweise um das ~20-Fache. Setzen Sie dies auf `false`, wenn nginx, Cloudflare oder ein anderer vorgeschalteter Proxy bereits komprimiert, um doppelte Verarbeitung zu vermeiden. Umgebungsvariable: `REBASE_COMPRESSION`. |
 | `maxBodySize` | `10485760` (10MB) | Obergrenze für Request-Bodies bei API-Routen; `0` deaktiviert sie. Storage-Uploads verwenden das separate `maxFileSize` (50MB) der Storage-Konfiguration, welches für diese Routen Vorrang hat. Umgebungsvariable: `REBASE_MAX_BODY_SIZE`. |
 | `csrf` | deaktiviert | **Opt-in.** Eine BaaS-API wird von mobilen Apps, SPAs auf anderen Domains und CLI-Tools aufgerufen, von denen keines einen `Origin`-Header sendet, den eine feste Liste akzeptieren würde – daher ist dies standardmäßig nicht aktiviert. Aktivieren Sie es mit den Origins, die Ihre Browser-Clients verwenden. Keine Umgebungsvariable vorhanden: Führen Sie `rebase eject` aus, um dies zu konfigurieren. |
 | `cronPersistence` | `true` | Gibt an, ob Ausführungsprotokolle in `rebase.cron_logs` geschrieben werden. Bei `false` laufen die Jobs weiter und der Verlauf verbleibt nur im Speicher, was das Studio-Panel bei einem Neustart dann verliert. |

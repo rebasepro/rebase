@@ -10,6 +10,7 @@
 import { declaredErrorAnswer, logger } from "@rebasepro/server";
 import type { CollectionConfig } from "@rebasepro/types";
 import { fieldKeyForColumn, getTableName } from "@rebasepro/common";
+import { extractCauseMessage } from "./error-cause";
 
 /**
  * Shape of a deliberate client-facing error — `ApiError` from
@@ -113,23 +114,9 @@ export function reachedDatabase(error: unknown): boolean {
     return extractPgError(error) !== null;
 }
 
-/**
- * Walk the error cause chain and return the deepest meaningful message.
- */
-export function extractCauseMessage(error: unknown): string | null {
-    if (!error || typeof error !== "object") return null;
-    if (!(error instanceof Error)) return null;
-
-    if (error.cause && typeof error.cause === "object") {
-        const deeper = extractCauseMessage(error.cause);
-        if (deeper) return deeper;
-        // The cause itself has a message
-        if (error.cause instanceof Error && error.cause.message) {
-            return error.cause.message;
-        }
-    }
-    return null;
-}
+// In its own module so the driver CLI can use it without loading the server
+// (this file imports `@rebasepro/server`).
+export { extractCauseMessage };
 
 /**
  * Codes that mean "this connection will never work as configured".

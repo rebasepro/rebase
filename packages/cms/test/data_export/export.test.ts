@@ -333,3 +333,53 @@ describe("Export Utility Functions", () => {
         });
     });
 });
+
+/**
+ * Each row's values were merged one property at a time into a fresh object
+ * (`reduce((a, b) => ({ ...a, ...b }))`), so a row cost the square of its
+ * property count: half of a 100k × 20 CSV export's processing time, and most
+ * of it at 50 properties. One accumulator makes it linear.
+ */
+describe("export processing scales with the property count", () => {
+
+    function exportRows(propertyCount: number, rowCount: number): number {
+        const properties: Properties = {};
+        const values: Record<string, unknown> = {};
+        for (let i = 0; i < propertyCount; i++) {
+            properties["p" + i] = { type: "string" };
+            values["p" + i] = "v" + i;
+        }
+        const data: Entity<Record<string, unknown>>[] = Array.from({ length: rowCount },
+            (_, i) => ({ id: String(i), path: "items", values }));
+        // The fastest of several runs: the run least disturbed by the rest of
+        // the machine. A median of five still moved with the load of a full
+        // `pnpm test` (52× once, on linear code).
+        let fastest = Infinity;
+        for (let run = 0; run < 7; run++) {
+            const t0 = performance.now();
+            getEntityJsonExportableData(data, undefined, properties, "string");
+            fastest = Math.min(fastest, performance.now() - t0);
+        }
+        return fastest;
+    }
+
+    test("ten times the properties costs about ten times as much, not a hundred", () => {
+        exportRows(300, 10); // warm up
+        const small = exportRows(300, 10);
+        const large = exportRows(3_000, 10);
+        // Linear measures 10–20× (large objects cost V8 a little more per key);
+        // the quadratic merge measured ~560×. The bound sits between the two
+        // with room on both sides, and the floor keeps a sub-millisecond
+        // `small` from turning timer noise into a ratio.
+        expect(large / Math.max(small, 1)).toBeLessThan(100);
+    });
+
+    test("keeps the values' own keys first and in order, and adds the declared ones after", () => {
+        const properties: Properties = { b: { type: "string" }, c: { type: "number" }, missing: { type: "string" } };
+        const [row] = getEntityJsonExportableData(
+            [{ id: "1", path: "items", values: { a: "x", b: "y", c: 3 } }],
+            undefined, properties, "string") as Record<string, unknown>[];
+        expect(Object.keys(row)).toEqual(["id", "a", "b", "c"]);
+        expect(row).toEqual({ id: "1", a: "x", b: "y", c: 3 });
+    });
+});

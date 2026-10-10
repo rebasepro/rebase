@@ -1,5 +1,5 @@
 ---
-sourceHash: f5376e9a832e32a2
+sourceHash: 4efc850ec3b2c417
 slug: es/docs/rls-check
 title: rls-check
 description: Audita la seguridad a nivel de fila (RLS) en cualquier base de datos PostgreSQL — Supabase, Neon, RDS o tu propio servidor. De solo lectura, sin registro y sin requerir Rebase.
@@ -341,7 +341,9 @@ el esquema `auth` previo a la 1.0 se sigue comprobando adecuadamente.
 La forma corregida de la comprobación anterior — `rebase.uid() IS NOT NULL AND rebase.uid() <>
 'anonymous'` — y el punto en el que muchos se detienen. Excluye a los clientes no autenticados, pero
 lo que no hace es delimitar las filas: lo que queda es que *toda cuenta registrada puede leer cada fila de
-esta tabla*, lo cual difiere bastante de lo que suele pretenderse.
+esta tabla*, lo cual difiere bastante de lo que suele pretenderse. En un proyecto de Rebase esto es una regla cuyo
+`condition` es `policy.authenticated()` y nada más, que la base de datos almacena como
+`rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])`.
 
 Ese es el patrón que convierte una tabla `users` en un directorio de todas las direcciones de la
 plataforma, legible por cualquiera que se haya registrado; y cuando el registro es abierto, "cualquiera que

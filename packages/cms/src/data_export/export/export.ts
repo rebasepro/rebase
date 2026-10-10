@@ -246,17 +246,21 @@ function processValuesForExport<M extends Record<string, unknown>>
         exportType: "csv" | "json",
         dateExportType: "timestamp" | "string"
     ): Record<string, unknown> {
-    const updatedValues = Object.entries(properties)
-        .map(([key, property]) => {
-            const inputValue = inputValues && (inputValues)[key];
-            const updatedValue = processValueForExport(inputValue, property as Property, exportType, dateExportType);
-            if (updatedValue === undefined) return {};
-            return ({ [key]: updatedValue });
-        })
-        .reduce((a, b) => ({ ...a,
-...b }), {}) as Record<string, unknown>;
-    return { ...inputValues,
-...updatedValues };
+    // One accumulator. Merging `{ [key]: value }` objects pairwise copied the
+    // whole row once per property — the square of the property count, per row.
+    const result: Record<string, unknown> = { ...inputValues };
+    for (const [key, property] of Object.entries(properties)) {
+        const inputValue = inputValues && (inputValues)[key];
+        const updatedValue = processValueForExport(inputValue, property as Property, exportType, dateExportType);
+        if (updatedValue === undefined) continue;
+        if (key === "__proto__") {
+            // An own property, as the object spread made it, not the prototype.
+            Object.defineProperty(result, key, { value: updatedValue, enumerable: true, writable: true, configurable: true });
+        } else {
+            result[key] = updatedValue;
+        }
+    }
+    return result;
 }
 
 /**
@@ -319,7 +323,15 @@ export function downloadBlob(content: BlobPart[], filename: string, contentType:
     pom.href = url;
     pom.setAttribute("download", filename);
     pom.click();
+    // Unrevoked, the URL kept the whole file in memory until the tab closed —
+    // one more copy per export. The download holds its own reference once it
+    // has started; the delay covers browsers that start it a moment after
+    // `click()` returns.
+    setTimeout(() => URL.revokeObjectURL(url), BLOB_URL_LIFETIME_MS);
 }
+
+/** How long an export's object URL outlives the click that downloads it. */
+const BLOB_URL_LIFETIME_MS = 10_000;
 
 export function downloadDataAsCsv(data: object[], name: string) {
     if (data.length === 0) return;

@@ -250,11 +250,109 @@ Both producers emit them, which matters because not every deployment runs
   index's `INCLUDE` columns are the one exception: Drizzle cannot express them,
   and the generated line carries a comment saying so and pointing at
   `schema.sql`, which does.
-- **Boot-time schema ensure** creates them with
-  `CREATE INDEX CONCURRENTLY IF NOT EXISTS`, on the same terms as the ANN
-  indexes beside it. A managed-runtime tenant provisions at boot and never runs
-  `db push`; without this it would start with none of its declared indexes and
-  nothing would say so.
+- **Boot-time schema ensure** creates them too, on the same terms as the
+  search and ANN indexes beside them. A managed-runtime tenant provisions at
+  boot and never runs `db push`; without this it would start with none of its
+  declared indexes and nothing would say so. A table the boot creates gets its
+  indexes with the table. On a table that already exists, the boot builds a
+  missing index after the server is serving, in the background, the way it
+  builds the [foreign-key indexes](#what-upgrading-does-to-an-existing-database).
+  It uses `CREATE INDEX CONCURRENTLY` on a connection of its own, so the
+  pool's 30 s `statement_timeout` cannot cancel a long build. An index that an
+  interrupted build left `INVALID` under its name is dropped and built again.
+  `IF NOT EXISTS` matches on the name, so it never repairs one. A `unique`
+  index is built the same way but before the server serves, and the boot fails
+  if it cannot be built. Serving without it would let duplicate rows in.
+
+## Foreign keys are indexed for you
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> Postgres creates the
+index a foreign key *points at* — the target's primary key — and never one on
+the column *holding* it. Every read from the other side of a link filters on
+that column: a `hasMany` or `hasOne` include, a nested listing such as
+`/authors/5/posts` (its page and its count), the reverse side of a
+`manyToMany`, and the `ON DELETE` check when a parent row is deleted. Without
+an index each of those reads every row of the child table.
+
+So Rebase derives a plain btree for:
+
+- the `localKey` of every [`belongsTo`](/docs/collections/relations#belongsto--the-key-is-on-this-table)
+  — which is also the column the far side's `hasOne` / `hasMany` reads;
+- the target column of every `manyToMany` junction. The junction's primary key
+  `(source, target)` already serves lookups by the source column; the reverse
+  side of the link needs this one. A junction is Rebase's table, so this one
+  has no opt-out.
+
+Measured on Postgres 18 with a warm cache, 1M comments over 50k posts:
+
+| The read | Without the index | With it |
+|---|---|---|
+| `include=comments` on a 25-post page (`post_id IN (…)`) | 38 ms | 0.3 ms |
+| `GET /posts/77/comments?limit=25` — the page | 28 ms | 0.3 ms |
+| …and its `count(*)` | 29 ms | 0.2 ms |
+| deleting one post (`ON DELETE SET NULL` check) | 129 ms | 1.7 ms |
+
+Nothing is indexed twice. The derived index is skipped when the column already
+leads the primary key, carries a `UNIQUE` (`validation.unique` on the relation
+or on the property that owns the column), or leads an index in `indexes:` —
+plain or composite, as long as it is a btree with no `where`. A partial index
+cannot serve a lookup that has to reach every row, and a GIN or BRIN index
+answers a different question, so neither counts.
+
+The name is the one [a declaration](#what-a-declaration-is-called) of a plain
+index on that column derives — `posts_author_id_ix_00ad191` — so the derived
+index and `indexes: [{ on: ["author"], … }]` are one object, not two. It is a
+[frozen derived name](/docs/architecture/schema-as-code) like every other.
+
+To keep the constraint and drop the index — a table so write-heavy that the
+index costs more than the lookups it serves, or one where you keep an index of
+your own outside `indexes:` — say so on the relation:
+
+```typescript
+author: {
+    name: "Author",
+    type: "relation",
+    relation: { kind: "belongsTo", target: () => authors, index: false }
+}
+```
+
+`index` is accepted on a `belongsTo` only; on the other kinds the config
+validator refuses it, because their foreign key is a column on the target (set
+`index` on the target's `belongsTo`) or in a junction.
+
+Rebase reads only your collections to decide this, never the database: `db
+push` and the boot have to reach the same set of indexes with the same names, or
+the next push would drop what the boot built. An index you wrote by hand on the
+same column, outside `indexes:`, is therefore not seen — declare it in
+`indexes:`, or set `index: false`, to keep one index rather than two.
+
+### What upgrading does to an existing database
+
+The indexes are new objects on tables that already hold data, and the two doors
+build them differently:
+
+- **The boot does not wait for them.** On a table that already exists, the
+  schema ensure leaves the missing foreign-key indexes out of the boot and
+  builds them after the server is serving, one at a time, with
+  `CREATE INDEX CONCURRENTLY` on a connection of its own (the pool's 30 s
+  `statement_timeout` does not apply to it). That takes no lock reads or writes
+  wait on. A table another session holds — another instance's build, an
+  `ALTER TABLE` — is given up on within the boot's lock budget and tried again on
+  the next boot. An index an interrupted build left `INVALID` (a deploy that
+  replaced the process mid-build, two instances racing on one name) is dropped
+  and built again. Each one is logged as it starts and finishes; a failure is a
+  warning, never a failed boot. A table this boot creates gets its indexes with
+  the table, before anything can write to it. Under `REBASE_PROVISION_ONLY` the
+  builds run before the process exits, since nothing after it would run them.
+- **`rebase db push` builds them with the rest of the push**, inside Atlas's
+  transaction, so the first push after upgrading runs one `CREATE INDEX` per
+  foreign-key column that lacks one. A plain `CREATE INDEX` blocks writes to
+  that table — reads go on — for as long as the build takes: about 0.4 s at 1M
+  rows and 6 s at 10M on a laptop SSD (`maintenance_work_mem` 64 MB), and
+  proportionally longer on slower storage or wider keys. `--dry-run` lists every
+  one. On a large production table, either let a boot build it concurrently
+  first — the push then finds it in place and plans nothing — or run the
+  push at a quiet moment.
 
 ## What is refused, and when
 

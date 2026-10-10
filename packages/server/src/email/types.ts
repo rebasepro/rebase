@@ -23,6 +23,14 @@ export interface SMTPConfig {
         pass: string;
     };
     name?: string;
+    /**
+     * How many connections to the server a burst of mail may hold open at
+     * once. Default 5. Connections are reused from one message to the next
+     * and closed a few seconds after the last send, so a quiet server holds
+     * none. Lower it for a provider that caps concurrent connections per
+     * mailbox — Office 365 SMTP AUTH allows 3.
+     */
+    maxConnections?: number;
 }
 
 /**

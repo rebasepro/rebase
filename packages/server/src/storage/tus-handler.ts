@@ -9,11 +9,11 @@
  */
 
 import { randomUUID } from "crypto";
-import { writeFile, unlink, stat, mkdir, open } from "fs/promises";
-import { existsSync } from "fs";
+import { writeFile, readFile, readdir, unlink, stat, mkdir, open } from "fs/promises";
+import { existsSync, openAsBlob } from "fs";
 import { join } from "path";
 import type { Context } from "hono";
-import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
+import { DEFAULT_STORAGE_SOURCE_KEY, type UploadFileResult } from "@rebasepro/types";
 import type { StorageController } from "./types";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
 import { logger } from "../utils/logger.js";
@@ -39,8 +39,6 @@ interface TusUpload {
     id: string;
     /** Total declared size in bytes. */
     size: number;
-    /** Bytes received so far. */
-    offset: number;
     /** TUS metadata parsed from the creation request. */
     metadata: Record<string, string>;
     /** Timestamp of creation (epoch ms). */
@@ -105,8 +103,81 @@ interface TusUpload {
 /** Maximum upload size: 5 GB. */
 const MAX_UPLOAD_SIZE = 5 * 1024 * 1024 * 1024;
 
+/**
+ * The header a resumable upload's last `PATCH` answers with the stored object
+ * in — `{ key, bucket, storageUrl }`, the `data` of `POST /upload`, as
+ * URI-encoded JSON — so a client gets from the resumable path what it gets
+ * from the multipart one. `create` answers it with `on-complete`, which tells
+ * a client this server will, before it sends a byte.
+ */
+export const UPLOAD_RESULT_HEADER = "Rebase-Upload-Result";
+
+/** `Upload-Metadata` entries carrying the object's custom metadata, as `metadata_<name>` form fields do on `POST /upload`. */
+const CUSTOM_METADATA_PREFIX = "metadata_";
+
+/** The custom metadata an upload carries, as `POST /upload` collects it from its form. */
+function customMetadataOf(metadata: Record<string, string>): Record<string, unknown> | undefined {
+    const custom: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(metadata)) {
+        if (name.startsWith(CUSTOM_METADATA_PREFIX)) custom[name.slice(CUSTOM_METADATA_PREFIX.length)] = value;
+    }
+    return Object.keys(custom).length > 0 ? custom : undefined;
+}
+
 /** Stale upload expiry: 24 hours. */
 const UPLOAD_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * What an upload id looks like: the `randomUUID()` `create` hands out.
+ *
+ * An id names files in the upload directory, so one that is anything else —
+ * `../x`, an absolute path — is refused before it reaches a path.
+ */
+const UPLOAD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** What is kept on disk about an upload, beside its bytes. */
+type StoredTusUpload = Omit<TusUpload, "completed" | "receiving" | "filePath">;
+
+/** A stored upload record, or `null` when the JSON is not one this handler wrote. */
+function storedUploadOf(value: unknown, id: string): StoredTusUpload | null {
+    if (typeof value !== "object" || value === null) return null;
+    const record: Record<string, unknown> = { ...value };
+    const optionalString = (field: unknown) => field === undefined || typeof field === "string";
+    if (
+        record.id !== id ||
+        typeof record.size !== "number" ||
+        typeof record.createdAt !== "number" ||
+        typeof record.key !== "string" ||
+        typeof record.metadata !== "object" || record.metadata === null ||
+        !optionalString(record.bucket) || !optionalString(record.storageId) || !optionalString(record.contentType)
+    ) {
+        return null;
+    }
+    const metadata: Record<string, string> = {};
+    for (const [name, field] of Object.entries(record.metadata)) {
+        if (typeof field === "string") metadata[name] = field;
+    }
+    const user = record.user;
+    let storedUser: TusUpload["user"] = null;
+    if (typeof user === "object" && user !== null && "uid" in user && typeof user.uid === "string") {
+        storedUser = {
+            uid: user.uid,
+            ...("email" in user && typeof user.email === "string" ? { email: user.email } : {}),
+            ...("roles" in user && Array.isArray(user.roles) ? { roles: user.roles.filter((r): r is string => typeof r === "string") } : {})
+        };
+    }
+    return {
+        id,
+        size: record.size,
+        createdAt: record.createdAt,
+        key: record.key,
+        metadata,
+        ...(typeof record.bucket === "string" ? { bucket: record.bucket } : {}),
+        ...(typeof record.storageId === "string" ? { storageId: record.storageId } : {}),
+        ...(typeof record.contentType === "string" ? { contentType: record.contentType } : {}),
+        user: storedUser
+    };
+}
 
 /**
  * TUS resumable upload handler.
@@ -114,8 +185,22 @@ const UPLOAD_EXPIRY_MS = 24 * 60 * 60 * 1000;
  * Each instance manages uploads for a single storage root. The
  * `storageController` is used to finalize completed uploads by
  * calling `putObject`.
+ *
+ * An upload lives in the upload directory, not in this process: its bytes in
+ * `<id>`, and what `create` decided about it in `<id>.json` beside them. Its
+ * offset is the length of the bytes file. So a restart — a rolling deploy —
+ * resumes an upload where it stopped instead of sending the client back to
+ * byte 0, and every process that shares the directory (one volume at
+ * `STORAGE_PATH`) serves every upload. The map below only remembers records
+ * already read.
  */
 export class TusHandler {
+    /**
+     * Upload records this process has read or written, by id. A cache of the
+     * `<id>.json` files: it never holds the offset (the bytes file's length
+     * does), and an upload another process finished or cancelled is noticed
+     * when its bytes file is gone.
+     */
     private uploads = new Map<string, TusUpload>();
     private tusDir: string;
     private cleanupTimer?: ReturnType<typeof setInterval>;
@@ -205,15 +290,42 @@ export class TusHandler {
         this.cleanupTimer.unref?.();
     }
 
-    /** Remove uploads that have been idle for longer than UPLOAD_EXPIRY_MS. */
+    /**
+     * Remove uploads created more than {@link UPLOAD_EXPIRY_MS} ago.
+     *
+     * From the directory rather than from this process's memory, so an upload
+     * a crashed or replaced process abandoned is collected too. A record is
+     * written once, at creation, so its file's mtime is when the upload began;
+     * a bytes file with no record (left by an earlier version) is judged by
+     * its own.
+     */
     private async cleanupStale(): Promise<void> {
-        const now = Date.now();
-        for (const [id, upload] of this.uploads) {
-            if (now - upload.createdAt > UPLOAD_EXPIRY_MS && !upload.completed) {
-                try { await unlink(upload.filePath); } catch { /* ok */ }
-                this.uploads.delete(id);
-            }
+        let names: string[];
+        try {
+            names = await readdir(this.tusDir);
+        } catch {
+            return;
         }
+        const now = Date.now();
+        const records = new Set(names.filter(name => name.endsWith(".json")).map(name => name.slice(0, -".json".length)));
+        for (const name of names) {
+            const id = name.endsWith(".json") ? name.slice(0, -".json".length) : name;
+            if (!UPLOAD_ID.test(id) || (!name.endsWith(".json") && records.has(id))) continue;
+            try {
+                const { mtimeMs } = await stat(join(this.tusDir, name));
+                if (now - mtimeMs <= UPLOAD_EXPIRY_MS || this.uploads.get(id)?.completed) continue;
+            } catch {
+                continue;
+            }
+            await this.forget(id);
+        }
+    }
+
+    /** The upload's bytes and record, gone; from every process, since they are files. */
+    private async forget(id: string): Promise<void> {
+        this.uploads.delete(id);
+        try { await unlink(join(this.tusDir, id)); } catch { /* ok */ }
+        try { await unlink(join(this.tusDir, `${id}.json`)); } catch { /* ok */ }
     }
 
     // -----------------------------------------------------------------------
@@ -414,13 +526,9 @@ export class TusHandler {
 
         const filePath = join(this.tusDir, id);
 
-        // Create empty temp file
-        await writeFile(filePath, Buffer.alloc(0));
-
         const upload: TusUpload = {
             id,
             size: uploadLength,
-            offset: 0,
             metadata,
             createdAt: Date.now(),
             filePath,
@@ -431,6 +539,22 @@ export class TusHandler {
             completed: false,
             user: triggerUser(c.get("user"))
         };
+
+        // The bytes file first, empty, then the record: a record always has
+        // its bytes beside it, so whoever reads one can resume from it.
+        await writeFile(filePath, Buffer.alloc(0));
+        const record: StoredTusUpload = {
+            id,
+            size: upload.size,
+            metadata: upload.metadata,
+            createdAt: upload.createdAt,
+            key: upload.key,
+            ...(bucket !== undefined ? { bucket } : {}),
+            ...(storageId !== undefined ? { storageId } : {}),
+            ...(contentType !== undefined ? { contentType } : {}),
+            user: upload.user
+        };
+        await writeFile(join(this.tusDir, `${id}.json`), JSON.stringify(record), { flag: "wx" });
         this.uploads.set(id, upload);
 
         // A path, not an absolute URL. The origin this process would put in
@@ -448,7 +572,8 @@ export class TusHandler {
             headers: {
                 Location: location,
                 "Tus-Resumable": "1.0.0",
-                "Upload-Offset": "0"
+                "Upload-Offset": "0",
+                [UPLOAD_RESULT_HEADER]: "on-complete"
             }
         });
     }
@@ -472,8 +597,8 @@ export class TusHandler {
      * break the resumable path on public sites while changing nothing about
      * the rest.
      */
-    private ownedUpload(c: Context, id: string): TusUpload {
-        const upload = this.uploads.get(id);
+    private async ownedUpload(c: Context, id: string): Promise<TusUpload> {
+        const upload = await this.lookup(id);
         if (!upload) {
             throw ApiError.notFound("Upload not found");
         }
@@ -489,15 +614,53 @@ export class TusHandler {
         throw ApiError.notFound("Upload not found");
     }
 
+    /**
+     * The upload with this id: from this process's memory, or from its record
+     * in the upload directory — written by another process sharing it, or by
+     * this one before a restart. `null` when there is no such upload.
+     */
+    private async lookup(id: string): Promise<TusUpload | null> {
+        if (!UPLOAD_ID.test(id)) return null;
+        const known = this.uploads.get(id);
+        if (known) return known;
+
+        let stored: StoredTusUpload | null;
+        try {
+            stored = storedUploadOf(JSON.parse(await readFile(join(this.tusDir, `${id}.json`), "utf-8")), id);
+        } catch {
+            return null;
+        }
+        if (!stored) return null;
+        const upload: TusUpload = { ...stored, filePath: join(this.tusDir, id), completed: false };
+        this.uploads.set(id, upload);
+        return upload;
+    }
+
+    /**
+     * Bytes received so far: the length of the bytes file. `null` when it is
+     * gone — finished or cancelled by another process — and then this one
+     * forgets the upload too.
+     */
+    private async offsetOf(upload: TusUpload): Promise<number | null> {
+        try {
+            return (await stat(upload.filePath)).size;
+        } catch {
+            this.uploads.delete(upload.id);
+            return null;
+        }
+    }
+
     /** `HEAD /tus/:id` — Query upload progress. */
-    head(c: Context, id: string): Response {
-        const upload = this.ownedUpload(c, id);
+    async head(c: Context, id: string): Promise<Response> {
+        const upload = await this.ownedUpload(c, id);
+        const offset = await this.offsetOf(upload);
+        if (offset === null) throw ApiError.notFound("Upload not found");
 
         return new Response(null, {
             status: 200,
             headers: {
                 "Tus-Resumable": "1.0.0",
-                "Upload-Offset": String(upload.offset),
+                "Upload-Offset": String(offset),
                 "Upload-Length": String(upload.size),
                 "Cache-Control": "no-store"
             }
@@ -506,7 +669,7 @@ export class TusHandler {
 
     /** `PATCH /tus/:id` — Write one chunk of an upload, at its offset. */
     async patch(c: Context, id: string): Promise<Response> {
-        const upload = this.ownedUpload(c, id);
+        const upload = await this.ownedUpload(c, id);
         if (upload.completed) {
             throw ApiError.badRequest("Upload already completed");
         }
@@ -532,7 +695,11 @@ export class TusHandler {
                 throw ApiError.badRequest("Upload-Offset header is required");
             }
             const offset = parseInt(offsetHeader, 10);
-            if (offset !== upload.offset) {
+            const received = await this.offsetOf(upload);
+            if (received === null) {
+                throw ApiError.notFound("Upload not found");
+            }
+            if (offset !== received) {
                 throw ApiError.conflict("Offset mismatch");
             }
 
@@ -561,25 +728,31 @@ export class TusHandler {
             // the same while the lock holds; written positionally, a temp file
             // that disagrees with the bookkeeping is overwritten rather than
             // extended.
-            const fh = await open(upload.filePath, "r+");
+            let fh;
+            try {
+                fh = await open(upload.filePath, "r+");
+            } catch {
+                // Finished or cancelled by another process meanwhile.
+                this.uploads.delete(upload.id);
+                throw ApiError.notFound("Upload not found");
+            }
             try {
                 await fh.write(chunk, 0, chunk.length, offset);
                 await fh.truncate(offset + chunk.length);
             } finally {
                 await fh.close();
             }
-            upload.offset = offset + chunk.length;
+            const nextOffset = offset + chunk.length;
 
             // Finalize if complete
-            if (upload.offset >= upload.size) {
-                await this.finalize(upload);
-            }
+            const stored = nextOffset >= upload.size ? await this.finalize(upload) : undefined;
 
             return new Response(null, {
                 status: 204,
                 headers: {
                     "Tus-Resumable": "1.0.0",
-                    "Upload-Offset": String(upload.offset)
+                    "Upload-Offset": String(nextOffset),
+                    ...(stored ? { [UPLOAD_RESULT_HEADER]: encodeURIComponent(JSON.stringify(stored)) } : {})
                 }
             });
         } finally {
@@ -589,10 +762,9 @@ export class TusHandler {
 
     /** `DELETE /tus/:id` — Cancel and remove an upload. */
     async delete(c: Context, id: string): Promise<Response> {
-        const upload = this.ownedUpload(c, id);
+        const upload = await this.ownedUpload(c, id);
 
-        try { await unlink(upload.filePath); } catch { /* ok */ }
-        this.uploads.delete(id);
+        await this.forget(upload.id);
 
         return new Response(null, {
             status: 204,
@@ -621,7 +793,7 @@ export class TusHandler {
      * temp file forever. Left false, a client that retries sends an empty chunk
      * at `offset === size`, which lands straight back here.
      */
-    private async finalize(upload: TusUpload): Promise<void> {
+    private async finalize(upload: TusUpload): Promise<UploadFileResult> {
         // Resolve the target controller from the storage source decided — and
         // authorized — in `create`. Reading `upload.metadata.storageId` here
         // instead is how the hook's answer and the write came apart.
@@ -658,20 +830,13 @@ export class TusHandler {
 
         try {
             // `openAsBlob` hands back a Blob backed by the file on disk rather
-            // than a copy of it in the heap. `readFile` was the whole upload in
-            // memory at once — up to the protocol's 5 GB ceiling, on a process
-            // whose container limit is a fraction of that, and the peak arrives
-            // at finalize where nothing is watching. Available since Node 19.8;
-            // the fallback keeps an older runtime working rather than failing
-            // the upload it just received.
-            let blob: Blob;
-            const fsPromises = await import("fs/promises");
-            const openAsBlob = (fsPromises as { openAsBlob?: (p: string) => Promise<Blob> }).openAsBlob;
-            if (typeof openAsBlob === "function") {
-                blob = await openAsBlob(upload.filePath);
-            } else {
-                blob = new Blob([new Uint8Array(await fsPromises.readFile(upload.filePath))]);
-            }
+            // than a copy of it in the heap, and the built-in controllers write
+            // from it a chunk (or a multipart part) at a time. `readFile` was
+            // the whole upload in memory at once — up to the protocol's 5 GB
+            // ceiling, on a process whose container limit is a fraction of
+            // that. It lives on `fs`, not `fs/promises`: looked up there it was
+            // never found, and every finalize took the `readFile` fallback.
+            const blob = await openAsBlob(upload.filePath);
             // `upload.key` and nothing else. The fallback chain that used to
             // live here (`|| metadata.filename || id`) is what let the write
             // land somewhere the hook was never asked about; the destination is
@@ -681,19 +846,19 @@ export class TusHandler {
 
             const file = new File([blob], fileName, { type: mimeType });
 
-            await targetController.putObject({
+            const stored = await targetController.putObject({
                 file,
                 key: fileName,
+                // The object's custom metadata, from `metadata_<name>` entries,
+                // as `POST /upload` takes it from `metadata_<name>` fields.
+                metadata: customMetadataOf(upload.metadata),
                 bucket: upload.bucket
             });
 
-            // Stored: only now is the upload complete, and only now is the temp
-            // file redundant.
+            // Stored: only now is the upload complete, and only now are the
+            // bytes file and the record redundant.
             upload.completed = true;
-
-            // Clean up temp file
-            try { await unlink(upload.filePath); } catch { /* ok */ }
-            this.uploads.delete(upload.id);
+            await this.forget(upload.id);
 
             logger.info(`[TUS] Upload ${upload.id} finalized → ${fileName}`, storageId ? { storageId } : {});
 
@@ -708,6 +873,7 @@ export class TusHandler {
                 contentType: mimeType,
                 user: upload.user
             });
+            return stored;
         } catch (err) {
             logger.error(`[TUS] Failed to finalize upload ${upload.id}`, { error: err });
             // The bytes stay on disk and the upload stays incomplete, so a

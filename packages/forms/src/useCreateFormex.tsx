@@ -20,6 +20,21 @@ type FormexHistoryEntry<T> = {
     boundary?: boolean;
 };
 
+/**
+ * How many steps {@link FormexController.undo} can go back. Every edit pushes a
+ * snapshot of the whole values, so an unbounded history grew by one copy per
+ * keystroke for as long as the form stayed open — 43.5 MB after 10,000
+ * keystrokes inside a 500-item array — and every re-baseline re-merged all of
+ * it. The oldest steps are dropped past this.
+ */
+export const FORMEX_MAX_UNDO_STEPS = 200;
+
+/** The history with at most {@link FORMEX_MAX_UNDO_STEPS} steps behind its last entry. */
+function capHistory<E>(history: E[]): E[] {
+    const excess = history.length - (FORMEX_MAX_UNDO_STEPS + 1);
+    return excess > 0 ? history.slice(excess) : history;
+}
+
 export function useCreateFormex<T = any>({
     initialValues,
     initialModifiedValues,
@@ -103,10 +118,23 @@ export function useCreateFormex<T = any>({
     const [isValidating, setIsValidating] = useState(false);
     const [version, setVersion] = useState(0);
 
+    // Every callback the caller hands in is read through a ref, so the
+    // controller's own functions never change identity. A caller passing
+    // inline functions — `EntityForm` does — used to give the controller a new
+    // identity on *every* render, and every field reading it re-rendered with
+    // it. The controller now changes with its state, and only with its state.
     const onValuesChangeRef = useRef(onValuesChangeDeferred);
     onValuesChangeRef.current = onValuesChangeDeferred;
     const onBaselineConflictRef = useRef(onBaselineConflict);
     onBaselineConflictRef.current = onBaselineConflict;
+    const validationRef = useRef(validation);
+    validationRef.current = validation;
+    const onSubmitRef = useRef(onSubmit);
+    onSubmitRef.current = onSubmit;
+    const onResetRef = useRef(onReset);
+    onResetRef.current = onReset;
+    const initialTouchedRef = useRef(initialTouched);
+    initialTouchedRef.current = initialTouched;
     const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     const callDebouncedOnValuesChange = useCallback((values: T) => {
@@ -130,8 +158,8 @@ export function useCreateFormex<T = any>({
     const pushHistory = useCallback((entry: FormexHistoryEntry<T>) => {
         const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
         newHistory.push(entry);
-        historyRef.current = newHistory;
-        historyIndexRef.current = newHistory.length - 1;
+        historyRef.current = capHistory(newHistory);
+        historyIndexRef.current = historyRef.current.length - 1;
     }, []);
 
     useEffect(() => {
@@ -150,11 +178,11 @@ export function useCreateFormex<T = any>({
 
     const validate = useCallback(async () => {
         setIsValidating(true);
-        const validationErrors = await validation?.(valuesRef.current);
+        const validationErrors = await validationRef.current?.(valuesRef.current);
         setErrors(validationErrors ?? {});
         setIsValidating(false);
         return validationErrors;
-    }, [validation]);
+    }, []);
 
     const setFieldValue = useCallback(
         (key: string, value: unknown, shouldValidate?: boolean) => {
@@ -228,17 +256,17 @@ export function useCreateFormex<T = any>({
             e?.stopPropagation();
             setIsSubmitting(true);
             setSubmitCount((prev: number) => prev + 1);
-            const validationErrors = await validation?.(valuesRef.current);
+            const validationErrors = await validationRef.current?.(valuesRef.current);
             if (validationErrors && Object.keys(validationErrors).length > 0) {
                 setErrors(validationErrors);
             } else {
                 setErrors({});
-                await onSubmit?.(valuesRef.current, controllerRef.current);
+                await onSubmitRef.current?.(valuesRef.current, controllerRef.current);
             }
             setIsSubmitting(false);
             setVersion((prev: number) => prev + 1);
         },
-        [onSubmit, validation]
+        []
     );
 
     const resetForm = useCallback((props?: FormexResetProps<T>) => {
@@ -252,7 +280,7 @@ export function useCreateFormex<T = any>({
         const priorValues = valuesRef.current;
         const priorTouched = touchedRef.current;
         const nextValues = valuesProp ?? initialValuesRef.current;
-        const nextTouched = touchedProp ?? initialTouched ?? {};
+        const nextTouched = touchedProp ?? initialTouchedRef.current ?? {};
         valuesRef.current = nextValues;
         initialValuesRef.current = nextValues;
         setValuesInner(nextValues);
@@ -261,7 +289,7 @@ export function useCreateFormex<T = any>({
         setDirty(false);
         setSubmitCount(submitCountProp ?? 0);
         setVersion((prev: number) => prev + 1);
-        onReset?.(controllerRef.current);
+        onResetRef.current?.(controllerRef.current);
         if (undoable) {
             // Keep what the user typed one step behind them. The entry stepped
             // back into carries the touched map as well as the values: without
@@ -271,13 +299,15 @@ export function useCreateFormex<T = any>({
             const kept = historyRef.current.slice(0, historyIndexRef.current + 1);
             kept[kept.length - 1] = { values: priorValues, touched: priorTouched };
             kept.push({ values: nextValues, touched: nextTouched, boundary: true });
-            historyRef.current = kept;
-            historyIndexRef.current = kept.length - 1;
+            // Capped like any push; the pair just written is the newest, so it
+            // is never what goes.
+            historyRef.current = capHistory(kept);
+            historyIndexRef.current = historyRef.current.length - 1;
         } else {
             historyRef.current = [{ values: nextValues }];
             historyIndexRef.current = 0;
         }
-    }, [onReset, initialTouched]);
+    }, []);
 
     /**
      * The `initialValues` prop moved: the record this form edits finished

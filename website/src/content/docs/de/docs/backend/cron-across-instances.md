@@ -1,5 +1,5 @@
 ---
-sourceHash: e38cb2eddd8b623a
+sourceHash: cd43978985b8b565
 title: Cron über mehrere Instanzen
 sidebar_label: Cron über mehrere Instanzen
 description: "Wie sich Cron-Jobs mit mehr als einem Server-Prozess verhalten: eine Ausführung pro Slot, ein Slot, den ein Neustart verloren hat, eine Pause, die jede Replik einhält, und Ausführungen, die sich nie überschneiden."
@@ -45,7 +45,7 @@ Drei wichtige Dinge dazu:
 
 Im Normalfall – ein Neustart wenige Minuten nachdem ein Slot regulär ausgeführt wurde – ist der jüngste Slot bereits beansprucht, sodass das Nachholen lediglich eine Claim-Prüfung pro Job beim Start erfordert und nichts weiter unternimmt.
 
-Beim Start werden Claims gelöscht, die älter als sieben Tage sind, der jüngste Claim jedes Jobs bleibt jedoch immer erhalten, unabhängig von seinem Alter. Dieser Claim ist der Nachweis, dass der Slot bereits ausgeführt wurde, sodass ein monatlicher Job mit einem monatsweiten Nachholfenster nicht durch ein Deployment am 10. erneut ausgeführt wird.
+Der Scheduler löscht Claims, die älter als sieben Tage sind, beim Start und danach jede Stunde, der jüngste Claim jedes Jobs bleibt jedoch immer erhalten, unabhängig von seinem Alter. Dieser Claim ist der Nachweis, dass der Slot bereits ausgeführt wurde, sodass ein monatlicher Job mit einem monatsweiten Nachholfenster nicht durch ein Deployment am 10. erneut ausgeführt wird.
 
 Ein nachgeholter Durchlauf ist ein normaler Eintrag in `cron_logs` (`manual` ist `false`), wobei die erste Log-Zeile den nachgeholten Slot und die Verspätung festhält:
 

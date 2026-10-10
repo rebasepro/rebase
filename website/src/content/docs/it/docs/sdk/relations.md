@@ -69,10 +69,10 @@ const { data } = await client.data.posts.include({
 
 | Opzione | Cosa fa |
 |---------|---------|
-| `limit` | Righe **per elemento genitore**, non su tutta la pagina — cinque commenti su ogni post, non cinque in totale. |
+| `limit` | Righe **per elemento genitore**, non su tutta la pagina — cinque commenti su ogni post, non cinque in totale. Applicato dalla query, quindi le righe oltre il limite non vengono mai lette dal database. |
 | `where` | Lo stesso dialetto di filtri utilizzato dal `where` di primo livello. Applicato direttamente alla query, quindi il `limit` si applica alle righe corrispondenti. |
 | `logical` | Un gruppo `or`/`and`/`not` sulle righe correlate. |
-| `orderBy` | La stessa sintassi di ordinamento, incluso il [posizionamento di NULL](/docs/sdk/querying#where-nulls-sort). |
+| `orderBy` | La stessa sintassi di ordinamento, incluso il [posizionamento di NULL](/docs/sdk/querying#where-nulls-sort). Gli ex aequo, e un `limit` senza `orderBy`, seguono la chiave della riga correlata, in ordine crescente. |
 | `fields` | Colonne della riga *correlata*. La sua chiave viene sempre preservata, in modo che la riga rimanga indirizzabile. |
 | `include` | Relazioni della riga correlata, a loro volta — è così che l'albero si annida. |
 

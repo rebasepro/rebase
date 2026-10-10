@@ -35,14 +35,14 @@ import { probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
 import { createAuthSchema } from "./schema/auth-schema";
 import { HistoryService } from "./history/HistoryService";
-import { ensureHistoryTableExists } from "./history/ensure-history-table";
+import { ensureHistoryIndexes, ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { patchPgNumericToNumber } from "./utils/pg-numeric-number-patch";
 import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./schema/introspect-runtime";
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
-import { detectConnectionPosture, ensureAppRole, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
+import { detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, refreshInstalledCdcFunction, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { collectionKeyColumns } from "./services/cdc/identity-columns";
@@ -119,6 +119,13 @@ export interface PostgresDriverInternals {
 // Re-export from shared CLI error utilities
 import { deepestErrorMessage, diagnoseDbError, isEconnrefused, parseHostInfo } from "./cli-errors";
 import { classifyConnectFailure } from "./utils/pg-error-utils";
+import type { OpenIndexBuildSession, ScheduledIndexBuild } from "./schema/deferred-index-build";
+
+/**
+ * How long after the policies step the deferred index builds start: past the
+ * rest of boot, so the server is listening by then.
+ */
+const DEFERRED_INDEX_BUILD_DELAY_MS = 5_000;
 
 /**
  * Which table name the boot-time drift check should look for, for one collection.
@@ -421,6 +428,30 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
     };
 
     /**
+     * A connection of its own for the index builds on live tables — see
+     * `poolIndexBuildSession` for why it cannot be the pool's next free one. A
+     * handle with no pool behind it (PGlite, an application's own client)
+     * gets the shared queryable, and the builder leaves session settings
+     * alone on it.
+     */
+    const openIndexBuildSession = (driverResult?: InitializedDriver): OpenIndexBuildSession => async () => {
+        const db = requireProvisioningDb(driverResult);
+        const pool = "$client" in db ? db.$client : undefined;
+        const { isPgPool, poolIndexBuildSession } = await import("./schema/deferred-index-build");
+        if (isPgPool(pool)) return poolIndexBuildSession(pool)();
+        const queryable = provisioningQueryable(driverResult);
+        return { dedicated: false, query: <T>(text: string) => queryable.query<T>(text), release: () => undefined };
+    };
+
+    /**
+     * The indexes the last schema ensure left for later on live tables —
+     * see `schema/deferred-index-build`. Started once the policies step is
+     * done, the last DDL a boot runs, so the build never holds a table that
+     * step needs; and by its own fallback timer if that step never runs here.
+     */
+    let pendingIndexBuild: ScheduledIndexBuild | undefined;
+
+    /**
      * Create the `rebase` schema and the helper functions every generated
      * policy calls — `rebase.uid()`, `rebase.roles()` and their siblings — on
      * whichever database the queryable points at.
@@ -430,7 +461,11 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
      */
     const provisionRlsRuntime = async (driverResult?: InitializedDriver): Promise<void> => {
         const db = requireProvisioningDb(driverResult);
-        const { RLS_BOOTSTRAP_STATEMENTS } = await import("./schema/rls-bootstrap-sql");
+        const { RLS_BOOTSTRAP_STATEMENTS, rlsRuntimeIsCurrent } = await import("./schema/rls-bootstrap-sql");
+        // Nothing to replace: a `CREATE OR REPLACE` of an unchanged function
+        // still rewrites it and invalidates every cached plan that calls it.
+        const run = async (text: string) => sqlRows<Record<string, unknown>>(await db.execute(sql.raw(text)));
+        if (await rlsRuntimeIsCurrent(run).catch(() => false)) return;
         // One statement per call — this handle speaks the extended query
         // protocol, which rejects multi-command strings. Advisory-locked
         // for the same reason the auth path is, and on the same key: two
@@ -1296,10 +1331,30 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             const internals = driverResult.internals as PostgresDriverInternals;
             const db = internals.db;
 
-            const inTransaction = await ensureHistoryTableExists(db);
+            const { BOOT_LOCK_TIMEOUT_MS } = await import("./schema/boot-ddl");
+            const historyTable = await ensureHistoryTableExists(db, { lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS });
+
+            // The index the hourly retention sweep reads, built like any
+            // index a live table is missing: concurrently, after the boot —
+            // or right here in a provisioning-only run, which exits when boot
+            // returns. See `ensureHistoryIndexes`.
+            const historyIndexes = await ensureHistoryIndexes(db, { lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS });
+            if (historyIndexes.length > 0) {
+                const { buildDeferredIndexes, scheduleDeferredIndexBuild } = await import("./schema/deferred-index-build");
+                const indexOptions = { log: (message: string) => logger.info(`[history] ${message}`), lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS };
+                const provisionOnly = ["1", "true"].includes((process.env.REBASE_PROVISION_ONLY ?? "").trim().toLowerCase());
+                if (provisionOnly) {
+                    await buildDeferredIndexes(openIndexBuildSession(driverResult), historyIndexes, indexOptions);
+                } else {
+                    scheduleDeferredIndexBuild(openIndexBuildSession(driverResult), historyIndexes, {
+                        ...indexOptions,
+                        delayMs: DEFERRED_INDEX_BUILD_DELAY_MS
+                    }).start();
+                }
+            }
 
             const retention = typeof config === "object" ? config.retention : undefined;
-            const historyService = new HistoryService(db, retention ? { ttlDays: retention } : undefined, { inTransaction });
+            const historyService = new HistoryService(db, retention ? { ttlDays: retention } : undefined, historyTable);
 
             return { historyService };
         },
@@ -1366,13 +1421,45 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             // bindable values (schema names are identifiers), and the module
             // validates them before they reach a string.
             const queryable = provisioningQueryable(driverResult);
+            const { BOOT_LOCK_TIMEOUT_MS } = await import("./schema/boot-ddl");
+            // A provisioning-only run exits as soon as boot returns, so an
+            // index left for later would never be built by it — and the
+            // serving processes of such a deployment provision nothing. It is
+            // a migration job: building inline is what it is for.
+            const provisionOnly = ["1", "true"].includes((process.env.REBASE_PROVISION_ONLY ?? "").trim().toLowerCase());
             const plan = await ensureCollectionTables(
                 queryable,
                 collections as Parameters<typeof ensureCollectionTables>[1],
-                log
+                log,
+                // A change to a table a long reader holds waits in one-second
+                // slices, so live queries on it are never held behind the boot
+                // for longer than that. See `schema/boot-ddl`. And a table this
+                // boot creates is built in a few transactions, not one commit
+                // per column.
+                {
+                    lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS,
+                    batchNewTables: true,
+                    deferIndexBuilds: !provisionOnly,
+                    openIndexBuildSession: openIndexBuildSession(driverResult)
+                }
             );
             for (const failure of plan.failures) {
                 logger.warn(describeEnsureFailure(failure));
+            }
+            pendingIndexBuild?.cancel();
+            pendingIndexBuild = undefined;
+            if (!provisionOnly && plan.deferredIndexes.length > 0) {
+                const { scheduleDeferredIndexBuild } = await import("./schema/deferred-index-build");
+                logger.info(
+                    `[schema] ${plan.deferredIndexes.length} index(es) are missing, or were left INVALID, on tables that ` +
+                    "already exist. They are built in the background once the server is serving, one at a time, " +
+                    "without blocking reads or writes."
+                );
+                pendingIndexBuild = scheduleDeferredIndexBuild(openIndexBuildSession(driverResult), plan.deferredIndexes, {
+                    log: message => logger.info(`[schema] ${message}`),
+                    lockTimeoutMs: BOOT_LOCK_TIMEOUT_MS,
+                    delayMs: DEFERRED_INDEX_BUILD_DELAY_MS
+                });
             }
             return { applied: plan.actions.length - plan.failures.length };
         },
@@ -1387,10 +1474,11 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
          * initialization, because the generated policies call `rebase.uid()` /
          * `rebase.roles()`, and `CREATE POLICY` validates those functions exist.
          *
-         * Runs through the same drizzle handle, one statement at a time (that
-         * handle speaks the extended query protocol, which rejects multi-command
-         * strings). Failures are per-table and non-fatal: a table left un-policed
-         * stays RLS-enabled, so it denies rather than leaks.
+         * Runs through the same drizzle handle, one transaction per table under
+         * a lock budget (see `schema/ensure-collection-policies`). Failures are
+         * per-table and non-fatal: a table left un-policed stays RLS-enabled, so
+         * it denies rather than leaks, and a table whose lock another session
+         * held throughout is left exactly as it was.
          */
         /**
          * The helper functions every generated policy calls — `rebase.uid()`,
@@ -1447,6 +1535,22 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                     `🔐 [rls] Could not fully apply policies to "${failure.table}" — RLS is on, so it denies until this is resolved: ${failure.error}`
                 );
             }
+            // Not a failure: the table's transaction rolled back, so it is
+            // exactly as it was — RLS on, its existing policies in force. Only
+            // worth more than a warning when those are not the declared ones.
+            for (const deferred of outcome.deferred) {
+                const message =
+                    `🔐 [rls] Policies on "${deferred.table}" were not re-applied: ${deferred.error}. ` +
+                    "RLS is on and the table keeps the policies it already had";
+                if (deferred.rulesChanged) {
+                    logger.error(
+                        `${message} — which are NOT the ones this deploy declares, so its new security rules are ` +
+                        "not in force on this table yet. Boot again once that session has finished."
+                    );
+                } else {
+                    logger.warn(`${message}; they are re-applied on the next boot.`);
+                }
+            }
 
             // RLS could not be turned on at all. The schema-wide grant to the
             // user role has already run by this point, so without the revoke
@@ -1496,6 +1600,9 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 );
             }
 
+            // The last DDL this boot runs; the deferred index builds may have
+            // the tables now.
+            pendingIndexBuild?.start();
             return { applied: outcome.policiesApplied };
         },
 
@@ -1566,10 +1673,16 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             // a missing schema was never made, so every write to a
             // `history: true` collection answered "permission denied for schema
             // rebase" until a restart found the schema at connect time. Made
-            // now, once provisioning has created them; idempotent otherwise.
+            // now, once provisioning has created them.
+            //
+            // The grant tier only — the role and the membership were settled at
+            // connect, in this process — and only what the catalogue says is
+            // still missing: on a database whose grants already hold, one read.
+            // It used to repeat every grant and every internal-table revoke the
+            // connect-time call had just made.
             if (driver.rlsUserRole) {
                 try {
-                    await ensureAppRole(runSql, managedSchemas);
+                    await ensureAppRoleGrants(runSql, managedSchemas);
                 } catch (err) {
                     // Fails closed — a missing grant refuses requests, it does
                     // not widen them — so a warning, not a refusal to serve.

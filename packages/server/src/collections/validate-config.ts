@@ -301,6 +301,7 @@ const RELATION_KEYS = new Set<string>([
     "onDelete",
     "overrides",
     "localKey",
+    "index",
     "foreignKeyOnTarget",
     "sourceKey",
     "through",
@@ -536,6 +537,27 @@ function checkRelation(
                     `A "${kind}" takes ${allowed.length ? allowed.map(a => `\`${a}\``).join(" and ") : "no link field"}.`
                 );
             }
+        }
+    }
+
+    // `index` switches off the btree Rebase derives on a `belongsTo`'s key. It
+    // means nothing on the other kinds — their foreign key is a column on the
+    // target or in a junction, which this relation does not plan — and a value
+    // that is not a boolean would be read as "on" while the author meant "off".
+    if (relation.index !== undefined) {
+        if (typeof relation.index !== "boolean") {
+            collect.error(
+                `${path}.index`,
+                `\`index: ${JSON.stringify(relation.index)}\` must be \`true\` or \`false\`. ` +
+                "Leave it out to keep the index Rebase derives on the foreign key."
+            );
+        } else if (typeof kind === "string" && kind !== "belongsTo") {
+            collect.error(
+                `${path}.index`,
+                `\`index\` is not valid on a "${kind}" relation: only a \`belongsTo\` puts a foreign key on ` +
+                "this table. A `hasOne`/`hasMany` key is the target's `belongsTo` — set `index` there — and a " +
+                "`manyToMany` junction's key columns are always indexed."
+            );
         }
     }
 }

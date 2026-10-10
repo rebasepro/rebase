@@ -1,10 +1,11 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
-import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import type { IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
-import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
+import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, hasFieldAccessRules, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, type FilterCompilationOptions } from "../utils/drizzle-conditions";
+import { enableIterativeScan, inTransaction, iterativeScansAvailable } from "./vector-iterative-scan";
 import {
     getCollectionByPath,
     getTableForCollection,
@@ -24,12 +25,12 @@ import { RelationService } from "./RelationService";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { toFlatRow, toRestRow, toRestValues, stripUnreadable } from "./row-pipeline";
+import { toFlatRow, toRestRow, stripUnreadable, canReadRelation } from "./row-pipeline";
 import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-column";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 // One rule, one place. See `soft-delete.ts` for why every read has to ask.
 import { andSoftDelete, withSoftDelete, type WithDeleted } from "./soft-delete";
-import { beforeQueryCondition, beforeQueryConditions, type ReadCallContextProvider } from "./read-scope";
+import { beforeQueryCondition, beforeQueryConditions, hasBeforeQuery, type ReadCallContextProvider } from "./read-scope";
 import { ApiError, logger } from "@rebasepro/server";
 import { reachedDatabase } from "../utils/pg-error-utils";
 
@@ -57,31 +58,6 @@ type ResolvedOrderKey = {
     target: AnyPgColumn | SQL;
     cursorTarget?: SQL;
 };
-
-/**
- * Ascending comparison for two values of one column, with NULLs placed.
- *
- * Used only to order the rows *inside* one included relation, where the sort
- * happens after a batched load rather than in SQL — see
- * {@link FetchService.shapeRelatedRows}. The NULL placement is the same
- * question the `ORDER BY` answers, and it is answered the same way here so a
- * nested `orderBy` does not put its empty values at the opposite end from the
- * identical top-level one.
- */
-function compareForSort(a: unknown, b: unknown, nullsLast: boolean): number {
-    const aNull = a === null || a === undefined;
-    const bNull = b === null || b === undefined;
-    if (aNull && bNull) return 0;
-    if (aNull) return nullsLast ? 1 : -1;
-    if (bNull) return nullsLast ? -1 : 1;
-    // Dates compare as numbers; everything else falls back to a string
-    // comparison, which is what a mixed or unknown column has.
-    const av = a instanceof Date ? a.getTime() : a;
-    const bv = b instanceof Date ? b.getTime() : b;
-    if (typeof av === "number" && typeof bv === "number") return av - bv;
-    if (typeof av === "boolean" && typeof bv === "boolean") return (av ? 1 : 0) - (bv ? 1 : 0);
-    return String(av).localeCompare(String(bv));
-}
 
 /**
  * Service for handling all row read operations.
@@ -117,6 +93,36 @@ export function numericAggregateAliases(
                 a.fn === "count" || a.fn === "sum" || a.fn === "avg"
                 || ((a.fn === "min" || a.fn === "max") && isNumberField(a.field)))
             .map(a => a.alias)
+    );
+}
+
+/**
+ * Refuse a read that names a relation property its caller may not read.
+ *
+ * The relation-shaped twin of the REST refusal of `?fields=salary`
+ * (`assertQueryFieldsReadable`): a nested URL (`/departments/1/members`, and
+ * `/departments/1/members/7` — is 7 one of them?) hands over the property's
+ * value, its related rows; an aggregate sort (`orderBy=count(members)`) orders
+ * the parents by it. An `include` omits such a relation instead (see
+ * {@link canReadRelation} in `loadIncludes`), as the row strip omits any
+ * withheld field from a row; a request that *names* one as what to read or
+ * sort by is refused, naming it — field names are public, values are not.
+ */
+function assertRelationReadable(
+    collection: CollectionConfig,
+    key: string,
+    relation: ResolvedRelation,
+    use: string
+): void {
+    if (canReadRelation(collection, key, relation)) return;
+    throw ApiError.badRequest(
+        `'${key}' is not readable on '${collection.slug}' with your roles, so it cannot be used in ${use}.`,
+        "FIELD_NOT_READABLE",
+        {
+            collection: collection.slug,
+            fields: [key],
+            violations: [{ field: key, code: "access", message: `'${key}' is not readable with your roles.` }]
+        }
     );
 }
 
@@ -356,6 +362,11 @@ export class FetchService {
                 { field: orderBy }
             );
         }
+        // Ordering the parents by a relation's count is a reading of it, as
+        // `orderBy=salary` is of a column. An unknown relation is left to the
+        // builder below, which refuses it naming the ones there are.
+        const sorted = findRelation(resolveCollectionRelations(collection), spec.relation);
+        if (sorted) assertRelationReadable(collection, spec.relation, sorted, "`orderBy`");
         const primaryKeys = getPrimaryKeys(collection, this.registry);
         const idColumn = primaryKeys.length === 1
             ? table[primaryKeys[0].fieldName as keyof typeof table] as AnyPgColumn
@@ -614,7 +625,9 @@ target });
         const out: { key: string; node: IncludeNode; relation: ResolvedRelation }[] = [];
 
         if (wildcard) {
-            // `*` is "every relation, one hop" — the admin panel's shape. A
+            // `*` is "every relation, one hop", tab-only relations included.
+            // The admin panel names the relations its properties render and
+            // sends `*` only when it cannot resolve them in the browser. A
             // relation also named explicitly keeps its options.
             for (const [key, relation] of Object.entries(resolvedRelations)) {
                 out.push({ key, node: tree[key] ?? { children: {} }, relation });
@@ -668,14 +681,51 @@ target });
     }
 
     /**
-     * Sort, cap and project the rows of ONE to-many relation, per parent.
+     * Refuse a `count` the loader cannot serve honestly, before anything runs.
      *
-     * `orderBy` and `limit` are applied here rather than in SQL because a limit
-     * on a batched relation load is *per parent*, and expressing that needs a
-     * LATERAL or a window function per relation kind — four of them, each with
-     * its own join shape. The rows were already narrowed by
-     * {@link includeNarrowing} in SQL, so what this sorts and cuts is the set
-     * the caller asked for and not the table.
+     * - On a to-one relation: there is nothing to count past a row or none,
+     *   and answering 0 or 1 under `_count` would invent a shape for it.
+     * - On a collection with a property named `_count`: the total would be
+     *   written over that column's value. A silent overwrite answers 200 with
+     *   the column gone, so it is a 400 naming why.
+     */
+    private assertCountsAllowed(
+        collection: CollectionConfig,
+        levels: { key: string; node: IncludeNode; relation: ResolvedRelation }[]
+    ): void {
+        const counted = levels.filter(({ node }) => node.count);
+        if (counted.length === 0) return;
+        const collectionName = collection.slug ?? collection.name;
+        for (const { key, relation } of counted) {
+            if (relation.cardinality === "one") {
+                throw ApiError.badRequest(
+                    `Cannot count relation '${key}' on collection '${collectionName}': ` +
+                    "it is a to-one relation. `count` totals the rows of a to-many relation.",
+                    "INVALID_INCLUDE",
+                    { relation: key, collection: collectionName }
+                );
+            }
+        }
+        if (Object.prototype.hasOwnProperty.call(collection.properties ?? {}, INCLUDE_COUNT_KEY)) {
+            throw ApiError.badRequest(
+                `Cannot serve \`count\` on collection '${collectionName}': it declares a property named ` +
+                `'${INCLUDE_COUNT_KEY}', which is where the totals would go.`,
+                "INVALID_INCLUDE",
+                { collection: collectionName, field: INCLUDE_COUNT_KEY }
+            );
+        }
+    }
+
+    /**
+     * Cap and project the rows of ONE relation, per parent.
+     *
+     * The order and the limit are Postgres's: the batch loader ranks each
+     * parent's related rows by the include's `orderBy` and reads back only the
+     * ones within its `limit` (see
+     * {@link RelationService.batchFetchRelatedEntitiesMany}), so `rows`
+     * arrives sorted and already cut. The slice here is what holds the limit
+     * where a `via` chain reaches one target along two paths — those rows share
+     * a rank — and it costs nothing where nothing is left to cut.
      */
     private shapeRelatedRows(
         rows: Record<string, unknown>[],
@@ -683,17 +733,7 @@ target });
         targetCollection: CollectionConfig
     ): Record<string, unknown>[] {
         let out = rows;
-        if (node.orderBy && node.orderBy.length > 0) {
-            const keys = node.orderBy;
-            out = [...out].sort((a, b) => {
-                for (const [field, direction, nulls] of keys) {
-                    const cmp = compareForSort(a[field], b[field], FetchService.nullsLast({ direction, nulls }));
-                    if (cmp !== 0) return direction === "desc" ? -cmp : cmp;
-                }
-                return 0;
-            });
-        }
-        if (node.limit !== undefined) out = out.slice(0, node.limit);
+        if (node.limit !== undefined && out.length > node.limit) out = out.slice(0, node.limit);
         if (node.fields && node.fields.length > 0) {
             const keep = new Set(node.fields);
             // The key always survives: a related row nobody can address cannot
@@ -751,7 +791,16 @@ target });
         if (addressable.length === 0) return;
         const rowIds = addressable.map(row => addressOf(row) as string);
 
-        const levels = this.resolveIncludeLevel(collection, include.tree, include.wildcard);
+        const requested = this.resolveIncludeLevel(collection, include.tree, include.wildcard);
+        this.assertCountsAllowed(collection, requested);
+
+        // A relation property this caller may not read is withheld whole: not
+        // loaded, so neither embedded nor counted — absent from the row, as the
+        // strip leaves any withheld field. Decided here, the one loader every
+        // door reaches (REST, `POST …/query`, the in-process SDK, socket fetches
+        // and subscriptions), and at every level of a nested include. The REST
+        // rows were stripped before this runs, so the strip cannot catch it.
+        const levels = requested.filter(({ key, relation }) => canReadRelation(collection, key, relation));
 
         for (const { key, node, relation } of levels) {
             const targetCollection = relation.target();
@@ -768,8 +817,16 @@ target });
 
             try {
                 if (relation.cardinality === "one") {
+                    // Rendered by the loader exactly as the target's own route
+                    // renders it (`style: "rest"`): a target left in the walk's
+                    // own types is how a date came back as a string at the top
+                    // level and a `{ __type: "date" }` envelope one level down,
+                    // in one response — and how the target's own to-one
+                    // relations arrived as `{ __type: "relation" }` refs.
+                    // The rows go along so a `belongsTo` takes each foreign
+                    // key from the row rather than selecting it again.
                     const results = await this.relationService.batchFetchRelatedEntities(
-                        collectionPath, rowIds, key, relation, narrow
+                        collectionPath, rowIds, key, relation, narrow, { style: "rest", parentRows: addressable }
                     );
                     for (const row of addressable) {
                         const related = results.get(String(addressOf(row)));
@@ -777,35 +834,43 @@ target });
                         // nothing is a fact about the row, and leaving the key
                         // off makes it indistinguishable from not having asked.
                         if (!related) { row[key] = null; continue; }
-                        // Rendered exactly as the parent is: the include loader
-                        // attaches these itself, and a target left in the walk's
-                        // own types is how a date came back as a string at the
-                        // top level and a `{ __type: "date" }` envelope one
-                        // level down, in one response.
-                        const [shaped] = this.shapeRelatedRows(
-                            [toRestValues({ ...related.values }, targetCollection)], node, targetCollection
-                        );
+                        const [shaped] = this.shapeRelatedRows([related.values], node, targetCollection);
                         row[key] = shaped;
                         loaded.push(shaped);
                     }
                 } else {
+                    // The include's own order and limit, which the loader
+                    // applies per parent in SQL — and, for `count`, the totals
+                    // the same statement counts before the limit.
+                    const totals = node.count ? new Map<string, number>() : undefined;
+                    const window = node.limit !== undefined || (node.orderBy && node.orderBy.length > 0) || totals
+                        ? { limit: node.limit, orderBy: node.orderBy, totals }
+                        : undefined;
                     const results = await this.relationService.batchFetchRelatedEntitiesMany(
-                        collectionPath, rowIds, key, relation, narrow
+                        collectionPath, rowIds, key, relation, narrow, window, { style: "rest" }
                     );
                     for (const row of addressable) {
-                        const related = results.get(String(addressOf(row))) ?? [];
+                        const address = String(addressOf(row));
+                        const related = results.get(address) ?? [];
+                        if (totals) {
+                            // Without a limit nothing was cut: the total is
+                            // the related rows themselves, one per target.
+                            const total = node.limit !== undefined
+                                ? totals.get(address) ?? 0
+                                : new Set(related.map(e => String(e.id))).size;
+                            const counts = (row[INCLUDE_COUNT_KEY] ??= {}) as Record<string, number>;
+                            counts[key] = total;
+                        }
                         const shaped = this.shapeRelatedRows(
                             // The junction's own columns ride along under
                             // `_pivot` — the link's data, not the target's, so
                             // it is nested rather than merged: two posts sharing
                             // a tag see one tag row and two different links, and
                             // a flattened `role` would collide with a column of
-                            // the target's own. It stays outside `toRestValues`
-                            // for the same reason: the target's collection does
-                            // not describe the link's columns.
-                            related.map(e => (e.pivot
-                                ? { ...toRestValues({ ...e.values }, targetCollection), [JUNCTION_PIVOT_KEY]: e.pivot }
-                                : toRestValues({ ...e.values }, targetCollection))),
+                            // the target's own. It is not part of the target's
+                            // REST rendering for the same reason: the target's
+                            // collection does not describe the link's columns.
+                            related.map(e => (e.pivot ? { ...e.values, [JUNCTION_PIVOT_KEY]: e.pivot } : e.values)),
                             node, targetCollection
                         );
                         row[key] = shaped;
@@ -974,7 +1039,9 @@ target });
         row: Record<string, unknown>,
         address: string,
         collection: CollectionConfig,
-        collectionPath: string
+        collectionPath: string,
+        /** The row as read, so a `belongsTo` takes its foreign key from it. */
+        sourceRow: Record<string, unknown>
     ): Promise<void> {
         if (!address) return;
         const toRef = (related: { id: string | number; path: string; values: Record<string, unknown> }) =>
@@ -988,7 +1055,7 @@ target });
             try {
                 if (relation.cardinality === "one") {
                     const related = (await this.relationService.batchFetchRelatedEntities(
-                        collectionPath, [address], key, relation
+                        collectionPath, [address], key, relation, undefined, { parentRows: [sourceRow] }
                     )).get(address);
                     if (related) row[key] = toRef(related);
                 } else {
@@ -1290,6 +1357,8 @@ target });
      * target table, so a nested listing can run as an ordinary collection query.
      */
     private buildRelationScope(hop: NestedPathHop): SQL {
+        // The rows of this relation, reached by URL rather than by `include`.
+        assertRelationReadable(hop.parentCollection, hop.relationKey, hop.relation, "a nested path");
         const parentPks = requirePrimaryKeys(hop.parentCollection, this.registry);
         const parsedParent = parseIdValues(hop.parentId, parentPks);
         // What a single-column link compares against. A link from a composite
@@ -1337,6 +1406,9 @@ target });
         if (!isNestedPath(collectionPath)) return true;
         const hop = resolveNestedPath(collectionPath, this.registry);
         if (!hop) return true;
+        // "Is row 7 one of this parent's members" is the relation's value one
+        // row at a time — the same reading the listing below is refused.
+        assertRelationReadable(hop.parentCollection, hop.relationKey, hop.relation, "a nested path");
         return this.relationService.isRelated(hop, id);
     }
 
@@ -1397,7 +1469,7 @@ target });
             if (row === undefined) return undefined;
             if (row !== null) {
                 const flatRow = toFlatRow(row, collection, this.registry);
-                await this.loadRelationRefs(flatRow, buildCompositeId(row, idInfoArray), collection, collectionPath);
+                await this.loadRelationRefs(flatRow, buildCompositeId(row, idInfoArray), collection, collectionPath, row);
 
                 // Again, now the relations are on the row: a relation property
                 // the caller may not read is withheld like any other field.
@@ -1420,7 +1492,7 @@ target });
         // owned foreign key into a ref. Given them, it queried each inverse
         // relation itself, with neither the target's scope nor its soft delete.
         const values = await parseDataFromServer(raw, collection) as Record<string, unknown>;
-        await this.loadRelationRefs(values, buildCompositeId(raw, idInfoArray), collection, collectionPath);
+        await this.loadRelationRefs(values, buildCompositeId(raw, idInfoArray), collection, collectionPath, raw);
 
         // The primary path strips inside `toFlatRow`; this one parses the row
         // itself, so it strips itself. Without it a fetch that fell back served
@@ -2142,6 +2214,51 @@ relatedTo: hop }, include
     }
 
     /**
+     * {@link fetchOneForRest}'s read of a row an INSERT just wrote, taken from
+     * the INSERT's own `RETURNING` instead of a second statement — or
+     * `undefined` when the two could answer differently.
+     *
+     * A write answers with `fetchOneForRest(slug, id, undefined, …, { withDeleted: true })`
+     * (see `PersistService.save`): the row's visible columns, rendered by
+     * `toRestRow`. For a row the statement itself wrote, with nothing written
+     * after it, `RETURNING` those same columns is that row — the same values
+     * through the same column decoders, in the same order, rendered the same
+     * way. Two things narrow the read and not the statement, and either one
+     * keeps the read:
+     *
+     *  - a `beforeQuery` adds conditions to the read (and runs application
+     *    code): a row outside them is no answer today, and would be one from
+     *    `RETURNING`;
+     *  - per-field read access, which projects the read for the viewer.
+     *
+     * Row-level security is the same either way. `INSERT … RETURNING` holds
+     * the new row to the table's SELECT policies and refuses one they hide
+     * (42501) — which the INSERT's `RETURNING <key>` already did, so returning
+     * more columns changes nothing about who may write or read what.
+     */
+    insertReturning(collectionPath: string): {
+        columns: Record<string, AnyPgColumn>;
+        render: (returned: Record<string, unknown>) => Record<string, unknown>;
+    } | undefined {
+        const collection = getCollectionByPath(collectionPath, this.registry);
+        if (hasBeforeQuery(this.registry, collection) || hasFieldAccessRules(collection)) return undefined;
+        const table = getTableForCollection(collection, this.registry);
+        // Not a real drizzle table (a stub in a test): nothing to return, so
+        // the read stays.
+        const tableColumns: Record<string, AnyPgColumn> | undefined = getTableColumns(table);
+        if (!tableColumns) return undefined;
+        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        // The read's projection, kept in the table's column order, so the
+        // rendered row has its keys in the order the read gives them.
+        const visible = this.columnProjection(table, collection, undefined, idInfoArray);
+        const columns: Record<string, AnyPgColumn> = {};
+        for (const [name, column] of Object.entries(tableColumns)) {
+            if (!visible || name in visible) columns[name] = column;
+        }
+        return { columns, render: returned => toRestRow(returned, collection, this.registry) };
+    }
+
+    /**
      * Fetch raw rows without any relation processing (for REST fast path)
      */
     private async fetchRowsWithConditionsRaw<M extends Record<string, unknown>>(
@@ -2192,6 +2309,19 @@ relatedTo: hop }, include
                 "Its rows are ordered by a distance computed per query, which cannot key a cursor. " +
                 "Use `limit`/`offset` for the next page of nearest rows.",
                 "VECTOR_CURSOR_UNSUPPORTED"
+            );
+        }
+
+        // A vector read runs with pgvector's iterative index scan, which has to
+        // be set in a transaction — see `vector-iterative-scan.ts`. This
+        // driver's request-scoped copies already read in one; the base driver,
+        // on the pool, is given one, read-only, and reads again inside it.
+        const iterative = options.vectorSearch !== undefined
+            && await iterativeScansAvailable(this.db, this.registry);
+        if (iterative && !inTransaction(this.db)) {
+            return this.db.transaction(
+                (tx) => new FetchService(tx, this.registry, this.callContext).fetchRowsWithConditionsRaw(collectionPath, options),
+                { accessMode: "read only" }
             );
         }
 
@@ -2286,9 +2416,16 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             collectionPath, collection, table, "list", FetchService.describeRead(options)
         ));
 
-        if (vectorMeta?.filter) {
-            allConditions.push(vectorMeta.filter);
-        }
+        // A vector `threshold` is not a WHERE condition here. The rows come
+        // back closest first whatever the plan, so the ones within it are the
+        // front of the page — and are cut from it below, after the read. As a
+        // condition it was applied to the index's candidates after the scan,
+        // like any filter, and under an iterative scan a page asking for more
+        // rows than lie within the threshold made the index walk on to its
+        // scan limit looking for them: 22 ms against 1 ms for the same page
+        // (20,000 rows × 256 dimensions). Cut afterwards, the page and its
+        // offset are the same rows either way — those within the threshold
+        // are a prefix of the ordering — and no scan looks past the page.
 
         if (allConditions.length > 0) {
             const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(allConditions);
@@ -2353,13 +2490,21 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         // Offset (numeric pagination)
         if (options.offset && options.offset > 0) query = query.offset(options.offset);
 
+        if (iterative) await enableIterativeScan(this.db);
+
         const rawResults = await query;
 
         if (vectorMeta) {
-            return (rawResults as { table_row: Record<string, unknown>; _distance: unknown }[]).map(r => ({
-                ...r.table_row,
-                _distance: typeof r._distance === "number" ? r._distance : parseFloat(String(r._distance))
-            }));
+            const threshold = options.vectorSearch?.threshold;
+            return (rawResults as { table_row: Record<string, unknown>; _distance: unknown }[])
+                .map(r => ({
+                    ...r.table_row,
+                    _distance: typeof r._distance === "number" ? r._distance : parseFloat(String(r._distance))
+                }))
+                // `<`, as the SQL condition was: a row at exactly the threshold
+                // is outside it, and so is a NaN distance (a zero vector's
+                // cosine), which Postgres also orders above every number.
+                .filter(row => threshold == null || row._distance < threshold);
         }
 
         if (rankSelect) {

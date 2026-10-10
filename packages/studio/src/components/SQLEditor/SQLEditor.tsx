@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import {
     Alert,
     Button,
+    type CellRendererParams,
     Checkbox,
     Chip,
     CircularProgress,
@@ -43,11 +44,11 @@ import {
     XIcon
 } from "@rebasepro/ui";
 
-import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView, useTranslation } from "@rebasepro/app";
+import { useApiBase, useApiConfig, useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView, useTranslation } from "@rebasepro/app";
 import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeStoredJson, writeStoredString } from "@rebasepro/utils";
 import { MonacoEditor, type MonacoEditorHandle } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
-import { buildExplainSql, formatSql, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, withAutoLimit, type CellEditResolution, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
+import { buildExplainSql, formatSql, keepLatestColumnWidths, needsDestructiveConfirmation, quoteIdentifier, groupSchemaRows, quoteTableName, rememberColumnWidth, resolveCellEdit, resolveQueryCollections, resultsToCsv, withAutoLimit, type CellEditResolution, type ColumnWidthsByQuery, type ResolvedQueryCollection, type ResultProvenance } from "../../utils/sql_utils";
 import { ExplainVisualizer } from "./ExplainVisualizer";
 
 import type { SQLEditorColumnInfo, TableInfo } from "./sql_editor_types";
@@ -307,7 +308,13 @@ export const SQLEditor = () => {
          * transaction in progress` for a ROLLBACK that ended nothing, which
          * otherwise reads as a plain success.
          */
-        notices: SqlScriptNotice[]
+        notices: SqlScriptNotice[],
+        /**
+         * How many rows the last statement returned, when the server sent
+         * only its first ones — see `SqlScriptResult.truncated`. `null` when
+         * the rows on screen are all of them.
+         */
+        truncatedFrom: number | null
     }>>(() => {
         const projectPrefixSync = getStoragePrefix(client?.baseUrl);
         // This runs during the first render, so anything it throws takes the
@@ -330,7 +337,8 @@ export const SQLEditor = () => {
             lastExecutedConnection: null,
             ranAs: null,
             lastProvenance: null,
-            notices: []
+            notices: [],
+            truncatedFrom: null
         }));
         if (restored.length > 0) return restored;
         return [{
@@ -347,7 +355,8 @@ export const SQLEditor = () => {
             lastExecutedConnection: null,
             ranAs: null,
             lastProvenance: null,
-            notices: []
+            notices: [],
+            truncatedFrom: null
         }];
     });
     const [activeTabId, setActiveTabId] = useState<string>(() => {
@@ -368,6 +377,12 @@ export const SQLEditor = () => {
     const loading = activeTab.loading;
     const error = activeTab.error;
     const execTime = activeTab.execTime;
+    /**
+     * The SQL whose rows are on screen, which their column widths are kept
+     * under. Not the text being typed: keyed by that, every keystroke handed
+     * the grid other widths, and every visible cell was drawn again.
+     */
+    const resultSql = activeTab.lastExecutedSql ?? "";
 
     const setSql = (newSql: string) => updateActiveTab({ sql: newSql });
     const setResults = (newResults: Record<string, unknown>[] | null) => updateActiveTab({ results: newResults });
@@ -536,27 +551,7 @@ role: selectedRole } : t));
             const result = await databaseAdmin!.executeSql!(sql, { database: selectedDatabase });
 
             const processGrouped = (data: Record<string, unknown>[]) => {
-                const grouped = data.reduce((acc: Record<string, TableInfo[]>, curr: Record<string, unknown>) => {
-                    const schema = (curr.schema || curr.SCHEMA || curr.table_schema || "public") as string;
-                    const table = (curr.table || curr.TABLE || curr.table_name) as string;
-                    const column = (curr.column || curr.COLUMN || curr.column_name) as string;
-                    const dataType = (curr.data_type || curr.DATA_TYPE || "") as string;
-                    const isPrimaryKey = curr.is_pk === true || curr.is_pk === "true";
-
-                    if (!acc[schema]) acc[schema] = [];
-                    let tableInfo = acc[schema].find(t => t.tableName === table);
-                    if (!tableInfo) {
-                        tableInfo = { schemaName: schema,
-tableName: table,
-columns: [] };
-                        acc[schema].push(tableInfo);
-                    }
-                    tableInfo.columns.push({ name: column,
-dataType,
-isPrimaryKey });
-                    return acc;
-                }, {});
-                setSchemas(grouped);
+                setSchemas(groupSchemaRows(data));
             };
 
             if (!result || !Array.isArray(result)) {
@@ -741,12 +736,14 @@ role: connection.role });
         }
     }, [editingCell, resolveEdit, activeTab.lastExecutedSql, activeTab.lastExecutedConnection, activeTab.results, isCurrentConnection, databaseAdmin, updateActiveTab, snackbarController, t]);
 
-    const [columnWidths, setColumnWidths] = useState<Record<string, Record<string, number>>>(() => {
+    const [columnWidths, setColumnWidths] = useState<ColumnWidthsByQuery>(() => {
         const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
-        return readStoredJson<Record<string, Record<string, number>>>(
+        // Trimmed on the way in too: a store written before the bound may
+        // hold every query ever resized.
+        return keepLatestColumnWidths(readStoredJson<Record<string, unknown>>(
             `rebase_sql_column_widths_${projectPrefixSync}`,
             { fallback: {}, accept: isRecordValue }
-        );
+        ));
     });
     const [snippets, setSnippets] = useState<Snippet[]>([]);
     const [history, setHistory] = useState<string[]>([]);
@@ -825,7 +822,8 @@ role: connection.role });
             lastExecutedConnection: null,
             ranAs: null,
             lastProvenance: null,
-            notices: []
+            notices: [],
+            truncatedFrom: null
         }]);
         setActiveTabId(newId);
     };
@@ -849,17 +847,11 @@ role: connection.role });
 
     const handleColumnResize = useCallback(({ key, width }: { key: string, width: number }) => {
         setColumnWidths(prev => {
-            const newWidths = {
-                ...prev,
-                [activeTab.sql]: {
-                    ...(prev[activeTab.sql] || {}),
-                    [key]: width
-                }
-            };
+            const newWidths = rememberColumnWidth(prev, resultSql, key, width);
             writeStoredJson(`rebase_sql_column_widths_${projectPrefix}`, newWidths);
             return newWidths;
         });
-    }, [activeTab.sql, projectPrefix]);
+    }, [resultSql, projectPrefix]);
 
     const handlePrettify = () => {
         setSql(formatSql(activeTab.sql));
@@ -886,7 +878,8 @@ lastExecutedSql: null,
 lastExecutedConnection: null,
 ranAs: null,
 lastProvenance: null,
-notices: [] });
+notices: [],
+truncatedFrom: null });
         const start = performance.now();
         try {
             if (databaseAdmin?.executeSql) {
@@ -910,7 +903,8 @@ execTime: Math.round(performance.now() - start) });
         updateActiveTab({ loading: true,
 error: null,
 results: null,
-notices: [] });
+notices: [],
+truncatedFrom: null });
         const start = performance.now();
 
         try {
@@ -932,7 +926,8 @@ notices: [] });
                     lastProvenance: run
                         ? { columns: run.columns, tables: run.tables }
                         : { columns: Object.keys(rows[0] ?? {}).map(name => ({ name })), tables: [] },
-                    notices: run?.notices ?? []
+                    notices: run?.notices ?? [],
+                    truncatedFrom: run?.truncated ? run.rowCount ?? null : null
                 });
                 // A server that ran the script as someone other than the role
                 // picked runs every statement that way: the picker is moot.
@@ -1014,21 +1009,66 @@ notices: [] });
     const handleExportCSV = () => {
         if (!results || results.length === 0) return;
 
-        const headers = Object.keys(results[0]).join(",");
-        const rows = results.map(row =>
-            Object.values(row).map(val => {
-                const str = String(val);
-                return str.includes(",") ? `"${str}"` : str;
-            }).join(",")
-        );
-        const csv = [headers, ...rows].join("\n");
-        const blob = new Blob([csv], { type: "text/csv" });
+        const blob = new Blob([resultsToCsv(results)], { type: "text/csv" });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = `query_results_${new Date().toISOString().slice(0, 19)}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
+    };
+
+    const apiConfig = useApiConfig();
+    const apiBase = useApiBase();
+    const [downloadingFullResult, setDownloadingFullResult] = useState(false);
+
+    /**
+     * The whole result of the last run, past the rows the console keeps:
+     * streamed by the server through a read-only cursor (`POST
+     * /admin/sql/csv`), on the database and as the role the rows on screen
+     * were read with.
+     */
+    const handleDownloadFullCsv = async () => {
+        const query = activeTab.lastExecutedSql;
+        const connection = activeTab.lastExecutedConnection;
+        if (!query || !apiBase) return;
+        setDownloadingFullResult(true);
+        try {
+            const token = apiConfig?.getAuthToken ? await apiConfig.getAuthToken() : null;
+            const response = await fetch(`${apiBase}/admin/sql/csv`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ sql: query, database: connection?.database, role: connection?.role })
+            });
+            if (!response.ok) {
+                const failure: unknown = await response.json().catch(() => null);
+                const reason = typeof failure === "object" && failure !== null && "error" in failure
+                    && typeof failure.error === "object" && failure.error !== null
+                    && "message" in failure.error && typeof failure.error.message === "string"
+                    ? failure.error.message
+                    : `HTTP ${response.status}`;
+                throw new Error(reason);
+            }
+            // A download cut off part-way fails here rather than saving a file
+            // that looks whole: the server errors the stream.
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `query_results_${new Date().toISOString().slice(0, 19)}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        } catch (e: unknown) {
+            snackbarController.open({
+                type: "error",
+                message: t("studio_sql_download_full_failed", { message: e instanceof Error ? e.message : String(e) })
+            });
+        } finally {
+            setDownloadingFullResult(false);
+        }
     };
 
     const handleExportJSON = () => {
@@ -1073,6 +1113,154 @@ notices: [] });
             });
         });
     };
+
+    // What the result grid is handed, kept the same object while only the
+    // editor's text changes: `VirtualTable` compares its props, and a new
+    // column list or cell renderer on every keystroke redrew every visible
+    // cell of the result for each character typed.
+    const savedWidths = columnWidths[resultSql];
+    const resultColumnKeys = useMemo(() => results && results.length > 0 ? Object.keys(results[0]) : [], [results]);
+
+    // Compute matched collections for this query, including PK column detection
+    // Only collections whose key the database says is in the result can be opened,
+    // and only from rows read on the app's own database: the record the CMS
+    // opens is that database's row with the key, whatever database the
+    // rows on screen came from.
+    const readFromAppDatabase = activeTab.lastExecutedConnection !== null &&
+        (activeTab.lastExecutedConnection.database === undefined || activeTab.lastExecutedConnection.database === appDatabase);
+    const lastProvenance = activeTab.lastProvenance;
+    const registryCollections = collectionRegistry.collections;
+    const actionableCollections = useMemo((): ResolvedQueryCollection[] => lastProvenance && registryCollections && readFromAppDatabase
+        ? resolveQueryCollections(lastProvenance, registryCollections)
+            .filter(mc => resultColumnKeys.includes(mc.pkColumn))
+        : [], [lastProvenance, registryCollections, readFromAppDatabase, resultColumnKeys]);
+
+    // For each row, determine which entities can be opened
+    const getRowEntityActions = useCallback((rowData: Record<string, unknown>): { collection: ResolvedQueryCollection, entityId: string | number }[] => {
+        if (!rowData) return [];
+        return actionableCollections
+            .filter(mc => rowData[mc.pkColumn] != null)
+            .map(mc => ({
+                collection: mc,
+                entityId: rowData[mc.pkColumn] as string | number
+            }));
+    }, [actionableCollections]);
+
+    // Build the columns array. If we have actionable collections, prepend a dedicated action column.
+    const hasRowActions = actionableCollections.length > 0;
+    const resultColumns = useMemo((): VirtualTableColumn[] => {
+        const dataColumns: VirtualTableColumn[] = resultColumnKeys.map(key => ({
+            key,
+            title: key,
+            width: savedWidths?.[key] ?? 150,
+            sortable: false,
+            resizable: true
+        }));
+        return hasRowActions
+            ? [{ key: "__cms_action__",
+title: "",
+width: 36,
+sortable: false,
+resizable: false }, ...dataColumns]
+            : dataColumns;
+    }, [resultColumnKeys, savedWidths, hasRowActions]);
+
+    const renderResultCell = useCallback(({ rowData, column, rowIndex }: CellRendererParams<Record<string, unknown>>) => {
+        // Dedicated collection action column
+        if (column.key === "__cms_action__") {
+            const rowActions = getRowEntityActions(rowData ?? {});
+            if (rowActions.length === 0) {
+                return <div className="h-full w-full"/>;
+            }
+            if (rowActions.length === 1) {
+                const ra = rowActions[0];
+                return (
+                    <div className="h-full flex items-center justify-center">
+                        <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}>
+                            <IconButton
+                                size="small"
+                                aria-label={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}
+                                className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    sidePanelController?.open({
+                                        path: ra.collection.collection.slug,
+                                        entityId: ra.entityId,
+                                        collection: ra.collection.collection,
+                                        updateUrl: false
+                                    });
+                                }}
+                            >
+                                <PencilIcon size={iconSize.smallest}/>
+                            </IconButton>
+                        </Tooltip>
+                    </div>
+                );
+            }
+            // Multiple matched collections (JOIN) — show a dropdown
+            return (
+                <div className="h-full flex items-center justify-center">
+                    <Menu
+                        trigger={
+                            <IconButton
+                                size="small"
+                                className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <MoreVerticalIcon size={iconSize.smallest}/>
+                            </IconButton>
+                        }
+                    >
+                        {rowActions.map(ra => (
+                            <MenuItem
+                                key={ra.collection.tableName}
+                                dense
+                                onClick={() => {
+                                    sidePanelController?.open({
+                                        path: ra.collection.collection.slug,
+                                        entityId: ra.entityId,
+                                        collection: ra.collection.collection,
+                                        updateUrl: false
+                                    });
+                                }}
+                            >
+                                {t("studio_sql_edit_entity", { name: ra.collection.collection.name,
+id: String(ra.entityId) })}
+                            </MenuItem>
+                        ))}
+                    </Menu>
+                </div>
+            );
+        }
+
+        // Regular data cell
+        const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.columnKey === column.key;
+        const value = rowData ? rowData[column.key] : null;
+        const displayValue = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value ?? "");
+
+        if (isEditing) {
+            return (
+                <FixedEditorOverlay
+                    displayValue={displayValue}
+                    onSave={(val) => handleCellSave(val, rowData ?? {}, column.key, rowIndex)}
+                    onCancel={() => setEditingCell(null)}
+                />
+            );
+        }
+
+        return (
+            <div
+                className="px-4 py-1.5 h-full flex items-center whitespace-nowrap text-[13px] text-text-primary dark:text-text-primary-dark font-mono cursor-text group/cell"
+                onDoubleClick={() => handleDoubleClick(rowIndex, column.key, displayValue, rowData ?? {})}
+            >
+                <div className="truncate flex-grow" title={displayValue}>
+                    {value === null || value === undefined ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-[11px]">NULL</span> : displayValue}
+                </div>
+            </div>
+        );
+    }, [getRowEntityActions, editingCell, handleCellSave, handleDoubleClick, sidePanelController, t]);
 
     const renderResults = () => {
         if (loading) {
@@ -1133,49 +1321,6 @@ notices: [] });
             );
         }
 
-        const savedWidths = columnWidths[activeTab.sql] || {};
-        const resultColumnKeys = Object.keys(results[0]);
-
-        // Compute matched collections for this query, including PK column detection
-        // Only collections whose key the database says is in the result can be opened,
-        // and only from rows read on the app's own database: the record the CMS
-        // opens is that database's row with the key, whatever database the
-        // rows on screen came from.
-        const readFromAppDatabase = activeTab.lastExecutedConnection !== null &&
-            (activeTab.lastExecutedConnection.database === undefined || activeTab.lastExecutedConnection.database === appDatabase);
-        const actionableCollections: ResolvedQueryCollection[] = activeTab.lastProvenance && collectionRegistry.collections && readFromAppDatabase
-            ? resolveQueryCollections(activeTab.lastProvenance, collectionRegistry.collections)
-                .filter(mc => resultColumnKeys.includes(mc.pkColumn))
-            : [];
-
-        // For each row, determine which entities can be opened
-        const getRowEntityActions = (rowData: Record<string, unknown>): { collection: ResolvedQueryCollection, entityId: string | number }[] => {
-            if (!rowData) return [];
-            return actionableCollections
-                .filter(mc => rowData[mc.pkColumn] != null)
-                .map(mc => ({
-                    collection: mc,
-                    entityId: rowData[mc.pkColumn] as string | number
-                }));
-        };
-
-        // Build the columns array. If we have actionable collections, prepend a dedicated action column.
-        const dataColumns: VirtualTableColumn[] = resultColumnKeys.map(key => ({
-            key,
-            title: key,
-            width: savedWidths[key] ?? 150,
-            sortable: false,
-            resizable: true
-        }));
-
-        const columns: VirtualTableColumn[] = actionableCollections.length > 0
-            ? [{ key: "__cms_action__",
-title: "",
-width: 36,
-sortable: false,
-resizable: false }, ...dataColumns]
-            : dataColumns;
-
         return (
             <div className="flex-grow flex flex-col overflow-hidden min-h-0">
                 {/* Collection Badges Bar */}
@@ -1201,107 +1346,12 @@ resizable: false }, ...dataColumns]
                 <div className="flex-grow relative h-full min-h-0 min-w-0">
                     <VirtualTable
                         data={results}
-                        columns={columns}
+                        columns={resultColumns}
                         rowHeight={32}
                         headerHeight={32}
                         extraData={editingCell}
                         onColumnResizeEnd={handleColumnResize}
-                        cellRenderer={({ rowData, column, rowIndex }) => {
-                            // Dedicated collection action column
-                            if (column.key === "__cms_action__") {
-                                const rowActions = getRowEntityActions(rowData ?? {});
-                                if (rowActions.length === 0) {
-                                    return <div className="h-full w-full"/>;
-                                }
-                                if (rowActions.length === 1) {
-                                    const ra = rowActions[0];
-                                    return (
-                                        <div className="h-full flex items-center justify-center">
-                                            <Tooltip title={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
-id: String(ra.entityId) })}>
-                                                <IconButton
-                                                    size="small"
-                                                    aria-label={t("studio_sql_edit_entity", { name: ra.collection.collection.name,
-id: String(ra.entityId) })}
-                                                    className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        sidePanelController?.open({
-                                                            path: ra.collection.collection.slug,
-                                                            entityId: ra.entityId,
-                                                            collection: ra.collection.collection,
-                                                            updateUrl: false
-                                                        });
-                                                    }}
-                                                >
-                                                    <PencilIcon size={iconSize.smallest}/>
-                                                </IconButton>
-                                            </Tooltip>
-                                        </div>
-                                    );
-                                }
-                                // Multiple matched collections (JOIN) — show a dropdown
-                                return (
-                                    <div className="h-full flex items-center justify-center">
-                                        <Menu
-                                            trigger={
-                                                <IconButton
-                                                    size="small"
-                                                    className="text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <MoreVerticalIcon size={iconSize.smallest}/>
-                                                </IconButton>
-                                            }
-                                        >
-                                            {rowActions.map(ra => (
-                                                <MenuItem
-                                                    key={ra.collection.tableName}
-                                                    dense
-                                                    onClick={() => {
-                                                        sidePanelController?.open({
-                                                            path: ra.collection.collection.slug,
-                                                            entityId: ra.entityId,
-                                                            collection: ra.collection.collection,
-                                                            updateUrl: false
-                                                        });
-                                                    }}
-                                                >
-                                                    {t("studio_sql_edit_entity", { name: ra.collection.collection.name,
-id: String(ra.entityId) })}
-                                                </MenuItem>
-                                            ))}
-                                        </Menu>
-                                    </div>
-                                );
-                            }
-
-                            // Regular data cell
-                            const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.columnKey === column.key;
-                            const value = rowData ? rowData[column.key] : null;
-                            const displayValue = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value ?? "");
-
-                            if (isEditing) {
-                                return (
-                                    <FixedEditorOverlay
-                                        displayValue={displayValue}
-                                        onSave={(val) => handleCellSave(val, rowData ?? {}, column.key, rowIndex)}
-                                        onCancel={() => setEditingCell(null)}
-                                    />
-                                );
-                            }
-
-                            return (
-                                <div
-                                    className="px-4 py-1.5 h-full flex items-center whitespace-nowrap text-[13px] text-text-primary dark:text-text-primary-dark font-mono cursor-text group/cell"
-                                    onDoubleClick={() => handleDoubleClick(rowIndex, column.key, displayValue, rowData ?? {})}
-                                >
-                                    <div className="truncate flex-grow" title={displayValue}>
-                                        {value === null || value === undefined ? <span className="text-text-disabled dark:text-text-disabled-dark italic text-[11px]">NULL</span> : displayValue}
-                                    </div>
-                                </div>
-                            );
-                        }}
+                        cellRenderer={renderResultCell}
                     />
                 </div>
 
@@ -1592,6 +1642,29 @@ isFavorite: !s.isFavorite } : s));
                                         <div className="px-4 pt-2 shrink-0">
                                             <Alert color="warning" size="small">
                                                 {t("studio_sql_ran_as_other_role", { ranAs: activeTab.ranAs, role: activeTab.lastExecutedConnection.role })}
+                                            </Alert>
+                                        </div>
+                                    )}
+                                    {!loading && results && activeTab.truncatedFrom !== null && (
+                                        <div className="px-4 pt-2 shrink-0">
+                                            <Alert
+                                                color="info"
+                                                size="small"
+                                                action={activeTab.lastExecutedSql && apiBase
+                                                    ? <Button
+                                                        size="small"
+                                                        variant="text"
+                                                        disabled={downloadingFullResult}
+                                                        onClick={handleDownloadFullCsv}
+                                                    >
+                                                        {downloadingFullResult ? t("studio_sql_downloading_full_csv") : t("studio_sql_download_full_csv")}
+                                                    </Button>
+                                                    : undefined}
+                                            >
+                                                {t("studio_sql_result_truncated", {
+                                                    shown: results.length.toLocaleString(),
+                                                    total: activeTab.truncatedFrom.toLocaleString()
+                                                })}
                                             </Alert>
                                         </div>
                                     )}

@@ -181,3 +181,48 @@ describe("UserSelector type-ahead", () => {
         expect(shown).toEqual(["Alice Coltrane"]);
     });
 });
+
+/**
+ * The list of users is for picking one, so it is fetched when the picker is
+ * opened — as the relation picker does. It was fetched at mount: a record form
+ * with three user fields fired three identical `GET /admin/users` on every
+ * open, and arrow-keying down a user column of the table fired one per cell.
+ */
+describe("UserSelector fetches its list on open", () => {
+
+    afterEach(() => {
+        delete (globalThis as { fetch?: unknown }).fetch;
+    });
+
+    it("fetches nothing while closed and empty", async () => {
+        const urls = mockFetch(async () => ({ users: [user("u-1", "Ada Lovelace")] }));
+
+        render(<UserSelector/>);
+        await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+
+        expect(urls).toEqual([]);
+    });
+
+    it("fetches the list once, when first opened", async () => {
+        const urls = mockFetch(async () => ({ users: [user("u-1", "Ada Lovelace")] }));
+
+        render(<UserSelector/>);
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button"));
+        });
+
+        await waitFor(() => expect(screen.getByText("Ada Lovelace")).toBeTruthy());
+        expect(listRequests(urls)).toHaveLength(1);
+    });
+
+    it("with a value, resolves just that user while closed", async () => {
+        const urls = mockFetch(async (url) => url.includes("ids=u-147")
+            ? { users: [user("u-147", "Grace Hopper")] }
+            : { users: [user("u-1", "Ada Lovelace")] });
+
+        render(<UserSelector value="u-147"/>);
+
+        await waitFor(() => expect(screen.getByTestId("user").textContent).toBe("Grace Hopper"));
+        expect(listRequests(urls)).toHaveLength(0);
+    });
+});

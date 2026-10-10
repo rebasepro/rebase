@@ -247,8 +247,9 @@ async function readTablesWithRlsOff(
  * `<> 'anonymous'` guard that makes it mean "signed in".
  *
  * Whitespace varies with Postgres's rewrite, so match on a collapsed form. The
- * guard clause (`<> 'anonymous'`, in any spelling) is what distinguishes the
- * corrected policy from the stale one, so its presence clears the text.
+ * guard clause ({@link EXCLUDES_ANONYMOUS}, in any spelling) is what
+ * distinguishes the corrected policy from the stale one, so its presence
+ * clears the text.
  *
  * Both schema spellings are matched. The helpers moved from `auth` to `rebase`
  * in 1.0, and this check reads policies *as the database stored them*: a
@@ -261,12 +262,28 @@ async function readTablesWithRlsOff(
 function isPermissiveAuthTautology(clause: string | null | undefined): boolean {
     if (!clause) return false;
     const flat = clause.toLowerCase().replace(/\s+/g, " ");
-    if (!/\b(?:rebase|auth)\.uid\s*\(\s*\)\s*is not null/.test(flat)) return false;
-    // The fix appends `AND rebase.uid() <> 'anonymous'`; Postgres may store the
-    // literal as `'anonymous'::text`. Either spelling means it is the corrected
-    // policy, not the tautology.
-    return !/<>\s*'anonymous'/.test(flat) && !/!=\s*'anonymous'/.test(flat);
+    // The call bare, or wrapped as an initPlan, which Postgres stores as
+    // `( SELECT rebase.uid() AS uid)`.
+    if (!/\b(?:rebase|auth)\.uid\s*\(\s*\)(?:\s+as\s+\w+\s*\))?\s*is not null/.test(flat)) return false;
+    return !EXCLUDES_ANONYMOUS.some((guard) => guard.test(flat));
 }
+
+/**
+ * The guard that makes the null test mean "signed in": the anonymous
+ * sentinel excluded, in every spelling a policy reaches the catalogue in.
+ *
+ * `policy.authenticated()` compiles to `NOT IN ('anonymous', 'anon')`, which
+ * Postgres stores as `<> ALL (ARRAY['anonymous'::text, 'anon'::text])`. Only
+ * `<> 'anonymous'` was recognised, so `doctor` and every `db push` called each
+ * `authenticated()` and `registered()` policy the insecure tautology. A list
+ * that leaves out `'anonymous'` excludes nobody a signed-out request arrives
+ * as, and does not clear it.
+ */
+const EXCLUDES_ANONYMOUS: RegExp[] = [
+    /(?:<>|!=)\s*'anonymous'/,
+    /(?:<>|!=)\s*all\s*\(\s*array\s*\[[^\]]*'anonymous'/,
+    /\bnot in\s*\([^)]*'anonymous'/
+];
 
 const keyOf = (p: PolicyRef) => `${p.schema}.${p.table}.${p.name}`;
 const sameRoles = (a: string[], b: string[]) =>

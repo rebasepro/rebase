@@ -148,7 +148,10 @@ Uma alteração nunca viaja para um assinante como dados. Ela viaja como o fato 
 
 1. **Invalidação.** Quando uma entidade é alterada (criada, atualizada, excluída), o servidor marca os caminhos afetados. A linha que foi gravada não é encaminhada — ela foi lida sob a autorização de quem gravou, o que não diz nada sobre o que qualquer assinante tem permissão para ver.
 
-2. **Refetch debounced com RLS.** Após **300ms** (`REFETCH_DEBOUNCE_MS`), o servidor busca novamente a coleção com seus filtros e ordenação originais. A consulta é executada dentro de uma transação que define os valores locais de transação `app.user_id` e `app.user_roles` a partir do `SubscriptionAuthContext` do assinante, para que o Postgres avalie a Segurança em Nível de Linha (RLS) sob a identidade daquele cliente e apenas as linhas que ele tem autorização para ver sejam enviadas no `collection_update`. O debounce também agrupa uma sequência rápida de gravações em uma única consulta.
+2. **Refetch debounced com RLS.** Após **300ms** (`REFETCH_DEBOUNCE_MS`), o servidor busca novamente a coleção com seus filtros e ordenação originais. A consulta é executada dentro de uma transação que define os valores locais de transação `app.user_id` e `app.user_roles` a partir do `SubscriptionAuthContext` do assinante, para que o Postgres avalie a Segurança em Nível de Linha (RLS) sob a identidade daquele cliente e apenas as linhas que ele tem autorização para ver sejam enviadas no `collection_update`. O debounce também agrupa uma sequência rápida de gravações em uma única consulta. Ele espera 300 ms sem
+uma nova alteração, mas nunca mais de **1 s** (`REFETCH_MAX_WAIT_MS`) depois da
+primeira, de modo que uma coleção gravada várias vezes por segundo ainda envia
+aos seus assinantes um frame pelo menos uma vez por segundo.
 
 Versões anteriores enviavam um `collection_patch` imediato contendo a linha gravada antes desse refetch, para feedback cross-tab em submilissegundos. Essa linha havia sido lida sob o escopo de quem realizou a gravação, portanto podia — e conseguia — alcançar assinantes cujas próprias políticas teriam negado o acesso, e o próprio filtro `where` da assinatura também não havia sido aplicado a ela. O patch foi removido: a latência percebida para uma atualização agora é a janela do debounce.
 
@@ -186,28 +189,32 @@ coleção que ela afetou — não com o número de sockets abertos:
 
 - Assinaturas que fazem a mesma pergunta (mesmo caminho, filtros, ordenação, página,
   `include`, `fields`, busca) como o mesmo principal (mesmo id de usuário, roles,
-  flag de convidado e claims) compartilham um único refetch. Uma gravação em uma lista custa **uma leitura
-  e uma contagem por grupo desses**, não importa quantos sockets a possuam; cada membro
-  ainda recebe um frame construído a partir de linhas lidas sob essa identidade.
+  flag de convidado e claims) compartilham um único refetch. Uma gravação em uma lista custa **uma
+  transação por grupo desses** — a leitura e a sua contagem —, não importa quantos sockets a
+  possuam; cada membro ainda recebe um frame construído a partir de linhas lidas sob essa
+  identidade. Uma primeira página que volta menor que o seu `limit` é o conjunto inteiro,
+  portanto nem chega a ser contada.
 - Uma assinatura de registro único só é consultada quando o próprio registro muda.
 - Principals diferentes nunca compartilham uma leitura — é isso que impede que um frame
   carregue uma linha que seu leitor não pode ver. Uma lista observada por mil
   usuários conectados diferentes é mil leituras e mil contagens em cada
-  gravação sobre ela.
+  gravação sobre ela, em mil transações.
 
 Medido em um notebook contra um PostgreSQL local com um pool de 20 conexões, uma
 gravação em uma lista:
 
 | Assinantes | Transações para a gravação | Último frame após a gravação |
 |-------------|----------------------------|----------------------------|
-| 1.000, um principal | 4 | ~350 ms |
-| 1.000, cada um um principal diferente | ~2.000 | ~700 ms |
+| 1.000, um principal | 2 | ~310 ms |
+| 1.000, cada um um principal diferente | ~1.000 | ~600 ms |
 
-300 ms de cada um é o debounce. A segunda linha é o teto a planejar: os
-refetches entram na fila do mesmo pool que o seu tráfego REST, então uma coleção escrita
-várias vezes por segundo enquanto **centenas de usuários diferentes** observam a mesma
-lista é onde o tempo real começa a competir com as requisições. Além disso, prefira
-assinaturas mais estreitas (uma página, um filtro sobre as próprias linhas do usuário) ou um
+300 ms de cada um é o debounce. A segunda linha é o teto a planejar. Os
+refetches rodam no mesmo pool que o seu tráfego REST, mas usando no máximo um quarto
+das suas conexões por vez (5 das 20 padrão, nunca menos de 2); as demais
+esperam a sua vez no servidor, de modo que o fan-out de uma gravação atrasa os seus próprios frames
+e não as suas requisições. Uma coleção escrita várias vezes por segundo enquanto
+**centenas de usuários diferentes** observam a mesma lista é onde esses frames
+começam a ficar para trás. Além disso, prefira assinaturas mais estreitas (uma página, um filtro sobre as próprias linhas do usuário) ou um
 [canal de broadcast](#canais-de-broadcast) carregando a alteração para os clientes
 refazerem a busca em seu próprio ritmo.
 
@@ -364,7 +371,7 @@ A presença rastreia quais usuários estão atualmente online em um canal e perm
 | `presence_state`  | Servidor → Cliente | Entidade completa de todas as presenças em um canal  |
 | `presence_diff`   | Servidor → Cliente | Atualização incremental (entradas e saídas)          |
 
-Quando um cliente envia `presence_track`, o servidor o adiciona automaticamente ao canal (sem necessidade de um `join_channel` separado) e transmite um `presence_diff` para todos os membros do canal.
+Quando um cliente envia `presence_track`, o servidor o adiciona automaticamente ao canal (sem necessidade de um `join_channel` separado) e transmite um `presence_diff` para todos os membros do canal. O SDK reenvia o seu estado a cada ~20 segundos como heartbeat; um heartbeat cujo estado não mudou apenas renova o tempo limite do cliente e não envia nenhum `presence_diff`.
 
 ```typescript
 // Track presence

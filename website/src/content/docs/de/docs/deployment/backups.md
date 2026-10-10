@@ -139,6 +139,11 @@ Der Storage-Controller wird übergeben, statt aus dem Kontext des Jobs
 übernommen zu werden, weil `rebase.storage` im Kontext die clientseitige
 Storage-API ist, kein Controller für den Backup-Bucket.
 
+Ein Backup unterliegt nicht den Upload-Limits des Controllers. `maxFileSize` (50 MB,
+sofern nicht gesetzt) und `allowedMimeTypes` gelten für das, was Benutzer hochladen;
+ein Dump beliebiger Größe wird also hochgeladen, ebenso einer, der über den Controller
+geschrieben wird, der die Dateien Ihrer App ausliefert.
+
 | Variable | Bedeutung |
 | --- | --- |
 | `BACKUP_SCHEDULE` | Cron-Ausdruck, z. B. `0 3 * * *` für täglich 03:00 Uhr. Nicht gesetzt schaltet geplante Backups aus. |

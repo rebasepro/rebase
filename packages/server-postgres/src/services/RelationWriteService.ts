@@ -1,4 +1,4 @@
-import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { CollectionConfig, JUNCTION_PIVOT_KEY, Properties, Property, ResolvedManyToMany, ResolvedRelation, ResolvedVia } from "@rebasepro/types";
 import { hasForeignKeyOnTarget, isManyToMany } from "@rebasepro/types";
@@ -408,11 +408,27 @@ export class RelationWriteService {
                         // more children aborted the whole save transaction.
                         .where(and(eq(fkCol, parentKeyValue), notInArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[]), visible));
 
-                    // Set FK for the provided targets
+                    // Set FK for the provided targets — only those that do not
+                    // point here already, and only those the caller can see.
+                    //
+                    // Already linked: a parent saved with its unchanged list
+                    // (which the admin form sends back on every save) rewrote
+                    // every child, fired the CDC trigger and the `updated_at`
+                    // touch trigger for each, and made them all look edited.
+                    //
+                    // Visible: the same scope the clear above holds to. A child
+                    // the target's `beforeQuery` or the trash hides is a row the
+                    // caller cannot address, and this took it from whichever
+                    // parent it had. It is left alone, as an id naming no row
+                    // is, so the answer says nothing about whether it exists.
                     await tx
                         .update(targetTable)
                         .set({ [fkField]: parentKeyValue })
-                        .where(inArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[]));
+                        .where(and(
+                            inArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[]),
+                            sql`${fkCol} IS DISTINCT FROM ${parentKeyValue}`,
+                            visible
+                        ));
                 } else {
                     // If empty array provided, clear all existing links for this parent
                     await tx

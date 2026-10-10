@@ -116,6 +116,34 @@ describe("an outage longer than the retry budget", () => {
         expect(errors).toEqual([]);
     });
 
+    it("calls it an outage after 14 s down, however quickly the redials fail", async () => {
+        // Redials are drawn from anywhere in their step, so three of them can
+        // all fail inside the first second. The outage is reported by how long
+        // the connection has been down — the 2 + 4 + 8 s it always meant —
+        // not by how many redials have failed, or a server restart that short
+        // would tell every live view its data stopped updating.
+        const server = new FaultServer();
+        const client = connect(server);
+        const errors: RebaseApiError[] = [];
+        client.listenCollection({ path: "items" }, () => undefined, error => errors.push(error as RebaseApiError));
+        await jest.advanceTimersByTimeAsync(20);
+        // Every redial at the 250 ms floor.
+        jest.spyOn(Math, "random").mockReturnValue(0);
+        const dialsBefore = server.sockets.length;
+
+        server.down();
+        server.current!.drop();
+        await jest.advanceTimersByTimeAsync(13_990);
+
+        expect(server.sockets.length - dialsBefore).toBeGreaterThan(40);
+        expect(errors).toEqual([]);
+        expect(client.state).toBe("reconnecting");
+
+        await jest.advanceTimersByTimeAsync(10);
+        expect(errors.map(error => error.code)).toEqual(["CONNECTION_LOST"]);
+        expect(client.state).toBe("disconnected");
+    });
+
     it("walks its states, and says so", async () => {
         const server = new FaultServer();
         const client = new RebaseWebSocketClient({ websocketUrl: "ws://test", WebSocket: server.WebSocket });

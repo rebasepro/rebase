@@ -69,10 +69,10 @@ const { data } = await client.data.posts.include({
 
 | Option | Funktion |
 |--------|--------------|
-| `limit` | Zeilen **pro Parent**, nicht über die gesamte Seite hinweg – fünf Kommentare zu jedem Beitrag, nicht fünf insgesamt. |
+| `limit` | Zeilen **pro Parent**, nicht über die gesamte Seite hinweg – fünf Kommentare zu jedem Beitrag, nicht fünf insgesamt. Wird von der Abfrage angewendet, sodass die Zeilen darüber hinaus nie aus der Datenbank gelesen werden. |
 | `where` | Derselbe Filter-Dialekt, den auch das Top-Level-`where` verwendet. Wird in die Abfrage verschoben, sodass das `limit` für übereinstimmende Zeilen gilt. |
 | `logical` | Eine `or`/`and`/`not`-Gruppe über die verknüpften Zeilen. |
-| `orderBy` | Dieselbe Sortiersyntax, einschließlich der [NULL-Platzierung](/docs/sdk/querying#where-nulls-sort). |
+| `orderBy` | Dieselbe Sortiersyntax, einschließlich der [NULL-Platzierung](/docs/sdk/querying#where-nulls-sort). Gleichstände sowie ein `limit` ohne `orderBy` richten sich nach dem Schlüssel der verknüpften Zeile, aufsteigend. |
 | `fields` | Spalten der *verknüpften* Zeile. Ihr Schlüssel bleibt immer erhalten, sodass die Zeile adressierbar bleibt. |
 | `include` | Relationen der verknüpften Zeile wiederum – so wird der Baum verschachtelt. |
 

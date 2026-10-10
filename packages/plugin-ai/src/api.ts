@@ -122,21 +122,46 @@ async function errorFrom(response: Response, fallback: string): Promise<Error> {
  * rendered, clicked, and failed.
  */
 export async function fetchAiStatus(props: { endpoint?: string; signal?: AbortSignal }): Promise<AiStatus> {
+    return (await probeAiStatus(props)).status;
+}
+
+/**
+ * The status, and whether the service gave it. An error status (a 429 from the
+ * host's per-IP limit, a 503 mid-deploy) says nothing about the service and
+ * reads as `available: false` all the same; the cache below tells the two apart.
+ */
+async function probeAiStatus(props: { endpoint?: string; signal?: AbortSignal }): Promise<{ status: AiStatus; answered: boolean }> {
     const response = await fetch(endpointOf(props.endpoint, "/status"), {
         method: "GET",
         signal: props.signal
     });
-    if (!response.ok) return { available: false };
+    if (!response.ok) return { status: { available: false }, answered: false };
     const body = await response.json();
     return {
-        available: Boolean(body?.available),
-        model: typeof body?.model === "string" ? body.model : undefined,
-        features: Array.isArray(body?.features) ? body.features : undefined
+        status: {
+            available: Boolean(body?.available),
+            model: typeof body?.model === "string" ? body.model : undefined,
+            features: Array.isArray(body?.features) ? body.features : undefined
+        },
+        answered: true
     };
 }
 
-/** One in-flight or settled probe per endpoint, for the life of the page. */
-const statusProbes = new Map<string, Promise<AiStatus>>();
+/** How long a failed probe's `available: false` stands before the next caller asks again. */
+const FAILED_PROBE_TTL_MS = 30_000;
+
+interface StatusProbe {
+    answer: Promise<AiStatus>;
+    /** Set once the probe has failed: from then, the time after which it is asked again. */
+    retryAfter?: number;
+}
+
+/**
+ * One probe per endpoint. Key: the status URL. An answer from the service is
+ * kept for the life of the page; a failed probe (unreachable host, an error
+ * status) for {@link FAILED_PROBE_TTL_MS}. Cleared by {@link clearAiStatusCache}.
+ */
+const statusProbes = new Map<string, StatusProbe>();
 
 /**
  * {@link fetchAiStatus}, asked once per endpoint per session.
@@ -148,18 +173,28 @@ const statusProbes = new Map<string, Promise<AiStatus>>();
  * the button flicker in and out for everyone behind it.
  *
  * Availability changes on the order of a deploy or a daily quota reset, not of a
- * form open, so a session-long answer is the right resolution. Failures resolve
- * to `available: false` and are cached like any other answer — retrying per form
- * open is the behaviour this replaces.
+ * form open, so the service's answer is kept for the session. A failed probe is
+ * not an answer: it resolves to `available: false` and is kept for 30 seconds,
+ * so a burst of form opens still asks once, and the first form opened after
+ * that asks again. Kept for the session, one dropped request hid Autofill until
+ * the page was reloaded.
  */
 export function fetchAiStatusCached(props: { endpoint?: string }): Promise<AiStatus> {
     const key = endpointOf(props.endpoint, "/status");
     const existing = statusProbes.get(key);
-    if (existing) return existing;
-    const probe = fetchAiStatus({ endpoint: props.endpoint })
-        .catch(() => ({ available: false }) as AiStatus);
-    statusProbes.set(key, probe);
-    return probe;
+    if (existing && (existing.retryAfter === undefined || Date.now() < existing.retryAfter)) {
+        return existing.answer;
+    }
+    const failed = (): AiStatus => {
+        entry.retryAfter = Date.now() + FAILED_PROBE_TTL_MS;
+        return { available: false };
+    };
+    const entry: StatusProbe = {
+        answer: probeAiStatus({ endpoint: props.endpoint })
+            .then(({ status, answered }) => answered ? status : failed(), failed)
+    };
+    statusProbes.set(key, entry);
+    return entry.answer;
 }
 
 /** Forget every cached probe, so the next caller asks again. */

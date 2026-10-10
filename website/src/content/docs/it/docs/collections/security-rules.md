@@ -1,5 +1,5 @@
 ---
-sourceHash: 22cf5bf2953fb715
+sourceHash: 9531407dffbf3092
 title: Regole di sicurezza (RLS)
 sidebar_label: Regole di sicurezza
 description: Definisci criteri di Row Level Security per le tue collection utilizzando scorciatoie pratiche o espressioni SQL raw.
@@ -52,7 +52,8 @@ securityRules: [
 ]
 ```
 
-Questo genera: `USING (user_id = rebase.uid())`
+Questo genera: `USING ((user_id)::text = (SELECT rebase.uid()))` — vedi
+[Valutata una volta per istruzione](#valutata-una-volta-per-istruzione) per la `SELECT`.
 
 ### Accesso pubblico
 
@@ -142,6 +143,23 @@ Importato da `@rebasepro/types`. Le espressioni si compongono; gli operandi sono
 | `policy.literal(value)` | una stringa, un numero, un booleano o `null` |
 | `policy.authUid()` | `rebase.uid()` |
 | `policy.authRoles()` | `rebase.roles()` |
+
+#### Valutata una volta per istruzione
+
+Ogni parte di una regola che non legge la riga — l'id del chiamante, un controllo dei ruoli, un claim,
+`serverContext()` — viene compilata all'interno di una sottoquery scalare. Una regola di proprietà diventa
+`(user_id)::text = (SELECT rebase.uid())`, e la lettura admin predefinita diventa
+`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`.
+
+Postgres calcola una sottoquery di questo tipo una volta per istruzione (un *initPlan*) anziché una volta
+per riga, e pianifica come se il controllo lasciasse passare metà della tabella anziché l'1,5%. È quella
+stima a mantenere una pagina profonda di una tabella grande sulla sua chiave primaria: senza di essa, la
+pagina 401 di un milione di righe era una scansione sequenziale e un ordinamento da 640 MB. Chi può leggere
+o scrivere cosa non cambia.
+
+Anche l'SQL raw di `using` / `withCheck` riceve lo stesso trattamento quando Rebase riesce a leggerne la
+struttura (`owner_id = rebase.uid()` ci riesce). Tutto il resto viene inserito così com'è, quindi racchiudi
+tu le chiamate: `(SELECT rebase.uid())`.
 
 ### `authenticated()` e `registered()`
 

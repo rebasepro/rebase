@@ -33,6 +33,9 @@ const CONSENTS = "rebase.oauth_consents";
 /** Every table this store owns, for the revoke sweep and for tests. */
 export const OAUTH_TABLES = [CLIENTS, CODES, REFRESH, CONSENTS] as const;
 
+/** How often, at most, issuing a credential also sweeps expired codes and tokens. */
+const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+
 /**
  * How long an authorization code lives.
  *
@@ -201,6 +204,25 @@ export function createOAuthStore(driver: DataDriver): OAuthStore | null {
     const exec = (sql: string, params?: unknown[]) => admin.executeSql(sql, params ? { params } : undefined);
     const ddl = createDdlBootstrapper(sql => exec(sql), "oauth-store");
 
+    // Expired codes are worthless the minute they lapse and there is no audit
+    // value in keeping them: they carry a redirect URI and a PKCE challenge for
+    // a session that never completed. Refresh rows are kept until expiry (+30
+    // days) so a replay still finds its family.
+    const sweepCodes = () => exec(`DELETE FROM ${CODES} WHERE expires_at < now() - interval '1 hour'`);
+    const sweepRefreshTokens = () => exec(`DELETE FROM ${REFRESH} WHERE expires_at < now() - interval '30 days'`);
+    // Swept at boot, and again at most once an hour when a credential is
+    // issued — a connected client rotates its refresh token hourly, so a pod
+    // that is never restarted otherwise keeps every row it ever wrote. Not
+    // awaited: the issue must not wait for, or fail on, housekeeping.
+    let lastSweep = Date.now();
+    const sweepIfDue = () => {
+        if (Date.now() - lastSweep < SWEEP_INTERVAL_MS) return;
+        lastSweep = Date.now();
+        sweepCodes()
+            .then(sweepRefreshTokens)
+            .catch(error => logger.warn("[oauth] Sweeping expired codes and tokens failed", { error }));
+    };
+
     return {
         async ensureTables() {
             await ddl.ensureObject(CLIENTS, `
@@ -255,6 +277,14 @@ export function createOAuthStore(driver: DataDriver): OAuthStore | null {
                 CREATE INDEX IF NOT EXISTS oauth_refresh_family_idx ON ${REFRESH} (family)
             `);
 
+            // A grant is (uid, client_id): "connected apps" counts its live
+            // tokens per consent and revoking it updates them all. Without this
+            // both scan every refresh row — ~1,440 per continuously connected
+            // client over a token's 60-day life.
+            await ddl.ensureObject(`${REFRESH} uid client index`, `
+                CREATE INDEX IF NOT EXISTS oauth_refresh_uid_client_idx ON ${REFRESH} (uid, client_id)
+            `);
+
             await ddl.ensureObject(CONSENTS, `
                 CREATE TABLE IF NOT EXISTS ${CONSENTS} (
                     uid        text NOT NULL,
@@ -270,14 +300,9 @@ export function createOAuthStore(driver: DataDriver): OAuthStore | null {
                 await ddl.step(`revoke ${table}`, () => exec(revokeInternalTableSql(schema, name)));
             }
 
-            // Expired codes are worthless the minute they lapse and there is no
-            // audit value in keeping them: they carry a redirect URI and a PKCE
-            // challenge for a session that never completed. Refresh rows are
-            // kept until expiry so a replay still finds its family.
-            await ddl.step("sweep expired codes", () =>
-                exec(`DELETE FROM ${CODES} WHERE expires_at < now() - interval '1 hour'`));
-            await ddl.step("sweep expired refresh tokens", () =>
-                exec(`DELETE FROM ${REFRESH} WHERE expires_at < now() - interval '30 days'`));
+            await ddl.step("sweep expired codes", sweepCodes);
+            await ddl.step("sweep expired refresh tokens", sweepRefreshTokens);
+            lastSweep = Date.now();
 
             // Ask the database whether the work actually happened.
             //
@@ -344,6 +369,7 @@ export function createOAuthStore(driver: DataDriver): OAuthStore | null {
         },
 
         async saveAuthorizationCode(code, record, expiresAt) {
+            sweepIfDue();
             await exec(
                 `INSERT INTO ${CODES}
                     (code_hash, client_id, uid, roles, redirect_uri,
@@ -395,6 +421,7 @@ export function createOAuthStore(driver: DataDriver): OAuthStore | null {
         },
 
         async saveRefreshToken(token, record, expiresAt) {
+            sweepIfDue();
             await exec(
                 `INSERT INTO ${REFRESH}
                     (token_hash, family, client_id, uid, roles, scope, resource, expires_at)

@@ -17,7 +17,6 @@ import fs from "fs";
 import path from "path";
 import { createRequire } from "module";
 import { spawnSync } from "child_process";
-import { execa } from "execa";
 import chalk from "chalk";
 import {
     BUNDLE_FORMAT_VERSION,
@@ -36,6 +35,7 @@ import { compareMountOrder, resolveBackendPaths } from "./manifest";
 import { cliVersion } from "./utils/version";
 import { toolStdio } from "./utils/tool-stdio";
 import { analyseFunctionsDirectory, summarisePortability } from "./function-portability";
+import { precompressStaticAssets } from "./precompress";
 import {
     getActiveBackendPlugin,
     resolveLocalBin,
@@ -1150,6 +1150,9 @@ async function regenerateSchema(
     }
 
     const collectionsPath = path.join("..", configDir, "collections");
+    // Imported here, not at the top: this module is part of the package's
+    // entry, which every `rebase` invocation loads, and execa is ~100 modules.
+    const { execa } = await import("execa");
     try {
         await execa(
             runner,
@@ -1360,6 +1363,7 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
         );
     }
 
+    const { execa } = await import("execa");
     try {
         await execa(tsc, ["-p", tsconfigPath], { cwd: projectRoot,
 stdio: toolStdio(options.quietStdout) });
@@ -1875,6 +1879,8 @@ force: true });
         }
     };
     count(staticOut);
+    // After counting: `fileCount` is the app's files, not their siblings.
+    precompressStaticAssets(staticOut);
 
     // Record it, because the runtime finds the assets through the manifest —
     // not by guessing a directory name.
@@ -1930,6 +1936,7 @@ export function buildStaticBundle(options: {
         }
     };
     count(staticOut);
+    precompressStaticAssets(staticOut);
 
     const manifest: RebaseBundleManifest = {
         bundleFormat: BUNDLE_FORMAT_VERSION,

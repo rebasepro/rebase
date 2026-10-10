@@ -183,6 +183,41 @@ describe("known-renamed keys", () => {
         expect(problem.message).toContain("not valid on a \"hasMany\" relation");
     });
 
+    // The opt-out from the derived foreign-key index. Accepted on the kind that
+    // puts a key on this table, and refused everywhere it could only be inert.
+    it("accepts `index: false` on a belongsTo", () => {
+        const collection = valid();
+        collection.properties.author.relation = {
+            kind: "belongsTo", target: () => ({}), relationName: "author", index: false
+        } as never;
+        expect(findCollectionConfigProblems([collection])).toEqual([]);
+    });
+
+    it("errors on `index` on a kind with no foreign key on this table", () => {
+        const collection = valid();
+        collection.properties.author.relation = {
+            kind: "hasMany", target: () => ({}), relationName: "author", index: false
+        } as never;
+
+        const [problem] = errors([collection]);
+
+        expect(problem.path).toBe("posts.properties.author.relation.index");
+        expect(problem.message).toContain("not valid on a \"hasMany\" relation");
+        expect(problem.message).toContain("set `index` there");
+    });
+
+    it("errors on an `index` that is not a boolean", () => {
+        const collection = valid();
+        collection.properties.author.relation = {
+            kind: "belongsTo", target: () => ({}), relationName: "author", index: "no"
+        } as never;
+
+        const [problem] = errors([collection]);
+
+        expect(problem.path).toBe("posts.properties.author.relation.index");
+        expect(problem.message).toContain("must be `true` or `false`");
+    });
+
     // Not a rename with a silent fallback: the surviving key is one level up
     // and unset, so ignoring this would turn a required relation optional in
     // the generated types and nullable in the column, quietly.

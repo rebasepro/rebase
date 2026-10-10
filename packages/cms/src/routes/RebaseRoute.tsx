@@ -1,11 +1,16 @@
 
 import type { ViewMode, AdminCollection } from "@rebasepro/cms-types";
 import { useLocation } from "react-router";
-import { EditViewBinding } from "../components/EditViewBinding";
-import { DetailViewBinding } from "../components/DetailViewBinding";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { CollectionViewBinding } from "../components/CollectionViewBinding/CollectionViewBinding";
+// Lazy: the table, the record views and the form behind them are not needed
+// until a collection opens, and a static import here preloaded all of them on
+// the login screen. See components/lazy_record_views.ts.
+import {
+    LazyCollectionViewBinding as CollectionViewBinding,
+    LazyDetailViewBinding as DetailViewBinding,
+    LazyEditViewBinding as EditViewBinding
+} from "../components/lazy_record_views";
 import { ErrorView, NotFoundPage, useUserConfigurationPersistence, useComponentOverride, useNavigationBlocker } from "@rebasepro/app";
 import { resolveOpenEntityMode, resolveViewMode } from "../util/view_mode";
 import { isPathWithinRecord } from "../util/navigation_utils";
@@ -21,6 +26,12 @@ import { useNavigationStateController } from "../hooks/navigation/contexts/Navig
 import { NavigationLoadingErrorView } from "../components/NavigationLoadingErrorView";
 
 export function RebaseRoute() {
+    return <Suspense fallback={<CircularProgressCenter/>}>
+        <RebaseRouteContent/>
+    </Suspense>;
+}
+
+function RebaseRouteContent() {
 
     const location = useLocation();
     const collectionRegistry = useCollectionRegistryController();

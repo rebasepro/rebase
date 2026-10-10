@@ -580,8 +580,19 @@ export interface SqlScriptResult {
     tables: SqlScriptTable[];
     /** The last statement's command: `SELECT`, `UPDATE`, `CREATE TABLE` … */
     command?: string;
-    /** How many rows the last statement returned or changed, when its command reports a count. */
+    /**
+     * How many rows the last statement returned or changed, when its command
+     * reports a count — or, for a {@link truncated} result, how many it
+     * returned, of which {@link rows} holds the first.
+     */
     rowCount?: number;
+    /**
+     * The last statement returned more than a run keeps, and {@link rows}
+     * holds only its first rows. The Studio console's door keeps at most
+     * 10,000 rows, or 32 Mi characters of values, of one result: a run that
+     * held every row of a million-row table took the server down with it.
+     */
+    truncated?: boolean;
     /** What the database said while the script ran, in order. */
     notices: SqlScriptNotice[];
     /**
@@ -591,6 +602,23 @@ export interface SqlScriptResult {
      * statement as the connection owner, who is named here instead.
      */
     effectiveRole?: string;
+}
+
+/**
+ * A query's result being read a batch at a time — see `SQLAdmin.openSqlCursor`.
+ *
+ * @group Admin
+ */
+export interface SqlCursor {
+    /** The result's column names, in order. */
+    readonly columns: string[];
+    /**
+     * The next rows, each value the text the database wrote for it and `null`
+     * for NULL — `null` once there are none left.
+     */
+    read(): Promise<(string | null)[][] | null>;
+    /** End the read and give the session back. Safe to call more than once. */
+    close(): Promise<void>;
 }
 
 /**
@@ -608,8 +636,14 @@ export interface SQLAdmin {
      * before it is reused. For SQL a person wrote (the Studio editor), which
      * may `SET ROLE` and must not leave that on a pooled connection the
      * server's own queries use next.
+     *
+     * `maxResultBytes` refuses a result whose rows take more than that many
+     * bytes, with an error whose `code` is `RESULT_TOO_LARGE`, rather than
+     * return it — never a part of it. On a session of its own the read stops
+     * there; elsewhere the rows are measured once read. The WebSocket
+     * `EXECUTE_SQL` door sets it for every caller.
      */
-    executeSql(sql: string, options?: { database?: string; role?: string; params?: unknown[]; isolateSession?: boolean }): Promise<Record<string, unknown>[]>;
+    executeSql(sql: string, options?: { database?: string; role?: string; params?: unknown[]; isolateSession?: boolean; maxResultBytes?: number }): Promise<Record<string, unknown>[]>;
 
     /**
      * Run a script a person wrote — the Studio SQL console — and describe what
@@ -624,6 +658,21 @@ export interface SQLAdmin {
      * rolled back by a later one.
      */
     runSqlScript?(sql: string, options?: { database?: string; role?: string }): Promise<SqlScriptResult>;
+
+    /**
+     * Read the whole result of ONE query a person wrote, a batch at a time —
+     * the Studio SQL console's "Download full result as CSV", which the
+     * console's 10,000-row cap would otherwise leave no way to get.
+     *
+     * Through a server-side cursor, in a read-only transaction, on a session
+     * of its own, as `role`: a write is refused by the database, and a second
+     * statement by the protocol. Each batch is read when the previous one has
+     * been consumed, so memory holds one batch whatever the result's size;
+     * every read runs under the session's `statement_timeout`. The session is
+     * reset and returned when the cursor is closed — which the caller must do,
+     * on success, failure or a reader that went away.
+     */
+    openSqlCursor?(sql: string, options?: { database?: string; role?: string; batchSize?: number }): Promise<SqlCursor>;
 
     /**
      * Fetch the available databases on the server.
@@ -653,6 +702,24 @@ export interface SQLAdmin {
      * Fetch the current database name.
      */
     fetchCurrentDatabase?(): Promise<string | undefined>;
+
+    /**
+     * Hold a `LISTEN` on `channel`, on a connection of its own that stays open
+     * and comes back after a drop, and call `onNotify` with each payload — what
+     * wakes the job worker when another process enqueues, instead of a poll
+     * every two seconds.
+     *
+     * Resolves once listening, with the stop. Rejects when no such connection
+     * can be had — an in-process database, a first connect that fails — so the
+     * caller can fall back to polling. `onReconnect` is called each time a
+     * dropped connection is listening again: whatever was sent meanwhile is
+     * lost. `channel` must be a plain identifier.
+     */
+    listen?(
+        channel: string,
+        onNotify: (payload: string) => void,
+        options?: { onReconnect?: () => void }
+    ): Promise<() => Promise<void>>;
 }
 
 /**

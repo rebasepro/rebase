@@ -353,12 +353,66 @@ describe("fetchAiStatusCached", () => {
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
-    it("answers unavailable, once, when the host cannot be reached", async () => {
-        const fetchMock = jest.fn().mockRejectedValue(new Error("offline"));
-        (global as any).fetch = fetchMock;
-        await expect(fetchAiStatusCached({})).resolves.toEqual({ available: false });
-        await expect(fetchAiStatusCached({})).resolves.toEqual({ available: false });
-        expect(fetchMock).toHaveBeenCalledTimes(1);
+    describe("a probe that failed", () => {
+        // A failed probe is not an answer about the service. Cached for the
+        // life of the page, one dropped request — a laptop waking up offline,
+        // a 429 from a host whose per-IP budget a busy office spent — hid
+        // Autofill until a reload, however soon the host came back. It is
+        // remembered briefly, so a burst of form opens still asks once.
+        let now = 1_000_000;
+        let nowSpy: jest.SpiedFunction<typeof Date.now>;
+        beforeEach(() => {
+            now = 1_000_000;
+            nowSpy = jest.spyOn(Date, "now").mockImplementation(() => now);
+        });
+        afterEach(() => nowSpy.mockRestore());
+
+        it("answers unavailable, and asks once, while the host cannot be reached", async () => {
+            const fetchMock = jest.fn().mockRejectedValue(new Error("offline"));
+            (global as any).fetch = fetchMock;
+            await expect(fetchAiStatusCached({})).resolves.toEqual({ available: false });
+            now += 29_000;
+            await expect(fetchAiStatusCached({})).resolves.toEqual({ available: false });
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+        });
+
+        it("is asked again 30 seconds later, and the host's recovery is then kept", async () => {
+            const fetchMock = jest.fn()
+                .mockRejectedValueOnce(new Error("offline"))
+                .mockResolvedValue(jsonResponse({ available: true }));
+            (global as any).fetch = fetchMock;
+
+            await expect(fetchAiStatusCached({})).resolves.toEqual({ available: false });
+            now += 30_001;
+            await expect(fetchAiStatusCached({})).resolves.toMatchObject({ available: true });
+            now += 24 * 60 * 60 * 1000;
+            await expect(fetchAiStatusCached({})).resolves.toMatchObject({ available: true });
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+        });
+
+        it("counts an error status as a failed probe, not as the service's answer", async () => {
+            const fetchMock = jest.fn()
+                .mockResolvedValueOnce(jsonResponse({}, false, 429))
+                .mockResolvedValue(jsonResponse({ available: true }));
+            (global as any).fetch = fetchMock;
+
+            await expect(fetchAiStatusCached({})).resolves.toEqual({ available: false });
+            now += 30_001;
+            await expect(fetchAiStatusCached({})).resolves.toMatchObject({ available: true });
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+        });
+
+        it("keeps the service's own 'unavailable' for the session", async () => {
+            // A host that answers `available: false` (no provider key, the day's
+            // quota spent) has answered; that changes on the order of a deploy.
+            const fetchMock = jest.fn().mockResolvedValue(jsonResponse({ available: false }));
+            (global as any).fetch = fetchMock;
+
+            await expect(fetchAiStatusCached({})).resolves.toMatchObject({ available: false });
+            now += 60 * 60 * 1000;
+            await expect(fetchAiStatusCached({})).resolves.toMatchObject({ available: false });
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+        });
     });
 });
 

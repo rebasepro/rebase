@@ -3,9 +3,6 @@ import path from "path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react"
 
-const ReactCompilerConfig = {
-    target: "18"
-};
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
 
@@ -31,7 +28,6 @@ export default defineConfig(() => ({
             external: isExternal,
             onwarn(warning, warn) {
                 if (warning.code === "MISSING_GLOBAL_NAME") return;
-                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
                 warn(warning);
             },
             output: {
@@ -55,13 +51,17 @@ export default defineConfig(() => ({
             "@rebasepro/ui": path.resolve(__dirname, "../ui/src")
         }
     },
+    // The schema visualizer's layout worker (`dagre-layout.worker.ts`) is
+    // inlined into this library as a module worker. Not the `iife` default:
+    // dagre's CommonJS files pick lodash and graphlib behind a
+    // `typeof require === "function"` test, which an ES bundle answers with
+    // its own `require` and an `iife` one leaves to the worker's scope —
+    // where it is undefined, and the fallback reads `window`, which a worker
+    // does not have.
+    worker: {
+        format: "es"
+    },
     plugins: [
-        react({
-            babel: {
-                plugins: [
-                    ["babel-plugin-react-compiler", ReactCompilerConfig]
-                ]
-            }
-        })
+        react()
     ]
 }));

@@ -22,6 +22,7 @@ import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
+import { SqlResultTooLargeError } from "../../src/services/sql-script.js";
 
 let container: PgContainer;
 let pool: pg.Pool;
@@ -179,6 +180,30 @@ describe("what a script returns", () => {
  * on its own, and the ROLLBACK's "there is no transaction in progress" was a
  * warning nobody showed.
  */
+describe("how much of a result a run keeps", () => {
+    // A run kept every row of every statement and sent them in one frame: a
+    // million-row `TABLE events` took a 1 GiB server down. See
+    // `SQL_CONSOLE_RESULT_LIMITS`.
+    it("keeps the first 10,000 rows of 50,000, and says how many there were", async () => {
+        const result = await driver.runSqlScript("SELECT g FROM generate_series(1, 50000) g");
+
+        expect(result.rows).toHaveLength(10_000);
+        expect(result.rows[0]).toEqual({ g: "1" });
+        expect(result.rows[9_999]).toEqual({ g: "10000" });
+        expect(result.truncated).toBe(true);
+        expect(result.command).toBe("SELECT");
+        expect(result.rowCount).toBe(50_000);
+    });
+
+    it("shows the last statement whole after a large one before it", async () => {
+        const result = await driver.runSqlScript("SELECT g FROM generate_series(1, 50000) g; SELECT 1 AS one");
+
+        expect(result.rows).toEqual([{ one: "1" }]);
+        expect(result.truncated).toBeUndefined();
+        expect(result.rowCount).toBe(1);
+    });
+});
+
 describe("a transaction and the run it began in", () => {
     const balance = async () => (await pool.query("SELECT balance FROM accounts WHERE id = 1")).rows[0].balance;
 
@@ -247,5 +272,131 @@ describe("executeSql on a session of its own", () => {
             .rejects.toMatchObject({ cause: expect.objectContaining({ message: expect.stringMatching(/permission denied/) }) });
         await expect(driver.executeSql("BEGIN; SELECT 1/0", { isolateSession: true }))
             .rejects.toMatchObject({ cause: expect.objectContaining({ message: expect.stringMatching(/division by zero[\s\S]*rolled back/) }) });
+    });
+});
+
+/**
+ * The admin `executeSql` door's byte budget — what the socket sets for a frame
+ * that is not a script. It refuses a result past the budget, and on a pool it
+ * stops reading there: the rows read so far are the budget, not the result.
+ */
+describe("executeSql with a byte budget", () => {
+    /** Data rows node-postgres received on this pool's connections, from now on. */
+    function countReceivedRows(): () => number {
+        let received = 0;
+        const counted = new WeakSet<pg.PoolClient>();
+        pool.on("acquire", (client) => {
+            if (counted.has(client) || !(client instanceof pg.Client)) return;
+            counted.add(client);
+            client.connection.on("dataRow", () => { received++; });
+        });
+        return () => received;
+    }
+
+    it("stops reading a result past it, refuses it, and the pool goes on", async () => {
+        const received = countReceivedRows();
+        // 200,000 rows of about 220 bytes on the wire: 44 MB, against a 4 MiB budget.
+        const run = driver.executeSql("SELECT g, repeat('x', 200) AS pad FROM generate_series(1, 200000) g", {
+            isolateSession: true,
+            maxResultBytes: 4 * 1024 * 1024
+        });
+
+        await expect(run).rejects.toBeInstanceOf(SqlResultTooLargeError);
+        await expect(run).rejects.toMatchObject({ code: "RESULT_TOO_LARGE" });
+        // About 19,000 rows fill the budget; the rest were never read.
+        expect(received()).toBeGreaterThan(15_000);
+        expect(received()).toBeLessThan(40_000);
+
+        expect(await driver.executeSql("SELECT balance FROM accounts WHERE id = 1", { isolateSession: true })).toEqual([{ balance: 100 }]);
+        expect(pool.totalCount).toBeLessThanOrEqual(3);
+    });
+
+    it("returns a result under it whole, values parsed as before", async () => {
+        const rows = await driver.executeSql("SELECT g FROM generate_series(1, 5000) g", { isolateSession: true, maxResultBytes: 4 * 1024 * 1024 });
+
+        expect(rows).toHaveLength(5000);
+        expect(rows[4999]).toEqual({ g: 5000 });
+    });
+});
+
+/**
+ * The SQL console's "Download full result as CSV": one query's whole result,
+ * through a server-side cursor in a read-only transaction, a batch at a time.
+ */
+describe("openSqlCursor", () => {
+    async function readAll(cursor: { read(): Promise<(string | null)[][] | null>; close(): Promise<void> }) {
+        const batches: number[] = [];
+        let last: (string | null)[] | undefined;
+        try {
+            for (let rows = await cursor.read(); rows; rows = await cursor.read()) {
+                batches.push(rows.length);
+                last = rows[rows.length - 1];
+            }
+        } finally {
+            await cursor.close();
+        }
+        return { batches, last };
+    }
+
+    it("reads 100,000 rows a batch of 1,000 at a time, every value as text, and gives the session back", async () => {
+        const cursor = await driver.openSqlCursor("SELECT g AS n, g::text || 'x' AS n, NULL::int AS empty FROM generate_series(1, 100000) g");
+
+        expect(cursor.columns).toEqual(["n", "n", "empty"]);
+        const { batches, last } = await readAll(cursor);
+        expect(batches).toHaveLength(100);
+        expect(Math.max(...batches)).toBe(1000);
+        expect(last).toEqual(["100000", "100000x", null]);
+
+        const after = await pool.query("SELECT current_user AS who, current_setting('transaction_read_only') AS ro");
+        expect(after.rows[0]).toEqual({ who: expect.not.stringMatching(/console_reader/), ro: "off" });
+        expect(pool.idleCount).toBeGreaterThan(0);
+    });
+
+    it("refuses a write, and says what can be downloaded", async () => {
+        await expect(driver.openSqlCursor("INSERT INTO accounts VALUES (9, 9) RETURNING *"))
+            .rejects.toMatchObject({ code: "SQL_ERROR", message: expect.stringMatching(/returns rows/) });
+        await expect(driver.openSqlCursor("WITH d AS (DELETE FROM accounts RETURNING *) SELECT * FROM d"))
+            .rejects.toMatchObject({ code: "SQL_ERROR" });
+        // A function that writes, called from a plain SELECT.
+        await pool.query("CREATE SEQUENCE IF NOT EXISTS export_seq");
+        await expect(driver.openSqlCursor("SELECT nextval('export_seq')"))
+            .rejects.toMatchObject({ code: "SQL_ERROR", message: expect.stringMatching(/read-only/) });
+
+        expect((await pool.query("SELECT count(*)::int AS n FROM accounts")).rows[0].n).toBe(1);
+    });
+
+    it("runs one statement: a second one riding along is refused, not run", async () => {
+        await expect(driver.openSqlCursor("SELECT 1; DROP TABLE accounts"))
+            .rejects.toMatchObject({ code: "SQL_ERROR", message: expect.stringMatching(/one query/) });
+
+        expect((await pool.query("SELECT count(*)::int AS n FROM accounts")).rows[0].n).toBe(1);
+    });
+
+    it("takes a query ending in a semicolon", async () => {
+        const { batches } = await readAll(await driver.openSqlCursor("SELECT 1 AS one;  "));
+        expect(batches).toEqual([1]);
+    });
+
+    it("reads as the role picked, which the database then holds to its grants", async () => {
+        await pool.query("CREATE TABLE IF NOT EXISTS secrets (v text); REVOKE ALL ON secrets FROM console_reader");
+        const { last } = await readAll(await driver.openSqlCursor("SELECT current_user AS who", { role: "console_reader" }));
+        expect(last).toEqual(["console_reader"]);
+
+        await expect(driver.openSqlCursor("SELECT * FROM secrets", { role: "console_reader" }))
+            .rejects.toMatchObject({ code: "SQL_ERROR", message: expect.stringMatching(/permission denied/) });
+    });
+
+    it("runs every read under the session's statement_timeout", async () => {
+        const timed = new pg.Pool({ connectionString: container.connectionString, max: 1, statement_timeout: 300 });
+        try {
+            const timedDb = drizzle(timed);
+            const registry = new PostgresCollectionRegistry();
+            const timedDriver = new PostgresBackendDriver(timedDb, new RealtimeService(timedDb, registry), registry);
+
+            await expect(timedDriver.openSqlCursor("SELECT pg_sleep(2)"))
+                .rejects.toMatchObject({ code: "SQL_ERROR", message: expect.stringMatching(/statement timeout/) });
+        } finally {
+            await timed.end();
+        }
     });
 });

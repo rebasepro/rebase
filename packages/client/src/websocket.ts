@@ -17,7 +17,7 @@ import {
     type RealtimeConnectionState
 } from "@rebasepro/types";
 import { buildCompositeId, COMPOSITE_ID_SEPARATOR, type PrimaryKeyInfo } from "@rebasepro/common";
-import { rebaseReviver } from "./reviver";
+import { parseRebaseJson } from "./reviver";
 import { readSqlScriptResult } from "./sql-script";
 import type { SqlScriptResult } from "@rebasepro/types";
 
@@ -97,11 +97,35 @@ function realtimeLostError(): RebaseApiError {
     );
 }
 
+/**
+ * Whether realtime debugging is on: `globalThis.__REBASE_DEBUG_REALTIME__ = true`,
+ * set from a console or a test. While it is, each refetched row that differs
+ * from the one held is explained key by key with `console.debug`.
+ */
+function realtimeDebugOn(): boolean {
+    return Reflect.get(globalThis, "__REBASE_DEBUG_REALTIME__") === true;
+}
+
 /** The ceiling of the reconnect backoff. */
 const MAX_RECONNECT_DELAY_MS = 30_000;
 
-/** Each reconnect delay is drawn from the last fifth below its step. */
-const RECONNECT_JITTER = 0.2;
+/**
+ * The shortest reconnect delay. Each delay is drawn from the whole of its step
+ * (full jitter), so without a floor a redial could land the instant the socket
+ * dropped — before a restarting server has any chance of being back.
+ */
+const MIN_RECONNECT_DELAY_MS = 250;
+
+/**
+ * How long the connection is down before the outage is reported: every
+ * registration is told `CONNECTION_LOST` and {@link RebaseWebSocketClient.state}
+ * reads `disconnected`. The first three steps of the backoff, 2 + 4 + 8 s.
+ *
+ * Measured from the drop rather than counted in redials: with full jitter,
+ * three redials can all fail within the first second, and a server restart
+ * that short is a blip, not an outage.
+ */
+const OUTAGE_REPORT_AFTER_MS = 14_000;
 
 /** A frame waiting in `messageQueue`, carrying the handlers of the promise its caller holds. */
 type QueuedFrame = Record<string, unknown> & {
@@ -424,11 +448,11 @@ export class RebaseWebSocketClient {
      */
     private maxReconnectAttempts = 5;
     /**
-     * How many failed redials make a blip an outage: the point at which every
-     * registration is told `CONNECTION_LOST` and {@link state} reads
-     * `disconnected`. Three is 2 + 4 + 8 s of backoff, about 14 s down.
+     * Reports the outage once the connection has been down for
+     * {@link OUTAGE_REPORT_AFTER_MS}. Armed by the first redial after a drop,
+     * cleared when a socket opens or the caller disconnects.
      */
-    private lostAfterAttempts = 3;
+    private outageTimer: ReturnType<typeof setTimeout> | null = null;
     /**
      * Whether a socket of this client has ever opened — what makes the next
      * open a *reconnect*, whose server has forgotten every subscription and
@@ -645,6 +669,7 @@ export class RebaseWebSocketClient {
         }
         // Whatever outage there was ends here: the next dial is a fresh one.
         this.reconnectAttempts = 0;
+        this.clearOutageTimer();
         this.outageReported = false;
         this.gaveUp = false;
         this.setState(permanent ? "closed" : "idle");
@@ -705,6 +730,7 @@ export class RebaseWebSocketClient {
                 // The outage, if there was one, is over. The registrations
                 // hear about it through the re-subscribe below: each one's
                 // next `onUpdate` carries what was written meanwhile.
+                this.clearOutageTimer();
                 this.outageReported = false;
                 this.gaveUp = false;
                 this.setState("connected");
@@ -741,7 +767,9 @@ export class RebaseWebSocketClient {
 
             this.ws!.onmessage = (event) => {
                 try {
-                    const message = JSON.parse(event.data, rebaseReviver);
+                    // A reviver parse calls back for every key and value of the
+                    // frame; most frames have nothing to revive. Same result.
+                    const message = parseRebaseJson<WebSocketMessage>(event.data);
                     this.handleWebSocketMessage(message);
                 } catch (error) {
                     console.error("Error parsing WebSocket message:", error);
@@ -846,9 +874,15 @@ export class RebaseWebSocketClient {
     private attemptReconnect() {
         if (this.closedByCaller) return;
 
-        // A blip has become an outage. Said once, to everything that is live,
-        // so a view can say its data is stale instead of looking current.
-        if (this.reconnectAttempts >= this.lostAfterAttempts) this.reportConnectionLost();
+        // A blip becomes an outage once it has lasted OUTAGE_REPORT_AFTER_MS.
+        // Said once, to everything that is live, so a view can say its data is
+        // stale instead of looking current.
+        if (!this.outageReported && !this.outageTimer) {
+            this.outageTimer = setTimeout(() => {
+                this.outageTimer = null;
+                this.reportConnectionLost();
+            }, OUTAGE_REPORT_AFTER_MS);
+        }
 
         // Giving up is only for a client nothing depends on. While anything is
         // registered the client keeps redialling at the capped interval:
@@ -859,15 +893,22 @@ export class RebaseWebSocketClient {
         if (this.reconnectAttempts >= this.maxReconnectAttempts && !this.hasRegistrations()) {
             console.warn("[Rebase] Realtime: the server is unreachable and nothing is subscribed. Not retrying until something asks for the connection.");
             this.gaveUp = true;
+            // Given up is down, however soon the redials happened to fail.
+            this.clearOutageTimer();
+            this.reportConnectionLost();
             return;
         }
 
         this.reconnectAttempts = Math.min(this.reconnectAttempts + 1, 30);
         const ceiling = Math.min(1000 * Math.pow(2, this.reconnectAttempts), MAX_RECONNECT_DELAY_MS);
-        // Up to a fifth earlier, at random: a deploy drops every client at the
-        // same instant, and the same schedule would bring them all back at the
-        // same instant too.
-        const delay = ceiling - Math.floor(Math.random() * ceiling * RECONNECT_JITTER);
+        // Anywhere in the step at random, above the floor ("full jitter"): a
+        // deploy drops every client at the same instant, and the same schedule
+        // would bring them all back at the same instant too. Drawn from the
+        // last fifth of the step only, the first redials still landed in one
+        // 400 ms window; spread over 250 ms – 2 s the peak is 4.4x lower.
+        // Uniform above the floor rather than clamped to it, which would land
+        // one client in eight on the same millisecond.
+        const delay = MIN_RECONNECT_DELAY_MS + Math.floor(Math.random() * (ceiling - MIN_RECONNECT_DELAY_MS));
 
         console.debug(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
@@ -900,6 +941,11 @@ export class RebaseWebSocketClient {
      * failed. When the socket is back they are re-subscribed, and the fresh
      * `onUpdate` is the recovery.
      */
+    private clearOutageTimer(): void {
+        if (this.outageTimer) clearTimeout(this.outageTimer);
+        this.outageTimer = null;
+    }
+
     private reportConnectionLost(): void {
         if (this.outageReported) return;
         this.outageReported = true;
@@ -1683,10 +1729,19 @@ options }
     }
 
     /**
-     * Recursively compare two values for structural equality.
-     * Handles primitives, null, undefined, Date, RegExp, arrays, and plain objects.
+     * Recursively compare two values a refetch can carry for structural
+     * equality: primitives, null, undefined, Date, RegExp, arrays and objects.
+     *
+     * A relation compares by the reference it holds, not by the row it happens
+     * to have loaded, so its `data` is left out on both sides. That used to be
+     * done by normalising each side into a copy first — two deep copies of
+     * every cached row on every frame, most of which then compared equal. It is
+     * done in place now, and an unchanged row costs no copy.
+     *
+     * `relationAware` is off for a relation's own fields: the copies never
+     * looked inside those either.
      */
-    private deepEqual(a: unknown, b: unknown): boolean {
+    private deepEqual(a: unknown, b: unknown, relationAware = true): boolean {
         // Same reference or same primitive
         if (a === b) return true;
 
@@ -1720,55 +1775,38 @@ options }
         if (aIsArray && bIsArray) {
             if (a.length !== b.length) return false;
             for (let i = 0; i < a.length; i++) {
-                if (!this.deepEqual(a[i], b[i])) return false;
+                if (!this.deepEqual(a[i], b[i], relationAware)) return false;
             }
             return true;
         }
 
-        // Plain object comparison
+        // Object comparison
         const aObj = a as Record<string, unknown>;
         const bObj = b as Record<string, unknown>;
-        const aKeys = Object.keys(aObj);
-        const bKeys = Object.keys(bObj);
+        // A relation is equal only to a relation, and never by its `data`.
+        let skip: string | undefined;
+        let nested = relationAware;
+        if (relationAware) {
+            const aIsRelation = aObj.__type === "relation";
+            if (aIsRelation !== (bObj.__type === "relation")) return false;
+            if (aIsRelation) {
+                skip = "data";
+                nested = false;
+            }
+        }
 
-        if (aKeys.length !== bKeys.length) return false;
-
-        for (const key of aKeys) {
+        let aCount = 0;
+        for (const key of Object.keys(aObj)) {
+            if (key === skip) continue;
+            aCount++;
             if (!Object.prototype.hasOwnProperty.call(bObj, key)) return false;
-            if (!this.deepEqual(aObj[key], bObj[key])) return false;
+            if (!this.deepEqual(aObj[key], bObj[key], nested)) return false;
         }
-
-        return true;
-    }
-
-    private normalizeForComparison(val: unknown): unknown {
-        if (!val) return val;
-
-        if (Array.isArray(val)) {
-            return val.map(item => this.normalizeForComparison(item));
+        let bCount = 0;
+        for (const key of Object.keys(bObj)) {
+            if (key !== skip) bCount++;
         }
-
-        if (typeof val === "object") {
-            if (val instanceof Date) return val;
-            if (val instanceof RegExp) return val;
-
-            const obj = val as Record<string, unknown>;
-            if (obj.__type === "relation") {
-                // `data` is dropped on purpose: a relation compares by the
-                // reference it holds, not by the row it happens to have loaded.
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { data, ...rest } = obj;
-                return rest;
-            }
-
-            const result: Record<string, unknown> = {};
-            for (const [k, v] of Object.entries(obj)) {
-                result[k] = this.normalizeForComparison(v);
-            }
-            return result;
-        }
-
-        return val;
+        return aCount === bCount;
     }
 
     /**
@@ -1810,25 +1848,28 @@ options }
             if (address !== undefined) cachedById.set(address, row);
         }
 
+        // Read once per frame, not per row.
+        const explain = realtimeDebugOn();
+
         return incoming.map(incomingRow => {
             const address = this.rowAddress(incomingRow, pks);
             const cachedRow = address === undefined ? undefined : cachedById.get(address);
             if (!cachedRow) return incomingRow;
 
             // Compare flat rows directly (no more path/values nesting)
-            const normCached = this.normalizeForComparison(cachedRow) as Record<string, unknown>;
-            const normIncoming = this.normalizeForComparison(incomingRow) as Record<string, unknown>;
+            if (this.deepEqual(cachedRow, incomingRow)) return cachedRow;
 
-            if (this.deepEqual(normCached, normIncoming)) {
-                return cachedRow;
-            } else {
-                // Deep debug: Why did it fail?
+            // Why it differs, key by key — a debugging aid, so only while
+            // realtime debugging is on. It used to run for every changed row
+            // of every frame, in production: a bulk write to a 1,000-row live
+            // list was 1,000 `JSON.stringify` calls and console lines a frame.
+            if (explain) {
                 const mismatches: Record<string, { cached: unknown, incoming: unknown }> = {};
-                const allKeys = new Set([...Object.keys(normCached), ...Object.keys(normIncoming)]);
+                const allKeys = new Set([...Object.keys(cachedRow), ...Object.keys(incomingRow)]);
                 for (const key of allKeys) {
-                    if (!this.deepEqual(normCached[key], normIncoming[key])) {
-                        mismatches[key] = { cached: normCached[key],
-incoming: normIncoming[key] };
+                    if (!this.deepEqual(cachedRow[key], incomingRow[key])) {
+                        mismatches[key] = { cached: cachedRow[key],
+incoming: incomingRow[key] };
                     }
                 }
                 console.debug(`[RebaseWS] Row ${address} refetch mismatch:\n`, JSON.stringify(mismatches, null, 2));

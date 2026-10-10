@@ -32,7 +32,7 @@ some clients never see, or a page that shows different logs on every refresh.
 | Collection subscriptions | Shared through the database when CDC is on | `REALTIME_CDC=auto` (the default) |
 | Broadcast channels and presence | In memory | `REALTIME_CHANNEL_BUS=postgres` |
 | Uploaded files, `STORAGE_TYPE=local` | The instance's own disk | S3 or GCS, or one shared volume at `STORAGE_PATH` |
-| Resumable (TUS) uploads in progress | The instance's memory and disk | Sticky sessions; a restart still loses them |
+| Resumable (TUS) uploads in progress | The instance's disk, at `STORAGE_PATH/.tus-uploads` | One shared volume at `STORAGE_PATH`, or sticky sessions |
 | Image transforms | An in-process cache | `STORAGE_RENDITION_CACHE=true` |
 | Logs Explorer | A ring of the last 10,000 lines | Nothing — ship stdout to a log aggregator |
 | Cron timers | Every process that runs the scheduler | Claimed in the database: one run per slot. `REBASE_CRON_SCHEDULER` picks where timers live |
@@ -89,15 +89,18 @@ received them, and another instance answers 404 for them. Use S3 or GCS, or
 mount one volume at `STORAGE_PATH` on every instance. See
 [Self-hosting: file storage](/docs/deployment/self-hosting/#file-storage).
 
-**Resumable uploads** (the TUS endpoint) keep each upload's partial file and its
-state on the local disk of the instance that created it, under
-`STORAGE_PATH/.tus-uploads` — even when finished files go to S3 or GCS. A chunk
-that lands on another instance is answered 404 and the client starts again.
-Route a client's upload requests to one instance (sticky sessions on the load
-balancer). A shared volume at `STORAGE_PATH` shares the partial files but not
-yet the upload state, which is held in the process's memory — so a restart or a
-rolling deploy also sends an upload in progress back to byte 0. Ordinary
-uploads through `POST /upload` are one request and are not affected.
+**Resumable uploads** (the TUS endpoint) keep each upload's partial file, and
+<span class="since-badge" data-since="0.25">Since 0.25</span> a record of the upload beside it, on the disk of the instance that
+created it, under `STORAGE_PATH/.tus-uploads` — even when finished files go to
+S3 or GCS. Mount one volume at `STORAGE_PATH` on every instance and any instance
+serves any upload; a restart or a rolling deploy resumes an upload where it
+stopped. Without a shared volume, a chunk that lands on another instance is
+answered 404: route a client's upload requests to one instance (sticky sessions
+on the load balancer). The SDK and the admin panel, which use this endpoint for
+files over 8 MiB, then send the file through `POST /upload` instead, and keep
+doing so for the rest of the session. Ordinary uploads through `POST /upload` are one request
+and are not affected. On 0.23 the upload's state was in the process's memory,
+so a shared volume did not help and a restart sent an upload back to byte 0.
 
 **Image transforms** (`?width=400&format=webp`) are cached in memory, so every
 instance computes every variant once, and a new instance starts cold. Set

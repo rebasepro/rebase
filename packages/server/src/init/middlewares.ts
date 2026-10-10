@@ -58,11 +58,9 @@ export function configureMiddlewares(
     app.use(`${basePath}/*`, requestId());
 
     // Response Compression — registered early so it wraps the final response of
-    // every downstream handler, including error responses.
-    //
-    // Hono's `threshold` is deliberately not plumbed through: it only applies to
-    // responses declaring a Content-Length, and `c.json()` sets none, so it
-    // would silently do nothing on the very responses this exists to shrink.
+    // every downstream handler, including error responses. Bodies under 1 KB
+    // go out as they are; `responseCompression` measures the ones `c.json()`
+    // leaves without a Content-Length.
     if (config.compression !== false) {
         app.use(`${basePath}/*`, responseCompression());
         logger.debug("Response compression enabled");

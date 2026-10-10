@@ -12,8 +12,9 @@ export * from "./LucideIconByName";
  *
  * Read the cost before reaching for it. The map holds a reference to every
  * icon in the library, so importing it pulls all ~1,750 into whatever chunk
- * you import it from — measured at **822 kB uncompressed**. There is no
- * tree-shaking that helps: the object literal names them all.
+ * you import it from — **822 kB unminified**, about 480 kB minified (~120 kB
+ * gzipped). There is no tree-shaking that helps: the object literal names
+ * them all.
  *
  * It used to be reached by this package's own navigation chrome, which put
  * that 822 kB in the entry chunk, modulepreloaded on the login screen, for

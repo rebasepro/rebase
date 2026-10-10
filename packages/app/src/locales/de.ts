@@ -908,6 +908,10 @@ export const de: RebaseTranslations = {
     studio_sql_update_failed: "Aktualisierung fehlgeschlagen: {{message}}",
     studio_sql_update_no_row: "Es wurde keine Zeile aktualisiert: Die Zeile wurde seit dem Lesen geändert oder gelöscht, oder die gewählte Rolle darf sie nicht aktualisieren. Führen Sie die Abfrage erneut aus, um den gespeicherten Wert zu sehen.",
     studio_sql_ran_as_other_role: "Diese Zeilen wurden als {{ranAs}} gelesen, nicht als {{role}}: Auf diesem Server ist der Rollenwechsel ausgeschaltet (DISABLE_DB_ROLE_SWITCHING), daher läuft jede Anweisung als Eigentümer der Verbindung.",
+    studio_sql_result_truncated: "Angezeigt werden die ersten {{shown}} von {{total}} Zeilen: Die Konsole behält höchstens 10.000 Zeilen oder 32 MB an Werten eines Ergebnisses. Schränken Sie die Abfrage ein oder blättern Sie mit LIMIT und OFFSET, um den Rest zu sehen. Kopieren und Exportieren umfassen nur die angezeigten Zeilen.",
+    studio_sql_download_full_csv: "Vollständiges Ergebnis als CSV herunterladen",
+    studio_sql_downloading_full_csv: "Wird heruntergeladen…",
+    studio_sql_download_full_failed: "Das vollständige Ergebnis konnte nicht heruntergeladen werden: {{message}}",
     studio_sql_role_switching_disabled: "Der Rollenwechsel ist auf diesem Server ausgeschaltet: Jede Anweisung läuft als {{role}}, egal welche Rolle hier gewählt ist.",
     studio_sql_execution_not_supported: "Die aktuelle Datenquelle unterstützt keine SQL-Ausführung.",
     studio_sql_error_executing: "Beim Ausführen der Abfrage ist ein Fehler aufgetreten.",
@@ -1347,6 +1351,10 @@ export const de: RebaseTranslations = {
     studio_schema_no_collections_body: "Es gibt noch nichts zu zeichnen. Lege eine Collection unter config/collections/ an oder öffne „Collections bearbeiten“, um hier eine hinzuzufügen.",
     studio_schema_introspect_hint: "Bei einer Datenbank, die bereits Tabellen hat, schreibt rebase schema introspect die Collection-Dateien für dich.",
     studio_schema_visualizer_source: "Aus Ihren Collections gezeichnet: Tabellen, Spalten, Typen und Relationen so, wie sie dort deklariert sind. Nur die RLS-Markierungen werden aus der Datenbank gelesen.",
+    studio_schema_laying_out: "Diagramm wird angeordnet…",
+    studio_schema_neighbourhood: "{{shown}} von {{total}} Tabellen: {{table}} und die Tabellen darum herum. Wählen Sie eine andere in der Liste, um weiterzugehen.",
+    studio_schema_neighbourhood_depth_1: "1 Relation entfernt",
+    studio_schema_neighbourhood_depth_2: "2 Relationen entfernt",
 
 
     // ─── Studio: RLS editor confirmations ───────────────────────

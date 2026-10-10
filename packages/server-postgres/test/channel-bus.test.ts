@@ -301,6 +301,20 @@ describe("Channel bus — cross-instance broadcast & presence", () => {
         expect(error).toMatchObject({ payload: { error: { code: "CHANNEL_BUS_PAYLOAD_TOO_LARGE" } } });
     });
 
+    it("forgets that it warned about a channel once the channel is gone", async () => {
+        // The once-per-channel warning was remembered for every channel name
+        // ever broadcast on, for the life of the process.
+        for (let i = 0; i < 50; i++) {
+            connect(a, `a${i}`, `doc:${i}`);
+            a.broadcastToChannel(`a${i}`, `doc:${i}`, "op", { blob: "x".repeat(PG_NOTIFY_MAX_PAYLOAD_BYTES) });
+        }
+        await flush();
+        expect(a["oversizedBroadcastWarned"].size).toBe(50);
+
+        for (let i = 0; i < 50; i++) a.leaveChannel(`a${i}`, `doc:${i}`);
+        expect(a["oversizedBroadcastWarned"].size).toBe(0);
+    });
+
     it("a retained message that has since been pruned is dropped, not delivered empty", async () => {
         const remote = connect(b, "b1", "snap:1");
 
@@ -373,6 +387,34 @@ describe("Channel bus — cross-instance broadcast & presence", () => {
         expect(sentMessages(remote).find(m => m.type === "presence_diff"))
             .toMatchObject({ leaves: { a1: { name: "Alice" } } });
         expect([...state.presence.keys()]).toEqual([]);
+    });
+
+    it("a disconnect of a socket that never tracked presence touches no roster row", async () => {
+        // Every socket close ran `DELETE … WHERE client_id = $1` whenever the
+        // bus was on — the sockets that only subscribe to data included, which
+        // is most of them, and all of them at once on a deploy.
+        const { service, execute } = createService(state);
+        await service.configureChannelBus(new FakeBus(wire));
+        const rosterDeletes = () => execute.mock.calls
+            .map(([query]) => readQuery(query).text)
+            .filter(text => text.includes("DELETE FROM rebase.channel_presence") && text.includes("client_id"));
+        try {
+            connect(service, "reader", "room:1");
+            connect(service, "tracker", "room:1");
+            service.trackPresence("tracker", "room:1", { name: "Tess" });
+            await flush();
+
+            await service.removeClient("reader");
+            await flush();
+            expect(rosterDeletes()).toHaveLength(0);
+
+            await service.removeClient("tracker");
+            await flush();
+            expect(rosterDeletes()).toHaveLength(1);
+            expect([...state.presence.keys()]).toEqual([]);
+        } finally {
+            await service.destroy();
+        }
     });
 
     it("reaps presence left behind by an instance that stopped heartbeating", async () => {

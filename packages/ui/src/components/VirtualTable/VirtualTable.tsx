@@ -2,7 +2,7 @@
 
 import React, { createContext, forwardRef, RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { deepEqual as equal } from "fast-equals"
+import { deepEqual as equal, shallowEqual } from "fast-equals"
 
 import { FixedSizeList as List } from "react-window";
 import useMeasure from "react-use-measure";
@@ -156,7 +156,25 @@ position });
             return index;
         }, [sortBy]);
 
-        const [columns, setColumns] = useState(columnsProp);
+        // Held by value: a caller that rebuilds equal column objects on each
+        // render must not hand every cell a new `columns` array, which is one
+        // of the things a cell is drawn from (see `areCellPropsEqual`).
+        const columnsPropRef = useRef(columnsProp);
+        if (columnsPropRef.current !== columnsProp && !equal(columnsPropRef.current, columnsProp)) {
+            columnsPropRef.current = columnsProp;
+        }
+        const stableColumnsProp = columnsPropRef.current;
+
+        // The columns as drawn: the prop, or what a resize or a drag has made
+        // of it since. Adopted during render when the prop changes rather than
+        // in an effect, which drew every changed column a second time — first
+        // with the old columns, then again, a commit later, with the new ones.
+        const [columns, setColumns] = useState(stableColumnsProp);
+        const [adoptedColumnsProp, setAdoptedColumnsProp] = useState(stableColumnsProp);
+        if (adoptedColumnsProp !== stableColumnsProp) {
+            setAdoptedColumnsProp(stableColumnsProp);
+            setColumns(stableColumnsProp);
+        }
 
         const tableRef = useRef<HTMLDivElement>(null);
         const endReachCallbackThreshold = useRef<number>(0);
@@ -208,10 +226,6 @@ position });
                 tableRef.current.scrollTo(scrollLeft, initialScroll);
             }
         }, [tableRef, initialScroll]);
-
-        useEffect(() => {
-            setColumns(columnsProp);
-        }, [columnsProp]);
 
     // Removed redundant ResizeObserver to prevent performance issues and UI flickering.
 
@@ -384,7 +398,10 @@ position });
             customView,
             onColumnResize: onColumnResizeInternal,
             onColumnResizeEnd: onColumnResizeEndInternal,
-            filter: filterRef.current,
+            // The prop, not `filterRef`: the ref is brought up to date by an
+            // effect, after this render has read it, so the header showed the
+            // filter from before — until something else redrew it.
+            filter: filterInput,
             onColumnSort,
             onFilterUpdate: onFilterUpdateInternal,
             sortIndex,
@@ -426,7 +443,6 @@ position });
                         height={bounds.height}
                         itemCount={(data?.length ?? 0) + (endAdornment ? 1 : 0)}
                         onScroll={draggingColumnId ? undefined : onScroll}
-                        includeAddColumn={Boolean(AddColumnComponent)}
                         itemSize={rowHeight}/>
 
                 </VirtualListContext.Provider>
@@ -455,8 +471,26 @@ position });
 
         return tableContent;
     },
-    equal
+    areVirtualTablePropsEqual
 );
+
+/**
+ * Every prop by value except `data`, which is compared by reference.
+ *
+ * A realtime frame decodes into new row objects whether or not anything in
+ * them changed, so a deep compare of `data` walked every row the table held —
+ * 10,000 rows scrolled through cost ~22 ms per frame — to decide what only
+ * the rows on screen can show. A new array now re-renders the table, and each
+ * row on screen compares its own row by value (`areRowRendererPropsEqual`):
+ * the work is bounded by the window, not by how far the user scrolled.
+ */
+function areVirtualTablePropsEqual(
+    a: VirtualTableProps<Record<string, unknown>>,
+    b: VirtualTableProps<Record<string, unknown>>
+): boolean {
+    if (a.data !== b.data) return false;
+    return equal({ ...a, data: undefined }, { ...b, data: undefined });
+}
 
 /**
  * `React.memo` is not generic-preserving: it takes the props type as its own
@@ -530,14 +564,154 @@ const SortableCellWrapper = ({
     );
 };
 
+type VirtualTableRowRendererProps = {
+    rowData: Record<string, unknown> | undefined;
+    index: number;
+    style: React.CSSProperties;
+    onRowClick?: VirtualTableContextProps<Record<string, unknown>>["onRowClick"];
+    columns: VirtualTableColumn[];
+    hoverRow: boolean;
+    rowClassName?: (rowData: Record<string, unknown>) => string | undefined;
+    rowHeight: number;
+    headerHeight: number;
+    cellRenderer: VirtualTableContextProps<Record<string, unknown>>["cellRenderer"];
+    draggingColumnId?: string | null;
+    columnsReorderable: boolean;
+    includeAddColumn: boolean;
+    extraData?: unknown;
+};
+
+/**
+ * One row and its cells, drawn again only when something it is drawn from
+ * changed.
+ *
+ * Every input is a prop and every prop is compared, so nothing a row shows can
+ * go stale behind its memo. The comparisons are by reference except for the
+ * row itself and `extraData`, which are compared by value: a realtime frame
+ * decodes into new, equal objects, and comparing only the rows on screen is
+ * what lets the table skip a deep compare of everything it holds.
+ *
+ * This replaced a deep compare of the row's `children` — every cell element,
+ * each carrying the full `columns` array — which cost ~400 column-object
+ * compares per row on every parent render.
+ */
+const VirtualTableRowRenderer = React.memo(function VirtualTableRowRenderer({
+    rowData,
+    index,
+    style,
+    onRowClick,
+    columns,
+    hoverRow,
+    rowClassName,
+    rowHeight,
+    headerHeight,
+    cellRenderer,
+    draggingColumnId,
+    columnsReorderable,
+    includeAddColumn,
+    extraData
+}: VirtualTableRowRendererProps) {
+    return (
+        <VirtualTableRow
+            rowData={rowData}
+            rowIndex={index}
+            onRowClick={onRowClick}
+            columns={columns}
+            hoverRow={hoverRow}
+            rowClassName={rowClassName}
+            style={{
+                ...style,
+                top: `calc(${style.top}px + ${headerHeight ?? 48}px)`
+            }}
+            rowHeight={rowHeight}>
+
+            {columns.map((column: VirtualTableColumn, columnIndex: number) => {
+                // The one place the row is read by key, and the one
+                // cast for it. `T` is constrained to `object`
+                // rather than `Record<string, unknown>` because an
+                // `interface` — `Entity`, every consumer's row type
+                // — has no implicit index signature and so does not
+                // satisfy the latter. Constraining it there did not
+                // make this read safe; it pushed an
+                // `as unknown as Record<string, unknown>` onto every
+                // caller, on the data going in AND on each callback
+                // coming back out, which is four of them in
+                // `SelectableTable` alone.
+                const cellData = rowData && (rowData as Record<string, unknown>)[column.key];
+                const isDragging = draggingColumnId === column.key;
+                const isDraggable = !column.frozen && columnsReorderable;
+
+                const cell = <VirtualTableCell
+                    dataKey={column.key}
+                    // @ts-expect-error -- React.memo<VirtualTableProps<any>> erases the generic T, so cellRenderer's parameter type widens to `any` losing structural compatibility with VirtualTableCell<T>. The types are structurally correct at runtime.
+                    cellRenderer={cellRenderer}
+                    column={column}
+                    columns={columns}
+                    rowData={rowData}
+                    cellData={cellData}
+                    rowIndex={index}
+                    columnIndex={columnIndex}
+                    extraData={extraData}/>;
+
+                return columnsReorderable ? (
+                    <SortableCellWrapper
+                        key={`cell_wrapper_${column.key}`}
+                        columnKey={column.key}
+                        width={column.width}
+                        isDragging={isDragging}
+                        isDraggable={isDraggable}
+                        frozen={column.frozen}
+                    >
+                        {cell}
+                    </SortableCellWrapper>
+                ) : (
+                    <div
+                        key={`cell_wrapper_${column.key}`}
+                        className={cls(
+                            "flex-shrink-0 relative",
+                            column.frozen && "sticky left-0 z-10 bg-surface-card"
+                        )}
+                        style={{
+                            minWidth: column.width,
+                            maxWidth: column.width,
+                            width: column.width
+                        }}
+                    >
+                        {cell}
+                    </div>
+                );
+            })}
+
+            {includeAddColumn && <div className={"w-20"}/>}
+
+        </VirtualTableRow>
+    );
+}, areRowRendererPropsEqual);
+
+function areRowRendererPropsEqual(a: VirtualTableRowRendererProps, b: VirtualTableRowRendererProps): boolean {
+    return a.index === b.index &&
+        a.columns === b.columns &&
+        a.cellRenderer === b.cellRenderer &&
+        a.onRowClick === b.onRowClick &&
+        a.rowClassName === b.rowClassName &&
+        a.hoverRow === b.hoverRow &&
+        a.rowHeight === b.rowHeight &&
+        a.headerHeight === b.headerHeight &&
+        a.draggingColumnId === b.draggingColumnId &&
+        a.columnsReorderable === b.columnsReorderable &&
+        a.includeAddColumn === b.includeAddColumn &&
+        shallowEqual(a.style, b.style) &&
+        equal(a.extraData, b.extraData) &&
+        equal(a.rowData, b.rowData);
+}
+
 function MemoizedList({
     outerRef,
     width,
     height,
     itemCount,
     onScroll,
-    itemSize,
-    includeAddColumn
+    itemSize
 }: {
     outerRef: RefObject<HTMLDivElement | null>;
     width: number;
@@ -549,7 +723,6 @@ function MemoizedList({
         scrollUpdateWasRequested: boolean;
     }) => void;
     itemSize: number;
-    includeAddColumn?: boolean;
 }) {
 
     const Row = useCallback(({
@@ -569,6 +742,7 @@ function MemoizedList({
                 endAdornment,
                 draggingColumnId,
                 onColumnsOrderChange,
+                AddColumnComponent,
                 extraData
             }) => {
 
@@ -584,91 +758,24 @@ function MemoizedList({
                     </div>;
                 }
 
-                const rowData = data ? data[index] : undefined;
-                return (
-                    <VirtualTableRow
-                        key={`row_${index}`}
-                        rowData={rowData}
-                        rowIndex={index}
-                        onRowClick={onRowClick}
-                        columns={columns}
-                        hoverRow={hoverRow}
-                        rowClassName={rowClassName}
-                        style={{
-                            ...style,
-                            top: `calc(${style.top}px + ${headerHeight ?? 48}px)`
-                        }}
-                        rowHeight={rowHeight}>
-
-                        {columns.map((column: VirtualTableColumn, columnIndex: number) => {
-                            // The one place the row is read by key, and the one
-                            // cast for it. `T` is constrained to `object`
-                            // rather than `Record<string, unknown>` because an
-                            // `interface` — `Entity`, every consumer's row type
-                            // — has no implicit index signature and so does not
-                            // satisfy the latter. Constraining it there did not
-                            // make this read safe; it pushed an
-                            // `as unknown as Record<string, unknown>` onto every
-                            // caller, on the data going in AND on each callback
-                            // coming back out, which is four of them in
-                            // `SelectableTable` alone.
-                            const cellData = rowData && (rowData as Record<string, unknown>)[column.key];
-                            const isDragging = draggingColumnId === column.key;
-                            const isDraggable = !column.frozen && !!onColumnsOrderChange;
-
-                            return onColumnsOrderChange ? (
-                                <SortableCellWrapper
-                                    key={`cell_wrapper_${column.key}`}
-                                    columnKey={column.key}
-                                    width={column.width}
-                                    isDragging={isDragging}
-                                    isDraggable={isDraggable}
-                                    frozen={column.frozen}
-                                >
-                                    <VirtualTableCell
-                                        dataKey={column.key}
-                                        // @ts-expect-error -- React.memo<VirtualTableProps<any>> erases the generic T, so cellRenderer's parameter type widens to `any` losing structural compatibility with VirtualTableCell<T>. The types are structurally correct at runtime.
-                                        cellRenderer={cellRenderer}
-                                        column={column}
-                                        columns={columns}
-                                        rowData={rowData}
-                                        cellData={cellData}
-                                        rowIndex={index}
-                                        columnIndex={columnIndex}
-                                        extraData={extraData}/>
-                                </SortableCellWrapper>
-                            ) : (
-                                <div
-                                    key={`cell_wrapper_${column.key}`}
-                                    className={cls(
-                                        "flex-shrink-0 relative",
-                                        column.frozen && "sticky left-0 z-10 bg-surface-card"
-                                    )}
-                                    style={{
-                                        minWidth: column.width,
-                                        maxWidth: column.width,
-                                        width: column.width
-                                    }}
-                                >
-                                    <VirtualTableCell
-                                        dataKey={column.key}
-                                        // @ts-expect-error -- React.memo<VirtualTableProps<any>> erases the generic T, so cellRenderer's parameter type widens to `any` losing structural compatibility with VirtualTableCell<T>. The types are structurally correct at runtime.
-                                        cellRenderer={cellRenderer}
-                                        column={column}
-                                        columns={columns}
-                                        rowData={rowData}
-                                        cellData={cellData}
-                                        rowIndex={index}
-                                        columnIndex={columnIndex}
-                                        extraData={extraData}/>
-                                </div>
-                            );
-                        })}
-
-                        {includeAddColumn && <div className={"w-20"}/>}
-
-                    </VirtualTableRow>
-                );
+                return <VirtualTableRowRenderer
+                    rowData={data ? data[index] : undefined}
+                    index={index}
+                    style={style}
+                    onRowClick={onRowClick}
+                    columns={columns}
+                    hoverRow={hoverRow}
+                    rowClassName={rowClassName}
+                    rowHeight={rowHeight}
+                    headerHeight={headerHeight}
+                    cellRenderer={cellRenderer}
+                    draggingColumnId={draggingColumnId}
+                    columnsReorderable={Boolean(onColumnsOrderChange)}
+                    // Read here rather than from this function's closure: the
+                    // component is created once, and a closure would keep the
+                    // first value for the life of the list.
+                    includeAddColumn={Boolean(AddColumnComponent)}
+                    extraData={extraData}/>;
             }}
         </VirtualListContext.Consumer>;
     }, []);

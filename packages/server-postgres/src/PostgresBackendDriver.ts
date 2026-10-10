@@ -24,6 +24,7 @@ import {
     BatchWriteProps,
     SaveManyProps,
     SaveProps,
+    SqlCursor,
     SqlScriptResult,
     StorageSource,
     UpdateManyProps,
@@ -43,8 +44,8 @@ import {
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool, type PoolClient } from "pg";
-import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
+import { DatabaseError, Pool, type PoolClient } from "pg";
+import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, hasFieldAccessRules, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath } from "./services/nested-path";
@@ -58,7 +59,8 @@ import { applyAuthContext } from "./security/rls-enforcement";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
-import { onOwnSession, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
+import { onOwnSession, openSqlCursorOnPool, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
+import { PgNotifyListener } from "./services/pg-notify-listener";
 
 /**
  * Has an operator opted out of database role switching entirely?
@@ -349,9 +351,32 @@ function authContextOf(user: User | undefined): SubscriptionAuthContext {
     };
 }
 
+/**
+ * Whether any tier declares a hook — application code that runs inside the
+ * write, and so may catch a failed statement (see
+ * `WriteTransactionScope.noteApplicationCode`).
+ */
+function declaresAnyHook(...tiers: (object | undefined)[]): boolean {
+    return tiers.some(tier => tier !== undefined && Object.values(tier).some(value => typeof value === "function"));
+}
+
+/**
+ * A bulk or batch update's answer for an id that names no row this caller can
+ * see: a 404 naming the id, which the entry's own label then wraps.
+ */
+function assertBatchRowFound(stored: Record<string, unknown> | undefined, id: unknown): void {
+    if (stored) return;
+    throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
+        statusCode: 404,
+        code: "NOT_FOUND"
+    });
+}
+
 export class PostgresBackendDriver implements DataDriver {
     key = "postgres";
     initialised = true;
+    /** `save` and `delete` read the row they address and run a caller's precondition on it. */
+    readonly checksRowPreconditions = true;
 
     public dataService: DataService;
     public realtimeService: RealtimeService;
@@ -445,6 +470,7 @@ export class PostgresBackendDriver implements DataDriver {
         return {
             executeSql: (...args: Parameters<NonNullable<DatabaseAdmin["executeSql"]>>) => this.executeSql(...args),
             runSqlScript: (...args: Parameters<NonNullable<DatabaseAdmin["runSqlScript"]>>) => this.runSqlScript(...args),
+            openSqlCursor: (...args: Parameters<NonNullable<DatabaseAdmin["openSqlCursor"]>>) => this.openSqlCursor(...args),
             fetchAvailableDatabases: () => this.fetchAvailableDatabases(),
             fetchAvailableRoles: () => this.fetchAvailableRoles(),
             fetchApplicationRoles: () => this.fetchApplicationRoles(),
@@ -472,6 +498,7 @@ export class PostgresBackendDriver implements DataDriver {
                     after as CollectionConfig[]
                 )
             }),
+            listen: (...args: Parameters<NonNullable<SQLAdmin["listen"]>>) => this.listen(...args),
             // Branch operations (only available when poolManager is configured)
             ...(this.branchService ? {
                 createBranch: this.branchService.createBranch.bind(this.branchService),
@@ -480,6 +507,38 @@ export class PostgresBackendDriver implements DataDriver {
                 getBranchInfo: this.branchService.getBranchInfo.bind(this.branchService)
             } : {})
         };
+    }
+
+    /**
+     * `SQLAdmin.listen`: a `LISTEN` on a connection of its own, through the
+     * listener CDC and the channel bus use, which reconnects and heartbeats.
+     *
+     * The connection is found the way the realtime listener finds its own:
+     * `DATABASE_DIRECT_URL` when set — a transaction-mode pooler such as
+     * PgBouncer does not keep a `LISTEN` — else the pool's own URL. The
+     * in-process development database has neither, and is refused, as is a
+     * first connect that fails: the caller polls instead.
+     */
+    async listen(
+        channel: string,
+        onNotify: (payload: string) => void,
+        options?: { onReconnect?: () => void }
+    ): Promise<() => Promise<void>> {
+        const pool = "$client" in this.db ? this.db.$client : undefined;
+        const connectionString = process.env.DATABASE_DIRECT_URL
+            || (pool instanceof Pool ? pool.options.connectionString : undefined);
+        if (!connectionString) {
+            throw new Error("no database URL to hold a LISTEN connection on (set DATABASE_DIRECT_URL)");
+        }
+        const listener = new PgNotifyListener({
+            connectionString,
+            channel,
+            logLabel: `[LISTEN ${channel}]`,
+            onPayload: onNotify,
+            onReconnect: options?.onReconnect
+        });
+        await listener.start();
+        return () => listener.stop();
     }
 
     /**
@@ -668,6 +727,21 @@ export class PostgresBackendDriver implements DataDriver {
      * collection's afterRead (so `post.author.email` is masked by the authors
      * collection, not left raw).
      */
+    /**
+     * One stored row as `restFetchService.fetchOneForRest` serves it: through
+     * `afterRead`, on a copy, so the row the write itself goes on with (its
+     * previous values, its history) stays the stored one. A precondition
+     * compares against what the caller was served — an `ETag` is a hash of that.
+     */
+    private async asRestServes(
+        row: Record<string, unknown> | null | undefined,
+        path: string
+    ): Promise<Record<string, unknown> | undefined> {
+        if (!row) return undefined;
+        const [served] = await this.applyAfterReadForRest([{ ...row }], path);
+        return served;
+    }
+
     async applyAfterReadForRest(
         rows: Record<string, unknown>[],
         path: string
@@ -707,6 +781,8 @@ export class PostgresBackendDriver implements DataDriver {
         const relKeys = Object.keys(relationTargets);
 
         if (!hasOwn && relKeys.length === 0) return rows;
+        // `afterRead` is application code; see `noteApplicationCode`.
+        currentWriteScope()?.noteApplicationCode();
 
         const maskEmbedded = async (value: unknown, target: { path: string; resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]> }): Promise<unknown> => {
             if (Array.isArray(value)) {
@@ -1097,7 +1173,7 @@ export class PostgresBackendDriver implements DataDriver {
         values: Partial<EntityValues<M>>,
         id: string | number | undefined,
         onConflict: readonly string[] | undefined
-    ): Promise<{ id: string; values: Partial<EntityValues<M>> } | undefined> {
+    ): Promise<{ id: string; values: Partial<EntityValues<M>>; row: Record<string, unknown> } | undefined> {
         const primaryKeys = getPrimaryKeys(collection, this.registry);
         const key: Record<string, unknown> = { ...values };
         if (isPresentKey(id)) Object.assign(key, parseIdValues(id, primaryKeys));
@@ -1133,7 +1209,8 @@ export class PostgresBackendDriver implements DataDriver {
         for (const field of [...primaryKeys.map(info => info.fieldName), ...targetFields]) delete rest[field];
         return {
             id: deriveRowAddress(row, collection, this.registry),
-            values: rest as Partial<EntityValues<M>>
+            values: rest as Partial<EntityValues<M>>,
+            row
         };
     }
 
@@ -1151,8 +1228,14 @@ export class PostgresBackendDriver implements DataDriver {
                                                             collection,
                                                             status,
                                                             upsert,
-                                                            onConflict
-                                                        }: SaveProps<M>, frame: WriteFrame): Promise<Record<string, unknown>> {
+                                                            onConflict,
+                                                            precondition
+                                                        }: SaveProps<M>, frame: WriteFrame,
+                                                        /**
+                                                         * The stored row, when this write already read it in
+                                                         * this transaction (an upsert continuing as an update).
+                                                         */
+                                                        knownStored?: Record<string, unknown>): Promise<Record<string, unknown>> {
 
         const {
             collection: resolvedCollection,
@@ -1160,6 +1243,7 @@ export class PostgresBackendDriver implements DataDriver {
             globalCallbacks,
             propertyCallbacks
         } = this.resolveCollectionCallbacks(collection, path);
+        if (declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) currentWriteScope()?.noteApplicationCode();
 
         // An upsert that finds its row is an update of that row, and runs as
         // one: the update gate, `beforeSave` told "existing" with the stored
@@ -1172,12 +1256,18 @@ export class PostgresBackendDriver implements DataDriver {
         // hides updated and then answered 500. The read runs in the write's
         // transaction; a row it cannot see is still met safely by the
         // statement's own conflict branch below.
-        if (status === "existing") {
+        const assertUpdateShape = () => {
+            if (status !== "existing") return;
             assertUpdateDoesNotSoftDelete(resolvedCollection as CollectionConfig | undefined, values, path);
             if (isPresentKey(id)) {
                 assertKeyUnchanged(resolvedCollection as CollectionConfig | undefined, this.registry, id, values as Record<string, unknown>, path);
             }
-        }
+        };
+        // A caller's precondition is answered first, as the REST routes
+        // answered their own read of the row before handing the body on: a
+        // body that is wrong for a row that is not there is still a 404.
+        const preconditionFirst = precondition !== undefined && status === "existing" && Boolean(id);
+        if (!preconditionFirst) assertUpdateShape();
 
         const upserting = upsert === true && status !== "existing";
         if (upserting && resolvedCollection) {
@@ -1185,8 +1275,20 @@ export class PostgresBackendDriver implements DataDriver {
                 path, resolvedCollection as CollectionConfig, values, id, onConflict
             );
             if (stored) {
-                // The same write, continued as an update: the same frame.
-                return this.saveInFrame<M>({ path, id: stored.id, values: stored.values, collection, status: "existing" }, frame);
+                // The same write, continued as an update: the same frame. The
+                // row the key named was just read, in this transaction, and is
+                // the update's previous values rather than a second read of
+                // it — unless the two reads could differ: a `beforeQuery` may
+                // narrow the "list" that found it differently from a "get", the
+                // find ran on the trusted plane for per-field read access, and a
+                // nested path reads the row from elsewhere.
+                const reusable = !callbacks?.beforeQuery && !globalCallbacks?.beforeQuery
+                    && !hasFieldAccessRules(resolvedCollection as CollectionConfig) && !isNestedPath(path);
+                return this.saveInFrame<M>(
+                    { path, id: stored.id, values: stored.values, collection, status: "existing" },
+                    frame,
+                    reusable ? stored.row : undefined
+                );
             }
         }
 
@@ -1239,16 +1341,34 @@ export class PostgresBackendDriver implements DataDriver {
             // its own collection. A read that fails for another reason (a
             // collection whose key the registry cannot resolve) stays
             // best-effort enrichment and is not a reason to fail a write.
+            //
+            // A caller's `precondition` (the REST routes' 404 and `If-Match`)
+            // judges this same read, inside this transaction — after the row
+            // is locked, when it asks for that — so the routes no longer read
+            // the row in a transaction of their own first.
             try {
-                const existing = await this.dataService.getFetchService().fetchOneForRest(
-                    this.storedRowPath(path), id, undefined, resolvedCollection?.databaseId,
-                    {
-                        withDeleted: restoresSoftDeletedRow(
-                            resolvedCollection as CollectionConfig | undefined,
-                            values as Record<string, unknown>
-                        ) ? true : undefined
-                    }
-                );
+                const withDeleted = restoresSoftDeletedRow(
+                    resolvedCollection as CollectionConfig | undefined,
+                    values as Record<string, unknown>
+                ) ? true : undefined;
+                if (precondition?.lock) await this.dataService.getPersistService().lockRow(path, id);
+                const storedPath = this.storedRowPath(path);
+                const existing = knownStored && !precondition
+                    ? knownStored
+                    : await this.dataService.getFetchService().fetchOneForRest(
+                        storedPath, id, undefined, resolvedCollection?.databaseId, { withDeleted }
+                    );
+                if (precondition) {
+                    // Judged at the address written: through a many-to-many
+                    // path that is the row as a member of the parent's set, which
+                    // the stored-row read above does not establish.
+                    const addressed = storedPath === path
+                        ? existing
+                        : await this.dataService.getFetchService().fetchOneForRest(
+                            path, id, undefined, resolvedCollection?.databaseId, { withDeleted }
+                        );
+                    await precondition.check(await this.asRestServes(addressed, path));
+                }
                 if (!existing) {
                     throw ApiError.notFound(`No row "${id}" in "${path}" to update.`);
                 }
@@ -1256,6 +1376,7 @@ export class PostgresBackendDriver implements DataDriver {
                     const { id: _existingId, ...existingValues } = existing;
                     previousValuesForHistory = existingValues as Partial<M>;
                 }
+                if (preconditionFirst) assertUpdateShape();
             } catch (err) {
                 // The refusal above is the answer, not a failed enrichment.
                 if (err instanceof ApiError) throw err;
@@ -1263,6 +1384,9 @@ export class PostgresBackendDriver implements DataDriver {
                 // has aborted the write's transaction, and carrying on only
                 // turns the next statement into an unrelated 25P02.
                 if (reachedDatabase(err)) throw err;
+                // And so is whatever a caller's precondition threw: the write
+                // it guards must not go ahead on a read that failed.
+                if (precondition) throw err;
                 // Best-effort enrichment: callbacks and history run without
                 // previous values rather than the save failing on a read the
                 // write itself does not need (e.g. a collection whose key the
@@ -1640,13 +1764,50 @@ export class PostgresBackendDriver implements DataDriver {
      * Rows are applied in order, so a batch that touches the same key twice ends
      * with the last write winning, exactly as separate calls would.
      */
+    /**
+     * Run a batch in one transaction of its own, on a driver bound to it, and
+     * tell realtime subscribers about its rows only once it has committed.
+     *
+     * Inside a request's transaction the events already wait for that one to
+     * commit, and the batch adds to its list. On the server's own driver they
+     * did not wait at all: each row was announced as it was written, before
+     * the COMMIT — a subscriber's refetch found nothing yet, and a batch that
+     * then rolled back had announced rows that never existed.
+     */
+    private async inBatchTransaction<T>(run: (txDriver: PostgresBackendDriver) => Promise<T>): Promise<T> {
+        const ownNotifications = !this._deferNotifications;
+        const pending: PostgresBackendDriver["_pendingNotifications"] = ownNotifications ? [] : this._pendingNotifications;
+        const result = await this.db.transaction(async (tx) => {
+            const txDriver = this.bindToTransaction(tx);
+            txDriver._deferNotifications = true;
+            txDriver._pendingNotifications = pending;
+            return run(txDriver);
+        });
+        if (ownNotifications) {
+            for (const notification of pending) {
+                try {
+                    await this.realtimeService.notifyUpdate(
+                        notification.path, notification.id, notification.row, notification.databaseId
+                    );
+                } catch (error) {
+                    logger.error("[DataDriver] Error flushing deferred notification", { error });
+                }
+            }
+        }
+        return result;
+    }
+
     private bindToTransaction(tx: DrizzleClient): PostgresBackendDriver {
         // Bind the whole batch to the transaction handle. Without this the rows
         // would be written through `this.db` and survive a rollback.
         const txDriver = new PostgresBackendDriver(
             tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
         );
-        txDriver.dataService = new DataService(tx, this.registry, () => txDriver.buildCallContext());
+        txDriver.dataService = new DataService(tx, this.registry, () => {
+            // Asked for by a `beforeQuery` about to run: application code.
+            currentWriteScope()?.noteApplicationCode();
+            return txDriver.buildCallContext();
+        });
         txDriver.client = this.client;
         // Carry the caller's notification batching through, so a bulk write
         // nested in an outer transaction still holds its events until commit.
@@ -1673,7 +1834,11 @@ export class PostgresBackendDriver implements DataDriver {
         const txDriver = new PostgresBackendDriver(
             tx, this.realtimeService, this.registry, user, this.poolManager, this.historyService
         );
-        txDriver.dataService = new DataService(tx, this.registry, () => txDriver.buildCallContext());
+        txDriver.dataService = new DataService(tx, this.registry, () => {
+            // Asked for by a `beforeQuery` about to run: application code.
+            currentWriteScope()?.noteApplicationCode();
+            return txDriver.buildCallContext();
+        });
         txDriver.client = this.client;
         return txDriver.buildCallContext();
     }
@@ -1685,8 +1850,7 @@ export class PostgresBackendDriver implements DataDriver {
                                                           upsert,
                                                           onConflict
                                                       }: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
-        return this.db.transaction(async (tx) => {
-            const txDriver = this.bindToTransaction(tx);
+        return this.inBatchTransaction(async (txDriver) => {
 
             const saved: Record<string, unknown>[] = [];
 
@@ -1748,41 +1912,26 @@ export class PostgresBackendDriver implements DataDriver {
         updates,
         collection
     }: UpdateManyProps<M>): Promise<Record<string, unknown>[]> {
-        return this.db.transaction(async (tx) => {
-            const txDriver = this.bindToTransaction(tx);
+        return this.inBatchTransaction(async (txDriver) => {
 
             const saved: Record<string, unknown>[] = [];
 
             for (let i = 0; i < updates.length; i++) {
                 const { id, values } = updates[i];
                 try {
-                    // Read first so a missing row is a 404 rather than a silent
-                    // no-op. `save` with status "existing" would otherwise write
-                    // an UPDATE that matches nothing and report success.
-                    // A restore is an update of a row the default read hides;
-                    // see `restoresSoftDeletedRow`.
-                    const existing = await txDriver.fetchOne({
-                        path,
-                        id: String(id),
-                        collection: collection as CollectionConfig,
-                        withDeleted: restoresSoftDeletedRow(
-                            (collection as CollectionConfig | undefined) ?? this.registry?.getCollectionByPath(path),
-                            values as Record<string, unknown>
-                        ) ? true : undefined
-                    });
-                    if (!existing) {
-                        throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
-                            statusCode: 404,
-                            code: "NOT_FOUND"
-                        });
-                    }
-
+                    // A missing row is a 404 rather than a silent no-op, judged
+                    // on the read `save` makes of the row it updates (a restore
+                    // reading the trash too). That read used to be preceded by
+                    // one of its own here, through the admin view-model walk,
+                    // which loaded every declared relation of the row — every
+                    // comment of a post — to learn that it existed.
                     saved.push(await txDriver.save<M>({
                         path,
                         id: String(id),
                         values,
                         collection,
-                        status: "existing"
+                        status: "existing",
+                        precondition: { check: stored => assertBatchRowFound(stored, id) }
                     }));
                 } catch (error) {
                     // Say which entry, as saveMany does: "the batch failed" is
@@ -1819,8 +1968,7 @@ export class PostgresBackendDriver implements DataDriver {
         collection,
         hard
     }: DeleteManyProps<M>): Promise<void> {
-        await this.db.transaction(async (tx) => {
-            const txDriver = this.bindToTransaction(tx);
+        await this.inBatchTransaction(async (txDriver) => {
 
             for (let i = 0; i < ids.length; i++) {
                 const id = ids[i];
@@ -1866,8 +2014,7 @@ export class PostgresBackendDriver implements DataDriver {
     async batchWrite<M extends Record<string, unknown>>({
         operations
     }: BatchWriteProps<M>): Promise<(Record<string, unknown> | null)[]> {
-        return this.db.transaction(async (tx) => {
-            const txDriver = this.bindToTransaction(tx);
+        return this.inBatchTransaction(async (txDriver) => {
 
             const results: (Record<string, unknown> | null)[] = [];
             /** What each named operation wrote, for the `$ref`s after it. */
@@ -1905,33 +2052,17 @@ export class PostgresBackendDriver implements DataDriver {
                             });
                             break;
                         case "update": {
-                            // Read first, so an id matching no row is a 404
-                            // rather than an UPDATE that matches nothing and
-                            // reports success — the same rule `updateMany` and
-                            // the single-row route both apply.
-                            const existing = await txDriver.fetchOne({
-                                path: operation.path,
-                                id: id!,
-                                collection: operation.collection as CollectionConfig,
-                                // A restore is an update of a row the default
-                                // read hides; see `restoresSoftDeletedRow`.
-                                withDeleted: restoresSoftDeletedRow(
-                                    (operation.collection as CollectionConfig | undefined) ?? this.registry?.getCollectionByPath(operation.path),
-                                    values as Record<string, unknown> | undefined
-                                ) ? true : undefined
-                            });
-                            if (!existing) {
-                                throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
-                                    statusCode: 404,
-                                    code: "NOT_FOUND"
-                                });
-                            }
+                            // An id matching no row is a 404 rather than an
+                            // UPDATE that matches nothing and reports success —
+                            // the same rule `updateMany` and the single-row
+                            // route apply, on the read `save` makes anyway.
                             row = await txDriver.save<M>({
                                 path: operation.path,
                                 id: id!,
                                 values: values ?? ({} as Partial<EntityValues<M>>),
                                 collection: operation.collection,
-                                status: "existing"
+                                status: "existing",
+                                precondition: { check: stored => assertBatchRowFound(stored, id) }
                             });
                             break;
                         }
@@ -1978,7 +2109,8 @@ export class PostgresBackendDriver implements DataDriver {
     private async deleteInFrame<M extends Record<string, unknown>>({
                                                               row,
                                                               collection,
-                                                              hard
+                                                              hard,
+                                                              precondition
                                                           }: DeleteProps<M>, frame: WriteFrame): Promise<void> {
 
         const targetPath = row.path;
@@ -1990,6 +2122,7 @@ export class PostgresBackendDriver implements DataDriver {
             globalCallbacks,
             propertyCallbacks
         } = this.resolveCollectionCallbacks(collection, targetPath);
+        if (declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) currentWriteScope()?.noteApplicationCode();
 
         // The row being deleted is read here, from the database, by this
         // driver — which on a user request is bound to that user's
@@ -2014,6 +2147,10 @@ export class PostgresBackendDriver implements DataDriver {
         // `{ __type: "date" }` and every relation in a ref carrying the related
         // row, and that is what the delete's history entry held: a revert to
         // it handed the envelope to Postgres as the column's value.
+        //
+        // A caller's `precondition` (the REST route's 404 and `If-Match`)
+        // judges this same read, after the row is locked when it asks for that.
+        if (precondition?.lock) await this.dataService.getPersistService().lockRow(targetPath, row.id);
         const stored = await this.dataService.fetchOneForRest<M>(
             targetPath,
             row.id,
@@ -2021,6 +2158,7 @@ export class PostgresBackendDriver implements DataDriver {
             resolvedCollection?.databaseId,
             { withDeleted: hard ? true : undefined }
         );
+        if (precondition) await precondition.check(await this.asRestServes(stored, targetPath));
         // Not found is answered before any callback runs: a callback handed a
         // row that is not there — or not there for this caller — would be
         // judging something it cannot see.
@@ -2328,19 +2466,21 @@ export class PostgresBackendDriver implements DataDriver {
         database?: string,
         role?: string,
         params?: unknown[],
-        isolateSession?: boolean
+        isolateSession?: boolean,
+        maxResultBytes?: number
     }): Promise<Record<string, unknown>[]> {
         if (options?.isolateSession) {
             return this.onIsolatedSession(
                 await this.getTargetDb(options.database),
                 options.role,
-                (db, role) => this.executeSqlOn(db, sqlText, { ...options, role })
+                (db, role) => this.executeSqlOn(db, sqlText, { ...options, role }),
+                options.maxResultBytes
             );
         }
-        if (!options?.database && !options?.role) {
-            return this.dataService.executeSql(sqlText, options?.params);
-        }
-        return this.executeSqlOn(await this.getTargetDb(options?.database), sqlText, options);
+        const rows = !options?.database && !options?.role
+            ? await this.dataService.executeSql(sqlText, options?.params)
+            : await this.executeSqlOn(await this.getTargetDb(options?.database), sqlText, options);
+        return options?.maxResultBytes === undefined ? rows : refuseOversizedRows(rows, options.maxResultBytes);
     }
 
     /**
@@ -2366,6 +2506,41 @@ export class PostgresBackendDriver implements DataDriver {
         return runSqlScriptOnPool(pool, sqlText, {
             assumeRole: role ? (connection) => this.assumeSessionRole(connection, role) : undefined
         });
+    }
+
+    /**
+     * Read the whole result of one query a person wrote, a batch at a time —
+     * see `SQLAdmin.openSqlCursor` and `openSqlCursorOnPool`. The database's
+     * refusal of the query (a write, a second statement, a syntax error, a
+     * role it may not take) is the caller's to read, as on the socket.
+     */
+    async openSqlCursor(sqlText: string, options?: {
+        database?: string,
+        role?: string,
+        batchSize?: number
+    }): Promise<SqlCursor> {
+        const targetDb = await this.getTargetDb(options?.database);
+        const pool = "$client" in targetDb ? targetDb.$client : undefined;
+        if (!(pool instanceof Pool)) {
+            // One session in process: a cursor held open across a download
+            // would hold every other query of the app behind it.
+            throw new ApiError(501, "SQL_EXPORT_UNSUPPORTED",
+                "Downloading a whole result reads it through a cursor on a connection of its own, and the " +
+                "in-process development database has one connection. Point DATABASE_URL at a Postgres of your " +
+                "own (`rebase dev --docker` starts one), or add a LIMIT and export the rows on screen.");
+        }
+        const role = options?.role;
+        try {
+            return await openSqlCursorOnPool(pool, sqlText, {
+                assumeRole: role ? (connection) => this.assumeSessionRole(connection, role) : undefined,
+                batchRows: options?.batchSize
+            });
+        } catch (error: unknown) {
+            if (error instanceof DatabaseError || error instanceof RoleSwitchUnavailableError) {
+                throw new ApiError(400, "SQL_ERROR", error.message);
+            }
+            throw error;
+        }
     }
 
     /**
@@ -2418,16 +2593,24 @@ export class PostgresBackendDriver implements DataDriver {
      * `onOwnSession`. `fn` is then handed no role: there is nothing left to
      * switch. A handle that is already one session (PGlite in process, a
      * single client) is reset in place, and `fn` switches the role itself.
+     *
+     * With `maxResultBytes`, a result past it is refused — see
+     * `readWithinBudget`: on a pool the read stops there, in process the rows
+     * are measured once read.
      */
-    private async onIsolatedSession<T>(
+    private async onIsolatedSession(
         targetDb: DrizzleClient,
         role: string | undefined,
-        fn: (db: DrizzleClient, role: string | undefined) => Promise<T>
-    ): Promise<T> {
+        fn: (db: DrizzleClient, role: string | undefined) => Promise<Record<string, unknown>[]>,
+        maxResultBytes?: number
+    ): Promise<Record<string, unknown>[]> {
         const pool = "$client" in targetDb ? targetDb.$client : undefined;
         if (!(pool instanceof Pool)) {
             try {
-                return await fn(targetDb, role);
+                // One session in process: the rows are read whole before
+                // anything could stop them, and refused afterwards all the same.
+                const rows = await fn(targetDb, role);
+                return maxResultBytes === undefined ? rows : refuseOversizedRows(rows, maxResultBytes);
             } finally {
                 for (const statement of RESET_SESSION_STATEMENTS) {
                     await targetDb.execute(drizzleSql.raw(statement)).catch((error: unknown) =>
@@ -2438,7 +2621,9 @@ export class PostgresBackendDriver implements DataDriver {
         return onOwnSession(
             pool,
             { assumeRole: role ? (connection) => this.assumeSessionRole(connection, role) : undefined },
-            (connection) => fn(drizzle(connection), undefined)
+            (connection) => maxResultBytes === undefined
+                ? fn(drizzle(connection), undefined)
+                : readWithinBudget(connection, maxResultBytes, () => fn(drizzle(connection), undefined))
         );
     }
 
@@ -2670,22 +2855,28 @@ export class PostgresBackendDriver implements DataDriver {
         `);
         const columns = result.rows as Record<string, unknown>[];
 
-        // Also fetch enum values for any USER-DEFINED columns
+        // The labels of every enum a USER-DEFINED column uses, in one query —
+        // it was one per column, in turn, each a round trip. A USER-DEFINED
+        // type that is not an enum (a composite, a PostGIS type) has none.
         const enumColumns = columns.filter((c) => c.data_type === "USER-DEFINED");
         if (enumColumns.length > 0) {
+            const typeNames = [...new Set(enumColumns.map(col => String(col.udt_name)))];
+            let labelsByType = new Map<string, unknown[]>();
+            try {
+                const enumResult = await this.db.execute(drizzleSql`
+                    SELECT t.typname AS type_name, array_agg(e.enumlabel::text ORDER BY e.enumsortorder) AS labels
+                    FROM pg_type t
+                    JOIN pg_enum e ON t.oid = e.enumtypid
+                    WHERE t.typname IN (${drizzleSql.join(typeNames.map(name => drizzleSql`${name}`), drizzleSql`, `)})
+                    GROUP BY t.typname
+                `);
+                labelsByType = new Map((enumResult.rows as Record<string, unknown>[])
+                    .map(row => [String(row.type_name), Array.isArray(row.labels) ? row.labels : []]));
+            } catch {
+                // As before: a column whose labels cannot be read has none.
+            }
             for (const col of enumColumns) {
-                try {
-                    const enumResult = await this.db.execute(drizzleSql`
-                        SELECT e.enumlabel
-                        FROM pg_type t
-                        JOIN pg_enum e ON t.oid = e.enumtypid
-                        WHERE t.typname = ${col.udt_name as string}
-                        ORDER BY e.enumsortorder
-                    `);
-                    col.enum_values = (enumResult.rows as Record<string, unknown>[]).map(e => e.enumlabel);
-                } catch {
-                    col.enum_values = [];
-                }
+                col.enum_values = labelsByType.get(String(col.udt_name)) ?? [];
             }
         }
         // Rows from hand-written SQL. The element type is the one claim nothing
@@ -2779,6 +2970,8 @@ export class PostgresBackendDriver implements DataDriver {
 export class AuthenticatedPostgresBackendDriver implements DataDriver {
     key = "postgres";
     initialised = true;
+    /** Its delegate's, run inside this caller's transaction. */
+    readonly checksRowPreconditions = true;
 
     public user: User;
     public data: RebaseSdkData;
@@ -2830,6 +3023,26 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             cursorFor: (collectionPath, row, orderBy) =>
                 this.delegate.restFetchService.cursorFor?.(collectionPath, row, orderBy)
         };
+    }
+
+    /**
+     * Several reads in one read-only transaction — see
+     * {@link DataDriver.readTogether}. The same transaction every read on this
+     * driver opens for itself, with the same identity, role and field viewer;
+     * `work` is handed the transaction's driver, whose reads run on it directly
+     * instead of each opening another.
+     *
+     * `REPEATABLE READ`, because the point of reading together is reading one
+     * snapshot: under the default `READ COMMITTED` each statement takes its
+     * own, and a count could still describe a different set from the page
+     * beside it. A read-only transaction cannot fail serialization at this
+     * level, so it costs nothing.
+     */
+    async readTogether<T>(work: (driver: DataDriver) => Promise<T>): Promise<T> {
+        return this.withTransaction((delegate) => work(delegate), {
+            accessMode: "read only",
+            isolationLevel: "repeatable read"
+        });
     }
 
     private async withTransaction<T>(
@@ -2913,7 +3126,11 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 let hookContext: RebaseCallContext | undefined;
                 const txEntityService = new DataService(
                     tx, this.delegate.registry,
-                    () => (hookContext ??= this.delegate.callContextWithin(tx, this.user))
+                    () => {
+                        // Asked for by a `beforeQuery` about to run: application code.
+                        writeScope?.noteApplicationCode();
+                        return (hookContext ??= this.delegate.callContextWithin(tx, this.user));
+                    }
                 );
                 const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
 

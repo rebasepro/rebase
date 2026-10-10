@@ -1,16 +1,15 @@
-import { Entity, FindParams } from "@rebasepro/types";
+import { Entity, FindParams, MAX_LIST_LIMIT } from "@rebasepro/types";
 import { EntityPageAccessor, walkEntityPages } from "../../util/entity_pages";
 
 /**
- * Rows asked for per request.
- *
- * Kept at or below the server's `MAX_LIST_LIMIT`, which is now the largest page
- * a read will serve *and refuses* anything larger — it used to clamp silently,
+ * Rows asked for per request: the server's `MAX_LIST_LIMIT`, the largest page a
+ * read will serve — it *refuses* anything larger. (It used to clamp silently,
  * and asking for 100 000 while receiving 1 000 looked exactly like a collection
- * with 1 000 rows in it. The walk still never trusts the page size it asked for:
- * it advances by the rows it was actually handed.
+ * with 1 000 rows in it.) The walk still never trusts the page size it asked
+ * for: it advances by the rows it was actually handed. It was 500, which made a
+ * 100 000-row export 200 sequential requests, each with its own count.
  */
-export const EXPORT_PAGE_SIZE = 500;
+export const EXPORT_PAGE_SIZE = MAX_LIST_LIMIT;
 
 /**
  * Most rows one browser-side export will materialise.

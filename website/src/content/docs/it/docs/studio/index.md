@@ -72,7 +72,7 @@ Fanno parte di Studio e vengono **caricati in modo lazy da `RebaseStudio`** — 
 
 | Scheda | Slug | Gruppo | Cosa fa |
 |--------|------|--------|---------|
-| Console SQL | `sql` | Database | Eseguire SQL grezzo sul tuo database PostgreSQL e leggere i risultati in tabella |
+| Console SQL | `sql` | Database | Eseguire SQL grezzo sul tuo database PostgreSQL e leggere i risultati in tabella. La tabella mostra il risultato dell'ultima istruzione, fino alle prime 10.000 righe o ai primi 32 MB di valori; un risultato più lungo indica quante righe erano, e copia ed esporta includono solo le righe mostrate |
 | Policy RLS | `rls` | Database | Ispezionare e gestire le policy di Row Level Security delle tue tabelle. Una policy viene elencata così come la conserva il database, con il badge **Differs from code** dove non corrisponde a ciò che dichiara il progetto. Una policy che Rebase genera non può essere modificata direttamente nel database, e su una tabella gestita da Rebase un banner indica che ogni avvio del server e `rebase db push` riapplicano le policy dichiarate |
 | Visualizzatore di schema | `schema-visualizer` | Database | Diagramma delle entità delle tue collezioni e delle loro relazioni, tracciato dalle definizioni delle collezioni: tabelle, colonne, tipi e relazioni sono come le dichiarano le collezioni. Solo gli indicatori RLS vengono letti dal database |
 | Branch | `branches` | Database | Creare e gestire i [branch del database](/docs/backend/branching) |

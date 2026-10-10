@@ -150,6 +150,8 @@ id: "1" }
             }
         });
         expect(getResult.content[0].text).toContain("doc-1");
+        // Compact JSON: indentation was about half of every answer's tokens.
+        expect(getResult.content[0].text).toContain(JSON.stringify({ id: "doc-1", title: "Test Doc" }));
 
         // 2. create_document
         const createResult = await handler({

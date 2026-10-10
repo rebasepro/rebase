@@ -1,6 +1,8 @@
-import { describe, expect, it, afterEach, jest } from "@jest/globals";
+import { describe, expect, it, afterEach, beforeEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { createHash } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
 
@@ -320,5 +322,81 @@ describe("the contract and the private docs read admin live", () => {
         const token = await generateAccessToken("admin-1", ["admin"]);
 
         expect((await app.request(url, bearer(token))).status).toBe(200);
+    });
+});
+
+describe("a backup download link, through the real admin gates", () => {
+    // The link stands in for the admin's header on one request, so it has to
+    // be answered ahead of every gate on `/api/admin/*` — the auth adapter's
+    // own admin routers authenticate everything under that prefix before the
+    // backups surface's gate is reached. A unit test of the backup routes
+    // alone mounts neither.
+    const DUMP = "rebase-app-20260714T030000Z.dump";
+    let dir: string;
+    const previous = process.env.BACKUP_DESTINATION;
+
+    beforeEach(() => {
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), "admin-gate-backup-"));
+        fs.writeFileSync(path.join(dir, DUMP), "PGDMP-bytes");
+        process.env.BACKUP_DESTINATION = dir;
+    });
+    afterEach(() => {
+        fs.rmSync(dir, { recursive: true, force: true });
+        if (previous === undefined) delete process.env.BACKUP_DESTINATION;
+        else process.env.BACKUP_DESTINATION = previous;
+    });
+
+    /** Roles read live, as the admin gates read them: `admin-1` is an admin. */
+    async function bootWithBackups(): Promise<Hono> {
+        const app = new Hono();
+        const backend = await initializeRebaseBackend({
+            app: app as never,
+            server: {} as never,
+            collections: [collection("jobs")],
+            cronsDir: CRONS_DIR,
+            cronPersistence: false,
+            bootstrappers: [{
+                ...bootstrapper,
+                async initializeAuth() {
+                    const authRepository = {
+                        getUserRoleIds: async (uid: string) => (uid === "admin-1" ? ["admin"] : ["editor"]),
+                        getTokensValidAfter: async () => null
+                    };
+                    return { userService: authRepository, authRepository };
+                }
+            } as unknown as BackendBootstrapper],
+            enableSwagger: false,
+            auth: publicDataPlane
+        } as never);
+        started.push({ app, stop: () => (backend as { cronScheduler?: { stop?: () => void } }).cronScheduler?.stop?.() });
+        return app;
+    }
+
+    it("opens the one backup without a header, and nothing else", async () => {
+        const app = await bootWithBackups();
+        const token = await generateAccessToken("admin-1", ["admin"]);
+        const key = path.join(dir, DUMP);
+
+        expect((await app.request("/api/admin/backups/download-url", {
+            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key })
+        })).status).toBe(401);
+
+        const minted = await app.request("/api/admin/backups/download-url", {
+            method: "POST",
+            headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+            body: JSON.stringify({ key })
+        });
+        expect(minted.status).toBe(200);
+        const link = await minted.json() as { url: string; token: string };
+        expect(link.url.startsWith("/api/admin/backups/download?")).toBe(true);
+
+        const res = await app.request(link.url);
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("PGDMP-bytes");
+
+        // The link is not a credential anywhere else under /api/admin.
+        expect((await app.request(`/api/admin/backups?token=${encodeURIComponent(link.token)}`)).status).toBe(401);
+        expect((await app.request("/api/admin/backups", bearer(link.token))).status).toBe(401);
+        expect((await app.request("/api/cron", bearer(link.token))).status).toBe(401);
     });
 });

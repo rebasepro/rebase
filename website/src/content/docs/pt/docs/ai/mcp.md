@@ -363,6 +363,9 @@ do lado de fora.
 
 O [endpoint remoto](#o-endpoint-remoto) cerca os resultados das suas ferramentas da mesma
 forma e avisa o cliente disso; seu `structuredContent` carrega o resultado puro.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> `list_collections` é
+a exceção: só um modelo lê a sua listagem, por isso ela é enviada uma única vez, no texto.
+Antes da 0.24 ela também carregava uma cópia em `structuredContent`.
 
 Trata-se de um marcador, não de uma sandbox. Um assistente que possui essas ferramentas é apenas tão seguro
 quanto o conteúdo que você permite que ele leia.

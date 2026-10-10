@@ -908,6 +908,10 @@ export const it: RebaseTranslations = {
     studio_sql_update_failed: "Aggiornamento non riuscito: {{message}}",
     studio_sql_update_no_row: "Nessuna riga è stata aggiornata: la riga è stata modificata o eliminata dopo la lettura, oppure il ruolo selezionato non può aggiornarla. Esegui di nuovo la query per vedere cosa è memorizzato.",
     studio_sql_ran_as_other_role: "Queste righe sono state lette come {{ranAs}}, non come {{role}}: su questo server il cambio di ruolo è disattivato (DISABLE_DB_ROLE_SWITCHING), quindi ogni istruzione viene eseguita come proprietario della connessione.",
+    studio_sql_result_truncated: "Sono mostrate le prime {{shown}} di {{total}} righe: la console conserva al massimo 10.000 righe, o 32 MB di valori, di un risultato. Restringi la query, o scorrila a pagine con LIMIT e OFFSET, per vedere il resto. Copia ed esportazione includono solo le righe mostrate.",
+    studio_sql_download_full_csv: "Scarica il risultato completo come CSV",
+    studio_sql_downloading_full_csv: "Download in corso…",
+    studio_sql_download_full_failed: "Impossibile scaricare il risultato completo: {{message}}",
     studio_sql_role_switching_disabled: "Il cambio di ruolo è disattivato su questo server: ogni istruzione viene eseguita come {{role}}, qualunque ruolo sia scelto qui.",
     studio_sql_execution_not_supported: "L'origine dati attuale non supporta l'esecuzione di SQL.",
     studio_sql_error_executing: "Si è verificato un errore durante l'esecuzione della query.",
@@ -1347,6 +1351,10 @@ export const it: RebaseTranslations = {
     studio_schema_no_collections_body: "Non c'è ancora nulla da disegnare. Aggiungi una collection in config/collections/, oppure apri «Modifica collection» per aggiungerne una qui.",
     studio_schema_introspect_hint: "Su un database che ha già delle tabelle, rebase schema introspect scrive i file di collection al posto tuo.",
     studio_schema_visualizer_source: "Disegnato dalle tue collection: tabelle, colonne, tipi e relazioni come le dichiarano. Solo gli indicatori RLS sono letti dal database.",
+    studio_schema_laying_out: "Disposizione del diagramma…",
+    studio_schema_neighbourhood: "{{shown}} tabelle su {{total}}: {{table}} e le tabelle intorno. Scegline un'altra nell'elenco per spostarti.",
+    studio_schema_neighbourhood_depth_1: "A 1 relazione",
+    studio_schema_neighbourhood_depth_2: "A 2 relazioni",
 
 
     // ─── Studio: RLS editor confirmations ───────────────────────

@@ -4,12 +4,13 @@ import { PgNotifyListener, type PgNotifyListenerStatus } from "../pg-notify-list
 
 /**
  * A single database change captured by the CDC triggers and delivered over the
- * `rebase_cdc` NOTIFY channel.
+ * `rebase_cdc` NOTIFY channel — one row of a notification, which may name many.
  */
 export interface CdcChangeEvent {
     schema: string;
     table: string;
-    op: "INSERT" | "UPDATE" | "DELETE";
+    /** `TRUNCATE` changed every row, and `row` is empty. */
+    op: "INSERT" | "UPDATE" | "DELETE" | "TRUNCATE";
     /**
      * The changed row's identity, by column: its key, and for a junction table
      * the two ids naming the child list (from NEW for insert/update, OLD for
@@ -21,35 +22,68 @@ export interface CdcChangeEvent {
     truncated?: boolean;
 }
 
+const OPS = new Set(["INSERT", "UPDATE", "DELETE", "TRUNCATE"]);
+
 /**
- * Parse a `rebase_cdc` NOTIFY payload. Returns `null` for anything malformed so
- * a single bad message can never crash the listener.
+ * Parse a `rebase_cdc` NOTIFY payload into the changes it names, one per row.
+ * Returns `null` for anything malformed so a single bad message can never
+ * crash the listener.
+ *
+ * Reads every shape a capture trigger sends, whichever version installed it —
+ * during a rolling deploy the database's triggers and this instance need not
+ * be the same version:
+ *  - `{ schema, table, op, row }` — one row: the row trigger, and a statement
+ *    that changed one row;
+ *  - `{ schema, table, op, cols, keys }` — a statement's rows in a batch. With
+ *    one column a key is the value; with several, an array in `cols` order;
+ *  - `{ schema, table, op: "TRUNCATE" }`.
  */
-export function parseCdcPayload(payload: string): CdcChangeEvent | null {
+export function parseCdcPayload(payload: string): CdcChangeEvent[] | null {
     let parsed: unknown;
     try {
         parsed = JSON.parse(payload);
     } catch {
         return null;
     }
-    if (!parsed || typeof parsed !== "object") return null;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
 
     const obj = parsed as Record<string, unknown>;
     const schema = typeof obj.schema === "string" ? obj.schema : undefined;
     const table = typeof obj.table === "string" ? obj.table : undefined;
     const op = obj.op;
     if (!schema || !table) return null;
-    if (op !== "INSERT" && op !== "UPDATE" && op !== "DELETE") return null;
+    if (typeof op !== "string" || !OPS.has(op)) return null;
+    const kind = op as CdcChangeEvent["op"];
 
-    const row = obj.row && typeof obj.row === "object" ? (obj.row as Record<string, unknown>) : {};
+    if (kind === "TRUNCATE") return [{ schema, table, op: kind, row: {}, truncated: false }];
 
-    return {
+    if (Array.isArray(obj.keys)) {
+        const cols = obj.cols;
+        if (!Array.isArray(cols) || cols.length === 0 || !cols.every((col) => typeof col === "string")) return null;
+        const names = cols as string[];
+        const events: CdcChangeEvent[] = [];
+        for (const key of obj.keys) {
+            let row: Record<string, unknown>;
+            if (names.length === 1) {
+                row = { [names[0]]: key };
+            } else {
+                if (!Array.isArray(key) || key.length !== names.length) return null;
+                row = {};
+                names.forEach((name, i) => { row[name] = key[i]; });
+            }
+            events.push({ schema, table, op: kind, row, truncated: false });
+        }
+        return events;
+    }
+
+    const row = obj.row && typeof obj.row === "object" && !Array.isArray(obj.row) ? (obj.row as Record<string, unknown>) : {};
+    return [{
         schema,
         table,
-        op,
+        op: kind,
         row,
         truncated: obj.truncated === true
-    };
+    }];
 }
 
 /**
@@ -71,7 +105,7 @@ export class CdcListener {
      */
     constructor(
         connectionString: string,
-        onEvent: (event: CdcChangeEvent) => void | Promise<void>,
+        onEvents: (events: CdcChangeEvent[]) => void | Promise<void>,
         onReconnect?: () => void
     ) {
         this.listener = new PgNotifyListener({
@@ -80,12 +114,12 @@ export class CdcListener {
             logLabel: "[CDC]",
             onReconnect,
             onPayload: (payload) => {
-                const event = parseCdcPayload(payload);
-                if (!event) {
+                const events = parseCdcPayload(payload);
+                if (!events) {
                     logger.warn("⚠️ [CDC] Dropping unparseable change notification.");
                     return;
                 }
-                return onEvent(event);
+                return onEvents(events);
             }
         });
     }

@@ -11,8 +11,10 @@ interface ShutdownConfig {
     jobQueue?: { stop(timeoutMs?: number): Promise<void> };
     /** Structural, same reason. */
     rlsAudit?: { stop(): void };
-    /** The expired-token sweep's timer. */
-    authTokenSweep?: { stop(): void };
+    /** The expired-token sweep: its timer, and the tick it may have running. */
+    authTokenSweep?: { stop(): Promise<void> | void };
+    /** The history retention sweep: its timer, and the sweep it may have running. */
+    historyRetentionSweep?: { stop(): Promise<void> | void };
     /** The stop `MetricsHistory.start()` returned: its interval writes to the pool. */
     stopMetricsSampler?: () => void;
     realtimeServices: Record<string, RealtimeProvider>;
@@ -22,6 +24,12 @@ interface ShutdownConfig {
      * one of these left open held the shutdown to its force timeout.
      */
     closeLongLivedResponses?: () => void;
+    /**
+     * The email service, when one is configured. A pooled SMTP transport keeps
+     * its connections open between sends; one with a `close()` is closed once
+     * nothing else can send, rather than left for its idle timer.
+     */
+    emailService?: object;
 }
 
 /**
@@ -156,6 +164,21 @@ function cleanupReserveMs(timeoutMs: number): number {
 const WORK_DRAIN_SHARE = 2 / 3;
 
 export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => Promise<void> {
+    /**
+     * Close the email transport's pooled connections. Last, so a request still
+     * draining can send; a send already in flight finishes on its connection,
+     * which the transport then closes. Never throws.
+     */
+    const closeEmail = (): void => {
+        const email = config.emailService;
+        if (!email || !("close" in email) || typeof email.close !== "function") return;
+        try {
+            email.close();
+        } catch (err) {
+            logger.warn("Error closing the email transport:", { error: err });
+        }
+    };
+
     return (timeoutMs = 15_000): Promise<void> => {
         return new Promise<void>((resolve) => {
             // Force-resolve after the timeout (unless disabled with 0). Armed
@@ -170,6 +193,7 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                     // So the process can actually end: an open socket holds the
                     // event loop, and the cleanup after this closes the pool.
                     config.server.closeAllConnections?.();
+                    closeEmail();
                     resolve();
                 }, timeoutMs)
                 : undefined;
@@ -201,8 +225,15 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 if (config.rlsAudit) {
                     config.rlsAudit.stop();
                 }
-                // And the token sweep's: one DELETE, nothing to wait for.
-                config.authTokenSweep?.stop();
+                // And the token sweep's — whose tick may be running (the first
+                // starts at boot, unawaited): waited for with the cron run
+                // below, so it does not run on into a pool closed after this.
+                const sweepStopped = Promise.resolve(config.authTokenSweep?.stop()).catch(
+                    (err: unknown) => logger.warn("Error stopping the expired-token sweep:", { error: err })
+                );
+                const historySweepStopped = Promise.resolve(config.historyRetentionSweep?.stop()).catch(
+                    (err: unknown) => logger.warn("Error stopping the history retention sweep:", { error: err })
+                );
                 // And the metrics sampler, whose next tick would write to a
                 // pool the embedder closes once this resolves.
                 config.stopMetricsSampler?.();
@@ -221,6 +252,8 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                     logger.info("Job queue stopped");
                 }
                 await cronStopped;
+                await sweepStopped;
+                await historySweepStopped;
 
                 // 1c. Wait for post-response work handed to `waitUntil()`.
                 //
@@ -282,6 +315,8 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                     clearInterval(sweepIdle);
                     logger.info("HTTP server closed");
                     clearTimeout(forceTimer);
+                    // 4. The email transport, once no request can send.
+                    closeEmail();
                     resolve();
                 });
             })();

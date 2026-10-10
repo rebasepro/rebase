@@ -58,6 +58,24 @@ describe("GET /download", () => {
         expect(res.status).toBe(404);
     });
 
+    it("streams an object-storage backup from the store, never reading it whole", async () => {
+        const getObject = jest.fn(async () => null);
+        const storage = {
+            getObject,
+            getObjectStream: async (key: string, options?: { bucket?: string }) =>
+                key === `nightly/${DUMP}` && options?.bucket === "bucket"
+                    ? { stream: new Blob([content]).stream(), size: content.length, contentType: "application/octet-stream", lastModified: 0 }
+                    : null
+        } as unknown as StorageController;
+
+        const res = await download(`nightly/${DUMP}`, storage, "s3://bucket/nightly");
+
+        expect(res.status).toBe(200);
+        expect(res.headers.get("Content-Length")).toBe(String(content.length));
+        expect(await res.text()).toBe(content);
+        expect(getObject).not.toHaveBeenCalled();
+    });
+
     it("streams an object-storage backup instead of copying it into a second buffer", async () => {
         const file = new File([content], DUMP);
         const arrayBuffer = jest.spyOn(file, "arrayBuffer");

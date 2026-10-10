@@ -75,7 +75,10 @@ const { url } = await client.storage.getSignedUrl(
 );
 ```
 
-Le SDK met en cache les URL signées pour éviter les appels serveur redondants.
+Le SDK met en cache les URL signées pour éviter les appels serveur redondants, jusqu'à l'expiration du
+jeton de téléchargement de chacune. Le cache appartient à l'identifiant qui l'a demandé : lorsque le jeton
+d'accès change — une déconnexion, un autre utilisateur qui se connecte, une actualisation — il repart de zéro,
+de sorte qu'un utilisateur ne reçoit jamais une URL émise pour un autre.
 
 ### URL privées vs. publiques
 

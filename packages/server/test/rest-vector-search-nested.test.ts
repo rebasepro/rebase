@@ -50,6 +50,8 @@ const author = {
 } as unknown as CollectionConfig;
 
 const VECTOR_QUERY = "vector_search=embedding&vector=%5B0.1%2C0.2%2C0.3%5D&vector_threshold=0.2";
+/** The same search with no threshold — the one listing kind whose `meta.total` still counts it. */
+const UNTHRESHOLDED_QUERY = "vector_search=embedding&vector=%5B0.1%2C0.2%2C0.3%5D";
 
 const EXPECTED = {
     property: "embedding",
@@ -99,16 +101,27 @@ describe("vector search on the subcollection routes", () => {
     });
 
     it("forwards it to the count behind that listing's `meta.total`", async () => {
+        // Without a threshold: a thresholded listing is not counted at all
+        // (its count is a distance per row of the table), see below.
         const { app, count } = createApp();
 
-        await app.request(`/authors/a1/posts?${VECTOR_QUERY}`);
+        await app.request(`/authors/a1/posts?${UNTHRESHOLDED_QUERY}`);
 
         expect(count).toHaveBeenCalledWith(
             expect.objectContaining({
                 path: "authors/a1/posts",
-                vectorSearch: EXPECTED
+                vectorSearch: { property: "embedding", vector: [0.1, 0.2, 0.3], distance: "cosine" }
             })
         );
+    });
+
+    it("runs no count behind a thresholded listing, and reports no total", async () => {
+        const { app, count } = createApp();
+
+        const res = await app.request(`/authors/a1/posts?${VECTOR_QUERY}`);
+
+        expect(count).not.toHaveBeenCalled();
+        expect(((await res.json()) as { meta: Record<string, unknown> }).meta).not.toHaveProperty("total");
     });
 
     it("forwards it to the nested /count endpoint", async () => {
@@ -147,13 +160,22 @@ describe("vector search on the root routes", () => {
     });
 
     it("forwards it to the count behind `meta.total`", async () => {
+        // Without a threshold, as on the nested route.
+        const { app, count } = createApp();
+
+        await app.request(`/posts?${UNTHRESHOLDED_QUERY}`);
+
+        expect(count).toHaveBeenCalledWith(
+            expect.objectContaining({ vectorSearch: { property: "embedding", vector: [0.1, 0.2, 0.3], distance: "cosine" } })
+        );
+    });
+
+    it("runs no count behind a thresholded listing", async () => {
         const { app, count } = createApp();
 
         await app.request(`/posts?${VECTOR_QUERY}`);
 
-        expect(count).toHaveBeenCalledWith(
-            expect.objectContaining({ vectorSearch: EXPECTED })
-        );
+        expect(count).not.toHaveBeenCalled();
     });
 
     it("forwards it to the /count endpoint", async () => {

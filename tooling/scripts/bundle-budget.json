@@ -2,27 +2,36 @@
     "targets": {
         "app/frontend/dist": {
             "chunks": {
-                "rebase-core": 2170294,
-                "form": 418915,
-                "index": 278407,
-                "rebase-ui": 186408,
-                "vendor-react-dom": 178377,
-                "vendor-zod": 65982,
-                "useHistory": 62326,
-                "vendor-datefns": 19559,
-                "serializable_utils": 7818,
-                "export": 6144,
-                "import": 6034,
-                "storage": 2185,
-                "useCollectionsConfigController": 1827,
+                "rebase-core": 452113,
+                "index": 313639,
+                "rebase-ui": 247128,
+                "vendor-react-dom": 178415,
+                "vendor-dnd": 49884,
+                "vendor-fuse": 26336,
+                "rebase-common": 19043,
+                "vendor-lucide": 15802,
+                "ConfigControllerProvider": 5329,
+                "useAdminContext": 1175,
                 "rolldown-runtime": 1084,
-                "util": 967,
-                "vendor-dnd": 451,
-                "id_column": 399,
-                "vendor-react-router": 281
+                "useSidePanel": 663,
+                "vendor-react-router": 358
             },
-            "totalBytes": 3407458,
-            "totalGzipBytes": 982314
+            "totalBytes": 1310969,
+            "totalGzipBytes": 408858
+        },
+        "sdk-minimal": {
+            "chunks": {
+                "sdk-minimal": 145656
+            },
+            "totalBytes": 145656,
+            "totalGzipBytes": 41701
+        },
+        "cms-shell": {
+            "chunks": {
+                "cms-shell": 732986
+            },
+            "totalBytes": 732986,
+            "totalGzipBytes": 241730
         }
     }
 }

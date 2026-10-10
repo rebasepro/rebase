@@ -100,7 +100,7 @@ describe("fetchAllEntitiesForExport", () => {
             onProgress: (loaded, total) => progress.push([loaded, total])
         });
 
-        expect(progress[0]).toEqual([500, 1100]);
+        expect(progress[0]).toEqual([1000, 1100]);
         expect(progress[progress.length - 1]).toEqual([1100, 1100]);
     });
 
@@ -115,5 +115,81 @@ describe("fetchAllEntitiesForExport", () => {
 
     test("the declared ceiling is the one the dialog can state", () => {
         expect(MAX_EXPORT_ROWS).toBeGreaterThan(0);
+    });
+
+    describe("seeking with the server's cursor", () => {
+
+        /**
+         * Like the REST listing: `meta.nextCursor` whenever another page
+         * follows, `after` continues strictly after it, and `after` with
+         * `offset` is refused (`CURSOR_WITH_OFFSET`).
+         */
+        function makeSeekingAccessor(rowCount: number, options: { cursor?: "always" | "never" | "stalls" } = {}) {
+            const calls: FindParams<any>[] = [];
+            const mode = options.cursor ?? "always";
+            return {
+                calls,
+                accessor: {
+                    async find(params?: FindParams<any>): Promise<FindResponse<any> & { meta: { nextCursor?: string } }> {
+                        calls.push(params ?? {});
+                        if (params?.after !== undefined && params?.offset !== undefined) {
+                            throw new Error("CURSOR_WITH_OFFSET");
+                        }
+                        const limit = resolveClientListLimit(params?.limit);
+                        const start = params?.after !== undefined ? Number(params.after.slice(1)) : (params?.offset ?? 0);
+                        const end = Math.min(start + limit, rowCount);
+                        const data = Array.from({ length: end - start }, (_, i) => ({
+                            id: `row-${start + i}`,
+                            path: "orders",
+                            values: { index: start + i }
+                        }));
+                        const hasMore = end < rowCount;
+                        const nextCursor = !hasMore || mode === "never" ? undefined
+                            : mode === "stalls" && params?.after ? params.after
+                                : `c${end}`;
+                        return {
+                            data,
+                            meta: { total: rowCount, limit, offset: start, hasMore, ...(nextCursor ? { nextCursor } : {}) }
+                        };
+                    }
+                }
+            };
+        }
+
+        test("a 100,000-row export reads 100 pages, each after the first by cursor", async () => {
+            const { accessor, calls } = makeSeekingAccessor(100_000);
+
+            const result = await fetchAllEntitiesForExport({ accessor });
+
+            expect(result).toHaveLength(100_000);
+            expect(new Set(result.map(r => r.id)).size).toEqual(100_000);
+            expect(calls).toHaveLength(100);
+            expect(calls[0].offset).toEqual(0);
+            expect(calls[0].after).toBeUndefined();
+            calls.slice(1).forEach((call, i) => {
+                expect(call.after).toEqual(`c${(i + 1) * 1000}`);
+                expect(call.offset).toBeUndefined();
+            });
+        });
+
+        test("pages by offset where the server issues no cursor", async () => {
+            const { accessor, calls } = makeSeekingAccessor(2_500, { cursor: "never" });
+
+            const result = await fetchAllEntitiesForExport({ accessor });
+
+            expect(result).toHaveLength(2_500);
+            expect(calls.map(c => c.offset)).toEqual([0, 1000, 2000]);
+            calls.forEach(call => expect(call.after).toBeUndefined());
+        });
+
+        test("falls back to offset from where it got to when a cursor stops advancing", async () => {
+            const { accessor, calls } = makeSeekingAccessor(3_500, { cursor: "stalls" });
+
+            const result = await fetchAllEntitiesForExport({ accessor });
+
+            expect(result).toHaveLength(3_500);
+            expect(new Set(result.map(r => r.id)).size).toEqual(3_500);
+            calls.forEach(call => expect(call.after !== undefined && call.offset !== undefined).toBe(false));
+        });
     });
 });

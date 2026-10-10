@@ -75,7 +75,10 @@ const { url } = await client.storage.getSignedUrl(
 );
 ```
 
-L'SDK memorizza nella cache gli URL firmati per evitare chiamate ridondanti al server.
+L'SDK memorizza nella cache gli URL firmati per evitare chiamate ridondanti al server, fino alla scadenza
+del token di download di ciascuno. La cache appartiene alla credenziale che l'ha richiesta: quando il token
+di accesso cambia — una disconnessione, un altro utente che accede, un refresh — riparte da zero, così a un
+utente non viene mai consegnato un URL generato per un altro.
 
 ### URL privati vs. pubblici
 

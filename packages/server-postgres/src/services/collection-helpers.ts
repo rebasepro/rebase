@@ -402,6 +402,31 @@ export function primaryKeyColumns(
 }
 
 /**
+ * The column a `joinPath` step names, on a table that may key it either way.
+ *
+ * A `JoinStep` is written in database terms — `on: { from: "author_id" }` —
+ * because there is no collection to translate through: the step names a raw
+ * table. A table the boot reads back out of the catalogue is keyed by the
+ * *wire* name, `authorId`, while a hand-written Drizzle schema may key it by
+ * the column name. Looking the step's name up as a key therefore found
+ * nothing on every booted table, and a `via` relation loaded nothing at all.
+ *
+ * The key first, as the step may already name one; then the column whose SQL
+ * name it is. `undefined` when the table has neither, which the caller turns
+ * into an error naming the step.
+ */
+export function columnNamed(table: PgTable, name: string): AnyPgColumn | undefined {
+    const columns: Record<string, AnyPgColumn> | undefined = getTableColumns(table);
+    if (!columns) {
+        // A stand-in without Drizzle's column map — a test double. Its keys
+        // are all there is to go by.
+        return (table[name as keyof typeof table] as AnyPgColumn | undefined) || undefined;
+    }
+    if (Object.prototype.hasOwnProperty.call(columns, name)) return columns[name];
+    return Object.values(columns).find(column => column.name === name);
+}
+
+/**
  * The column on the *source* table that a `hasOne`/`hasMany` link points at.
  *
  * `sourceKey` is authored when the two sides join on a natural key — an

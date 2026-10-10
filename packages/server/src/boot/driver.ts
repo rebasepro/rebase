@@ -10,6 +10,7 @@ import type {
 import { logger } from "../utils/logger";
 import { BundleError } from "./bundle";
 import type { ResolvedDataSourceConfig } from "./sources";
+import type { PoolConnect } from "../metrics/pool-wait";
 import { findPackageDir, readPackageVersion } from "./version-skew";
 
 /**
@@ -56,6 +57,8 @@ export interface DriverConnection {
     pool?: {
         end: () => Promise<void>;
         query?: (sql: string) => Promise<unknown>;
+        /** Checks a connection out. Timed, when metrics are on — see `metrics/pool-wait.ts`. */
+        connect?: PoolConnect;
     };
     /** Some drivers expose a query directly instead of via a pool. */
     query?: (sql: string) => Promise<unknown>;

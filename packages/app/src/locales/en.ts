@@ -916,6 +916,10 @@ export const en: RebaseTranslations = {
     studio_sql_update_failed: "Failed to update: {{message}}",
     studio_sql_update_no_row: "No row was updated: the row has changed or been deleted since it was read, or the selected role may not update it. Run the query again to see what is stored.",
     studio_sql_ran_as_other_role: "These rows were read as {{ranAs}}, not as {{role}}: role switching is turned off on this server (DISABLE_DB_ROLE_SWITCHING), so every statement runs as the connection owner.",
+    studio_sql_result_truncated: "Showing the first {{shown}} of {{total}} rows: the console keeps at most 10,000 rows, or 32 MB of values, of one result. Narrow the query, or page through it with LIMIT and OFFSET, to see the rest. Copy and export include only the rows shown.",
+    studio_sql_download_full_csv: "Download full result as CSV",
+    studio_sql_downloading_full_csv: "Downloading…",
+    studio_sql_download_full_failed: "Could not download the full result: {{message}}",
     studio_sql_role_switching_disabled: "Role switching is turned off on this server: every statement runs as {{role}}, whichever role is picked here.",
     studio_sql_execution_not_supported: "SQL execution is not supported by the current data source.",
     studio_sql_error_executing: "An error occurred while executing the query.",
@@ -1355,6 +1359,10 @@ export const en: RebaseTranslations = {
     studio_schema_no_collections_body: "There is nothing to draw yet. Add a collection under config/collections/, or open Edit collections to add one here.",
     studio_schema_introspect_hint: "Against a database that already has tables, rebase schema introspect writes the collection files for you.",
     studio_schema_visualizer_source: "Drawn from your collections: tables, columns, types and relations are as they declare them. Only the RLS markers are read from the database.",
+    studio_schema_laying_out: "Laying out the diagram…",
+    studio_schema_neighbourhood: "Showing {{shown}} of {{total}} tables: {{table}} and the tables around it. Pick another in the list to move.",
+    studio_schema_neighbourhood_depth_1: "1 relation away",
+    studio_schema_neighbourhood_depth_2: "2 relations away",
 
 
     // ─── Studio: RLS editor confirmations ───────────────────────

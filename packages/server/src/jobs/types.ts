@@ -95,16 +95,21 @@ export interface EnqueueOptions {
 /** How the worker behaves. */
 export interface JobQueueOptions {
     /**
-     * Off unless asked for. A worker polls the database forever, and turning
-     * that on for every backend that happens to run on Postgres is not a
-     * default anyone chose.
+     * Off unless asked for. A worker looks for work for as long as the process
+     * lives, and turning that on for every backend that happens to run on
+     * Postgres is not a default anyone chose.
      */
     enabled?: boolean;
     /** Named handlers. A job whose `task` is not here is left alone, not failed — see the worker. */
     tasks?: Record<string, JobHandler<never>>;
     /** How many jobs one instance runs at once. Default 5. */
     concurrency?: number;
-    /** How often to look for work when the last look found none. Default 2000ms. */
+    /**
+     * The wait after a look for work that found none — doubled after each
+     * further one, up to 30 seconds, and reset whenever there is work. Only
+     * where the database cannot wake the worker with `NOTIFY`; where it can,
+     * an idle worker looks every 30 seconds as a safety net. Default 2000ms.
+     */
     pollIntervalMs?: number;
     /**
      * How long a claim may go unrenewed before another worker may take the job.

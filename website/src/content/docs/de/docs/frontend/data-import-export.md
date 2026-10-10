@@ -1,5 +1,5 @@
 ---
-sourceHash: d8dc261c256b2bc3
+sourceHash: 6d792c1a29a7f0a9
 title: Datenimport & -export
 sidebar_label: Datenimport & -export
 description: Importieren Sie Daten aus CSV-, JSON- und Excel-Dateien in Ihre Collections und exportieren Sie Collection-Daten nach CSV oder JSON mit optionalen berechneten Feldern.
@@ -76,9 +76,10 @@ zu `0`, `false` oder einem leeren Wert, ohne aufgelistet zu werden. Gehen Sie zu
 einer anderen Eigenschaft zuzuordnen, oder korrigieren Sie die Datei und laden Sie sie erneut hoch.
 
 Die eigenen Regeln der Collection — Pflichtfelder, Enum-Optionen, eindeutige Werte — werden vom
-Server beim Schreiben der Zeilen geprüft, 25 Zeilen auf einmal. Wird eine Zeile abgelehnt, stoppt
-der Import und benennt sie; die Zeilen davor sind bereits gespeichert, und **Retry** setzt ab der
-abgelehnten Zeile fort.
+Server beim Schreiben der Zeilen geprüft, in Batches von bis zu 500 Zeilen (weniger bei breiten
+Zeilen, damit eine Anfrage unter etwa 1 MB bleibt). Ein Batch wird ganz oder gar nicht gespeichert.
+Wird eine Zeile abgelehnt, stoppt der Import und benennt sie; die Batches davor sind bereits
+gespeichert, und **Retry** setzt ab der ersten Zeile des Batches der abgelehnten Zeile fort.
 
 ### Eine Collection aus einer Datei erstellen
 

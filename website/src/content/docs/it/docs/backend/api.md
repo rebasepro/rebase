@@ -238,6 +238,14 @@ Il limite predefinito è **50**, il massimo è **1000**. Entrambi provengono da 
 
 Tutti e tre i parametri della finestra vengono rifiutati anziché corretti automaticamente, e ciascuno specifica il proprio codice: `INVALID_LIMIT`, `INVALID_OFFSET` (un numero intero maggiore o uguale a 0) e `INVALID_PAGE` (un numero intero maggiore o uguale a 1). Una finestra silenziosamente diversa da quella richiesta non potrebbe essere distinta dal raggiungimento della fine della collection, motivo per cui nessuno di essi viene limitato o ignorato.
 
+### Saltare il conteggio
+
+<span class="since-badge" data-since="0.25">Da 0.25</span> `meta.total` è un `COUNT(*)` su ogni riga corrispondente — su una tabella grande, la maggior parte di
+ciò che costa una richiesta di elenco. `?count=none` (`GET /api/data/orders?count=none`) lo salta:
+niente `meta.total`, mentre `meta.hasMore` resta esatto (la lettura chiede una riga oltre la pagina).
+`?count=exact` è il valore predefinito; qualsiasi altro valore è un 400 `INVALID_COUNT`. Una lettura
+con `?distinct=true` non viene mai conteggiata.
+
 ### Paginazione tramite cursore
 
 `offset` riconta le righe a ogni richiesta; pertanto, una riga inserita o eliminata tra due pagine sposta la finestra e la scansione salta o ripete silenziosamente delle righe. `?after=` esegue invece una ricerca diretta (seek): la pagina successiva inizia tassativamente dopo l'ultima riga restituita.
@@ -404,10 +412,10 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 
 | Chiave | Significato |
 |--------|-------------|
-| `limit` | Righe **per riga genitore**, non sull'intera pagina |
+| `limit` | Righe **per riga genitore**, non sull'intera pagina. Applicato dalla query, quindi le righe oltre il limite non vengono mai lette dal database |
 | `where` | Lo stesso dialetto di filtro utilizzato dal `where` di primo livello |
 | `logical` | Un gruppo `or`/`and`/`not` sulle righe correlate |
-| `orderBy` | La stessa sintassi di ordinamento, inclusa la posizione dei valori NULL |
+| `orderBy` | La stessa sintassi di ordinamento, inclusa la posizione dei valori NULL. Gli ex aequo, e un `limit` senza `orderBy`, seguono la chiave della riga correlata, in ordine crescente |
 | `fields` | Colonne della riga *correlata*; la sua chiave viene sempre preservata |
 | `include` | A sua volta, relazioni della riga correlata |
 
@@ -425,10 +433,14 @@ Le relazioni incluse vengono incorporate direttamente nella risposta:
     "author": {
         "id": 42,
         "name": "Jane Doe",
-        "email": "jane@example.com"
+        "email": "jane@example.com",
+        "companyId": 7
     }
 }
 ```
+
+Una riga inclusa è ciò che serve la route del suo target (`GET /api/data/authors/42`): le stesse colonne e le
+stesse codifiche, chiavi esterne come colonne, nessun oggetto di riferimento.
 
 ## Scrittura
 

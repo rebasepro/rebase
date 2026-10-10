@@ -3,6 +3,7 @@ import { ANONYMOUS_USER_ID, PolicyExpression, SecurityRule } from "@rebasepro/ty
 import {
     AnonymousGrantRisk,
     findAnonymousGrants,
+    REBASE_INTERNAL_TABLES,
     REBASE_USER_ROLE,
     revokeInternalTableAccess,
     securityRuleToConditions
@@ -40,8 +41,9 @@ import { logger } from "@rebasepro/server";
  *     SELECT/INSERT/UPDATE/DELETE grants (+ default privileges so future
  *     tables stay covered).
  *  3. {@link applyAuthContext} — per-transaction: set the `app.*` GUCs the
- *     policies read (`rebase.uid()` etc.) and `SET LOCAL ROLE rebase_user` so
- *     RLS binds. Transaction-scoped, so it composes with poolers.
+ *     policies read (`rebase.uid()` etc.) and the transaction-local role
+ *     `rebase_user` so RLS binds, in one statement. Transaction-scoped, so it
+ *     composes with poolers.
  *
  * Provisioning runs from the framework's own bootstrap/migrate (which already
  * self-creates the `auth` schema and functions) — enforcement is default-on,
@@ -345,20 +347,152 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
         }
     }
 
-    // Tier 3 — grants. Table owners (the expected non-superuser posture) can
-    // always grant on their own objects, so this tier needs no extra privilege.
-    const nspRows = await run("SELECT nspname FROM pg_namespace");
-    const existing = new Set(nspRows.map((r) => String(r.nspname)));
+    // Tier 3 — grants.
+    await ensureAppRoleGrants(run, uniqueSchemas);
+
+    logger.debug(`🔐 [rls] User role "${REBASE_USER_ROLE}" provisioned (schemas: ${uniqueSchemas.join(", ")})`);
+}
+
+/** A string literal for a catalogue read. Names come from config and constants, never from a request. */
+const sqlLiteral = (value: string): string => `'${value.replace(/'/g, "''")}'`;
+const textArray = (values: readonly string[]): string =>
+    values.length === 0 ? "ARRAY[]::text[]" : `ARRAY[${values.map(sqlLiteral).join(", ")}]::text[]`;
+
+/** What the grant tier would find already in place in one schema. */
+interface SchemaGrants {
+    /** `USAGE` on the schema, granted by its owner. */
+    usage: boolean;
+    /**
+     * Every relation `GRANT … ON ALL TABLES` reaches already has all four DML
+     * privileges from its owner — Rebase's own RLS-off tables aside, which the
+     * sweep takes back right after and so never keep them.
+     */
+    tables: boolean;
+    /** Every sequence already has `USAGE, SELECT` from its owner. */
+    sequences: boolean;
+    /** This role's default privileges in the schema already grant the table DML. */
+    defaultTables: boolean;
+    /** …and the sequence `USAGE, SELECT`. */
+    defaultSequences: boolean;
+    /**
+     * Rebase's own RLS-off tables a `REVOKE` would still change: the user role
+     * holds a privilege on them, or the table has never had an ACL written —
+     * `NULL`, which a `REVOKE` (like the grant-and-revoke it replaces) turns
+     * into the owner's explicit default. Same access either way; the same
+     * catalogue only this way.
+     */
+    internalGranted: string[];
+}
+
+/**
+ * The grant tier's state for every existing schema in `schemas`, in one read.
+ *
+ * A grant counts as present only as the statement this tier runs would record
+ * it — grantor the object's owner, which is what a GRANT by the owner, a member
+ * of the owning role or a superuser records — so skipping it leaves the ACL
+ * exactly as running it would. Anything else reads as missing, and the
+ * statement runs as it always did.
+ */
+async function readSchemaGrants(run: RawSqlRunner, schemas: string[]): Promise<Map<string, SchemaGrants>> {
+    const internal = textArray(REBASE_INTERNAL_TABLES);
+    const target = `(SELECT oid FROM pg_roles WHERE rolname = ${sqlLiteral(REBASE_USER_ROLE)})`;
+    /** Distinct privileges `acl` gives the user role (from `grantor`, when given) out of `privileges`. */
+    const held = (acl: string, privileges: string[], grantor?: string): string =>
+        `(SELECT count(DISTINCT a.privilege_type) FROM aclexplode(${acl}) a WHERE a.grantee = ${target}` +
+        `${grantor ? ` AND a.grantor = ${grantor}` : ""} AND a.privilege_type IN (${privileges.map(sqlLiteral).join(", ")}))`;
+    const DML = ["SELECT", "INSERT", "UPDATE", "DELETE"];
+    const SEQ = ["USAGE", "SELECT"];
+    const rows = await run(`
+        SELECT n.nspname AS schema,
+               ${held("n.nspacl", ["USAGE"], "n.nspowner")} = 1 AS usage,
+               NOT EXISTS (
+                   SELECT 1 FROM pg_class c
+                   WHERE c.relnamespace = n.oid AND c.relkind IN ('r', 'v', 'm', 'f', 'p')
+                     AND NOT (c.relname = ANY(${internal}) AND NOT c.relrowsecurity)
+                     AND ${held("c.relacl", DML, "c.relowner")} < ${DML.length}
+               ) AS tables,
+               NOT EXISTS (
+                   SELECT 1 FROM pg_class c
+                   WHERE c.relnamespace = n.oid AND c.relkind = 'S'
+                     AND ${held("c.relacl", SEQ, "c.relowner")} < ${SEQ.length}
+               ) AS sequences,
+               EXISTS (
+                   SELECT 1 FROM pg_default_acl d
+                   WHERE d.defaclrole = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+                     AND d.defaclnamespace = n.oid AND d.defaclobjtype = 'r'
+                     AND ${held("d.defaclacl", DML)} = ${DML.length}
+               ) AS default_tables,
+               EXISTS (
+                   SELECT 1 FROM pg_default_acl d
+                   WHERE d.defaclrole = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+                     AND d.defaclnamespace = n.oid AND d.defaclobjtype = 'S'
+                     AND ${held("d.defaclacl", SEQ)} = ${SEQ.length}
+               ) AS default_sequences,
+               ARRAY(
+                   SELECT c.relname::text FROM pg_class c
+                   WHERE c.relnamespace = n.oid AND c.relname = ANY(${internal}) AND NOT c.relrowsecurity
+                     AND (c.relacl IS NULL OR EXISTS (SELECT 1 FROM aclexplode(c.relacl) a WHERE a.grantee = ${target}))
+                   ORDER BY 1
+               ) AS internal_granted
+        FROM pg_namespace n
+        WHERE n.nspname = ANY(${textArray(schemas)})
+    `);
+    const grants = new Map<string, SchemaGrants>();
+    for (const row of rows) {
+        const internalGranted = row.internal_granted;
+        grants.set(String(row.schema), {
+            usage: row.usage === true,
+            tables: row.tables === true,
+            sequences: row.sequences === true,
+            defaultTables: row.default_tables === true,
+            defaultSequences: row.default_sequences === true,
+            internalGranted: Array.isArray(internalGranted)
+                ? internalGranted.map(String)
+                // A driver that hands arrays back as text: `{a,b}`.
+                : String(internalGranted ?? "").replace(/^\{|\}$/g, "").split(",").filter(Boolean)
+        });
+    }
+    return grants;
+}
+
+/**
+ * The grant tier of {@link ensureAppRole} on its own: `USAGE` on each existing
+ * schema in `schemas`, DML on its tables and `USAGE, SELECT` on its
+ * sequences, the default privileges that cover what this role creates later,
+ * and Rebase's own tables taken back — for a role and membership already
+ * provisioned.
+ *
+ * Every statement is issued only when the catalogue says it would change
+ * something. They used to run unconditionally, twice per boot (at connect, and
+ * again in the final posture check): a `GRANT … ON ALL TABLES` rewrites every
+ * table's `pg_class` row whether or not the ACL changes, which invalidates
+ * every table's cached plans on every connection, and the internal-table sweep
+ * ran 23 `REVOKE`s per schema. A boot against a database whose grants already
+ * hold now reads one catalogue query and writes nothing; one that is missing
+ * any of them runs exactly the statements it always ran.
+ *
+ * Table owners (the expected non-superuser posture) can always grant on their
+ * own objects, so this needs no extra privilege.
+ */
+export async function ensureAppRoleGrants(run: RawSqlRunner, schemas: string[]): Promise<void> {
+    const uniqueSchemas = Array.from(new Set(schemas.filter(Boolean)));
+    const grants = await readSchemaGrants(run, uniqueSchemas);
     for (const schema of uniqueSchemas) {
-        if (!existing.has(schema)) continue;
+        const state = grants.get(schema);
+        // Not there (yet): a later call, once provisioning has created it, grants it.
+        if (!state) continue;
         const s = quoteIdent(schema);
-        await run(`GRANT USAGE ON SCHEMA ${s} TO ${REBASE_USER_ROLE}`);
-        await run(`GRANT ${USER_TABLE_PRIVILEGES} ON ALL TABLES IN SCHEMA ${s} TO ${REBASE_USER_ROLE}`);
-        await run(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ${s} TO ${REBASE_USER_ROLE}`);
+        if (!state.usage) await run(`GRANT USAGE ON SCHEMA ${s} TO ${REBASE_USER_ROLE}`);
+        if (!state.tables) await run(`GRANT ${USER_TABLE_PRIVILEGES} ON ALL TABLES IN SCHEMA ${s} TO ${REBASE_USER_ROLE}`);
+        if (!state.sequences) await run(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ${s} TO ${REBASE_USER_ROLE}`);
         // Cover objects created later by the CURRENT role (the role that runs
         // migrations), so a migrate can never strand the user role.
-        await run(`ALTER DEFAULT PRIVILEGES IN SCHEMA ${s} GRANT ${USER_TABLE_PRIVILEGES} ON TABLES TO ${REBASE_USER_ROLE}`);
-        await run(`ALTER DEFAULT PRIVILEGES IN SCHEMA ${s} GRANT USAGE, SELECT ON SEQUENCES TO ${REBASE_USER_ROLE}`);
+        if (!state.defaultTables) {
+            await run(`ALTER DEFAULT PRIVILEGES IN SCHEMA ${s} GRANT ${USER_TABLE_PRIVILEGES} ON TABLES TO ${REBASE_USER_ROLE}`);
+        }
+        if (!state.defaultSequences) {
+            await run(`ALTER DEFAULT PRIVILEGES IN SCHEMA ${s} GRANT USAGE, SELECT ON SEQUENCES TO ${REBASE_USER_ROLE}`);
+        }
 
         // The grants above are deliberately schema-wide — a project's own
         // collections may live in `rebase`, and future tables must be reachable
@@ -367,7 +501,13 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
         // row an end user should ever address. Taking the privilege back here
         // covers every table that already exists; each creator revokes on the
         // table it just made, for the boot that creates them for the first time.
+        //
+        // All of them right after the schema-wide grant, which has just handed
+        // them out; otherwise only the ones the catalogue says still hold one.
+        const tables = state.tables ? state.internalGranted : undefined;
+        if (tables && tables.length === 0) continue;
         await revokeInternalTableAccess(async (text) => { await run(text); }, schema, {
+            tables,
             onError: (table, error) => logger.warn(
                 `🔐 [rls] Could not revoke "${REBASE_USER_ROLE}" access to "${schema}"."${table}" — ` +
                 "it stays reachable by authenticated requests: " +
@@ -375,15 +515,23 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
             )
         });
     }
+}
 
-    logger.debug(`🔐 [rls] User role "${REBASE_USER_ROLE}" provisioned (schemas: ${uniqueSchemas.join(", ")})`);
+/**
+ * Rebase's own RLS-off tables in `schema` that a `revokeInternalTableAccess`
+ * sweep would change — the user role holds a privilege on them, or their ACL
+ * has never been written. One read; the sweep it narrows is one `DO` per
+ * table name.
+ */
+export async function internalTablesGrantedToUserRole(run: RawSqlRunner, schema: string): Promise<string[]> {
+    return (await readSchemaGrants(run, [schema])).get(schema)?.internalGranted ?? [];
 }
 
 /**
  * Apply the authenticated context to a transaction: the `app.*` GUCs that RLS
  * policies read via `rebase.uid()` / `rebase.roles()` / `rebase.jwt()`, and — when
- * `userRole` is set — `SET LOCAL ROLE` so RLS binds every statement in this
- * transaction (reads *and* writes).
+ * `userRole` is set — the `LOCAL` role switch, in the same statement, so RLS
+ * binds every statement in this transaction (reads *and* writes).
  *
  * GUCs are set with `is_local = true` and the role switch is `LOCAL`: both
  * reset at commit/rollback, so pooled connections are never polluted.
@@ -437,11 +585,21 @@ export async function applyAuthContext(tx: SqlTx, auth: AuthContext, userRole?: 
         // same fact as `rebase.is_anonymous()`. Two sources that could
         // disagree would be worse than one.
         is_anonymous: auth.isAnonymous === true
-    })}, true)
+    })}, true)${userRole
+        // The role switch, in the same statement rather than a `SET LOCAL ROLE`
+        // round trip of its own on every transaction. Postgres implements
+        // `SET ROLE` as the `role` setting: `set_config('role', name, true)`
+        // runs the same membership check, fails with the same SQLSTATE and
+        // message (42501 "permission denied to set role", 22023 for an unknown
+        // role — `isRoleSwitchingPermissionError` still reads it), takes the
+        // name verbatim as the quoted identifier did, and resets at COMMIT and
+        // ROLLBACK like `LOCAL`. Last in the list, after the GUCs; a refusal
+        // fails the whole statement, so the transaction aborts rather than
+        // running on as the connection owner. auth-context-one-statement.test.ts.
+        ? drizzleSql`,
+            set_config('role', ${userRole}, true)`
+        : drizzleSql``}
     `);
-    if (userRole) {
-        await tx.execute(drizzleSql.raw(`SET LOCAL ROLE ${quoteIdent(userRole)}`));
-    }
 }
 
 /** Role names from other BaaS platforms that people reach for out of habit. */

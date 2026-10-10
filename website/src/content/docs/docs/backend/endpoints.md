@@ -37,7 +37,9 @@ list. `:slug` is a collection's `slug`.
 | `GET` | `/api/data/collections` | session | [REST API](/docs/backend/api/) |
 | `GET` | `/api/data/:slug` | RLS | [Querying](/docs/backend/api/#filtering) |
 | `POST` | `/api/data/:slug` | RLS | [REST API](/docs/backend/api/) |
+| `POST` | `/api/data/:slug/query` | RLS | The listing, query parameters in the body — [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | RLS | [Querying](/docs/backend/api/#filtering) |
+| `POST` | `/api/data/:slug/count` | RLS | The count, query parameters in the body — [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/aggregate` | RLS | [REST API](/docs/backend/api/#rest-endpoints) |
 | `GET` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
@@ -133,11 +135,13 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Run a job now |
 | `GET` | `/api/admin/backups` | `backups:read` | Backup inventory |
-| `GET` | `/api/admin/backups/download` | `backups:read` | Streams one backup |
+| `GET` | `/api/admin/backups/download` | `backups:read` | Streams one backup. With `?token=` from a download link, no header is needed, for that backup only |
+| `POST` | `/api/admin/backups/download-url` | `backups:read` | <span class="since-badge" data-since="0.25">Since 0.25</span> A link to one backup, `{ key }` → `{ url, token, expiresIn }`, good for 60 seconds — [Backups](/docs/deployment/backups/#download-a-backup) |
 | `GET` | `/api/admin/logs` | `logs:read` | The recent log buffer |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | The most recent entries |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | The scheduled audit's latest result |
+| `POST` | `/api/admin/sql/csv` | `database:write` | <span class="since-badge" data-since="0.25">Since 0.25</span> Streams one read-only query's whole result as CSV — [Studio](/docs/studio/)'s "Download full result as CSV" |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plans a change; never applies one |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | A person only, unless `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
@@ -161,6 +165,7 @@ for projects that have not moved; write new code against the canonical path.
 | `GET` | `/api/storage/file/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `DELETE` | `/api/storage/file/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `GET` | `/api/storage/metadata/*` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
+| `POST` | `/api/storage/metadata` | session + `storageAuthorize`, per key | <span class="since-badge" data-since="0.25">Since 0.25</span> [Storage](/docs/backend/storage/#storage-endpoints): metadata for up to 100 objects |
 | `GET` | `/api/storage/list` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `POST` | `/api/storage/folder` | session + `storageAuthorize` | [Storage](/docs/backend/storage/) |
 | `GET` | `/api/storage/sources` | session | The named storage sources this backend serves |

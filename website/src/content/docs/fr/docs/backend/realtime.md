@@ -148,7 +148,7 @@ Une modification ne voyage jamais vers un abonné sous forme de données brutes.
 
 1. **Invalidation.** Lorsqu'une entité change (créée, mise à jour, supprimée), le serveur marque les chemins affectés. La ligne écrite n'est pas transmise — elle a été lue sous l'autorisation de l'auteur de l'écriture, ce qui ne préjuge en rien de ce qu'un abonné quelconque a le droit de voir.
 
-2. **Nouvelle requête RLS temporisée (debounce).** Après **300 ms** (`REFETCH_DEBOUNCE_MS`), le serveur réexécute la requête sur la collection avec vos filtres et votre ordre de tri d'origine. La requête s'exécute dans une transaction qui définit `app.user_id` et `app.user_roles` au niveau de la transaction à partir du `SubscriptionAuthContext` de l'abonné. Postgres évalue ainsi la sécurité au niveau des lignes (RLS) sous l'identité de ce client, et seules les lignes qu'il est autorisé à voir sont envoyées dans `collection_update`. La temporisation (debounce) permet également de regrouper une rafale d'écritures en une seule requête.
+2. **Nouvelle requête RLS temporisée (debounce).** Après **300 ms** (`REFETCH_DEBOUNCE_MS`), le serveur réexécute la requête sur la collection avec vos filtres et votre ordre de tri d'origine. La requête s'exécute dans une transaction qui définit `app.user_id` et `app.user_roles` au niveau de la transaction à partir du `SubscriptionAuthContext` de l'abonné. Postgres évalue ainsi la sécurité au niveau des lignes (RLS) sous l'identité de ce client, et seules les lignes qu'il est autorisé à voir sont envoyées dans `collection_update`. La temporisation (debounce) permet également de regrouper une rafale d'écritures en une seule requête. Elle attend 300 ms sans nouvelle modification, mais jamais plus de **1 s** (`REFETCH_MAX_WAIT_MS`) après la première, de sorte qu'une collection écrite plusieurs fois par seconde envoie tout de même une trame à ses abonnés au moins une fois par seconde.
 
 Les versions antérieures envoyaient un `collection_patch` immédiat contenant la ligne écrite avant cette nouvelle requête, pour un retour inter-onglets inférieur à la milliseconde. Cette ligne ayant été lue sous les droits de l'auteur de l'écriture, elle pouvait — et de fait parvenait — à des abonnés dont les propres politiques l'auraient refusée, et le filtre `where` de l'abonnement ne lui était pas non plus appliqué. Ce patch a été supprimé : la latence perçue pour une mise à jour correspond désormais à la fenêtre de temporisation (debounce).
 
@@ -187,29 +187,33 @@ sur la collection qu'elle a touchée — pas avec le nombre de sockets ouverts :
 - Les abonnements qui posent la même question (même chemin, filtres, tri, page, `include`,
   `fields`, recherche) en tant que la même identité (même id d'utilisateur, mêmes rôles, même
   statut invité et mêmes revendications) partagent une seule nouvelle requête. Une écriture
-  sur une liste coûte **une lecture et un décompte par groupe de ce genre**, quel que soit le
-  nombre de sockets qui le détiennent ; chaque membre reçoit tout de même une trame construite
-  à partir de lignes lues sous cette identité.
+  sur une liste coûte **une transaction par groupe de ce genre** — la lecture et son
+  décompte — quel que soit le nombre de sockets qui le détiennent ; chaque membre reçoit tout
+  de même une trame construite à partir de lignes lues sous cette identité. Une première page
+  qui revient plus courte que sa `limit` est l'ensemble complet : elle n'est donc pas comptée
+  du tout.
 - Un abonnement à une seule entité n'est interrogé que lorsque son propre enregistrement change.
 - Des identités différentes ne partagent jamais une lecture — c'est ce qui empêche une trame
   de porter une ligne que son destinataire ne devrait pas voir. Une liste surveillée par mille
   utilisateurs connectés différents, c'est mille lectures et mille décomptes à chaque écriture
-  qui la touche.
+  qui la touche, dans mille transactions.
 
 Mesuré sur un ordinateur portable contre un PostgreSQL local avec un pool de 20 connexions,
 une écriture sur une liste :
 
 | Abonnés | Transactions pour l'écriture | Dernière trame après l'écriture |
 |-------------|----------------------------|----------------------------|
-| 1 000, une seule identité | 4 | ~350 ms |
-| 1 000, chacun une identité différente | ~2 000 | ~700 ms |
+| 1 000, une seule identité | 2 | ~310 ms |
+| 1 000, chacun une identité différente | ~1 000 | ~600 ms |
 
 300 ms de chacune sont la temporisation (debounce). La seconde ligne est le plafond à
-prévoir : les nouvelles requêtes font la queue sur le même pool que votre trafic REST, si bien
-qu'une collection écrite plusieurs fois par seconde tandis que **des centaines d'utilisateurs
-différents** surveillent la même liste est le point où le temps réel commence à entrer en
-concurrence avec les requêtes. Au-delà, préférez des abonnements plus étroits (une page, un
-filtre sur les propres lignes de l'utilisateur) ou un
+prévoir. Les nouvelles requêtes s'exécutent sur le même pool que votre trafic REST, mais
+au plus sur un quart de ses connexions à la fois (5 sur les 20 par défaut, jamais moins de 2) ;
+les autres attendent leur tour dans le serveur, si bien que la diffusion d'une écriture retarde
+ses propres trames plutôt que vos requêtes. Une collection écrite plusieurs fois par seconde
+tandis que **des centaines d'utilisateurs différents** surveillent la même liste est le point
+où ces trames commencent à prendre du retard. Au-delà, préférez des abonnements plus étroits
+(une page, un filtre sur les propres lignes de l'utilisateur) ou un
 [canal de diffusion](#canaux-de-diffusion-broadcast-channels) qui porte le changement pour que
 les clients le relisent à leur propre rythme.
 
@@ -349,7 +353,7 @@ La présence permet de suivre quels utilisateurs sont actuellement en ligne dans
 | `presence_state` | Serveur → Client | Entité complète de toutes les présences dans un canal |
 | `presence_diff` | Serveur → Client | Mise à jour incrémentielle (arrivées et départs) |
 
-Lorsqu'un client envoie `presence_track`, le serveur l'ajoute automatiquement au canal (nul besoin d'un `join_channel` distinct) et diffuse un `presence_diff` à tous les membres du canal.
+Lorsqu'un client envoie `presence_track`, le serveur l'ajoute automatiquement au canal (nul besoin d'un `join_channel` distinct) et diffuse un `presence_diff` à tous les membres du canal. Le SDK renvoie son état toutes les 20 secondes environ en guise de battement de cœur (heartbeat) ; un battement dont l'état n'a pas changé ne fait que rafraîchir le délai d'expiration du client et n'envoie aucun `presence_diff`.
 
 ```typescript
 // Track presence

@@ -96,7 +96,7 @@ C'est l'étape qui donne l'impression qu'une clé aux portées correctes ne fonc
 politique RLS que Rebase ajoute par défaut à chaque collection compile vers :
 
 ```sql
-rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
+(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))
 ```
 
 C'est le contexte serveur, ou un administrateur. Une clé de service sans le rôle `admin` ne

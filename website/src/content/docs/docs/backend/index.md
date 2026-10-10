@@ -239,7 +239,7 @@ observe:
 
 | Key | Default | What it does |
 |---|---|---|
-| `compression` | `true` | gzip/deflate on API responses, negotiated from `Accept-Encoding`. Already-compressed, streamed and `no-transform` bodies are left alone, so it is safe to leave on — a large JSON list typically drops by ~20x. Set `false` when nginx, Cloudflare or another proxy in front already compresses, to avoid paying twice. Environment: `REBASE_COMPRESSION`. |
+| `compression` | `true` | gzip/deflate on API responses, negotiated from `Accept-Encoding`. Already-compressed, streamed and `no-transform` bodies are left alone, and so are bodies under 1 KB (gzip costs more than it saves there), so it is safe to leave on — a large JSON list typically drops by ~20x. Set `false` when nginx, Cloudflare or another proxy in front already compresses, to avoid paying twice. Environment: `REBASE_COMPRESSION`. |
 | `maxBodySize` | `10485760` (10MB) | Ceiling for request bodies on API routes; `0` disables it. Storage uploads use the storage config's own `maxFileSize` (50MB), which wins for those routes. Environment: `REBASE_MAX_BODY_SIZE`. |
 | `csrf` | off | **Opt-in.** A BaaS API is called by mobile apps, SPAs on other domains and CLI tools, none of which send an `Origin` a fixed list would accept — so this is not on by default. Turn it on with the origins your browser clients use. No environment form: eject to set it. |
 | `cronPersistence` | `true` | Whether run logs reach `rebase.cron_logs`. `false` keeps the jobs running and the history in memory only, which the Studio panel then loses on restart. |

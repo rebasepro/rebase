@@ -105,8 +105,8 @@ describe("a write's hand-offs share its transaction (E2E)", () => {
         // Boot order, as the bootstrapper runs it: the restricted role first,
         // then history, then the job queue.
         await ensureAppRole(async (text) => (await pool.query(text)).rows as Record<string, unknown>[], ["public", "rebase"]);
-        const historyInTransaction = await ensureHistoryTableExists(db as never);
-        expect(historyInTransaction).toBe(true);
+        const historyTable = await ensureHistoryTableExists(db as never);
+        expect(historyTable.inTransaction).toBe(true);
 
         const registry = new PostgresCollectionRegistry();
         const prop = (name: string) => ({ name, type: "string" });
@@ -119,7 +119,7 @@ describe("a write's hand-offs share its transaction (E2E)", () => {
 
         driver = new PostgresBackendDriver(
             db as never, new RealtimeService(db as never, registry) as never, registry,
-            undefined, undefined, new HistoryService(db as never, undefined, { inTransaction: historyInTransaction })
+            undefined, undefined, new HistoryService(db as never, undefined, historyTable)
         );
         driver.rlsUserRole = REBASE_USER_ROLE;
 

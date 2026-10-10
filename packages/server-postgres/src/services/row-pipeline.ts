@@ -1,4 +1,4 @@
-import { CollectionConfig, JUNCTION_PIVOT_KEY, Property, ResolvedRelation, isManyToMany, type ResolvedVia } from "@rebasepro/types";
+import { CollectionConfig, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, Property, ResolvedRelation, isManyToMany, type ResolvedVia } from "@rebasepro/types";
 import { canReadField, resolveCollectionRelations, findRelation, createRelationRefWithData, fieldKeyForColumn } from "@rebasepro/common";
 import { currentFieldViewer } from "./field-viewer";
 import { normalizeDbValues } from "../data-transformer";
@@ -129,12 +129,13 @@ function toRestScalar(value: unknown, property: Property | undefined): unknown {
 /**
  * Apply {@link toRestScalar} across a row, leaving undeclared columns alone.
  *
- * Exported because the include loader attaches related rows itself, and a
- * target rendered differently from its parent is the shape bug this whole file
- * exists to prevent — a date was a string at the top level and a
- * `{ __type: "date" }` envelope one level down, in the same response.
+ * A target rendered differently from its parent is the shape bug this whole
+ * file exists to prevent — a date was a string at the top level and a
+ * `{ __type: "date" }` envelope one level down, in the same response. The
+ * include loader renders its targets with {@link toRestRow}, through
+ * `RelationService`'s `"rest"` style, for the same reason.
  */
-export function toRestValues(
+function toRestValues(
     row: Record<string, unknown>,
     collection: CollectionConfig
 ): Record<string, unknown> {
@@ -209,12 +210,56 @@ export function stripUnreadable(
         }
     }
 
+    // A relation withheld from this viewer is withheld whole: its total under
+    // `_count` says as much about it as its rows would.
+    const counts = row[INCLUDE_COUNT_KEY];
+    if (hidden.size > 0 && counts && typeof counts === "object") {
+        for (const name of hidden) delete (counts as Record<string, unknown>)[name];
+        if (Object.keys(counts).length === 0) delete row[INCLUDE_COUNT_KEY];
+    }
     if (hidden.size > 0 && Array.isArray(row._matches)) {
         row._matches = (row._matches as unknown[]).filter(
             match => !hidden.has(typeof match === "string" ? match : String((match as { field?: unknown })?.field))
         );
     }
     return row;
+}
+
+/**
+ * May the current caller be handed the rows of this relation of `collection`?
+ *
+ * A relation property's value *is* its related rows, so a property the caller
+ * may not read withholds the relation whole: an `include` neither loads it nor
+ * counts it. {@link stripUnreadable} cannot be the only guard here, because the
+ * REST rows are stripped before the include loader runs (`toRestRow`, then
+ * `loadIncludes`) — the loader wrote the rows back onto the key the strip had
+ * just deleted, and `_count` beside them.
+ *
+ * Judged by every `type: "relation"` property that names this relation: by its
+ * own key (the include key of an inline relation), or by the `relationName` it
+ * addresses in the collection's `relations` array. A relation declared only in
+ * `relations` has no property, so no field rule, and stays readable.
+ */
+export function canReadRelation(
+    collection: CollectionConfig,
+    key: string,
+    relation: ResolvedRelation
+): boolean {
+    const properties = collection.properties as Record<string, Property> | undefined;
+    if (!properties) return true;
+
+    const viewer = currentFieldViewer();
+    if (!canReadField(properties[key], viewer)) return false;
+
+    let relations: ReturnType<typeof resolveCollectionRelations> | undefined;
+    for (const [name, property] of Object.entries(properties)) {
+        if (property?.type !== "relation" || canReadField(property, viewer)) continue;
+        relations ??= resolveCollectionRelations(collection);
+        if (findRelation(relations, name) === relation) return false;
+        const addressed = property.relation?.relationName;
+        if (addressed && findRelation(relations, addressed) === relation) return false;
+    }
+    return true;
 }
 
 function renderTarget(

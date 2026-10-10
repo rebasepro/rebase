@@ -3,8 +3,17 @@
  */
 
 import type { S3Client as S3ClientType, } from "@aws-sdk/client-s3";
-import { DEFAULT_MAX_FILE_SIZE, S3StorageConfig, StorageController } from "./types";
+import {
+    DEFAULT_MAX_FILE_SIZE,
+    S3StorageConfig,
+    StorageController,
+    type StoredObjectInfo,
+    type StoredObjectRange,
+    type PutObjectOptions,
+    type StoredObjectStream
+} from "./types";
 import { folderKey, listingPrefix } from "./keys";
+import { webStreamFrom } from "./streams";
 import { ApiError } from "../api/errors";
 import {
     DownloadConfig,
@@ -45,6 +54,11 @@ async function loadPresigner() {
     }
     return _presignerModule;
 }
+
+/** Files up to this size are one `PutObject`; larger ones are uploaded in parts of (at least) this size. */
+const MULTIPART_PART_SIZE = 8 * 1024 * 1024;
+/** S3's limit on the parts of one upload. */
+const MAX_MULTIPART_PARTS = 10_000;
 
 /**
  * S3-compatible storage implementation
@@ -136,33 +150,68 @@ export class S3StorageController implements StorageController {
         key,
         metadata,
         bucket
-    }: UploadFileProps): Promise<UploadFileResult> {
-        this.validateFile(file);
+    }: UploadFileProps, options?: PutObjectOptions): Promise<UploadFileResult> {
+        if (options?.uploadLimits !== false) this.validateFile(file);
 
         const usedBucket = this.getBucket(bucket);
-
-        // Convert File to Buffer
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
         const s3 = await loadS3();
         const client = await this.getClient();
-
-        const command = new s3.PutObjectCommand({
+        const target = {
             Bucket: usedBucket,
             Key: key,
-            Body: buffer,
             ContentType: file.type,
             Metadata: metadata ? this.flattenMetadata(metadata) : undefined
-        });
+        };
 
-        await client.send(command);
+        if (file.size <= MULTIPART_PART_SIZE) {
+            // One request from one buffer, as always: a small file is no bigger
+            // than a part. `Buffer.from(arrayBuffer)` is a view, not a copy.
+            await client.send(new s3.PutObjectCommand({ ...target, Body: Buffer.from(await file.arrayBuffer()) }));
+        } else {
+            await this.putMultipart(target, file);
+        }
 
         return {
             key,
             bucket: usedBucket,
             storageUrl: `s3://${usedBucket}/${key}`
         };
+    }
+
+    /**
+     * Upload a large file in parts, one part in memory at a time.
+     *
+     * Reading the whole file into one buffer held it twice over (the
+     * `arrayBuffer()`, then the SDK's view and the multipart parser's copy
+     * before it), and `PutObject` stops at 5 GB regardless. A slice of a
+     * `File` reads only that range — from disk, for the disk-backed files TUS
+     * and backups hand over — so memory is one part whatever the file's size.
+     * A failure aborts the upload: no partial object appears at the key, and
+     * no orphaned parts are kept (and billed).
+     */
+    private async putMultipart(
+        target: { Bucket: string; Key: string; ContentType: string; Metadata?: Record<string, string> },
+        file: Blob
+    ): Promise<void> {
+        const s3 = await loadS3();
+        const client = await this.getClient();
+        // At most 10,000 parts: a part grows past 8 MiB only beyond 80 GB.
+        const partSize = Math.max(MULTIPART_PART_SIZE, Math.ceil(file.size / MAX_MULTIPART_PARTS));
+        const { UploadId } = await client.send(new s3.CreateMultipartUploadCommand(target));
+        if (!UploadId) throw new Error(`S3 did not start a multipart upload for ${target.Key}.`);
+        const { Bucket, Key } = target;
+        try {
+            const parts: { ETag?: string; PartNumber: number }[] = [];
+            for (let offset = 0, PartNumber = 1; offset < file.size; offset += partSize, PartNumber++) {
+                const Body = Buffer.from(await file.slice(offset, Math.min(offset + partSize, file.size)).arrayBuffer());
+                const { ETag } = await client.send(new s3.UploadPartCommand({ Bucket, Key, UploadId, PartNumber, Body }));
+                parts.push({ ETag, PartNumber });
+            }
+            await client.send(new s3.CompleteMultipartUploadCommand({ Bucket, Key, UploadId, MultipartUpload: { Parts: parts } }));
+        } catch (error: unknown) {
+            await client.send(new s3.AbortMultipartUploadCommand({ Bucket, Key, UploadId })).catch(() => undefined);
+            throw error;
+        }
     }
 
     /**
@@ -302,6 +351,112 @@ export class S3StorageController implements StorageController {
         }
     }
 
+    /**
+     * The bucket and key a call addresses: an `s3://` or `gs://` URL names its
+     * own bucket, anything else is a key in the given (or configured) bucket.
+     */
+    private resolveLocation(key: string, bucket?: string): { bucket: string; key: string } {
+        const match = key.match(/^(s3|gs):\/\//);
+        if (match) {
+            const withoutProtocol = key.substring(match[0].length);
+            const firstSlash = withoutProtocol.indexOf("/");
+            if (firstSlash > 0) {
+                return { bucket: withoutProtocol.substring(0, firstSlash), key: withoutProtocol.substring(firstSlash + 1) };
+            }
+        }
+        return { bucket: this.getBucket(bucket), key };
+    }
+
+    /**
+     * See {@link StorageController.getMetadata}. One `HeadObject`. Without it,
+     * `GET /metadata/*` fell back to `getSignedUrl`, which signed a URL per
+     * call — ~134 µs of CPU — only for the route to throw it away.
+     */
+    async getMetadata(key: string, bucket?: string): Promise<DownloadMetadata | null> {
+        const location = this.resolveLocation(key, bucket);
+        const s3 = await loadS3();
+        const client = await this.getClient();
+        try {
+            const head = await client.send(new s3.HeadObjectCommand({ Bucket: location.bucket, Key: location.key }));
+            return {
+                bucket: location.bucket,
+                fullPath: location.key,
+                name: location.key.split("/").pop() || location.key,
+                size: head.ContentLength || 0,
+                contentType: head.ContentType || "application/octet-stream",
+                customMetadata: head.Metadata || {}
+            };
+        } catch (error: unknown) {
+            if (isS3NotFound(error)) return null;
+            throw error;
+        }
+    }
+
+    /** See {@link StorageController.statObject}. One `HeadObject`; no body is read. */
+    async statObject(key: string, bucket?: string): Promise<StoredObjectInfo | null> {
+        const location = this.resolveLocation(key, bucket);
+        const s3 = await loadS3();
+        const client = await this.getClient();
+        try {
+            const head = await client.send(new s3.HeadObjectCommand({ Bucket: location.bucket, Key: location.key }));
+            return {
+                size: head.ContentLength ?? 0,
+                contentType: head.ContentType || "application/octet-stream",
+                // The object's version — see `getObject` on why a missing one
+                // must not become a stable value.
+                lastModified: head.LastModified?.getTime() ?? Date.now()
+            };
+        } catch (error: unknown) {
+            if (isS3NotFound(error)) return null;
+            throw error;
+        }
+    }
+
+    /**
+     * See {@link StorageController.getObjectStream}. One `GetObject`, with a
+     * `Range` when one is asked for, so only those bytes leave the bucket; the
+     * body is handed on as it arrives rather than collected first.
+     */
+    async getObjectStream(
+        key: string,
+        options?: { bucket?: string; range?: StoredObjectRange }
+    ): Promise<StoredObjectStream | null> {
+        const location = this.resolveLocation(key, options?.bucket);
+        const range = options?.range;
+        const s3 = await loadS3();
+        const client = await this.getClient();
+        let response;
+        try {
+            response = await client.send(new s3.GetObjectCommand({
+                Bucket: location.bucket,
+                Key: location.key,
+                ...(range ? { Range: `bytes=${range.start}-${range.end}` } : {})
+            }));
+        } catch (error: unknown) {
+            if (isS3NotFound(error)) return null;
+            // The object shrank below the range since it was described. Read
+            // it whole: the caller serves a whole object as a 200, which HTTP
+            // allows for any range request.
+            if (range && isS3RangeNotSatisfiable(error)) return this.getObjectStream(key, { bucket: options?.bucket });
+            throw error;
+        }
+        const body = response.Body;
+        if (!body) return null;
+
+        // A ranged answer says the whole object's size after the slash of its
+        // `Content-Range`. A store that ignored the `Range` sent no
+        // `Content-Range` and the whole object, which is what this then says.
+        const total = range ? /\/(\d+)\s*$/.exec(response.ContentRange ?? "")?.[1] : undefined;
+        const served = range && total !== undefined ? range : undefined;
+        return {
+            stream: isByteIterable(body) ? webStreamFrom(body) : body.transformToWebStream(),
+            size: total !== undefined ? Number(total) : response.ContentLength ?? 0,
+            contentType: response.ContentType || "application/octet-stream",
+            lastModified: response.LastModified?.getTime() ?? Date.now(),
+            ...(served ? { range: served } : {})
+        };
+    }
+
     async deleteObject(key: string, bucket?: string): Promise<void> {
         // Handle s3:// and gs:// URLs
         let resolvedPath = key;
@@ -375,6 +530,10 @@ export class S3StorageController implements StorageController {
             bucket: resolvedBucket,
             fullPath: obj.Key || "",
             name: (obj.Key || "").split("/").pop() || "",
+            // What the listing already carries, so a folder can be shown
+            // without a HEAD per file. ListObjectsV2 has no content type.
+            ...(typeof obj.Size === "number" ? { size: obj.Size } : {}),
+            ...(obj.LastModified instanceof Date ? { updated: obj.LastModified.toISOString() } : {}),
             parent: null as never,
             root: null as never,
             toString: () => `s3://${resolvedBucket}/${obj.Key}`
@@ -400,4 +559,31 @@ export class S3StorageController implements StorageController {
             nextPageToken: response.NextContinuationToken
         };
     }
+}
+
+/** The error name and HTTP status an SDK error carries, read without assuming its shape. */
+function s3ErrorFacts(error: unknown): { name?: string; status?: number } {
+    if (typeof error !== "object" || error === null) return {};
+    const name = "name" in error && typeof error.name === "string" ? error.name : undefined;
+    const meta = "$metadata" in error ? error.$metadata : undefined;
+    const status = typeof meta === "object" && meta !== null && "httpStatusCode" in meta && typeof meta.httpStatusCode === "number"
+        ? meta.httpStatusCode
+        : undefined;
+    return { name, status };
+}
+
+/** A missing object, as `GetObject` (`NoSuchKey`) and `HeadObject` (`NotFound`, no body) report it. */
+function isS3NotFound(error: unknown): boolean {
+    const { name, status } = s3ErrorFacts(error);
+    return name === "NoSuchKey" || name === "NotFound" || status === 404;
+}
+
+function isS3RangeNotSatisfiable(error: unknown): boolean {
+    const { name, status } = s3ErrorFacts(error);
+    return name === "InvalidRange" || status === 416;
+}
+
+/** A Node response body — what the SDK hands over on Node — rather than a browser one. */
+function isByteIterable(value: unknown): value is AsyncIterable<Uint8Array> {
+    return typeof value === "object" && value !== null && Symbol.asyncIterator in value;
 }

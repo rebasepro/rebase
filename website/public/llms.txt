@@ -40,6 +40,7 @@
 - [Environment & Configuration](https://rebase.pro/docs/getting-started/configuration): All environment variables and configuration options for Rebase projects.
 - [Troubleshooting](https://rebase.pro/docs/troubleshooting): The failures that stop a Rebase backend from starting or serving — an unreachable database, wrong credentials, a missing extension, an RLS refusal, schema drift, a busy port, a function that will not load — and what each one looks like.
 - [Upgrading](https://rebase.pro/docs/upgrading): What breaks when you move an existing app to the current release, and what to do about each one.
+- [Upgrading 0.24 to the next release](https://rebase.pro/docs/upgrading/0-24-to-next): The breaking changes already merged on main and live in these docs, before the release that carries them exists — the REST count switch, the MCP collection listing, and the admin's translations.
 - [Upgrading 0.23 to 0.24](https://rebase.pro/docs/upgrading/0-23-to-0-24): The breaking changes 0.24 carries for an app on 0.23 — generated SQL and SDK types, CLI paths, scopes, upserts and keys, the remote MCP endpoint, sessions and accounts, the backup routes, the insights plugin and images in markdown fields.
 - [Upgrading 0.21 to 0.23](https://rebase.pro/docs/upgrading/0-21-to-0-23): The breaking changes 0.23 carries for an app on 0.21 or 0.22 — nested-path API keys, boot refusals, custom auth repositories, guest upgrades and custom job stores.
 - [Upgrading 0.18 to 0.21](https://rebase.pro/docs/upgrading/0-18-to-0-21): Every breaking change in 0.21, and what to do about each one.
@@ -80,11 +81,13 @@
 - [Custom auth adapters](https://rebase.pro/docs/backend/auth-adapters): Replace Rebase's built-in authentication with Clerk, Firebase Auth or your own identity provider by implementing the AuthAdapter contract.
 - [Storage Configuration](https://rebase.pro/docs/backend/storage): Configure local filesystem, S3-compatible, or GCS/Firebase Storage backends for file uploads, images, and media.
 - [Storage caching and CDNs](https://rebase.pro/docs/backend/storage-caching): How Rebase serves stored files so browsers and CDNs can cache them — ETags and 304s, Cache-Control by who may read an object, byte ranges for seeking in audio and video, and what to configure on a CDN in front.
+- [Resumable uploads (TUS)](https://rebase.pro/docs/backend/storage-resumable-uploads): The TUS v1.0.0 endpoint under /api/storage/tus — how a large file goes up a chunk at a time, what each request answers, how the SDK and the admin panel use it, and how it behaves across restarts and instances.
 - [Multiple Databases and Buckets](https://rebase.pro/docs/backend/multiple-sources): Route collections to different databases and properties to different storage buckets, and configure each one from the environment.
 - [MongoDB](https://rebase.pro/docs/backend/mongodb): @rebasepro/server-mongo runs Rebase on MongoDB: a complete data driver, change-stream realtime and snapshot history — and no row-level security.
 - [Realtime & WebSocket](https://rebase.pro/docs/backend/realtime): Real-time data synchronization, broadcast channels, and presence tracking via WebSocket.
 - [Realtime across instances](https://rebase.pro/docs/backend/realtime-transports): How broadcast channels and presence survive more than one server process: the LISTEN/NOTIFY bus, what each instance owns, and writing your own transport.
 - [Search](https://rebase.pro/docs/backend/search): How .search() behaves by default, and how to opt a Postgres collection in to ranked full-text search over the fields you name — including JSONB and array content.
+- [Vector Search](https://rebase.pro/docs/backend/vector-search): Nearest-neighbour search over a vector property through the REST API — the query parameters, thresholds, embeddings too long for a URL, and how filters behave on an HNSW index.
 - [Indexes](https://rebase.pro/docs/backend/indexes): Declare ordinary Postgres indexes on a collection — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.
 - [Cron Jobs](https://rebase.pro/docs/backend/cron-jobs): Schedule recurring background tasks with Rebase's built-in cron job system. Define jobs as TypeScript files, monitor them in Studio, and manage them via the REST API.
 - [Cron across instances](https://rebase.pro/docs/backend/cron-across-instances): How cron jobs behave with more than one server process: one run per slot, a slot a restart dropped, a pause every replica honours, and runs that never overlap.
@@ -195,6 +198,7 @@
 - [TextField](https://rebase.pro/docs/ui/components/textfield): TextField — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [ToggleButtonGroup](https://rebase.pro/docs/ui/components/togglebuttongroup): ToggleButtonGroup — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [Tooltip](https://rebase.pro/docs/ui/components/tooltip): Tooltip — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+- [TooltipProvider](https://rebase.pro/docs/ui/components/tooltipprovider): TooltipProvider — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [Typography](https://rebase.pro/docs/ui/components/typography): Typography — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [VirtualTable](https://rebase.pro/docs/ui/components/virtualtable): VirtualTable — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
 - [VirtualTableSelectionProvider](https://rebase.pro/docs/ui/components/virtualtableselectionprovider): VirtualTableSelectionProvider — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.

@@ -1,6 +1,7 @@
 import {
     assertNoUndefinedFilterValues,
     buildAggregateQueryString,
+    buildQueryBody,
     buildQueryString,
     FindParams,
     RebaseApiError,
@@ -108,6 +109,112 @@ function inflightCountsFor(transport: Transport): Map<string, Promise<number>> {
         inflightCounts.set(transport, map);
     }
     return map;
+}
+
+/**
+ * Transports whose server reads `?count=none` as a filter on a column named
+ * `count`.
+ *
+ * Every server released before the parameter existed does, and answers a 400
+ * `UNKNOWN_FILTER_FIELD` naming `count`. Skipping the count only ever saves
+ * the server work, so a read refused for it is sent again without it, and
+ * later reads through the same transport (one per client, so one server) stop
+ * sending it. Membership is never cleared: a server does not lose the
+ * parameter, and one that gains it in an upgrade gets it again on the next
+ * page load.
+ */
+const serversWithoutCountParam = new WeakSet<Transport>();
+
+/**
+ * The longest URL a `find()` sends as a `GET`. Past it the parameters go in
+ * the body of `POST /data/<collection>/query` instead.
+ *
+ * Not the server's own ceiling but the one in front of it: nginx refuses a
+ * request line over 8 KB by default (414), and a proxy or CDN is in front of
+ * most deployments. 6 KB leaves the rest of the request line, and the headers
+ * some proxies count against the same buffer, room.
+ */
+const MAX_FIND_URL_LENGTH = 6 * 1024;
+
+/**
+ * Transports whose server has no `POST …/query` — every server before 0.24.
+ *
+ * Such a server answers the POST 404 (or a proxy 405), and the read is sent
+ * again as the `GET` it has always been, which may well be refused for its
+ * length: that refusal is the old server's answer, and the caller sees it.
+ * Membership is never cleared, as for {@link serversWithoutCountParam}.
+ */
+const serversWithoutQueryRoute = new WeakSet<Transport>();
+
+/** {@link serversWithoutQueryRoute}, for `POST …/count`. */
+const serversWithoutCountRoute = new WeakSet<Transport>();
+
+/**
+ * Whether a read goes as its `POST` twin rather than `GET`: always for a
+ * vector search, whose embedding is a JSON array in the URL (768 dimensions
+ * are 17 KB of it, past Node's 16 KB and nginx's 8 KB), and for anything else
+ * whose URL would not fit through a proxy.
+ */
+function sendsQueryBody(
+    transport: Transport,
+    path: string,
+    queryString: string,
+    params: FindParams | undefined,
+    serversWithoutRoute: WeakSet<Transport>
+): boolean {
+    if (serversWithoutRoute.has(transport)) return false;
+    if (params?.vectorSearch) return true;
+    return `${transport.baseUrl ?? ""}${transport.apiPath ?? ""}${path}${queryString}`.length > MAX_FIND_URL_LENGTH;
+}
+
+/**
+ * A read whose parameters go in the URL of `GET <path>`, or — where
+ * {@link sendsQueryBody} says so — in the JSON body of its `POST` twin:
+ * `POST …/query` for a listing, `POST …/count` for a count.
+ *
+ * Against a server without the twin (404, or a proxy's 405) the `GET` is sent
+ * instead, and the transport remembers — unless the `GET` 404s as well, which
+ * is the collection's answer, not the route's.
+ */
+async function readWithParams<T>(
+    transport: Transport,
+    path: string,
+    postPath: string,
+    params: FindParams | undefined,
+    serversWithoutRoute: WeakSet<Transport>
+): Promise<T> {
+    const queryString = buildQueryString(params);
+    const get = () => transport.request<T>(path + queryString, { method: "GET" });
+    if (!sendsQueryBody(transport, path, queryString, params, serversWithoutRoute)) return get();
+    try {
+        return await transport.request<T>(postPath, {
+            method: "POST",
+            body: JSON.stringify(buildQueryBody(params))
+        });
+    } catch (error) {
+        if (!(error instanceof RebaseApiError) || (error.status !== 404 && error.status !== 405)) throw error;
+        // A server without the route, or a collection it does not
+        // have: the GET tells the two apart. A 404 from it as well
+        // is the collection's, and says nothing about the route.
+        try {
+            const answer = await get();
+            serversWithoutRoute.add(transport);
+            return answer;
+        } catch (getError) {
+            if (!(getError instanceof RebaseApiError && getError.status === 404)) {
+                serversWithoutRoute.add(transport);
+            }
+            throw getError;
+        }
+    }
+}
+
+function isCountReadAsFilter(error: unknown): boolean {
+    if (!(error instanceof RebaseApiError) || error.status !== 400 || error.code !== "UNKNOWN_FILTER_FIELD") {
+        return false;
+    }
+    const details = error.details;
+    return typeof details === "object" && details !== null && "field" in details && details.field === "count";
 }
 
 /**
@@ -269,11 +376,24 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
 
     const client: CollectionClient<M> = {
         async find(params?: FindParams<M>): Promise<FindResult<M>> {
-            const qs = buildQueryString(params);
-            const raw = await transport.request<{
-                data: Record<string, unknown>[];
-                meta: FindResult<M>["meta"]
-            }>(basePath + qs, { method: "GET" });
+            type Page = { data: Record<string, unknown>[]; meta: FindResult<M>["meta"] };
+            const read = (p: FindParams<M> | undefined): Promise<Page> =>
+                readWithParams<Page>(transport, basePath, `${basePath}/query`, p, serversWithoutQueryRoute);
+            const counted = { ...params, count: undefined };
+            let raw: Awaited<ReturnType<typeof read>>;
+            if (params?.count !== "none") {
+                raw = await read(params);
+            } else if (serversWithoutCountParam.has(transport)) {
+                raw = await read(counted);
+            } else {
+                try {
+                    raw = await read(params);
+                } catch (error) {
+                    if (!isCountReadAsFilter(error)) throw error;
+                    serversWithoutCountParam.add(transport);
+                    raw = await read(counted);
+                }
+            }
             return {
                 data: (raw.data || []) as M[],
                 meta: raw.meta
@@ -476,7 +596,9 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 // would make the total disagree with the `find()` it describes.
                 // Same reasoning as limit/offset: parameters that cannot affect
                 // the answer are not forwarded.
-                include: undefined
+                include: undefined,
+                // Whether a *page* is counted beside it; this is the count.
+                count: undefined
             };
             const qs = buildQueryString(countParams);
 
@@ -499,9 +621,13 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             const existing = inflight.get(key);
             if (existing) return existing;
 
-            const request = transport
-                .request<{ count: number }>(key, { method: "GET" })
-                .then((raw) => raw.count ?? 0);
+            // The verb `find()` would use for the same filters: a vector
+            // search or a URL too long for a proxy goes as `POST …/count`, so
+            // a count beside a `find()` that worked is not the request a
+            // 431/414 refuses.
+            const request = readWithParams<{ count: number }>(
+                transport, `${basePath}/count`, `${basePath}/count`, countParams, serversWithoutCountRoute
+            ).then((raw) => raw.count ?? 0);
             inflight.set(key, request);
             try {
                 return await request;
@@ -565,12 +691,20 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 };
             }
 
-            client.find(params).then((result) => deliver(result, false)).catch((error) => {
-                if (!closed) onError?.(error as Error);
-            });
+            // Subscribe first. A socket that already holds this query's rows —
+            // another observer has the same subscription — replays them
+            // synchronously, and then the fetch could only ever be dropped by
+            // `deliver` above, after the server had run the query and its
+            // count for it. Only when the socket has nothing yet does the fetch
+            // go out, as the fast path to a first answer.
             const live = wantsLive
                 ? client.listen(params, (result) => deliver(result, true), onError)
                 : undefined;
+            if (!liveDelivered) {
+                client.find(params).then((result) => deliver(result, false)).catch((error) => {
+                    if (!closed) onError?.(error as Error);
+                });
+            }
             return () => {
                 closed = true;
                 live?.();
@@ -598,12 +732,16 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 onResult(row, { fromCache: false, hasPendingWrites: false });
             };
 
-            client.findById(id).then((row) => deliver(row, false)).catch((error) => {
-                if (!closed) onError?.(error as Error);
-            });
+            // Subscribe first, for the reason `observe` does: a replayed row
+            // makes the fetch one whose answer would be dropped.
             const live = options?.realtime !== false && !isUnsupported(client.listenById)
                 ? client.listenById(id, (row) => deliver(row, true), onError)
                 : undefined;
+            if (!liveDelivered) {
+                client.findById(id).then((row) => deliver(row, false)).catch((error) => {
+                    if (!closed) onError?.(error as Error);
+                });
+            }
             return () => {
                 closed = true;
                 live?.();

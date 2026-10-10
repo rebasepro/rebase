@@ -1,79 +1,116 @@
 /**
- * `include` is what makes the REST transport return a collection's relations in
- * the same request as its rows. The realtime transport ignores it and embeds
- * relation data unconditionally, so a gap here is invisible in a normal
- * (websocket) deployment and only shows up as blank relation cells when
- * realtime is off — which is exactly why it needs pinning here.
+ * `include` is what makes a collection view's read return the relations its
+ * cells render in the same request as its rows — over REST and over the
+ * realtime subscription alike, which run the same include loader. A relation a
+ * cell renders that is not named here arrives as a bare foreign key, and the
+ * cell fetches it on its own: one request per cell.
+ *
+ * It names the relations a *property* declares. It used to be `["*"]`, which
+ * the server reads as every relation the collection declares — including the
+ * ones declared only in `relations: []` for a record's tabs, which no list
+ * surface renders and whose rows every read embedded for every parent.
  */
 import { describe, expect, it } from "@jest/globals";
-import { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { getRelationIncludeParams } from "../src/util/previews";
 
-const collectionWith = (properties: CollectionConfig["properties"]): CollectionConfig =>
-    ({ slug: "test",
-name: "Test",
-properties } as CollectionConfig);
+const users: AdminCollection = { slug: "users", name: "Users", table: "users", properties: { name: { type: "string" } } };
+const tagsCollection: AdminCollection = { slug: "tags", name: "Tags", table: "tags", properties: { label: { type: "string" } } };
+const comments: AdminCollection = { slug: "comments", name: "Comments", table: "comments", properties: { body: { type: "string" } } };
+
+const collectionWith = (properties: AdminCollection["properties"], relations?: AdminCollection["relations"]): AdminCollection =>
+    ({ slug: "posts",
+        name: "Posts",
+        table: "posts",
+        properties,
+        ...(relations ? { relations } : {}) });
 
 describe("getRelationIncludeParams", () => {
 
-    it("asks for relations when a property is a relation", () => {
+    it("names a relation a property declares inline", () => {
         const collection = collectionWith({
-            name: { type: "string" },
-            author: { type: "relation",
-relationName: "author" }
+            title: { type: "string" },
+            author: { type: "relation", relation: { kind: "belongsTo", target: () => users } }
         });
-        expect(getRelationIncludeParams(collection)).toEqual(["*"]);
+        expect(getRelationIncludeParams(collection)).toEqual(["author"]);
     });
 
-    it("asks for relations when a property is a reference", () => {
+    it("names a property whose relation is declared in `relations` under its key", () => {
         const collection = collectionWith({
-            name: { type: "string" },
-            owner: { type: "reference",
-path: "users" }
-        });
-        expect(getRelationIncludeParams(collection)).toEqual(["*"]);
+            title: { type: "string" },
+            author: { type: "relation" }
+        }, [{ kind: "belongsTo", relationName: "author", target: () => users }]);
+        expect(getRelationIncludeParams(collection)).toEqual(["author"]);
     });
 
-    it("asks for relations when a property is an array of relations", () => {
+    it("names an array of relations backed by a relation of the same name", () => {
         // Rendered by ArrayOfRelationsPreview, so the data has to arrive with
-        // the rows — the previous inline check only looked at top-level types
-        // and left these collections fetching one request per cell.
+        // the rows — an inline check that only looked at top-level types once
+        // left these collections fetching one request per cell.
         const collection = collectionWith({
-            name: { type: "string" },
-            tags: { type: "array",
-of: { type: "relation",
-relationName: "tags" } }
-        });
-        expect(getRelationIncludeParams(collection)).toEqual(["*"]);
+            title: { type: "string" },
+            tags: { type: "array", of: { type: "relation" } }
+        }, [{ kind: "manyToMany", relationName: "tags", target: () => tagsCollection }]);
+        expect(getRelationIncludeParams(collection)).toEqual(["tags"]);
     });
 
-    it("asks for relations when a property is an array of references", () => {
+    it("leaves out a relation declared only for the record's tabs", () => {
+        // No property names `comments`: no list cell, chip or card renders it,
+        // and `*` used to embed every comment of every post on the page.
         const collection = collectionWith({
-            name: { type: "string" },
-            editors: { type: "array",
-of: { type: "reference",
-path: "users" } }
+            title: { type: "string" },
+            author: { type: "relation", relation: { kind: "belongsTo", target: () => users } }
+        }, [{ kind: "hasMany", relationName: "comments", target: () => comments }]);
+        expect(getRelationIncludeParams(collection)).toEqual(["author"]);
+
+        const tabsOnly = collectionWith({ title: { type: "string" } },
+            [{ kind: "hasMany", relationName: "comments", target: () => comments }]);
+        expect(getRelationIncludeParams(tabsOnly)).toBeUndefined();
+    });
+
+    it("asks for nothing for references, which no include loads", () => {
+        // A reference is resolved by its own preview; the server's include
+        // covers relations only, so `*` never loaded anything for one.
+        const collection = collectionWith({
+            title: { type: "string" },
+            owner: { type: "reference", path: "users" },
+            editors: { type: "array", of: { type: "reference", path: "users" } }
         });
-        expect(getRelationIncludeParams(collection)).toEqual(["*"]);
+        expect(getRelationIncludeParams(collection)).toBeUndefined();
     });
 
     it("stays out of the way when the collection has no relations", () => {
         const collection = collectionWith({
-            name: { type: "string" },
+            title: { type: "string" },
             count: { type: "number" },
-            tags: { type: "array",
-of: { type: "string" } }
+            tags: { type: "array", of: { type: "string" } }
         });
         expect(getRelationIncludeParams(collection)).toBeUndefined();
     });
 
     it("tolerates property builders and a collection with no properties", () => {
         const withBuilder = collectionWith({
-            name: { type: "string" },
+            title: { type: "string" },
             computed: (() => ({ type: "string" })) as never
         });
         expect(getRelationIncludeParams(withBuilder)).toBeUndefined();
-        expect(getRelationIncludeParams({ slug: "x",
-name: "X" } as CollectionConfig)).toBeUndefined();
+        expect(getRelationIncludeParams({ slug: "x", name: "X" } as AdminCollection)).toBeUndefined();
+    });
+
+    it("hands back the same array for the same relations, whatever object the collection is", () => {
+        // `useRelationSelector` lists the include as an effect dependency;
+        // a fresh array per render re-opened its read on every render.
+        const build = () => collectionWith({
+            author: { type: "relation", relation: { kind: "belongsTo", target: () => users } }
+        });
+        expect(getRelationIncludeParams(build())).toBe(getRelationIncludeParams(build()));
+    });
+
+    it("leaves the choice to the server when a relation cannot be resolved here", () => {
+        const collection = collectionWith({
+            title: { type: "string" },
+            author: { type: "relation", relation: { kind: "belongsTo" } as never }
+        });
+        expect(getRelationIncludeParams(collection)).toEqual(["*"]);
     });
 });

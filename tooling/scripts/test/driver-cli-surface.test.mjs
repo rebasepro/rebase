@@ -166,7 +166,9 @@ test("the driver CLI is spawned from exactly one place", () => {
         const file = path.join(ROOT, rel);
         if (!existsSync(file)) continue;
         readFileSync(file, "utf8").split("\n").forEach((line, i) => {
-            if (/execa\([^)]*\[\s*pluginCli/.test(line)) sites.push(`${rel}:${i + 1} → ${line.trim()}`);
+            // `pluginCli` anywhere in the argv array: the interpreter's own
+            // arguments (`--import <tsx's loader>`) come before it.
+            if (/execa\([^)]*\[[^\]]*\bpluginCli\b/.test(line)) sites.push(`${rel}:${i + 1} → ${line.trim()}`);
         });
     }
     assert.equal(

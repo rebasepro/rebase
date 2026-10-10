@@ -137,6 +137,19 @@ export interface IncludeOptions {
     fields?: string[];
     /** Relations of the related row to load in turn. */
     include?: IncludeSpec;
+    /**
+     * Also serve how many related rows there are in all, per parent, under
+     * the row's `_count` ({@link INCLUDE_COUNT_KEY}) — `{ tags: [...], _count:
+     * { tags: 37 } }`. Counted by the same query that reads the rows, over the
+     * same rows a read without `limit` would return (the include's `where`,
+     * soft delete, row-level security), so `limit` caps what is sent and the
+     * count says what was left out.
+     *
+     * To-many relations only: a to-one relation is a 400.
+     *
+     * @since 0.24
+     */
+    count?: boolean;
 }
 
 /**
@@ -146,7 +159,11 @@ export interface IncludeOptions {
  * - `["author", "comments.author"]` — a dotted path is the same thing as the
  *   nested object form, spelled flat. It is what the REST `?include=` parameter
  *   carries, and the two forms compile to the same request.
- * - `["*"]` — every relation, one hop deep. The admin panel's shape.
+ * - `["*"]` — every relation the collection declares, one hop deep, those
+ *   declared only for a record's tabs included — so on a list it can embed
+ *   every row of a to-many relation no column shows. Name the relations the
+ *   view renders instead; the admin panel does, and sends `*` only when it
+ *   cannot resolve a collection's relations in the browser.
  * - `{ comments: { limit: 5, include: { author: true } } }` — the parametrised
  *   form.
  *
@@ -328,8 +345,10 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      * projection (which it always is) every row is already distinct. Pair it
      * with `fields` naming the columns you actually want the distinct values of.
      *
-     * `meta.total` counts distinct rows too, so a distinct listing's `hasMore`
-     * describes the set it is paging.
+     * A distinct read is not counted, whichever door it goes through: over
+     * HTTP its `meta.total` is absent, and in-process it is the rows up to the
+     * end of the page — as for {@link FindParams.count} `"none"`. `hasMore`
+     * is exact either way.
      */
     distinct?: boolean;
 
@@ -392,6 +411,24 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      * carries a `searchString`; there is nothing to explain otherwise.
      */
     searchExplain?: boolean;
+
+    /**
+     * Whether to count the whole matching set for `meta.total`.
+     *
+     * `"exact"`, the default, runs a `COUNT(*)` over every row the query
+     * matches beside the page — and on a large table that count, not the page,
+     * is most of what a list read costs: it reads every matching row to report
+     * one number. `"none"` skips it. `meta.hasMore` is still exact (the read
+     * asks for one row past the page and reports whether it came back), so
+     * nothing that pages — `iterate()`, `findAll()`, a "load more" button —
+     * needs the count.
+     *
+     * Without the count there is no `total` to report: over HTTP `meta.total`
+     * is absent, and in-process it is the rows up to the end of this page
+     * (`offset` + the page), the figure a driver that cannot count reports.
+     * Sent as `?count=none`.
+     */
+    count?: "exact" | "none";
 }
 
 /**
@@ -580,6 +617,11 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
  * @group Data
  */
 export interface PaginationMeta {
+    /**
+     * Every row the query matches, counted. Not counted — and absent from an
+     * HTTP response — when the query asked for {@link FindParams.count}
+     * `"none"`, and on a `distinct` read over HTTP.
+     */
     total: number;
     limit: number;
     offset: number;
@@ -752,11 +794,12 @@ export interface AggregateResult extends Array<AggregateRow> {
 }
 
 /**
- * Which column an iteration seeks on, for keyset ("seek") pagination.
+ * Which column an iteration sorts by when it is asked to seek, for keyset
+ * ("seek") pagination.
  *
  * Either the column name on its own — sorted ascending — or the column plus an
- * explicit direction. The column must be **unique** and must be the column the
- * query is ordered by; see {@link PageWalkOptions.cursor}.
+ * explicit direction. It is used only when the query names no `orderBy`; see
+ * {@link PageWalkOptions.cursor}.
  *
  * @group Data
  */
@@ -778,23 +821,23 @@ export interface PageWalkOptions<M extends Record<string, unknown> = Record<stri
      */
     pageSize?: number;
     /**
-     * Paginate by **seeking on a column** instead of by offset.
+     * **Require** seeking: fail rather than fall back to offset paging.
      *
-     * Offset paging — the default — re-counts rows on every request, so a row
-     * inserted or deleted *while the iteration runs* shifts the window and the
-     * walk silently skips or repeats rows. Seeking is immune to that: each page
-     * asks for rows strictly after the last one seen, so concurrent writes
-     * before the cursor cannot move it.
+     * Every walk already seeks when it can. After the first page it hands the
+     * server's `meta.nextCursor` back as `after`, so each page asks for rows
+     * strictly after the last one seen — concurrent writes before that row
+     * cannot shift the window, and the database never skips rows by count.
+     * Where the server issues no cursor (a relevance-ordered search, a vector
+     * search, a `distinct` read, a server that predates cursors), the default
+     * walk pages by offset instead, which a concurrent insert or delete can
+     * make skip or repeat a row.
      *
-     * Prefer this whenever the collection has a unique, sortable column
-     * (typically its primary key). The column must be unique — a repeated value
-     * at a page boundary either skips rows or stalls, and the iterator throws
-     * rather than looping — and the query is ordered by it, so a `cursor` and a
-     * conflicting `orderBy` is an error, not a silent override.
-     *
-     * Implemented with the parameters `find()` already takes (an `orderBy` plus
-     * a `>` / `<` filter on the cursor column), so it works on every transport
-     * and needs nothing new from the server.
+     * Passing `cursor` turns that fallback into an error: a listing with no
+     * cursor throws `cursor-missing`, and a cursor that stops advancing throws
+     * `cursor-stalled`. It also names the column to sort by when the query has
+     * no `orderBy`; an explicit `orderBy` wins, and the cursor follows whatever
+     * the query is sorted by, multi-key sorts and nullable keys included. The
+     * row id breaks the final tie, so the order is always total.
      *
      * @example
      * for await (const job of client.data.jobs.iterate({ cursor: "id" })) { … }
@@ -812,6 +855,9 @@ export interface PageWalkOptions<M extends Record<string, unknown> = Record<stri
  * Parameters accepted by {@link SDKCollectionClient.iterate} — everything
  * `find()` takes except the window itself (`limit`, `offset`, `page`), which
  * the iterator owns, plus the walk options.
+ *
+ * `count` is accepted and ignored: no page of a walk is counted, since nothing
+ * a walk returns carries a total (see {@link FindParams.count}).
  *
  * @group Data
  */
@@ -1276,14 +1322,15 @@ export interface SDKCollectionClient<
      *
      * ## Consistency
      *
-     * By default this pages by **offset**, which is only as stable as the table
-     * is still: a row inserted or deleted ahead of the cursor between two
-     * requests shifts every later window, so the walk can skip a row or hand
-     * back the same one twice. That is inherent to offset paging, not a bug
-     * here. On a collection with a unique sortable column, pass
-     * {@link PageWalkOptions.cursor} to seek on it instead — the walk then
-     * asks for rows strictly after the last one it saw, which concurrent writes
-     * cannot perturb.
+     * After the first page the walk **seeks**: it hands the server's
+     * `meta.nextCursor` back as `after`, so each page asks for rows strictly
+     * after the last one it saw, which concurrent writes cannot perturb. A
+     * listing the server issues no cursor for — relevance, a vector search, a
+     * `distinct` read — is paged by **offset** instead, which is only as stable
+     * as the table is still: a row inserted or deleted ahead of the window
+     * between two requests shifts every later one, so the walk can skip a row
+     * or hand back the same one twice. Pass {@link PageWalkOptions.cursor} to
+     * make seeking a requirement rather than a preference.
      *
      * @example
      * for await (const job of client.data.jobs.iterate({
@@ -1306,7 +1353,7 @@ export interface SDKCollectionClient<
      * {@link FindAllParams.maxRows} when the data really is bigger, or switch to
      * `iterate()` and stream it.
      *
-     * The offset-drift caveat on {@link iterate} applies here too.
+     * The consistency notes on {@link iterate} apply here too.
      *
      * @throws When more rows match than `maxRows` allows.
      *

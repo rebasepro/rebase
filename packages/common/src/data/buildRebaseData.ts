@@ -1,4 +1,4 @@
-import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateSelect, type ComputedSortField, type FieldPath, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateSelect, type ComputedSortField, type FieldPath, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
@@ -343,16 +343,27 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         async find(params?: FindParams<M>): Promise<FindResponse<M>> {
             // Ensure filters are in canonical [op, value] format even if passed as PostgREST strings
             const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
-            const { limit, offset, driverOffset } = resolveFindWindow(params);
+            const window = resolveFindWindow(params);
+            const { offset, driverOffset } = window;
+            // A vector search nobody bounded reads the nearest
+            // DEFAULT_VECTOR_LIST_LIMIT rows, as it does over HTTP — not 50
+            // rows ordered by distance. The `page` stride stays the plain one,
+            // as the HTTP parser's does.
+            const limit = params?.limit === undefined && params?.vectorSearch
+                ? DEFAULT_VECTOR_LIST_LIMIT
+                : window.limit;
 
             // Keyset paging, through the same codec and the same driver
             // comparison the HTTP route uses. The in-process accessor is a
             // transport like any other: a walk that seeked differently here
             // than over the wire would be a difference the types cannot see.
             const cursor = params?.after ? decodeCursor(params.after) : undefined;
-            const orderBy = cursor
+            const sort = cursor
                 ? reconcileCursorOrder(cursor, normalizeOrderBy(params?.orderBy))
                 : normalizeOrderBy(params?.orderBy);
+            // A cursor issued for an unsorted read carries an empty sort; the
+            // HTTP route hands the driver none at all, and so does this.
+            const orderBy = sort && sort.length > 0 ? sort : undefined;
             const startAfter = cursor ? cursorToStartAfter(cursor) : undefined;
 
             // One relation shape, whatever the call looks like.
@@ -371,79 +382,104 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             // one. Drivers without one (every browser driver, and so the
             // admin's own path through `buildRebaseData`) are untouched.
             //
-            // One row past the page, when seeking.
+            // One row past the page, when seeking — and when not counting.
             //
             // `hasMore` on an offset page is `offset + rows.length < total`, and
             // under a cursor that arithmetic is simply false: every seeked page
             // runs at offset 0, so it compares one page against the whole
-            // collection and says "more" forever. Asking for `limit + 1` and
-            // looking at whether the extra row arrived is the answer keyset
-            // paging actually has — and it costs nothing, where the count it
-            // replaces was a second query per page.
-            const probeLimit = startAfter ? limit + 1 : limit;
+            // collection and says "more" forever. Without a count there is
+            // nothing to compare against at all. Asking for `limit + 1` and
+            // looking at whether the extra row arrived is the answer both have —
+            // and it costs nothing, where the count it replaces is a second
+            // query over every matching row.
+            //
+            // Counted only where the HTTP listing counts (`RestApiGenerator.readPage`).
+            // A distinct read collapses rows the count would count one by one,
+            // so its total described a different set from the one served, and
+            // `hasMore` — derived from it — offered pages that did not exist.
+            // A vector search with a threshold is a distance computed for every
+            // row of the table, beside a page an index serves in a millisecond.
+            const seeking = startAfter !== undefined;
+            const counting = driver.count !== undefined
+                && params?.count !== "none"
+                && params?.distinct !== true
+                && params?.vectorSearch?.threshold === undefined;
+            const probing = seeking || !counting;
+            const probeLimit = probing ? limit + 1 : limit;
 
-            const fetchService = driver.restFetchService;
-            const fetched = fetchService
-                ? await fetchService.fetchCollectionForRest(
-                    storedPath(),
-                    {
-                        filter,
-                        // Without this the group was dropped and the read ran
-                        // unfiltered — every row the caller's policies allow,
-                        // in place of the ones they asked for.
-                        logical: params?.logical,
+            // The page and its count in one transaction where the driver can
+            // run them so — see `DataDriver.readTogether`.
+            const read = async (reader: DataDriver) => {
+                const fetchService = reader.restFetchService;
+                const fetched = fetchService
+                    ? await fetchService.fetchCollectionForRest(
+                        storedPath(),
+                        {
+                            filter,
+                            // Without this the group was dropped and the read ran
+                            // unfiltered — every row the caller's policies allow,
+                            // in place of the ones they asked for.
+                            logical: params?.logical,
+                            limit: probeLimit,
+                            // A cursor and an offset describe the same window two
+                            // incompatible ways; seeking wins and the offset is not
+                            // sent, or the page would start `offset` rows past
+                            // where the cursor pointed.
+                            offset: seeking ? undefined : driverOffset,
+                            startAfter,
+                            orderBy,
+                            searchString: params?.searchString,
+                            searchExplain: params?.searchExplain,
+                            // Left out, `.vectorSearch(…).find()` in a function
+                            // or a cron read the newest rows in id order, with
+                            // no `_distance` and no error.
+                            vectorSearch: params?.vectorSearch,
+                            fields: params?.fields,
+                            distinct: params?.distinct
+                        },
+                        params?.include
+                    )
+                    : await reader.fetchCollection<M>({
+                        path: storedPath(),
                         limit: probeLimit,
-                        // A cursor and an offset describe the same window two
-                        // incompatible ways; seeking wins and the offset is not
-                        // sent, or the page would start `offset` rows past
-                        // where the cursor pointed.
-                        offset: startAfter ? undefined : driverOffset,
+                        offset: seeking ? undefined : driverOffset,
                         startAfter,
+                        filter,
+                        logical: params?.logical,
                         orderBy,
                         searchString: params?.searchString,
+                        searchExplain: params?.searchExplain,
+                        vectorSearch: params?.vectorSearch,
+                        include: params?.include,
                         fields: params?.fields,
                         distinct: params?.distinct
-                    },
-                    params?.include
-                )
-                : await driver.fetchCollection<M>({
-                    path: storedPath(),
-                    limit: probeLimit,
-                    offset: startAfter ? undefined : driverOffset,
-                    startAfter,
-                    filter,
-                    logical: params?.logical,
-                    orderBy,
-                    searchString: params?.searchString,
-                    include: params?.include,
-                    fields: params?.fields,
-                    distinct: params?.distinct
-                });
-
-            // The probe row is evidence, not data — it is never served.
-            const seeking = startAfter !== undefined;
-            const rows = seeking ? fetched.slice(0, limit) : fetched;
-
-            // Compute real total when count is available
-            let total = rows.length + offset;
-            let hasMore = seeking ? fetched.length > limit : rows.length >= limit;
-            if (driver.count) {
+                    });
                 // The same narrowing the rows were read with. Counting only by
                 // `filter` reported the whole collection beside a narrowed
-                // page, and `hasMore` is derived from it — so the list offered
+                // page, and `hasMore` was derived from it — so the list offered
                 // a next page that did not exist.
-                total = await driver.count({
-                    path: storedPath(),
-                    filter,
-                    logical: params?.logical,
-                    searchString: params?.searchString
-                });
-                // ...but only for an *offset* page. `offset` is 0 on every
-                // seeked page, so this arithmetic compares one page against the
-                // whole collection and says "more" forever; the probe row above
-                // is what answers it under a cursor.
-                if (!seeking) hasMore = offset + rows.length < total;
-            }
+                const counted = counting && reader.count
+                    ? await reader.count({
+                        path: storedPath(),
+                        filter,
+                        logical: params?.logical,
+                        searchString: params?.searchString,
+                        vectorSearch: params?.vectorSearch
+                    })
+                    : undefined;
+                return { fetched, counted };
+            };
+            const { fetched, counted } = driver.readTogether
+                ? await driver.readTogether(read)
+                : await read(driver);
+
+            // The probe row is evidence, not data — it is never served.
+            const rows = probing ? fetched.slice(0, limit) : fetched;
+
+            // Without a count, the rows up to the end of this page: all a
+            // driver that cannot count has ever been able to report.
+            const total = counted ?? rows.length + offset;
+            const hasMore = probing ? fetched.length > limit : offset + rows.length < total;
 
             // The cursor for the *next* page, from the last row served. Issued
             // by the driver, which is the only layer that knows which columns
@@ -578,7 +614,10 @@ ids });
                     path: storedPath(),
                     filter,
                     logical: params?.logical,
-                    searchString: params?.searchString
+                    searchString: params?.searchString,
+                    // A threshold drops rows, so it narrows the count as it
+                    // narrows the read — as `GET /count` does.
+                    vectorSearch: params?.vectorSearch
                 });
             }
             : undefined,
@@ -1127,7 +1166,13 @@ function toEntityAccessor<M extends Record<string, unknown>>(
     sdk: SDKCollectionClient<M>,
     slug: string,
     getPks: () => PrimaryKeyInfo[] = () => [],
-    toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>
+    toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>,
+    /**
+     * What `toViewModel` converts with — the collection as resolved now. A
+     * live list keeps the entities it built for as long as this and the keys
+     * stay the same object (see `listen`).
+     */
+    viewModelSource: () => unknown = () => undefined
 ): CollectionAccessor<M> {
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams<M>): Promise<FindResponse<M>> {
@@ -1173,8 +1218,38 @@ function toEntityAccessor<M extends Record<string, unknown>>(
             : (params: AggregateParams<M>) => sdk.aggregate(params),
         listen: isUnsupported(sdk.listen)
             ? undefined
-            : (params: FindParams<M> | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) =>
-                sdk.listen(params, (res) => onUpdate({ data: res.data.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel)), meta: res.meta }), onError),
+            : (params: FindParams<M> | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) => {
+                // One entity per row object, for as long as the subscription
+                // lives. The socket hands back the very row it cached when a
+                // refetch of it is equal (`mergeRows`), so a push that changed
+                // one row of fifty arrives with forty-nine rows it has seen;
+                // building fifty new entities threw that away, and every view
+                // downstream compared fifty rows by value again. Keyed on the
+                // row object, so only a row the socket kept is reused, and
+                // dropped whenever the keys or the collection the values are
+                // converted with change (a key learned late, a schema edit).
+                let built = new WeakMap<object, Entity<M>>();
+                let builtWith: [PrimaryKeyInfo[], unknown] | undefined;
+                return sdk.listen(params, (res) => {
+                    const pks = getPks();
+                    const source = viewModelSource();
+                    if (!builtWith || builtWith[0] !== pks || builtWith[1] !== source) {
+                        built = new WeakMap();
+                        builtWith = [pks, source];
+                    }
+                    onUpdate({
+                        data: res.data.map((row) => {
+                            let entity = built.get(row);
+                            if (!entity) {
+                                entity = rowToEntity<M>(row, slug, pks, toViewModel);
+                                built.set(row, entity);
+                            }
+                            return entity;
+                        }),
+                        meta: res.meta
+                    });
+                }, onError);
+            },
         listenById: isUnsupported(sdk.listenById)
             ? undefined
             : (id: string | number, onUpdate: (s: Entity<M> | undefined) => void, onError?: (e: Error) => void) =>
@@ -1226,7 +1301,8 @@ export function wrapAsEntityData(sdkData: Pick<RebaseSdkData, "collection">, opt
     function getAccessor(slug: string): CollectionAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = toEntityAccessor(sdkData.collection(slug), slug, () => primaryKeysFor(slug), viewModelFor(slug));
+            accessor = toEntityAccessor(sdkData.collection(slug), slug, () => primaryKeysFor(slug), viewModelFor(slug),
+                () => options?.resolveCollection?.(slug));
             cache.set(slug, accessor);
         }
         return accessor;

@@ -69,6 +69,18 @@ describe("createCronStore", () => {
             expect(all).toContain("DELETE FROM rebase.cron_claims");
         });
 
+        it("leaves the claim retention sweep out of booting", async () => {
+            // Only the future-slot release runs here — it is about the slots
+            // this boot is about to fire. Retention is `sweepClaims`, on the
+            // scheduler's timer.
+            const { driver, statements } = recordingDriver();
+            await createCronStore(driver)!.ensureTable();
+            const deletes = statements.filter(s => s.includes("DELETE FROM rebase.cron_claims"));
+            expect(deletes).toHaveLength(1);
+            expect(deletes[0]).toContain("slot > now()");
+            expect(statements.some(s => s.includes("claimed_at < now()"))).toBe(false);
+        });
+
         it("releases claims on slots that have not happened yet", async () => {
             const statements: string[] = [];
             const params: unknown[][] = [];
@@ -114,13 +126,22 @@ describe("createCronStore", () => {
             expect(revokesIn(statements).some(s => s.includes("\"cron_job_state\""))).toBe(true);
         });
 
-        it("indexes the failed runs, so the per-job failure count reads only those", async () => {
+        it("adds the run counters, and indexes what the sweeps read", async () => {
             const { driver, statements } = recordingDriver();
             await createCronStore(driver)!.ensureTable();
 
-            const index = statements.find(s => s.includes("idx_cron_logs_job_failures"));
-            expect(index).toContain("CREATE INDEX IF NOT EXISTS");
-            expect(index).toContain("WHERE NOT success");
+            const counters = statements.find(s => s.includes("ALTER TABLE rebase.cron_job_state"));
+            expect(counters).toContain("ADD COLUMN IF NOT EXISTS total_runs BIGINT NOT NULL DEFAULT 0");
+            expect(counters).toContain("ADD COLUMN IF NOT EXISTS total_failures BIGINT NOT NULL DEFAULT 0");
+            expect(counters).toContain("ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMPTZ");
+            expect(statements.find(s => s.includes("ALTER TABLE rebase.cron_logs")))
+                .toContain("ADD COLUMN IF NOT EXISTS counted BOOLEAN");
+
+            const ddl = statements.filter(s => /^\s*(CREATE|DROP) INDEX/.test(s));
+            expect(ddl.find(s => s.includes("idx_cron_logs_uncounted"))).toContain("WHERE counted IS NULL");
+            expect(ddl.find(s => s.includes("idx_cron_logs_started"))).toContain("(started_at)");
+            // The failure count is a counter now; nothing reads that index.
+            expect(ddl.find(s => s.includes("idx_cron_logs_job_failures"))).toContain("DROP INDEX IF EXISTS");
         });
 
         it("says what is lost when the job state table is unusable", async () => {
@@ -443,8 +464,55 @@ describe("createCronStore", () => {
         });
     });
 
+    describe("insertLog", () => {
+        const entry = {
+            jobId: "nightly",
+            startedAt: "2026-09-20T03:00:00.000Z",
+            finishedAt: "2026-09-20T03:00:01.000Z",
+            durationMs: 1000,
+            success: false,
+            error: "boom",
+            logs: ["a line"],
+            manual: false
+        };
+
+        it("logs the run and counts it in one statement", async () => {
+            const exec = jest.fn<ExecuteSql>().mockResolvedValue([]);
+            await createCronStore(makeDriver(exec))!.insertLog(entry);
+
+            expect(exec).toHaveBeenCalledTimes(1);
+            const [sql] = exec.mock.calls[0]!;
+            expect(sql).toContain("INSERT INTO rebase.cron_logs");
+            expect(sql).toContain("INSERT INTO rebase.cron_job_state");
+            expect(sql).toContain("total_runs = s.total_runs + EXCLUDED.total_runs");
+            expect(sql).toContain("counted)");
+        });
+
+        it("still logs the run, uncounted, when the counters are not there", async () => {
+            const exec = jest.fn<ExecuteSql>()
+                .mockRejectedValueOnce(drizzleError("42703", 'column "total_runs" does not exist'))
+                .mockResolvedValue([]);
+            await createCronStore(makeDriver(exec))!.insertLog(entry);
+
+            expect(exec).toHaveBeenCalledTimes(2);
+            const [sql] = exec.mock.calls[1]!;
+            expect(sql).toContain("INSERT INTO rebase.cron_logs");
+            expect(sql).not.toContain("cron_job_state");
+            expect(sql).not.toContain("counted");
+        });
+
+        it("does not write the run twice after any other failure", async () => {
+            // A statement that failed after it committed would be logged — and
+            // counted — a second time.
+            jest.spyOn(logger, "error").mockImplementation(() => undefined);
+            const exec = jest.fn<ExecuteSql>().mockRejectedValue(new Error("Connection terminated unexpectedly"));
+            await createCronStore(makeDriver(exec))!.insertLog(entry);
+            expect(exec).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe("fetchRunSummaries", () => {
-        it("reads each job's count and last run from its own rows", async () => {
+        it("reads each job's count and last run from its counters", async () => {
             const exec = jest.fn<ExecuteSql>().mockResolvedValue([
                 {
                     job_id: "nightly",
@@ -470,12 +538,16 @@ describe("createCronStore", () => {
             expect(summaries.get("never")).toEqual({ totalRuns: 0, totalFailures: 0 });
 
             const [sql, options] = exec.mock.calls[0]!;
-            // Bounded per job: the job's own index range, never a GROUP BY over
-            // every row the table has ever held.
+            // The counters, by primary key — never a count over the history,
+            // which grew without bound and was counted on every poll. The
+            // history is read only for the runs not counted yet.
+            expect(sql).toContain("LEFT JOIN rebase.cron_job_state AS s ON s.job_id = j.job_id");
             expect(sql).not.toContain("GROUP BY");
-            expect(sql).toContain("ORDER BY l.started_at DESC");
-            expect(sql).toContain("LIMIT 1");
-            expect(sql).toContain("NOT l.success");
+            const historyReads = sql.split("FROM rebase.cron_logs").slice(1);
+            expect(historyReads).toHaveLength(2);
+            for (const read of historyReads) {
+                expect(read).toMatch(/^\s+l\s+WHERE l\.job_id = j\.job_id AND l\.counted IS NULL/);
+            }
             expect(options?.params).toEqual(["nightly", "never"]);
         });
 

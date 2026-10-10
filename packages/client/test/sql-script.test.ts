@@ -138,6 +138,15 @@ describe("readSqlScriptResult", () => {
         expect(readSqlScriptResult({ result: [], effectiveRole: 7 }).effectiveRole).toBeUndefined();
     });
 
+    it("reads a result the server cut short, and the count of rows there were", () => {
+        const result = readSqlScriptResult({ result: [{ g: "1" }], command: "SELECT", rowCount: 50_000, truncated: true });
+        expect(result.truncated).toBe(true);
+        expect(result.rowCount).toBe(50_000);
+
+        expect(readSqlScriptResult({ result: [] }).truncated).toBeUndefined();
+        expect(readSqlScriptResult({ result: [], truncated: "yes" }).truncated).toBeUndefined();
+    });
+
     it("drops a source it cannot read, and reads an unknown inheritance as the unsafe answer", () => {
         const result = readSqlScriptResult({
             result: [],

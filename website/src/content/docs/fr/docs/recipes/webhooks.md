@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d8f8d760d14c7f4
+sourceHash: 39e76a1b431b1678
 title: "Recette : Intégration de Webhooks"
 sidebar_label: Webhooks
 description: Utilisez les callbacks d'entité pour envoyer des webhooks à des services externes lorsque les données changent, sans maintenir ouverte la transaction de l'écriture.
@@ -75,9 +75,12 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
 ```
 
 La file est en processus et en mémoire : un crash ou un déploiement entre la validation et la
-livraison perd l'événement. Appelez `await dispatcher.flush()` à l'arrêt. Si les livraisons
-doivent survivre à un redémarrage, écrivez une ligne d'outbox dans la même transaction et videz-la
-depuis un job.
+livraison perd l'événement. Chaque webhook possède sa propre file : un destinataire hors service ne
+retarde que ses propres livraisons, jamais celles d'un autre webhook. Appelez `await dispatcher.flush(10_000)`
+à l'arrêt : l'appel attend ce qui est en file et se résout à `false` si le délai imparti expire d'abord, car
+un destinataire hors service peut retenir chacune de ses livraisons jusqu'à ~36 secondes de nouvelles tentatives.
+Si les livraisons doivent survivre à un redémarrage, écrivez une ligne d'outbox dans la même transaction et
+videz-la depuis un job.
 
 ### Appeler directement un endpoint
 

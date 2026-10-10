@@ -361,6 +361,8 @@ scindé par une espace sans chasse (zero-width space), de sorte qu'une ligne qui
 
 Le [point de terminaison distant](#le-point-de-terminaison-distant) clôture ses résultats d'outils
 de la même façon et le signale au client ; son `structuredContent` porte le résultat brut.
+<span class="since-badge" data-since="0.25">Depuis 0.25</span> `list_collections` fait exception : seul un modèle lit sa liste,
+elle n'est donc envoyée qu'une fois, dans le texte. Avant la 0.24, elle portait aussi une copie dans `structuredContent`.
 
 Il s'agit d'un marqueur, pas d'un bac à sable (sandbox). Un assistant disposant de ces outils n'est sûr
 qu'à hauteur de la fiabilité du contenu que vous lui permettez de lire.

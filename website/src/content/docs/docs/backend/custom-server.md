@@ -87,8 +87,9 @@ async function startServer() {
     
     // 1. WebSocket Upgrade Guard
     // WebSockets require hijacking the HTTP Upgrade header. You must bind
-    // Rebase to a raw Node.js http.Server instance.
-    const server = createServer(app);
+    // Rebase to a raw Node.js http.Server instance. 64 KB of headers, as the
+    // Rebase runtime takes: a vector search in the URL outgrows Node's 16 KB.
+    const server = createServer({ maxHeaderSize: 64 * 1024 }, app);
 
     // 2. Configure the connection pool
     const pool = new pg.Pool({
@@ -211,7 +212,7 @@ async function startServer() {
 startServer();
 ```
 
-> **Standard path:** if your server uses `initializeRebaseBackend` (like the scaffolded template does), don't hand-roll the shutdown handler above — use the built-in helper instead. It drains HTTP, stops the cron scheduler, tears down realtime services, guards against repeated signals, and force-exits if shutdown hangs:
+> **Standard path:** if your server uses `initializeRebaseBackend` (like the scaffolded template does), don't hand-roll the shutdown handler above — use the built-in helper instead. It drains HTTP, stops the cron scheduler, tears down realtime services, closes the SMTP connection pool once nothing can send, guards against repeated signals, and force-exits if shutdown hangs:
 >
 > ```ts
 > import { installShutdownHandlers } from "@rebasepro/server";
@@ -252,10 +253,16 @@ app.use(cors({
     exposedHeaders: [
         "ETag", "Retry-After", "X-Request-ID",
         "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Preference-Applied"
+        "Preference-Applied",
+        // Resumable uploads, which the SDK uses for files over 8 MiB
+        "Location", "Upload-Offset", "Rebase-Upload-Result"
     ]
 }));
 ```
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The last three are what a resumable upload answers in. Without them the
+SDK cannot follow one from another origin, and sends every file as one
+multipart request instead.
 
 The Rebase runtime and the ejected backend send this list already. On 0.23
 they expose none of these headers, so a frontend on another origin reads no `ETag`.

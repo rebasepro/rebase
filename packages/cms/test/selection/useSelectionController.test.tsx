@@ -159,4 +159,69 @@ describe("useSelectionController", () => {
 
         expect(result.current.selection).toBe(before);
     });
+
+    /**
+     * "Select all loaded rows", then every view asks each loaded row whether it
+     * is selected — the selection menu, and the list or card view again. A
+     * linear search per row made that n² reads of row ids: 10,000 rows held
+     * and selected took ~200 ms per view per change. Counted, not timed: the
+     * reads of `id` must grow with n, not with n².
+     */
+    describe("asking every loaded row whether it is selected", () => {
+
+        function countingRows(n: number, path: string, counter: { reads: number }): Entity<any>[] {
+            return Array.from({ length: n }, (_, i) => {
+                const id = `id_${i}`;
+                return {
+                    path,
+                    values: {},
+                    get id() {
+                        counter.reads++;
+                        return id;
+                    }
+                } as Entity<any>;
+            });
+        }
+
+        function idReadsToAskAll(n: number, mode: "entities" | "query"): number {
+            const counter = { reads: 0 };
+            const loaded = countingRows(n, "orders", counter);
+            const { result } = renderHook(() => useSelectionController());
+            if (mode === "entities") {
+                act(() => result.current.setSelectedEntities(loaded));
+            } else {
+                act(() => result.current.selectAllMatching({ path: "orders" }, n));
+                // Every other row taken back out: n/2 exclusions.
+                act(() => {
+                    for (let i = 0; i < n; i += 2) result.current.toggleEntitySelection(loaded[i], false);
+                });
+            }
+            counter.reads = 0;
+            const selected = loaded.filter(e => result.current.isEntitySelected(e)).length;
+            expect(selected).toBe(mode === "entities" ? n : n / 2);
+            return counter.reads;
+        }
+
+        test.each(["entities", "query"] as const)("in %s mode the work grows linearly", (mode) => {
+            const small = idReadsToAskAll(1000, mode);
+            const large = idReadsToAskAll(4000, mode);
+            // 4x the rows: ~4x the reads when linear, ~16x when quadratic.
+            expect(large / small).toBeLessThan(6);
+            expect(large).toBeLessThan(4000 * 10);
+        });
+
+        test("still identifies a row by path as well as id, for ids that look alike", () => {
+            const { result } = renderHook(() => useSelectionController());
+            act(() => result.current.setSelectedEntities([
+                { id: 1, path: "orders", values: {} },
+                { id: "a/b", path: "x", values: {} }
+            ]));
+            expect(result.current.isEntitySelected({ id: 1, path: "orders", values: {} })).toBe(true);
+            // A number id is not its string.
+            expect(result.current.isEntitySelected({ id: "1", path: "orders", values: {} })).toBe(false);
+            // Path and id are not one string glued with a slash.
+            expect(result.current.isEntitySelected({ id: "b", path: "x/a", values: {} })).toBe(false);
+            expect(result.current.isEntitySelected({ id: "a/b", path: "x", values: {} })).toBe(true);
+        });
+    });
 });

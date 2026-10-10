@@ -104,10 +104,11 @@ describe("a record that is not there", () => {
         expect(back.getAttribute("href")).toBe("/c/posts");
     });
 
-    it("is translated", () => {
+    it("is translated", async () => {
         renderRecord("ghost-id", "es");
 
-        expect(screen.getByRole("link", { name: "Volver a Posts" })).toBeTruthy();
+        // Only English is bundled; Spanish renders once its table is fetched.
+        expect(await screen.findByRole("link", { name: "Volver a Posts" })).toBeTruthy();
         // The bare English label was the whole screen in every locale.
         expect(screen.queryByText("Entity not found")).toBeNull();
     });

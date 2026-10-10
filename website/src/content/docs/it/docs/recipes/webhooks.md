@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d8f8d760d14c7f4
+sourceHash: 39e76a1b431b1678
 title: "Ricetta: Integrazione Webhook"
 sidebar_label: Webhooks
 description: Utilizza i callback delle entità per inviare webhook a servizi esterni quando i dati cambiano, senza tenere aperta la transazione della scrittura.
@@ -75,8 +75,11 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
 ```
 
 La coda è in-process e in memoria: un crash o un deploy tra il commit e la consegna perde
-l'evento. Chiama `await dispatcher.flush()` allo spegnimento. Se le consegne devono sopravvivere
-a un riavvio, scrivi una riga di outbox nella stessa transazione e svuotala da un job.
+l'evento. Ogni webhook ha la propria coda, quindi un destinatario non raggiungibile ritarda solo le
+proprie consegne, mai quelle di un altro webhook. Chiama `await dispatcher.flush(10_000)` allo spegnimento:
+attende ciò che è in coda e si risolve con `false` se il budget si esaurisce prima, perché un destinatario
+non raggiungibile può trattenere ciascuna delle sue consegne fino a ~36 secondi di tentativi. Se le
+consegne devono sopravvivere a un riavvio, scrivi una riga di outbox nella stessa transazione e svuotala da un job.
 
 ### Chiamare direttamente un endpoint
 

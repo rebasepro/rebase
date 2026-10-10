@@ -165,6 +165,13 @@ Un paramètre en dehors de ces limites renvoie une erreur **400**, et non une va
 auparavant, `?width=99999` renvoyait une image de 4096px et `?format=tiff` une image webp, sans
 qu'aucun message ne le signale.
 
+Les miniatures d'images stockées du panneau d'administration utilisent ce point de terminaison : l'aperçu
+d'un tableau ou d'une carte demande un rendu webp d'environ deux fois sa taille affichée (96 à 800 px)
+plutôt que l'original. `sharp` est une dépendance facultative ; sans elle, la transformation répond 500,
+si bien que le panneau vérifie une seule fois par chargement de page, avec une unique requête de rendu,
+et affiche les originaux si le serveur ne peut pas redimensionner. Les fichiers SVG et GIF sont toujours
+affichés tels quels.
+
 ### Performances et mise en cache LRU
 
 La transformation consomme beaucoup de CPU et de mémoire, et sur un objet public, le point de terminaison est

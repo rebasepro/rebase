@@ -148,7 +148,7 @@ Eine Änderung wird niemals als direkte Daten an einen Abonnenten übertragen. S
 
 1. **Invalidierung.** Wenn sich eine Entität ändert (erstellt, aktualisiert, gelöscht), markiert der Server die betroffenen Pfade. Die geschriebene Zeile wird nicht weitergeleitet – sie wurde unter der Autorisierung des Schreibers gelesen, was nichts darüber aussagt, was ein Abonnent sehen darf.
 
-2. **Gedebouncter RLS-Refetch.** Nach **300 ms** (`REFETCH_DEBOUNCE_MS`) ruft der Server die Collection mit Ihren ursprünglichen Filtern und der Sortierreihenfolge erneut ab. Die Abfrage wird innerhalb einer Transaktion ausgeführt, die die transaktionslokalen Variablen `app.user_id` und `app.user_roles` aus dem `SubscriptionAuthContext` des Abonnenten setzt. Dadurch wertet Postgres Row-Level Security unter der Identität dieses Clients aus, und nur die Zeilen, zu deren Ansicht er berechtigt ist, werden im `collection_update` gesendet. Das Debouncing fasst zudem eine Serie rascher Schreibvorgänge zu einer einzigen Abfrage zusammen.
+2. **Gedebouncter RLS-Refetch.** Nach **300 ms** (`REFETCH_DEBOUNCE_MS`) ruft der Server die Collection mit Ihren ursprünglichen Filtern und der Sortierreihenfolge erneut ab. Die Abfrage wird innerhalb einer Transaktion ausgeführt, die die transaktionslokalen Variablen `app.user_id` und `app.user_roles` aus dem `SubscriptionAuthContext` des Abonnenten setzt. Dadurch wertet Postgres Row-Level Security unter der Identität dieses Clients aus, und nur die Zeilen, zu deren Ansicht er berechtigt ist, werden im `collection_update` gesendet. Das Debouncing fasst zudem eine Serie rascher Schreibvorgänge zu einer einzigen Abfrage zusammen. Es wartet 300 ms ohne eine weitere Änderung, aber nie länger als **1 s** (`REFETCH_MAX_WAIT_MS`) nach der ersten, sodass eine Collection, die mehrmals pro Sekunde geschrieben wird, ihren Abonnenten trotzdem mindestens einmal pro Sekunde einen Frame sendet.
 
 Frühere Versionen sendeten vor diesem Refetch ein sofortiges `collection_patch` mit der geschriebenen Zeile, um ein sub-millisekundenschnelles Feedback über Tabs hinweg zu ermöglichen. Diese Zeile war jedoch im Gültigkeitsbereich des Autors gelesen worden, sodass sie Abonnenten erreichen konnte – und erreichte –, deren eigene Richtlinien dies verwehrt hätten, und auch der `where`-Filter des Abonnements wurde nicht darauf angewendet. Der Patch wurde entfernt: Die wahrgenommene Latenz für ein Update entspricht nun dem Debounce-Fenster.
 
@@ -182,18 +182,18 @@ Wenn die Zählung selbst fehlschlägt, enthält der Frame `partial: true` und ke
 
 Da jeder Frame eine Abfrage ist, die als sein Abonnent ausgeführt wird, wächst die Kosten eines Schreibvorgangs mit der Anzahl der **unterschiedlichen Fragen unterschiedlicher Prinzipale** auf der betroffenen Collection – nicht mit der Anzahl offener Sockets:
 
-- Abonnements, die dieselbe Frage stellen (derselbe Pfad, dieselben Filter, Sortierung, Seite, `include`, `fields`, Suche) als derselbe Prinzipal (dieselbe Benutzer-ID, Rollen, Guest-Flag und Claims), teilen sich einen Refetch. Ein Schreibvorgang auf eine Liste kostet **einen Read und einen Count pro solcher Gruppe**, egal wie viele Sockets sie halten; jedes Mitglied erhält weiterhin einen Frame, der aus unter dieser Identität gelesenen Zeilen aufgebaut ist.
+- Abonnements, die dieselbe Frage stellen (derselbe Pfad, dieselben Filter, Sortierung, Seite, `include`, `fields`, Suche) als derselbe Prinzipal (dieselbe Benutzer-ID, Rollen, Guest-Flag und Claims), teilen sich einen Refetch. Ein Schreibvorgang auf eine Liste kostet **eine Transaktion pro solcher Gruppe** — den Read und seinen Count —, egal wie viele Sockets sie halten; jedes Mitglied erhält weiterhin einen Frame, der aus unter dieser Identität gelesenen Zeilen aufgebaut ist. Eine erste Seite, die kürzer ausfällt als ihr `limit`, ist die gesamte Menge und wird daher gar nicht gezählt.
 - Ein Einzeldatensatz-Abonnement wird nur abgefragt, wenn sich sein eigener Datensatz ändert.
-- Unterschiedliche Prinzipale teilen sich niemals einen Read – das verhindert, dass ein Frame eine Zeile trägt, die sein Leser nicht sehen darf. Eine Liste, die von tausend unterschiedlichen angemeldeten Benutzern beobachtet wird, bedeutet tausend Reads und tausend Counts bei jedem Schreibvorgang darauf.
+- Unterschiedliche Prinzipale teilen sich niemals einen Read – das verhindert, dass ein Frame eine Zeile trägt, die sein Leser nicht sehen darf. Eine Liste, die von tausend unterschiedlichen angemeldeten Benutzern beobachtet wird, bedeutet tausend Reads und tausend Counts bei jedem Schreibvorgang darauf, in tausend Transaktionen.
 
 Auf einem Laptop gegen ein lokales PostgreSQL mit einem Verbindungspool von 20 Verbindungen gemessen, ein Schreibvorgang auf eine Liste:
 
 | Abonnenten | Transaktionen für den Schreibvorgang | Letzter Frame nach dem Schreibvorgang |
 |-------------|----------------------------|----------------------------|
-| 1.000, ein Prinzipal | 4 | ~350 ms |
-| 1.000, jeweils ein anderer Prinzipal | ~2.000 | ~700 ms |
+| 1.000, ein Prinzipal | 2 | ~310 ms |
+| 1.000, jeweils ein anderer Prinzipal | ~1.000 | ~600 ms |
 
-300 ms davon sind das Debounce. Die zweite Zeile ist die Obergrenze, mit der Sie planen sollten: Die Refetches reihen sich im selben Pool ein wie Ihr REST-Traffic, sodass eine Collection, die mehrmals pro Sekunde geschrieben wird, während **Hunderte unterschiedlicher Benutzer** dieselbe Liste beobachten, der Punkt ist, an dem Realtime beginnt, mit Anfragen zu konkurrieren. Bevorzugen Sie darüber hinaus engere Abonnements (eine Seite, ein Filter auf die eigenen Zeilen des Benutzers) oder einen [Broadcast-Kanal](#broadcast-kanäle), der die Änderung trägt, damit Clients nach ihrem eigenen Zeitplan erneut abrufen können.
+300 ms davon sind das Debounce. Die zweite Zeile ist die Obergrenze, mit der Sie planen sollten. Die Refetches laufen im selben Pool wie Ihr REST-Traffic, aber höchstens auf einem Viertel seiner Verbindungen gleichzeitig (5 der standardmäßigen 20, nie weniger als 2); die übrigen warten im Server auf ihren Zug, sodass der Fan-out eines Schreibvorgangs seine eigenen Frames verzögert statt Ihrer Anfragen. Eine Collection, die mehrmals pro Sekunde geschrieben wird, während **Hunderte unterschiedlicher Benutzer** dieselbe Liste beobachten, ist der Punkt, an dem diese Frames zu verzögern beginnen. Bevorzugen Sie darüber hinaus engere Abonnements (eine Seite, ein Filter auf die eigenen Zeilen des Benutzers) oder einen [Broadcast-Kanal](#broadcast-kanäle), der die Änderung trägt, damit Clients nach ihrem eigenen Zeitplan erneut abrufen können.
 
 **Ein Socket darf höchstens 1.000 Abonnements halten.** Das nächste wird mit einem Fehler-Frame mit dem Code `TOO_MANY_SUBSCRIPTIONS` abgelehnt; das erneute Abonnieren unter einer ID, die der Socket bereits hält, ersetzt dieses Abonnement und zählt nicht erneut. Das SDK teilt sich identische Abonnements auf einem Socket, sodass dies die unterschiedlichen Listen und Datensätze zählt, die eine Seite offen hat. Ändern Sie dies mit `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` oder `realtime.maxSubscriptionsPerSocket` auf dem Postgres-Adapter (die Umgebungsvariable gewinnt); ein Wert, der keine positive ganze Zahl ist, stoppt den Server beim Start. Auf 0.23 sind die Abonnements eines Sockets nicht begrenzt.
 
@@ -323,7 +323,7 @@ Presence verfolgt, welche Benutzer aktuell in einem Kanal online sind, und ermö
 | `presence_state`  | Server → Client | Vollständige Entität aller Presences in einem Kanal          |
 | `presence_diff`   | Server → Client | Inkrementelles Update (Beitritte und Austritte)                |
 
-Wenn ein Client `presence_track` sendet, lässt der Server ihn dem Kanal automatisch beitreten (kein separater Aufruf von `join_channel` erforderlich) und sendet ein `presence_diff` als Broadcast an alle Kanalmitglieder.
+Wenn ein Client `presence_track` sendet, lässt der Server ihn dem Kanal automatisch beitreten (kein separater Aufruf von `join_channel` erforderlich) und sendet ein `presence_diff` als Broadcast an alle Kanalmitglieder. Das SDK sendet seinen Status alle ~20 Sekunden erneut als Heartbeat; ein Heartbeat mit unverändertem Status aktualisiert nur den Timeout des Clients und sendet kein `presence_diff`.
 
 ```typescript
 // Track presence

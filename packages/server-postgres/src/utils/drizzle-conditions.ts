@@ -32,7 +32,7 @@ import { buildSearchColumnSpec, SEARCH_UNACCENT_FN, type SearchColumnSpec } from
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
 import { ApiError, logger } from "@rebasepro/server";
-import { getColumnMeta } from "../services/collection-helpers";
+import { columnNamed, getColumnMeta } from "../services/collection-helpers";
 
 /**
  * What to do with a filter field that resolves to no column at all.
@@ -136,9 +136,7 @@ const relationColumn = (
  * many-to-many was unaffected.
  */
 export function joinColumn(table: PgTable<any>, name: string): AnyPgColumn | undefined {
-    const columns = getTableColumns(table) as Record<string, AnyPgColumn>;
-    const column = getColumnName(name);
-    return columns[column] ?? Object.values(columns).find(candidate => candidate.name === column);
+    return columnNamed(table, getColumnName(name));
 }
 
 /** The target collection of a relation, or `undefined` if its thunk cannot resolve. */

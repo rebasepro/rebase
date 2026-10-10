@@ -1,5 +1,5 @@
-import type { Connection, Pool, PoolClient, Submittable } from "pg";
-import type { SqlScriptColumn, SqlScriptNotice, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
+import { Client, DatabaseError, type Connection, type Pool, type PoolClient, type Submittable } from "pg";
+import type { SqlCursor, SqlScriptColumn, SqlScriptNotice, SqlScriptResult, SqlScriptTable } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 
 /**
@@ -32,11 +32,63 @@ interface WireField {
 }
 
 /** One statement of the script, as it came back. */
-interface StatementOutcome {
+export interface StatementOutcome {
     fields: WireField[];
     rows: Record<string, string | null>[];
+    /** How many rows the database sent for it, kept or not. */
+    received: number;
+    /** Rows past the {@link SqlResultLimits} were counted and not kept. */
+    truncated: boolean;
     /** The command tag, e.g. `SELECT 3`, `INSERT 0 1`, `CREATE TABLE`. */
     tag?: string;
+}
+
+/** How much of one statement's result a run keeps. */
+export interface SqlResultLimits {
+    /** Rows kept; the rest are counted and let go. */
+    maxRows: number;
+    /** Characters of values kept, summed over the kept rows. */
+    maxTextLength: number;
+}
+
+/**
+ * What the Studio console keeps of a result: its first 10,000 rows, or its
+ * first 32 Mi characters of values, whichever ends first.
+ *
+ * Every row used to be kept. `TABLE events` on a million rows held 418 MB of
+ * row objects and built a 475 MB frame, and a server with 1 GiB died of it —
+ * every other user's connection with it. Ten times the console's own
+ * `LIMIT 1000`, so a run that asked for a page always gets it whole; the text
+ * budget is for the rows a count does not bound — a document column, a
+ * `jsonb` blob — and keeps the frame, the string it is built from and the
+ * socket's copy of it around 100 MB at worst.
+ *
+ * Postgres still sends every row (a simple query cannot be stopped short of
+ * cancelling it, which would abort the statements after it); they are counted,
+ * so the result says how many there were.
+ */
+export const SQL_CONSOLE_RESULT_LIMITS: SqlResultLimits = { maxRows: 10_000, maxTextLength: 32 * 1024 * 1024 };
+
+/** The rows of one result kept so far, against {@link SqlResultLimits}. */
+class ResultBudget {
+    private rows = 0;
+    private textLength = 0;
+
+    constructor(private readonly limits: SqlResultLimits) {}
+
+    /** Whether a row with `textLength` characters of values is kept; counted when it is. */
+    admit(textLength: number): boolean {
+        if (this.rows >= this.limits.maxRows || this.textLength + textLength > this.limits.maxTextLength) return false;
+        this.rows++;
+        this.textLength += textLength;
+        return true;
+    }
+}
+
+function textLengthOf(values: readonly (string | null)[]): number {
+    let length = 0;
+    for (const value of values) if (value !== null) length += value.length;
+    return length;
 }
 
 /**
@@ -48,7 +100,7 @@ interface StatementOutcome {
  * result with no rows. The message handlers below are the ones node-postgres
  * calls on the active query — the same protocol `pg-cursor` implements.
  */
-class ScriptRun implements Submittable {
+export class ScriptRun implements Submittable {
     /**
      * Set by node-postgres when the pool has a `query_timeout`: a wrapper that
      * clears its read timer. Called on every outcome, so the timer never
@@ -56,16 +108,25 @@ class ScriptRun implements Submittable {
      */
     callback?: (error: Error | null) => void;
 
+    /**
+     * Every statement of the script, as it came back. Only the last holds its
+     * rows: the console shows the last, and a statement's rows are let go when
+     * the next one begins — `SELECT * FROM big; SELECT 1` held every row of
+     * `big` to the end, to show one.
+     */
     readonly statements: StatementOutcome[] = [];
     readonly done: Promise<StatementOutcome[]>;
 
     /** The statement whose row description arrived and whose command has not completed. */
     private open?: StatementOutcome;
+    /** What {@link open} has kept of its rows. */
+    private budget: ResultBudget;
     private settled = false;
     private resolveRun: (statements: StatementOutcome[]) => void = () => undefined;
     private rejectRun: (error: Error) => void = () => undefined;
 
-    constructor(private readonly text: string) {
+    constructor(private readonly text: string, private readonly limits: SqlResultLimits = SQL_CONSOLE_RESULT_LIMITS) {
+        this.budget = new ResultBudget(limits);
         this.done = new Promise((resolve, reject) => {
             this.resolveRun = resolve;
             this.rejectRun = reject;
@@ -77,9 +138,13 @@ class ScriptRun implements Submittable {
     }
 
     handleRowDescription(message: { fields: WireField[] }): void {
+        this.releaseRows();
+        this.budget = new ResultBudget(this.limits);
         this.open = {
             fields: message.fields.map(({ name, tableID, columnID, dataTypeID }) => ({ name, tableID, columnID, dataTypeID })),
-            rows: []
+            rows: [],
+            received: 0,
+            truncated: false
         };
         this.statements.push(this.open);
     }
@@ -87,6 +152,12 @@ class ScriptRun implements Submittable {
     handleDataRow(message: { fields: (string | null)[] }): void {
         const statement = this.open;
         if (!statement) return;
+        statement.received++;
+        if (statement.truncated) return;
+        if (!this.budget.admit(textLengthOf(message.fields))) {
+            statement.truncated = true;
+            return;
+        }
         const row: Record<string, string | null> = {};
         statement.fields.forEach((field, index) => {
             row[field.name] = message.fields[index] ?? null;
@@ -95,8 +166,11 @@ class ScriptRun implements Submittable {
     }
 
     handleCommandComplete(message: { text: string }): void {
-        const statement = this.open ?? { fields: [], rows: [] };
-        if (!this.open) this.statements.push(statement);
+        const statement = this.open ?? { fields: [], rows: [], received: 0, truncated: false };
+        if (!this.open) {
+            this.releaseRows();
+            this.statements.push(statement);
+        }
         this.open = undefined;
         statement.tag = message.text;
     }
@@ -129,6 +203,12 @@ class ScriptRun implements Submittable {
 
     handleReadyForQuery(): void {
         this.settle(null);
+    }
+
+    /** Let go of the rows of the statement before the one beginning: only the last is shown. */
+    private releaseRows(): void {
+        const previous = this.statements[this.statements.length - 1];
+        if (previous) previous.rows = [];
     }
 
     private settle(error: Error | null): void {
@@ -389,18 +469,22 @@ export async function runSqlScriptOnPool(pool: Pool, sql: string, options: OwnSe
             const script = new ScriptRun(sql);
             connection.query(script);
             const statements = await script.done;
-            const last: StatementOutcome = statements[statements.length - 1] ?? { fields: [], rows: [] };
+            const last: StatementOutcome = statements[statements.length - 1] ?? { fields: [], rows: [], received: 0, truncated: false };
             return { last, described: { columns: last.fields.map((field): SqlScriptColumn => ({ name: field.name })), tables: [] as SqlScriptTable[] } };
         } finally {
             connection.removeListener("notice", listen);
         }
     }, async (connection, value) => ({ ...value, described: await describeColumns(connection, value.last.fields) }));
 
+    const tag = parseCommandTag(run.last.tag);
     return {
         rows: run.last.rows,
         columns: run.described.columns,
         tables: run.described.tables,
-        ...parseCommandTag(run.last.tag),
+        ...tag,
+        // The tag counts every row the statement returned; a command whose
+        // tag carries no count was counted here.
+        ...(run.last.truncated ? { truncated: true, rowCount: tag.rowCount ?? run.last.received } : {}),
         notices
     };
 }
@@ -410,12 +494,20 @@ export async function runSqlScriptOnPool(pool: Pool, sql: string, options: OwnSe
  * pool (PGlite in process): every value as text, and no column with a source —
  * nothing to say where a value came from, so nothing the console will edit.
  */
-export function sqlScriptResultFromRows(rows: Record<string, unknown>[]): SqlScriptResult {
+export function sqlScriptResultFromRows(rows: Record<string, unknown>[], limits: SqlResultLimits = SQL_CONSOLE_RESULT_LIMITS): SqlScriptResult {
     const names = rows.length > 0 ? Object.keys(rows[0]) : [];
+    const budget = new ResultBudget(limits);
+    const kept: Record<string, string | null>[] = [];
+    for (const row of rows) {
+        const entries = Object.entries(row).map(([key, value]): [string, string | null] => [key, valueAsText(value)]);
+        if (!budget.admit(textLengthOf(entries.map(([, value]) => value)))) break;
+        kept.push(Object.fromEntries(entries));
+    }
     return {
-        rows: rows.map(row => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, valueAsText(value)]))),
+        rows: kept,
         columns: names.map(name => ({ name })),
         tables: [],
+        ...(kept.length < rows.length ? { truncated: true, rowCount: rows.length } : {}),
         notices: []
     };
 }
@@ -427,4 +519,332 @@ function valueAsText(value: unknown): string | null {
     if (value instanceof Uint8Array) return `\\x${Buffer.from(value).toString("hex")}`;
     if (typeof value === "object") return JSON.stringify(value);
     return String(value);
+}
+
+/**
+ * How many bytes of rows one answer of the admin `executeSql` door — the
+ * WebSocket `EXECUTE_SQL` without `mode: "script"` — may carry: 128 MiB.
+ *
+ * That door had no limit at all. A million-row `SELECT` held every row parsed
+ * (432 MB of heap on the console's door before it was capped), then built the
+ * frame from them, and a server with 1 GiB died of it — with every other
+ * user's connection. Unlike the console's script door it does not keep a
+ * prefix: a program reading rows through it would take a prefix for the whole
+ * answer, so past the budget the answer is refused, {@link SqlResultTooLargeError}.
+ *
+ * Generous on purpose. The catalogue reads the admin UI makes through this door
+ * are far below it — the SQL console's schema browser reads one
+ * `information_schema.columns` row per column, 7 MB for the 100,000 columns of
+ * 5,000 tables — and anything near it is a result no browser tab should hold.
+ */
+export const SQL_RESULT_BYTE_BUDGET = 128 * 1024 * 1024;
+
+/**
+ * A result larger than the bytes its caller allowed, refused rather than
+ * returned in part. Its message is for the person who wrote the SQL.
+ */
+export class SqlResultTooLargeError extends Error {
+    readonly code = "RESULT_TOO_LARGE";
+
+    constructor(readonly limitBytes: number) {
+        super(
+            `This result is larger than ${describeBytes(limitBytes)} of rows, so none of it was sent. ` +
+            "Add a LIMIT, or select fewer columns, to read it in parts."
+        );
+        this.name = "SqlResultTooLargeError";
+    }
+}
+
+function describeBytes(bytes: number): string {
+    const mib = bytes / (1024 * 1024);
+    return mib >= 1 ? `${Number.isInteger(mib) ? mib : mib.toFixed(1)} MB` : `${bytes} bytes`;
+}
+
+/**
+ * The bytes a row takes as the database sends it: each value's text and four
+ * bytes of length. For rows that come back parsed, where there is no message
+ * to measure — PGlite, a client that is not node-postgres's own.
+ */
+function rowBytes(row: Record<string, unknown>): number {
+    let bytes = 6;
+    for (const value of Object.values(row)) bytes += 4 + textBytes(value);
+    return bytes;
+}
+
+function textBytes(value: unknown): number {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === "string") return value.length;
+    if (value instanceof Date) return 24;
+    if (value instanceof Uint8Array) return 2 + value.byteLength * 2;
+    if (typeof value === "object") return JSON.stringify(value).length;
+    return String(value).length;
+}
+
+/**
+ * Refuse rows that came back whole and are past `maxBytes`.
+ *
+ * Where nothing could watch the read, it is measured once done — and the
+ * answer still refused rather than sent.
+ */
+export function refuseOversizedRows<T extends Record<string, unknown>>(rows: T[], maxBytes: number): T[] {
+    let bytes = 0;
+    for (const row of rows) {
+        bytes += rowBytes(row);
+        if (bytes > maxBytes) throw new SqlResultTooLargeError(maxBytes);
+    }
+    return rows;
+}
+
+/** A `DataRow` message's length, as node-postgres's parser hands it over. */
+function messageLength(message: unknown): number {
+    return typeof message === "object" && message !== null && "length" in message && typeof message.length === "number"
+        ? message.length
+        : 0;
+}
+
+/**
+ * Run `work` — one query on `connection` — and stop reading once its rows pass
+ * `maxBytes`.
+ *
+ * node-postgres keeps every row of a query until the query completes, and a
+ * simple query cannot be stopped short of its end, so the only way to stop
+ * holding rows is to stop receiving them: the socket is closed. Postgres sees
+ * its client gone and abandons the statement; the session — and anything it
+ * held — goes with it, and `onOwnSession` destroys the connection rather than
+ * return it to the pool. What the caller gets is {@link SqlResultTooLargeError},
+ * never the rows read so far.
+ *
+ * Counted from the wire, message by message, as they arrive: what is held when
+ * it stops is the budget plus one network read.
+ */
+export async function readWithinBudget<T extends Record<string, unknown>>(
+    connection: PoolClient,
+    maxBytes: number,
+    work: () => Promise<T[]>
+): Promise<T[]> {
+    if (!(connection instanceof Client)) return refuseOversizedRows(await work(), maxBytes);
+    const wire = connection.connection;
+    let received = 0;
+    let exceeded = false;
+    const count = (message: unknown) => {
+        if (exceeded) return;
+        received += messageLength(message);
+        if (received <= maxBytes) return;
+        exceeded = true;
+        wire.stream.destroy();
+    };
+    // A checked-out client has no pool listener, and node-postgres emits the
+    // closed socket as an `error` on the client: unheard, that ends the process.
+    const ignore = () => undefined;
+    connection.on("error", ignore);
+    wire.on("dataRow", count);
+    try {
+        const rows = await work();
+        if (exceeded) throw new SqlResultTooLargeError(maxBytes);
+        return rows;
+    } catch (error: unknown) {
+        if (exceeded) throw new SqlResultTooLargeError(maxBytes);
+        throw error;
+    } finally {
+        wire.removeListener("dataRow", count);
+        // A closed connection may still say so; it is discarded, not reused.
+        if (!exceeded) connection.removeListener("error", ignore);
+    }
+}
+
+/** Rows one read of a {@link SqlCursor} fetches. */
+export const SQL_CURSOR_BATCH_ROWS = 1000;
+
+/**
+ * How long a cursor's session may sit between reads before Postgres ends it.
+ * A download whose reader stopped reading holds a connection and an open
+ * transaction; this is the most it holds them for.
+ */
+const SQL_CURSOR_IDLE_TIMEOUT_MS = 60_000;
+
+const SQL_CURSOR_NAME = "rebase_sql_export";
+
+/**
+ * One `FETCH`, read message by message as {@link ScriptRun} reads a script:
+ * every value the text the database wrote, each row an array — so two columns
+ * of one name stay two columns.
+ */
+class FetchRun implements Submittable {
+    /** Set by node-postgres when the pool has a `query_timeout`; see {@link ScriptRun.callback}. */
+    callback?: (error: Error | null) => void;
+    columns?: string[];
+    readonly rows: (string | null)[][] = [];
+    readonly done: Promise<void>;
+    private settled = false;
+    private resolveRun: () => void = () => undefined;
+    private rejectRun: (error: Error) => void = () => undefined;
+
+    constructor(private readonly text: string) {
+        this.done = new Promise((resolve, reject) => {
+            this.resolveRun = resolve;
+            this.rejectRun = reject;
+        });
+    }
+
+    submit(connection: Connection): void {
+        connection.query(this.text);
+    }
+
+    handleRowDescription(message: { fields: WireField[] }): void {
+        this.columns = message.fields.map(field => field.name);
+    }
+
+    handleDataRow(message: { fields: (string | null)[] }): void {
+        this.rows.push(message.fields);
+    }
+
+    handleCommandComplete(): void {
+        // The rows are counted by the caller; the tag says nothing more.
+    }
+
+    handleEmptyQuery(): void {
+        // A FETCH is never empty.
+    }
+
+    handlePortalSuspended(): void {
+        // Only the extended protocol suspends a portal.
+    }
+
+    handleError(error: Error): void {
+        this.settle(error);
+    }
+
+    handleReadyForQuery(): void {
+        this.settle(null);
+    }
+
+    private settle(error: Error | null): void {
+        if (this.settled) return;
+        this.settled = true;
+        this.callback?.(error);
+        if (error) this.rejectRun(error);
+        else this.resolveRun();
+    }
+}
+
+/** A cursor on a pooled session of its own. See {@link openSqlCursorOnPool}. */
+class PoolSqlCursor implements SqlCursor {
+    columns: string[] = [];
+    /** The first batch, read when the cursor was opened. */
+    pending: (string | null)[][] | null = null;
+    private exhausted = false;
+    private closed = false;
+    /**
+     * What the session said when it died between reads — the idle timeout, a
+     * restart. Heard here because a checked-out client has no pool listener,
+     * and an unheard `error` event ends the process.
+     */
+    private failure?: Error;
+    private readonly listen = (error: Error) => { this.failure = error; };
+
+    constructor(private readonly connection: PoolClient, private readonly batchRows: number) {
+        connection.on("error", this.listen);
+    }
+
+    /** The next batch from Postgres; the last one is shorter than a batch. */
+    async fetch(): Promise<(string | null)[][]> {
+        if (this.failure) throw this.failure;
+        const run = new FetchRun(`FETCH FORWARD ${this.batchRows} FROM ${SQL_CURSOR_NAME}`);
+        this.connection.query(run);
+        await run.done;
+        if (run.columns) this.columns = run.columns;
+        if (run.rows.length < this.batchRows) this.exhausted = true;
+        return run.rows;
+    }
+
+    async read(): Promise<(string | null)[][] | null> {
+        if (this.closed) return null;
+        const pending = this.pending;
+        this.pending = null;
+        const rows = pending ?? (this.exhausted ? [] : await this.fetch());
+        return rows.length > 0 ? rows : null;
+    }
+
+    /**
+     * Roll the read-only transaction back, reset the session and give it back;
+     * destroyed instead when it cannot be reset.
+     */
+    async close(): Promise<void> {
+        if (this.closed) return;
+        this.closed = true;
+        let reusable = !this.failure;
+        if (reusable) {
+            try {
+                await this.connection.query("ROLLBACK");
+                for (const statement of RESET_SESSION_STATEMENTS) await this.connection.query(statement);
+            } catch {
+                reusable = false;
+            }
+        }
+        // A dead session may still say so once more; it is discarded, so keep listening.
+        if (reusable) this.connection.removeListener("error", this.listen);
+        this.connection.release(reusable ? undefined : true);
+    }
+}
+
+/**
+ * The query refused before a row was read, with what to do about it: Postgres
+ * answers `DECLARE … CURSOR FOR INSERT …` with a syntax error at `INSERT`,
+ * which says nothing to a person who never wrote `DECLARE`.
+ */
+function explainCursorRefusal(error: unknown, prefixLength: number): unknown {
+    if (!(error instanceof DatabaseError)) return error;
+    if (error.code === "42601" && Number(error.position) === prefixLength + 1) {
+        error.message = "Only a query that returns rows can be downloaded — SELECT, WITH … SELECT, TABLE or VALUES. " +
+            "Run any other statement in the console.";
+    } else if (error.code === "42601" && /multiple commands/.test(error.message)) {
+        error.message = "A download runs one query, and this SQL holds more than one statement. Run the query on its own, then download it.";
+    } else if (error.code === "25006") {
+        error.message = `A download runs read-only: ${error.message}.`;
+    }
+    return error;
+}
+
+/**
+ * Open a cursor over ONE query a person wrote — the SQL console's "Download
+ * full result as CSV".
+ *
+ * On a connection of its own, in the role asked for, inside
+ * `BEGIN TRANSACTION READ ONLY`: the database refuses a write, a
+ * data-modifying `WITH` and a function that writes. The query is declared over
+ * the extended protocol, which refuses a second statement — `SELECT 1; DROP
+ * TABLE t` cannot ride along. Rows are then fetched {@link SQL_CURSOR_BATCH_ROWS}
+ * at a time, each `FETCH` under the session's `statement_timeout`; nothing
+ * fetches ahead of the reader, so memory holds one batch. The first batch is
+ * read here, so a query that fails on its first rows fails before anything has
+ * been sent.
+ *
+ * The caller closes the cursor — always. A reader that stops reading without
+ * closing is ended by `idle_in_transaction_session_timeout` after
+ * {@link SQL_CURSOR_IDLE_TIMEOUT_MS}.
+ */
+export async function openSqlCursorOnPool(
+    pool: Pool,
+    sql: string,
+    options: OwnSessionOptions & { batchRows?: number } = {}
+): Promise<SqlCursor> {
+    const connection = await pool.connect();
+    const cursor = new PoolSqlCursor(connection, options.batchRows ?? SQL_CURSOR_BATCH_ROWS);
+    const prefix = `DECLARE ${SQL_CURSOR_NAME} NO SCROLL CURSOR FOR `;
+    try {
+        await options.assumeRole?.(connection);
+        await connection.query("BEGIN TRANSACTION READ ONLY");
+        await connection.query(`SET LOCAL idle_in_transaction_session_timeout = ${SQL_CURSOR_IDLE_TIMEOUT_MS}`);
+        // `queryMode` is node-postgres's switch to the extended protocol; the
+        // typings do not declare it.
+        const declare = { text: prefix + sql.trim().replace(/;\s*$/, ""), queryMode: "extended" };
+        await connection.query(declare).catch((error: unknown) => {
+            throw explainCursorRefusal(error, prefix.length);
+        });
+        cursor.pending = await cursor.fetch();
+        return cursor;
+    } catch (error: unknown) {
+        await cursor.close();
+        throw error;
+    }
 }

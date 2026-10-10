@@ -39,6 +39,38 @@ describe("a grant narrowed to collections", () => {
         expect(text).not.toContain("secrets");
     });
 
+    it("describes exactly the collections it lists, for every grant", async () => {
+        // The listing says which collections exist; describe_collection gives
+        // one's schema. If they filtered differently, a collection's schema
+        // would be readable by naming it while the listing hid it — or the
+        // listing would offer one that cannot be described.
+        const THIRD = { slug: "notes", name: "Notes", properties: { body: { type: "string", name: "Body" } } } as unknown as CollectionConfig;
+        const ALL = [...BOTH, THIRD];
+        const grants = [
+            "data:read", "data:read:candidates", "data:read:candidates data:read:notes",
+            "data:write", "data:read:secrets data:write:candidates", "data:delete:notes data:read:notes"
+        ];
+        for (const grant of grants) {
+            const { app } = buildApp({ driver: stubDriver().driver, collections: ALL });
+            const bearer = await token(grant);
+            const listedBody = await (await callTool(app, bearer, "list_collections", {})).json() as {
+                result?: { isError?: boolean; content: { text: string }[] }; error?: unknown
+            };
+            const listed = listedBody.result && !listedBody.result.isError
+                ? (JSON.parse(listedBody.result.content[0].text.split("\n").slice(2, -1).join("\n")) as { collections: { name: string }[] })
+                    .collections.map(c => c.name).sort()
+                : [];
+            const describable: string[] = [];
+            for (const { slug } of ALL) {
+                const body = await (await callTool(app, bearer, "describe_collection", { collection: slug })).json() as {
+                    result?: { isError?: boolean }
+                };
+                if (body.result && !body.result.isError) describable.push(slug);
+            }
+            expect([grant, describable.sort()]).toEqual([grant, listed]);
+        }
+    });
+
     it("reads its collection and refuses another, naming the grant that would reach it", async () => {
         const { driver, calls } = stubDriver();
         const { app } = buildApp({ driver, collections: BOTH });

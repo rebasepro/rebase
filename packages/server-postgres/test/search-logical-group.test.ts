@@ -112,10 +112,13 @@ describe("the `or`/`and` group survives a search", () => {
             logical: group
         });
 
-        expect(queries).toHaveLength(1);
-        expect(queries[0].sql).toContain("<=>");
-        expect(queries[0].params).toContain("published");
-        expect(queries[0].params).toContain("pinned");
+        // The rows read, beside the once-per-database look at pgvector's
+        // version that decides on an iterative index scan.
+        const reads = queries.filter(q => !q.sql.includes("pg_extension"));
+        expect(reads).toHaveLength(1);
+        expect(reads[0].sql).toContain("<=>");
+        expect(reads[0].params).toContain("published");
+        expect(reads[0].params).toContain("pinned");
     });
 
     it("still combines the group with `filter` using AND, not OR", async () => {

@@ -31,6 +31,7 @@ import { PickerTrigger } from "./PickerTrigger";
 import { getTitlePropertyKey, useData, usePermissions, useRelationSelector, useTranslation } from "@rebasepro/app";
 import { useSidePanel } from "../hooks/useSidePanel";
 import { normalizeToEntityRelation } from "@rebasepro/common";
+import { findEntitiesByIds } from "../util/find_entities_by_ids";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */
 function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
@@ -272,6 +273,8 @@ export const RelationSelector = React.forwardRef<
         entityToRelationItemRef.current = entityToRelationItem;
         const collectionSlugRef = useRef(collection.slug);
         collectionSlugRef.current = collection.slug;
+        const collectionRef = useRef(collection);
+        collectionRef.current = collection;
 
         // Stable ref to track which IDs we've already resolved
         const resolvedIdsRef = useRef<string>("");
@@ -374,9 +377,32 @@ export const RelationSelector = React.forwardRef<
                 setIsLoadingSelectedItems(true);
             }
             const client = dataClientRef.current;
+            const target = collectionRef.current;
+
+            // The ids nothing above resolves, by the path they are read at:
+            // one request per path (per 1,000 ids), not one per id.
+            const unresolved = new Map<string, (string | number)[]>();
+            for (const rel of currentRelationsArray) {
+                const isPrimitive = typeof rel === "string" || typeof rel === "number";
+                const relId = isPrimitive ? rel : (rel as EntityRelation).id;
+                if (!isPrimitive && (rel as EntityRelation).data) continue;
+                if (currentSelectedMap.has(String(relId))) continue;
+                const path = isPrimitive ? slug : (rel as EntityRelation).path;
+                unresolved.set(path, [...(unresolved.get(path) ?? []), relId]);
+            }
 
             Promise.all(
-                currentRelationsArray.map(async (rel) => {
+                [...unresolved].map(async ([path, ids]): Promise<[string, Map<string, Entity>]> => {
+                    try {
+                        return [path, await findEntitiesByIds(client.collection(path), target, ids)];
+                    } catch (e) {
+                        console.warn("RelationSelector: could not fetch the entities for relations", path, ids, e);
+                        return [path, new Map()];
+                    }
+                })
+            ).then(read => {
+                const readByPath = new Map(read);
+                return currentRelationsArray.map((rel) => {
                     const isPrimitive = typeof rel === "string" || typeof rel === "number";
                     const relId = isPrimitive ? rel : (rel as EntityRelation).id;
                     const path = isPrimitive ? slug : (rel as EntityRelation).path;
@@ -389,18 +415,13 @@ export const RelationSelector = React.forwardRef<
                     if (currentSelectedMap.has(String(relId))) {
                         return currentSelectedMap.get(String(relId))!;
                     }
-
-                    try {
-                        const entity = await client.collection(path).findById(relId);
-                        if (entity) return toRelationItem(entity, relation);
-                    } catch (e) {
-                        console.warn("RelationSelector: could not fetch entity for relation", rel, e);
-                    }
+                    const entity = readByPath.get(path)?.get(String(relId));
+                    if (entity) return toRelationItem(entity, relation);
                     return { id: relId,
 label: String(relId),
 relation } as RelationItem;
-                })
-            ).then(resolved => {
+                });
+            }).then(resolved => {
                 if (active) {
                     setSelectedItems(resolved);
                     setIsLoadingSelectedItems(false);

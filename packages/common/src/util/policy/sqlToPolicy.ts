@@ -78,32 +78,68 @@ function splitTopLevel(sql: string, keyword: "AND" | "OR"): string[] | null {
     return trimmedParts.length > 1 ? trimmedParts : null;
 }
 
-/** Drop redundant wrapping parens (`(a AND b)` → `a AND b`), never `(a) AND (b)`. */
+/** `SELECT` as the first word of `sql`. */
+const STARTS_WITH_SELECT = /^select(?=[\s(])/i;
+
+/**
+ * Drop redundant wrapping parens (`(a AND b)` → `a AND b`), never `(a) AND (b)`
+ * — and never the parens of a scalar subquery: `(SELECT x)` without them is not
+ * an expression at all, and re-emitted bare it is a syntax error inside
+ * `USING (…)`.
+ */
 function stripOuterParens(sql: string): string {
     let s = sql.trim();
-    for (;;) {
-        if (!s.startsWith("(") || !s.endsWith(")")) return s;
-        let depth = 0;
-        let inString = false;
-        let wraps = true;
-        for (let i = 0; i < s.length; i++) {
-            const ch = s[i];
-            if (inString) {
-                if (ch === "'") {
-                    if (s[i + 1] === "'") i++;
-                    else inString = false;
-                }
-                continue;
-            }
-            if (ch === "'") { inString = true; continue; }
-            if (ch === "(") depth++;
-            else if (ch === ")") {
-                depth--;
-                if (depth === 0 && i < s.length - 1) { wraps = false; break; }
-            }
-        }
-        if (!wraps) return s;
+    while (wrapsWhole(s) && !STARTS_WITH_SELECT.test(s.slice(1).trim())) {
         s = s.slice(1, -1).trim();
+    }
+    return s;
+}
+
+/** Whether `s` is one parenthesised group: `(a AND b)`, not `(a) AND (b)`. */
+function wrapsWhole(s: string): boolean {
+    if (!s.startsWith("(") || !s.endsWith(")")) return false;
+    let depth = 0;
+    let inString = false;
+    for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (inString) {
+            if (ch === "'") {
+                if (s[i + 1] === "'") i++;
+                else inString = false;
+            }
+            continue;
+        }
+        if (ch === "'") { inString = true; continue; }
+        if (ch === "(") depth++;
+        else if (ch === ")") {
+            depth--;
+            if (depth === 0 && i < s.length - 1) return false;
+        }
+    }
+    return true;
+}
+
+/** `x` when `s` is exactly `(SELECT x)`, otherwise null. */
+function scalarSubqueryBody(s: string): string | null {
+    if (!wrapsWhole(s)) return null;
+    const inner = s.slice(1, -1).trim();
+    return STARTS_WITH_SELECT.test(inner) ? inner.slice("select".length).trim() : null;
+}
+
+/** Whether any part of `expr` fell through to `raw`. */
+function containsRaw(expr: PolicyExpression): boolean {
+    switch (expr.kind) {
+        case "raw":
+            return true;
+        case "and":
+        case "or":
+            return expr.operands.some(containsRaw);
+        case "not":
+            return containsRaw(expr.operand);
+        case "existsIn":
+            return containsRaw(expr.where);
+        default:
+            return false;
     }
 }
 
@@ -119,6 +155,18 @@ export function sqlToPolicy(sql: string): PolicyExpression {
     // it also means a legacy policy that falls through to `raw` is stored in the
     // new spelling, so editing and saving one in the Studio migrates it.
     const trimmed = stripOuterParens(rewriteLegacyRlsFunctions(sql).trim());
+
+    // `(SELECT x)` — how the compiler spells a part of a policy that does not
+    // read the row, so Postgres evaluates it once per statement. Read back as
+    // `x` when `x` is understood completely: without a FROM a scalar subquery
+    // is one row holding x's value, so the two mean the same. Anything less —
+    // a FROM, a LIMIT, an alias, a clause the parser does not know — stays
+    // `raw`, parens included, and is reproduced verbatim.
+    const subqueryBody = scalarSubqueryBody(trimmed);
+    if (subqueryBody !== null) {
+        const inner = sqlToPolicy(subqueryBody);
+        return containsRaw(inner) ? policy.raw(trimmed) : inner;
+    }
 
     if (trimmed.toLowerCase() === "true") return policy.true();
     if (trimmed.toLowerCase() === "false") return policy.false();
@@ -344,6 +392,12 @@ function parseOperand(str: string) {
     // whole clause to `raw` and reproduces it verbatim. That is the rule the
     // rest of this file already follows: when in doubt, prefer `raw`.
     if (/^current_setting\s*\(\s*'app\.(uid|user_id)'\s*\)$/i.test(str) || /^rebase\.uid\(\)$/i.test(str)) {
+        return policy.authUid();
+    }
+    // The same call as an initPlan — the compiler's spelling, `(SELECT
+    // rebase.uid())`, and Postgres's re-rendering of it, `( SELECT rebase.uid()
+    // AS uid)`. Anchored like the line above, for the same reason.
+    if (/^\(\s*select\s+rebase\.uid\(\)(?:\s+as\s+"?uid"?)?\s*\)$/i.test(str)) {
         return policy.authUid();
     }
 

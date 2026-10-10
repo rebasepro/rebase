@@ -271,6 +271,13 @@ async function topSellers(driver: DataDriver, since: string) {
 casting: the guard is the difference between a driver that cannot run SQL saying
 so and one throwing `admin.executeSql is not a function` at the call site.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> `executeSql` returns
+every row it reads. For SQL whose size you do not control, pass `maxResultBytes`:
+a result whose rows take more bytes than that is refused with an error whose
+`code` is `RESULT_TOO_LARGE`, never returned in part. The realtime socket's
+`EXECUTE_SQL`, which an admin client's `executeSql` goes through, sets 128 MB for
+every caller.
+
 **Something the framework should do and does not.** If you find yourself
 patching `@rebasepro/server-postgres`, or ejecting for one behaviour, that is
 worth an issue rather than a fork —

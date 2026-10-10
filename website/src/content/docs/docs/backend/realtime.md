@@ -158,7 +158,15 @@ query run as them:
    `app.user_roles` from the subscriber's `SubscriptionAuthContext`, so Postgres
    evaluates Row-Level Security under that client's identity and only the rows
    they are authorized to see are sent in the `collection_update`. The debounce
-   also coalesces a burst of writes into one query.
+   also coalesces a burst of writes into one query. It waits for 300 ms without
+   a further change, but never more than **1 s** (`REFETCH_MAX_WAIT_MS`) after
+   the first one, so a collection written several times a second still sends
+   its subscribers a frame at least once a second.
+
+   <span class="since-badge" data-since="0.25">Since 0.25</span> A refetch that reads exactly what a subscriber was last sent sends that
+   subscriber nothing: a write to row 9,000 of a list showing the first 50 costs
+   the read, not a frame to every viewer. After an error frame, the next rows
+   are sent again even if they are the same.
 
 Earlier versions sent an immediate `collection_patch` carrying the written row
 before this refetch, for sub-millisecond cross-tab feedback. That row had been
@@ -217,44 +225,40 @@ collection it touched — not with the number of open sockets:
 
 - Subscriptions that ask the same question (same path, filters, sort, page,
   `include`, `fields`, search) as the same principal (same user id, roles,
-  guest flag and claims) share one refetch. A write to a list costs **one read
-  and one count per such group**, however many sockets hold it; every member
-  still gets a frame built from rows read under that identity.
+  guest flag and claims) share one refetch. A write to a list costs **one
+  transaction per such group** — the read and its count — however many sockets
+  hold it; every member still gets a frame built from rows read under that
+  identity. A first page that comes back shorter than its `limit` is the whole
+  set, so it is not counted at all.
 - A single-record subscription is asked only when its own record changes.
 - Different principals never share a read — that is what keeps a frame from
   carrying a row its reader may not see. A list watched by a thousand
   different signed-in users is a thousand reads and a thousand counts on every
-  write to it.
+  write to it, in a thousand transactions.
 
 Measured on a laptop against a local PostgreSQL with a 20-connection pool, one
 write to a list:
 
 | Subscribers | Transactions for the write | Last frame after the write |
 |-------------|----------------------------|----------------------------|
-| 1,000, one principal | 4 | ~350 ms |
-| 1,000, each a different principal | ~2,000 | ~700 ms |
+| 1,000, one principal | 2 | ~310 ms |
+| 1,000, each a different principal | ~1,000 | ~600 ms |
 
-300 ms of each is the debounce. The second row is the ceiling to plan for: the
-refetches queue on the same pool as your REST traffic, so a collection written
-several times a second while **hundreds of different users** watch the same
-list is where realtime starts to compete with requests. Beyond that, prefer
-narrower subscriptions (a page, a filter on the user's own rows) or a
-[broadcast channel](#broadcast-channels) carrying the change for clients to
-re-fetch on their own schedule.
+300 ms of each is the debounce. The second row is the ceiling to plan for. The
+refetches run on the same pool as your REST traffic, but at most a quarter of
+its connections at a time (5 of the default 20, never fewer than 2); the rest
+wait their turn in the server, so a write's fan-out delays its own frames
+rather than your requests. A collection written several times a second while
+**hundreds of different users** watch the same list is where those frames
+start to lag. Beyond that, prefer narrower subscriptions (a page, a filter on
+the user's own rows) or a [broadcast channel](#broadcast-channels) carrying the
+change for clients to re-fetch on their own schedule.
 
-**One socket may hold at most 1,000 subscriptions.** The next is refused with
-an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the
-socket already holds replaces that subscription and does not count again. The
-SDK shares identical subscriptions on a socket, so this counts the distinct
-lists and records a page has open. Change it with
-`REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket`
-on the Postgres adapter (the environment variable wins); a value that is not a
-positive whole number stops the server at boot. On 0.23 a socket's subscriptions
-are not limited.
+**One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. On 0.23 a socket's subscriptions are not limited.
 
-A subscription id is the socket's own: two clients that both name a
-subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the
-sender's.
+A subscription id is the socket's own: two clients that both name a subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the sender's.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> **Subscribing counts against the data rate limit.** A subscription's first frame is a read, run as the subscriber, and so is a channel's history request. So `subscribe_collection`, `subscribe_one` and `channel_history` count as data requests in the caller's rate-limit bucket (the one their HTTP requests and their other sockets share) once the socket's own allowance is spent. Each socket may send 1,000 of them without counting them, or as many as its subscription ceiling when that is higher, and the allowance comes back over 15 minutes. That is everything a socket can hold, so the re-subscribe after a reconnect is never refused and never spends the person's budget. Past the allowance, a frame over the limit is refused with an error frame coded `RATE_LIMITED`, which the SDK delivers to that subscription's `onError`, or to the channel's. On 0.23 these frames count only against the socket's own budget of 2,000 frames a minute.
 
 ### Sockets that stop answering
 
@@ -268,7 +272,10 @@ them too, as most WebSocket libraries do.
 
 A socket is also terminated when more than 16&nbsp;MiB of frames sent to it are
 still unread. That is a client that does not read what it is sent, or one so far
-behind that what it would read is stale.
+behind that what it would read is stale. And when a server's sockets together
+hold more than 256&nbsp;MiB unread (or a quarter of the memory limit the server
+runs under, when that is smaller), the ones with the most unread are terminated
+first, until the rest fit.
 
 A terminated socket is cleaned up like a closed one. Its subscriptions end, it
 leaves its channels, and its presence is removed, with the departure announced
@@ -396,7 +403,7 @@ Presence tracks which users are currently online in a channel and lets each user
 | `presence_state`  | Server → Client | Full entity of all presences in a channel          |
 | `presence_diff`   | Server → Client | Incremental update (joins and leaves)                |
 
-When a client sends `presence_track`, the server automatically joins them to the channel (no separate `join_channel` needed) and broadcasts a `presence_diff` to all channel members.
+When a client sends `presence_track`, the server automatically joins them to the channel (no separate `join_channel` needed) and broadcasts a `presence_diff` to all channel members. The SDK re-sends its state every ~20 seconds as a heartbeat; a heartbeat whose state is unchanged only refreshes the client's timeout and sends no `presence_diff`.
 
 ```typescript
 // Track presence
@@ -433,9 +440,9 @@ Stale presences are automatically cleaned up after 30 seconds of inactivity.
 
 The typed SDK automatically reconnects when the WebSocket connection drops:
 
-- **Exponential backoff** — The first redial is about 2 seconds after the drop, and each later one waits twice as long, up to 30 seconds. Each delay is shortened by up to a fifth at random, so clients dropped together by a deploy do not all come back at the same instant.
+- **Exponential backoff** — Each redial waits for a step that starts at 2 seconds and doubles each time, up to 30 seconds. The delay is drawn at random from anywhere in its step, but never under a quarter of a second, so clients dropped together by a deploy come back spread across the whole step rather than at the same instant.
 - **No give-up while anything is live** — While a subscription or a joined channel exists, the client keeps redialling at the 30-second ceiling for as long as the outage lasts. With nothing registered it stops after 5 failed attempts, and the next subscription dials again. In a browser, the `online` event and the tab becoming visible again both redial at once instead of waiting out the backoff.
-- **Outages are reported once** — When the connection has been down for about 15 seconds (three failed redials), every live subscription's `onError` and every joined channel's `onError` receives one `RebaseApiError` with code `CONNECTION_LOST`. The subscription is **kept**: the error says its data is not updating, not that it has ended.
+- **Outages are reported once** — When the connection has been down for 14 seconds, however many redials that took, every live subscription's `onError` and every joined channel's `onError` receives one `RebaseApiError` with code `CONNECTION_LOST`. The subscription is **kept**: the error says its data is not updating, not that it has ended.
 - **Automatic resubscription** — On successful reconnect, all active subscriptions are re-registered with the server, and each one's next `onUpdate` carries whatever was written while the client was away. That update is the recovery signal. No manual intervention needed.
 - **Requests are at-most-once** — A request made while the socket is down waits for it, for up to 30 seconds from the call, and then fails with `REQUEST_TIMEOUT` without ever being sent. A request that was already sent when the connection dropped fails with `CONNECTION_LOST` and is **not** sent again: the server may or may not have run it, and only the caller knows whether running it twice is safe.
 
@@ -474,7 +481,7 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies.
 
 1. The WebSocket connection authenticates using the same JWT token as the REST API.
 2. Every subscription refetch runs inside a PostgreSQL transaction with `set_config('app.user_id', ...)` and `set_config('app.user_roles', ...)` — ensuring RLS policies are enforced.
-3. The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame, to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame with the code `SESSION_ENDED` or `TOKEN_EXPIRED` and is closed with code `4001`. The SDK authenticates its socket again each time it refreshes its token, and after a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
+3. The identity is checked again for as long as the socket is open, not only when it authenticates. Before each frame the server asks what an HTTP request would ask: is the token still valid, was its session signed out or revoked, does the account still exist, and which roles does it hold now. Channel frames are asked at most once a second. A socket that only listens is asked at least every 30 seconds, and a token stops being honoured at the instant it expires. A role taken away applies from the next frame, to reads, writes and open subscriptions alike. A socket whose identity has ended receives an `AUTH_ERROR` frame with the code `SESSION_ENDED` or `TOKEN_EXPIRED` and is closed with code `4001`. The SDK authenticates its socket again each time it refreshes its token; a new token for the same identity (the same user id, roles, guest flag and claims) leaves the open subscriptions as they are, and one for a different identity refetches each of them as it. After a `4001` it reconnects with the session it holds then, or with none. A client speaking the protocol directly has to send a fresh token in `AUTHENTICATE` before the old one expires.
 
 This means each socket only receives updates for records its authenticated identity may see.
 
@@ -524,7 +531,9 @@ If the connection can't support it, `auto` logs an informational line instead an
 
 ### How It Works
 
-1. **Self-provisioning** — At startup (server/owner context), Rebase installs an idempotent `AFTER INSERT/UPDATE/DELETE` trigger on each managed table. The trigger emits a change notification on the `rebase_cdc` channel that names the changed row by its key — the primary key, plus the two id columns for a many-to-many junction table — and carries **no other column**. PostgreSQL puts no privilege on `LISTEN`, so any role that can connect to the database can read this channel; it learns which keys changed, never what they hold. A key too large for PostgreSQL's 8&nbsp;KB `NOTIFY` limit is sent as no key (a change to the whole collection), so CDC can never abort the triggering write. The function is replaced on every boot that provisions, so a database instrumented by an older version — whose trigger sent whole rows — is brought up to date by the next boot, `REALTIME_CDC=off` included.
+1. **Self-provisioning** — At startup (server/owner context), Rebase installs idempotent `AFTER INSERT/UPDATE/DELETE/TRUNCATE` triggers on each managed table. They fire once per statement and emit change notifications on the `rebase_cdc` channel that name the changed rows by their key — the primary key, plus the two id columns for a many-to-many junction table — and carry **no other column**. A statement that changed many rows names them in batches of about a thousand keys, so a 1M-row `UPDATE` sends about 1,000 notifications rather than a million; a statement that changed one row sends one notification, and one that changed none sends nothing. A `TRUNCATE` is announced as a change to every row of the collection. A partitioned table keeps one trigger per row, because PostgreSQL copies a row trigger onto every partition and a write made straight to a partition is still seen. PostgreSQL puts no privilege on `LISTEN`, so any role that can connect to the database can read this channel; it learns which keys changed, never what they hold. A key too large for PostgreSQL's 8&nbsp;KB `NOTIFY` limit is sent as no key (a change to the whole collection, which every list and single-row subscription on it refetches), so CDC can never abort the triggering write. The functions are replaced on every boot that provisions, so a database instrumented by an older version — whose trigger sent whole rows — is brought up to date by the next boot, `REALTIME_CDC=off` included.
+
+   <span class="since-badge" data-since="0.25">Since 0.25</span> **Upgrading.** A database instrumented by a version before batching has one trigger per row; the first boot of a newer version replaces it with the per-statement triggers. For 24 hours after that, the new triggers still send one notification per row, as the old ones did, so instances of the older version still running during a rolling deploy (or after a rollback) hear every row. After the window they batch. Every version that batches reads both shapes.
 2. **Capture** — A dedicated, unpooled `LISTEN` client per instance consumes `rebase_cdc`, maps the changed table back to its collection, and feeds the change into the same `RealtimeService` pipeline used by API mutations. Like the cross-instance listener, it prefers `DATABASE_DIRECT_URL` and auto-reconnects.
 3. **RLS-safe delivery** — The raw row from the change stream is **never** forwarded to subscribers. The change is marked invalidated, and each subscription re-reads the row under its **own** auth context. Filtering is therefore per subscriber, never per publisher: a client only ever receives rows its RLS policies permit.
 4. **Cross-instance** — Because every instance observes every commit through the change stream, CDC also *is* the cross-instance channel; the legacy per-mutation `rebase_entity_changes` broadcast is not used while CDC is active.
@@ -567,7 +576,7 @@ channel.onError((error) => {
 | Code | Means |
 |------|-------|
 | `CHANNEL_FORBIDDEN` | You are not a member of the channel — join it before broadcasting or reading its history |
-| `RATE_LIMITED` | Past the channel frame budget above |
+| `RATE_LIMITED` | Past the channel frame budget above, or, for a history request, past the [data rate limit](#what-a-write-costs-and-the-limits) |
 | `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
 | `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
 | `CHANNEL_HISTORY_GAP` | Raised by the client: a catch-up found that the server no longer retains messages this client never received. `details` is `{ from, to }`, the sequence numbers missed. Resync the channel's state from its source of truth |

@@ -999,6 +999,10 @@ export interface RebaseTranslations {
     studio_sql_update_failed?: string;
     studio_sql_update_no_row?: string;
     studio_sql_ran_as_other_role?: string;
+    studio_sql_result_truncated?: string;
+    studio_sql_download_full_csv?: string;
+    studio_sql_downloading_full_csv?: string;
+    studio_sql_download_full_failed?: string;
     studio_sql_role_switching_disabled?: string;
     studio_sql_execution_not_supported?: string;
     studio_sql_error_executing?: string;
@@ -1459,6 +1463,10 @@ export interface RebaseTranslations {
     studio_schema_no_collections_body?: string;
     studio_schema_introspect_hint?: string;
     studio_schema_visualizer_source?: string;
+    studio_schema_laying_out?: string;
+    studio_schema_neighbourhood?: string;
+    studio_schema_neighbourhood_depth_1?: string;
+    studio_schema_neighbourhood_depth_2?: string;
 
 
     // ─── Studio: RLS editor confirmations ───────────────────────

@@ -13,6 +13,7 @@ import { mapPgType } from "./introspect-db-types";
 import { arrayStorage, columnStorage, literalDefaultOf, onDeleteOf, primaryKeyStorage } from "./introspect-db-storage";
 import { reconstructSearchBlock } from "./introspect-db-search";
 import { SEARCH_STAMP_PREFIX } from "./search-column";
+import { foreignKeyIndexSpec } from "./collection-index";
 import type { CheckFactsByTable } from "./introspect-db-constraints";
 import type { TableClassification } from "./introspect-db-structure";
 import {
@@ -88,6 +89,12 @@ export interface UniqueConstraintRow {
     column_names: string[];
 }
 
+/** One index, by name. */
+export interface IndexRow {
+    table_name: string;
+    index_name: string;
+}
+
 /** A CHECK constraint, as `pg_get_constraintdef` renders it. */
 export interface CheckConstraintRow {
     table_name: string;
@@ -117,6 +124,13 @@ export interface SchemaMetadata {
     pks: PrimaryKeyRow[];
     fks: ForeignKeyRow[];
     uniques: UniqueConstraintRow[];
+    /**
+     * Every index on the introspected tables, by name — how a foreign key
+     * whose column Rebase would index is told apart from one it already has.
+     * Absent when the caller did not read them, and then nothing is said
+     * about foreign-key indexes either way.
+     */
+    indexes?: IndexRow[];
     checks: CheckConstraintRow[];
     comments: CommentRow[];
     /**
@@ -1274,6 +1288,21 @@ export function generateCollectionFile(
             const onDelete = onDeleteOf(fk, required);
             const requiredLine = required ? "\n            validation: { required: true }," : "";
             const onDeleteLine = onDelete ? `,\n                onDelete: ${quote(onDelete)}` : "";
+            // A `belongsTo` gets a btree on its key by default, under a name
+            // derived from the column. A database that does not already hold
+            // that index would have one built by the first push — which is a
+            // change, and "introspect, then push, changes nothing". So the
+            // relation says `index: false` and says why; deleting the line is
+            // how to ask for the index. Not where the key leads the primary
+            // key: the planner derives nothing there to begin with.
+            const derivedIndex = foreignKeyIndexSpec(context.metadata?.schema ?? "public", tableName, fk.column_name);
+            const indexMissing = context.metadata?.indexes !== undefined
+                && meta.pks[0] !== fk.column_name
+                && !context.metadata.indexes.some(i => i.table_name === tableName && i.index_name === derivedIndex.indexName);
+            const indexLine = indexMissing
+                ? `,\n                // The database has no index of Rebase's on ${commentText(fk.column_name)}. ` +
+                  "Delete this line to have one built.\n                index: false"
+                : "";
 
             propertyBlocks.set(relName, `
         ${propKey(relName)}: {
@@ -1283,7 +1312,7 @@ export function generateCollectionFile(
             relation: {
                 kind: "belongsTo",
                 target: ${relationTarget(targetCollectionCamel)},
-                localKey: ${quote(fk.column_name)}${onDeleteLine}
+                localKey: ${quote(fk.column_name)}${onDeleteLine}${indexLine}
             }
         },`);
         }

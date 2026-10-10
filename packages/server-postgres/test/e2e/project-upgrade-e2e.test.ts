@@ -219,23 +219,14 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
         // it is compared against.
         const second = await ensureCollectionTables(client, collections);
 
-        // Index creations are excluded, and only the ones carrying
-        // `IF NOT EXISTS`.
-        //
-        // They are not probe-guarded and are not meant to be: the planner emits
-        // them on every boot and lets Postgres decide, which is the correct
-        // shape for a statement that is free when the object is already there
-        // and is the only safe way to add one CONCURRENTLY. So they are outside
-        // the property this test exists for — "a guard that reads a name the
-        // catalogue stores differently re-issues forever" — and asserting on
-        // them fails for every project that declares an index, which since 0.14
-        // is most of them.
-        //
-        // An index statement WITHOUT `IF NOT EXISTS` is still asserted, because
-        // that one really would fail on the second boot.
-        const reissued = second.actions.filter(
-            a => !(a.kind === "create-index" && /IF\s+NOT\s+EXISTS/i.test(a.sql))
-        );
+        // Index creations and helper functions included. They used to be
+        // excluded because the planner emitted them on every boot and let
+        // `IF NOT EXISTS` / `CREATE OR REPLACE` decide — which made every
+        // unchanged boot report "Applied N additive schema change(s)", rewrite
+        // the helpers' `pg_proc` rows and lock each indexed table to learn the
+        // name was taken. Both are now looked up in the catalogue, so a second
+        // run plans nothing at all.
+        const reissued = second.actions;
         expect(reissued.map(a => `${a.kind} ${a.target}`)).toEqual([]);
     });
 

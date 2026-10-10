@@ -18,7 +18,7 @@ import net from "net";
 import os from "os";
 import path from "path";
 
-import { appBannerLines, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devStaticShape, devWatchArgs, devWatchIncludes, getProjectPort, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
+import { appBannerLines, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devStaticShape, devWatchArgs, devWatchIncludes, getProjectPort, needsStaleSchemaPreflight, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
 import type { PreparedDatabase } from "../dev-db/prepare";
 import { validateManifest } from "../manifest";
 
@@ -82,7 +82,7 @@ describe("devWatchArgs", () => {
     it("hands the collections directory to dev, and watches the trigger instead", () => {
         const args = devWatchArgs("/srv/app", paths, "entry.mjs", "/tmp/rebase-dev/x/restart");
         const pairs = (flag: string) => args.flatMap((a, i) => (a === flag ? [args[i + 1]] : []));
-        expect(pairs("--exclude")).toEqual(["/srv/app/config/collections/**"]);
+        expect(pairs("--exclude")).toContain("/srv/app/config/collections/**");
         expect(pairs("--include")).toContain("/tmp/rebase-dev/x/restart");
         // The rest of config/ (resources, auth, …) still restarts on its own.
         expect(pairs("--include")).toContain(path.join("/srv/app", "config"));
@@ -96,8 +96,78 @@ describe("devWatchArgs", () => {
 
     it("leaves the collections to tsx when there is no trigger it could watch", () => {
         const args = devWatchArgs("/srv/app", paths, "entry.mjs", null);
-        expect(args).not.toContain("--exclude");
+        const excludes = args.flatMap((a, i) => (a === "--exclude" ? [args[i + 1]] : []));
+        expect(excludes).not.toContain("/srv/app/config/collections/**");
     });
+
+    /**
+     * tsx applies its default ignores relative to its cwd, `backend/`, so they
+     * never reached `config/`: chokidar crawled `config/node_modules` before the
+     * first spawn (17 s in the monorepo's example app) and restarted the backend
+     * on every install there, and on a `.DS_Store` in `config/`.
+     */
+    it("gives every included directory tsx's default ignores, as absolute globs", () => {
+        for (const trigger of ["/tmp/rebase-dev/x/restart", null]) {
+            const args = devWatchArgs("/srv/app", paths, "entry.mjs", trigger);
+            const excludes = args.flatMap((a, i) => (a === "--exclude" ? [args[i + 1]] : []));
+            for (const dir of devWatchIncludes("/srv/app", paths)) {
+                const root = dir.split(path.sep).join("/");
+                expect(excludes).toEqual(expect.arrayContaining([
+                    `${root}/**/{node_modules,bower_components,vendor}/**`,
+                    `${root}/**/.*/**`,
+                    `${root}/**/.*`
+                ]));
+            }
+            expect(args.lastIndexOf("--exclude")).toBeLessThan(args.indexOf("--conditions"));
+        }
+    });
+
+    it("does not restart on dependency churn or a dotfile under config/, under the real tsx", async () => {
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-dev-watch-scope-")));
+        const tsxCli = createRequire(import.meta.url).resolve("tsx/cli");
+        try {
+            const dependency = path.join(root, "config", "node_modules", "dep", "index.js");
+            fs.mkdirSync(path.dirname(dependency), { recursive: true });
+            fs.writeFileSync(dependency, "module.exports = 1;\n");
+            const resources = path.join(root, "config", "resources.ts");
+            fs.writeFileSync(resources, "export default {};\n");
+            fs.mkdirSync(path.join(root, "backend"));
+            const boots = path.join(root, "boots.log");
+            fs.writeFileSync(path.join(root, "backend", "entry.mjs"), [
+                "import fs from 'node:fs';",
+                `fs.appendFileSync(${JSON.stringify(boots)}, 'boot\\n');`,
+                "setInterval(() => {}, 1000);"
+            ].join("\n"));
+
+            const count = () => (fs.existsSync(boots) ? fs.readFileSync(boots, "utf8").split("\n").filter(Boolean).length : 0);
+            const waitFor = async (n: number) => {
+                for (let i = 0; i < 100 && count() < n; i++) await new Promise(r => setTimeout(r, 100));
+                return count();
+            };
+
+            const { execa } = await import("execa");
+            const child = execa(process.execPath, [tsxCli, ...devWatchArgs(root, {}, "entry.mjs", null)], { cwd: path.join(root, "backend"), reject: false });
+            try {
+                expect(await waitFor(1), "tsx never ran the entry").toBe(1);
+                await new Promise(r => setTimeout(r, 500));
+                fs.appendFileSync(dependency, "module.exports = 2;\n");
+                fs.writeFileSync(path.join(root, "config", ".DS_Store"), "x");
+                fs.mkdirSync(path.join(root, "config", "node_modules", ".vite-temp"));
+                fs.writeFileSync(path.join(root, "config", "node_modules", ".vite-temp", "vite.config.mjs.timestamp-1.mjs"), "x");
+                await new Promise(r => setTimeout(r, 1500));
+                expect(count(), "tsx restarted on a write it was never meant to watch").toBe(1);
+
+                // The rest of config/ still restarts the backend.
+                fs.appendFileSync(resources, "export const touched = true;\n");
+                expect(await waitFor(2)).toBe(2);
+            } finally {
+                child.kill("SIGTERM");
+                await child;
+            }
+        } finally {
+            fs.rmSync(root, { recursive: true, force: true });
+        }
+    }, 30_000);
 
     it("puts the trigger where tsx is willing to watch it", () => {
         // tsx ignores every path with a dot-named segment, so a trigger under
@@ -161,6 +231,26 @@ describe("devWatchArgs", () => {
             fs.rmSync(root, { recursive: true, force: true });
         }
     }, 30_000);
+});
+
+/**
+ * One driver process for the schema on a `rebase dev` start, not two.
+ *
+ * Dev regenerates `schema.generated.ts` before the database, then used to run
+ * the driver's `schema stale --fix` too — which compares that file against the
+ * generator that wrote it a moment earlier, so it could only answer "nothing
+ * stale", for ~0.6 s of every start. It still runs when there was nothing to
+ * regenerate or the regeneration failed: then it is the only safety net.
+ */
+describe("needsStaleSchemaPreflight", () => {
+    it("is skipped after a regeneration that succeeded", () => {
+        expect(needsStaleSchemaPreflight("generated")).toBe(false);
+    });
+
+    it("still runs when the regeneration was skipped or failed", () => {
+        expect(needsStaleSchemaPreflight("skipped")).toBe(true);
+        expect(needsStaleSchemaPreflight("failed")).toBe(true);
+    });
 });
 
 describe("getProjectPort", () => {

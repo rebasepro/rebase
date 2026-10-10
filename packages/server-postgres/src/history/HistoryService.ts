@@ -11,7 +11,7 @@ export type {
 import type { RecordHistoryParams, FetchHistoryOptions, HistoryRetentionConfig } from "@rebasepro/types";
 import { firstSqlRow, sqlRows } from "@rebasepro/common";
 import { currentWriteScope } from "../services/write-transaction-scope";
-import { RECORD_HISTORY_FUNCTION } from "./ensure-history-table";
+import { RECORD_HISTORY_FUNCTION, type HistoryTableState } from "./ensure-history-table";
 
 /**
  * A Postgres history row is already the wire shape — `updated_at` comes back
@@ -24,6 +24,9 @@ const DEFAULT_RETENTION: HistoryRetentionConfig = {
     maxEntries: 200,
     ttlDays: 90
 };
+
+/** Entries one statement of {@link HistoryService.pruneExpired} deletes at most. */
+export const PRUNE_BATCH_SIZE = 5_000;
 
 /**
  * Service for recording and querying row change history.
@@ -39,14 +42,23 @@ export class HistoryService {
      */
     private readonly inTransaction: boolean;
 
+    /**
+     * What new entries are stored as — see `EntityHistoryEntry.format`. `2`,
+     * the previous values of the changed fields only, needs the table's
+     * `format` column, so it is what `ensureHistoryTableExists` found; a
+     * service built without saying stores whole rows, as it always did.
+     */
+    private readonly entryFormat: 1 | 2;
+
     constructor(
         private db: NodePgDatabase,
         retention?: Partial<HistoryRetentionConfig>,
-        options?: { inTransaction?: boolean }
+        options?: Partial<HistoryTableState>
     ) {
         this.retention = { ...DEFAULT_RETENTION,
 ...retention };
         this.inTransaction = options?.inTransaction === true;
+        this.entryFormat = options?.entryFormat === 2 ? 2 : 1;
     }
 
     /**
@@ -102,6 +114,17 @@ export class HistoryService {
             return;
         }
 
+        // An update's previous values, for the fields it changed — every other
+        // field held what it holds now, which `values` already records. Two
+        // copies of the whole row was 1,108 of a 1,256-byte entry for a
+        // one-field change to a 20-field row. A revert writes `values`, so it
+        // reads the same entry either way.
+        const compact = this.entryFormat === 2;
+        const storedPrevious = compact && previousValues && changedFields
+            ? previousValuesOf(previousValues, changedFields)
+            : previousValues;
+        const format = compact ? sql`, ${2}::smallint` : sql``;
+
         try {
             // Checked and used with no `await` between, so the transaction
             // cannot close in the gap.
@@ -114,21 +137,21 @@ export class HistoryService {
                         ${action},
                         ${changedFields ? sql`ARRAY[${sql.join(changedFields.map(f => sql`${f}`), sql`, `)}]::text[]` : sql`NULL::text[]`},
                         ${values ? sql`${JSON.stringify(values)}::jsonb` : sql`NULL::jsonb`},
-                        ${previousValues ? sql`${JSON.stringify(previousValues)}::jsonb` : sql`NULL::jsonb`},
-                        ${updatedBy ?? null}::text
+                        ${storedPrevious ? sql`${JSON.stringify(storedPrevious)}::jsonb` : sql`NULL::jsonb`},
+                        ${updatedBy ?? null}::text${format}
                     )
                 `));
             } else await this.db.execute(sql`
                 INSERT INTO rebase.entity_history
-                    (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by)
+                    (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by${compact ? sql`, format` : sql``})
                 VALUES (
                     ${tableName},
                     ${String(id)},
                     ${action},
                     ${changedFields ? sql`ARRAY[${sql.join(changedFields.map(f => sql`${f}`), sql`, `)}]::text[]` : sql`NULL`},
                     ${values ? sql`${JSON.stringify(values)}::jsonb` : sql`NULL`},
-                    ${previousValues ? sql`${JSON.stringify(previousValues)}::jsonb` : sql`NULL`},
-                    ${updatedBy ?? null}
+                    ${storedPrevious ? sql`${JSON.stringify(storedPrevious)}::jsonb` : sql`NULL`},
+                    ${updatedBy ?? null}${format}
                 )
             `);
         } catch (error) {
@@ -174,7 +197,7 @@ export class HistoryService {
             `),
             this.db.execute(sql`
                 SELECT id, table_name, entity_id, action, changed_fields,
-                       "values", previous_values, updated_by, updated_at
+                       "values", previous_values, updated_by, updated_at, ${this.formatColumn()}
                 FROM rebase.entity_history
                 WHERE table_name = ${tableName}
                   AND entity_id = ${String(id)}
@@ -201,12 +224,20 @@ export class HistoryService {
     async fetchHistoryEntry(historyId: string): Promise<HistoryEntry | null> {
         const result = await this.db.execute(sql`
             SELECT id, table_name, entity_id, action, changed_fields,
-                   "values", previous_values, updated_by, updated_at
+                   "values", previous_values, updated_by, updated_at, ${this.formatColumn()}
             FROM rebase.entity_history
             WHERE id = ${historyId}
         `);
 
         return firstSqlRow<HistoryEntry>(result) ?? null;
+    }
+
+    /**
+     * Each entry's `format`. A table without the column holds only entries
+     * that store the whole previous row, which is what `1` says.
+     */
+    private formatColumn() {
+        return this.entryFormat === 2 ? sql`format` : sql`1::smallint AS format`;
     }
 
     // ───────── Retention / Pruning ─────────
@@ -215,46 +246,84 @@ export class HistoryService {
      * Prune history for a single row: enforce maxEntries and TTL.
      */
     async pruneEntity(tableName: string, id: string): Promise<number> {
-        let deleted = 0;
-
-        // 1. TTL — delete entries older than ttlDays
-        const ttlResult = await this.db.execute(sql`
+        // One statement for both rules: older than `ttlDays`, or beyond the
+        // newest `maxEntries`. They were two DELETEs, each its own pool
+        // checkout after every recorded change — 2,000 of them queued by a
+        // 1,000-row bulk. Together they remove the same rows: an expired entry
+        // is older than every live one, so the newest `maxEntries` of all of
+        // them are the newest of the live ones whenever there are that many,
+        // and otherwise every entry past them has expired anyway.
+        const result = await this.db.execute(sql`
             DELETE FROM rebase.entity_history
             WHERE table_name = ${tableName}
               AND entity_id = ${String(id)}
-              AND updated_at < NOW() - MAKE_INTERVAL(days => ${this.retention.ttlDays})
-        `);
-        deleted += ttlResult.rowCount ?? 0;
-
-        // 2. Max entries — keep the newest maxEntries, delete the rest
-        const maxResult = await this.db.execute(sql`
-            DELETE FROM rebase.entity_history
-            WHERE id IN (
-                SELECT id FROM rebase.entity_history
-                WHERE table_name = ${tableName}
-                  AND entity_id = ${String(id)}
-                ORDER BY updated_at DESC
-                OFFSET ${this.retention.maxEntries}
-            )
-        `);
-        deleted += maxResult.rowCount ?? 0;
-
-        return deleted;
-    }
-
-    /**
-     * Global prune: enforce TTL across ALL rows in a single sweep.
-     * Intended to be called periodically (e.g. once per hour or daily).
-     */
-    async pruneExpired(): Promise<number> {
-        const result = await this.db.execute(sql`
-            DELETE FROM rebase.entity_history
-            WHERE updated_at < NOW() - MAKE_INTERVAL(days => ${this.retention.ttlDays})
+              AND (
+                updated_at < NOW() - MAKE_INTERVAL(days => ${this.retention.ttlDays})
+                OR id IN (
+                    SELECT id FROM rebase.entity_history
+                    WHERE table_name = ${tableName}
+                      AND entity_id = ${String(id)}
+                    ORDER BY updated_at DESC
+                    OFFSET ${this.retention.maxEntries}
+                )
+              )
         `);
         return result.rowCount ?? 0;
     }
+
+    /**
+     * Delete every entry older than `ttlDays`, whichever row it belongs to.
+     *
+     * The inline prune above only ever visits a row that was just written,
+     * so a row nobody writes again — every deleted one — kept its history for
+     * good, whatever `ttlDays` said. This is the other half: the backend runs
+     * it once an hour, on one instance of the fleet (see
+     * `startHistoryRetentionSweep` in `@rebasepro/server`).
+     *
+     * In batches of {@link PRUNE_BATCH_SIZE}, each its own statement, repeated
+     * until one comes back short: a first sweep over a year of backlog is many
+     * short deletes, not one that holds millions of row locks and a pool
+     * connection for minutes. `SKIP LOCKED`, so two instances sweeping at once
+     * (or a sweep meeting an inline prune) split the work instead of waiting
+     * on each other. Each batch reads `idx_history_updated_at`, built in the
+     * background at boot (`ensureHistoryIndexes`).
+     *
+     * `signal` ends it after the batch in flight: a shutdown waits for the
+     * sweep, and a first sweep over a large backlog is hundreds of batches.
+     * What is left goes in the next sweep.
+     */
+    async pruneExpired(options?: { signal?: AbortSignal }): Promise<number> {
+        let total = 0;
+        for (;;) {
+            if (options?.signal?.aborted) return total;
+            const result = await this.db.execute(sql`
+                DELETE FROM rebase.entity_history
+                WHERE id IN (
+                    SELECT id FROM rebase.entity_history
+                    WHERE updated_at < NOW() - MAKE_INTERVAL(days => ${this.retention.ttlDays})
+                    LIMIT ${PRUNE_BATCH_SIZE}
+                    FOR UPDATE SKIP LOCKED
+                )
+            `);
+            const deleted = result.rowCount ?? 0;
+            total += deleted;
+            if (deleted < PRUNE_BATCH_SIZE) return total;
+        }
+    }
 }
 
+
+/**
+ * What `previous` held in `fields`. A field it did not have is left out, so it
+ * reads as absent before the change, as it was.
+ */
+function previousValuesOf(previous: Record<string, unknown>, fields: readonly string[]): Record<string, unknown> {
+    const kept: Record<string, unknown> = {};
+    for (const field of fields) {
+        if (Object.prototype.hasOwnProperty.call(previous, field)) kept[field] = previous[field];
+    }
+    return kept;
+}
 
 /**
  * Deep equality without JSON.stringify.

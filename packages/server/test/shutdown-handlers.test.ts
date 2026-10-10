@@ -1,6 +1,7 @@
 import { createServer } from "http";
 import type { RealtimeProvider } from "@rebasepro/types";
 import { createShutdown, installShutdownHandlers } from "../src/init/shutdown";
+import { createExpiredTokenSweep } from "../src/auth/expired-token-sweep";
 import { createJobQueue } from "../src/jobs";
 import { CronScheduler } from "../src/cron/cron-scheduler";
 import type { JobRecord, JobStore } from "../src/jobs";
@@ -216,6 +217,30 @@ describe("createShutdown", () => {
         expect(Date.now() - started).toBeLessThan(1_000);
         // The job drain gave up inside the budget, leaving time for the rest.
         expect(closedByShutdown).toBe(true);
+    });
+
+    /**
+     * The expired-token sweep's first tick starts at boot and is not awaited:
+     * it creates the cron-claims table, claims the hour and deletes. Shutdown
+     * only cleared its timer, so an embedder that closed the pool once
+     * `shutdown()` resolved had that tick run on into a closed pool — five
+     * "Cannot use a pool after calling end on the pool" ERRORs per boot.
+     */
+    it("waits for the expired-token sweep's tick in flight", async () => {
+        let finished = false;
+        const sweep = createExpiredTokenSweep({
+            authRepo: {
+                deleteExpiredTokens: async () => {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    finished = true;
+                }
+            }
+        });
+        sweep.start();
+
+        await createShutdown({ server: createServer(), authTokenSweep: sweep, realtimeServices: {} })(3_000);
+
+        expect(finished).toBe(true);
     });
 
     it("waits for a cron run in flight before tearing down under it", async () => {

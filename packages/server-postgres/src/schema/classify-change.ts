@@ -1025,7 +1025,14 @@ function classifyTable(
         push({
             kind: "change-constraint",
             verdict: "safe",
-            detail: `Creates ${index.unique ? "unique " : ""}index "${index.indexName}" on "${after.qualified}".`
+            // A derived foreign-key index on a table that already exists is
+            // not among the statements this change applies: the next boot
+            // builds it in the background, concurrently — see
+            // `deferred-index-build`. Said, so the plan does not claim it.
+            detail: index.derived === "foreign-key"
+                ? `Indexes the foreign key "${index.keys[0].column}" ("${index.indexName}" on "${after.qualified}") — ` +
+                  "with the table when it is new, otherwise in the background on the next boot."
+                : `Creates ${index.unique ? "unique " : ""}index "${index.indexName}" on "${after.qualified}".`
         });
     }
     for (const index of before.indexes) {

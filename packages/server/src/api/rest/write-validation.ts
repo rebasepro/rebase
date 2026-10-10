@@ -1,4 +1,4 @@
-import { CollectionConfig, JUNCTION_PIVOT_KEY, isFieldOperation, isManyToMany, type EnumValues, type IncludeSpec, type Property, type ResolvedBelongsTo } from "@rebasepro/types";
+import { CollectionConfig, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, isFieldOperation, isManyToMany, type EnumValues, type IncludeSpec, type Property, type ResolvedBelongsTo } from "@rebasepro/types";
 import {
     type FieldViewer,
     enumToObjectEntries,
@@ -912,6 +912,9 @@ export function projectResponseFields<T extends Record<string, unknown>>(
     // serve rows with a literal `id`, so that stays the fallback.
     const primaryKeys = resolvePrimaryKeys(collection).map(key => key.fieldName);
     const keep = new Set<string>([...fields, ...included, ...(primaryKeys.length > 0 ? primaryKeys : ["id"])]);
+    // A counted relation's total travels beside its rows, so it goes where
+    // they go: the include asked for it, as it asked for the rows.
+    if (include && Object.values(include.tree).some(node => node.count)) keep.add(INCLUDE_COUNT_KEY);
     return rows.map(row => {
         const projected: Record<string, unknown> = {};
         for (const key of Object.keys(row)) {

@@ -34,6 +34,7 @@ import { UrlContext } from "../hooks/navigation/contexts/UrlContext";
 import { NavigationStateContext } from "../hooks/navigation/contexts/NavigationStateContext";
 
 import { SidePanelProvider } from "./SidePanelProvider";
+import { prefetchRecordViews } from "./lazy_record_views";
 
 // Collection editor internals — used when collectionEditor is enabled
 import { useLocalCollectionsConfigController } from "../collection_editor/useLocalCollectionsConfigController";
@@ -72,6 +73,9 @@ export interface RebaseNavigationProps {
  */
 export function RebaseNavigation({ children }: RebaseNavigationProps) {
     const registry = useRebaseRegistry();
+    // Mounted behind the auth gate: someone is signed in, so the collection
+    // table and record views are about to be wanted. Fetch them while idle.
+    useEffect(() => prefetchRecordViews(), []);
     const context = useRebaseContext();
     const adminModeController = useAdminModeController();
     // The store the rest of the panel reads. Built one level up, by

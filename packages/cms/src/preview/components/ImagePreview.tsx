@@ -12,6 +12,12 @@ export interface ImagePreviewProps {
     size: PreviewSize,
     url: string,
     /**
+     * A smaller rendition of `url` to display (a storage thumbnail). If it
+     * fails to load, `url` itself is shown; the copy and open buttons always
+     * use `url`.
+     */
+    previewUrl?: string,
+    /**
      * If true, image fills its container completely with object-fit cover
      */
     fill?: boolean
@@ -23,15 +29,21 @@ export interface ImagePreviewProps {
 export function ImagePreview({
     size,
     url,
+    previewUrl,
     fill
     }: ImagePreviewProps) {
     const [hasError, setHasError] = useState(false);
+    const [previewFailed, setPreviewFailed] = useState(false);
 
     useEffect(() => {
         setHasError(false);
-    }, [url]);
+        setPreviewFailed(false);
+    }, [url, previewUrl]);
 
-    const handleError = () => setHasError(true);
+    const src = previewUrl && !previewFailed ? previewUrl : url;
+    // A rendition that fails (a server that could not resize this file) gives
+    // way to the original; only the original failing is an error.
+    const handleError = () => (src !== url ? setPreviewFailed(true) : setHasError(true));
 
     const imageSize = useMemo(() => getThumbnailMeasure(size), [size]);
     const { t } = useTranslation();
@@ -46,7 +58,7 @@ export function ImagePreview({
             );
         }
         return (
-            <img src={url}
+            <img src={src}
                 className={"w-full h-full object-cover"}
                 key={"fill_image_preview_" + url}
                 loading="lazy"
@@ -67,7 +79,7 @@ maxHeight: "100%" }}>
             );
         }
         return (
-            <img src={url}
+            <img src={src}
                 className={"rounded-md"}
                 key={"tiny_image_preview_" + url}
                 onError={handleError}
@@ -101,7 +113,7 @@ maxHeight: "100%" }}>
                     <ImageOffIcon className="text-surface-400 dark:text-surface-500"/>
                 </div>
             ) : (
-                <img src={url}
+                <img src={src}
                     className={"rounded-md"}
                     style={imageStyle}
                     onError={handleError}/>

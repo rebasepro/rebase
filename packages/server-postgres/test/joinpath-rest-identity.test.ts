@@ -178,7 +178,8 @@ label: "Gadget" }]);
         await fetchService.fetchCollectionForRest("sku_items", {}, ["warehouse"]);
 
         expect(batchFetch).toHaveBeenCalledWith(
-            "sku_items", ["ABC-1", "ABC-2"], "warehouse", expect.anything(), undefined
+            "sku_items", ["ABC-1", "ABC-2"], "warehouse", expect.anything(), undefined,
+            expect.objectContaining({ style: "rest" })
         );
     });
 
@@ -225,7 +226,8 @@ user_id: 2 }]);
         const rows = await fetchService.fetchCollectionForRest("memberships", {}, ["warehouse"]);
 
         expect(batchFetch).toHaveBeenCalledWith(
-            "memberships", ["1:::2"], "warehouse", expect.anything(), undefined
+            "memberships", ["1:::2"], "warehouse", expect.anything(), undefined,
+            expect.objectContaining({ style: "rest" })
         );
         expect(rows[0]).toMatchObject({ tenant_id: 1,
 user_id: 2 });
@@ -249,8 +251,11 @@ city: "Paris" } }
 
         const rows = await fetchService.fetchCollectionForRest("sku_items", {}, ["all_warehouses"]);
 
+        // No `where`, no per-parent order or limit to push into the read, and
+        // the target rendered as its own REST route renders it.
         expect(batchFetchMany).toHaveBeenCalledWith(
-            "sku_items", ["ABC-1"], "all_warehouses", expect.anything(), undefined
+            "sku_items", ["ABC-1"], "all_warehouses", expect.anything(), undefined, undefined,
+            expect.objectContaining({ style: "rest" })
         );
         // The embedded rows carry the target's own columns — `id` here is the
         // integer column, not a re-merged string address.

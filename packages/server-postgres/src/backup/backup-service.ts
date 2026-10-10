@@ -403,15 +403,40 @@ export async function uploadBackup(
 ): Promise<{ key: string; storageUrl: string }> {
     const fileName = path.basename(localFile);
     const key = joinStorageKey(dest.prefix, fileName);
-    const buffer = fs.readFileSync(localFile);
-    const file = new File([buffer], fileName, { type: "application/octet-stream" });
+    // Backed by the dump on disk, not read into memory: the built-in
+    // controllers write it a chunk (S3: a multipart part) at a time. Read with
+    // `readFileSync` and copied into a `File`, a dump was held three or four
+    // times over in the process running the cron, and one over 2 GiB could
+    // not be read at all (`ERR_FS_FILE_TOO_LARGE`), so it never uploaded.
+    const file = new File([await fs.openAsBlob(localFile)], fileName, { type: "application/octet-stream" });
+    // Not held to the controller's upload limits: `maxFileSize` (50 MB unless
+    // set) and `allowedMimeTypes` say what a user may upload, and the CLI and
+    // the documented cron build their controller without either. Held to
+    // them, every dump over 50 MB failed with PAYLOAD_TOO_LARGE.
     const result = await storage.putObject({
         file,
         key,
         bucket: dest.bucket,
         metadata: { "rebase-backup": "1" }
-    });
+    }, { uploadLimits: false });
     return { key, storageUrl: result.storageUrl };
+}
+
+/** Stats in flight at once while listing a local backup folder. */
+const LOCAL_STAT_CONCURRENCY = 32;
+
+/** `fn` over `items`, at most `limit` at a time; results in input order. */
+async function mapBounded<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let next = 0;
+    const worker = async () => {
+        while (next < items.length) {
+            const i = next++;
+            results[i] = await fn(items[i]);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+    return results;
 }
 
 /**
@@ -423,17 +448,18 @@ export async function listBackups(
     storage?: StorageController
 ): Promise<BackupObject[]> {
     if (dest.kind === "local") {
-        if (!fs.existsSync(dest.path)) return [];
-        const stat = fs.statSync(dest.path);
+        // Asynchronous throughout, a few stats at a time: retention lists the
+        // folder after every scheduled backup, inside the server process, and
+        // a year of hourly backups is 8,760 dumps stat'ed one by one.
+        const stat = await fs.promises.stat(dest.path).catch(() => null);
+        if (!stat) return [];
         const dir = stat.isDirectory() ? dest.path : path.dirname(dest.path);
-        return fs
-            .readdirSync(dir)
-            .filter((f) => f.endsWith(".dump"))
-            .map((f) => {
-                const full = path.join(dir, f);
-                const stats = fs.statSync(full);
-                const createdAt = parseBackupTimestamp(f) ?? stats.mtime;
-                return { key: full, createdAt, sizeBytes: stats.size };
+        const dumps = (await fs.promises.readdir(dir)).filter((f) => f.endsWith(".dump"));
+        const stats = await mapBounded(dumps, LOCAL_STAT_CONCURRENCY, (f) => fs.promises.stat(path.join(dir, f)));
+        return dumps
+            .map((f, i) => {
+                const createdAt = parseBackupTimestamp(f) ?? stats[i].mtime;
+                return { key: path.join(dir, f), createdAt, sizeBytes: stats[i].size };
             })
             .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
     }

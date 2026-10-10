@@ -357,6 +357,17 @@ export interface UserRepository {
     listUsersPaginated(options?: ListUsersOptions): Promise<PaginatedUsersResult>;
 
     /**
+     * The ids of at most `limit` users, in no particular order. Answers "is
+     * there any user?" (`limit` 1) and "is this the only one?" (`limit` 2).
+     *
+     * `listUsersPaginated` answered those by counting the whole table and
+     * sorting it, on every anonymous `GET /auth/config` and every sign-up.
+     * Optional: a repository without it is asked through `listUsersPaginated`
+     * instead (`isUserTableEmpty` / `isOnlyUser` in `registration-policy.ts`).
+     */
+    firstUserIds?(limit: number): Promise<string[]>;
+
+    /**
      * Update user's password hash. `null` removes the password: the account
      * then signs in only by link, code or provider.
      */

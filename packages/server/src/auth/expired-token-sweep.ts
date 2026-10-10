@@ -49,7 +49,11 @@ export type ExpiredTokenSweepOutcome = "swept" | "claimed-elsewhere" | "unclaime
 export interface ExpiredTokenSweep {
     /** Sweep now, then once per interval. */
     start(): void;
-    stop(): void;
+    /**
+     * No more ticks. Resolves once a tick already running has finished, so a
+     * caller about to close the pool can wait for the tick still using it.
+     */
+    stop(): Promise<void>;
     /** One tick: claim this interval's slot and, if it is ours, sweep. */
     runSlot(): Promise<ExpiredTokenSweepOutcome>;
 }
@@ -119,9 +123,11 @@ export function createExpiredTokenSweep(options: ExpiredTokenSweepOptions): Expi
             // Not awaited: boot does not wait on housekeeping.
             void runSlot();
         },
-        stop() {
+        async stop() {
             if (timer) clearTimeout(timer);
             timer = undefined;
+            // A tick never rejects (it reports its failures), so this only waits.
+            await inFlight;
         },
         runSlot
     };

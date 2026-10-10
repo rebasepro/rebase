@@ -1,7 +1,22 @@
 import { CollectionAccessor, Entity, RebaseData } from "@rebasepro/types";
 
-/** Rows written per request, and per transaction where the data source has one. */
-export const IMPORT_BATCH_SIZE = 25;
+/**
+ * Rows written per request, and per transaction where the data source has one.
+ *
+ * It was 25, which made a 10,000-row import 400 sequential round trips. The
+ * server takes up to 1,000 rows per `POST /bulk`; 500 keeps a failed batch's
+ * rollback small enough to retry, and the byte cap below bounds the body.
+ */
+export const IMPORT_BATCH_SIZE = 500;
+
+/**
+ * The most JSON one batch carries, in UTF-8 bytes. ~1 MB: a tenth of the
+ * server's default body limit (10 MB, `maxBodySize`), and under the 1 MiB a
+ * reverse proxy commonly allows by default (nginx's `client_max_body_size`),
+ * so wide rows shrink the batch instead of failing it with a 413. A row larger
+ * than this still goes, alone.
+ */
+export const IMPORT_BATCH_MAX_BYTES = 1_000_000;
 
 /**
  * An import failure that says where it stopped.
@@ -18,6 +33,13 @@ export interface ImportSaveError extends Error {
     failedFrom: number;
     /** Index after the last row of the batch that was not written. */
     failedTo: number;
+    /**
+     * Index of the row the server named as the cause, 0-based, when it named
+     * one (`Row 37: …` — every server message about one row of a bulk write
+     * starts that way, counted within the batch). The message is rewritten to
+     * name it the way the file does: from 1, counted from the first row.
+     */
+    failedRow?: number;
 }
 
 /** The row a bulk write takes: the values, with the chosen id as a column. */
@@ -34,6 +56,62 @@ function isBulkUnsupported(error: unknown): boolean {
     if ((error as { code?: string })?.code === "BULK_UNSUPPORTED") return true;
     const message = (error as Error)?.message ?? "";
     return /bulk writes are not supported|does not support bulk/i.test(message);
+}
+
+/** The body was refused for its size: a proxy's or the server's 413, or too many rows. */
+function isTooLarge(error: unknown): boolean {
+    const status = (error as { status?: number; statusCode?: number })?.status
+        ?? (error as { statusCode?: number })?.statusCode;
+    if (status === 413) return true;
+    const code = (error as { code?: string })?.code;
+    return code === "PAYLOAD_TOO_LARGE" || code === "BULK_TOO_LARGE";
+}
+
+/** The length of a string in UTF-8 bytes, which is what a body limit counts. */
+function utf8Length(text: string): number {
+    let bytes = 0;
+    for (let i = 0; i < text.length; i++) {
+        const code = text.charCodeAt(i);
+        if (code < 0x80) bytes += 1;
+        else if (code < 0x800) bytes += 2;
+        else if (code >= 0xD800 && code <= 0xDBFF) {
+            bytes += 4;
+            i++;
+        } else bytes += 3;
+    }
+    return bytes;
+}
+
+/** `{"rows":[`, `],"upsert":true}` and some slack. */
+const BULK_ENVELOPE_BYTES = 64;
+
+/**
+ * Where the batch starting at `start` ends: at `maxRows` rows, or before the
+ * row that would take the body past `maxBytes` — never before one row.
+ */
+function batchEnd(data: Partial<Entity<any>>[], start: number, maxRows: number, maxBytes: number): number {
+    let bytes = BULK_ENVELOPE_BYTES;
+    let end = start;
+    while (end < data.length && end - start < maxRows) {
+        const rowBytes = utf8Length(JSON.stringify(toBulkRow(data[end]))) + 1;
+        if (end > start && bytes + rowBytes > maxBytes) break;
+        bytes += rowBytes;
+        end++;
+    }
+    return end;
+}
+
+/**
+ * The row a server message names, counted within the batch, and the message
+ * with that row counted the way the user's file counts it.
+ */
+function locateFailedRow(error: unknown, start: number): { row: number, message: string } | undefined {
+    const message = (error as Error)?.message;
+    if (typeof message !== "string") return undefined;
+    const match = /^Row (\d+)(?: of \d+)?/.exec(message);
+    if (!match) return undefined;
+    const row = start + Number(match[1]);
+    return { row, message: `Row ${row + 1}` + message.slice(match[0].length) };
 }
 
 function isConflict(error: unknown): boolean {
@@ -106,11 +184,14 @@ export async function saveImportedEntities(dataClient: RebaseData,
     {
         offset = 0,
         batchSize = IMPORT_BATCH_SIZE,
+        maxBatchBytes = IMPORT_BATCH_MAX_BYTES,
         onBatchCommitted = () => undefined,
         bulkUnsupported = { current: false }
     }: {
         offset?: number;
         batchSize?: number;
+        /** See {@link IMPORT_BATCH_MAX_BYTES}. */
+        maxBatchBytes?: number;
         onBatchCommitted?: (rowsWritten: number) => void;
         bulkUnsupported?: { current: boolean };
     } = {}): Promise<void> {
@@ -119,19 +200,31 @@ export async function saveImportedEntities(dataClient: RebaseData,
 
     const accessor = dataClient.collection(path);
 
-    for (let start = offset; start < data.length; start += batchSize) {
-        const batch = data.slice(start, start + batchSize);
+    // Lowered for the rest of the import when a batch is refused for its
+    // size — a server or proxy configured below the byte cap — so an import
+    // that worked in small batches does not fail in large ones.
+    let maxRows = Math.max(1, batchSize);
+    let start = offset;
+    while (start < data.length) {
+        const batch = data.slice(start, batchEnd(data, start, maxRows, maxBatchBytes));
         const written = { count: 0 };
         try {
             await writeBatch(accessor, batch, bulkUnsupported, written);
         } catch (e) {
+            if (written.count === 0 && batch.length > 1 && isTooLarge(e)) {
+                maxRows = Math.max(1, Math.floor(batch.length / 2));
+                continue;
+            }
+            const located = locateFailedRow(e, start + written.count);
             throw Object.assign(e as Error, {
                 committed: start + written.count,
                 failedFrom: start + written.count,
-                failedTo: start + batch.length
+                failedTo: start + batch.length,
+                ...(located ? { failedRow: located.row, message: located.message } : {})
             }) as ImportSaveError;
         }
-        onBatchCommitted(start + batch.length);
+        start += batch.length;
+        onBatchCommitted(start);
     }
 
     onBatchCommitted(data.length);

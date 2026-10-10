@@ -153,7 +153,13 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
         ...rest
     } = (params ?? {}) as IterateParams<M> & Pick<FindParams<M>, "offset" | "page">;
 
-    const findParams = { ...rest } as FindParams<M>;
+    // No page of a walk is counted. Nothing it returns carries a total —
+    // `iterate()` yields rows, `findAll()` an array — and `hasMore`, the one
+    // thing it reads off `meta`, does not need one: without a count the read
+    // asks for one row past the page. The count is most of what a list read
+    // costs on a large table (1.8 s of a 100k-row walk's SQL, 26 ms without).
+    // A caller's own `count` is overridden for the same reason.
+    const findParams = { ...rest, count: "none" } as FindParams<M>;
     const size = normalizePageSize(pageSize);
     const pageCap = normalizeMaxPages(maxPages);
 
@@ -197,6 +203,23 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
     let pages = 0;
     let after: string | undefined = startAfter || undefined;
 
+    // ── The default walk seeks too, whenever the server lets it ─────────────
+    //
+    // A walk nobody asked to seek still continues from `meta.nextCursor` when a
+    // page carries one. Advancing `offset` instead made every request skip
+    // `offset` rows in the database before reading the next page, so the walk
+    // cost grew with the square of the collection: 4.5 s of SQL for 100k rows
+    // where seeking is 1.8 s — and the order is the same, because the cursor
+    // is the server's, built over the very sort the offset pages used.
+    //
+    // Where no cursor comes — relevance, a vector search, a distinct read, a
+    // server that predates cursors — it pages by offset exactly as before, from
+    // the position it has reached (`offset` keeps counting rows either way).
+    // `after` and `offset` never go out together: the server refuses that
+    // (`CURSOR_WITH_OFFSET`). Only an explicit `cursor`/`after` walk treats a
+    // missing or stalled cursor as an error; this one never promised to seek.
+    let seekingByServerCursor = false;
+
     for (;;) {
         if (pages >= pageCap) {
             throw new RebasePaginationError(
@@ -210,6 +233,8 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
         const pageParams: FindParams<M> = { ...findParams, limit: size };
         if (seekRequested) {
             if (after) pageParams.after = after;
+        } else if (seekingByServerCursor && after) {
+            pageParams.after = after;
         } else {
             pageParams.offset = offset;
         }
@@ -255,8 +280,14 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
         } else {
             // Advance by what actually arrived, not by the page size: a server
             // free to return fewer rows than asked for would otherwise leave a
-            // hole in the walk.
+            // hole in the walk. Counted on seeked pages too, so a fallback to
+            // offset resumes exactly where the walk has got to.
             offset += rows.length;
+            const next = page.meta.nextCursor;
+            // A cursor equal to the one just sent cannot advance the walk;
+            // offset still can.
+            seekingByServerCursor = !!next && next !== after;
+            after = seekingByServerCursor ? next : undefined;
         }
     }
 }

@@ -219,9 +219,11 @@ experiences. The findings are about what other roles get.
 ### On a Rebase database, change the rule, not the policy
 
 Every policy on a Rebase deployment is compiled from a collection's `securityRules`, and the
-runtime **re-applies them on every boot**: it drops each generated policy and creates it
-again from the config. An `ALTER POLICY` run against one of them therefore survives exactly
-until the next restart, and the finding comes back with it — after you watched it disappear.
+runtime **checks them on every boot**: each generated policy carries a stamp (a
+`rebase:<hash>` comment) of what was compiled and what Postgres stored, and a table whose
+policies no longer match it is re-applied from the config. An `ALTER POLICY` run against one
+of them therefore survives exactly until the next restart, and the finding comes back with
+it — after you watched it disappear.
 
 `rls-check` recognises those policies (a `<table>_<operation>_<hash>` name, or a call to
 `rebase.uid()` / `rebase.roles()` in the expression) and prescribes the rule instead of SQL.
@@ -339,7 +341,13 @@ the pre-1.0 `auth` schema is still checked.
 The corrected form of the check above — `rebase.uid() IS NOT NULL AND rebase.uid() <>
 'anonymous'` — and the place people stop. It does exclude signed-out callers. What it does
 not do is scope any rows: what remains is *every registered account may read every row of
-this table*, which is a different sentence from the one it is usually meant to be.
+this table*, which is a different sentence from the one it is usually meant to be. On a
+Rebase project this is a rule whose `condition` is `policy.authenticated()` and nothing
+else, which the database stores as `rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])`.
+<span class="since-badge" data-since="0.25">Since 0.25</span> A rule whose condition is
+only `policy.registered()` is reported too: its extra `NOT rebase.is_anonymous()` keeps
+guests out and scopes no rows either, so every account that is not a guest reads every
+row. With the default `--fail-on high`, a CI run that scans such a policy now fails.
 
 That is the shape that turns a `users` table into a directory of every address on the
 platform, readable by anyone who signed up — and where registration is open, "anyone who

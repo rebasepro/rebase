@@ -2,15 +2,19 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { CollectionConfig } from "@rebasepro/types";
-import type { CdcChangeEvent } from "../src/services/cdc/CdcListener";
+import { parseCdcPayload, type CdcChangeEvent } from "../src/services/cdc/CdcListener";
 
 // The RLS-bound refetch path (fetchCollectionWithAuth / fetchEntityWithAuth)
 // builds a DataService inside the auth transaction — mock it so no real DB is hit.
-const mockFetchCollection = jest.fn().mockResolvedValue([
-    { id: 1, path: "posts", values: { title: "From RLS refetch" } }
+// Each read returns a row no earlier read returned: a refetch that reads what
+// its subscriber was last sent sends nothing, and these tests are about whether
+// a change reaches a subscriber, so every read here is news.
+let mockReads = 0;
+const mockFetchCollection = jest.fn(async () => [
+    { id: 1, path: "posts", values: { title: "From RLS refetch", read: ++mockReads } }
 ]);
-const mockFetchEntity = jest.fn().mockResolvedValue(
-    { id: 1, path: "posts", values: { title: "From RLS refetch" } }
+const mockFetchEntity = jest.fn(async (): Promise<Record<string, unknown> | null> =>
+    ({ id: 1, path: "posts", values: { title: "From RLS refetch", read: ++mockReads } })
 );
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
@@ -225,5 +229,113 @@ describe("RealtimeService — database-level CDC", () => {
 
         expect(mockFetchCollection).toHaveBeenCalled();
         expect(ws.send).toHaveBeenCalledWith(expect.stringContaining("collection_update"));
+    });
+
+    /** Subscribe `clientId` to one row of posts per id, and return its socket. */
+    async function subscribeRows(clientId: string, ids: string[]) {
+        const ws = new MockWebSocket() as any;
+        service.addClient(clientId, ws);
+        for (const id of ids) {
+            await service.handleClientMessage(clientId, {
+                type: "subscribe_one",
+                payload: { path: "posts", id, subscriptionId: `row-${id}` }
+            });
+        }
+        await flushTimers();
+        ws.send.mockClear();
+        mockFetchEntity.mockClear();
+        return ws;
+    }
+
+    const sentTo = (ws: { send: jest.Mock }): string[] =>
+        ws.send.mock.calls.map((call: unknown[]) => JSON.parse(String(call[0])).subscriptionId as string).sort();
+
+    it("delivers a statement's batch to the subscriber of each row it names, and of no other", async () => {
+        const ws = await subscribeRows("client-batch", ["2", "3", "9"]);
+
+        // One notification for a statement that updated rows 1–4.
+        const events = parseCdcPayload(JSON.stringify({ schema: "public", table: "posts", op: "UPDATE", cols: ["id"], keys: [1, 2, 3, 4] }));
+        for (const event of events ?? []) await emitCdc(service, event);
+        await flushTimers();
+
+        expect(sentTo(ws)).toEqual(["row-2", "row-3"]);
+    });
+
+    it("delivers a TRUNCATE to every subscription on the collection, single-row ones included", async () => {
+        const ws = await subscribeRows("client-truncate", ["1", "2"]);
+        await service.handleClientMessage("client-truncate", {
+            type: "subscribe_collection",
+            payload: { path: "posts", subscriptionId: "list" }
+        });
+        await flushTimers();
+        ws.send.mockClear();
+        mockFetchEntity.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+
+        await emitCdc(service, { schema: "public", table: "posts", op: "TRUNCATE", row: {} });
+        await flushTimers();
+
+        expect(sentTo(ws)).toEqual(["list", "row-1", "row-2"]);
+        const rows = ws.send.mock.calls.map((call: unknown[]) => JSON.parse(String(call[0]))).filter((f: { type: string }) => f.type === "single_update");
+        expect(rows.map((f: { row: unknown }) => f.row)).toEqual([null, null]);
+    });
+
+    it("delivers a change that names no row — a key too large to notify — to the single-row subscribers too", async () => {
+        const ws = await subscribeRows("client-unkeyed", ["5"]);
+
+        await emitCdc(service, { schema: "public", table: "posts", op: "UPDATE", row: {}, truncated: true });
+        await flushTimers();
+
+        expect(sentTo(ws)).toEqual(["row-5"]);
+    });
+});
+
+/**
+ * The record of this instance's own writes, kept so their CDC echo is not
+ * delivered twice, purged expired entries by walking the whole map on every
+ * write once it held over 1,000 — and inside the 300 ms window nothing has
+ * expired, so a burst of writes walked it all each time: 703 ms of event loop
+ * for 20,000 marks.
+ */
+describe("RealtimeService — the record of its own writes", () => {
+    /** A Map that counts the entries anything iterates out of it. */
+    class CountingMap<K, V> extends Map<K, V> {
+        visited = 0;
+        *entries(): MapIterator<[K, V]> {
+            for (const entry of super.entries()) {
+                this.visited++;
+                yield entry;
+            }
+        }
+        [Symbol.iterator](): MapIterator<[K, V]> {
+            return this.entries();
+        }
+    }
+
+    const visitedFor = (marks: number): number => {
+        const registry = new PostgresCollectionRegistry();
+        const service = new RealtimeService({ execute: jest.fn(), transaction: jest.fn() } as never, registry);
+        const recent = new CountingMap<string, number>();
+        Reflect.set(service, "recentAppEmits", recent);
+        const mark = Reflect.get(service, "markAppEmit") as (key: string) => void;
+        // A burst inside one window, then one write per window for a while:
+        // the burst's entries expire and are purged.
+        for (let i = 0; i < marks; i++) mark.call(service, `::posts::${i}`);
+        const afterBurst = recent.visited;
+        for (let w = 0; w < 5; w++) {
+            jest.advanceTimersByTime(400);
+            mark.call(service, `::posts::late-${w}`);
+        }
+        expect(recent.size).toBeLessThan(10);
+        return afterBurst;
+    };
+
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it("costs a burst of writes work in proportion to the burst, not its square", () => {
+        const small = visitedFor(2_000);
+        const large = visitedFor(8_000);
+        expect(small).toBeLessThanOrEqual(2_000);
+        expect(large).toBeLessThanOrEqual(8_000);
     });
 });

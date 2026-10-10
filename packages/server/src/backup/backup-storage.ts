@@ -13,10 +13,16 @@ import { parseEnvBoolean } from "@rebasepro/types";
 import { GCSStorageController } from "../storage/GCSStorageController";
 import { S3StorageController } from "../storage/S3StorageController";
 import type { StorageController } from "../storage/types";
-import type { BackupDestination } from "./backup-common";
+import { parseBackupDestination, type BackupDestination } from "./backup-common";
 
 /** A destination in object storage — `s3://bucket/prefix` or `gs://bucket/prefix`. */
 export type ObjectBackupDestination = Exclude<BackupDestination, { kind: "local" }>;
+
+/** The destination `BACKUP_DESTINATION` names, or `null` when it is unset. */
+export function backupDestinationFromEnv(env: Record<string, string | undefined>): BackupDestination | null {
+    const out = env.BACKUP_DESTINATION?.trim();
+    return out ? parseBackupDestination(out) : null;
+}
 
 /** The destination as `BACKUP_DESTINATION` spells it. */
 export function describeBackupDestination(dest: BackupDestination): string {

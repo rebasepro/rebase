@@ -1,0 +1,130 @@
+{
+  "about": "CREATE POLICY statements the compiler emitted for test/fixtures/policy-shapes.ts before policy predicates were hoisted into initPlans (recorded at e3f3cd297). policy-shapes-equivalence.test.ts holds the current compiler to the same row-level outcome. Never re-record this with the compiler it is checking.",
+  "policies": {
+    "public.docs": [
+      "CREATE POLICY \"docs_default_admin_read\" ON \"public\".\"docs\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"docs_default_admin_write_insert\" ON \"public\".\"docs\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"docs_default_admin_write_update\" ON \"public\".\"docs\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"docs_default_admin_write_delete\" ON \"public\".\"docs\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+    ],
+    "public.articles": [
+      "CREATE POLICY \"articles_select_841c287\" ON \"public\".\"articles\" AS PERMISSIVE FOR SELECT TO \"public\" USING (true);",
+      "CREATE POLICY \"articles_insert_f4378b2_0\" ON \"public\".\"articles\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['editor']);",
+      "CREATE POLICY \"articles_update_f4378b2_1\" ON \"public\".\"articles\" AS PERMISSIVE FOR UPDATE TO \"public\" USING (string_to_array(rebase.roles(), ',') && ARRAY['editor']) WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['editor']);",
+      "CREATE POLICY \"articles_delete_f4378b2_2\" ON \"public\".\"articles\" AS PERMISSIVE FOR DELETE TO \"public\" USING (string_to_array(rebase.roles(), ',') && ARRAY['editor']);",
+      "CREATE POLICY \"articles_default_admin_read\" ON \"public\".\"articles\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"articles_default_admin_write_insert\" ON \"public\".\"articles\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"articles_default_admin_write_update\" ON \"public\".\"articles\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"articles_default_admin_write_delete\" ON \"public\".\"articles\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+    ],
+    "public.notes": [
+      "CREATE POLICY \"notes_all_23c62de\" ON \"public\".\"notes\" AS PERMISSIVE FOR ALL TO \"public\" USING ((owner_id)::text = rebase.uid()) WITH CHECK ((owner_id)::text = rebase.uid());",
+      "CREATE POLICY \"notes_default_admin_read\" ON \"public\".\"notes\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"notes_default_admin_write_insert\" ON \"public\".\"notes\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"notes_default_admin_write_update\" ON \"public\".\"notes\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"notes_default_admin_write_delete\" ON \"public\".\"notes\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+    ],
+    "public.secrets": [
+      "CREATE POLICY \"secrets_select_15c9aec\" ON \"public\".\"secrets\" AS PERMISSIVE FOR SELECT TO \"public\" USING (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'));",
+      "CREATE POLICY \"secrets_select_d924d73\" ON \"public\".\"secrets\" AS RESTRICTIVE FOR SELECT TO \"public\" USING ((NOT (string_to_array(rebase.roles(), ',') && ARRAY['auditor'])) OR (level <= 3));",
+      "CREATE POLICY \"secrets_select_94f4f80\" ON \"public\".\"secrets\" AS PERMISSIVE FOR SELECT TO \"public\" USING (level <= CASE WHEN NULLIF(rebase.jwt() ->> 'clearance', '') ~ '^-?[0-9]{1,18}$' THEN (NULLIF(rebase.jwt() ->> 'clearance', ''))::bigint END);",
+      "CREATE POLICY \"secrets_insert_fb9c563\" ON \"public\".\"secrets\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon') AND NOT rebase.is_anonymous());",
+      "CREATE POLICY \"secrets_update_1749d40\" ON \"public\".\"secrets\" AS PERMISSIVE FOR UPDATE TO \"public\" USING (region = NULLIF(rebase.jwt() ->> 'region', '')) WITH CHECK (region = NULLIF(rebase.jwt() ->> 'region', ''));",
+      "CREATE POLICY \"secrets_delete_c04410a\" ON \"public\".\"secrets\" AS PERMISSIVE FOR DELETE TO \"public\" USING (string_to_array(rebase.roles(), ',') @> ARRAY['admin','editor']);",
+      "CREATE POLICY \"secrets_default_admin_read\" ON \"public\".\"secrets\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"secrets_default_admin_write_insert\" ON \"public\".\"secrets\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"secrets_default_admin_write_update\" ON \"public\".\"secrets\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"secrets_default_admin_write_delete\" ON \"public\".\"secrets\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+    ],
+    "public.accounts": [
+      "CREATE POLICY \"accounts_update_0eba17e\" ON \"public\".\"accounts\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((id)::text = rebase.uid()) WITH CHECK ((id)::text = rebase.uid());",
+      "CREATE POLICY \"accounts_default_admin_read\" ON \"public\".\"accounts\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"accounts_default_admin_write_insert\" ON \"public\".\"accounts\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"accounts_default_admin_write_update\" ON \"public\".\"accounts\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"accounts_default_admin_write_delete\" ON \"public\".\"accounts\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"accounts_default_self_read\" ON \"public\".\"accounts\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((id)::text = rebase.uid());",
+      "CREATE POLICY \"accounts_require_admin_write_insert\" ON \"public\".\"accounts\" AS RESTRICTIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"accounts_require_admin_write_update\" ON \"public\".\"accounts\" AS RESTRICTIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"accounts_require_admin_write_delete\" ON \"public\".\"accounts\" AS RESTRICTIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+    ],
+    "public.projects": [
+      "CREATE POLICY \"projects_all_d087a01\" ON \"public\".\"projects\" AS PERMISSIVE FOR ALL TO \"public\" USING (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')) WITH CHECK (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'));",
+      "CREATE POLICY \"projects_default_admin_read\" ON \"public\".\"projects\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"projects_default_admin_write_insert\" ON \"public\".\"projects\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"projects_default_admin_write_update\" ON \"public\".\"projects\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"projects_default_admin_write_delete\" ON \"public\".\"projects\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"projects_tenant_scope\" ON \"public\".\"projects\" AS RESTRICTIVE FOR ALL TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']) OR (org_id = CASE WHEN NULLIF(rebase.jwt() ->> 'org', '') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN (NULLIF(rebase.jwt() ->> 'org', ''))::uuid END)) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']) OR (org_id = CASE WHEN NULLIF(rebase.jwt() ->> 'org', '') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN (NULLIF(rebase.jwt() ->> 'org', ''))::uuid END));"
+    ],
+    "public.memberships": [
+      "CREATE POLICY \"memberships_select_8baab12\" ON \"public\".\"memberships\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((user_id)::text = rebase.uid());",
+      "CREATE POLICY \"memberships_default_admin_read\" ON \"public\".\"memberships\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"memberships_default_admin_write_insert\" ON \"public\".\"memberships\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"memberships_default_admin_write_update\" ON \"public\".\"memberships\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"memberships_default_admin_write_delete\" ON \"public\".\"memberships\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+    ],
+    "public.tasks": [
+      "CREATE POLICY \"tasks_select_841c287\" ON \"public\".\"tasks\" AS PERMISSIVE FOR SELECT TO \"public\" USING (true);",
+      "CREATE POLICY \"tasks_insert_7d725c8_0\" ON \"public\".\"tasks\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'));",
+      "CREATE POLICY \"tasks_update_7d725c8_1\" ON \"public\".\"tasks\" AS PERMISSIVE FOR UPDATE TO \"public\" USING (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')) WITH CHECK (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'));",
+      "CREATE POLICY \"tasks_default_admin_read\" ON \"public\".\"tasks\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"tasks_default_admin_write_insert\" ON \"public\".\"tasks\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"tasks_default_admin_write_update\" ON \"public\".\"tasks\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"tasks_default_admin_write_delete\" ON \"public\".\"tasks\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"tasks_tenant_scope\" ON \"public\".\"tasks\" AS RESTRICTIVE FOR ALL TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin','support']) OR (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"tasks\".org_id) AND ((\"_ex0\".user_id)::text = rebase.uid())))) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin','support']) OR (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"tasks\".org_id) AND ((\"_ex0\".user_id)::text = rebase.uid()))));"
+    ],
+    "public.boards": [
+      "CREATE POLICY \"boards_select_eb2b93c\" ON \"public\".\"boards\" AS PERMISSIVE FOR SELECT TO \"public\" USING (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"boards\".org_id) AND ((\"_ex0\".user_id)::text = rebase.uid())));",
+      "CREATE POLICY \"boards_update_944cfe2\" ON \"public\".\"boards\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((string_to_array(rebase.roles(), ',') && ARRAY['support']) OR ((NOT (string_to_array(rebase.roles(), ',') && ARRAY['banned'])) AND (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"boards\".org_id) AND ((\"_ex0\".user_id)::text = rebase.uid()))))) WITH CHECK ((string_to_array(rebase.roles(), ',') && ARRAY['support']) OR ((NOT (string_to_array(rebase.roles(), ',') && ARRAY['banned'])) AND (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"boards\".org_id) AND ((\"_ex0\".user_id)::text = rebase.uid())))));",
+      "CREATE POLICY \"boards_default_admin_read\" ON \"public\".\"boards\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"boards_default_admin_write_insert\" ON \"public\".\"boards\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"boards_default_admin_write_update\" ON \"public\".\"boards\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"boards_default_admin_write_delete\" ON \"public\".\"boards\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+    ],
+    "public.posts": [
+      "CREATE POLICY \"posts_select_841c287\" ON \"public\".\"posts\" AS PERMISSIVE FOR SELECT TO \"public\" USING (true);",
+      "CREATE POLICY \"posts_update_25b861c\" ON \"public\".\"posts\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((owner_id)::text = rebase.uid()) WITH CHECK ((owner_id)::text = rebase.uid());",
+      "CREATE POLICY \"posts_default_admin_read\" ON \"public\".\"posts\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"posts_default_admin_write_insert\" ON \"public\".\"posts\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"posts_default_admin_write_update\" ON \"public\".\"posts\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"posts_default_admin_write_delete\" ON \"public\".\"posts\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+    ],
+    "public.tags": [
+      "CREATE POLICY \"tags_select_29d0af3\" ON \"public\".\"tags\" AS PERMISSIVE FOR SELECT TO \"public\" USING (NOT (rebase.uid() = 'blocked-user'));",
+      "CREATE POLICY \"tags_default_admin_read\" ON \"public\".\"tags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"tags_default_admin_write_insert\" ON \"public\".\"tags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"tags_default_admin_write_update\" ON \"public\".\"tags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"tags_default_admin_write_delete\" ON \"public\".\"tags\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+    ],
+    "public.wiki": [
+      "CREATE POLICY \"wiki_select_ad5ed8f\" ON \"public\".\"wiki\" AS PERMISSIVE FOR SELECT TO \"public\" USING (((owner_id)::text = rebase.uid()) OR (visibility = 'public'));",
+      "CREATE POLICY \"wiki_insert_e78fed1\" ON \"public\".\"wiki\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((length(title) > 3) AND ((owner_id)::text = rebase.uid()));",
+      "CREATE POLICY \"wiki_default_admin_read\" ON \"public\".\"wiki\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"wiki_default_admin_write_insert\" ON \"public\".\"wiki\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"wiki_default_admin_write_update\" ON \"public\".\"wiki\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"wiki_default_admin_write_delete\" ON \"public\".\"wiki\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+    ],
+    "public.jobs": [
+      "CREATE POLICY \"jobs_all_85fdfe6\" ON \"public\".\"jobs\" AS PERMISSIVE FOR ALL TO \"public\" USING (rebase.uid() IS NULL) WITH CHECK (rebase.uid() IS NULL);"
+    ],
+    "public.flags": [
+      "CREATE POLICY \"flags_select_50cd14c\" ON \"public\".\"flags\" AS PERMISSIVE FOR SELECT TO \"public\" USING (rebase.uid() != 'anonymous');",
+      "CREATE POLICY \"flags_insert_d790931\" ON \"public\".\"flags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')) AND (string_to_array(rebase.roles(), ',') && ARRAY['editor']));",
+      "CREATE POLICY \"flags_update_c12cb43\" ON \"public\".\"flags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((false) OR (string_to_array(rebase.roles(), ',') && ARRAY['editor','support'])) WITH CHECK ((false) OR (string_to_array(rebase.roles(), ',') && ARRAY['editor','support']));",
+      "CREATE POLICY \"flags_delete_0a0ffd3\" ON \"public\".\"flags\" AS RESTRICTIVE FOR DELETE TO \"public\" USING ((NOT (string_to_array(rebase.roles(), ',') && ARRAY['intern'])) OR (false));",
+      "CREATE POLICY \"flags_default_admin_read\" ON \"public\".\"flags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"flags_default_admin_write_insert\" ON \"public\".\"flags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"flags_default_admin_write_update\" ON \"public\".\"flags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"flags_default_admin_write_delete\" ON \"public\".\"flags\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+    ],
+    "public.posts_tags": [
+      "CREATE POLICY \"posts_tags_default_admin_read\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"posts_tags_default_admin_write_insert\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"posts_tags_default_admin_write_update\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"posts_tags_default_admin_write_delete\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "CREATE POLICY \"posts_tags_default_edge_read\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE \"_ex0\".id = \"public\".\"posts_tags\".post_id)) AND (EXISTS (SELECT 1 FROM \"public\".\"tags\" \"_ex1\" WHERE \"_ex1\".id = \"public\".\"posts_tags\".tag_id)));",
+      "CREATE POLICY \"posts_tags_default_edge_write_insert\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK (EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND (((\"_ex0\".owner_id)::text = rebase.uid()))));",
+      "CREATE POLICY \"posts_tags_default_edge_write_update\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING (EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND (((\"_ex0\".owner_id)::text = rebase.uid())))) WITH CHECK (EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND (((\"_ex0\".owner_id)::text = rebase.uid()))));",
+      "CREATE POLICY \"posts_tags_default_edge_write_delete\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR DELETE TO \"public\" USING (EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND (((\"_ex0\".owner_id)::text = rebase.uid()))));"
+    ]
+  }
+}

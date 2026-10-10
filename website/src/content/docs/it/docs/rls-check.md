@@ -1,5 +1,5 @@
 ---
-sourceHash: f5376e9a832e32a2
+sourceHash: 4efc850ec3b2c417
 slug: it/docs/rls-check
 title: rls-check
 description: Esegui l'audit della row-level security su qualsiasi database PostgreSQL — Supabase, Neon, RDS o il tuo server. Di sola lettura, nessuna registrazione, nessun Rebase richiesto.
@@ -344,7 +344,9 @@ schema `auth` precedente alla 1.0 viene comunque verificato.
 La forma corretta del controllo precedente — `rebase.uid() IS NOT NULL AND rebase.uid() <>
 'anonymous'` — e il punto in cui molti si fermano. Esclude i chiamanti non autenticati, ma
 non circoscrive le righe: il risultato è che *ogni account registrato può leggere ogni riga di
-questa tabella*, che è un'affermazione diversa da quella solitamente intesa.
+questa tabella*, che è un'affermazione diversa da quella solitamente intesa. In un progetto Rebase è una regola
+la cui `condition` è `policy.authenticated()` e nient'altro, che il database memorizza come
+`rebase.uid() <> ALL (ARRAY['anonymous', 'anon'])`.
 
 Questo è il pattern che trasforma una tabella `users` in un elenco di tutti gli indirizzi della
 piattaforma, leggibile da chiunque si sia registrato — e nei casi in cui la registrazione è aperta, "chiunque si sia

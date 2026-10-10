@@ -916,6 +916,10 @@ export const es: RebaseTranslations = {
     studio_sql_update_failed: "Error al actualizar: {{message}}",
     studio_sql_update_no_row: "No se actualizó ninguna fila: la fila cambió o se eliminó desde que se leyó, o el rol seleccionado no puede actualizarla. Vuelve a ejecutar la consulta para ver lo que está guardado.",
     studio_sql_ran_as_other_role: "Estas filas se leyeron como {{ranAs}}, no como {{role}}: el cambio de rol está desactivado en este servidor (DISABLE_DB_ROLE_SWITCHING), así que cada sentencia se ejecuta como el propietario de la conexión.",
+    studio_sql_result_truncated: "Se muestran las primeras {{shown}} de {{total}} filas: la consola guarda como máximo 10.000 filas, o 32 MB de valores, de un resultado. Acota la consulta, o recórrela por páginas con LIMIT y OFFSET, para ver el resto. Copiar y exportar incluyen solo las filas mostradas.",
+    studio_sql_download_full_csv: "Descargar el resultado completo como CSV",
+    studio_sql_downloading_full_csv: "Descargando…",
+    studio_sql_download_full_failed: "No se pudo descargar el resultado completo: {{message}}",
     studio_sql_role_switching_disabled: "El cambio de rol está desactivado en este servidor: cada sentencia se ejecuta como {{role}}, sea cual sea el rol elegido aquí.",
     studio_sql_execution_not_supported: "La fuente de datos actual no admite la ejecución de SQL.",
     studio_sql_error_executing: "Se produjo un error al ejecutar la consulta.",
@@ -1355,6 +1359,10 @@ export const es: RebaseTranslations = {
     studio_schema_no_collections_body: "Todavía no hay nada que dibujar. Añade una colección en config/collections/, o abre «Editar colecciones» para añadir una aquí.",
     studio_schema_introspect_hint: "Contra una base de datos que ya tiene tablas, rebase schema introspect escribe los archivos de colección por ti.",
     studio_schema_visualizer_source: "Dibujado a partir de tus colecciones: tablas, columnas, tipos y relaciones tal como las declaran. Solo los indicadores de RLS se leen de la base de datos.",
+    studio_schema_laying_out: "Organizando el diagrama…",
+    studio_schema_neighbourhood: "Mostrando {{shown}} de {{total}} tablas: {{table}} y las tablas a su alrededor. Elige otra en la lista para moverte.",
+    studio_schema_neighbourhood_depth_1: "A 1 relación",
+    studio_schema_neighbourhood_depth_2: "A 2 relaciones",
 
 
     // ─── Studio: RLS editor confirmations ───────────────────────

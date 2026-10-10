@@ -384,6 +384,34 @@ describe("createDataRateLimiter — identity with no auth middleware ahead of it
     const hitWith = (app: Hono, headers: Record<string, string>) =>
         app.fetch(new Request("http://localhost/file", { headers: { "x-real-ip": "9.9.9.9", ...headers } }));
 
+    /**
+     * The limiter asks "which bucket?" twice per request — for the key and for
+     * the limit — and with no auth middleware ahead of it each answer verified
+     * the token again: two HMAC verifies before the route's own. One request,
+     * one verify.
+     */
+    it("verifies the caller's token once per request, not once per question", async () => {
+        const jwt = await import("../src/auth/jwt");
+        jwt.configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });
+        const access = await jwt.generateAccessToken("user-with-token", []);
+        const download = await jwt.generateDownloadToken("docs/a.png", 300, null, "user-with-token");
+        const verifyAccess = jest.spyOn(jwt, "verifyAccessToken");
+        const verifyDownload = jest.spyOn(jwt, "verifyDownloadToken");
+        try {
+            const app = bareApp({ anonymous: 1, user: 3 });
+
+            expect((await hitWith(app, { authorization: `Bearer ${access}` })).status).toBe(200);
+            expect(verifyAccess).toHaveBeenCalledTimes(1);
+
+            const res = await app.fetch(new Request(`http://localhost/file?token=${download}`, { headers: { "x-real-ip": "9.9.9.9" } }));
+            expect(res.status).toBe(200);
+            expect(verifyDownload).toHaveBeenCalledTimes(1);
+        } finally {
+            verifyAccess.mockRestore();
+            verifyDownload.mockRestore();
+        }
+    });
+
     it("gives a bearer-token caller the user allowance, not the anonymous one", async () => {
         const { configureJwt, generateAccessToken } = await import("../src/auth/jwt");
         configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });

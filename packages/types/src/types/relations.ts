@@ -26,6 +26,24 @@ export type OnAction = "cascade" | "restrict" | "no action" | "set null" | "set 
 export const JUNCTION_PIVOT_KEY = "_pivot";
 
 /**
+ * The key a row carries the totals of its counted relations under.
+ *
+ * An include that asks for a count — `include: { tags: { limit: 4, count: true } }`
+ * — serves, beside the (capped) `tags`, how many related rows there are in all:
+ * `{ id: 1, tags: [ …4 rows ], _count: { tags: 37 } }`. One object per row,
+ * keyed by relation name, so counting a second relation adds a key rather than
+ * a second top-level name.
+ *
+ * Leading underscore, like {@link JUNCTION_PIVOT_KEY} and `_matches`: it
+ * describes the read, not the record, and no column or form writes it. A
+ * collection with a property of this name cannot ask for a count — the read
+ * answers 400 rather than writing over the column.
+ *
+ * @group Models
+ */
+export const INCLUDE_COUNT_KEY = "_count";
+
+/**
  * What kind of link a relation is.
  *
  * The discriminant. Every other field a relation carries belongs to exactly one
@@ -116,6 +134,23 @@ export interface BelongsToRelation extends RelationBase {
      * Defaults to `<relationName>_id`.
      */
     localKey?: string;
+    /**
+     * Whether Rebase creates a btree index on {@link localKey}. Defaults to
+     * `true`.
+     *
+     * Postgres indexes the key a foreign key *points at* but never the column
+     * holding it, so without one every read from the other side seq-scans this
+     * table: a `hasMany`/`hasOne` include, a nested listing such as
+     * `/authors/5/posts`, and the `ON DELETE` check when a target row is
+     * deleted. The derived index is skipped on its own when the column already
+     * leads one — the primary key, a `validation.unique`, or an entry in
+     * `indexes:` — so it never duplicates an index you declared.
+     *
+     * Set `false` for a table so write-heavy that the index costs more than
+     * the lookups it serves, or when you keep an index of your own on the
+     * column outside Rebase's `indexes:` block.
+     */
+    index?: boolean;
 }
 
 /**
@@ -390,6 +425,8 @@ export interface ResolvedBelongsTo extends ResolvedRelationBase {
     shared: false;
     /** Column on this collection's table. */
     localKey: string;
+    /** As authored, with the default filled in — see {@link BelongsToRelation.index}. */
+    index: boolean;
 }
 
 /** @group Models */

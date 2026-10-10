@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import {
     useAuthController,
     useCustomizationController,
@@ -95,10 +95,15 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
         }, 100);
     };
 
-    const properties = getPropertiesWithPropertiesOrder(collection.properties, collection.propertiesOrder as Extract<keyof M, string>[]);
+    // Built once per collection: every column's picker lists these, and a
+    // list built afresh on each render redrew every picker on every remap.
+    const properties = useMemo(
+        () => getPropertiesWithPropertiesOrder(collection.properties, collection.propertiesOrder as Extract<keyof M, string>[]),
+        [collection.properties, collection.propertiesOrder]
+    );
 
-    const propertiesAndLevel = Object.entries(properties)
-        .flatMap(([key, property]) => getPropertiesAndLevel(key, property, 0));
+    const propertiesAndLevel = useMemo(() => Object.entries(properties)
+        .flatMap(([key, property]) => getPropertiesAndLevel(key, property, 0)), [properties]);
     const propertiesOrder = (collection.propertiesOrder ?? Object.keys(collection.properties)) as Extract<keyof M, string>[];
 
     return <>
@@ -271,37 +276,42 @@ function PropertyTreeSelect({
         }
     };
 
+    // The same elements on every render: a remap re-renders every picker, and
+    // fresh elements made each of them redraw its whole list.
+    const propertyItems = useMemo(() => propertiesAndLevel.map(({
+        property,
+        level,
+        propertyKey
+    }) => {
+        // A map with fields is filled from a column per field; a
+        // key-value map, like a geopoint, takes a column whole.
+        return <SelectItem value={propertyKey}
+            key={propertyKey}
+            textValue={property.name || propertyKey}
+            disabled={property.type === "map" && !takesObjectWhole(property)}>
+            <PropertySelectEntry propertyKey={propertyKey}
+                property={property}
+                level={level}/>
+        </SelectItem>;
+    }), [propertiesAndLevel]);
+
     return <Select value={isIdColumn ? internalIDValue : (selectedPropertyKey ?? undefined)}
         fullWidth={true}
         onValueChange={onSelectValueChange}
         renderValue={renderValue}>
-
-        <SelectItem value={"__do_not_import"}>
-            <Typography variant={"body2"} color={"disabled"} className={"p-4"}>Do not import this property</Typography>
-        </SelectItem>
-
-        <SelectItem value={internalIDValue}>
-            <Typography variant={"body2"} className={"p-4"}>Use this column as ID</Typography>
-        </SelectItem>
-
-        {propertiesAndLevel.map(({
-            property,
-            level,
-            propertyKey
-        }) => {
-            // A map with fields is filled from a column per field; a
-            // key-value map, like a geopoint, takes a column whole.
-            return <SelectItem value={propertyKey}
-                key={propertyKey}
-                disabled={property.type === "map" && !takesObjectWhole(property)}>
-                <PropertySelectEntry propertyKey={propertyKey}
-                    property={property}
-                    level={level}/>
-            </SelectItem>;
-        })}
-
+        {DO_NOT_IMPORT_ITEM}
+        {USE_AS_ID_ITEM}
+        {propertyItems}
     </Select>;
 }
+
+const DO_NOT_IMPORT_ITEM = <SelectItem value={"__do_not_import"}>
+    <Typography variant={"body2"} color={"disabled"} className={"p-4"}>Do not import this property</Typography>
+</SelectItem>;
+
+const USE_AS_ID_ITEM = <SelectItem value={internalIDValue}>
+    <Typography variant={"body2"} className={"p-4"}>Use this column as ID</Typography>
+</SelectItem>;
 
 type PropertyAndLevel = {
     property: Property,

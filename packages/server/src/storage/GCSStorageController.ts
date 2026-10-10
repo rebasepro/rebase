@@ -6,12 +6,18 @@
  * import cost or need it installed.
  */
 
+import type { FileMetadata } from "@google-cloud/storage";
 import {
     StorageController,
     GCSStorageConfig,
-    DEFAULT_MAX_FILE_SIZE
+    DEFAULT_MAX_FILE_SIZE,
+    type StoredObjectInfo,
+    type StoredObjectRange,
+    type PutObjectOptions,
+    type StoredObjectStream
 } from "./types";
 import { folderKey, listingPrefix } from "./keys";
+import { bufferWebStream, bytesView, webStreamFrom } from "./streams";
 import { ApiError } from "../api/errors";
 import {
     UploadFileProps,
@@ -95,18 +101,18 @@ export class GCSStorageController implements StorageController {
         key,
         metadata,
         bucket
-    }: UploadFileProps): Promise<UploadFileResult> {
-        this.validateFile(file);
+    }: UploadFileProps, options?: PutObjectOptions): Promise<UploadFileResult> {
+        if (options?.uploadLimits !== false) this.validateFile(file);
 
         const usedBucket = this.getBucket(bucket);
         const client = await this.getClient();
         const gcsFile = client.bucket(usedBucket).file(key);
 
-        // Convert File to Buffer
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        await gcsFile.save(buffer, {
+        // Streamed from the file a chunk at a time. Read into one buffer first,
+        // it was held whole (twice, with the copy) for the length of the
+        // upload. Handed over as a function so the client can open it again to
+        // retry, which it does not do for a stream it was given once.
+        await gcsFile.save(() => byteChunks(file), {
             contentType: file.type,
             metadata: metadata ? { metadata: this.flattenMetadata(metadata) } : undefined
         });
@@ -186,46 +192,142 @@ export class GCSStorageController implements StorageController {
         };
     }
 
+    /**
+     * The object's bytes, type and version — all three of ONE generation.
+     *
+     * Described first, then read pinned to the generation described, as
+     * {@link getObjectStream} reads. It used to download and then ask for the
+     * metadata: an overwrite between the two calls answered the old bytes
+     * under the new generation's `updated`, and that `lastModified` keys the
+     * routes' `ETag` and transform cache, so the stale bytes — or a rendition
+     * of them — were served as current. A pinned read of a generation replaced
+     * since it was described fails, and the object is described again.
+     */
     async getObject(key: string, bucket?: string): Promise<File | null> {
-        // Handle gs:// and s3:// URLs
-        let resolvedPath = key;
-        let resolvedBucket = this.getBucket(bucket);
+        for (let attempt = 1; ; attempt++) {
+            const located = await this.locate(key, bucket);
+            if (!located) return null;
 
-        const match = key.match(/^(gs|s3):\/\//);
-        if (match) {
-            const protocolLength = match[0].length;
-            const withoutProtocol = key.substring(protocolLength);
-            const firstSlash = withoutProtocol.indexOf("/");
-            if (firstSlash > 0) {
-                resolvedBucket = withoutProtocol.substring(0, firstSlash);
-                resolvedPath = withoutProtocol.substring(firstSlash + 1);
+            let contents: Buffer;
+            try {
+                contents = await this.readDecompressed(located);
+            } catch (error: unknown) {
+                // Replaced or deleted since it was described. Three
+                // overwrites inside one read is a write loop, not a race.
+                if (isNotFoundError(error) && attempt < 3) continue;
+                if (isNotFoundError(error)) {
+                    throw new Error(`The object "${located.key}" changed on every read; try again.`);
+                }
+                throw error;
             }
-        }
 
-        try {
-            const client = await this.getClient();
-            const gcsFile = client.bucket(resolvedBucket).file(resolvedPath);
-
-            const [contents] = await gcsFile.download();
-
-            // Get content type from metadata
-            const [fileMetadata] = await gcsFile.getMetadata();
-            const contentType = fileMetadata.contentType || "application/octet-stream";
-            const fileName = resolvedPath.split("/").pop() || resolvedPath;
-
-            const blob = new Blob([new Uint8Array(contents)], { type: contentType });
+            const contentType = located.meta.contentType || "application/octet-stream";
             // The object's own version — see `S3StorageController.getObject`.
-            const updated = typeof fileMetadata.updated === "string" ? Date.parse(fileMetadata.updated) : NaN;
-            return new File([blob], fileName, {
+            const updated = typeof located.meta.updated === "string" ? Date.parse(located.meta.updated) : NaN;
+            return new File([bytesView(contents)], located.key.split("/").pop() || located.key, {
                 type: contentType,
                 lastModified: Number.isNaN(updated) ? undefined : updated
             });
-        } catch (error: unknown) {
-            if (isNotFoundError(error)) {
-                return null;
+        }
+    }
+
+    /**
+     * The bucket and key a call addresses: a `gs://` or `s3://` URL names its
+     * own bucket, anything else is a key in the given (or configured) bucket.
+     */
+    private resolveLocation(key: string, bucket?: string): { bucket: string; key: string } {
+        const match = key.match(/^(gs|s3):\/\//);
+        if (match) {
+            const withoutProtocol = key.substring(match[0].length);
+            const firstSlash = withoutProtocol.indexOf("/");
+            if (firstSlash > 0) {
+                return { bucket: withoutProtocol.substring(0, firstSlash), key: withoutProtocol.substring(firstSlash + 1) };
             }
+        }
+        return { bucket: this.getBucket(bucket), key };
+    }
+
+    /** The object's metadata and where it lives, or `null` when there is no such object. */
+    private async locate(key: string, bucket?: string): Promise<{ bucket: string; key: string; meta: FileMetadata } | null> {
+        const location = this.resolveLocation(key, bucket);
+        const client = await this.getClient();
+        try {
+            const [meta] = await client.bucket(location.bucket).file(location.key).getMetadata();
+            return { ...location, meta };
+        } catch (error: unknown) {
+            if (isNotFoundError(error)) return null;
             throw error;
         }
+    }
+
+    /**
+     * The generation just described, so an overwrite between describing an
+     * object and reading it fails the read instead of sending the new bytes
+     * under the old size and version.
+     */
+    private async pinnedFile(located: { bucket: string; key: string; meta: FileMetadata }) {
+        const client = await this.getClient();
+        const generation = located.meta.generation;
+        return client.bucket(located.bucket).file(located.key, generation !== undefined ? { generation } : {});
+    }
+
+    /**
+     * An object stored gzip-encoded (`gsutil cp -z`) is decompressed on the way
+     * out, so its stored size is not the size served and a range of the one is
+     * not a range of the other. Such an object is read whole, as every object
+     * used to be; nothing this server writes is stored that way.
+     */
+    private async readDecompressed(located: { bucket: string; key: string; meta: FileMetadata }): Promise<Buffer> {
+        const [contents] = await (await this.pinnedFile(located)).download();
+        return contents;
+    }
+
+    /** See {@link StorageController.statObject}. One metadata request; no body is read. */
+    async statObject(key: string, bucket?: string): Promise<StoredObjectInfo | null> {
+        const located = await this.locate(key, bucket);
+        if (!located) return null;
+        const info = storedObjectInfo(located.meta);
+        if (located.meta.contentEncoding === "gzip") {
+            return { ...info, size: (await this.readDecompressed(located)).byteLength };
+        }
+        return info;
+    }
+
+    /**
+     * See {@link StorageController.getObjectStream}. One metadata request, then
+     * a read of exactly the requested bytes, handed on as they arrive.
+     *
+     * The metadata comes first, not after the download as `getObject` has it:
+     * it is what pins the read to one generation.
+     */
+    async getObjectStream(
+        key: string,
+        options?: { bucket?: string; range?: StoredObjectRange }
+    ): Promise<StoredObjectStream | null> {
+        const located = await this.locate(key, options?.bucket);
+        if (!located) return null;
+        const info = storedObjectInfo(located.meta);
+        const range = options?.range;
+
+        if (located.meta.contentEncoding === "gzip") {
+            const contents = await this.readDecompressed(located);
+            const inRange = range && range.end < contents.byteLength && range.start <= range.end;
+            return {
+                ...info,
+                size: contents.byteLength,
+                stream: bufferWebStream(inRange ? contents.subarray(range.start, range.end + 1) : contents),
+                ...(inRange ? { range } : {})
+            };
+        }
+
+        const file = await this.pinnedFile(located);
+        return {
+            ...info,
+            // Opened on the first read: nothing is requested from the bucket
+            // for a stream the caller ends up not reading.
+            stream: webStreamFrom(() => file.createReadStream(range ? { start: range.start, end: range.end } : {})),
+            ...(range ? { range } : {})
+        };
     }
 
     async deleteObject(key: string, bucket?: string): Promise<void> {
@@ -276,6 +378,9 @@ export class GCSStorageController implements StorageController {
             bucket: resolvedBucket,
             fullPath: file.name,
             name: file.name.split("/").pop() || "",
+            // Each listed object arrives with its full metadata, so a folder
+            // can be shown without a metadata request per file.
+            ...listedFacts(file.metadata),
             parent: null as never,
             root: null as never,
             toString: () => `gs://${resolvedBucket}/${file.name}`
@@ -372,6 +477,42 @@ export class GCSStorageController implements StorageController {
 // ---------------------------------------------------------------------------
 // Error helpers
 // ---------------------------------------------------------------------------
+
+/** A file's bytes, a chunk at a time — what `File.save` pipes from. */
+async function* byteChunks(file: Blob): AsyncGenerator<Uint8Array> {
+    const reader = file.stream().getReader();
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) return;
+            yield value;
+        }
+    } finally {
+        reader.releaseLock();
+    }
+}
+
+/** What a listing entry says about its object, from the metadata the listing carried. */
+function listedFacts(meta: FileMetadata | undefined): Pick<StorageReference, "size" | "updated" | "contentType"> {
+    if (!meta) return {};
+    const size = meta.size === undefined ? NaN : Number(meta.size);
+    return {
+        ...(Number.isFinite(size) ? { size } : {}),
+        ...(typeof meta.updated === "string" ? { updated: meta.updated } : {}),
+        ...(typeof meta.contentType === "string" && meta.contentType ? { contentType: meta.contentType } : {})
+    };
+}
+
+/** What `statObject` reports, from an object's metadata. */
+function storedObjectInfo(meta: FileMetadata): StoredObjectInfo {
+    // The object's own version — see `S3StorageController.getObject`.
+    const updated = typeof meta.updated === "string" ? Date.parse(meta.updated) : NaN;
+    return {
+        size: Number(meta.size) || 0,
+        contentType: meta.contentType || "application/octet-stream",
+        lastModified: Number.isNaN(updated) ? Date.now() : updated
+    };
+}
 
 /**
  * Check whether an error represents a 404 / Not Found from the GCS client.

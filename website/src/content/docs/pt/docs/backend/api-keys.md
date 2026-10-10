@@ -96,7 +96,7 @@ Este é o passo que faz uma chave com o escopo correto parecer quebrada. A polí
 que o Rebase adiciona a cada coleção por padrão compila para:
 
 ```sql
-rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
+(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))
 ```
 
 Ou seja, o contexto do servidor ou um administrador. Uma chave de serviço sem o papel `admin`

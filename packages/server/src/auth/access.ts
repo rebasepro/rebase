@@ -38,9 +38,38 @@ import {
 import type { HonoEnv } from "../api/types";
 import { ApiError } from "../api/errors";
 import { refuse } from "./middleware";
+import type { AuthRepository } from "./interfaces";
 
 /** The account a personal key acts as, as it is now. Null when it no longer exists. */
 export type KeyOwnerResolver = (uid: string) => Promise<{ roles: string[] } | null>;
+
+/**
+ * How a personal key finds its owner in an account store: the account as it
+ * is now — a missing or disabled one is no owner — and its roles.
+ *
+ * One read where the store answers both at once: `getAccountAccessState`, the
+ * statement every access token is already judged against, which reads roles
+ * and `disabled_at` together. Otherwise the account, then its roles — the two
+ * reads this always made, one round trip more per request.
+ */
+export function keyOwnerResolverFor(
+    repo: Pick<AuthRepository, "getUserById" | "getUserRoleIds" | "getAccountAccessState">
+): KeyOwnerResolver {
+    if (typeof repo.getAccountAccessState === "function") {
+        const readAccount = repo.getAccountAccessState.bind(repo);
+        return async (uid) => {
+            const account = await readAccount(uid);
+            // A disabled owner's keys stop with them.
+            if (!account || account.disabled) return null;
+            return { roles: account.roles };
+        };
+    }
+    return async (uid) => {
+        const user = await repo.getUserById(uid);
+        if (!user || user.disabled) return null;
+        return { roles: await repo.getUserRoleIds(uid) };
+    };
+}
 
 let configured: AccessModel = EMPTY_ACCESS_MODEL;
 let keyOwners: KeyOwnerResolver | undefined;

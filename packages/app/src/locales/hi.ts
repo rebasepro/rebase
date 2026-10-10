@@ -908,6 +908,10 @@ export const hi: RebaseTranslations = {
     studio_sql_update_failed: "अपडेट विफल: {{message}}",
     studio_sql_update_no_row: "कोई पंक्ति अपडेट नहीं हुई: पढ़े जाने के बाद पंक्ति बदल दी गई या हटा दी गई, या चुनी गई भूमिका इसे अपडेट नहीं कर सकती। जो संग्रहीत है उसे देखने के लिए क्वेरी फिर से चलाएँ।",
     studio_sql_ran_as_other_role: "ये पंक्तियाँ {{role}} के रूप में नहीं, {{ranAs}} के रूप में पढ़ी गईं: इस सर्वर पर भूमिका बदलना बंद है (DISABLE_DB_ROLE_SWITCHING), इसलिए हर स्टेटमेंट कनेक्शन के स्वामी के रूप में चलता है।",
+    studio_sql_result_truncated: "{{total}} में से पहली {{shown}} पंक्तियाँ दिखाई जा रही हैं: कंसोल एक परिणाम की अधिकतम 10,000 पंक्तियाँ, या 32 MB मान, रखता है। बाकी देखने के लिए क्वेरी को सीमित करें, या LIMIT और OFFSET से पन्ने-दर-पन्ने देखें। कॉपी और एक्सपोर्ट में केवल दिखाई गई पंक्तियाँ होती हैं।",
+    studio_sql_download_full_csv: "पूरा परिणाम CSV के रूप में डाउनलोड करें",
+    studio_sql_downloading_full_csv: "डाउनलोड हो रहा है…",
+    studio_sql_download_full_failed: "पूरा परिणाम डाउनलोड नहीं हो सका: {{message}}",
     studio_sql_role_switching_disabled: "इस सर्वर पर भूमिका बदलना बंद है: यहाँ कोई भी भूमिका चुनी जाए, हर स्टेटमेंट {{role}} के रूप में चलता है।",
     studio_sql_execution_not_supported: "वर्तमान डेटा स्रोत SQL निष्पादन का समर्थन नहीं करता।",
     studio_sql_error_executing: "क्वेरी चलाते समय एक त्रुटि हुई।",
@@ -1347,6 +1351,10 @@ export const hi: RebaseTranslations = {
     studio_schema_no_collections_body: "अभी बनाने के लिए कुछ नहीं है। config/collections/ में एक कलेक्शन जोड़ें, या यहाँ जोड़ने के लिए “कलेक्शन संपादित करें” खोलें।",
     studio_schema_introspect_hint: "जिस डेटाबेस में पहले से टेबल हैं, वहाँ rebase schema introspect आपके लिए कलेक्शन फ़ाइलें लिख देता है।",
     studio_schema_visualizer_source: "आपके कलेक्शनों से बनाया गया: टेबल, कॉलम, टाइप और रिलेशन वैसे ही जैसे वे घोषित करते हैं। केवल RLS चिह्न डेटाबेस से पढ़े जाते हैं।",
+    studio_schema_laying_out: "आरेख व्यवस्थित किया जा रहा है…",
+    studio_schema_neighbourhood: "{{total}} में से {{shown}} टेबल दिखाई जा रही हैं: {{table}} और उसके आस-पास की टेबल। आगे बढ़ने के लिए सूची में कोई और चुनें।",
+    studio_schema_neighbourhood_depth_1: "1 रिलेशन दूर",
+    studio_schema_neighbourhood_depth_2: "2 रिलेशन दूर",
 
 
     // ─── Studio: RLS editor confirmations ───────────────────────

@@ -261,6 +261,31 @@ CREATE POLICY secure_anon_real_guard_all ON public.secure_anon_real_guard
     );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.secure_anon_real_guard TO anon, authenticated;
 
+-- Rebase's `policy.registered()`: signed in, not the anonymous sentinel, not a
+-- guest — and nothing about which rows. Written as the compiler writes it, so
+-- what is scanned is what Postgres stores for it: the guest conjunct comes
+-- back as `(NOT ( SELECT rebase.is_anonymous() AS is_anonymous))`, which the
+-- parser did not recognise, and the whole clause went unreported. Every
+-- account that is not a guest reads every row: `policy-authenticated-tautology`.
+CREATE SCHEMA rebase;
+GRANT USAGE ON SCHEMA rebase TO anon, authenticated;
+CREATE FUNCTION rebase.uid() RETURNS text
+    LANGUAGE sql STABLE AS $$ SELECT NULLIF(current_setting('app.uid', true), '') $$;
+CREATE FUNCTION rebase.is_anonymous() RETURNS boolean
+    LANGUAGE sql STABLE AS $$ SELECT COALESCE(NULLIF(current_setting('app.is_anonymous', true), ''), 'false')::boolean $$;
+CREATE TABLE public.vuln_registered_tautology (
+    id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    body text
+);
+ALTER TABLE public.vuln_registered_tautology ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vuln_registered_tautology FORCE ROW LEVEL SECURITY;
+CREATE POLICY vuln_registered_tautology_read ON public.vuln_registered_tautology
+    FOR SELECT TO authenticated USING (
+        (SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')
+        AND NOT (SELECT rebase.is_anonymous())
+    );
+GRANT SELECT ON public.vuln_registered_tautology TO authenticated;
+
 -- The base table for the view checks below. Correct in itself.
 CREATE TABLE public.protected_ledger (
     id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),

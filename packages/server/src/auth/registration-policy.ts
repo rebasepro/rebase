@@ -1,3 +1,5 @@
+import type { AuthRepository } from "./interfaces";
+
 /**
  * Whether a registration may proceed — computed in exactly one place.
  *
@@ -66,6 +68,35 @@ export interface RegistrationPolicy {
  */
 export function isBootstrapWindowOpen(env: { NODE_ENV?: string } = process.env): boolean {
     return env.NODE_ENV !== "production";
+}
+
+type UserPresenceRepository = Pick<AuthRepository, "firstUserIds" | "listUsersPaginated">;
+
+/**
+ * Whether the users table is empty — the question behind the bootstrap window.
+ *
+ * Through `AuthRepository.firstUserIds` when the repository has it: one
+ * unordered `LIMIT 1` read. Otherwise through `listUsersPaginated`, which also
+ * counts and sorts the whole table, so it is only the fallback.
+ */
+export async function isUserTableEmpty(repo: UserPresenceRepository): Promise<boolean> {
+    if (repo.firstUserIds) return (await repo.firstUserIds(1)).length === 0;
+    const { total } = await repo.listUsersPaginated({ limit: 1 });
+    return total === 0;
+}
+
+/**
+ * Whether the account just created is the only one there is. Two ids at most:
+ * whether anyone else exists, and, when nobody does, whether it is this one.
+ * Same fallback as {@link isUserTableEmpty}.
+ */
+export async function isOnlyUser(repo: UserPresenceRepository, uid: string): Promise<boolean> {
+    if (repo.firstUserIds) {
+        const ids = await repo.firstUserIds(2);
+        return ids.length === 1 && ids[0] === uid;
+    }
+    const { users, total } = await repo.listUsersPaginated({ limit: 2 });
+    return total === 1 && users[0]?.id === uid;
 }
 
 /**

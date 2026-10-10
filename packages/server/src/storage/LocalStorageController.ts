@@ -4,12 +4,20 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { randomUUID } from "crypto";
+import { Readable } from "stream";
+import { pipeline } from "stream/promises";
 import { promisify } from "util";
 import {
     StorageController,
     LocalStorageConfig,
-    DEFAULT_MAX_FILE_SIZE
+    DEFAULT_MAX_FILE_SIZE,
+    type StoredObjectInfo,
+    type StoredObjectRange,
+    type PutObjectOptions,
+    type StoredObjectStream
 } from "./types";
+import { fileWebStream } from "./streams";
 import {
     UploadFileProps,
     UploadFileResult,
@@ -25,7 +33,6 @@ const mkdir = promisify(fs.mkdir);
 const writeFile = promisify(fs.writeFile);
 const readFile = promisify(fs.readFile);
 const unlink = promisify(fs.unlink);
-const readdir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
 const access = promisify(fs.access);
 
@@ -36,6 +43,83 @@ const access = promisify(fs.access);
  * bare key lives.
  */
 export const DEFAULT_BUCKET = "default";
+
+/** What a write in progress is named: `.<name>.<uuid>.partial`, beside its target. */
+const PARTIAL_SUFFIX = ".partial";
+
+/**
+ * How long a folder's entries, read for a paged listing, serve its
+ * continuation pages. See {@link LocalStorageController.listingEntries}.
+ */
+const LISTING_SNAPSHOT_TTL_MS = 30_000;
+/**
+ * A folder changed less than this long before it was read is not kept. Two
+ * changes inside one mtime tick (a second on HFS+ and ext3, two on FAT) leave
+ * one mtime, so the later change would not invalidate the read.
+ */
+const LISTING_SNAPSHOT_RACY_MS = 2_000;
+/** Folders kept at once, and entries across them, before the oldest goes. */
+const LISTING_SNAPSHOT_MAX_DIRS = 16;
+const LISTING_SNAPSHOT_MAX_ENTRIES = 100_000;
+
+interface ListingSnapshot {
+    entries: fs.Dirent[];
+    /** The folder's mtime when it was read. */
+    mtimeMs: number;
+    /** When it was read, by `Date.now()`. */
+    readAt: number;
+}
+const isPartialWrite = (name: string) => /^\..+\.[0-9a-f-]{36}\.partial$/.test(name);
+
+/** A file's bytes, a chunk at a time. */
+async function* blobChunks(file: Blob): AsyncGenerator<Uint8Array> {
+    const reader = file.stream().getReader();
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) return;
+            yield value;
+        }
+    } finally {
+        reader.releaseLock();
+    }
+}
+
+/** Files of one listing page described at once: a `stat` and a sidecar read each. */
+const LISTING_DESCRIBE_CONCURRENCY = 32;
+
+/**
+ * Give each listed file its `size`, `updated` and `contentType`, from a `stat`
+ * and the metadata sidecar `putObject` writes. A file gone since the folder
+ * was read keeps its name and nothing else; one without a sidecar is
+ * `application/octet-stream`, as `statObject` reports it.
+ */
+async function describeListed(items: StorageReference[], absolutePathOf: (ref: StorageReference) => string): Promise<void> {
+    let next = 0;
+    const worker = async () => {
+        while (next < items.length) {
+            const ref = items[next++];
+            const absolute = absolutePathOf(ref);
+            let fileStat: fs.Stats;
+            try {
+                fileStat = await fs.promises.stat(absolute);
+            } catch {
+                continue;
+            }
+            let contentType = "application/octet-stream";
+            try {
+                const sidecar = JSON.parse(await fs.promises.readFile(`${absolute}.metadata.json`, "utf-8"));
+                if (typeof sidecar?.contentType === "string" && sidecar.contentType) contentType = sidecar.contentType;
+            } catch {
+                // No sidecar: the default type.
+            }
+            ref.size = fileStat.size;
+            ref.updated = new Date(Math.trunc(fileStat.mtimeMs)).toISOString();
+            ref.contentType = contentType;
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(LISTING_DESCRIBE_CONCURRENCY, items.length) }, worker));
+}
 
 /**
  * Remove initial and trailing slashes from a path.
@@ -59,6 +143,14 @@ function normalizeStoragePath(s: string): string {
 export class LocalStorageController implements StorageController {
     private config: LocalStorageConfig;
     private basePath: string;
+    /**
+     * Folder entries read by a listing's first page, for its continuation
+     * pages. Keyed by the folder's absolute path (bucket included). Not
+     * caller-scoped, because the entries are not: every caller of this method
+     * gets the same names, and the routes authorize the prefix before calling
+     * it. Insertion-ordered, so the first key is the oldest.
+     */
+    private readonly listingSnapshots = new Map<string, ListingSnapshot>();
 
     constructor(config: LocalStorageConfig) {
         this.config = config;
@@ -179,8 +271,8 @@ export class LocalStorageController implements StorageController {
         key,
         metadata,
         bucket
-    }: UploadFileProps): Promise<UploadFileResult> {
-        this.validateFile(file);
+    }: UploadFileProps, options?: PutObjectOptions): Promise<UploadFileResult> {
+        if (options?.uploadLimits !== false) this.validateFile(file);
 
         // Always use a bucket (default to 'default'). `||`, not `??`: an empty
         // bucket is "the caller named none", and it used to resolve to the
@@ -192,10 +284,18 @@ export class LocalStorageController implements StorageController {
         // Ensure parent directory exists
         await this.ensureDir(path.dirname(fullPath));
 
-        // Convert File to Buffer and write
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        await writeFile(fullPath, buffer);
+        // Streamed to disk a chunk at a time — read whole, the file was held
+        // twice in memory (the read, then a copy). Written beside the target
+        // and renamed over it, so a write that fails part-way leaves the old
+        // object (or none), never a truncated one.
+        const partial = path.join(path.dirname(fullPath), `.${path.basename(fullPath)}.${randomUUID()}${PARTIAL_SUFFIX}`);
+        try {
+            await pipeline(Readable.from(blobChunks(file)), fs.createWriteStream(partial));
+            await fs.promises.rename(partial, fullPath);
+        } catch (error: unknown) {
+            await fs.promises.rm(partial, { force: true });
+            throw error;
+        }
 
         // Always save metadata file with at least contentType (required for preview)
         const metadataPath = `${fullPath}.metadata.json`;
@@ -332,6 +432,62 @@ export class LocalStorageController implements StorageController {
         }
     }
 
+    /** The file a read of `key` addresses — `getObject`'s resolution, `local://` URLs included. */
+    private readPath(key: string, bucket?: string): string {
+        let resolvedPath = key;
+        let resolvedBucket = bucket;
+        if (key.startsWith("local://")) {
+            const withoutProtocol = key.substring("local://".length);
+            const firstSlash = withoutProtocol.indexOf("/");
+            if (firstSlash > 0) {
+                resolvedBucket = withoutProtocol.substring(0, firstSlash);
+                resolvedPath = withoutProtocol.substring(firstSlash + 1);
+            }
+        }
+        return this.getFullPath(normalizeStoragePath(resolvedPath), resolvedBucket);
+    }
+
+    /** See {@link StorageController.statObject}. A `stat` and the metadata sidecar; the file is not read. */
+    async statObject(key: string, bucket?: string): Promise<StoredObjectInfo | null> {
+        const fullPath = this.readPath(key, bucket);
+        let fileStat: fs.Stats;
+        try {
+            fileStat = await stat(fullPath);
+        } catch {
+            return null;
+        }
+        // A folder is not an object — see `getSignedUrl`.
+        if (!fileStat.isFile()) return null;
+
+        let contentType = "application/octet-stream";
+        try {
+            const metadata = JSON.parse(await readFile(`${fullPath}.metadata.json`, "utf-8"));
+            contentType = metadata.contentType || contentType;
+        } catch {
+            // No metadata, use default content type
+        }
+        return { size: fileStat.size, contentType, lastModified: Math.trunc(fileStat.mtimeMs) };
+    }
+
+    /**
+     * See {@link StorageController.getObjectStream}. The file — or only the
+     * requested range of it — read from disk a chunk at a time, opened on the
+     * first read.
+     */
+    async getObjectStream(
+        key: string,
+        options?: { bucket?: string; range?: StoredObjectRange }
+    ): Promise<StoredObjectStream | null> {
+        const info = await this.statObject(key, options?.bucket);
+        if (!info) return null;
+        const range = options?.range;
+        return {
+            ...info,
+            stream: fileWebStream(this.readPath(key, options?.bucket), range),
+            ...(range ? { range } : {})
+        };
+    }
+
     async deleteObject(key: string, bucket?: string): Promise<void> {
         // Handle local:// URLs
         let resolvedPath = key;
@@ -416,8 +572,7 @@ export class LocalStorageController implements StorageController {
         const prefixes: StorageReference[] = [];
 
         try {
-            await access(fullPath, fs.constants.R_OK);
-            const entries = await readdir(fullPath, { withFileTypes: true });
+            const entries = await this.listingEntries(fullPath, startIndex > 0);
 
             let count = 0;
             // Cursor over `entries`, not over emitted results. Every stored
@@ -431,8 +586,8 @@ export class LocalStorageController implements StorageController {
                 const entry = entries[i];
                 scanned = i + 1;
 
-                // Skip metadata files
-                if (entry.name.endsWith(".metadata.json")) {
+                // Skip metadata files, and writes still in progress
+                if (entry.name.endsWith(".metadata.json") || isPartialWrite(entry.name)) {
                     continue;
                 }
 
@@ -462,7 +617,14 @@ export class LocalStorageController implements StorageController {
                 count++;
             }
 
+            // Each file's size, version and stored type, so a folder can be
+            // shown without a metadata request per file — which made the
+            // same `stat` and sidecar read, behind an HTTP round trip each.
+            await describeListed(items, ref => path.join(fullPath, ref.name));
+
             const nextPageToken = scanned < entries.length ? String(scanned) : undefined;
+            // The last page of a walk frees the folder's read.
+            if (!nextPageToken) this.listingSnapshots.delete(fullPath);
 
             return {
                 items,
@@ -477,6 +639,49 @@ prefixes: [] };
             }
             throw error;
         }
+    }
+
+    /**
+     * A folder's entries for a listing page.
+     *
+     * A page token is an index into these entries, and every continuation
+     * page used to read the whole folder again to find its place: a folder of
+     * n entries listed in pages of p cost n/p full reads. A first page reads
+     * the folder and, when there is a next page, keeps the read; a
+     * continuation page indexes into it while all of these hold:
+     *
+     *  - the folder's mtime is the one read with it. Adding, removing or
+     *    renaming an entry changes it, which is the invalidation;
+     *  - it is under {@link LISTING_SNAPSHOT_TTL_MS} old;
+     *  - the folder had not changed in the {@link LISTING_SNAPSHOT_RACY_MS}
+     *    before the read. Otherwise it is not kept at all.
+     *
+     * A first page always reads the folder as it is.
+     */
+    private async listingEntries(fullPath: string, continuation: boolean): Promise<fs.Dirent[]> {
+        const readAt = Date.now();
+        // A stat rather than `access`: the same ENOENT/ENOTDIR for a missing
+        // folder, and the mtime the kept read is checked against. A folder
+        // this process cannot read still fails at `readdir`, as it did.
+        const { mtimeMs } = await fs.promises.stat(fullPath);
+        const kept = this.listingSnapshots.get(fullPath);
+        if (continuation && kept && kept.mtimeMs === mtimeMs && readAt - kept.readAt < LISTING_SNAPSHOT_TTL_MS) {
+            return kept.entries;
+        }
+        this.listingSnapshots.delete(fullPath);
+
+        const entries = await fs.promises.readdir(fullPath, { withFileTypes: true });
+        if (readAt - mtimeMs > LISTING_SNAPSHOT_RACY_MS && entries.length <= LISTING_SNAPSHOT_MAX_ENTRIES) {
+            this.listingSnapshots.set(fullPath, { entries, mtimeMs, readAt });
+            let total = 0;
+            for (const snapshot of this.listingSnapshots.values()) total += snapshot.entries.length;
+            for (const [key, snapshot] of this.listingSnapshots) {
+                if (this.listingSnapshots.size <= LISTING_SNAPSHOT_MAX_DIRS && total <= LISTING_SNAPSHOT_MAX_ENTRIES) break;
+                this.listingSnapshots.delete(key);
+                total -= snapshot.entries.length;
+            }
+        }
+        return entries;
     }
 
     /**

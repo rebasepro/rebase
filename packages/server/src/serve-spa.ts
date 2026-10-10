@@ -3,6 +3,9 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import * as path from "path";
 import * as fs from "fs";
 import fsp from "node:fs/promises";
+import zlib from "node:zlib";
+import { COMPRESSIBLE_CONTENT_TYPE_REGEX } from "hono/compress";
+import { getMimeType } from "hono/utils/mime";
 import { responseCompression } from "./utils/compression.js";
 import { logger } from "./utils/logger.js";
 import { STATIC_APP_CSP } from "./boot/security-headers.js";
@@ -142,14 +145,248 @@ function isForbiddenStaticPath(requestPath: string): boolean {
  * A path that does not resolve is not refused here: it does not exist, and
  * `serveStatic` answering 404 for it is the right outcome and a cheaper one.
  */
-async function resolvesInsideBuild(frontendPath: string, relativePath: string): Promise<boolean> {
+async function resolvesInsideBuild(buildRoot: BuildRoot, frontendPath: string, relativePath: string): Promise<boolean> {
     try {
-        const root = await fsp.realpath(frontendPath);
         const target = await fsp.realpath(path.join(frontendPath, relativePath));
-        return target === root || target.startsWith(root + path.sep);
+        const inside = (root: string) => target === root || target.startsWith(root + path.sep);
+        // A refusal is never made against a remembered root: it is asked again.
+        return inside(await buildRoot.resolve()) || inside(await buildRoot.resolve({ fresh: true }));
     } catch {
         return true;
     }
+}
+
+/** The build directory's real path, for {@link resolvesInsideBuild}. */
+interface BuildRoot {
+    resolve(options?: { fresh?: boolean }): Promise<string>;
+}
+
+/**
+ * The build root's real path, resolved once where that is safe.
+ *
+ * Every static request resolved it, although it is the one path in the check
+ * that does not depend on the request. Remembered only when the build path
+ * holds no symlink at mount — resolving to itself — because the deploy
+ * pattern that does flip a symlink (`current -> releases/N`) moves the root
+ * under a running server, and such a root is resolved per request as before.
+ * A failed resolve is not remembered.
+ */
+function buildRootOf(frontendPath: string): BuildRoot {
+    const absolute = path.resolve(frontendPath);
+    let stable: boolean | undefined;
+    let remembered: Promise<string> | undefined;
+    const resolveNow = () => fsp.realpath(frontendPath);
+    return {
+        resolve({ fresh = false } = {}) {
+            if (fresh || stable === false) return resolveNow();
+            remembered ??= resolveNow().then(
+                (real) => {
+                    stable = real === absolute;
+                    if (!stable) remembered = undefined;
+                    return real;
+                },
+                (error: unknown) => {
+                    remembered = undefined;
+                    throw error;
+                }
+            );
+            return remembered;
+        }
+    };
+}
+
+/**
+ * Does the build hold any precompressed sibling (`.br`, `.gz`, `.zst`)?
+ *
+ * Asked once at mount, so `serveStatic` looks for siblings only in a build
+ * that has them. With `precompressed` on it `statSync`s all three beside every
+ * file, each a throw-and-catch on the event loop, for files no build of ours
+ * emits. Bounded: past a few thousand entries the answer is "maybe", which
+ * keeps the per-request lookup — what every mount did before. Dot-directories
+ * and `node_modules` are not build output; a symlinked directory is not
+ * followed. Siblings written after the mount are not seen, and those files are
+ * then compressed on the fly instead: the same bytes, at a CPU cost.
+ */
+function buildHasPrecompressedFiles(frontendPath: string, budget = 5000): boolean {
+    const pending = [frontendPath];
+    let seen = 0;
+    while (pending.length > 0) {
+        const dir = pending.pop() as string;
+        let entries: fs.Dirent[];
+        try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
+        } catch {
+            continue;
+        }
+        for (const entry of entries) {
+            if (++seen > budget) return true;
+            if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+            if (entry.isDirectory()) pending.push(path.join(dir, entry.name));
+            else if (/\.(?:br|gz|zst)$/.test(entry.name)) return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * A request path as `serveStatic` reads it — `decodeURI`, falling back per
+ * escape — or `null` where `serveStatic` refuses it. Mirrored so the file the
+ * validators below describe is the file `serveStatic` would send.
+ */
+function decodeStaticPath(requestPath: string): string | null {
+    let decoded: string;
+    try {
+        decoded = decodeURI(requestPath);
+    } catch {
+        decoded = requestPath.replace(/(?:%[0-9A-Fa-f]{2})+/g, (escape) => {
+            try {
+                return decodeURI(escape);
+            } catch {
+                return escape;
+            }
+        });
+    }
+    return /(?:^|[/\\])\.{1,2}(?:$|[/\\])|[/\\]{2,}|\\/.test(decoded) ? null : decoded;
+}
+
+/** The file a static request maps to, and its validators. */
+interface StaticFile {
+    path: string;
+    size: number;
+    mtimeMs: number;
+    etag: string;
+    lastModified: string;
+}
+
+/**
+ * A weak validator from size and modification time — what changes when a
+ * file is rewritten or rebuilt. Weak because the gzip and identity bodies of
+ * one file share it, as Hono's `compress` makes a strong one weak.
+ */
+function weakETag(size: number, mtimeMs: number): string {
+    return `W/"${size.toString(16)}-${Math.trunc(mtimeMs).toString(16)}"`;
+}
+
+async function statStaticFile(filePath: string): Promise<StaticFile | null> {
+    try {
+        let resolved = filePath;
+        let stats = await fsp.stat(resolved);
+        // A directory serves its index.html, as `serveStatic` does.
+        if (stats.isDirectory()) {
+            resolved = path.join(resolved, "index.html");
+            stats = await fsp.stat(resolved);
+        }
+        if (!stats.isFile()) return null;
+        return {
+            path: resolved,
+            size: stats.size,
+            mtimeMs: stats.mtimeMs,
+            etag: weakETag(stats.size, stats.mtimeMs),
+            lastModified: stats.mtime.toUTCString()
+        };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Whether the client's copy is current: `If-None-Match` (weak comparison) if
+ * it sent one, else `If-Modified-Since` at the second resolution
+ * `Last-Modified` carries. RFC 9110 §13.1.
+ */
+function isNotModified(c: Context, etag: string, mtimeMs: number): boolean {
+    const ifNoneMatch = c.req.header("if-none-match");
+    if (ifNoneMatch !== undefined) {
+        const opaque = etag.replace(/^W\//, "");
+        return ifNoneMatch.split(",").some((tag) => {
+            const trimmed = tag.trim();
+            return trimmed === "*" || trimmed.replace(/^W\//, "") === opaque;
+        });
+    }
+    const ifModifiedSince = c.req.header("if-modified-since");
+    if (ifModifiedSince === undefined) return false;
+    const since = Date.parse(ifModifiedSince);
+    return !Number.isNaN(since) && Math.floor(mtimeMs / 1000) * 1000 <= since;
+}
+
+/** The 304 for {@link isNotModified}: the validators, and no body. */
+function notModified(c: Context, file: { etag: string; lastModified: string }): Response {
+    return c.body(null, 304, {
+        ETag: file.etag,
+        "Last-Modified": file.lastModified,
+        Vary: "Accept-Encoding"
+    });
+}
+
+/**
+ * Would Hono's `compress` pick gzip for this `Accept-Encoding`? Its rule,
+ * restated: of gzip and deflate, the first with q=1, else the higher q above 0.
+ */
+function negotiatesGzip(acceptEncoding: string | undefined): boolean {
+    if (!acceptEncoding) return false;
+    const q = new Map<string, number>();
+    for (const part of acceptEncoding.split(",")) {
+        const [name, ...params] = part.split(";").map((piece) => piece.trim());
+        const weight = params.find((param) => /^q=/i.test(param));
+        const value = weight === undefined ? 1 : Number(weight.slice(2));
+        q.set(name.toLowerCase(), Number.isFinite(value) ? value : 1);
+    }
+    const wildcard = q.get("*");
+    const gzip = q.get("gzip") ?? wildcard ?? 0;
+    const deflate = q.get("deflate") ?? wildcard ?? 0;
+    if (gzip === 1) return true;
+    return gzip > 0 && deflate !== 1 && gzip >= deflate;
+}
+
+/**
+ * Gzipped content-hashed build files, so each is compressed once per process
+ * rather than once per visitor.
+ *
+ * Key: the file's path, size and modification time — a file rewritten under
+ * the same name (a rebuild in place) is a new entry, and a hashed name changes
+ * with its bytes anyway. These are public build artifacts, the same bytes for
+ * every caller of a mount, so nothing request- or user-specific is stored.
+ * Bounded by compressed bytes, least recently used first out; a file larger
+ * than {@link COMPRESSED_ASSET_MAX_SOURCE} is left to on-the-fly compression.
+ * Same zlib default level as `CompressionStream`.
+ */
+const COMPRESSED_ASSET_BUDGET = 32 * 1024 * 1024;
+const COMPRESSED_ASSET_MAX_SOURCE = 8 * 1024 * 1024;
+const COMPRESSION_THRESHOLD = 1024;
+const compressedAssets = new Map<string, Uint8Array<ArrayBuffer>>();
+const compressingAssets = new Map<string, Promise<Uint8Array<ArrayBuffer>>>();
+let compressedAssetBytes = 0;
+
+function gzippedAsset(file: StaticFile): Promise<Uint8Array<ArrayBuffer>> {
+    const key = `${file.path}\0${file.size}\0${file.mtimeMs}`;
+    const hit = compressedAssets.get(key);
+    if (hit) {
+        compressedAssets.delete(key);
+        compressedAssets.set(key, hit);
+        return Promise.resolve(hit);
+    }
+    let pending = compressingAssets.get(key);
+    if (!pending) {
+        pending = (async () => {
+            const source = await fsp.readFile(file.path);
+            const gzipped = await new Promise<Uint8Array<ArrayBuffer>>((resolve, reject) =>
+                zlib.gzip(source, (error, result) => error ? reject(error) : resolve(result)));
+            // Rewritten between the stat and the read: serve what was read,
+            // but do not file it under the old size and time.
+            if (source.byteLength === file.size) {
+                compressedAssets.set(key, gzipped);
+                compressedAssetBytes += gzipped.byteLength;
+                for (const [oldest, bytes] of compressedAssets) {
+                    if (compressedAssetBytes <= COMPRESSED_ASSET_BUDGET) break;
+                    compressedAssets.delete(oldest);
+                    compressedAssetBytes -= bytes.byteLength;
+                }
+            }
+            return gzipped;
+        })().finally(() => compressingAssets.delete(key));
+        compressingAssets.set(key, pending);
+    }
+    return pending;
 }
 
 /**
@@ -371,11 +608,14 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
             c.header("Content-Security-Policy", STATIC_APP_CSP);
         }
         if (c.res.headers.has("cache-control")) return;
-        // 404s and redirects are not the build's artifacts to cache. A 304 is,
-        // and carries the header from the 200 that seeded it.
-        if (c.res.status !== 200) return;
+        // 404s and redirects are not the build's artifacts to cache. A 304
+        // repeats the 200's policy, as RFC 9110 §15.4.5 asks.
+        if (c.res.status !== 200 && c.res.status !== 304) return;
         c.header("Cache-Control", isContentHashed(c.req.path) ? IMMUTABLE_CACHE : REVALIDATE_CACHE);
     });
+
+    const buildRoot = buildRootOf(frontendPath);
+    const precompressed = buildHasPrecompressedFiles(frontendPath);
 
     // Before `serveStatic`, because it is what `serveStatic` will otherwise
     // answer. See {@link isForbiddenStaticPath} and {@link resolvesInsideBuild}.
@@ -386,7 +626,7 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         if (isForbiddenStaticPath(requestPath)) {
             return c.text("Not found", 404);
         }
-        if (!await resolvesInsideBuild(frontendPath, "." + requestPath)) {
+        if (!await resolvesInsideBuild(buildRoot, frontendPath, "." + requestPath)) {
             logger.warn(
                 `[static] Refused ${c.req.path}: it resolves outside the build directory ` +
                 `(${frontendPath}). A symlink in a build is a way out of it.`
@@ -397,10 +637,67 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         return next();
     });
 
+    // Validators, and the kept gzip of hashed chunks — for a request that maps
+    // to a file of the build. After the containment check above, before
+    // compression and `serveStatic`: a 304 and a kept gzip need neither.
+    //
+    //  - `ETag` (weak, size + mtime) on what `serveStatic` sends, and a 304 when
+    //    the client already holds it. `serveStatic` sets `Last-Modified` but
+    //    never reads `If-Modified-Since`, and sends no ETag.
+    //  - A content-hashed, compressible file of 1 KB or more, asked for in
+    //    full by a client that negotiates gzip, in a build without
+    //    precompressed siblings: its gzip from {@link gzippedAsset}, with a
+    //    `Content-Length`, instead of `CompressionStream` on every request.
+    app.use(scope, async (c, next) => {
+        if (declines(c) || (c.req.method !== "GET" && c.req.method !== "HEAD")) return next();
+        const decoded = decodeStaticPath(c.req.path);
+        if (decoded === null) return next();
+        const relative = isRoot ? decoded : (decoded.slice(basePath.length) || "/");
+        const file = await statStaticFile(path.join(frontendPath, relative));
+        if (!file) return next();
+
+        if (isNotModified(c, file.etag, file.mtimeMs)) return notModified(c, file);
+
+        const mimeType = getMimeType(file.path);
+        if (
+            c.req.method === "GET" && !precompressed && !c.req.header("range")
+            && isContentHashed(relative) && mimeType !== undefined && COMPRESSIBLE_CONTENT_TYPE_REGEX.test(mimeType)
+            && file.size >= COMPRESSION_THRESHOLD && file.size <= COMPRESSED_ASSET_MAX_SOURCE
+            && negotiatesGzip(c.req.header("accept-encoding"))
+        ) {
+            let gzipped: Uint8Array<ArrayBuffer> | undefined;
+            try {
+                gzipped = await gzippedAsset(file);
+            } catch {
+                // Gone or unreadable since the stat: `serveStatic` decides.
+            }
+            if (gzipped) {
+                return c.body(gzipped, 200, {
+                    "Content-Type": mimeType,
+                    "Content-Encoding": "gzip",
+                    "Content-Length": String(gzipped.byteLength),
+                    Vary: "Accept-Encoding",
+                    "Last-Modified": file.lastModified,
+                    ETag: file.etag
+                });
+            }
+        }
+
+        await next();
+        // Only on the response `serveStatic` built from this same file — it
+        // stamps the same `Last-Modified` — never on a fallback that answered
+        // instead, nor on a precompressed sibling's.
+        if (c.res.status === 200 && !c.res.headers.has("etag")
+            && c.res.headers.get("last-modified") === file.lastModified) {
+            c.res.headers.set("ETag", file.etag);
+        }
+    });
+
     app.use(scope, unlessDeclined(responseCompression()));
     app.use(scope, unlessDeclined(serveStatic({
         root: path.relative(process.cwd(), frontendPath),
-        precompressed: true,
+        // Only where the build has siblings to find; see buildHasPrecompressedFiles.
+        precompressed,
         // The prefix is a serving concern, not a directory: `/admin/assets/x.js`
         // lives at `<adminBuild>/assets/x.js`.
         ...(isRoot ? {} : { rewriteRequestPath: (p: string) => p.slice(basePath.length) || "/" })
@@ -413,7 +710,11 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
 
 
     // Cache the index.html content to avoid re-reading from disk on every navigation request.
+    // Its validators are those of the file it was read from — the same ones `/`
+    // carries when `serveStatic` answers it — taken when it is read, so a
+    // deep link revalidates to a 304 like any file.
     let cachedHtml: string | null = null;
+    let cachedHtmlFile: StaticFile | null = null;
 
     // SPA fallback - serve index.html for all non-excluded routes under basePath.
     //
@@ -442,6 +743,7 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
 
         if (!cachedHtml) {
             try {
+                cachedHtmlFile = await statStaticFile(indexPath);
                 cachedHtml = await fsp.readFile(indexPath, "utf-8");
             } catch {
                 logger.warn(`⚠️ Index file not found: ${indexPath}`);
@@ -449,6 +751,11 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
             }
         }
 
+        if (cachedHtmlFile) {
+            if (isNotModified(c, cachedHtmlFile.etag, cachedHtmlFile.mtimeMs)) return notModified(c, cachedHtmlFile);
+            c.header("ETag", cachedHtmlFile.etag);
+            c.header("Last-Modified", cachedHtmlFile.lastModified);
+        }
         return c.html(cachedHtml);
     });
 

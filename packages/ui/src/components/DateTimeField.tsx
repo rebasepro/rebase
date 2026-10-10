@@ -47,6 +47,72 @@ export type DateTimeFieldProps = {
     "aria-label"?: string;
 };
 
+/** The parts `<input type="date">` / `"datetime-local"` values are built from. */
+const INPUT_PARTS: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+};
+
+/**
+ * Formatters for named time zones, keyed by the IANA name ("UTC" included).
+ *
+ * Building an `Intl.DateTimeFormat` costs about ten times what formatting
+ * with one does, and this field needs one per render and three per keystroke
+ * when it has a `timezone`. A named zone's rules cannot change during a
+ * session, so its formatter is built once; the map holds one entry per zone
+ * a field has used. The local zone (no `timezone`) is NOT cached: a formatter
+ * fixes the zone it resolved when it was built, while the parse side reads the
+ * machine's zone live through `Date`, and a laptop can change zones with the
+ * tab open.
+ */
+const zoneFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function inputPartsFormatter(timeZone: string | undefined): Intl.DateTimeFormat {
+    if (timeZone === undefined) return new Intl.DateTimeFormat("en-CA", INPUT_PARTS);
+    let formatter = zoneFormatters.get(timeZone);
+    if (!formatter) {
+        formatter = new Intl.DateTimeFormat("en-CA", {
+            ...INPUT_PARTS,
+            timeZone
+        });
+        zoneFormatters.set(timeZone, formatter);
+    }
+    return formatter;
+}
+
+/** A UTC `Date` as the input's value string, in `timezone` (undefined = local). */
+function valueAsInputValue(
+    dateValue: Date | null,
+    mode: "date" | "date_time",
+    timezone: string | undefined
+): string {
+    if (!dateValue || !(dateValue instanceof Date) || isNaN(dateValue.getTime())) {
+        return "";
+    }
+    const pad = (n: number) => n.toString().padStart(2, "0");
+
+    // The date parts in the target timezone (undefined = local timezone)
+    const parts = inputPartsFormatter(timezone).formatToParts(dateValue);
+
+    const getPart = (type: string) => parts.find(p => p.type === type)?.value ?? "";
+
+    const year = getPart("year");
+    const month = getPart("month");
+    const day = getPart("day");
+
+    if (mode === "date") {
+        return `${year}-${month}-${day}`;
+    } else {
+        const hours = getPart("hour");
+        const minutes = getPart("minute");
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+}
+
 export const DateTimeField: React.FC<DateTimeFieldProps> = ({
     value,
     label,
@@ -97,45 +163,6 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
         onChange?.(null);
     };
 
-    // Convert UTC Date to display string in the specified timezone
-    const valueAsInputValue = (
-        dateValue: Date | null,
-        mode: "date" | "date_time"
-    ) => {
-        if (!dateValue || !(dateValue instanceof Date) || isNaN(dateValue.getTime())) {
-            return "";
-        }
-        const pad = (n: number) => n.toString().padStart(2, "0");
-
-        // Use Intl.DateTimeFormat to get date parts in the target timezone
-        const options: Intl.DateTimeFormatOptions = {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-            timeZone: timezone // undefined = local timezone
-        };
-
-        const formatter = new Intl.DateTimeFormat("en-CA", options);
-        const parts = formatter.formatToParts(dateValue);
-
-        const getPart = (type: string) => parts.find(p => p.type === type)?.value ?? "";
-
-        const year = getPart("year");
-        const month = getPart("month");
-        const day = getPart("day");
-
-        if (mode === "date") {
-            return `${year}-${month}-${day}`;
-        } else {
-            const hours = getPart("hour");
-            const minutes = getPart("minute");
-            return `${year}-${month}-${day}T${hours}:${minutes}`;
-        }
-    };
-
     // Get the UTC offset for a specific date in the target timezone (in minutes)
     const getTimezoneOffsetMinutes = (date: Date, tz?: string): number => {
         if (!tz) {
@@ -143,24 +170,8 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
             return -date.getTimezoneOffset();
         }
         // For named timezones, calculate the offset by comparing formatted times
-        const utcFormatter = new Intl.DateTimeFormat("en-CA", {
-            year: "numeric",
-month: "2-digit",
-day: "2-digit",
-            hour: "2-digit",
-minute: "2-digit",
-hour12: false,
-            timeZone: "UTC"
-        });
-        const tzFormatter = new Intl.DateTimeFormat("en-CA", {
-            year: "numeric",
-month: "2-digit",
-day: "2-digit",
-            hour: "2-digit",
-minute: "2-digit",
-hour12: false,
-            timeZone: tz
-        });
+        const utcFormatter = inputPartsFormatter("UTC");
+        const tzFormatter = inputPartsFormatter(tz);
 
         const utcParts = utcFormatter.formatToParts(date);
         const tzParts = tzFormatter.formatToParts(date);
@@ -258,10 +269,19 @@ hour12: false,
         }
     };
 
+    // Formatted when the value, mode or zone changes, not on every render.
+    // Focusing formats afresh (below), so typing always starts from the
+    // current wall-clock text.
+    const valueTime = value instanceof Date ? value.getTime() : undefined;
+    const displayValue = React.useMemo(
+        () => valueAsInputValue(valueTime === undefined ? null : new Date(valueTime), mode, timezone),
+        [valueTime, mode, timezone]
+    );
+
     const handleFocus = () => {
         setFocused(true);
         setIsTyping(true);
-        setInternalValue(valueAsInputValue(value ?? null, mode));
+        setInternalValue(valueAsInputValue(value ?? null, mode, timezone));
     };
 
     const handleBlur = () => {
@@ -271,8 +291,6 @@ hour12: false,
 
     return (
         <>
-            {/* Inject the styles to hide the calendar icon */}
-            <style>{inputStyles}</style>
             <div
                 className={cls(
                     "rounded-lg relative max-w-full",
@@ -320,7 +338,7 @@ hour12: false,
                     aria-labelledby={label ? labelId : undefined}
                     aria-label={label ? undefined : ariaLabel}
                     type={mode === "date_time" ? "datetime-local" : "date"}
-                    value={isTyping ? internalValue : valueAsInputValue(value ?? null, mode)}
+                    value={isTyping ? internalValue : displayValue}
                     onChange={handleInputChange}
                     onFocus={handleFocus}
                     onBlur={handleBlur}

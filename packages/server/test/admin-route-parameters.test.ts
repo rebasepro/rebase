@@ -15,7 +15,7 @@ import { Hono } from "hono";
 import { createCronRoutes } from "../src/cron/cron-routes";
 import { createLogsRoutes, logBuffer } from "../src/api/logs-routes";
 import { createFunctionRoutes } from "../src/functions/function-routes";
-import { createSchemaEditorRoutes } from "../src/api/schema-editor-routes";
+import { createSchemaEditorRoutes, createSchemaSourceEditor } from "../src/api/schema-editor-routes";
 import type { CronScheduler } from "../src/cron/cron-scheduler";
 import type { HonoEnv } from "../src/api/types";
 
@@ -108,7 +108,7 @@ describe("GET /functions", () => {
 });
 
 describe("POST /admin/schema-editor/*", () => {
-    const app = mount(createSchemaEditorRoutes("/tmp/rebase-schema-editor-test"));
+    const app = mount(createSchemaEditorRoutes(createSchemaSourceEditor("/tmp/rebase-schema-editor-test")));
 
     const post = (path: string, body: string) => app.request(path, {
         method: "POST",

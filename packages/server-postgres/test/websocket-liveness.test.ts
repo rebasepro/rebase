@@ -21,8 +21,9 @@ import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals
 
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
-        fetchCollectionForRest: jest.fn(async () => [{ id: 1 }]),
-        fetchOneForRest: jest.fn(async () => ({ id: 1 })),
+        // Each read is news: a refetch that reads what its subscriber was last sent sends nothing.
+        fetchCollectionForRest: jest.fn(async () => [{ id: 1, read: Math.random() }]),
+        fetchOneForRest: jest.fn(async () => ({ id: 1, read: Math.random() })),
         count: jest.fn(async () => 1),
         cursorFor: jest.fn().mockReturnValue(undefined)
     }))
@@ -35,7 +36,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { MAX_SOCKET_BUFFERED_BYTES, reapSilentSockets } from "../src/services/socket-liveness";
+import { MAX_PROCESS_BUFFERED_BYTES, MAX_SOCKET_BUFFERED_BYTES, processSendBudget, reapSilentSockets } from "../src/services/socket-liveness";
 import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 
 const posts = {
@@ -147,12 +148,17 @@ describe("a socket that stops answering pings", () => {
         expect(service.subscriptions.size).toBe(2);
 
         // Both re-track inside the presence timeout, as the SDK does, so a
-        // departure announced later can only be the socket's own.
+        // departure announced later can only be the socket's own. Each beat
+        // carries a new state: a heartbeat that repeats its state announces
+        // nothing, and the diff a changed one sends is how this test knows the
+        // server has handled it.
+        let beat = 0;
         const retrack = async () => {
             const diffs = () => watcher.frames.filter(f => f.type === "presence_diff").length;
             const seen = diffs();
-            watcher.send({ type: "presence_track", payload: { channel: "room", state: { name: "watcher" } } });
-            zombie.send({ type: "presence_track", payload: { channel: "room", state: { name: "zombie" } } });
+            beat++;
+            watcher.send({ type: "presence_track", payload: { channel: "room", state: { name: "watcher", beat } } });
+            zombie.send({ type: "presence_track", payload: { channel: "room", state: { name: "zombie", beat } } });
             await until(() => diffs() >= seen + 2, "both re-tracked");
         };
 
@@ -267,6 +273,59 @@ describe("a socket that does not read what it is sent", () => {
 
         await until(() => reader.frames.length > before, "the frame after the write");
         expect(terminate).not.toHaveBeenCalled();
+    });
+});
+
+describe("sockets that, between them, hold more unread bytes than the process allows", () => {
+    // Each under its own ceiling; together past MAX_PROCESS_BUFFERED_BYTES.
+    // With no process-wide budget, a hundred slow phones during a bulk-update
+    // storm could hold 1.6 GB of frames before any one of them was let go.
+    const MiB = 1024 * 1024;
+
+    async function backlogged(sizes: number[]): Promise<{ sender: Awaited<ReturnType<typeof open>>; slow: WebSocket[] }> {
+        const sender = await open();
+        for (const _ of sizes) await open();
+        const slow = onServer.slice(1);
+        slow.forEach((ws, i) => Object.defineProperty(ws, "bufferedAmount", { configurable: true, get: () => sizes[i] }));
+        return { sender, slow };
+    }
+
+    it("terminates the largest backlogs first, and only until the rest fit", async () => {
+        expect(MAX_PROCESS_BUFFERED_BYTES).toBe(256 * MiB);
+        // 18 x 14 + 15 + 15.5 = 282.5 MiB: two have to go to be back under 256.
+        const sizes = [...Array.from({ length: 9 }, () => 14 * MiB), 15.5 * MiB, 15 * MiB, ...Array.from({ length: 9 }, () => 14 * MiB)];
+        const { sender, slow } = await backlogged(sizes);
+        const terminated: number[] = [];
+        slow.forEach((ws, i) => jest.spyOn(ws, "terminate").mockImplementation(() => {
+            terminated.push(sizes[i]);
+        }));
+        jest.advanceTimersByTime(1_000);
+
+        // Any frame through the process is when the budget is looked at.
+        sender.send({ type: "COUNT", requestId: "r1", payload: { path: "posts" } });
+        await until(() => sender.frames.some(f => f.type === "COUNT_SUCCESS" || f.type === "ERROR"), "the frame answered");
+
+        expect(terminated).toEqual([15.5 * MiB, 15 * MiB]);
+    });
+
+    it("keeps every socket while their backlogs fit together", async () => {
+        const sizes = Array.from({ length: 20 }, () => 12.5 * MiB);
+        const { sender, slow } = await backlogged(sizes);
+        const terminations = slow.map(ws => jest.spyOn(ws, "terminate"));
+        jest.advanceTimersByTime(1_000);
+
+        sender.send({ type: "COUNT", requestId: "r1", payload: { path: "posts" } });
+        await until(() => sender.frames.some(f => f.type === "COUNT_SUCCESS" || f.type === "ERROR"), "the frame answered");
+
+        for (const terminate of terminations) expect(terminate).not.toHaveBeenCalled();
+    });
+
+    it("is a quarter of a smaller memory limit the process runs under", () => {
+        expect(processSendBudget(0)).toBe(256 * MiB);
+        expect(processSendBudget(8 * 1024 * MiB)).toBe(256 * MiB);
+        expect(processSendBudget(512 * MiB)).toBe(128 * MiB);
+        // Never below one socket's own ceiling.
+        expect(processSendBudget(32 * MiB)).toBe(MAX_SOCKET_BUFFERED_BYTES);
     });
 });
 

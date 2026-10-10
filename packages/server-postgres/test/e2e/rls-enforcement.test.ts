@@ -143,9 +143,9 @@ describe("Unified RLS enforcement (E2E)", () => {
         return (await userDriver(uid)).count({ path: "tasks", collection: tasksCollection } as never);
     }
     async function realtimeFetchAs(uid: string): Promise<unknown[]> {
-        return (realtime as unknown as {
-            fetchCollectionWithAuth(path: string, req: Record<string, unknown>, auth?: { uid: string; roles: string[] }): Promise<unknown[]>;
-        }).fetchCollectionWithAuth("tasks", {}, { uid, roles: [] });
+        return (await (realtime as unknown as {
+            fetchCollectionWithAuth(path: string, req: Record<string, unknown>, auth: { uid: string; roles: string[] } | undefined, options: { meta: boolean }): Promise<{ rows: unknown[] }>;
+        }).fetchCollectionWithAuth("tasks", {}, { uid, roles: [] }, { meta: false })).rows;
     }
     async function rawCount(table: string, where = ""): Promise<number> {
         const r = await adminClient.query(`SELECT count(*)::int AS c FROM public.${table} ${where}`);
@@ -512,10 +512,10 @@ describe("Unified RLS enforcement (E2E)", () => {
     // realtime path calls it directly, bypassing the driver's own guard, so
     // exercise it there against the default-read (null-or-admin) policy.
     it("does not escalate an empty user id to server context (realtime refetch)", async () => {
-        const rtDocs = (auth: { uid: string; roles: string[] }) =>
-            (realtime as unknown as {
-                fetchCollectionWithAuth(p: string, r: Record<string, unknown>, a?: { uid: string; roles: string[] }): Promise<unknown[]>;
-            }).fetchCollectionWithAuth("docs", {}, auth);
+        const rtDocs = async (auth: { uid: string; roles: string[] }) =>
+            (await (realtime as unknown as {
+                fetchCollectionWithAuth(p: string, r: Record<string, unknown>, a: { uid: string; roles: string[] } | undefined, o: { meta: boolean }): Promise<{ rows: unknown[] }>;
+            }).fetchCollectionWithAuth("docs", {}, auth, { meta: false })).rows;
 
         // Empty uid → coerced to "anonymous" → auth.uid() is NON-null → the
         // null-server default policy does NOT match → sees 0, not all rows.

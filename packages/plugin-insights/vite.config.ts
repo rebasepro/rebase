@@ -2,9 +2,6 @@ import path from "path";
 
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react"
-const ReactCompilerConfig = {
-    target: "18"
-};
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
 
@@ -30,7 +27,6 @@ export default defineConfig(() => ({
             external: isExternal,
             onwarn(warning, warn) {
                 if (warning.code === "MISSING_GLOBAL_NAME") return;
-                if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
                 warn(warning);
             },
             output: {
@@ -47,11 +43,5 @@ export default defineConfig(() => ({
             "@rebasepro/ui": path.resolve(__dirname, "../ui/src")
         }
     },
-    plugins: [react({
-        babel: {
-            plugins: [
-                ["babel-plugin-react-compiler", ReactCompilerConfig]
-            ]
-        }
-    })]
+    plugins: [react()]
 }));

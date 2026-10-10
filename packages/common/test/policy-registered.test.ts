@@ -28,7 +28,7 @@ describe("policy.registered()", () => {
         const sql = policyToPostgres(policy.registered());
 
         it("requires a session", () => {
-            expect(sql).toContain("rebase.uid() IS NOT NULL");
+            expect(sql).toContain("(SELECT rebase.uid()) IS NOT NULL");
         });
 
         it("still excludes the no-session sentinel, as authenticated() does", () => {
@@ -40,7 +40,7 @@ describe("policy.registered()", () => {
         });
 
         it("and excludes a guest", () => {
-            expect(sql).toContain("NOT rebase.is_anonymous()");
+            expect(sql).toContain("NOT (SELECT rebase.is_anonymous())");
         });
 
         it("is strictly narrower than authenticated()", () => {

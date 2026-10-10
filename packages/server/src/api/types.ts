@@ -151,4 +151,9 @@ export interface QueryOptions {
      * the point of the feature.
      */
     withDeleted?: boolean | "only";
+    /**
+     * From `?count=exact|none` — whether a listing counts `meta.total`. See
+     * `FindParams.count`. Unset is `"exact"`.
+     */
+    count?: "exact" | "none";
 }

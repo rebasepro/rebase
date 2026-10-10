@@ -221,6 +221,30 @@ export async function removeJunctionLink(
 }
 
 /**
+ * Whether a stored link already holds every value of `wanted`.
+ *
+ * A client that edits one member's role sends the whole array back, each
+ * element with the `_pivot` it was read with; updating every one of them made
+ * one statement and one CDC event per member for a change to one. Equal only
+ * when that is certain — the same string, number or boolean, the same instant —
+ * and never for a pair that might differ (a JSON value, a `numeric` read back
+ * as text): those are written, as every one of them used to be.
+ */
+const PIVOT_SELECTION_PREFIX = "pivot:";
+
+function holdsPivot(stored: Record<string, unknown> | undefined, wanted: Record<string, unknown>): boolean {
+    if (!stored) return false;
+    return Object.entries(wanted).every(([key, value]) => samePivotValue(value, stored[key]));
+}
+
+function samePivotValue(wanted: unknown, stored: unknown): boolean {
+    if (wanted === null || wanted === undefined) return stored === null || stored === undefined;
+    if (wanted instanceof Date) return stored instanceof Date && stored.getTime() === wanted.getTime();
+    if (typeof wanted === "string" || typeof wanted === "number" || typeof wanted === "boolean") return wanted === stored;
+    return false;
+}
+
+/**
  * Make the junction say that `parentId` is linked to exactly `targetIds`, by
  * diffing against what is linked now rather than replacing the set.
  *
@@ -268,14 +292,26 @@ export async function applyJunctionMembership(
     links: JunctionLinkWrite[],
     visibleTargets?: VisibleTargets
 ): Promise<void> {
+    // The link's own columns are read with its key, so a link sent back with
+    // the values it already holds is not rewritten below.
+    // Flat, under a prefix no key column can carry, so a payload column named
+    // like the key cannot shadow it.
+    const selection: Record<string, AnyPgColumn> = { targetId: binding.targetColumn };
+    const payloadKeys: string[] = [];
+    for (const key of Object.keys(binding.payload)) {
+        const payloadColumn = binding.table[key as keyof typeof binding.table] as AnyPgColumn | undefined;
+        if (!payloadColumn) continue;
+        selection[`${PIVOT_SELECTION_PREFIX}${key}`] = payloadColumn;
+        payloadKeys.push(key);
+    }
     const existingRows = visibleTargets
         ? await tx
-            .select({ targetId: binding.targetColumn })
+            .select(selection)
             .from(binding.table)
             .innerJoin(visibleTargets.table, eq(binding.targetColumn, visibleTargets.idColumn))
             .where(and(eq(binding.parentColumn, parentId), visibleTargets.condition))
         : await tx
-            .select({ targetId: binding.targetColumn })
+            .select(selection)
             .from(binding.table)
             .where(eq(binding.parentColumn, parentId));
 
@@ -283,9 +319,16 @@ export async function applyJunctionMembership(
     // driver as a string where the parsed value is a number, and a diff that
     // missed that would delete and re-insert every link on every save.
     const existingById = new Map<string, unknown>();
-    for (const row of existingRows as Array<{ targetId: unknown }>) {
+    const storedPivotById = new Map<string, Record<string, unknown>>();
+    for (const row of existingRows as Array<Record<string, unknown>>) {
         if (row.targetId === null || row.targetId === undefined) continue;
         existingById.set(String(row.targetId), row.targetId);
+        if (payloadKeys.length > 0) {
+            storedPivotById.set(
+                String(row.targetId),
+                Object.fromEntries(payloadKeys.map(key => [key, row[`${PIVOT_SELECTION_PREFIX}${key}`]]))
+            );
+        }
     }
 
     const wantedById = new Map<string, JunctionLinkWrite>();
@@ -303,7 +346,8 @@ export async function applyJunctionMembership(
     // Already linked AND named with a payload: the caller is stating what the
     // link holds, not re-stating that it exists.
     const repayloaded = [...wantedById.entries()]
-        .filter(([key, link]) => existingById.has(key) && link.pivot && Object.keys(link.pivot).length > 0)
+        .filter(([key, link]) => existingById.has(key) && link.pivot && Object.keys(link.pivot).length > 0
+            && !holdsPivot(storedPivotById.get(key), link.pivot))
         .map(([, link]) => link);
 
     if (removed.length > 0) {

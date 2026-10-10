@@ -152,10 +152,25 @@ const { data } = await client.data.docs
     .find();
 ```
 
-`where` and `orderBy` on the same query act as filters applied *before* the
-ordering — this returns the nearest rows that also match, not the nearest rows
-filtered afterwards. Producing `queryVector` is your job: Rebase stores and
-searches embeddings, it does not compute them.
+`where` on the same query is a filter on which rows are candidates — this
+returns the nearest rows that also match, not the nearest rows filtered
+afterwards. On the HNSW index that holds from pgvector 0.8.0 (see
+[Filters on an approximate index](/docs/backend/vector-search/#filters-on-an-approximate-index));
+on an older pgvector a filter that few of the nearest rows pass returns a short
+page. Producing `queryVector` is your job: Rebase stores and searches
+embeddings, it does not compute them.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> The SDK sends a
+vector search as `POST /api/data/<collection>/query`, with the embedding in the
+body: in the URL, 768 dimensions are about 17 KB, past what Node (16 KB) and most
+proxies (nginx: 8 KB) accept. `count()` with a vector search goes the same way,
+as `POST /api/data/<collection>/count`. Against a server older than 0.24, which
+has no such route, either falls back to the `GET` — and a long embedding there
+can still be refused with a 431 or a 414.
+
+<span class="since-badge" data-since="0.25">Since 0.25</span> With a `threshold`,
+the result has no `meta.total` — counting the rows within a distance computes it
+for every row of the table. Page with `meta.hasMore`, which stays exact.
 
 ### What you have to provide
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: bad3ea0d4f6e00f8
+sourceHash: 714b241cabcf5ac5
 title: Caché de almacenamiento y CDN
 sidebar_label: Caché de almacenamiento y CDN
 description: Cómo sirve Rebase los archivos almacenados para que los navegadores y las CDN puedan almacenarlos en caché — ETags y 304, Cache-Control según quién puede leer un objeto, rangos de bytes para desplazarse en audio y vídeo, y qué configurar en una CDN por delante.
@@ -48,9 +48,16 @@ la diferencia entre un reproductor que funciona y uno roto.
 - La revalidación prevalece sobre un rango: una solicitud que lleve tanto `If-None-Match` como
   `Range` recibe el `304`.
 
-En el almacenamiento local solo se lee del disco la porción solicitada. En S3 y GCS, el
-objeto se sigue recuperando por completo —un `StorageController` no tiene lectura por rangos—, por lo que el
-ahorro se produce en la respuesta, no aguas arriba.
+<span class="since-badge" data-since="0.25">Desde 0.25</span> Solo se leen los bytes solicitados —del disco en el almacenamiento local, y con una
+lectura por rangos desde S3 y GCS—, y cada objeto se envía al cliente en streaming a medida
+que se lee, en lugar de mantenerlo antes en memoria, así que servir un vídeo grande le cuesta
+al servidor la misma memoria que servir una miniatura. Una revalidación que termina en un
+`304`, un `HEAD`, un `416` y una variante de imagen ya en caché se responden a partir de los
+metadatos del objeto sin leer sus bytes en absoluto.
+
+Un `StorageController` personalizado obtiene lo mismo implementando los métodos opcionales
+`statObject` y `getObjectStream`. Uno que no los tenga se sirve mediante `getObject`, que lee
+el objeto completo en cada solicitud, rangos incluidos.
 
 ## Colocar una CDN por delante
 

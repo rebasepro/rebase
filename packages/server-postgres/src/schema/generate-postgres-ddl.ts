@@ -1,152 +1,22 @@
-import { promises as fsPromises } from "fs";
-import * as fs from "fs";
 import path from "path";
-import { pathToFileURL } from "url";
-import {
-    generatePostgresDdl,
-    generatePostgresPoliciesDdl,
-    generatePostgresSearchDdl,
-    generatePostgresTriggersDdl,
-    generatePostgresVectorDdl
-} from "./generate-postgres-ddl-logic";
-import { CollectionConfig, declaredDatabaseExtensions } from "@rebasepro/types";
-import { loadCollectionsFromDirectory } from "@rebasepro/server";
-import { out, outError } from "../cli-output";
-
-/** Where a project declares its resources, relative to the config directory. */
-const RESOURCE_ENTRIES = ["resources.ts", "resources.js", "resources/index.ts", "resources/index.js"];
+import { out } from "../cli-output";
+import { writePostgresDdl } from "./generate-files";
 
 /**
- * Evaluate the project's `resources.ts`, so `declaredDatabaseExtensions()` can
- * answer.
- *
- * This generator runs as its own tsx subprocess and loads only the collections
- * directory, so nothing else in it would ever import the resources module — and
- * a permission that reads as absent because nobody loaded it is the worst shape
- * this could take: the push succeeds, `vector.sql` quietly omits the
- * `CREATE EXTENSION`, and the failure lands one statement later looking like a
- * database problem.
- *
- * Imported directly rather than through the config index, for the reason
- * `boot/resource-loading.ts` gives: re-exporting from the index would work only
- * for projects that remember to.
- *
- * A project with no resources module is the normal case and declares nothing.
- * An import that *throws* is not swallowed — a resources module that does not
- * evaluate is a configuration error, and treating it as "declared nothing"
- * would turn it into a silently missing extension.
+ * The generator as its own process — what `--watch` runs, because a watch has
+ * to re-import the collections on every save and Node's module cache would
+ * serve it the first version forever. One-shot generation runs in the driver's
+ * own process instead; see `generate-files.ts`.
  */
-async function loadDeclaredResources(configDir: string): Promise<void> {
-    const entry = RESOURCE_ENTRIES
-        .map(name => path.join(configDir, name))
-        .find(candidate => fs.existsSync(candidate));
-    if (!entry) return;
-    await import(pathToFileURL(entry).href);
-}
-
 const runGeneration = async (collectionsFilePath?: string, outputPath?: string) => {
+    if (!collectionsFilePath) {
+        throw new Error("No collections file path provided.");
+    }
     try {
-        if (!collectionsFilePath) {
-            throw new Error("No collections file path provided.");
-        }
-
-        const resolvedPath = path.resolve(collectionsFilePath);
-
-        // `<config>/collections` is the path this is given, so the config
-        // directory is its parent — the same relationship `rebase resources`
-        // and the boot loader assume.
-        await loadDeclaredResources(path.dirname(resolvedPath));
-
-        // Shared with the runtime and the doctor: what gets generated here must
-        // be exactly what the server serves, including directory-level defaults.
-        let collections: CollectionConfig[] = await loadCollectionsFromDirectory(resolvedPath);
-
-
-        if (!collections || !Array.isArray(collections)) {
-            collections = [];
-        }
-
-        // Sort collections by slug alphabetically to ensure deterministic DDL generation
-        collections.sort((a, b) => a.slug.localeCompare(b.slug));
-
-        // `schema.sql` is Atlas's desired state, and it carries neither the RLS
-        // policies, nor the search apparatus, nor the vector columns: Atlas
-        // manages none of them, and in the search and vector cases cannot. All
-        // three are written beside it and applied by the CLI in their own right.
-        const ddlContent = generatePostgresDdl(collections, {
-            includePolicies: false,
-            includeSearch: false,
-            includeVector: false
-        });
-        const policiesContent = generatePostgresPoliciesDdl(collections);
-        const searchContent = generatePostgresSearchDdl(collections);
-        const vectorContent = generatePostgresVectorDdl(collections, {
-            extensions: declaredDatabaseExtensions()
-        });
-        const triggersContent = generatePostgresTriggersDdl(collections);
-
-        if (outputPath) {
-            const outputDir = path.dirname(outputPath);
-            await fsPromises.mkdir(outputDir, { recursive: true });
-            await fsPromises.writeFile(outputPath, ddlContent);
-            out(`✅ PostgreSQL DDL generated successfully at ${outputPath}`);
-
-            const policiesPath = path.join(outputDir, "policies.sql");
-            await fsPromises.writeFile(policiesPath, policiesContent);
-            out(`✅ PostgreSQL Policies DDL generated successfully at ${policiesPath}`);
-
-            // Removed when the last `search` block goes: the CLI applies this
-            // file whenever it exists, and a stale one would keep re-creating
-            // functions for collections that no longer want them.
-            const searchPath = path.join(outputDir, "search.sql");
-            if (searchContent) {
-                await fsPromises.writeFile(searchPath, searchContent);
-                out(`✅ PostgreSQL search DDL generated successfully at ${searchPath}`);
-            } else if (fs.existsSync(searchPath)) {
-                await fsPromises.rm(searchPath);
-            }
-
-            // Removed when the last `vector` property goes, for the same reason
-            // `search.sql` is: the CLI applies whichever of these files exists,
-            // and a stale one would keep re-adding a column the collections no
-            // longer declare — which Atlas, no longer told to exclude it, would
-            // then plan a DROP for on the very next push.
-            const vectorPath = path.join(outputDir, "vector.sql");
-            if (vectorContent) {
-                await fsPromises.writeFile(vectorPath, vectorContent);
-                out(`✅ PostgreSQL vector DDL generated successfully at ${vectorPath}`);
-            } else if (fs.existsSync(vectorPath)) {
-                await fsPromises.rm(vectorPath);
-            }
-
-            // `autoValue: "on_update"`, on the same terms as the two above: a
-            // trigger is a function plus a binding, which Atlas's free tier
-            // will not parse, and a stale file would keep re-installing a
-            // trigger for a column nothing declares any more.
-            const triggersPath = path.join(outputDir, "triggers.sql");
-            if (triggersContent) {
-                await fsPromises.writeFile(triggersPath, triggersContent);
-                out(`✅ PostgreSQL trigger DDL generated successfully at ${triggersPath}`);
-            } else if (fs.existsSync(triggersPath)) {
-                await fsPromises.rm(triggersPath);
-            }
-        } else {
-            out("✅ PostgreSQL DDL generated successfully.");
-            out(String(ddlContent));
-            out("\n✅ PostgreSQL Policies DDL generated successfully.");
-            out(String(policiesContent));
-        }
-
+        await writePostgresDdl({ collectionsPath: path.resolve(collectionsFilePath), outputPath });
     } catch (error) {
-        outError(`Error generating DDL schema: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
-        // Step 1 of `rebase db push` is this process, and its exit code is the
-        // only thing the push reads. Printing and exiting 0 made a resources
-        // module that does not evaluate — the single most common cause here —
-        // report `✓ rebase db push completed successfully` while Atlas applied
-        // whatever `drizzle/schema.sql` happened to be on disk, sometimes
-        // minutes old. With no prior file the same run died inside Atlas on
-        // `stat drizzle/schema.sql: no such file or directory`, which hides the
-        // real cause two screens up.
+        // A caller that reads nothing but this process's exit code must not
+        // see 0 after an error was printed — see `writePostgresDdl`.
         process.exitCode = 1;
         throw error;
     }

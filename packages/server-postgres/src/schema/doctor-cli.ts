@@ -7,6 +7,7 @@ import path from "path";
 import chalk from "chalk";
 import { runDoctor } from "./doctor";
 import { exitCodeForPolicyGate, runPolicyChecks } from "./doctor-policy-checks";
+import { runSearchScaleCheck } from "./doctor-search-scale";
 import { diagnoseDbError } from "../cli-errors";
 
 async function main() {
@@ -51,6 +52,9 @@ async function main() {
     });
 
     const policyStatus = await runPolicyChecks(collectionsPath, databaseUrl);
+
+    // A hint about speed, not drift: it never changes the exit code.
+    await runSearchScaleCheck(collectionsPath, databaseUrl);
 
     // Exit non-zero if there are errors. A policy run that could not happen is
     // reported loudly above but does not fail the interactive command — the

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -97,6 +97,27 @@ describe("a TUS upload that cannot be stored", () => {
         expect(tempFiles()).toEqual([]);
     });
 
+    it("hands the store a file backed by the upload on disk, never a copy read into memory", async () => {
+        // The lookup used to ask `fs/promises` for `openAsBlob`, which lives on
+        // `fs`: it was never found, and every finalize read the whole upload
+        // into memory through the `readFile` fallback.
+        const readFile = jest.spyOn(fs.promises, "readFile");
+        let given: File | undefined;
+        const ctrl = {
+            putObject: async ({ file, key }: { file: File; key: string }) => {
+                given = file;
+                return { key };
+            }
+        } as unknown as StorageController;
+        const { patch } = await upload(new TusHandler(scratch, ctrl), "x".repeat(4096));
+
+        expect((await patch()).status).toBe(204);
+
+        expect(readFile).not.toHaveBeenCalled();
+        expect(given!.size).toBe(4096);
+        readFile.mockRestore();
+    });
+
     it("refuses the PATCH when the store rejects it, rather than reporting success", async () => {
         const { ctrl } = controller("throw");
         const { patch } = await upload(new TusHandler(scratch, ctrl));
@@ -115,7 +136,10 @@ describe("a TUS upload that cannot be stored", () => {
 
         await patch();
 
-        expect(tempFiles()).toHaveLength(1);
+        // The bytes, and the record a retry — on this process or another — resumes from.
+        const kept = tempFiles();
+        expect(kept.filter(name => !name.endsWith(".json"))).toHaveLength(1);
+        expect(kept.filter(name => name.endsWith(".json"))).toHaveLength(1);
     });
 
     it("refuses the PATCH when no storage is configured at all", async () => {

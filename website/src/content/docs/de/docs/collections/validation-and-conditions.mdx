@@ -1,5 +1,5 @@
 ---
-sourceHash: 94d3f5bd886e2894
+sourceHash: 7e7cf627ef1d34b8
 title: Validierung und Bedingungen
 sidebar_label: Validierung & Bedingungen
 description: "Enum-Werte, Validierungsregeln pro Eigenschaft und die bedingten Felder, die eine Eigenschaft basierend auf den Werten der Entität als erforderlich, deaktiviert oder ausgeblendet festlegen."
@@ -78,7 +78,7 @@ der es schreibt.
 |-------|-----|--------------|
 | `required` | `boolean` | Der Wert muss vorhanden sein |
 | `requiredMessage` | `string` | Was das Formular anzeigt, wenn er fehlt. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
-| `unique` | `boolean` | Nur eine Zeile in der Tabelle darf diesen Wert enthalten |
+| `unique` | `boolean` | Nur eine Zeile in der Tabelle darf diesen Wert enthalten. Das Admin-Formular prüft dies auch beim Speichern eines Werts, den die Bearbeitung geändert hat, sodass ein Duplikat vor dem Schreibvorgang an seinem Feld benannt wird |
 | `uniqueInArray` | `boolean` | Nur ein Eintrag *pro Array* darf ihn enthalten. Gilt für ein direktes Kind einer `array`-Eigenschaft oder ein Kind der ersten Ebene einer `map` darin. **Nur im Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |
 
 ### Strings

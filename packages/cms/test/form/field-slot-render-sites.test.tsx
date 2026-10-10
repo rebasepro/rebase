@@ -42,16 +42,15 @@ jest.mock("@rebasepro/app", () => ({
     isReadOnly: () => false
 }));
 
-// `Field` wires a property key to the surrounding formex form. There is no form
-// here, so it hands the render prop the one thing the binding reads off it.
+// The binding reads its own slice of the surrounding formex form. There is no
+// form here, so the slice is taken from a controller that holds nothing.
+const mockFormex = {
+    values: {}, errors: {}, touched: {}, submitCount: 0, isSubmitting: false,
+    setFieldTouched: () => undefined, setFieldValue: () => undefined
+};
 jest.mock("@rebasepro/forms", () => ({
-    Field: ({ children }: { children: (p: unknown) => React.ReactNode }) => children({
-        field: { value: "hello" },
-        form: {
-            values: {}, errors: {}, touched: {}, submitCount: 0, isSubmitting: false,
-            setFieldTouched: () => undefined, setFieldValue: () => undefined
-        }
-    }),
+    useFormexSelector: (selector: (formex: unknown) => unknown) => selector(mockFormex),
+    useFormexGetter: () => () => mockFormex,
     getIn: () => undefined
 }));
 

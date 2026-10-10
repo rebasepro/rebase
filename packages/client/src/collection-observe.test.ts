@@ -136,3 +136,105 @@ describe("observe() without the offline layer", () => {
         expect(results).toHaveLength(0);
     });
 });
+
+/**
+ * A socket that already holds a query's rows hands them to every new
+ * subscriber synchronously (`listenCollection`/`listenOne` replay their cached
+ * frame). The `find()` an observer used to send beside the subscription could
+ * then only be dropped — `deliver` ignores a fetch once the socket has spoken —
+ * yet it still went out, and the server ran the query and its `COUNT(*)` for
+ * it. Ten components on one query cost ten discarded GETs per mount.
+ */
+describe("observe() does not fetch what the socket already answered", () => {
+    /** A socket holding `rows` for every query and every row, replayed on subscribe. */
+    function createReplayingWs(rows: Record<string, unknown>[]) {
+        let subscribes = 0;
+        const ws = {
+            listenCollection: (
+                _props: unknown,
+                onUpdate: (rows: Record<string, unknown>[], meta?: unknown) => void
+            ) => {
+                subscribes++;
+                onUpdate(rows, { total: rows.length, hasMore: false, limit: 20, offset: 0 });
+                return () => undefined;
+            },
+            listenOne: (
+                _props: unknown,
+                onUpdate: (row: Record<string, unknown> | null) => void
+            ) => {
+                subscribes++;
+                onUpdate(rows[0] ?? null);
+                return () => undefined;
+            }
+        } as unknown as RebaseWebSocketClient;
+        return { ws, subscribes: () => subscribes };
+    }
+
+    it("sends no GET for observers the socket replays to", async () => {
+        const transport = createTransport({
+            find: () => Promise.resolve({ data: [{ id: "1", name: "a" }], meta: { total: 1 } })
+        });
+        const { ws, subscribes } = createReplayingWs([{ id: "1", name: "a" }]);
+        const client = createCollectionClient<Row>(transport, "products", ws);
+
+        const results: LiveResult<Row>[][] = Array.from({ length: 10 }, () => []);
+        const stops = results.map((into) => client.observe({ limit: 20 }, (r) => into.push(r)));
+        await flush();
+
+        expect(subscribes()).toBe(10);
+        expect(transport.request).not.toHaveBeenCalled();
+        for (const into of results) {
+            expect(into).toHaveLength(1);
+            expect(into[0].data).toEqual([{ id: "1", name: "a" }]);
+        }
+        stops.forEach((stop) => stop());
+    });
+
+    it("sends no GET for observeById when the socket replays the row", async () => {
+        const transport = createTransport({});
+        const { ws } = createReplayingWs([{ id: "1", name: "a" }]);
+        const client = createCollectionClient<Row>(transport, "products", ws);
+
+        const rows: (Row | undefined)[][] = Array.from({ length: 10 }, () => []);
+        const stops = rows.map((into) => client.observeById("1", (row) => into.push(row)));
+        await flush();
+
+        expect(transport.request).not.toHaveBeenCalled();
+        for (const into of rows) expect(into).toEqual([{ id: "1", name: "a" }]);
+        stops.forEach((stop) => stop());
+    });
+
+    it("still fetches when the socket has nothing yet", async () => {
+        // The first observer of a query: the subscription is new, so the fetch
+        // is the fast path to a first answer and races the subscribe.
+        const transport = createTransport({
+            find: () => Promise.resolve({ data: [{ id: "1", name: "a" }], meta: { total: 1 } })
+        });
+        const { ws } = createWs();
+        const client = createCollectionClient<Row>(transport, "products", ws);
+
+        const results: LiveResult<Row>[] = [];
+        const stop = client.observe({ limit: 20 }, (r) => results.push(r));
+        await flush();
+
+        expect(transport.request).toHaveBeenCalledTimes(1);
+        expect(results.map((r) => r.data)).toEqual([[{ id: "1", name: "a" }]]);
+        stop();
+    });
+
+    it("still fetches when realtime is off", async () => {
+        const transport = createTransport({
+            find: () => Promise.resolve({ data: [{ id: "1", name: "a" }], meta: { total: 1 } })
+        });
+        const { ws } = createReplayingWs([{ id: "1", name: "a" }]);
+        const client = createCollectionClient<Row>(transport, "products", ws);
+
+        const results: LiveResult<Row>[] = [];
+        const stop = client.observe({ limit: 20 }, (r) => results.push(r), undefined, { realtime: false });
+        await flush();
+
+        expect(transport.request).toHaveBeenCalledTimes(1);
+        expect(results).toHaveLength(1);
+        stop();
+    });
+});

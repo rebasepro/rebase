@@ -1,5 +1,5 @@
 ---
-sourceHash: e38cb2eddd8b623a
+sourceHash: cd43978985b8b565
 title: Cron su più istanze
 sidebar_label: Cron su più istanze
 description: "Come si comportano i cron job con più di un processo server: un'esecuzione per slot, uno slot perso per un riavvio, una pausa rispettata da ogni replica ed esecuzioni che non si sovrappongono mai."
@@ -45,7 +45,7 @@ Tre cose da sapere:
 
 Nel caso tipico — un riavvio pochi minuti dopo la normale esecuzione di uno slot — lo slot più recente è già stato reclamato, quindi il recupero costa un solo controllo di claim per job a ogni avvio e non intraprende alcuna azione.
 
-All'avvio vengono eliminati i claim più vecchi di sette giorni, ma quello più recente di ogni job viene sempre mantenuto, qualunque sia la sua età. Quel claim è la prova che lo slot è già stato eseguito, quindi un job mensile con una finestra di recupero di un mese non viene rieseguito da un deploy il giorno 10.
+Lo scheduler elimina i claim più vecchi di sette giorni all'avvio e poi ogni ora, ma quello più recente di ogni job viene sempre mantenuto, qualunque sia la sua età. Quel claim è la prova che lo slot è già stato eseguito, quindi un job mensile con una finestra di recupero di un mese non viene rieseguito da un deploy il giorno 10.
 
 Un'esecuzione recuperata è una voce normale in `cron_logs` (`manual` è `false`), con una prima riga di log che indica lo slot recuperato e il relativo ritardo:
 
