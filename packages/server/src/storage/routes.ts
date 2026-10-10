@@ -41,6 +41,7 @@ import { HonoEnv } from "../api/types";
 import { parseTransformOptions, transformImage, transformContentType, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
 import { storageRequestWildcard } from "./requested-object";
+import { isDownloadTokenGrant, isPublicObjectGrant, PUBLIC_OBJECT_PRINCIPAL } from "./request-principals";
 import { canonicalStorageId, InvalidListOptionsError } from "./keys";
 import {
     canonicalKeyOrBadRequest,
@@ -448,8 +449,6 @@ interface StorageRequestContext {
 /** The caller a request acts for. The one place a route reads it off the context. */
 const callerOf = (c: StorageRequestContext): StorageCaller => ({ user: c.get("user"), scopes: c.get("scopes") });
 
-/** Who `publicObjectAuth` lets read a public object anonymously. */
-const PUBLIC_OBJECT_PRINCIPAL: StorageAuthorizeUser = { uid: "public", roles: ["public"] };
 
 /** Most keys `POST /metadata` takes in one request. */
 export const DOWNLOAD_METADATA_BATCH_MAX = 100;
@@ -627,7 +626,14 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // answer, and would break every <img> the client already renders.
         // Public paths are declared public, so they are equally not the hook's
         // business.
-        if (user?.uid === "download-token" || user?.uid === "public") return;
+        //
+        // Each grant is recognised as the object its middleware set, not by
+        // its uid, and only for what it grants — a read, and for the public
+        // principal a read of a public key. An identity that merely carries
+        // the uid (a custom `AuthAdapter` calling its guests `"public"`) is a
+        // user like any other, and the hook decides.
+        if (operation === "read" && isDownloadTokenGrant(user)) return;
+        if (operation === "read" && isPublicObjectGrant(user) && isPublicStorageKey(key)) return;
 
         let allowed: boolean;
         try {
@@ -1220,7 +1226,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * a session. Minting needs the credential that was authorized.
      */
     const refuseDownloadTokenPrincipal = (principal: { uid?: string } | undefined): void => {
-        if (principal?.uid === "download-token") {
+        if (isDownloadTokenGrant(principal)) {
             throw ApiError.forbidden(
                 "A download token cannot be used to mint another. Request metadata with the " +
                     "session or key the object was authorized against."
@@ -1282,7 +1288,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                     `${bucket}/${resolvedPath}`,
                     downloadTokenTtl,
                     storageId ?? undefined,
-                    minter && minter !== "public" && !isAnonymousUid(minter) ? minter : undefined
+                    minter && !isPublicObjectGrant(caller.user) && !isAnonymousUid(minter) ? minter : undefined
                 );
                 downloadConfig.metadata.tokenExpiresIn = downloadTokenTtl;
             }

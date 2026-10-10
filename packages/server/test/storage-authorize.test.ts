@@ -219,6 +219,60 @@ describe("storage per-object authorization", () => {
         });
     });
 
+    describe("an identity that only carries a synthetic principal's uid", () => {
+        /**
+         * The hook skip for the two synthetic principals was decided on the uid
+         * string. A custom `AuthAdapter` is free to return any uid — calling
+         * its guests `"public"` is natural — and such an identity then skipped
+         * the hook on every operation: it could upload into, delete from and
+         * list anyone's prefix. The skip belongs to the grant the middleware
+         * made, not to whoever spells its uid.
+         */
+        const asIdentity = async (uid: string) => {
+            app = new Hono<HonoEnv>();
+            app.onError(errorHandler);
+            app.route("/api/storage", createStorageRoutes({
+                controller,
+                requireAuth: true,
+                authAdapter: { verifyRequest: async () => ({ uid, roles: [] }) },
+                authorize: async () => false
+            }));
+        };
+
+        for (const uid of ["public", "download-token"]) {
+            it(`asks the hook about a write by an identity whose uid is "${uid}"`, async () => {
+                await asIdentity(uid);
+                const form = new FormData();
+                form.append("file", new File(["intruder"], "x.txt", { type: "text/plain" }));
+                form.append("key", "bob/x.txt");
+
+                const res = await app.fetch(new Request("http://localhost/api/storage/upload", {
+                    method: "POST",
+                    body: form
+                }));
+
+                expect(res.status).toBe(403);
+                expect(await controller.getObject("bob/x.txt")).toBeNull();
+            });
+
+            it(`asks the hook about a delete and a read by an identity whose uid is "${uid}"`, async () => {
+                await asIdentity(uid);
+
+                const del = await app.fetch(new Request("http://localhost/api/storage/file/bob/notes.txt", {
+                    method: "DELETE"
+                }));
+                expect(del.status).toBe(403);
+                expect(await controller.getObject("bob/notes.txt")).not.toBeNull();
+
+                const read = await app.fetch(new Request("http://localhost/api/storage/file/bob/notes.txt"));
+                expect(read.status).toBe(403);
+
+                const list = await app.fetch(new Request("http://localhost/api/storage/list?prefix=bob"));
+                expect(list.status).toBe(403);
+            });
+        }
+    });
+
     describe("writes", () => {
         it("refuses an upload into someone else's prefix", async () => {
             const form = new FormData();

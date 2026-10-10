@@ -17,6 +17,7 @@ import { applyImpersonation, type ImpersonationCredential } from "./impersonatio
 // belongs to, with the same functions, not with copies of one rule.
 import { canonicalStorageId } from "../storage/keys";
 import { storageRequestWildcard, tryRequestedStorageObject } from "../storage/requested-object";
+import { DOWNLOAD_TOKEN_PRINCIPAL, PUBLIC_OBJECT_PRINCIPAL } from "../storage/request-principals";
 
 // Re-exported from here because this is where callers look for it; the separate
 // module exists only so `api-key-middleware` can use it without closing an
@@ -576,7 +577,7 @@ export const publicObjectAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
 
     const requested = tryRequestedStorageObject(storageRequestWildcard(c));
     if (requested && isPublicStorageKey(requested.key)) {
-        c.set("user", { uid: "public", roles: ["public"] });
+        c.set("user", PUBLIC_OBJECT_PRINCIPAL);
     }
 
     return next();
@@ -675,7 +676,7 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
         if (payload) {
             const outcome = evaluateGrant(payload);
             if (outcome === "grant") {
-                c.set("user", { uid: "download-token", roles: ["reader"] });
+                c.set("user", DOWNLOAD_TOKEN_PRINCIPAL);
                 return next();
             }
             if (outcome !== "no-path") return denyMismatch(outcome);
@@ -697,7 +698,7 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
         if (payload) {
             const outcome = evaluateGrant(payload);
             if (outcome === "grant") {
-                c.set("user", { uid: "download-token", roles: ["reader"] });
+                c.set("user", DOWNLOAD_TOKEN_PRINCIPAL);
                 return next();
             }
             if (outcome !== "no-path") return denyMismatch(outcome);
