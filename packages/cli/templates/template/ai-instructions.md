@@ -7,7 +7,8 @@
 | Command | What it does |
 |---|---|
 | `pnpm dev` | Backend, frontend and the managed development database, together |
-| `pnpm schema:generate` then `pnpm db:push` | The same loop with `pnpm dev` not running, plus the changes boot leaves alone: collections → Drizzle schema → development database |
+| `pnpm schema:generate` then `pnpm generate:sdk` | The same loop with `pnpm dev` not running: collections → Drizzle schema and SDK types. The next boot creates what is missing |
+| `pnpm db:push` | The changes boot leaves alone (a rename, a narrowed type, a removed field). Needs your own PostgreSQL in `DATABASE_URL`; it refuses the managed development database |
 | `pnpm db:generate` then `pnpm db:migrate` | The production path — write the migration file, then apply it |
 | `pnpm schema:introspect` | The other direction: existing tables → collection definitions |
 | `pnpm generate:sdk` | Regenerate the typed client in `generated/sdk/` from the collections. `pnpm dev` already does this on start and on every save; the script is for CI and for when `pnpm dev` is not running |
