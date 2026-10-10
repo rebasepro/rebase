@@ -8,8 +8,8 @@ description: Core principles, workflow, and maintenance for using Rebase. Use th
 Please complete these setup steps before proceeding, and remember your progress to avoid repeating them in future interactions.
 
 1. **Local Environment Setup:** Verify the environment is properly set up:
-   - Run `node --version`. A scaffolded project declares `node >= 22.22.0`, which is
-     what `.nvmrc` pins; an older runtime fails at install, not at run time.
+   - Run `node --version`. A scaffolded project declares `node >= 22.22.0` in its
+     `package.json` `engines`; an older runtime fails at install, not at run time.
    - Run `pnpm --version` to check pnpm is installed. If not, install it: `npm install -g pnpm`.
    - **Do not check for PostgreSQL.** With `DATABASE_URL` unset — which is how
      `rebase init` leaves `.env` — `rebase dev` starts a **managed PostgreSQL
@@ -224,7 +224,7 @@ Read these when you need them, not before.
 
 - **`JWT_SECRET must be at least 32 characters long`:** Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` and set it in `.env`.
 - **`JWT_SECRET must be explicitly set in production`:** Auto-generated dev secrets are blocked in production. Set the value explicitly in `.env`.
-- **Tokens invalidated on restart:** In development, `JWT_SECRET` is auto-generated ephemerally. Set it explicitly in `.env` for persistent sessions across restarts.
+- **Tokens invalidated on restart:** `rebase init` writes `JWT_SECRET` into `.env`, and outside production a `JWT_SECRET` left unset is generated once and cached in `.rebase-dev-secrets.json`, so sessions survive a restart. They do not only when that file cannot be written (a read-only or containerised working directory); boot then warns that the secrets are ephemeral. Set `JWT_SECRET` in `.env` to fix it.
 - **`REBASE_SERVICE_KEY is too short`:** Must be ≥32 characters. Generate with `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`.
 
 ### Port Conflicts
@@ -242,7 +242,7 @@ Read these when you need them, not before.
 ### CLI & Tooling
 
 - **pnpm not found:** Install with `npm install -g pnpm`.
-- **Node.js version mismatch:** a scaffolded project declares `node >= 22.22.0`, which is what `.nvmrc` pins. Use `nvm install 22.22.0 && nvm use 22.22.0`.
+- **Node.js version mismatch:** a scaffolded project declares `node >= 22.22.0` in its `package.json` `engines`. Use `nvm install 22.22.0 && nvm use 22.22.0`.
 - **`Could not find tsx binary`:** Install tsx in your project: `pnpm add -D tsx`.
 - **`Could not detect an active database plugin`:** Ensure `@rebasepro/server-postgres` (or another driver) is listed in `backend/package.json` dependencies.
 - **`No bootstrappers or database adapter provided`:** The `initializeRebaseBackend()` call is missing the `database` (or `bootstrappers`) property. See the backend configuration section above.

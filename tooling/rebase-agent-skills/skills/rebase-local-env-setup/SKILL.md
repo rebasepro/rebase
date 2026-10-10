@@ -46,8 +46,8 @@ no `app/` directory:
 ## 1. Verify Node.js
 
 - **Action**: Run `node --version`.
-- **Required**: Node.js **>= 22.22.0** — what a scaffolded project's `engines` declares and
-  what `.nvmrc` pins. Not a recommendation: an older runtime fails at install.
+- **Required**: Node.js **>= 22.22.0** — what a scaffolded project's `package.json` `engines`
+  declares. Not a recommendation: an older runtime fails at install.
 - **Handling**: If Node.js is missing or below that:
 
   **Recommended: Use a Node Version Manager**
@@ -133,7 +133,7 @@ ports have working development defaults.
 | Variable | Notes |
 |---|---|
 | `DATABASE_URL` | **Leave it unset** for the managed database. Set it and yours wins, always. |
-| `JWT_SECRET` | Must be ≥ 32 characters. Left empty, dev mode auto-generates an ephemeral one — **every session is invalidated on each restart**. Set an explicit value for persistent sessions. |
+| `JWT_SECRET` | Must be ≥ 32 characters. `rebase init` writes one. Left empty, dev mode generates one and caches it in `.rebase-dev-secrets.json`, so sessions survive a restart; only where that file cannot be written is it ephemeral (boot warns), and every restart then signs everyone out. |
 | `PORT` / `VITE_API_URL` | Configure `rebase start`, the production server. `rebase dev` derives its ports from the project path and ignores them. |
 | `FRONTEND_URL` | Used in password-reset and verification emails. |
 

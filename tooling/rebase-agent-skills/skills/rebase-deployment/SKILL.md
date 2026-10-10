@@ -227,11 +227,11 @@ All variables recognized by the base `rebaseEnvSchema`:
 
 ### Auto-Generated Secrets (Dev Only)
 
-In non-production mode, `loadEnv()` auto-generates ephemeral secrets for:
+In non-production mode, `loadEnv()` generates these when they are unset, and caches them in `.rebase-dev-secrets.json` (gitignored) so they survive a restart:
 - `JWT_SECRET` — if not set
 - `REBASE_SERVICE_KEY` — if not set
 
-These are random hex strings generated via `crypto.randomBytes(48)`. A warning is logged:
+These are random hex strings generated via `crypto.randomBytes(48)`. Only when the cache file cannot be read or written (a read-only working directory, some containers) are they regenerated on every boot, and then a warning is logged:
 
 ```
 ⚠️  Auto-generated secrets for: JWT_SECRET, REBASE_SERVICE_KEY. These are ephemeral — existing tokens will be invalidated on restart. Set them explicitly in .env for persistent sessions.

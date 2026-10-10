@@ -417,7 +417,7 @@ function loadEnv<E extends z.ZodObject<z.ZodRawShape>>(options: { extend: E }): 
 
 ### Dev-Mode Auto-Generated Secrets
 
-In non-production mode, `loadEnv()` **auto-generates** ephemeral `JWT_SECRET` and `REBASE_SERVICE_KEY` if not set, so developers can start without manual setup. These are regenerated on every restart — existing tokens will be invalidated.
+In non-production mode, `loadEnv()` **auto-generates** `JWT_SECRET` and `REBASE_SERVICE_KEY` if not set, so developers can start without manual setup. They are cached in `.rebase-dev-secrets.json` (gitignored), so existing tokens survive a restart. Only when that file cannot be written are they regenerated on every boot, and boot warns that they are ephemeral.
 
 ### Full Environment Variable Reference
 

@@ -6,7 +6,7 @@ Rebase provides `loadEnv()` from `@rebasepro/server` to validate and load enviro
 
 ### Behavior
 
-- **Auto-generates** ephemeral `JWT_SECRET` and `REBASE_SERVICE_KEY` in non-production mode so developers can start without manual setup
+- **Auto-generates** `JWT_SECRET` and `REBASE_SERVICE_KEY` in non-production mode so developers can start without manual setup, cached in `.rebase-dev-secrets.json` so a restart keeps them
 - **Blocks** auto-generated secrets in production (fails validation)
 - Returns a fully typed, validated env object
 
