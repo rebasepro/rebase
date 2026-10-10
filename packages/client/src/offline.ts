@@ -2302,17 +2302,19 @@ data: u.data as AnyRow })),
                 await this.ingestReplaced(op, queued[i].id, rows[i], ticket);
             }
         } else if (op.type === "update") {
-            // Keyed only when the edit was already sent once: then its body is
-            // frozen (tail coalescing skips an op with `sent`), so the replay
-            // is the same request under the same key. An edit only ever queued
-            // can absorb later edits after a replay attempt, and a key held for
-            // the smaller body would refuse the merged one — while re-sending
-            // plain values without a key writes the same values again.
-            const row = await inner.update(
-                op.id!,
-                op.data as AnyRow,
-                op.sent ? { idempotencyKey: op.sent.idempotencyKey } : undefined
-            );
+            // Always keyed. An edit only ever queued is given its key here, on
+            // its first send, and recorded as sent before the request goes
+            // out: from then on its body is frozen (tail coalescing skips an
+            // op with `sent`, so a later edit queues as a write of its own),
+            // and a replay is the same request under the same key. Sent bare,
+            // a replay whose first attempt committed and lost its answer wrote
+            // the queued values again — over whatever a colleague had written
+            // since.
+            if (!op.sent) {
+                op.sent = { idempotencyKey: op.mutationId };
+                await this.store.enqueue(`${ticket.scope}|${op.mutationId}`, op).catch(() => undefined);
+            }
+            const row = await inner.update(op.id!, op.data as AnyRow, { idempotencyKey: op.sent.idempotencyKey });
             await this.ingestReplaced(op, op.id!, row, ticket);
         } else if (op.type === "deleteMany") {
             const ids = op.ids ?? [];

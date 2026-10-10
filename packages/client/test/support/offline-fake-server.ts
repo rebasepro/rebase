@@ -30,6 +30,8 @@ export function fakeServer() {
     const state = { online: true };
     const rows = new Map<string, Row>();
     const calls: Call[] = [];
+    /** Answers stored under the idempotency key they were given for. */
+    const answered = new Map<string, Row>();
     let reject: ((op: string, id: unknown, data: unknown, options?: Record<string, unknown>) => Error | undefined) | undefined;
     let afterCommit: ((op: string) => Error | undefined) | undefined;
     let findGate: Promise<Row[]> | undefined;
@@ -65,10 +67,16 @@ export function fakeServer() {
         },
         async update(id: string | number, data: Row, options?: Record<string, unknown>) {
             check("update", id, data, options);
+            // As the real `PATCH` does: a key it has seen is answered from its
+            // record of the first request, and the edit is not applied again.
+            const key = options?.idempotencyKey as string | undefined;
+            const replayed = key === undefined ? undefined : answered.get(key);
+            if (replayed) return replayed;
             const existing = rows.get(String(id));
             if (!existing) throw new RebaseApiError("Not found", { status: 404, code: "NOT_FOUND" });
             const row = { ...existing, ...data, id };
             rows.set(String(id), row);
+            if (key !== undefined) answered.set(key, { ...row });
             const lost = afterCommit?.("update");
             if (lost) throw lost;
             return row;
