@@ -1390,7 +1390,7 @@ All auth endpoints validate input with Zod schemas:
 | Field | Validation |
 |---|---|
 | `email` | Valid email, max 255 chars |
-| `password` | Min 1 char, max 128 chars |
+| `password` | Min 1 char, max 128 chars (the request shape only: register, reset and change also apply the password policy, 8+ chars with upper, lower and digit, and answer `400 WEAK_PASSWORD`) |
 | `displayName` | Max 255 chars |
 | `photoURL` | Valid URL, max 2048 chars |
 | `refreshToken` | Min 1 char |

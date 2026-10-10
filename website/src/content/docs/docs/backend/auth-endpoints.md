@@ -72,6 +72,18 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).
 
+### Password policy
+
+A new password needs at least 8 characters, with an upper-case letter, a
+lower-case letter and a digit. Registration, reset and change refuse one that
+fails with `400 WEAK_PASSWORD`, listing each rule it broke, and so does an
+administrator setting a password with `PUT /api/admin/users/:uid` (as a plain
+`400`). `POST /api/admin/users` does not check a password it is given. Sign-in
+never checks the policy, so an older password keeps working. To set your own rules, pass
+`auth.hooks.validatePasswordStrength` from an [ejected](/docs/backend/authentication/#configuration)
+backend. The first admin seeded from `REBASE_ADMIN_PASSWORD` is held to a
+different rule: at least 12 characters, and nothing else.
+
 ### Response format
 
 Every endpoint that issues a session answers with the same envelope — `register`,
