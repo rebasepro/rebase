@@ -46,10 +46,14 @@ Realtime is on the list because it costs something whether or not anyone uses
 it: a process that consumes change events holds a `LISTEN` connection outside
 the pool for as long as it runs, and installs the capture triggers at boot. Only
 a process serving websockets has anyone to deliver to, so the two roles that
-serve none do neither. **Writes made by those processes are still heard** — the
-capture is database triggers, so a change is published by the database rather
-than by whichever process made it. A function that writes a row still wakes up
-every subscriber on the `api`.
+serve none do neither. **Writes made by those processes are still heard.** With
+change capture on, the capture is database triggers, so a change is published by
+the database rather than by whichever process made it. With capture off
+(`REALTIME_CDC=off`, or `auto` falling back because the database role cannot
+create triggers), a `worker` or `functions` process announces each of its own
+writes on the cross-instance channel instead, without holding a `LISTEN`
+connection. Either way, a function that writes a row still wakes up every
+subscriber on the `api`.
 
 ## Docker Compose
 

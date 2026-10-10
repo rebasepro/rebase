@@ -1094,6 +1094,15 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 } catch (err) {
                     logger.warn("⚠️ Cross-instance realtime could not be started", { error: err });
                 }
+            } else if (!cdcEnabled && !realtimeSubscribes) {
+                // A worker or a functions process, with no capture to publish
+                // its writes for it (REALTIME_CDC=off, or `auto` fell back).
+                // It has nobody to deliver to, but the `api` does: announce
+                // each write the way an `all` process would, minus the
+                // LISTEN. Where the `api` turns out to run capture after all,
+                // nothing listens on this channel and the notification is
+                // dropped by the database.
+                realtimeService.startPublishing();
             }
 
             // ── Startup Schema Validation ────────────────────────────────────

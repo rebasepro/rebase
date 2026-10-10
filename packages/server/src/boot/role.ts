@@ -83,8 +83,9 @@ type RoleShape = Pick<ResolvedRole, "surfaces" | "ownership" | "provisionSchema"
  * whether or not anyone calls it: a process that consumes change events holds a
  * dedicated `LISTEN` connection outside the pool for as long as it runs, and
  * only a process serving websockets has anybody to deliver to. Writes made *by*
- * these processes are still heard — capture is database triggers, so a change is
- * published by the database rather than by whichever pod made it.
+ * these processes are still heard: with capture on, the database publishes each
+ * change whichever pod made it; with capture off, these processes announce their
+ * own writes on the cross-instance channel without listening to it.
  */
 const ROLES: Record<RebaseRuntimeRole, RoleShape> = {
     all: {

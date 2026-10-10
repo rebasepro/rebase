@@ -3664,6 +3664,22 @@ lastSeen: Date.now() });
     }
 
     /**
+     * Announce this process's writes on {@link PG_NOTIFY_CHANNEL} without
+     * listening for anyone else's.
+     *
+     * For a process that serves no websockets (`worker`, `functions`) while
+     * change capture is not in effect. It has no subscriber of its own, so it
+     * holds no LISTEN connection — but without capture the announcement is
+     * the only way the `api` hears that a cron or a function wrote a row.
+     * Sending needs only the pool.
+     */
+    startPublishing(): void {
+        if (this.broadcasting) return;
+        this.broadcasting = true;
+        logger.info(`📡 [RealtimeService] Announcing this process's writes to the instances that serve realtime (instanceId: ${this.instanceId})`);
+    }
+
+    /**
      * Stop listening and clean up the dedicated LISTEN connection.
      */
     async stopListening(): Promise<void> {
