@@ -55,6 +55,7 @@ import { inWriteFrame, type WriteFrame } from "./services/write-depth";
 import { HistoryService } from "./history/HistoryService";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
+import { rowsOfResult } from "./utils/result-rows";
 import { applyAuthContext } from "./security/rls-enforcement";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
@@ -2676,8 +2677,7 @@ export class PostgresBackendDriver implements DataDriver {
                     try {
                         return await targetDb.transaction(async (tx) => {
                             await tx.execute(drizzleSql.raw(`SET LOCAL ROLE "${safeRole}"`));
-                            const result = await tx.execute(this.buildStatement(sqlText, options?.params));
-                            return result.rows as Record<string, unknown>[];
+                            return rowsOfResult(await tx.execute(this.buildStatement(sqlText, options?.params)));
                         });
                     } catch (roleError: unknown) {
                         if (isRoleSwitchingPermissionError(roleError)) {
@@ -2704,8 +2704,7 @@ export class PostgresBackendDriver implements DataDriver {
                 }
             }
 
-            const result = await targetDb.execute(this.buildStatement(sqlText, options?.params));
-            return result.rows as Record<string, unknown>[];
+            return rowsOfResult(await targetDb.execute(this.buildStatement(sqlText, options?.params)));
         } catch (error: unknown) {
             if (error instanceof RoleSwitchUnavailableError) throw error;
             const msg = error instanceof Error ? error.message : String(error);

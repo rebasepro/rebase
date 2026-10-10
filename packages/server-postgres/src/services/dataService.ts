@@ -9,6 +9,7 @@ import { RelationService } from "./RelationService";
 import { DataRepository, FetchCollectionOptions, SearchOptions, CountOptions, DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { logger, rawQueryLoggingEnabled } from "@rebasepro/server";
+import { rowsOfResult } from "../utils/result-rows";
 
 // Re-export data transformer functions for external use
 export { sanitizeAndConvertDates, serializeDataToServer, parseDataFromServer } from "../data-transformer";
@@ -287,11 +288,11 @@ export class DataService implements DataRepository {
             result = await this.db.execute(sql.raw(sqlText));
         }
 
-        const rows = result.rows;
+        const rows = rowsOfResult(result);
         if (rawQueryLoggingEnabled()) {
-            logger.debug(`SQL executed successfully. Returned ${Array.isArray(rows) ? rows.length : "non-array"} rows.`);
+            logger.debug(`SQL executed successfully. Returned ${rows.length} rows.`);
         }
-        return rows as Record<string, unknown>[];
+        return rows;
     }
 
     // =============================================================
