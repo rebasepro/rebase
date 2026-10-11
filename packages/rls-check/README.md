@@ -16,7 +16,7 @@ It also takes the connection string as an argument, but prefer not to: npm echoe
 
 It works against Supabase, Neon, RDS, Cloud SQL, Postgres in a container on your laptop, or anything else that speaks the wire protocol. It knows nothing about your framework and asks nothing of your codebase.
 
-**It is read-only.** It issues `SELECT`s against the system catalogs — `pg_class`, `pg_policies`, `pg_proc`, `information_schema` — and nothing else. It writes nothing, changes no setting, and sends nothing anywhere. There is no telemetry, no upload, and no network access beyond the connection you give it.
+**It is read-only.** It sets two options for its own session, `statement_timeout` and `default_transaction_read_only = on`, and then issues `SELECT`s against the system catalogs (`pg_class` and its ACLs, `pg_policies`, `pg_proc`, `pg_roles` …) and nothing else. It writes nothing, changes nothing beyond its own session, and sends nothing anywhere. There is no telemetry, no upload, and no network access beyond the connection you give it.
 
 ---
 
