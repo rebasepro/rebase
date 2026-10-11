@@ -426,3 +426,24 @@ describe("useBackendStorageSource", () => {
         });
     });
 });
+
+describe("useBackendStorageSource — a refused request", () => {
+    /**
+     * The server answers `{ error: { message, code } }`. The hook read
+     * `body.error` as the message, so every refusal surfaced as
+     * "[object Object]".
+     */
+    it("says what the server said", async () => {
+        Object.defineProperty(global, "fetch", {
+            configurable: true,
+            writable: true,
+            value: async () => reply(403, { json: { error: { message: "Not authorized for this object", code: "FORBIDDEN" } } })
+        });
+        const source = storage();
+
+        await expect(source.putObject({ file: new File(["x"], "x.txt"), key: "x.txt" }))
+            .rejects.toThrow("Not authorized for this object");
+        await expect(source.deleteObject("x.txt")).rejects.toThrow("Not authorized for this object");
+        await expect(source.listObjects("")).rejects.toMatchObject({ message: "Not authorized for this object", status: 403 });
+    });
+});

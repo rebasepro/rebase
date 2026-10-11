@@ -10,6 +10,7 @@ import {
     DownloadConfig,
     DownloadMetadata,
     StorageListResult,
+    RebaseApiError,
     isPublicStoragePath,
     storageObjectPath
 } from "@rebasepro/types";
@@ -25,6 +26,24 @@ import {
     type ResumableUploadSend
 } from "@rebasepro/common";
 import { DEFAULT_API_PATH } from "./ApiConfigContext";
+
+/**
+ * The error a failed storage response answers with.
+ *
+ * The server's envelope is `{ error: { message, code } }`. This hook read
+ * `body.error` as the message, so every refusal surfaced as
+ * `"[object Object]"` — "Error uploading file: [object Object]".
+ */
+async function storageResponseError(response: Response, fallback: string): Promise<RebaseApiError> {
+    const body: unknown = await response.json().catch(() => undefined);
+    const error = body && typeof body === "object" && "error" in body ? body.error : undefined;
+    const message = typeof error === "string"
+        ? error
+        : error && typeof error === "object" && "message" in error && typeof error.message === "string"
+            ? error.message
+            : undefined;
+    return new RebaseApiError(message || fallback, { status: response.status });
+}
 
 /**
  * A storage key as it goes into a URL path: each segment encoded, the `/`
@@ -178,8 +197,7 @@ export function useBackendStorageSource({
         });
 
         if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: "Upload failed" }));
-            throw new Error(error.error || "Upload failed");
+            throw await storageResponseError(response, "Upload failed");
         }
 
         const result = await response.json();
@@ -200,8 +218,7 @@ export function useBackendStorageSource({
                 fetchWithAuth(`${storageBasePath}/metadata/${encodeStorageKey(filePath)}`));
             if (response.status === 404) return null;
             if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: "Failed to get download URL" }));
-                throw new Error(error.error || "Failed to get download URL");
+                throw await storageResponseError(response, "Failed to get download URL");
             }
             const result: { data: DownloadMetadata } = await response.json();
             return result.data;
@@ -354,8 +371,7 @@ export function useBackendStorageSource({
         });
 
         if (!response.ok && response.status !== 404) {
-            const error = await response.json().catch(() => ({ error: "Failed to delete file" }));
-            throw new Error(error.error || "Failed to delete file");
+            throw await storageResponseError(response, "Failed to delete file");
         }
 
         // Clear from cache
@@ -384,8 +400,7 @@ export function useBackendStorageSource({
         );
 
         if (!response.ok) {
-            const error = await response.json().catch(() => ({ error: "Failed to list files" }));
-            throw new Error(error.error || "Failed to list files");
+            throw await storageResponseError(response, "Failed to list files");
         }
 
         const result = await response.json();
