@@ -788,7 +788,7 @@ export class DrizzleConditionBuilder {
         // apart, which used to widen results silently — exactly the thing an
         // operator wants in the log at warn.
         const answer = unknownFilterField(field, collectionPath, listedColumnKeys(table, collection));
-        throw ApiError.badRequest(answer.message, answer.code, answer.details);
+        throw ApiError.badRequest(answer.message, "UNKNOWN_FILTER_FIELD", answer.details);
     }
 
     /**
@@ -848,7 +848,7 @@ export class DrizzleConditionBuilder {
                 { slug: targetCollection.slug, validFields: listedColumnKeys(targetTable, targetCollection) },
                 collectionPath
             );
-            throw ApiError.badRequest(answer.message, answer.code, answer.details);
+            throw ApiError.badRequest(answer.message, "UNKNOWN_FILTER_FIELD", answer.details);
         }
 
         // The column on *this* table the subquery correlates back to. Only

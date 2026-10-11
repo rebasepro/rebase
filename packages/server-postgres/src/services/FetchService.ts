@@ -584,7 +584,7 @@ target });
         // The REST check answers an `excludeFromApi` sort key with the same
         // function, so a hidden field and a typo cannot be told apart.
         const answer = unknownOrderByField(orderBy, collectionName, listedColumnKeys(table, collection));
-        throw ApiError.badRequest(answer.message, answer.code, answer.details);
+        throw ApiError.badRequest(answer.message, "UNKNOWN_ORDER_BY_FIELD", answer.details);
     }
 
     // =============================================================
@@ -638,7 +638,7 @@ target });
                 const answer = unknownIncludeRelation(
                     key, collection.slug ?? collection.name, includableRelationNames(collection)
                 );
-                throw ApiError.badRequest(answer.message, answer.code, answer.details);
+                throw ApiError.badRequest(answer.message, "UNKNOWN_RELATION", answer.details);
             }
             out.push({ key, node, relation });
         }
@@ -994,7 +994,7 @@ target });
             const answer = unknownProjectionField(
                 name, collection.slug ?? collection.name, queryableFieldNames(collection)
             );
-            throw ApiError.badRequest(answer.message, answer.code, answer.details);
+            throw ApiError.badRequest(answer.message, "UNKNOWN_FIELD", answer.details);
         }
         return projection;
     }
