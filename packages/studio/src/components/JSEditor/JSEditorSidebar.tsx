@@ -1,5 +1,6 @@
 
 import React, { useState } from "react";
+import { useTranslation } from "@rebasepro/app";
 import {
     cls,
     defaultBorderMixin,
@@ -96,6 +97,7 @@ export const JSEditorSidebar = ({
     onDeleteSnippet,
     onInsertCode
 }: JSEditorSidebarProps) => {
+    const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState<"collections" | "snippets" | "history" | "reference">("collections");
 
     return (
@@ -103,7 +105,7 @@ export const JSEditorSidebar = ({
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "collections" | "snippets" | "history" | "reference")} variant="boxy" className="border-b border-hairline">
                 <Tab value="collections">
                     <Tooltip title="Browse collections">
-                        <span className="text-xs">Collections</span>
+                        <span className="text-xs">{t("studio_js_collections_tab")}</span>
                     </Tooltip>
                 </Tab>
                 <Tab value="reference">
@@ -125,7 +127,7 @@ export const JSEditorSidebar = ({
                     <div className="flex flex-col h-full">
                         <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                             <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
-                                Collections
+                                {t("studio_js_collections_tab")}
                             </Typography>
                         </div>
                         <div className="flex-grow overflow-y-auto p-1 space-y-1 no-scrollbar">

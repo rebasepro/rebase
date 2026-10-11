@@ -1172,7 +1172,9 @@ export interface RebaseTranslations {
     studio_kanban_configure?: string;
     studio_missing_reference_error?: string;
     studio_new_collection_add?: string;
-    studio_collections_editor_title?: string;
+    studio_tool_schema?: string;
+    studio_tool_schema_description?: string;
+    studio_js_collections_tab?: string;
     studio_collections_editor_empty?: string;
     studio_collections_editor_pick?: string;
     studio_collections_editor_read_only?: string;

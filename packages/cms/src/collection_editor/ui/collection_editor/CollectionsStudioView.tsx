@@ -130,7 +130,7 @@ export function CollectionsStudioView({
                     <div className={cls("flex flex-col h-full w-full bg-surface-sheet border-r", defaultBorderMixin)}>
                         <div className="flex items-center justify-between px-3 py-2 min-h-[48px]">
                             <Typography variant="subtitle2">
-                                {t("studio_collections_editor_title")}
+                                {t("studio_tool_schema")}
                             </Typography>
                             <Tooltip title={readOnlyReason ?? t("add_new_collection")}>
                                 <div>

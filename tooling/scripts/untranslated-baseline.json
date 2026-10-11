@@ -34,7 +34,6 @@
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionRLSTab.tsx::studio_policy_restrictive": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionRLSTab.tsx::studio_rls_create_policy": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionRLSTab.tsx::studio_rls_title": 1,
-  "packages/cms/src/collection_editor/ui/collection_editor/CollectionsStudioView.tsx::add_new_collection": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionStudioView.tsx::add_new_collection": 1,
   "packages/cms/src/collection_editor/ui/collection_editor/CollectionYupValidation.tsx::required": 3,
   "packages/cms/src/collection_editor/ui/collection_editor/DisplaySettingsForm.tsx::default_row_size": 1,

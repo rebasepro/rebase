@@ -1,7 +1,7 @@
 import type { AppView, HomePageSection, PluginGenericProps } from "@rebasepro/cms-types";
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, cls, Container, ExpandablePanel, Typography } from "@rebasepro/ui";
-import { IconForView, useNavigationGroupLabel, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot } from "@rebasepro/app";
+import { IconForView, useNavigationGroupLabel, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot, useTranslation } from "@rebasepro/app";
 import { useNavigate } from "react-router";
 import { useStudioBreadcrumbs, SchemaDriftBanner } from "@rebasepro/app";
 
@@ -111,6 +111,7 @@ export function StudioHomePage({
     const breadcrumbs = useStudioBreadcrumbs();
     const navigate = useNavigate();
     const registry = useRebaseRegistry();
+    const { t } = useTranslation();
 
     useEffect(() => {
         breadcrumbs.set({ breadcrumbs: [] });
@@ -132,15 +133,15 @@ export function StudioHomePage({
         if (schemaEnabled) {
             views.push({
                 slug: "schema",
-                name: "Collections",
+                name: t("studio_tool_schema"),
                 group: "Database",
                 icon: "LayoutList",
-                description: "Define and manage your data model and collection schemas"
+                description: t("studio_tool_schema_description")
             });
         }
         views.push(...(registry.studioConfig?.devViews ?? []));
         return buildSections(views).filter(s => !hiddenGroups?.includes(s.label));
-    }, [registry.studioConfig?.devViews, schemaEnabled, hiddenGroups]);
+    }, [registry.studioConfig?.devViews, schemaEnabled, hiddenGroups, t]);
 
     const groupNames = useMemo(
         () => filteredSections.map(s => s.label),
