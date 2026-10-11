@@ -923,12 +923,65 @@ export async function checkCollectionsVsDatabase(
                 }
             }
         }
+
+        if (plan) {
+            issues.push(...orphanedJunctionIssues(plan, columnsByTable, pksByTable, fksByTable));
+        }
     } finally {
         await pool.end();
     }
 
-    return { passed: issues.length === 0,
+    // An `info` note — the orphaned junction — does not make the phase fail.
+    return { passed: !issues.some(issue => issue.severity !== "info"),
 issues };
+}
+
+/**
+ * A `public` table in the junction shape that no collection declares.
+ *
+ * The shape is the planner's: exactly two columns, together the primary key,
+ * each a single-column foreign key to a collection's table. Renaming or
+ * removing a many-to-many leaves such a table behind — push and boot only
+ * create — with every link row still in it and nothing reading it.
+ *
+ * Info, never more: the table may be data somebody still wants. The remedy is
+ * shown, never run.
+ */
+export function orphanedJunctionIssues(
+    plan: SchemaPlan,
+    columnsByTable: Map<string, { column_name: string }[]>,
+    pksByTable: Map<string, string[]>,
+    fksByTable: Map<string, { constraint_name: string; column_name: string; foreign_table_schema: string; foreign_table_name: string }[]>
+): DoctorIssue[] {
+    const declared = new Set(plan.tables.map(table => table.qualified));
+    const collectionTables = new Set(plan.tables.filter(table => table.kind === "collection").map(table => table.qualified));
+    const issues: DoctorIssue[] = [];
+    for (const [table, columns] of columnsByTable) {
+        // Keys are bare for `public` and `schema.table` elsewhere.
+        if (table.includes(".") || declared.has(`public.${table}`)) continue;
+        // Two columns and a two-column key: the key is those two columns.
+        if (columns.length !== 2 || (pksByTable.get(table) ?? []).length !== 2) continue;
+
+        const byConstraint = new Map<string, { column: string; target: string }[]>();
+        for (const fk of fksByTable.get(table) ?? []) {
+            const target = `${fk.foreign_table_schema}.${fk.foreign_table_name}`;
+            byConstraint.set(fk.constraint_name, [...(byConstraint.get(fk.constraint_name) ?? []), { column: fk.column_name, target }]);
+        }
+        const links = [...byConstraint.values()];
+        if (links.length !== 2 || links.some(link => link.length !== 1)) continue;
+        if (new Set(links.map(([link]) => link.column)).size !== 2) continue;
+        if (!links.every(([link]) => collectionTables.has(link.target))) continue;
+
+        const targets = links.map(([link]) => link.target.replace(/^public\./, ""));
+        issues.push({
+            severity: "info",
+            category: "orphaned_junction",
+            table,
+            message: `Table "${table}" links "${targets[0]}" and "${targets[1]}" like a many-to-many junction, but no collection declares it — left behind by a renamed or removed relation?`,
+            fix: `DROP TABLE "public"."${table}";`
+        });
+    }
+    return issues;
 }
 
 // ── Report Rendering ─────────────────────────────────────────────────────

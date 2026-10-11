@@ -255,6 +255,8 @@ The database comparison needs `DATABASE_URL` (or `ADMIN_CONNECTION_STRING`). Wit
 
 <span class="since-badge" data-since="0.25">Since 0.25</span> It also names every collection with no [`search` block](/docs/backend/search) whose table holds more than about 10,000 rows. A search there — the admin's search box, `.search()`, `?searchString=` — is `ILIKE '%term%'` over the text columns, which no index can serve, so each one reads the whole table, and its count reads it again (about a third of a second at 100,000 rows, growing with the table). The row count is Postgres's own estimate, so the check scans nothing. It is a hint: it does not change the exit code, and nothing is indexed for you.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> It names an **orphaned junction**: a `public` table shaped like a many-to-many junction that no collection declares. The shape is two columns that together form the primary key, each a foreign key to a collection's table. Renaming or removing a `manyToMany` leaves its old junction behind, because push and boot only create tables, and every link row is still in it. The note is information only, so it does not change the exit code. Its fix is the `DROP TABLE` statement, which `doctor` shows and never runs.
+
 ### `rebase generate-sdk`
 
 Generate a typed SDK from your collection definitions:
