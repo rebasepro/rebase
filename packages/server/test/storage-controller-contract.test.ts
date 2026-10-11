@@ -165,6 +165,20 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
         expect(revalidated.status).toBe(304);
     });
 
+    it("describes an object's custom metadata as the caller's metadata only", async () => {
+        // Local storage answered its whole metadata file — `contentType`,
+        // `size`, `uploadedAt` among the caller's keys — where S3 and GCS
+        // answer the caller's metadata alone.
+        await h.controller.putObject({ file: textFile("a.txt", "hello"), key: "meta/a.txt", metadata: { owner: "alice" } });
+
+        const res = await request("/api/storage/metadata/meta/a.txt");
+        expect(res.status).toBe(200);
+        const { data } = await res.json() as { data: { customMetadata: Record<string, unknown>; contentType: string } };
+
+        expect(data.customMetadata).toEqual({ owner: "alice" });
+        expect(data.contentType).toBe("text/plain");
+    });
+
     it("serves a range as exactly those bytes, and a HEAD with the size and no body", async () => {
         const body = "0123456789abcdefghijklmnopqrstuvwxyz";
         await h.controller.putObject({ file: textFile("clip.bin", body, "video/mp4"), key: "media/clip.bin" });

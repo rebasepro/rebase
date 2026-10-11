@@ -102,7 +102,7 @@ image: {
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload to a specific named backend |
 | `GET` | `/api/storage/file/*` | Retrieve a file — everything after `/file/` is the object key |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Retrieve a file from a specific backend |
-| `GET` | `/api/storage/metadata/*` | Size, content type and last modification of one object, without its bytes |
+| `GET` | `/api/storage/metadata/*` | Size, content type and custom metadata of one object, without its bytes, plus a short-lived download token when it is private |
 | `POST` | `/api/storage/metadata` | <span class="since-badge" data-since="0.25">Since 0.25</span> The same for up to 100 objects of one source: body `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Delete a file |
 | `GET` | `/api/storage/list` | List objects under a prefix (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). A `maxResults` below 1, or a `pageToken` the source never issued, is `400 INVALID_LIST_OPTIONS` |

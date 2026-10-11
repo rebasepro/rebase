@@ -71,6 +71,19 @@ interface ListingSnapshot {
 }
 const isPartialWrite = (name: string) => /^\..+\.[0-9a-f-]{36}\.partial$/.test(name);
 
+/** The fields local storage itself writes into an object's metadata file. */
+const SIDECAR_OWN_FIELDS = new Set(["contentType", "size", "uploadedAt"]);
+
+/**
+ * The caller's metadata from an object's metadata file — without the fields
+ * local storage keeps there for itself, which S3 and GCS do not return as
+ * custom metadata either.
+ */
+function customMetadataOfSidecar(sidecar: unknown): Record<string, unknown> {
+    if (!sidecar || typeof sidecar !== "object" || Array.isArray(sidecar)) return {};
+    return Object.fromEntries(Object.entries(sidecar).filter(([key]) => !SIDECAR_OWN_FIELDS.has(key)));
+}
+
 /** What the metadata kept beside an object is named: `<key>.metadata.json`. */
 const METADATA_SUFFIX = ".metadata.json";
 
@@ -388,7 +401,7 @@ export class LocalStorageController implements StorageController {
                 name: path.basename(resolvedPath),
                 size: fileStat.size,
                 contentType: savedMetadata.contentType || "application/octet-stream",
-                customMetadata: savedMetadata
+                customMetadata: customMetadataOfSidecar(savedMetadata)
             };
         } catch {
             // No metadata file, create basic metadata from stat
