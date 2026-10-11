@@ -89,11 +89,13 @@ describe("in-process SDK: every FindParams field reaches the driver", () => {
         expect(calls.fetch[0].offset).toBe(2 * DEFAULT_LIST_LIMIT);
     });
 
-    it("find() lets `page` win over `offset`, as the contract states", async () => {
+    it("find() refuses `page` with `offset`, as the server does, before reaching the driver", async () => {
+        // `page` used to win silently over an `offset` the caller then never
+        // saw applied. The contract and the server both refuse the pair now.
         const { driver, calls } = recordingDriver();
-        await sdk(buildSdkData(driver), "posts").find({ page: 2, offset: 999, limit: 10 });
-
-        expect(calls.fetch[0].offset).toBe(10);
+        await expect(sdk(buildSdkData(driver), "posts").find({ page: 2, offset: 999, limit: 10 }))
+            .rejects.toMatchObject({ code: "PAGE_WITH_OFFSET" });
+        expect(calls.fetch).toHaveLength(0);
     });
 
     it("find()'s own total counts the rows find() returned", async () => {
