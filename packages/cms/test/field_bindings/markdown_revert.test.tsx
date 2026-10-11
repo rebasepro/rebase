@@ -96,6 +96,15 @@ describe("MarkdownEditorFieldBinding", () => {
         expect(formValue).toBeNull();
     });
 
+    it("emptying a stored text writes NULL, as a text field does", async () => {
+        // `""` over a stored value: `isNull` filters stopped matching the row,
+        // and the plain text field already writes NULL when emptied.
+        await mount("Old");
+
+        await act(async () => emitMarkdown!(""));
+        expect(formValue).toBeNull();
+    });
+
     it("keeps the stored text verbatim when the editor only re-serialises it", async () => {
         // "* a" re-serialises as "- a": a canonical match, not an edit.
         await mount("* a");

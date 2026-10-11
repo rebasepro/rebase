@@ -156,8 +156,11 @@ export function MarkdownEditorFieldBinding({
         if (normalizedContent === normalizeMarkdown(value)) {
             return;
         }
-        internalValue.current = content;
-        setValue(content);
+        // Emptied: NULL, as the plain text field writes. `""` over a stored
+        // value stopped `isNull` filters matching the row.
+        const next = normalizedContent.trim() === "" ? null : content;
+        internalValue.current = next;
+        setValue(next);
     }, [setValue, value]);
 
     useEffect(() => {
