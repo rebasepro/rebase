@@ -1,6 +1,6 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { parseQueryOptions } from "../src/api/rest/query-parser";
-import { assertReadableFields, requestViewer } from "../src/api/rest/field-access-query";
+import { assertNoHiddenAggregateNames, assertReadableFields, requestViewer } from "../src/api/rest/field-access-query";
 import { ApiError } from "../src/api/errors";
 
 /**
@@ -96,9 +96,17 @@ describe("a query naming an unreadable field", () => {
         expect(refusal(() => parseQueryOptions({ salary: "gt.1" }, {}, clerk)).code).toBe("FIELD_NOT_READABLE");
     });
 
-    it("still refuses an `excludeFromApi` column where the driver has no unknown-field answer", () => {
-        expect(refusal(() => assertReadableFields(["passwordHash"], staff, { roles: ["admin"] }, "groupBy")).code)
-            .toBe("FIELD_NOT_READABLE");
+    it("answers an `excludeFromApi` column in an aggregate as an unknown one", () => {
+        expect(() => assertReadableFields(["passwordHash"], staff, { roles: ["admin"] }, "groupBy")).not.toThrow();
+        for (const [aggregates, groupBy] of [
+            [[{ fn: "sum", field: "passwordHash" }], []],
+            [[{ fn: "count" }], ["passwordHash"]]
+        ] as const) {
+            const error = refusal(() => assertNoHiddenAggregateNames(aggregates, groupBy, staff));
+            expect(error.code).toBe("UNKNOWN_AGGREGATE_FIELD");
+            expect(error.message).toContain("'passwordHash'");
+            expect(error.message).not.toMatch(/Valid fields:.*password/i);
+        }
     });
 });
 
@@ -211,9 +219,12 @@ describe("a vector search", () => {
             .toBe("FIELD_NOT_READABLE");
     });
 
-    it("refuses an `excludeFromApi` property, even for admin", () => {
-        expect(refusal(() => parseQueryOptions(search("internalEmbedding"), {}, { collection: docs, viewer: { roles: ["admin"] } })).code)
-            .toBe("FIELD_NOT_READABLE");
+    it("answers an `excludeFromApi` property as an unknown one, even for admin", () => {
+        const error = refusal(() => parseQueryOptions(search("internalEmbedding"), {}, { collection: docs, viewer: { roles: ["admin"] } }));
+        expect(error.code).toBe("UNKNOWN_VECTOR_PROPERTY");
+        expect(error.message).toBe(
+            "Unknown vector property \"internalEmbedding\". This collection's vector properties are: embedding, secretEmbedding."
+        );
     });
 
     it("answers a caller who may read it", () => {

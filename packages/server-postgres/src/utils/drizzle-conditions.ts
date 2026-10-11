@@ -8,9 +8,11 @@ import {
     encodeRelationAggregateSort, type Property, type RelationAggregateFn, type RelationAggregateSort
 } from "@rebasepro/types";
 import {
+    apiHiddenFieldNames,
     canReadField,
     queryableFieldNames,
     unknownFilterField,
+    unknownVectorProperty,
     unknownRelationTargetField,
     fieldKeyForColumn, getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations, toFilterTuples
 } from "@rebasepro/common";
@@ -2971,9 +2973,10 @@ whereConditions };
             vector: number[];
             distance?: "cosine" | "l2" | "inner_product";
             threshold?: number;
-        }
+        },
+        collection?: CollectionConfig
     ): { orderBy: SQL; filter?: SQL; distanceSelect: SQL } {
-        const column = DrizzleConditionBuilder.resolveVectorColumn(table, vectorSearch.property);
+        const column = DrizzleConditionBuilder.resolveVectorColumn(table, vectorSearch.property, collection);
 
         // The vector is interpolated as a raw SQL literal below (pgvector has no
         // bind form for the `::vector` cast), so every element must be a finite
@@ -3023,21 +3026,22 @@ whereConditions };
      * like candidates. The type check is on the *physical* column
      * (`vector(1536)`) rather than on the declared property, so it holds for an
      * introspected collection too, where the property carries no Rebase type.
+     *
+     * The answer for a name that is not a column lists no `excludeFromApi`
+     * property; the REST check answers a hidden one with the same function, so
+     * the two cannot be told apart.
      */
-    private static resolveVectorColumn(table: PgTable<any>, property: string): AnyPgColumn {
+    private static resolveVectorColumn(table: PgTable<any>, property: string, collection?: CollectionConfig): AnyPgColumn {
         const columns = getTableColumns(table) as Record<string, AnyPgColumn> | undefined;
         const column = columns?.[property];
         if (!column) {
+            const hidden = collection ? apiHiddenFieldNames(collection) : undefined;
             const known = Object.entries(columns ?? {})
-                .filter(([, c]) => isVectorColumn(c))
-                .map(([name]) => name);
-            throw ApiError.badRequest(
-                `Unknown vector property "${property}". ` +
-                (known.length > 0
-                    ? `This collection's vector properties are: ${known.join(", ")}.`
-                    : "This collection declares no `vector` property to search."),
-                "UNKNOWN_VECTOR_PROPERTY"
-            );
+                .filter(([name, c]) => isVectorColumn(c) && !hidden?.has(name))
+                .map(([name]) => name)
+                .sort();
+            const answer = unknownVectorProperty(property, known);
+            throw ApiError.badRequest(answer.message, "UNKNOWN_VECTOR_PROPERTY", answer.details);
         }
         if (!isVectorColumn(column)) {
             throw ApiError.badRequest(

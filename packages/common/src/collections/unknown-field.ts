@@ -123,3 +123,40 @@ export function includableRelationNames(collection: CollectionConfig): string[] 
     const hidden = apiHiddenFieldNames(collection);
     return Object.keys(resolveCollectionRelations(collection)).filter(key => !hidden.has(key)).sort();
 }
+
+/**
+ * An aggregate's `select` field or `groupBy` key that names no column.
+ * `forWhat` is where it was named: `sum()`, `count()`, `groupBy`.
+ * `validFields` is {@link queryableFieldNames}, never an `excludeFromApi` field.
+ */
+export function unknownAggregateField(field: string, forWhat: string, validFields: string[]): UnknownFieldAnswer {
+    return {
+        message: `Unknown field '${field}' in ${forWhat}${validList(validFields)}`,
+        code: "UNKNOWN_AGGREGATE_FIELD",
+        details: { field, ...(validFields.length > 0 && { validFields }) }
+    };
+}
+
+/**
+ * The properties a `vector_search` can name, sorted: those declared
+ * `{ type: "vector" }`, never an `excludeFromApi` one.
+ */
+export function vectorPropertyNames(collection: CollectionConfig): string[] {
+    const hidden = apiHiddenFieldNames(collection);
+    return Object.entries(collection.properties ?? {})
+        .filter(([key, property]) => (property as Property | undefined)?.type === "vector" && !hidden.has(key))
+        .map(([key]) => key)
+        .sort();
+}
+
+/** A `vector_search` naming no vector property. `vectorProperties` is {@link vectorPropertyNames}. */
+export function unknownVectorProperty(property: string, vectorProperties: string[]): UnknownFieldAnswer {
+    return {
+        message: `Unknown vector property "${property}". ` +
+            (vectorProperties.length > 0
+                ? `This collection's vector properties are: ${vectorProperties.join(", ")}.`
+                : "This collection declares no `vector` property to search."),
+        code: "UNKNOWN_VECTOR_PROPERTY",
+        details: { property, ...(vectorProperties.length > 0 && { vectorProperties }) }
+    };
+}

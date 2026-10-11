@@ -11,11 +11,14 @@ import {
     resolveCollectionRelations,
     restrictedFieldNames,
     type UnknownFieldAnswer,
+    unknownAggregateField,
     unknownFilterField,
     unknownIncludeRelation,
     unknownOrderByField,
     unknownProjectionField,
-    unknownRelationTargetField
+    unknownRelationTargetField,
+    unknownVectorProperty,
+    vectorPropertyNames
 } from "@rebasepro/common";
 import { ApiError } from "../errors";
 
@@ -40,8 +43,8 @@ import { ApiError } from "../errors";
  * An `excludeFromApi` field is the exception, because its name is *not*
  * public: OpenAPI, `list_collections` and the generated SDK all leave it out.
  * "`email` is not readable on `authors`" would confirm the one thing those hide,
- * so a filter, sort, projection or include naming one is answered as one naming
- * a field that does not exist — built by the functions the driver answers a
+ * so a filter, sort, projection, include, aggregate or vector search naming one
+ * is answered as one naming a field that does not exist — built by the functions the driver answers a
  * typo with (`@rebasepro/common`'s `unknown-field`), so the two answers are the
  * same bytes. See {@link assertNoHiddenNames}.
  *
@@ -73,14 +76,6 @@ const ANON_ROLES: readonly string[] = Object.freeze(["anon"]);
 
 /** Which query parameter a refused field arrived in, for the message. */
 type Where = "filter" | "orderBy" | "fields" | "select" | "groupBy" | "vector_search";
-
-/**
- * The parameters an `excludeFromApi` name is answered in as an unknown field
- * (by {@link assertNoHiddenNames}) rather than as an unreadable one. The others
- * — `select`, `groupBy`, `vector_search` — have no unknown-field answer shared
- * with the driver yet, so a hidden name there is still refused as unreadable.
- */
-const ANSWERED_AS_UNKNOWN: ReadonlySet<Where> = new Set<Where>(["filter", "orderBy", "fields"]);
 
 const WHERE_LABEL: Record<Where, string> = {
     filter: "a filter",
@@ -132,10 +127,12 @@ export function assertReadableFields(
     if (names.length === 0) return;
     const { refused } = restrictedFieldNames(collection, viewer, "read");
     if (refused.size === 0) return;
-    const hidden = ANSWERED_AS_UNKNOWN.has(where) ? apiHiddenFieldNames(collection) : undefined;
+    // An `excludeFromApi` name is answered as an unknown one, by
+    // `assertNoHiddenNames` or `assertNoHiddenAggregateNames`, never here.
+    const hidden = apiHiddenFieldNames(collection);
 
     const named = [...new Set(names.filter((n): n is string =>
-        n !== undefined && refused.has(n) && !hidden?.has(n)))];
+        n !== undefined && refused.has(n) && !hidden.has(n)))];
     if (named.length === 0) return;
 
     throw ApiError.badRequest(
@@ -180,6 +177,34 @@ export function assertQueryFieldsReadable(
     // them: a hidden name is a typo the driver has not reached yet.
     const include = options.include !== undefined ? normalizeInclude(options.include) : undefined;
     assertNoHiddenNames({ ...options, filtered, include: include?.tree }, collection);
+}
+
+/**
+ * The aggregate route's `select` and `groupBy`, which it parses itself: an
+ * `excludeFromApi` name there is answered exactly as the driver answers a
+ * column that does not exist. Walked in the driver's order — each aggregate's
+ * field, then each group key — and the first hidden *or* unknown name gets the
+ * answer, so a typo before a hidden name is still the one named.
+ */
+export function assertNoHiddenAggregateNames(
+    aggregates: readonly { fn: string; field?: string }[],
+    groupBy: readonly string[],
+    collection: CollectionConfig
+): void {
+    const hidden = apiHiddenFieldNames(collection);
+    if (hidden.size === 0) return;
+    const asked = [
+        ...aggregates.flatMap(({ fn, field }) => field === undefined ? [] : [{ name: field, forWhat: `${fn}()` }]),
+        ...groupBy.map(name => ({ name, forWhat: "groupBy" }))
+    ];
+    if (!asked.some(({ name }) => hidden.has(name))) return;
+    const valid = queryableFieldNames(collection);
+    const known = (name: string) => !hidden.has(name) && (valid.includes(name) || name in (collection.properties ?? {}));
+    for (const { name, forWhat } of asked) {
+        if (known(name)) continue;
+        const answer = unknownAggregateField(name, forWhat, valid);
+        throw ApiError.badRequest(answer.message, answer.code, answer.details);
+    }
 }
 
 /**
@@ -295,6 +320,7 @@ function assertNoHiddenNames(
         orderBy?: { field: string }[];
         fields?: string[];
         include?: Record<string, IncludeNode>;
+        vectorSearch?: { property: string };
     },
     collection: CollectionConfig
 ): void {
@@ -309,12 +335,17 @@ function assertNoHiddenNames(
             })
         ];
         const shapes = asked.map(({ kind, name }) => ({ kind, name, shape: nameShape(name, collection, hidden) }));
-        if (shapes.some(entry => entry.shape.hidden)) {
+        const vectorHidden = options.vectorSearch !== undefined && hidden.has(options.vectorSearch.property);
+        if (vectorHidden || shapes.some(entry => entry.shape.hidden)) {
             for (const { kind, name, shape } of shapes) {
                 if (shape.known && !shape.hidden) continue;
                 const answer = unknownAnswer(kind, name, shape, collection);
                 throw ApiError.badRequest(answer.message, answer.code, answer.details);
             }
+        }
+        if (vectorHidden && options.vectorSearch) {
+            const answer = unknownVectorProperty(options.vectorSearch.property, vectorPropertyNames(collection));
+            throw ApiError.badRequest(answer.message, answer.code, answer.details);
         }
     }
 

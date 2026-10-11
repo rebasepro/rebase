@@ -21,10 +21,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
+import { integer, pgTable, serial, varchar, vector } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
 import type { CollectionConfig, DataDriver } from "@rebasepro/types";
-import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
+import { startPgContainer, stopPgContainer, PGVECTOR_IMAGE, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
@@ -37,7 +37,9 @@ const authorsTable = pgTable("authors", {
     id: serial("id").primaryKey(),
     name: varchar("name"),
     email: varchar("email"),
-    salary: integer("salary")
+    salary: integer("salary"),
+    embedding: vector("embedding", { dimensions: 3 }),
+    style: vector("style", { dimensions: 3 })
 });
 const notesTable = pgTable("notes", {
     id: serial("id").primaryKey(),
@@ -59,7 +61,7 @@ const notes = {
     }
 } as unknown as CollectionConfig;
 
-/** One hidden column, one column restricted by role, one hidden relation. */
+/** Hidden columns (one a vector), one column restricted by role, one hidden relation. */
 const authors = {
     name: "Authors", slug: "authors", table: "authors",
     properties: {
@@ -67,6 +69,8 @@ const authors = {
         name: { name: "Name", type: "string" },
         email: { name: "Email", type: "string", excludeFromApi: true },
         salary: { name: "Salary", type: "number", access: { read: ["admin"] } },
+        embedding: { name: "Embedding", type: "vector", dimensions: 3, excludeFromApi: true },
+        style: { name: "Style", type: "vector", dimensions: 3 },
         notes: {
             name: "Notes", type: "relation", excludeFromApi: true,
             relation: { kind: "hasMany", target: () => notes, foreignKeyOnTarget: "author_id" }
@@ -132,7 +136,7 @@ describe("an excludeFromApi field answers as a field that does not exist (E2E)",
     }
 
     beforeAll(async () => {
-        container = await startPgContainer();
+        container = await startPgContainer({ image: PGVECTOR_IMAGE });
         for (let i = 0; ; i++) {
             try {
                 observer = new pg.Client({ connectionString: container.connectionString });
@@ -144,7 +148,9 @@ describe("an excludeFromApi field answers as a field that does not exist (E2E)",
             }
         }
         await observer.query(`
-            CREATE TABLE public.authors (id serial PRIMARY KEY, name varchar, email varchar, salary integer);
+            CREATE EXTENSION IF NOT EXISTS vector;
+            CREATE TABLE public.authors (id serial PRIMARY KEY, name varchar, email varchar, salary integer,
+                embedding vector(3), style vector(3));
             CREATE TABLE public.notes (id serial PRIMARY KEY, body varchar, author_id integer REFERENCES public.authors(id));
             CREATE TABLE public.posts (id serial PRIMARY KEY, title varchar, draft_key varchar, author_id integer REFERENCES public.authors(id));
             INSERT INTO public.authors (name, email, salary) VALUES ('Ada', '${SECRET_EMAIL}', ${SECRET_SALARY}), ('Bob', 'bob@hidden.test', 1);
@@ -226,6 +232,47 @@ describe("an excludeFromApi field answers as a field that does not exist (E2E)",
             expect(a.status).toBeGreaterThanOrEqual(400);
             expect(a).toEqual(b);
             expect(raw).not.toContain("FIELD_NOT_READABLE");
+        });
+    });
+
+    describe("in an aggregate or a vector search", () => {
+        const vector = `&vector=${encodeURIComponent("[1,0,0]")}`;
+
+        it.each([
+            ["an aggregate `select`", "/authors/aggregate?select=count(email)", "/authors/aggregate?select=count(emial)",
+                "email", "emial"],
+            ["an aggregate `groupBy`", "/authors/aggregate?select=count()&groupBy=email",
+                "/authors/aggregate?select=count()&groupBy=emial", "email", "emial"],
+            ["a vector search", `/authors?vector_search=embedding${vector}`, `/authors?vector_search=embeddnig${vector}`,
+                "embedding", "embeddnig"],
+            ["a vector count", `/authors/count?vector_search=embedding${vector}`,
+                `/authors/count?vector_search=embeddnig${vector}`, "embedding", "embeddnig"]
+        ])("%s answers as a misspelt field", async (_label, hidden, typo, name, misspelt) => {
+            const { hidden: a, typo: b, raw } = await pair(hidden, typo, name, misspelt);
+            expect(a.status).toBe(400);
+            expect(a).toEqual(b);
+            expect(raw).not.toContain("FIELD_NOT_READABLE");
+        });
+
+        it("an unknown aggregate field lists no hidden column", async () => {
+            const served = await rest("/authors/aggregate?select=count(zzz)");
+            expect(served.status).toBe(400);
+            expect(served.json.error.code).toBe("UNKNOWN_AGGREGATE_FIELD");
+            expect(served.json.error.message).toContain("name");
+            expect(served.text).not.toMatch(/\bemail\b|\bembedding\b/);
+        });
+
+        it("an unknown vector property lists no hidden vector", async () => {
+            const served = await rest(`/authors?vector_search=zzz${vector}`);
+            expect(served.status).toBe(400);
+            expect(served.json.error.code).toBe("UNKNOWN_VECTOR_PROPERTY");
+            expect(served.json.error.message).toContain("style");
+            expect(served.text).not.toContain("embedding");
+        });
+
+        it("a vector property restricted by nothing still searches", async () => {
+            const served = await rest(`/authors?vector_search=style${vector}`);
+            expect(served.status).toBe(200);
         });
     });
 

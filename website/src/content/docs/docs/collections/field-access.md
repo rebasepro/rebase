@@ -146,11 +146,12 @@ mistake that is not there. **Field names are public; field values are not.**
 
 Except an `excludeFromApi` field's. OpenAPI, `list_collections` and the generated
 SDK leave it out, so its name is not public, and "not readable" would confirm it
-exists. A filter, `orderBy`, `fields` or `include` naming one gets exactly the
-answer a misspelt name gets — `UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`,
-`UNKNOWN_FIELD` or `UNKNOWN_RELATION`, the same message and details — and no
-unknown-field answer lists it among the valid fields. In an aggregate `select` or
-`groupBy` and in `vector_search` it is still refused with `FIELD_NOT_READABLE`.
+exists. A filter, `orderBy`, `fields`, `include`, aggregate `select` or
+`groupBy`, or `vector_search` naming one gets exactly the answer a misspelt name
+gets — `UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`,
+`UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD` or `UNKNOWN_VECTOR_PROPERTY`, the
+same message and details — and no unknown-field answer lists it among the valid
+fields.
 
 ### Writes
 

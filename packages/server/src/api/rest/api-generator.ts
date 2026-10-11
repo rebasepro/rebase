@@ -6,7 +6,7 @@ import { hostEnv } from "../../utils/host";
 import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { cursorToStartAfter, restoresSoftDeletedRow } from "@rebasepro/common";
 import { isObject } from "@rebasepro/utils";
-import { assertReadableFields, requestViewer } from "./field-access-query";
+import { assertNoHiddenAggregateNames, assertReadableFields, requestViewer } from "./field-access-query";
 import { assertKnownWriteFields, assertWriteRequestValid, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "./field-ops";
 import { resolveConflictTarget } from "./conflict-target";
@@ -1439,6 +1439,7 @@ export class RestApiGenerator {
             const viewer = requestViewer(c);
             assertReadableFields(aggregates.map(a => a.field), resolvedCollection, viewer, "select");
             assertReadableFields(groupBy ?? [], resolvedCollection, viewer, "groupBy");
+            assertNoHiddenAggregateNames(aggregates, groupBy ?? [], resolvedCollection);
 
             // The groups are paged like a listing's rows: `limit` bounds them,
             // `offset` (or `page`) moves past them, `orderBy` sorts them by a

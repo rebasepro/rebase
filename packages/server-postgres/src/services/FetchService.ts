@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNot
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import type { IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
-import { includableRelationNames, queryableFieldNames, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, hasFieldAccessRules, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
+import { includableRelationNames, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, hasFieldAccessRules, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, listedColumnKeys, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import { namesHiddenFromCaller } from "./field-viewer";
@@ -1814,7 +1814,7 @@ target });
             // threshold it contributes no filter, so the count is unchanged and
             // what is gained is that `/count` refuses the request the listing
             // refuses instead of answering it with a number.
-            const vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch);
+            const vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch, collection);
             if (vectorMeta.filter) allConditions.push(vectorMeta.filter);
         }
 
@@ -1869,10 +1869,11 @@ target });
         const columnFor = (field: string, forWhat: string): AnyPgColumn => {
             const column = columns[field as keyof typeof columns] as AnyPgColumn | undefined;
             if (!column) {
-                throw ApiError.badRequest(
-                    `Unknown field '${field}' in ${forWhat}. Valid fields: ${Object.keys(columns).sort().join(", ")}`,
-                    "UNKNOWN_AGGREGATE_FIELD"
-                );
+                // Lists no `excludeFromApi` field; the REST check answers a
+                // hidden one with the same function, so a hidden field and a
+                // typo cannot be told apart.
+                const answer = unknownAggregateField(field, forWhat, listedColumnKeys(table, collection));
+                throw ApiError.badRequest(answer.message, "UNKNOWN_AGGREGATE_FIELD", answer.details);
             }
             return column;
         };
@@ -2354,7 +2355,7 @@ relatedTo: hop }, include
 
         let vectorMeta: { orderBy: SQL; filter?: SQL; distanceSelect: SQL } | undefined;
         if (options.vectorSearch) {
-            vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch);
+            vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch, collection);
         }
 
         // A generated search column is an index in column form; `SELECT *`
