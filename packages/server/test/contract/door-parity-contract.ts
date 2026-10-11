@@ -180,6 +180,16 @@ export const PARITY_CASES: readonly ParityCase[] = [
         then: { outcome: "updated", hooks: saveHooks("existing"), history: ["update"], ...live("edited") }
     },
     {
+        // The previous values were read with the key stripped and the saved
+        // values kept it, so every update listed `id` among its changed fields
+        // and "skip an update that changed nothing" could never fire.
+        name: "an update that changes nothing writes no history",
+        finding: "DD-15",
+        given: "live",
+        when: { op: "update", values: { title: STORED_TITLE } },
+        then: { outcome: "updated", hooks: saveHooks("existing"), history: [], ...live() }
+    },
+    {
         name: "an update of a key no row has",
         given: "absent",
         when: { op: "update", values: { title: "ghost" } },

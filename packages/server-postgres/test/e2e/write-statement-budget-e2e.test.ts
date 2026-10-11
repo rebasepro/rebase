@@ -728,8 +728,9 @@ describe("a write's statements (E2E)", () => {
 
             const [entry] = await updateEntries(id);
             expect(entry.format).toBe(2);
-            // Nothing outside the changed fields. (`id` is listed as changed on
-            // every update and was never in a stored previous row; still not.)
+            // Nothing outside the changed fields — and the key, which no
+            // update changes, is not one of them.
+            expect(entry.changed_fields).not.toContain("id");
             expect(Object.keys(entry.previous_values).every(key => entry.changed_fields.includes(key))).toBe(true);
             expect(Object.keys(entry.previous_values).sort()).toEqual(["title", "updatedAt"]);
             expect(entry.previous_values.title).toBe("first draft");

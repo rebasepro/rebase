@@ -1373,10 +1373,10 @@ export class PostgresBackendDriver implements DataDriver {
                 if (!existing) {
                     throw ApiError.notFound(`No row "${id}" in "${path}" to update.`);
                 }
-                if (existing) {
-                    const { id: _existingId, ...existingValues } = existing;
-                    previousValuesForHistory = existingValues as Partial<M>;
-                }
+                // Every column, the key among them — the same shape as the
+                // saved row history compares it with. Without the key on this
+                // side, every update listed it as changed.
+                previousValuesForHistory = existing as Partial<M>;
                 if (preconditionFirst) assertUpdateShape();
             } catch (err) {
                 // The refusal above is the answer, not a failed enrichment.
