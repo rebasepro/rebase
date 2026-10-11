@@ -4,6 +4,7 @@ import { SQL_RESULT_BYTE_BUDGET, SqlResultTooLargeError } from "./services/sql-s
 import { PostgresBackendDriver, effectiveSqlRole, sqlRoleRanAs } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
+import type { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketOptions, WebSocketMessage } from "@rebasepro/types";
 import type { SqlScriptResult } from "@rebasepro/types";
 import { redactSqlLiterals } from "@rebasepro/common";
@@ -343,6 +344,21 @@ export const PUBLIC_TYPES = new Set([
     "DELETE",
     "CHECK_UNIQUE_FIELD"
 ]);
+
+/**
+ * Refuse a path whose collection — its first segment, for a nested path — this
+ * server does not have, with the answer REST gives (`NOT_FOUND`).
+ */
+function assertKnownCollection(
+    registry: Pick<PostgresCollectionRegistry, "getCollectionByPath"> | undefined,
+    path: unknown
+): void {
+    if (!registry || typeof path !== "string") return;
+    const root = path.split("/").find(segment => segment !== "");
+    if (root !== undefined && !registry.getCollectionByPath(root)) {
+        throw ApiError.notFound(`Unknown collection '${root}'.`);
+    }
+}
 
 /**
  * Recursively extract the deepest error message from an error's cause chain (e.g., Drizzle wrapping a PG error).
@@ -1226,6 +1242,14 @@ roles: verifiedUser.roles }
                     return driver;
                 };
 
+                // A data frame naming a collection this server does not have
+                // is the 404 REST gives for it. Left to the driver it was a
+                // plain error — `INTERNAL_ERROR`, logged as an incident, its
+                // message replaced in production.
+                if (PUBLIC_TYPES.has(type)) {
+                    assertKnownCollection(driver.registry, type === "DELETE" ? payload?.row?.path : payload?.path);
+                }
+
                 switch (type) {
                     case "FETCH_COLLECTION": {
                         wsDebug("📋 [WebSocket Server] Processing FETCH_COLLECTION request");
@@ -1729,7 +1753,13 @@ colors: true }));
                     }
 
                     default:
-                        logger.error("❌ [WebSocket Server] Unknown message type", { detail: type });
+                        // Answered, so the client's request settles with a
+                        // reason rather than timing out on silence.
+                        logger.warn("[WebSocket Server] Unknown message type", { detail: type });
+                        throw ApiError.badRequest(
+                            `Unknown message type '${String(type)}'.`,
+                            "UNKNOWN_MESSAGE_TYPE"
+                        );
                 }
             } catch (error: unknown) {
                 // A refused `limit` is the caller's mistake, not a server fault.

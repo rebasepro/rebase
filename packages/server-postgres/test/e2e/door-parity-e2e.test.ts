@@ -538,6 +538,34 @@ describe("door parity: one operation, one answer (E2E)", () => {
         });
     });
 
+    /**
+     * A frame the socket cannot serve is answered, by name. An unknown
+     * collection was an `INTERNAL_ERROR` (logged as an incident, its message
+     * replaced in production) where REST answers 404; an unknown frame type
+     * got no answer at all, so the client's request simply timed out.
+     */
+    describe("a request the socket cannot serve (DD-14)", () => {
+        it("an unknown collection is NOT_FOUND, as over REST", async () => {
+            expect((await http("GET", "/nope")).status).toBe(404);
+            for (const [type, payload] of [
+                ["FETCH_COLLECTION", { path: "nope" }],
+                ["FETCH_ONE", { path: "nope", id: "1" }],
+                ["SAVE", { path: "nope", values: { title: "x" }, status: "new" }]
+            ] as const) {
+                const answer = await frame(type, payload);
+                expect([type, answer.type, answer.payload?.error?.code]).toEqual([type, "ERROR", "NOT_FOUND"]);
+                expect(answer.payload?.error?.message).toContain("nope");
+            }
+        });
+
+        it("an unknown frame type is answered, naming the type", async () => {
+            const answer = await frame("FETCH_EVERYTHING", {});
+            expect(answer.type).toBe("ERROR");
+            expect(answer.payload?.error?.code).toBe("UNKNOWN_MESSAGE_TYPE");
+            expect(answer.payload?.error?.message).toContain("FETCH_EVERYTHING");
+        });
+    });
+
     let caseSeq = 0;
     for (const parity of PARITY_CASES) {
         describe(`given a ${parity.given} row, ${parity.name}${parity.finding ? ` (${parity.finding})` : ""}`, () => {

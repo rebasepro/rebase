@@ -123,7 +123,11 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
             key: "postgres",
             initialised: true,
             registry: {
-                getCollectionByPath: (path: string) => (path === "users" ? usersCollection : path === "profiles" ? profilesCollection : undefined)
+                getCollectionByPath: (path: string) => (path === "users" ? usersCollection
+                    : path === "profiles" ? profilesCollection
+                        // A root whose nested paths the tests write through.
+                        : path === "owners" ? ({ slug: "owners", name: "Owners", properties: {} } as unknown as CollectionConfig)
+                            : undefined)
             },
             save: async (props: unknown) => { saved.push(props); return {}; },
             withAuth: undefined
@@ -304,14 +308,13 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
         expect(saved).toEqual([{ path: "users", status: "new", values: { email: "a@b.c" }, upsert: true, onConflict: ["email"] }]);
     });
 
-    it("says nothing about a path the registry does not know", async () => {
-        // Unknown collection is the driver's question to answer, and refusing
-        // here would turn it into a validation error.
-        const { send } = connect();
+    it("answers a path the registry does not know with REST's 404, not a validation error", async () => {
+        const { send, ws } = connect();
 
         await send({ type: "SAVE", requestId: "r-2", payload: { path: "unknown", values: { x: 1 } } });
 
-        expect(saved).toHaveLength(1);
+        expect(saved).toHaveLength(0);
+        expect(lastFrame(ws)).toMatchObject({ type: "ERROR", requestId: "r-2", payload: { error: { code: "NOT_FOUND" } } });
     });
 });
 
