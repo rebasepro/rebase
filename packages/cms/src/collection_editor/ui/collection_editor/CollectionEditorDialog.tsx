@@ -49,7 +49,7 @@ import { CollectionInference } from "../../types/collection_inference";
 import { buildEntityPropertiesFromData } from "@rebasepro/inference";
 import { CollectionEditorImportMapping } from "./import/CollectionEditorImportMapping";
 import { CollectionEditorImportDataPreview } from "./import/CollectionEditorImportDataPreview";
-import { cleanPropertiesFromImport } from "./import/clean_import_data";
+import { cleanPropertiesFromImport, importedColumnOrder } from "./import/clean_import_data";
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 import { getFullIdPath } from "./util";
 import { AICollectionGeneratorPopover } from "./AICollectionGeneratorPopover";
@@ -681,14 +681,12 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                 importConfig?.setIdColumn(res.idColumn);
                 importConfig?.setImportData(data);
                 importConfig?.setHeadersMapping(res.headersMapping);
-                const filteredHeadingsOrder = ((propertiesOrder ?? [])
-                    .filter((key) => res.headersMapping[key]) as string[]) ?? Object.keys(res.properties);
-                importConfig?.setHeadingsOrder(filteredHeadingsOrder);
+                const order = importedColumnOrder(propertiesOrder ?? [], res.headersMapping);
+                importConfig?.setHeadingsOrder(order.headingsOrder);
                 importConfig?.setOriginProperties(res.properties);
 
-                const mappedHeadings = (propertiesOrder ?? []).map((key) => res.headersMapping[key]).filter(Boolean) as string[] ?? Object.keys(res.properties);
                 setFieldValue("properties", res.properties);
-                setFieldValue("propertiesOrder", mappedHeadings);
+                setFieldValue("propertiesOrder", order.propertiesOrder);
             });
     }
 

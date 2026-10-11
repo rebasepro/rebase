@@ -1,5 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
 import { importIntoNewCollection, lostCells } from "./fixtures/pipeline";
+import { cleanPropertiesFromImport, importedColumnOrder } from "../../src/collection_editor/ui/collection_editor/import/clean_import_data";
 
 /**
  * A file imported into a new collection keeps every value it holds. Each
@@ -70,5 +71,21 @@ describe("every column gets a property of its own", () => {
             .toEqual(["Ann", "ann", "アン", 100, 1, 2]);
         // `_private` is left out of a new collection on purpose (AIX-15).
         expect(lostCells(result).filter(line => !line.includes("'_private'"))).toEqual([]);
+    });
+
+    // `constructor` and `prototype` are refused as columns, but the file's
+    // order kept them, and the dialog read `headersMapping["constructor"]` —
+    // `Object` itself on a plain object — so the mapping step crashed and the
+    // saved `propertiesOrder` held `{}`.
+    test("a constructor or prototype header is no column of the new collection's order", async () => {
+        const result = await importIntoNewCollection("j_keys.csv");
+        expect(result.loaded.propertiesOrder).not.toContain("constructor");
+        expect(result.loaded.propertiesOrder).not.toContain("prototype");
+        const order = importedColumnOrder(["name", "constructor", "prototype", "toString", "__proto__"],
+            cleanPropertiesFromImport({ name: { type: "string" } }).headersMapping);
+        expect(order).toEqual({ headingsOrder: ["name"], propertiesOrder: ["name"] });
+        const fromFile = importedColumnOrder(result.loaded.propertiesOrder, result.headersMapping);
+        expect(fromFile.propertiesOrder.every(key => typeof key === "string" && key !== "")).toBe(true);
+        expect(fromFile.headingsOrder).not.toContain("constructor");
     });
 });

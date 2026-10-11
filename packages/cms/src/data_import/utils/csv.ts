@@ -152,6 +152,8 @@ export function parseCsvToObjects(text: string): ParsedCsv {
         return obj;
     });
 
-    return { headers,
+    // A refused column is not a column of the file's order either: kept there,
+    // the mapping step listed a header no row holds.
+    return { headers: headers.filter(header => !isPrototypePollutingKey(header)),
         data };
 }

@@ -2,6 +2,25 @@ import { Properties } from "@rebasepro/types";
 import { guessIdColumn, ImportConfig } from "../../../_cms_internals";
 import { slugify } from "@rebasepro/utils";
 
+/**
+ * The file's column order, as the mapping step shows it (`headingsOrder`, the
+ * file's own names) and as the new collection orders its properties (the
+ * slugs). Only a column the mapping holds as its *own* key counts: a plain
+ * object answers `constructor` with `Object` itself, so a `constructor` header
+ * — refused as a column, kept in the file's order — crashed the mapping step
+ * and saved `{}` into `propertiesOrder`.
+ */
+export function importedColumnOrder(fileOrder: string[], headersMapping: ImportConfig["headersMapping"]): {
+    headingsOrder: string[],
+    propertiesOrder: string[]
+} {
+    const headingsOrder = fileOrder.filter((key) => Object.hasOwn(headersMapping, key) && Boolean(headersMapping[key]));
+    return {
+        headingsOrder,
+        propertiesOrder: headingsOrder.map((key) => headersMapping[key] as string)
+    };
+}
+
 export function cleanPropertiesFromImport(properties: Properties, parentSlug = ""): {
     headersMapping: ImportConfig["headersMapping"],
     properties: Properties,
