@@ -295,7 +295,7 @@ Inside `admin`, except `history`, which is a backend feature and stays at the to
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `formAutoSave` | `boolean` | `false` | Auto-save on field change |
+| `formAutoSave` | `boolean` | `false` | Auto-save two seconds after an edit, once the form validates. A New form is not saved until something is entered. |
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Backup unsaved changes |
 | `hideIdFromForm` | `boolean` | `false` | Hide the entity ID from the form |
 | `hideIdFromCollection` | `boolean` | `false` | Hide the ID column from the table |

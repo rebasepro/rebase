@@ -104,13 +104,31 @@ export function EntityForm<M extends Record<string, unknown>>({
         onStatusChange?.(status);
     };
 
-    const [valuesToBeSaved, setValuesToBeSaved] = useState<EntityValues<M> | undefined>(undefined);
+    /**
+     * The autosave due: what it writes, and the whole form it was taken from
+     * — which is what validation judges.
+     */
+    const [valuesToBeSaved, setValuesToBeSaved] = useState<{ toSave: EntityValues<M>, values: M } | undefined>(undefined);
     useDebouncedCallback(valuesToBeSaved, () => {
-        if (valuesToBeSaved && onSubmitProp) {
-            setIsSavingAutoSave(true);
-            Promise.resolve(onSubmitProp(valuesToBeSaved, formex))
-                .finally(() => setIsSavingAutoSave(false));
-        }
+        if (!valuesToBeSaved || !onSubmitProp) return;
+        const pending = valuesToBeSaved;
+        setIsSavingAutoSave(true);
+        // An autosave is a save, and is held to what Save is held to. It
+        // wrote every edit unchecked; a form that does not validate now shows
+        // why, and writes nothing until it does.
+        validateForSave(pending.values)
+            .then((errors) => {
+                if (Object.keys(errors).length > 0) {
+                    formex.validate();
+                    return;
+                }
+                return onSubmitProp(pending.toSave, formex);
+            })
+            .catch((e) => {
+                console.error(e);
+                setSavingError(e);
+            })
+            .finally(() => setIsSavingAutoSave(false));
     }, false, 2000);
 
     /**
@@ -246,31 +264,37 @@ export function EntityForm<M extends Record<string, unknown>>({
             onValuesModified?.(false, baseInitialValues as M);
         },
         onValuesChangeDeferred: onValuesChangeDeferredProp,
-        validation: async (values): Promise<Record<string, string>> => {
-            const errors = await validationErrorsFor(values);
-            if (status !== "existing" || !entity?.values || Object.keys(errors).length === 0) {
-                setPredatingViolations({});
-                return errors;
-            }
-            // A record stored before a rule existed still breaks it, and the
-            // server — which judges only what is sent — would take an
-            // unrelated edit. So a field the user did not change, that the
-            // stored record already broke, is a warning and not a refusal. A
-            // field they changed must be valid, and so must one their edit
-            // made invalid: a rule that reads the edited value is the edit's.
-            const edited = getChangedProperties<M>(values, entity.values as Partial<M>);
-            const storedErrors = await validationErrorsFor(entity.values as M);
-            const blocking: Record<string, string> = {};
-            const predating: Record<string, string> = {};
-            for (const [key, error] of Object.entries(errors)) {
-                if (!(key in edited) && key in storedErrors) predating[key] = error;
-                else blocking[key] = error;
-            }
-            setPredatingViolations(predating);
-            return blocking;
-        }
+        validation: (values) => validateForSave(values)
     });
     const formex: FormexController<M> = formexProp ?? internalFormex;
+
+    /**
+     * The errors that stop a save of `values`. Formex runs it on submit, and
+     * the autosave runs it before each write.
+     */
+    async function validateForSave(values: M): Promise<Record<string, string>> {
+        const errors = await validationErrorsFor(values);
+        if (status !== "existing" || !entity?.values || Object.keys(errors).length === 0) {
+            setPredatingViolations({});
+            return errors;
+        }
+        // A record stored before a rule existed still breaks it, and the
+        // server — which judges only what is sent — would take an
+        // unrelated edit. So a field the user did not change, that the
+        // stored record already broke, is a warning and not a refusal. A
+        // field they changed must be valid, and so must one their edit
+        // made invalid: a rule that reads the edited value is the edit's.
+        const edited = getChangedProperties<M>(values, entity.values as Partial<M>);
+        const storedErrors = await validationErrorsFor(entity.values as M);
+        const blocking: Record<string, string> = {};
+        const predating: Record<string, string> = {};
+        for (const [key, error] of Object.entries(errors)) {
+            if (!(key in edited) && key in storedErrors) predating[key] = error;
+            else blocking[key] = error;
+        }
+        setPredatingViolations(predating);
+        return blocking;
+    }
 
     // One form takes a shortcut: the one the focus is in, else the one
     // mounted last (the top panel). Registered once per mount, so the order
@@ -332,7 +356,10 @@ export function EntityForm<M extends Record<string, unknown>>({
         }
     };
 
-    const lastSavedValues = useRef<EntityValues<M> | undefined>(entity?.values);
+    // What the form opened with counts as saved: a New form nobody touched
+    // has nothing to autosave. Seeded with `entity?.values`, which a new
+    // record does not have, the first autosave wrote a record of defaults.
+    const lastSavedValues = useRef<EntityValues<M> | undefined>(baseInitialValues as EntityValues<M>);
     const save = async (values: EntityValues<M>): Promise<Entity<M> | void> => {
         // The string transforms a property declares change what is written;
         // validation has already judged the transformed value.
@@ -354,7 +381,7 @@ export function EntityForm<M extends Record<string, unknown>>({
         const autoSaveEnabled = autoSave ?? false;
 
         if (autoSaveEnabled) {
-            setValuesToBeSaved(valuesToSave);
+            setValuesToBeSaved({ toSave: valuesToSave, values: values as M });
             return Promise.resolve();
         }
 
