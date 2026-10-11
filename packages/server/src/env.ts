@@ -287,6 +287,26 @@ export function areSecretsEphemeral(input: {
  * // env.STRIPE_SECRET_KEY → string        (validated, required)
  * ```
  */
+/**
+ * What a schema makes of the environment, as far as it can: the parsed data
+ * when it parsed, otherwise every variable it did not refuse, parsed with
+ * each one optional. Used only to run the cross-variable checks alongside a
+ * failed parse; the failure itself is still thrown.
+ */
+function bestEffortData(
+    schema: z.ZodObject<z.ZodRawShape>,
+    result: { success: boolean; data?: unknown; error?: z.ZodError }
+): Record<string, unknown> {
+    if (result.success) return result.data as Record<string, unknown>;
+    const refused = new Set((result.error?.issues ?? []).map(issue => String(issue.path[0])));
+    const rest: Record<string, string | undefined> = {};
+    for (const [key, value] of Object.entries(process.env)) {
+        if (!refused.has(key)) rest[key] = value;
+    }
+    const partial = schema.partial().safeParse(rest);
+    return partial.success ? partial.data as Record<string, unknown> : {};
+}
+
 export function loadEnv(): RebaseEnv;
 export function loadEnv<E extends z.ZodObject<z.ZodRawShape>>(options: { extend: E }): RebaseEnv & z.infer<E>;
 export function loadEnv(options?: { extend?: z.ZodObject<z.ZodRawShape> }): Record<string, unknown> {
@@ -367,13 +387,15 @@ export function loadEnv(options?: { extend?: z.ZodObject<z.ZodRawShape> }): Reco
         ...(baseResult.success ? [] : baseResult.error.issues),
         ...(extendResult && !extendResult.success ? extendResult.error.issues : [])
     ];
-    if (parseIssues.length > 0) throw new z.ZodError(parseIssues);
 
     // The refinements below scan every entry, extension fields included, so
-    // they run against the merged object rather than either half.
+    // they run against the merged object rather than either half. They run
+    // even when a schema refused something — against what the rest of the
+    // environment parses to — so a boot that is wrong in three ways says all
+    // three at once, rather than one per restart.
     const env = {
-        ...(baseResult.data as RebaseEnv & Record<string, unknown>),
-        ...((extendResult?.data ?? {}) as Record<string, unknown>)
+        ...bestEffortData(rebaseEnvSchema, baseResult),
+        ...(options?.extend && extendResult ? bestEffortData(options.extend, extendResult) : {})
     } as RebaseEnv & Record<string, unknown>;
 
     const refinements = z.custom<Record<string, unknown>>().superRefine((data, ctx) => {
@@ -420,7 +442,14 @@ export function loadEnv(options?: { extend?: z.ZodObject<z.ZodRawShape> }): Reco
     });
 
     const refined = refinements.safeParse(env);
-    if (!refined.success) throw refined.error;
+    // A variable the schema already refused is reported once, by the schema.
+    const refusedByParse = new Set(parseIssues.map(issue => String(issue.path[0])));
+    const refinementIssues = refined.success
+        ? []
+        : refined.error.issues.filter(issue => !refusedByParse.has(String(issue.path[0])));
+    if (parseIssues.length + refinementIssues.length > 0) {
+        throw new z.ZodError([...parseIssues, ...refinementIssues]);
+    }
 
     // Warn after successful parse so the server still starts in dev — and only
     // when the claim is true. See `secretsAreEphemeral`.

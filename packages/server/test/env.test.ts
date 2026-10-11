@@ -316,3 +316,58 @@ describe("loadEnv({ extend }) across two copies of zod", () => {
             .not.toThrow();
     });
 });
+
+/**
+ * Every problem in one pass.
+ *
+ * The base schema failing used to throw before the production refinements
+ * ran, so a production boot missing `JWT_SECRET` did not also say that
+ * `CORS_ORIGINS` was missing or that `DATABASE_URL` was a loopback address:
+ * the operator learned them one restart at a time.
+ */
+describe("loadEnv reports every problem at once", () => {
+    const originalEnv = { ...process.env };
+    afterEach(() => { process.env = { ...originalEnv }; });
+
+    function issuePaths(load: () => unknown): string[] {
+        try {
+            load();
+        } catch (error) {
+            return (error as z.ZodError).issues.map(issue => String(issue.path[0])).sort();
+        }
+        throw new Error("expected loadEnv to throw");
+    }
+
+    it("names a missing secret, the missing CORS origins and a loopback database together", () => {
+        process.env = {
+            NODE_ENV: "production",
+            DATABASE_URL: "postgresql://rebase@127.0.0.1:5432/rebase"
+        };
+
+        const paths = issuePaths(() => loadEnv());
+
+        expect(paths).toEqual(expect.arrayContaining(["CORS_ORIGINS", "DATABASE_URL", "JWT_SECRET"]));
+    });
+
+    it("does not report a variable twice when it is both malformed and loopback", () => {
+        process.env = {
+            NODE_ENV: "production",
+            JWT_SECRET: "12345678901234567890123456789012",
+            FRONTEND_URL: "https://my-app.com",
+            DATABASE_URL: "postgresql://localhost:5432/rebase",
+            STORAGE_TYPE: "dropbox"
+        };
+
+        const paths = issuePaths(() => loadEnv());
+
+        expect(paths).toEqual(["DATABASE_URL", "STORAGE_TYPE"]);
+    });
+
+    it("still answers the base schema's own message for the variable it refused", () => {
+        process.env = { NODE_ENV: "production", DATABASE_URL: "postgresql://db.internal/rebase", FRONTEND_URL: "https://my-app.com" };
+
+        const paths = issuePaths(() => loadEnv());
+
+        expect(paths).toEqual(["JWT_SECRET"]);
+    });
+});
