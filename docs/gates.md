@@ -75,7 +75,7 @@ this list, in this order.
 |---|---|---|
 | `typecheck` | The authoritative type gate: the monorepo and `tsconfig.tests.json`, resolving `@rebasepro/*` to source, so a stale `dist` cannot make it pass. | — |
 | `check:core-types` | The core packages with `@rebasepro/cms-types` absent, which the gate above structurally cannot check. | — |
-| `check:headless` | The backend never *executes* React or a UI package: every collection file imported under a rejecting loader hook. | — |
+| `check:headless` | The backend never *executes* React or a UI package: every collection file imported under a rejecting loader hook, including the template's `presets/*` that `rebase init` copies into a project. | — |
 | `check:types-headless` | The type-level counterpart, source half: core sources and manifests, where `@types/react` as a devDependency satisfied the monorepo and no consumer. | — |
 | `check:browser-deps` | The other direction: a browser-facing package pulling a server framework into `node_modules` through an auto-installed peer, which neither headless guard sees. | — |
 | `check:baas-types` | A real BaaS project typechecked with `react` mapped to a stub: a React type reached through an alias. | — |

@@ -61,20 +61,38 @@ const SERVER_PACKAGES = [
     "packages/cms-types/src/index.ts"
 ];
 
-/** Mirrors the filter in packages/server/src/collections/loader.ts. */
+/**
+ * Mirrors the filter in packages/server/src/collections/loader.ts, and then
+ * walks down: the template's `presets/<name>/` directories are not loaded from
+ * where they sit, but `rebase init` copies one of them into a project's
+ * collections, where the backend does load them. A preset that pulled React in
+ * would boot-fail the first project made from it, so each is imported here too.
+ * `index.ts` is skipped at every level, as the loader skips it: it only
+ * re-exports, and a preset's one names `./users`, which exists only once
+ * `rebase init` has put the preset beside the template's own collections.
+ */
 function collectionFilesIn(directory) {
     if (!fs.existsSync(directory)) return [];
-    return fs
-        .readdirSync(directory)
-        .filter(
-            (file) =>
-                (file.endsWith(".ts") || file.endsWith(".js")) &&
-                !file.includes(".test.") &&
-                !file.endsWith(".d.ts") &&
-                file !== "index.ts" &&
-                file !== "index.js"
-        )
-        .map((file) => path.join(directory, file));
+    const files = [];
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const full = path.join(directory, entry.name);
+        if (entry.isDirectory()) {
+            if (entry.name === "node_modules" || entry.name === "__tests__") continue;
+            files.push(...collectionFilesIn(full));
+            continue;
+        }
+        const file = entry.name;
+        if (
+            (file.endsWith(".ts") || file.endsWith(".js")) &&
+            !file.includes(".test.") &&
+            !file.endsWith(".d.ts") &&
+            file !== "index.ts" &&
+            file !== "index.js"
+        ) {
+            files.push(full);
+        }
+    }
+    return files.sort();
 }
 
 const failures = [];
