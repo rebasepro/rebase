@@ -416,9 +416,24 @@ function getZodGeoPointSchema({
     name,
     entityId
 }: PropertyContext<GeopointProperty>): ZodTypeAny {
-    let schema: ZodTypeAny = z.object({}).passthrough().nullable().optional();
+    // The field marks a coordinate off the globe in red; the schema has to
+    // refuse it too, or Save wrote latitude 200 under the red message.
+    // A `GeoPoint` instance or a plain `{ latitude, longitude }`.
+    const coordinate = (value: unknown, axis: "latitude" | "longitude"): number | undefined => {
+        if (typeof value !== "object" || value === null) return undefined;
+        const n = (value as Record<string, unknown>)[axis];
+        return typeof n === "number" ? n : undefined;
+    };
+    let schema: ZodTypeAny = z.object({}).passthrough().nullable().optional()
+        .refine(
+            (value: unknown) => Math.abs(coordinate(value, "latitude") ?? 0) <= 90,
+            { message: "Latitude must be between -90 and 90" }
+        )
+        .refine(
+            (value: unknown) => Math.abs(coordinate(value, "longitude") ?? 0) <= 180,
+            { message: "Longitude must be between -180 and 180" }
+        );
     const validation = property.validation;
-
 
     if (validation?.required) {
         schema = schema.refine(

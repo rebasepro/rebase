@@ -595,8 +595,24 @@ function collectViolations(
             return;
         }
 
+        case "geopoint": {
+            // The shape is the data transformer's to refuse; a point with
+            // numeric coordinates off the globe is this rule's.
+            if (typeof value !== "object" || value === null) return;
+            const { latitude, longitude } = value as { latitude?: unknown; longitude?: unknown };
+            if (typeof latitude !== "number" || typeof longitude !== "number") return;
+            if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+                into.push({
+                    field: key,
+                    code: "geopoint_range",
+                    message: `'${key}' must have a latitude between -90 and 90 and a longitude between -180 and 180 (received ${latitude}, ${longitude}).`
+                });
+            }
+            return;
+        }
+
         default:
-            // boolean, geopoint, relation, reference, vector, binary carry only
+            // boolean, relation, reference, vector, binary carry only
             // `required`/`unique`, both of which the database enforces.
     }
 }
