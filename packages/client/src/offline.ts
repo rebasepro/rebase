@@ -1246,10 +1246,9 @@ data: u.data as AnyRow })),
                 }
                 const cached = await this.readCache<number>(this.countKey(slug, params));
                 if (cached !== undefined) return Math.max(0, cached + this.pendingDelta(slug, params));
-                const state = this.collections.get(slug);
-                if (state && state.rows.size > 0) {
-                    return runLocalQuery([...state.rows.values()].map((e) => e.row), params).meta.total;
-                }
+                // Counting the cached rows would answer "how many rows does
+                // this device hold" under the name of "how many rows are
+                // there": 20 of 214 after a cold start, said with confidence.
                 throw offlineError(`Offline: no cached count for "${slug}".`);
             },
 
@@ -2195,18 +2194,33 @@ data: u.data as AnyRow })),
     /** How many rows the queue adds to (or removes from) a server-side count. */
     private pendingDelta(slug: string, params?: FindParams): number {
         if (!isExactlyEvaluable(params)) return 0;
+        // Each write moves the count by whether its row matched before it
+        // and after it. "Before" is the row the write's rollback keeps; a row
+        // that was not cached when it was written is unknown, and moves
+        // nothing rather than a guess.
+        const counts = (row: AnyRow | null | undefined) => (row && matchesParams(row, params) ? 1 : 0);
+        const before = (op: PendingMutation, id: string | number | undefined) =>
+            id === undefined ? undefined : op.rollback?.rows?.[String(id)];
         let delta = 0;
         for (const op of this.queue) {
             if (op.collection !== slug) continue;
-            if (op.type === "create") {
-                if (matchesParams(op.data as AnyRow, params)) delta++;
-            } else if (op.type === "createMany") {
-                for (const row of (op.data as AnyRow[] | undefined) ?? []) {
-                    if (matchesParams(row, params)) delta++;
+            if (op.type === "create" || op.type === "createMany") {
+                const rows = op.type === "create" ? [op.data as AnyRow] : (op.data as AnyRow[] | undefined) ?? [];
+                // A create over a row this device already held (a
+                // caller-supplied id) replaces it rather than adding one.
+                for (const row of rows) delta += counts(row) - counts(before(op, row?.id as string | number | undefined));
+            } else if (op.type === "update") {
+                const was = before(op, op.id);
+                if (was) delta += counts({ ...was, ...(op.data as AnyRow) }) - counts(was);
+            } else if (op.type === "updateMany") {
+                for (const update of op.updates ?? []) {
+                    const was = before(op, update.id);
+                    if (was) delta += counts({ ...was, ...update.data }) - counts(was);
                 }
             } else if (op.type === "delete") {
-                const before = op.rollback?.rows?.[String(op.id)];
-                if (before && matchesParams(before, params)) delta--;
+                delta -= counts(before(op, op.id));
+            } else if (op.type === "deleteMany") {
+                for (const id of op.ids ?? []) delta -= counts(before(op, id));
             }
         }
         return delta;

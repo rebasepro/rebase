@@ -90,9 +90,9 @@ export function fakeServer() {
             check("deleteMany", ids, undefined, options);
             for (const id of ids) rows.delete(String(id));
         },
-        async count() {
+        async count(params?: unknown) {
             check("count");
-            return rows.size;
+            return runLocalQuery([...rows.values()], { ...(params as object), limit: 1_000_000 } as never).data.length;
         },
         listen(_params: unknown, onUpdate: (result: { data: Row[] }) => void) {
             listeners.push(onUpdate);

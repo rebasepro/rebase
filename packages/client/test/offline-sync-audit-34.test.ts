@@ -224,3 +224,42 @@ describe("an application callback that throws (L5)", () => {
         expect(heard.at(-1)).toBe(0);
     });
 });
+
+describe("a count answered while writes are queued (M11)", () => {
+    function counted() {
+        const server = fakeServer();
+        for (const id of ["1", "2", "3"]) server.rows.set(id, { id, status: "open" });
+        const { posts } = manager(server);
+        return { server, posts };
+    }
+    const open = { where: { status: ["==", "open"] } } as never;
+
+    it("moves with a deleteMany made offline", async () => {
+        const { posts } = counted();
+        await posts.find();
+        expect(await posts.count()).toBe(3);
+        setNavigatorOnLine(false);
+        await posts.deleteMany(["1", "2"]);
+        expect(await posts.count()).toBe(1);
+    });
+
+    it("moves with an edit that takes a row out of the filter, or puts it back", async () => {
+        const { posts } = counted();
+        await posts.find();
+        expect(await posts.count(open)).toBe(3);
+        setNavigatorOnLine(false);
+        await posts.update("1", { status: "closed" });
+        expect(await posts.count(open)).toBe(2);
+        await posts.updateMany([{ id: "2", data: { status: "closed" } }]);
+        expect(await posts.count(open)).toBe(1);
+        await posts.update("1", { status: "open" });
+        expect(await posts.count(open)).toBe(2);
+    });
+
+    it("refuses to pass off the cached rows as the collection's count", async () => {
+        const { posts } = counted();
+        await posts.find({ limit: 2 });
+        setNavigatorOnLine(false);
+        await expect(posts.count()).rejects.toMatchObject({ code: "OFFLINE" });
+    });
+});
