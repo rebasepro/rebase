@@ -474,6 +474,9 @@ export function inferTypeFromValue(value: unknown): DataType {
     if (typeof value === "string") return "string";
     if (typeof value === "number") return "number";
     if (typeof value === "boolean") return "boolean";
+    // A Date is an object, so it read as a map — while the CMS's own detector
+    // (`getInferenceType`) calls it a date. The two defaults agree now.
+    if (value instanceof Date) return "date";
     if (Array.isArray(value)) return "array";
     if (typeof value === "object") return "map";
     return "string";

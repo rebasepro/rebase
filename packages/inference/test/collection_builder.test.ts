@@ -351,3 +351,28 @@ describe("a field inside a map", () => {
         expect(nested.code.type).toBe("string");
     });
 });
+
+describe("the README's quick start", () => {
+    it("infers what the README says it does", async () => {
+        const { inferTypeFromValue } = await import("../src/collection_builder");
+        const sampleData = [
+            { name: "Alice", age: 30, active: true, role: "admin" },
+            { name: "Bob", age: 25, active: false, role: "editor" },
+            { name: "Carol", age: 28, active: true, role: "admin" },
+            { name: "Dan", age: 41, active: true, role: "editor" },
+            { name: "Eve", age: 35, active: false, role: "admin" },
+            { name: "Frank", age: 52, active: true, role: "editor" },
+            { name: "Grace", age: 23, active: true, role: "admin" }
+        ];
+        const properties = await buildEntityPropertiesFromData(sampleData, inferTypeFromValue);
+        expect(properties.name).toEqual(expect.objectContaining({ type: "string", name: "Name", validation: { required: true } }));
+        expect(properties.age).toEqual(expect.objectContaining({ type: "number", validation: { required: true } }));
+        expect(properties.active).toEqual(expect.objectContaining({ type: "boolean", validation: { required: true } }));
+        expect((properties.role as { enum?: unknown[] }).enum).toHaveLength(2);
+    });
+
+    it("calls a Date a date, as the CMS's detector does", async () => {
+        const { inferTypeFromValue } = await import("../src/collection_builder");
+        expect(inferTypeFromValue(new Date())).toBe("date");
+    });
+});

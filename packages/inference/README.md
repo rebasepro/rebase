@@ -1,6 +1,6 @@
 # @rebasepro/inference
 
-Automatically infer Rebase collection property schemas from sample data — analyzes field types, detects enums, references, validation rules, and nested structures.
+Infer Rebase collection property schemas from sample data: field types, enums, `required`, `email` / `url`, storage fields, and nested maps and arrays.
 
 ## Installation
 
@@ -14,7 +14,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
-`@rebasepro/inference` examines arrays of data objects and produces `Properties` definitions compatible with the Rebase collection schema. It uses statistical analysis to determine the most probable type for each field, detect enum values, identify reference patterns, and build nested map/array structures. Used by the Rebase introspection pipeline and data import tools.
+`@rebasepro/inference` examines arrays of data objects and produces `Properties` definitions compatible with the Rebase collection schema. It counts the types each field holds to pick one: a column that mixes numbers with text that is not exactly a number is a string. It also detects enum values and builds nested map/array structures. A `"reference"` property is built only when your `getType` returns `"reference"`; the default `inferTypeFromValue` never does. The admin's "create a collection from a file" import is its consumer in Rebase; database introspection does not use it.
 
 ## Key Exports
 
@@ -22,10 +22,10 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 | Export | Type | Description |
 |---|---|---|
-| `buildEntityPropertiesFromData` | `(data: object[], getType: InferenceTypeBuilder) => Promise<Properties>` | Main entry — infer full property schema from data |
+| `buildEntityPropertiesFromData` | `(data: object[], getType: InferenceTypeBuilder, options?: { ignoreKey?: (key: string) => boolean }) => Promise<Properties>` | Main entry — infer full property schema from data. `ignoreKey` leaves top-level keys out (none by default) |
 | `buildPropertyFromData` | `(data: unknown[], property: Property, getType: InferenceTypeBuilder) => Property` | Refine an existing property with new sample data |
 | `buildPropertiesOrder` | `(properties: Properties, propertiesOrder?: string[], priorityKeys?: string[]) => string[]` | Sort property keys (title/name first, then images, then alphabetical) |
-| `inferTypeFromValue` | `(value: unknown) => DataType` | Default type inference: string, number, boolean, array, map, vector |
+| `inferTypeFromValue` | `(value: unknown) => DataType` | Default type inference: string, number, boolean, date, array, map, vector |
 | `InferenceTypeBuilder` | Type | `(value: unknown) => DataType` — pluggable type detector |
 
 ### String Utilities
@@ -60,6 +60,10 @@ const sampleData = [
     { name: "Alice", age: 30, active: true, role: "admin" },
     { name: "Bob", age: 25, active: false, role: "editor" },
     { name: "Carol", age: 28, active: true, role: "admin" },
+    { name: "Dan", age: 41, active: true, role: "editor" },
+    { name: "Eve", age: 35, active: false, role: "admin" },
+    { name: "Frank", age: 52, active: true, role: "editor" },
+    { name: "Grace", age: 23, active: true, role: "admin" },
 ];
 
 const properties = await buildEntityPropertiesFromData(
@@ -67,11 +71,12 @@ const properties = await buildEntityPropertiesFromData(
     inferTypeFromValue
 );
 // properties = {
-//   name: { type: "string", name: "Name", ... },
-//   age:  { type: "number", name: "Age", ... },
-//   active: { type: "boolean", name: "Active", ... },
-//   role: { type: "string", name: "Role", enum: [...], ... }
+//   name: { type: "string", name: "Name", validation: { required: true } },
+//   age:  { type: "number", name: "Age", validation: { required: true } },
+//   active: { type: "boolean", name: "Active", validation: { required: true } },
+//   role: { type: "string", name: "Role", enum: [...], validation: { required: true } }
 // }
+// An enum is inferred when a column has fewer distinct values than a third of its values.
 ```
 
 ## Related Packages

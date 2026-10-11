@@ -84,7 +84,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 | `@rebasepro/forms` | Lightweight React form state management | Frontend |
 | `@rebasepro/plugin-ai` | AI-powered field autocompletion plugin | Frontend |
 | `@rebasepro/plugin-data-import-export` | CSV/JSON/Excel import and export | Frontend |
-| `@rebasepro/inference` | Auto-detect schema from existing database data | Backend/CLI |
+| `@rebasepro/inference` | Infer collection properties from sample rows (the admin's "create a collection from a file" import) | Frontend |
 
 ## Data Flow
 
