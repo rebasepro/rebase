@@ -57,17 +57,42 @@ export interface WalkEntityPagesParams<M extends Record<string, unknown>> {
  * @throws When more than `maxRows` rows match. A truncated answer is worse than
  * no answer: it is indistinguishable from a complete one.
  */
-export async function walkEntityPages<M extends Record<string, unknown>>({
+export async function walkEntityPages<M extends Record<string, unknown>>(
+    params: WalkEntityPagesParams<M>
+): Promise<Entity<M>[]> {
+    const rows: Entity<M>[] = [];
+    await forEachEntityPage<M>({
+        ...params,
+        onPage: (page) => {
+            rows.push(...page);
+        }
+    });
+    return rows;
+}
+
+/**
+ * {@link walkEntityPages}, handing each page to `onPage` as it arrives instead
+ * of collecting them: the next page is read once `onPage` has settled, and
+ * nothing here keeps a page after that. For a caller that can consume a page
+ * and let it go — an export writing its file as it reads.
+ *
+ * @throws When more than `maxRows` rows match — after handing on the pages
+ * before the one that crossed it.
+ */
+export async function forEachEntityPage<M extends Record<string, unknown>>({
     accessor,
     params,
     pageSize,
     maxRows,
     onCeiling,
     onProgress,
-    signal
-}: WalkEntityPagesParams<M>): Promise<Entity<M>[]> {
+    signal,
+    onPage
+}: WalkEntityPagesParams<M> & {
+    onPage: (page: Entity<M>[]) => void | Promise<void>;
+}): Promise<void> {
 
-    const rows: Entity<M>[] = [];
+    let loaded = 0;
     let offset = 0;
     let after: string | undefined;
 
@@ -81,11 +106,13 @@ export async function walkEntityPages<M extends Record<string, unknown>>({
         } as FindParams<M>);
 
         const page = res?.data ?? [];
-        rows.push(...page);
-        onProgress?.(rows.length, res?.meta?.total);
+        loaded += page.length;
+        onProgress?.(loaded, res?.meta?.total);
 
-        if (rows.length > maxRows)
+        if (loaded > maxRows)
             throw new Error(onCeiling(maxRows));
+
+        if (page.length > 0) await onPage(page);
 
         // An empty page ends the walk whatever the metadata says, so a server
         // that keeps answering `hasMore` cannot spin forever.
@@ -102,6 +129,4 @@ export async function walkEntityPages<M extends Record<string, unknown>>({
         const next = res?.meta?.nextCursor;
         after = next && next !== after ? next : undefined;
     }
-
-    return rows;
 }

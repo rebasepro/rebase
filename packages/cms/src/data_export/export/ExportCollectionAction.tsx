@@ -28,8 +28,8 @@ import {
     RadioGroupItem,
     Tooltip
 } from "@rebasepro/ui";
-import { downloadEntitiesExport } from "./export";
-import { fetchAllEntitiesForExport, MAX_EXPORT_ROWS } from "./fetch_export_data";
+import { createCsvExportWriter, downloadBlob, downloadEntitiesExport } from "./export";
+import { fetchAllEntitiesForExport, forEachEntityPageForExport, MAX_EXPORT_ROWS } from "./fetch_export_data";
 import { resolveAdditionalExportValues } from "./additional_fields";
 import { resolveSelection, selectionQueryToFindParams } from "../../selection";
 
@@ -121,51 +121,73 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
             const onProgress = (loaded: number, total: number | undefined) => setProgress({ loaded, total });
             const accessor = dataClient.collection(path) as { find: (params?: any) => Promise<any> };
 
-            // What the user is looking at, or what they picked out of it.
-            //
-            // Neither used to be true: the export read the collection with no
-            // params at all, so a filtered, searched table of 40 rows exported
-            // every row in the table — and ticking rows first changed nothing.
-            const data = exportSelection
-                ? await resolveSelection<M>({
-                    selection: exportSelection,
-                    accessor,
-                    maxRows: MAX_EXPORT_ROWS,
-                    onProgress
-                })
-                // Paginated, not `find({})`: an absent limit resolves to 50 rows
-                // server-side, so the export used to be the first page of the
-                // collection under a filename that read like all of it.
-                : await fetchAllEntitiesForExport<M>({
-                    accessor,
-                    params: selectionQueryToFindParams(liveQuery),
-                    onProgress
-                });
-            const additionalData = await fetchAdditionalFields(data);
             const additionalHeaders = [
                 ...exportConfig?.additionalFields?.map(column => column.key) ?? [],
                 ...collection.additionalFields?.map(field => field.key) ?? []
             ];
-
             const defaultValues = includeUndefinedValues ? getDefaultValuesFor(collection.properties) : undefined;
-            const dataWithDefaults = defaultValues
+            const withDefaults = (data: Entity<M>[]) => defaultValues
                 ? data.map(entity => ({
                     ...entity,
                     values: { ...defaultValues,
 ...entity.values }
                 }))
                 : data;
-            downloadEntitiesExport({
-                data: dataWithDefaults,
-                additionalData,
-                properties: collection.properties,
-                propertiesOrder: collection.propertiesOrder,
-                name: collection.name,
-                flattenArrays,
-                additionalHeaders,
-                exportType,
-                dateExportType
+
+            // What the user is looking at, or what they picked out of it.
+            //
+            // Neither used to be true: the export read the collection with no
+            // params at all, so a filtered, searched table of 40 rows exported
+            // every row in the table — and ticking rows first changed nothing.
+            //
+            // Paginated, not `find({})`: an absent limit resolves to 50 rows
+            // server-side, so the export used to be the first page of the
+            // collection under a filename that read like all of it.
+            const findParams = selectionQueryToFindParams(liveQuery);
+            const resolveSelected = (selection: NonNullable<typeof exportSelection>) => resolveSelection<M>({
+                selection,
+                accessor,
+                maxRows: MAX_EXPORT_ROWS,
+                onProgress
             });
+
+            if (exportType === "csv") {
+                // Written a page at a time as the pages arrive, and each page
+                // let go once written: holding every entity until the end, then
+                // a copy of every row beside it, peaked at ~211 MB for a 32 MB
+                // file of 100,000 rows × 20 columns.
+                const writer = createCsvExportWriter({
+                    properties: collection.properties,
+                    propertiesOrder: collection.propertiesOrder,
+                    additionalHeaders,
+                    flattenArrays,
+                    dateExportType
+                });
+                const writePage = async (page: Entity<M>[]) => {
+                    writer.addPage(withDefaults(page), await fetchAdditionalFields(page));
+                };
+                if (exportSelection) {
+                    await writePage(await resolveSelected(exportSelection));
+                } else {
+                    await forEachEntityPageForExport<M>({ accessor, params: findParams, onProgress, onPage: writePage });
+                }
+                downloadBlob(writer.finish(), `${collection.name}.csv`, "text/csv");
+            } else {
+                const data = exportSelection
+                    ? await resolveSelected(exportSelection)
+                    : await fetchAllEntitiesForExport<M>({ accessor, params: findParams, onProgress });
+                downloadEntitiesExport({
+                    data: withDefaults(data),
+                    additionalData: await fetchAdditionalFields(data),
+                    properties: collection.properties,
+                    propertiesOrder: collection.propertiesOrder,
+                    name: collection.name,
+                    flattenArrays,
+                    additionalHeaders,
+                    exportType,
+                    dateExportType
+                });
+            }
             onAnalyticsEvent?.("export_collection_success", {
                 collection: collection.slug
             });

@@ -39,12 +39,15 @@ export function downloadEntitiesExport<M extends Record<string, unknown>>({
     });
 
     if (exportType === "csv") {
-        const arrayValuesCount = flattenArrays ? getArrayValuesCount(data.map(d => d.values)) : {};
-        const headers = getExportHeaders(properties, propertiesOrder, additionalHeaders, arrayValuesCount);
-        const exportableData = getEntityCSVExportableData(data, additionalData, properties, headers, dateExportType);
-        const headersData = entryToCSVRow(headers.map(h => h.label));
-        const csvData = exportableData.map(entry => entryToCSVRow(entry));
-        downloadBlob([headersData, ...csvData], `${name}.csv`, "text/csv");
+        const writer = createCsvExportWriter({
+            properties,
+            propertiesOrder,
+            additionalHeaders,
+            flattenArrays,
+            dateExportType
+        });
+        writer.addPage(data, additionalData);
+        downloadBlob(writer.finish(), `${name}.csv`, "text/csv");
     } else {
         const exportableData = getEntityJsonExportableData(data, additionalData, properties, dateExportType);
         const json = JSON.stringify(exportableData, null, 2);
@@ -58,22 +61,8 @@ export function getEntityCSVExportableData(data: Entity<Record<string, unknown>>
     headers: Header[],
     dateExportType: "timestamp" | "string"
 ) {
-
-    const mergedData: Record<string, unknown>[] = data.map(e => ({
-        id: e.id,
-        ...processValuesForExport(e.values, properties, "csv", dateExportType)
-    }));
-
-    if (additionalData) {
-        additionalData.forEach((additional, index) => {
-            mergedData[index] = { ...mergedData[index],
-...additional };
-        });
-    }
-
-    return mergedData && mergedData.map((entry) => {
-        return headers.map((header) => getValueInPath(entry, header.key));
-    });
+    return mergeExportRows(data, additionalData, properties, "csv", dateExportType)
+        .map((entry) => headers.map((header) => getValueInPath(entry, header.key)));
 }
 
 export function getEntityJsonExportableData(data: Entity<Record<string, unknown>>[],
@@ -81,10 +70,24 @@ export function getEntityJsonExportableData(data: Entity<Record<string, unknown>
     properties: Properties,
     dateExportType: "timestamp" | "string"
 ) {
+    return mergeExportRows(data, additionalData, properties, "json", dateExportType);
+}
+
+/**
+ * Each entity as the record its export row is read from: `id`, the processed
+ * values, then `additionalData[i]` over them. An `additionalData` longer than
+ * `data` adds rows of its own.
+ */
+function mergeExportRows(data: Entity<Record<string, unknown>>[],
+    additionalData: Record<string, unknown>[] | undefined,
+    properties: Properties,
+    exportType: "csv" | "json",
+    dateExportType: "timestamp" | "string"
+): Record<string, unknown>[] {
 
     const mergedData: Record<string, unknown>[] = data.map(e => ({
         id: e.id,
-        ...processValuesForExport(e.values, properties, "json", dateExportType)
+        ...processValuesForExport(e.values, properties, exportType, dateExportType)
     }));
 
     if (additionalData) {
@@ -97,41 +100,332 @@ export function getEntityJsonExportableData(data: Entity<Record<string, unknown>
     return mergedData;
 }
 
-function getExportHeaders<M extends Record<string, unknown>>(properties: Properties,
+/**
+ * The columns of an export, in groups: the `id`, then one group per property
+ * in `propertiesOrder`, then one per additional header. A property's group is
+ * the one that becomes a column per array item (`tags[0]`, `tags[1]`, …) when
+ * arrays are flattened and some row holds more than one.
+ */
+interface ExportHeaderGroup {
+    /** The property's key, for a property's group. */
+    key?: string;
+    property?: Property;
+    /** The group's columns while its array is not expanded. */
+    headers: Header[];
+}
+
+function getExportHeaderGroups(properties: Properties,
     propertiesOrder: string[] | undefined,
-    additionalHeaders: string[] | undefined,
-    arrayValuesCount?: ArrayValuesCount): Header[] {
+    additionalHeaders: string[] | undefined): ExportHeaderGroup[] {
 
-    const headers: Header[] = [
-        {
-            label: "id",
-            key: "id"
-        },
-        ...(propertiesOrder ?? Object.keys(properties))
-            .flatMap((childKey) => {
-                const property = properties[childKey];
-                if (!property) {
-                    console.warn("Property not found", childKey, properties);
-                    return [];
-                }
-                if (arrayValuesCount && arrayValuesCount[childKey] > 1) {
-                    return Array.from({ length: arrayValuesCount[childKey] },
-                        (_, i) => getHeaders(property as Property, `${childKey}[${i}]`, ""))
-                        .flat();
-                } else {
-                    return getHeaders(property as Property, childKey, "");
-                }
-            })
-    ];
-
-    if (additionalHeaders) {
-        headers.push(...additionalHeaders.map(h => ({
-            label: h,
-            key: h
-        })));
+    const groups: ExportHeaderGroup[] = [{ headers: [{ label: "id", key: "id" }] }];
+    for (const childKey of propertiesOrder ?? Object.keys(properties)) {
+        const property = properties[childKey];
+        if (!property) {
+            console.warn("Property not found", childKey, properties);
+            continue;
+        }
+        groups.push({ key: childKey, property: property as Property, headers: getHeaders(property as Property, childKey, "") });
     }
+    if (additionalHeaders) {
+        groups.push(...additionalHeaders.map(h => ({ headers: [{ label: h, key: h }] })));
+    }
+    return groups;
+}
 
-    return headers;
+/** How many columns per item the group's array spreads into, or 0 when it does not. */
+function expandedItemCount(group: ExportHeaderGroup, arrayValuesCount: ArrayValuesCount): number {
+    if (group.key === undefined) return 0;
+    const count = arrayValuesCount[group.key];
+    return count > 1 ? count : 0;
+}
+
+/** The group's columns for array item `index`. */
+function itemHeaders(group: ExportHeaderGroup, index: number): Header[] {
+    return getHeaders(group.property as Property, `${group.key}[${index}]`, "");
+}
+
+function headersOf(groups: ExportHeaderGroup[], arrayValuesCount: ArrayValuesCount): Header[] {
+    return groups.flatMap((group) => {
+        const count = expandedItemCount(group, arrayValuesCount);
+        return count > 0
+            ? Array.from({ length: count }, (_, i) => itemHeaders(group, i)).flat()
+            : group.headers;
+    });
+}
+
+function rowCells(entry: Record<string, unknown>, headers: Header[]): string[] {
+    return headers.map((header) => toCSVCell(getValueInPath(entry, header.key)));
+}
+
+export interface CsvExportWriterParams {
+    properties: Properties;
+    propertiesOrder: string[] | undefined;
+    additionalHeaders: string[] | undefined;
+    flattenArrays: boolean;
+    dateExportType: "timestamp" | "string";
+}
+
+/**
+ * Writes a CSV export one page of entities at a time.
+ *
+ * An export used to hold every entity it read, then a copy of every row, then
+ * an array of cells per row, then the row strings — about 211 MB at its peak
+ * for 100,000 rows × 20 columns, for a 32 MB file. Each page is now turned
+ * into its CSV text as it arrives and its entities are let go; what is held
+ * is the text itself.
+ *
+ * The file is the one the in-memory export wrote, byte for byte. What makes
+ * that work across pages is `flattenArrays`: the columns an array spreads into
+ * (`tags[0]` … `tags[n-1]`) depend on the longest array in *any* row, which
+ * an early page cannot know. So a page is written with the columns known when
+ * it arrives, and a row also keeps the cells of any array items those columns
+ * leave out. At the end, a page written with fewer columns than the file has
+ * is re-cut: its cells copied, and an array's swapped for, or extended with,
+ * the kept item cells (or empty ones). Usually the longest array is met in the
+ * first page and nothing is re-cut. A property key with `.` or `[` in it
+ * resolves through other properties when spread, so an export with one keeps
+ * its rows' records and writes them at the end, as before.
+ */
+export interface CsvExportWriter {
+    /** One page of entities, with their additional-column values index for index. */
+    addPage(data: Entity<Record<string, unknown>>[], additionalData?: Record<string, unknown>[]): void;
+    /** The whole file, header row first. Once: the pages are handed over. */
+    finish(): BlobPart[];
+}
+
+/**
+ * A row's cells for the items of one array that its page's columns leave out,
+ * kept in case the file has columns for them. The cells of items `0…n-1` in
+ * one string, for an array its page did not spread; otherwise one string per
+ * item, a hole where an item is not kept or its cells are all empty.
+ */
+type RowItemCells = string | (string | undefined)[];
+
+interface CsvExportPage {
+    /** The rows, `\r\n` after each. */
+    text: string;
+    rows: number;
+    /** Per group, the items its array was spread into on this page; 0 when not spread. */
+    spread: number[];
+    /** By `row * groups + group`, for the rows that hold items `spread` leaves out. */
+    items?: (RowItemCells | undefined)[];
+    /** The rows' records, when the export cannot be re-cut (see the writer). */
+    entries?: Record<string, unknown>[];
+}
+
+export function createCsvExportWriter({
+    properties,
+    propertiesOrder,
+    additionalHeaders,
+    flattenArrays,
+    dateExportType
+}: CsvExportWriterParams): CsvExportWriter {
+
+    const groups = getExportHeaderGroups(properties, propertiesOrder, additionalHeaders);
+    // The columns of item `i` of each group, built once per item, not per row.
+    const itemHeaderCache: Header[][][] = groups.map(() => []);
+    const headersOfItem = (groupIndex: number, index: number): Header[] =>
+        itemHeaderCache[groupIndex][index] ??= itemHeaders(groups[groupIndex], index);
+    // Cells per item; a group with none (a map with no properties) spreads
+    // into no columns at all.
+    const itemWidths = groups.map((group, groupIndex) => group.key === undefined ? 0 : headersOfItem(groupIndex, 0).length);
+    const arrayValuesCount: ArrayValuesCount = {};
+    // A key the spread column's path would read through some other property.
+    const keepEntries = flattenArrays && groups.some((group) => group.key !== undefined && /[.[\]]/.test(group.key));
+    const pages: CsvExportPage[] = [];
+
+    return {
+        addPage(data, additionalData) {
+            if (flattenArrays) {
+                // Merged by maximum, which is what one pass over every row
+                // computes.
+                for (const [key, count] of Object.entries(getArrayValuesCount(data.map(d => d.values)))) {
+                    arrayValuesCount[key] = Math.max(arrayValuesCount[key] || 0, count);
+                }
+            }
+            const spread = groups.map((group) => expandedItemCount(group, arrayValuesCount));
+            const entries = mergeExportRows(data, additionalData, properties, "csv", dateExportType);
+            if (keepEntries) {
+                pages.push({ text: "", rows: entries.length, spread, entries });
+                return;
+            }
+            const headers = headersOf(groups, arrayValuesCount);
+            const lines: string[] = [];
+            let items: CsvExportPage["items"];
+            entries.forEach((entry, row) => {
+                lines.push(rowCells(entry, headers).join(",") + "\r\n");
+                if (!flattenArrays) return;
+                const bracketed = bracketedKeyIndices(entry);
+                groups.forEach((group, groupIndex) => {
+                    if (group.key === undefined || itemWidths[groupIndex] === 0) return;
+                    const written = spread[groupIndex];
+                    const indices = itemIndicesWithValues(entry, group.key, bracketed)
+                        .filter((index) => index >= written);
+                    if (indices.length === 0) return;
+                    const value = entry[group.key];
+                    let cells: RowItemCells;
+                    if (written === 0 && Array.isArray(value) && indices.length === value.length) {
+                        cells = value.map((_, index) => rowCells(entry, headersOfItem(groupIndex, index)).join(",")).join(",");
+                    } else {
+                        cells = [];
+                        for (const index of indices) {
+                            cells[index] = rowCells(entry, headersOfItem(groupIndex, index)).join(",");
+                        }
+                    }
+                    (items ??= [])[row * groups.length + groupIndex] = cells;
+                });
+            });
+            pages.push({ text: lines.join(""), rows: entries.length, spread, items });
+        },
+
+        finish() {
+            const counts = flattenArrays ? arrayValuesCount : {};
+            const headers = headersOf(groups, counts);
+            const parts: BlobPart[] = [entryToCSVRow(headers.map(h => h.label))];
+            const spread = groups.map((group) => expandedItemCount(group, counts));
+
+            // Handed over a page at a time, so a re-cut page and the text it
+            // was cut from are not both held for the whole file.
+            for (let page = pages.shift(); page; page = pages.shift()) {
+                if (page.entries) {
+                    parts.push(page.entries.map((entry) => rowCells(entry, headers).join(",") + "\r\n").join(""));
+                } else if (page.spread.every((count, groupIndex) => count === spread[groupIndex])) {
+                    parts.push(page.text);
+                } else {
+                    parts.push(recutPage(page, groups, spread, itemWidths));
+                }
+            }
+            return parts;
+        }
+    };
+}
+
+/**
+ * The record's own keys spelled `key[i]…`, by `key`: `getValueInPath` reads
+ * one of those for the cell `key[i]` before anything else. Almost never there.
+ */
+function bracketedKeyIndices(entry: Record<string, unknown>): Map<string, number[]> | undefined {
+    let found: Map<string, number[]> | undefined;
+    for (const own of Object.keys(entry)) {
+        if (!own.includes("[")) continue;
+        const match = /^(.*?)\[(\d+)\]/.exec(own);
+        if (!match) continue;
+        found ??= new Map();
+        const indices = found.get(match[1]) ?? [];
+        indices.push(Number(match[2]));
+        found.set(match[1], indices);
+    }
+    return found;
+}
+
+const NO_INDICES: number[] = [];
+
+/**
+ * The array items of `entry[key]` whose spread cells may not all be empty —
+ * every other item's are, as `getValueInPath` reads `key[i]` and
+ * `key[i].child`: an array's own items, an object's own integer-named keys
+ * (read as `key[i]` too), and a key of the record spelled `key[i]…` itself.
+ * Over-including is harmless; the cells are computed, not assumed.
+ */
+function itemIndicesWithValues(entry: Record<string, unknown>,
+    key: string,
+    bracketed: Map<string, number[]> | undefined): number[] {
+    const value = entry[key];
+    const extra = bracketed?.get(key);
+    if (!extra) {
+        // The common cases, without building a set per cell.
+        if (Array.isArray(value)) return value.map((_, i) => i);
+        if (value === null || typeof value !== "object") return NO_INDICES;
+    }
+    const indices = new Set<number>();
+    if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) indices.add(i);
+    } else if (value !== null && typeof value === "object") {
+        for (const own of Object.getOwnPropertyNames(value)) {
+            const match = /^(\d+)(?:$|[.[])/.exec(own);
+            if (match) indices.add(Number(match[1]));
+        }
+    }
+    extra?.forEach((index) => indices.add(index));
+    return [...indices];
+}
+
+/**
+ * A page written with fewer columns than the file has, cut back into cells
+ * and written again: each array the file spreads further than the page did
+ * gets its kept item cells, or empty ones.
+ */
+function recutPage(page: CsvExportPage, groups: ExportHeaderGroup[], spread: number[], itemWidths: number[]): string {
+    const text = page.text;
+    const out: string[] = [];
+    let pos = 0;
+    for (let row = 0; row < page.rows; row++) {
+        const cells: string[] = [];
+        let first = true;
+        groups.forEach((group, groupIndex) => {
+            const written = page.spread[groupIndex];
+            const itemWidth = itemWidths[groupIndex];
+            const width = written > 0 ? written * itemWidth : group.headers.length;
+            const groupCells: string[] = [];
+            for (let c = 0; c < width; c++) {
+                if (!first) pos++; // the comma before every cell but the row's first
+                first = false;
+                const end = csvCellEnd(text, pos);
+                groupCells.push(text.slice(pos, end));
+                pos = end;
+            }
+            const count = spread[groupIndex];
+            if (count === written) {
+                cells.push(...groupCells);
+                return;
+            }
+            // Spread further than the page was: the items it wrote stay.
+            if (written > 0) cells.push(...groupCells);
+            const items = page.items?.[row * groups.length + groupIndex];
+            const dense = typeof items === "string" ? splitCsvCells(items) : undefined;
+            for (let i = written; i < count; i++) {
+                const itemCells = dense
+                    ? dense.slice(i * itemWidth, (i + 1) * itemWidth)
+                    : (typeof items === "object" && items[i] !== undefined ? splitCsvCells(items[i] as string) : []);
+                for (let c = 0; c < itemWidth; c++) cells.push(itemCells[c] ?? "");
+            }
+        });
+        pos += 2; // "\r\n"
+        out.push(cells.join(",") + "\r\n");
+    }
+    return out.join("");
+}
+
+/** The cells of a run of them joined with commas, as `toCSVCell` wrote them. */
+function splitCsvCells(text: string): string[] {
+    const cells: string[] = [];
+    let pos = 0;
+    for (; ;) {
+        const end = csvCellEnd(text, pos);
+        cells.push(text.slice(pos, end));
+        if (end >= text.length) return cells;
+        pos = end + 1;
+    }
+}
+
+/**
+ * Where the cell starting at `start` ends. Every cell `toCSVCell` writes is
+ * either empty or quoted with its own quotes doubled, so the next lone quote
+ * closes it.
+ */
+function csvCellEnd(text: string, start: number): number {
+    if (text.charCodeAt(start) !== 34 /* " */) return start;
+    let i = start + 1;
+    for (; ;) {
+        const quote = text.indexOf("\"", i);
+        if (quote < 0) return text.length;
+        if (text.charCodeAt(quote + 1) === 34) {
+            i = quote + 2;
+        } else {
+            return quote + 1;
+        }
+    }
 }
 
 /**

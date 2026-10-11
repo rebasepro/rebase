@@ -1,5 +1,5 @@
 import { Entity, FindParams, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { EntityPageAccessor, walkEntityPages } from "../../util/entity_pages";
+import { EntityPageAccessor, forEachEntityPage, walkEntityPages } from "../../util/entity_pages";
 
 /**
  * Rows asked for per request: the server's `MAX_LIST_LIMIT`, the largest page a
@@ -55,8 +55,40 @@ export async function fetchAllEntitiesForExport<M extends Record<string, unknown
         pageSize,
         maxRows,
         onProgress,
-        onCeiling: (max) =>
-            `This export would contain more than ${max.toLocaleString()} rows, which is more than the ` +
-            "browser can build in one file. Filter the collection down, or export it from the server."
+        onCeiling: exportCeilingMessage
     });
+}
+
+/**
+ * {@link fetchAllEntitiesForExport}, handing each page to `onPage` as it is
+ * read instead of collecting every row: for an export that writes its file as
+ * it goes (CSV), so that what it holds is the file and one page, not every
+ * entity in it.
+ *
+ * @throws When more than `maxRows` rows match.
+ */
+export async function forEachEntityPageForExport<M extends Record<string, unknown>>({
+    accessor,
+    params,
+    pageSize = EXPORT_PAGE_SIZE,
+    maxRows = MAX_EXPORT_ROWS,
+    onProgress,
+    onPage
+}: FetchAllForExportParams<M> & {
+    onPage: (page: Entity<M>[]) => void | Promise<void>;
+}): Promise<void> {
+    return forEachEntityPage<M>({
+        accessor,
+        params,
+        pageSize,
+        maxRows,
+        onProgress,
+        onPage,
+        onCeiling: exportCeilingMessage
+    });
+}
+
+function exportCeilingMessage(max: number): string {
+    return `This export would contain more than ${max.toLocaleString()} rows, which is more than the ` +
+        "browser can build in one file. Filter the collection down, or export it from the server.";
 }

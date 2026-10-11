@@ -1,0 +1,15 @@
+"id","name","tags","address.street","address.city","address.geo.lat","address.geo.lng","price","links","authors","owner","pair","published","active","location","notes","meta","computed","name"
+"row-0","Plain","[]","1 Main St","Rome","41.9","12.5","10","[]","[""a1""]","users/u1","[""x"",1]","1704164645000","true","{""latitude"":1,""longitude"":2}","first","{""k"":""v""}","c0","Plain"
+"row-1","Quote ""inside"", comma","[""a""]","Line 1
+Line 2","'=SUM(A1)",,,"-5","[""{\""label\"":\""A \\\""q\\\""\"",\""url\"":\""https://a.example\""}""]","[""a2""]",,"[""y"",null]","1700000000000","false",,"{""0"":""zero"",""1"":""one""}","{""3"":""three""}","1","Quote ""inside"", comma"
+"row-2","+1",,,,,,"0",,"[]",,"[""z"",2]","not a date",,,"'@handle",,"2","+1"
+"row-3","'	Tabbed","[""a"",""b""]",,"Paris",,,"3.5","[""{\""label\"":\""B\"",\""url\"":\""u\""}"",""{\""label\"":\""C\""}""]","[""a3"",""a4""]","users/u2",,"1683356889000","true",,"-12","[1,2]","c3","'	Tabbed"
+"override-id","Has id in values","[""only""]",,,,,,,,,,,,,"CRLF
+inside","{}","4","Has id in values"
+"row-5","OVERRIDDEN","[""t1"",""t2"",""t3""]",,,,,"7","[""{\""label\"":\""D\"",\""url\"":\""d\""}"",""{\""label\"":\""E\"",\""url\"":\""e\""}"",""{\""label\"":\""F\"",\""url\"":\""f\""}""]","[""a5"",""a6"",""a7""]",,"[null,null]",,,,"[""n1"",""n2"",""n3""]",,"5","OVERRIDDEN"
+"row-6","Unicode ✓ ünïcödé","not an array",,,,,"1e+21",,,,,,"false",,"","{""nested"":{""deep"":[1,{""x"":""y""}]}}","c6","Unicode ✓ ünïcödé"
+"row-7","","[null,null,""c""]",,,,,,"[""null""]",,,,,,,,,"7",""
+"row-8","Late long array","[""1"",""2"",""3"",""4"",""5""]","""quoted street""",,"0","-0.5",,,,,,,,,"plain",,"8","Late long array"
+"row-9","Literal bracket key","[""x""]",,,,,,,,,,,,,"n",,"c9","Literal bracket key"
+"row-10","Empty values",,,,,,,,,,,,,,,,"10","Empty values"
+"row-11","Last","[""z"",""y""]",,,,,"99",,"[""a8""]",,"[""last"",9]",,"true",,"'=cmd|' /C calc'!A0","{""a"":""b""}","11","Last"
