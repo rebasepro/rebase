@@ -137,6 +137,7 @@ rows. A page this device never fetched now fails with `OFFLINE`, and so does a
 show what it has with a note, or ask for a page the device already holds.
 
 ```ts
+let rows;
 try {
   rows = await client.data.posts.findAll();
 } catch (e) {

@@ -483,7 +483,6 @@ fails the boot rather than the first upload.
 
 ### The hook
 
-
 `requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an authorization hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model. Worse, they can `GET /storage/list?prefix=` first, so the keys do not even have to be guessed.
 
 :::caution[Storage will not boot in production without one]
@@ -561,8 +560,7 @@ storageTriggers: [
         path: "uploads/:uid/**",
         events: ["finalize"],
         handler: async ({ key, params, size, user }) => {
-            // `indexUpload` is a `queue()` declared in config/resources.ts
-            await indexUpload.enqueue({ key, uid: params.uid, size });
+            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in config/resources.ts
         }
     }
 ]
