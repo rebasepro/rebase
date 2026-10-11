@@ -120,7 +120,8 @@ function MapEditView<T extends Record<string, unknown>>({
         const currentKeys = internalState.map(([id, { key }]) => key);
         const newKeys = Object.entries(value ?? {}).filter(([key, v]) => v !== undefined).map(([key]) => key);
         const keysToAdd = newKeys.filter((key) => !currentKeys.includes(key));
-        const keysToRemove = currentKeys.filter((key) => !newKeys.includes(key));
+        // A row without a name yet is the form's alone: it is not in the value.
+        const keysToRemove = currentKeys.filter((key) => key !== "" && !newKeys.includes(key));
         const newRowIds = [...internalState];
         keysToAdd.forEach((key) => {
             newRowIds.push([getRandomId(), {
@@ -222,10 +223,9 @@ function MapEditView<T extends Record<string, unknown>>({
                 startIcon={<PlusIcon/>}
                 onClick={(e) => {
                     e.preventDefault();
-                    setValue({
-                        ...(value ?? {} as T),
-                        "": null
-                    });
+                    // Only a row: written into the value as `{ "": null }`, a
+                    // record saved before the key was named stored an entry
+                    // under the empty key.
                     setInternalState([...internalState, [getRandomId(), {
                         key: "",
                         type: "string"
