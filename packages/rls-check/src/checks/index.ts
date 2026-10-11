@@ -48,6 +48,11 @@ export interface RunOptions {
     only?: string[];
     /** Skip these check ids. */
     skip?: string[];
+    /**
+     * Told about every check that threw. Its findings are missing, which looks
+     * exactly like a clean result unless the caller says so.
+     */
+    onCheckError?: (checkId: string, error: unknown) => void;
 }
 
 /**
@@ -69,10 +74,11 @@ export function runChecks(snapshot: DbSnapshot, opts: RunOptions = {}): Finding[
 
         try {
             findings.push(...check.run(snapshot));
-        } catch {
-            // Deliberately silent: `report.ts` owns what the user sees, and a
-            // check that failed produced no findings, which is what the caller
-            // is told by its absence.
+        } catch (error) {
+            // Not a reason to stop the others, but not silence either: a check
+            // that crashed found nothing, and the report said "passed all
+            // checks" and exited 0 for a table it never looked at.
+            opts.onCheckError?.(check.id, error);
         }
     }
 

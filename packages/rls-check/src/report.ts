@@ -89,7 +89,7 @@ export function exitVerdict(result: ScanResult, failOn: Severity | "none"): { co
         const failed = result.diagnostics?.degraded.length ?? 0;
         return {
             code,
-            reason: `the scan was incomplete (${failed} catalogue ${failed === 1 ? "read" : "reads"} failed), so there is no verdict.`
+            reason: `the scan was incomplete (${failed} catalogue ${failed === 1 ? "read or check" : "reads or checks"} failed), so there is no verdict.`
         };
     }
     if (failOn === "none") return { code, reason: "--fail-on none, so findings never fail the run." };
@@ -282,9 +282,9 @@ function renderDegradedCaveat(
     width: number
 ): string[] {
     const out: string[] = [];
-    out.push(style.yellow(`⚠ This scan was incomplete: ${degraded.length} catalogue read(s) failed.`));
+    out.push(style.yellow(`⚠ This scan was incomplete: ${degraded.length} catalogue read(s) or check(s) failed.`));
     out.push(...wrap(
-        "Checks that depend on what could not be read report nothing, which looks exactly " +
+        "Checks that crashed, or depend on what could not be read, report nothing, which looks exactly " +
         "like finding nothing. Treat this run as inconclusive rather than clean.",
         width
     ));

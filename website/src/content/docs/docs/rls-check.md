@@ -90,7 +90,7 @@ your application's own role is the closest thing to asking the database what you
 | --- | --- |
 | `0` | No findings at or above the `--fail-on` threshold |
 | `1` | At least one finding at or above the threshold |
-| `2` | The scan could not run — bad arguments, connection refused, auth failure, timeout |
+| `2` | The scan could not run — bad arguments, connection refused, auth failure, timeout — or was incomplete: a catalogue read failed or a check crashed (`diagnostics.degraded`). This holds even with `--fail-on none` |
 
 `1` and `2` are deliberately distinct: a broken connection must never look like a clean
 database.

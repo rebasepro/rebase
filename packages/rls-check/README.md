@@ -216,7 +216,7 @@ If your password contains `/`, `?` or `#`, percent-encode it. Those three end th
 | --- | --- |
 | `0` | Clean, or nothing at or above `--fail-on`. |
 | `1` | Findings at or above `--fail-on`. |
-| `2` | The scan did not run: bad arguments, connection refused, authentication failed, timeout. |
+| `2` | The scan did not run: bad arguments, connection refused, authentication failed, timeout. Or it was incomplete: a catalogue read failed or a check crashed (`diagnostics.degraded`). This holds even with `--fail-on none`, since an incomplete scan has no verdict. |
 
 `1` and `2` are never conflated. A pipeline that reads a DNS failure as a clean bill of health is worse than no tool at all.
 

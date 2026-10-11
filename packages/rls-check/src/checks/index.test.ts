@@ -52,6 +52,16 @@ describe("CHECKS", () => {
 });
 
 describe("runChecks", () => {
+    // A check that threw was swallowed without a word, so the run reported
+    // "passed all checks" for what it never looked at.
+    it("tells the caller about a check that crashed, and still runs the others", () => {
+        const crashed: string[] = [];
+        const snapshot = { ...messy(), policies: null as never };
+        runChecks(snapshot, { onCheckError: (id) => crashed.push(id) });
+        expect(crashed.length).toBeGreaterThan(0);
+        expect(crashed.length).toBeLessThan(CHECKS.length);
+    });
+
     it("stamps every finding with its docs anchor", () => {
         for (const f of runChecks(messy())) {
             expect(f.docs).toBe(`https://rebase.pro/docs/rls-check#${f.id}`);

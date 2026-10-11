@@ -78,7 +78,16 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
         statementTimeoutMs: options.statementTimeoutMs ?? DEFAULT_TIMEOUT_MS
     });
 
-    const findings = runChecks(snapshot, { only: options.only, skip: options.skip });
+    // A check that crashed degrades the scan, as a failed catalogue read does:
+    // exit 2, and the report names it.
+    const findings = runChecks(snapshot, {
+        only: options.only,
+        skip: options.skip,
+        onCheckError: (checkId, error) => diagnostics.degraded.push({
+            what: `check ${checkId}`,
+            error: error instanceof Error ? error.message : String(error)
+        })
+    });
 
     return buildScanResult(snapshot, findings, {
         connectionString: options.connectionString,
