@@ -146,6 +146,12 @@ description: Every released change to Rebase — new features, fixes, and the br
   the first write is queued. Queued writes are also stamped with a layout
   version: a write saved by a newer SDK is kept, not replayed by an older one.
 
+- **observeById(id, onResult, onError, { include }) loads relations into every
+  emission, online and offline.** The options are typed as
+  `ObserveByIdOptions`, and the condition types behind a typed `or()` /
+  `and()` group, `FilterConditionFor` and `LogicalConditionFor`, are exported
+  too (see Changed).
+
 #### UI kit & plugins
 
 - **`VirtualTable`, `ListView` and `CardView` accept `undefined` entries in
@@ -159,6 +165,19 @@ description: Every released change to Rebase — new features, fixes, and the br
   ToggleButtonGroup `aria-label` / `aria-labelledby`.** `DateTimeField`'s
   `locale` is now applied, as the input's `lang`.
 
+- **ToggleButtonGroup takes fullWidth.**
+
+#### Admin (CMS & app)
+
+- **Four translation keys name the split-view dividers and the drawer's
+  CMS / Studio switch: `resize_sidebar`, `resize_editor`, `resize_list` and
+  `panel_mode`.** All four are optional on `RebaseTranslations`, so a custom
+  translation table without them falls back to English.
+
+- **useCreateFormex takes `beforeSubmit`, awaited at the start of a submit,
+  before the values are read.** The record form uses it to wait for a file
+  that is still uploading (see Fixed).
+
 #### CI & tooling
 
 - **Three new gates: `pnpm check:test-types`, `pnpm check:casts` and
@@ -166,6 +185,10 @@ description: Every released change to Rebase — new features, fixes, and the br
   and may not grow; the count of `as any`, `as never` and `as unknown as` in
   package source may not grow; and every test runner must import workspace
   packages from source, not `dist`.
+
+- **`pnpm check:auth-sql-tests`: every auth module that issues SQL is run
+  against a real database by a test.** A module whose queries only a mock ever
+  saw fails the gate.
 
 ### Changed
 
@@ -592,6 +615,11 @@ description: Every released change to Rebase — new features, fixes, and the br
   accepts.** For example `["array-contains", ["a"]]` on a `string[]` column is
   now a compile error, where the server refused it at run time.
 
+- **On a client with generated types, or(), and(), not() and cond() groups
+  are checked against the row, as the object-form where is.**
+  `posts.where(or(cond("titel", "==", 1)))` and `cond("views", "==", "many")`
+  are now compile errors. Relation and JSON paths are not checked.
+
 #### Storage & email
 
 - **Storage files are streamed instead of read whole, and a Range request
@@ -954,6 +982,58 @@ description: Every released change to Rebase — new features, fixes, and the br
   column, and shows a failed save.** Duplicating a collection with relations
   saves; it was refused with "Relation property … has no target collection".
 
+- **Blocks (oneOf) follow their own validation rules.** A block's value is
+  checked against the property its type names, in the form and on the server.
+
+- **alwaysApplyDefaultValues fills a declared default into an empty value when
+  an existing record opens.** A Postgres row's `null` won, and the flag did
+  nothing.
+
+- **A record created from the form lets the database fill the columns nobody
+  set,** such as `DEFAULT now()` and other column defaults.
+
+- **Save waits for a file that is still uploading, and saves its path.** The
+  record was saved without the file, and the upload was orphaned.
+
+- **Importing a file of some columns by id (`id,price`) updates the existing
+  records** instead of failing with "'name' is required".
+
+- **Typing a field back to its stored value leaves the form clean.**
+
+- **A latitude outside -90..90 or a longitude outside -180..180 is refused, by
+  the form and by the server.**
+
+- **disabled: { clearOnDisabled: true } empties every field kind,** relations,
+  maps, markdown and user pickers included.
+
+- **A CSV export writes the id column once.**
+
+- **An integer column refuses a fraction, in the form and on the server,
+  without validation.integer.** Date-bound messages name the bound plainly, and
+  uniqueInArray catches the same related row linked twice.
+
+- **Adding a key-value entry no longer saves an entry under the empty key.**
+
+- **The user picker says it could not load users, and why,** instead of "No
+  users found".
+
+- **Emptying a markdown field writes NULL,** as a text field does.
+
+- **Table cells, inline and in the popup editor, apply a property's conditions
+  and dynamicProps, as the form does.**
+
+- **An autosave the server refuses marks the fields it names,** as a save from
+  the Save button does.
+
+- **The record form's "does not exist", "fix the highlighted errors" and "save
+  before adding collections" notices are translated.**
+
+- **A bulk delete with failures shows one summary, how many failed and the
+  first reason,** instead of one snackbar per row.
+
+- **Account settings → Sessions shows each session's address and creation
+  time, and names its revoke button, in the user's language.**
+
 #### Studio
 
 - **The SQL console's CSV export follows RFC 4180.** Values with commas,
@@ -970,6 +1050,9 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 - **The storage browser asks before an upload replaces files of the same name,
   and an upload or delete that fails part-way still shows what it did.**
+
+- **The storage browser's list view announces Name, Type and Size as column
+  headers.**
 
 - **The panel calls `/api/admin/schema-editor`, `/api/admin/logs` and
   `/api/admin/cron`, not the deprecated aliases.** The aliases drew
@@ -1060,6 +1143,14 @@ description: Every released change to Rebase — new features, fixes, and the br
   older build that opens an offline database a newer build upgraded keeps
   working, in memory, instead of failing every call.
 
+- **A find() that gets a 204, an empty body or a page without data fails with
+  `UNEXPECTED_RESPONSE`, and so does a findById() on an empty body.** find()
+  resolved as "no rows" or threw a `TypeError`, and findById() returned `{}`.
+
+- **createMany, updateMany, deleteMany and batch called with something other
+  than an array throw a RebaseClientError with INVALID_BULK_BODY,** not a
+  `TypeError`.
+
 #### Auth
 
 - **An expired access token is logged at debug, not as an ERROR.** These are
@@ -1069,6 +1160,11 @@ description: Every released change to Rebase — new features, fixes, and the br
 - **Shutdown waits for the expired-token sweep's tick.** Closing the pool right
   after `backend.shutdown()` logged "Cannot use a pool after calling end on the
   pool" from the sweep.
+
+- **An authenticator enrolment that was started and never confirmed can be
+  removed.** `DELETE /auth/mfa/unenroll` (`client.auth.mfa.unenroll`) asks for
+  an `aal2` session only once the account has a verified factor, the same rule
+  as enroll and verify.
 
 #### UI kit & plugins
 
@@ -1098,6 +1194,14 @@ description: Every released change to Rebase — new features, fixes, and the br
   keyboard-opened popover no longer rings its whole panel.** With reduced
   motion on, dialogs, sheets, popovers, tooltips, collapsing panels and icon
   buttons no longer animate.
+
+- **Split-view dividers say what they resize ("Resize the sidebar", "Resize the
+  editor", "Resize the list") in the app's language.** This covers the SQL and
+  JS consoles, the RLS editor, the schema visualizer, the collections editor
+  and the split collection list.
+
+- **The drawer's CMS / Studio switch is named in the app's language, and Tab
+  no longer stops on it while the collapsed drawer hides it.**
 
 #### rls-check
 
