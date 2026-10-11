@@ -525,7 +525,23 @@ export class OfflineManager {
     /** The local database: normalized rows and query snapshots per collection. */
     private collections = new Map<string, CollectionState>();
     /** In-memory mirror of the current scope's queue, in replay order. */
-    private queue: PendingMutation[] = [];
+    private queueEntries: PendingMutation[] = [];
+    private get queue(): PendingMutation[] {
+        return this.queueEntries;
+    }
+    private set queue(next: PendingMutation[]) {
+        this.queueEntries = next;
+        this.pendingIndex = undefined;
+    }
+    /**
+     * Per collection, the row ids the queue writes to and the ones it creates
+     * — {@link hasPending} and {@link isLocallyCreated}, which answering a
+     * page asks once or twice per row. Each used to scan the whole queue: a
+     * 500-row page against 200 queued writes read 80,000 queue entries, on
+     * every emit. Built on first use after the queue changes; whatever changes
+     * it in place calls {@link queueChangedInPlace}.
+     */
+    private pendingIndex?: Map<string, { writes: Set<string>; creates: Set<string> }>;
     /**
      * The mutation currently on the wire, if any.
      *
@@ -2192,6 +2208,7 @@ data: u.data as AnyRow })),
             };
             await this.persistMutation(this.queueKey(full), full);
             this.queue.push(full);
+            this.queueChangedInPlace();
             this.afterQueueChange();
             this.requestPersistence();
         });
@@ -2215,27 +2232,40 @@ data: u.data as AnyRow })),
         storage.persist().then((persisted) => this.patchStatus({ persisted }), () => undefined);
     }
 
-    private hasPending(slug: string, id: string | number): boolean {
-        const key = String(id);
-        return this.queue.some((op) => {
-            if (op.collection !== slug) return false;
-            if (op.type === "createMany") {
-                return (op.data as AnyRow[] | undefined)?.some((r) => String(r.id) === key) ?? false;
+    /** The queue's row ids for one collection — see {@link pendingIndex}. */
+    private pendingIds(slug: string): { writes: Set<string>; creates: Set<string> } | undefined {
+        if (!this.pendingIndex) {
+            const index = new Map<string, { writes: Set<string>; creates: Set<string> }>();
+            for (const op of this.queue) {
+                let entry = index.get(op.collection);
+                if (!entry) index.set(op.collection, entry = { writes: new Set(), creates: new Set() });
+                if (op.type === "createMany") {
+                    for (const row of (op.data as AnyRow[] | undefined) ?? []) {
+                        entry.writes.add(String(row.id));
+                        entry.creates.add(String(row.id));
+                    }
+                } else if (op.id !== undefined) {
+                    entry.writes.add(String(op.id));
+                    if (op.type === "create") entry.creates.add(String(op.id));
+                }
             }
-            return op.id !== undefined && String(op.id) === key;
-        });
+            this.pendingIndex = index;
+        }
+        return this.pendingIndex.get(slug);
+    }
+
+    /** The queue's entries were changed without replacing the array. */
+    private queueChangedInPlace(): void {
+        this.pendingIndex = undefined;
+    }
+
+    private hasPending(slug: string, id: string | number): boolean {
+        return this.pendingIds(slug)?.writes.has(String(id)) ?? false;
     }
 
     /** Is this row one the server has never been told about? */
     private isLocallyCreated(slug: string, idKey: string): boolean {
-        return this.queue.some((op) => {
-            if (op.collection !== slug) return false;
-            if (op.type === "create") return op.id !== undefined && String(op.id) === idKey;
-            if (op.type === "createMany") {
-                return (op.data as AnyRow[] | undefined)?.some((r) => String(r.id) === idKey) ?? false;
-            }
-            return false;
-        });
+        return this.pendingIds(slug)?.creates.has(idKey) ?? false;
     }
 
     /** How many rows the queue adds to (or removes from) a server-side count. */
@@ -2601,6 +2631,7 @@ data: u.data as AnyRow })),
                 }
                 if (queued.id !== undefined && String(queued.id) === oldKey) {
                     queued.id = serverId;
+                    this.queueChangedInPlace();
                     if (queued.data && !Array.isArray(queued.data)) {
                         (queued.data as AnyRow).id = serverId;
                     }
@@ -2768,6 +2799,7 @@ data: u.data as AnyRow })),
         if (!this.isCurrent(ticket)) return;
         const position = this.queue.indexOf(op);
         this.queue.splice(position < 0 ? 0 : position, position < 0 ? 0 : 1, ...pieces);
+        this.queueChangedInPlace();
         this.afterQueueChange(false);
     }
 

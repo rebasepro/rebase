@@ -302,3 +302,30 @@ describe("a queued write read back after a reload (L2)", () => {
         expect((queued.data as { location: GeoPoint }).location.latitude).toBe(45.4);
     });
 });
+
+describe("answering a page while writes are queued (L8)", () => {
+    it("does not rescan the queue for every row", async () => {
+        const server = fakeServer();
+        for (let i = 0; i < 500; i++) server.rows.set(String(i), { id: String(i), n: i });
+        const { offline, posts } = manager(server);
+        await posts.find({ limit: 500 });
+        setNavigatorOnLine(false);
+        for (let i = 0; i < 200; i++) await posts.update(String(i * 2), { n: -i });
+
+        // Count every read of a queue entry while one page is answered.
+        let reads = 0;
+        const queue = Reflect.get(offline, "queue") as PendingMutation[];
+        Reflect.set(offline, "queue", new Proxy(queue, {
+            get(target, key, receiver) {
+                if (typeof key === "string" && /^\d+$/.test(key)) reads++;
+                return Reflect.get(target, key, receiver);
+            }
+        }));
+        const page = await posts.find({ limit: 500 });
+
+        expect(page.data).toHaveLength(500);
+        expect(page.data.find((row) => row.id === "2")?.n).toBe(-1);
+        // One pass over the 200 entries, not one per row (500 × 200 = 100,000).
+        expect(reads).toBeLessThanOrEqual(1_000);
+    });
+});
