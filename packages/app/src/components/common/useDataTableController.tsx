@@ -14,6 +14,16 @@ import { ScrollRestorationController } from "./useScrollRestoration";
 
 export const DEFAULT_PAGE_SIZE = 50;
 
+/**
+ * Rows held with `pagination: false` past which development builds warn. The
+ * docs promise every row, so they are all loaded; but tens of thousands of
+ * them sit in memory and re-render on every change, and nothing said so.
+ */
+export const UNPAGINATED_WARNING_ROWS = 10_000;
+
+/** The collections already warned about, so a warning is said once per collection. */
+const warnedUnpaginated = new Set<string>();
+
 export type DataTableControllerProps<M extends Record<string, any> = any> = {
     /**
      * Full path where the data of this table is located
@@ -266,6 +276,17 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     const [sparseData, setSparseData] = useState<(Entity<M> | undefined)[] | undefined>(restored?.sparse);
     const rawDataRef = React.useRef(rawData);
     rawDataRef.current = rawData;
+
+    const heldRows = rawData.length;
+    const collectionKey = collection.slug ?? path;
+    useEffect(() => {
+        if (paginationEnabled || heldRows <= UNPAGINATED_WARNING_ROWS) return;
+        if (process.env.NODE_ENV === "production" || warnedUnpaginated.has(collectionKey)) return;
+        warnedUnpaginated.add(collectionKey);
+        console.warn(`Rebase: the collection "${collectionKey}" holds ${heldRows} rows with \`pagination: false\`, ` +
+            "and loads every one of them. Set `pagination` to a page size to read them as they are scrolled to. " +
+            "(Shown once, in development only.)");
+    }, [paginationEnabled, heldRows, collectionKey]);
     const windowRef = React.useRef<CollectionWindow<M> | undefined>(undefined);
 
     /**

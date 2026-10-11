@@ -282,7 +282,7 @@ All of the following go inside `admin`.
 | `sideDialogWidth` | `number \| string` | — | Width of the side dialog |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default density of the list, table and card views (the table's row height) |
-| `pagination` | `boolean \| number` | `true` (50) | Enable pagination and/or set page size |
+| `pagination` | `boolean \| number` | `true` (50) | Enable pagination and/or set page size. `false` loads every row; in development the console warns once when that is more than 10,000 rows |
 | `listProperties` | `string[]` | — | Properties to display in the list view |
 | `propertiesOrder` | `string[]` | — | Column order in the table view |
 | `selectionEnabled` | `boolean` | `true` | Enable row selection |
