@@ -109,7 +109,8 @@ describe("the client finishes an MFA sign-in from the server's own refusal", () 
 
         expect(session.accessToken).toEqual(expect.any(String));
         expect(client.auth.getSession()?.user.uid).toBe(uid);
-        expect((await client.auth.getUser()).email).toBe(EMAIL);
+        // The minted session authenticates a request.
+        expect((await client.auth.getUser())?.email).toBe(EMAIL);
     });
 
     it("leaves the client signed out when the code is wrong", async () => {
