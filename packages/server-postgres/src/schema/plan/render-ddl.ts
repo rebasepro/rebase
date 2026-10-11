@@ -153,7 +153,11 @@ export const renderPolicyStatements = (
         `FOR ${policy.operation.toUpperCase()} TO ${policy.roles.map(r => `"${r}"`).join(", ")}`;
     if (policy.using) create += ` USING (${policy.using})`;
     if (policy.withCheck) create += ` WITH CHECK (${policy.withCheck})`;
-    return [`DROP POLICY IF EXISTS "${policy.name}" ON ${target};`, `${create};`];
+    // The one policy an older naming stored this rule's operations under —
+    // see `PolicyPlan.supersedes`. In the same per-table transaction, so a
+    // request sees the old policy or the new ones, never neither.
+    const superseded = (policy.supersedes ?? []).map(name => `DROP POLICY IF EXISTS "${name}" ON ${target};`);
+    return [...superseded, `DROP POLICY IF EXISTS "${policy.name}" ON ${target};`, `${create};`];
 };
 
 /** `ALTER TABLE … ENABLE ROW LEVEL SECURITY;` — every generated table is locked. */

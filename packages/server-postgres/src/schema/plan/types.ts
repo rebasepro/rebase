@@ -240,6 +240,14 @@ export interface PolicyPlan {
      * what `securityRules` reads like — `policies.sql` says so in a comment.
      */
     injected: boolean;
+    /**
+     * Policy names, as Postgres stored them, that this policy replaces — set
+     * only on the first policy of a rule whose per-operation names used to
+     * collide at 63 bytes (see `getPolicySupersededNames`). Rendered as a
+     * `DROP POLICY IF EXISTS` ahead of the policy, so a boot or push swaps the
+     * one truncated survivor for a policy per operation. Absent otherwise.
+     */
+    supersedes?: string[];
 }
 
 /** A `BEFORE UPDATE` trigger stamping `now()` onto an `on_update` column. */

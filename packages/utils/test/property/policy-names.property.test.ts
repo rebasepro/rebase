@@ -241,7 +241,9 @@ describe("policy names", () => {
      * It is not destructive: truncation always eats into the seven hex
      * characters, so `isGeneratedPolicyName` stops matching and
      * `dropOrphanedPolicies` keeps the policy rather than dropping it. The
-     * failure is phantom drift, not lost RLS.
+     * failure is phantom drift, not lost RLS. (The case that did lose RLS — a
+     * multi-operation rule whose names all cut to one stored name — is
+     * renamed suffix-first now; see `policy-names.test.ts`.)
      *
      * Not fixed here because every fix renames identifiers that are already in
      * deployed databases, and that decision needs to be made deliberately

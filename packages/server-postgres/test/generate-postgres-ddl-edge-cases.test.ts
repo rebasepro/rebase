@@ -353,6 +353,41 @@ describe("generatePostgresDdl edge cases", () => {
             expect((result.match(/CREATE POLICY/g) ?? []).length).toBe(4);
         });
 
+        /**
+         * Postgres keeps 63 bytes of an identifier. On a table of 42 bytes or
+         * more the three `<table>_default_admin_write_<op>` names were one
+         * stored name: each CREATE replaced the last and only DELETE survived,
+         * so admin INSERT and UPDATE were denied.
+         */
+        it("gives every operation of a long table its own stored policy, and drops the old survivor", () => {
+            const table = "t".repeat(43);
+            const result = generatePostgresPoliciesDdl([
+                { slug: table, table, name: "Long", properties: { name: { type: "string" } } }
+            ]);
+            const created = [...result.matchAll(/CREATE POLICY "([^"]+)"/g)].map(m => m[1]);
+            expect(created).toHaveLength(4);
+            expect(new Set(created.map(name => name.slice(0, 63))).size).toBe(4);
+            for (const op of ["insert", "update", "delete"]) {
+                expect(created.some(name => name.length <= 63 && name.endsWith(`_${op}`))).toBe(true);
+            }
+            // The policy an earlier release stored all three under goes first.
+            const legacy = `DROP POLICY IF EXISTS "${table}_default_admin_write" ON "public"."${table}";`;
+            expect(result).toContain(legacy);
+            expect(result.indexOf(legacy)).toBeLessThan(result.indexOf(`_insert" ON`));
+        });
+
+        it("does not drop a superseded name another policy is stored under", () => {
+            // At 50 bytes `<table>_default_admin_read` cuts to the same 63 bytes
+            // as the old write names; dropping that would drop the read policy.
+            const table = "t".repeat(50);
+            const result = generatePostgresPoliciesDdl([
+                { slug: table, table, name: "Long", properties: { name: { type: "string" } } }
+            ]);
+            const stored = `${table}_default_admi`;
+            expect(result).not.toContain(`DROP POLICY IF EXISTS "${stored}"`);
+            expect(result).toContain(`CREATE POLICY "${table}_default_admin_read"`);
+        });
+
         it("should return only the header comment for an empty collections array", () => {
             const result = generatePostgresPoliciesDdl([]);
             expect(result).toContain("RLS policies");

@@ -61,6 +61,7 @@ import {
 } from "@rebasepro/common";
 import {
     generateForeignKeyName,
+    getPolicySupersededNames,
     legacyForeignKeyName,
     toPostgresIdentifier,
     toSnakeCase
@@ -533,9 +534,39 @@ export const compileSecurityRule = (
     resolveCollection: ResolveCollection,
     injected: boolean,
     ruleKey = rule.name ?? "(unnamed)"
-): PolicyPlan[] =>
-    compileRulePolicies(collection, rule, { resolveCollection })
-        .map(policy => ({ ...policy, ruleKey, injected }));
+): PolicyPlan[] => {
+    const supersedes = getPolicySupersededNames(rule, getTableName(collection));
+    return compileRulePolicies(collection, rule, { resolveCollection })
+        .map((policy, index) => ({
+            ...policy,
+            ruleKey,
+            injected,
+            ...(index === 0 && supersedes.length > 0 ? { supersedes } : {})
+        }));
+};
+
+/**
+ * A table's policies, minus any superseded name Postgres would store one of
+ * them under.
+ *
+ * A superseded name is a 63-byte cut, and another rule's over-long name can
+ * cut to the very same bytes — `<table>_default_admin_read` and the old
+ * `<table>_default_admin_write_<op>` both do on a 50-byte table. Dropping it
+ * then would drop that policy right after its own `CREATE`. Its own `DROP
+ * POLICY IF EXISTS` already removes the old policy, so nothing is lost.
+ */
+const withoutLiveSupersededNames = (policies: PolicyPlan[]): PolicyPlan[] => {
+    const stored = new Set(policies.map(policy => toPostgresIdentifier(policy.name)));
+    return policies.map(policy => {
+        if (!policy.supersedes) return policy;
+        const supersedes = policy.supersedes.filter(name => !stored.has(name));
+        if (supersedes.length === policy.supersedes.length) return policy;
+        const kept: PolicyPlan = { ...policy };
+        if (supersedes.length > 0) kept.supersedes = supersedes;
+        else delete kept.supersedes;
+        return kept;
+    });
+};
 
 // ── The planner ──────────────────────────────────────────────────────────────
 
@@ -907,14 +938,14 @@ function planCollectionTable(
     const primaryKey = planPrimaryKey(collection, columns);
 
     const injected = new Set(getInjectedSecurityRules(collection).map(rule => rule.name));
-    const policies = getEffectiveSecurityRules(collection).flatMap((rule, index) =>
+    const policies = withoutLiveSupersededNames(getEffectiveSecurityRules(collection).flatMap((rule, index) =>
         compileSecurityRule(
             collection,
             rule,
             resolveCollection,
             Boolean(rule.name && injected.has(rule.name)),
             rule.name ?? `#${index}`
-        ));
+        )));
 
     // ── Tenancy ──────────────────────────────────────────────────────────────
     // The policy is already above — `getEffectiveSecurityRules` injects it, so
@@ -1578,9 +1609,9 @@ function planJunctionTable(
     // follow the declaring side's update rules. Without them they were the one
     // kind of generated table with no RLS at all.
     const policies = spec
-        ? getJunctionSecurityRules(spec).flatMap((rule, index) =>
+        ? withoutLiveSupersededNames(getJunctionSecurityRules(spec).flatMap((rule, index) =>
             compileSecurityRule(
-                getJunctionCollectionConfig(spec), rule, resolveCollection, false, rule.name ?? `#${index}`))
+                getJunctionCollectionConfig(spec), rule, resolveCollection, false, rule.name ?? `#${index}`)))
         : [];
 
     return {
