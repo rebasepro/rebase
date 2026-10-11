@@ -252,6 +252,16 @@ tracked tsconfig's extends, files, include, references and paths entry has to
 name something on disk.`
     },
     {
+        run: "check:test-resolution",
+        why: `A workspace package's \`exports\` point at \`dist\`, so a jest or vitest config
+with no source mapping tests the last BUILD of its dependencies. CI builds
+first and never notices; locally and in a worktree a change to packages/types
+plus a CLI test checked a stale build, and the CLI e2e passed locally against a
+\`dist\` from before the commit it was failing on in CI. Every test runner a
+package's \`test*\` scripts run must map each \`workspace:\` dependency that
+has a \`src/index.ts\` to that source (or to a deliberate mock).`
+    },
+    {
         run: "check:control-chars",
         why: `A literal NUL inside a sentinel string in \`packages/client/src/collection.ts\`
 made grep and ripgrep classify the file as binary and skip it in silence:
