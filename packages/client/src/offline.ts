@@ -428,6 +428,16 @@ interface ScopeTicket {
     epoch: number;
 }
 
+/** The queue's row ids for one collection — see `OfflineManager.pendingIndex`. */
+interface PendingIds {
+    /** Rows any queued write writes to. */
+    writes: Set<string>;
+    /** Rows a queued write creates. */
+    creates: Set<string>;
+    /** The first queued write to each row. */
+    first: Map<string, PendingMutation>;
+}
+
 interface RowEntry {
     row: AnyRow;
     cachedAt: number;
@@ -541,7 +551,7 @@ export class OfflineManager {
      * every emit. Built on first use after the queue changes; whatever changes
      * it in place calls {@link queueChangedInPlace}.
      */
-    private pendingIndex?: Map<string, { writes: Set<string>; creates: Set<string> }>;
+    private pendingIndex?: Map<string, PendingIds>;
     /**
      * The mutation currently on the wire, if any.
      *
@@ -1709,7 +1719,7 @@ data: u.data as AnyRow })),
         if (exact && offset === 0) {
             for (const [key, entry] of state.rows) {
                 if (seen.has(key) || !this.hasPending(slug, key)) continue;
-                if (!this.isLocallyCreated(slug, key)) continue;
+                if (!this.isLocallyCreated(slug, key) && !this.movedIntoFilter(slug, key, params)) continue;
                 if (!matchesParams(entry.row, params)) continue;
                 rows.push(entry.row as M);
                 added++;
@@ -1803,7 +1813,7 @@ data: u.data as AnyRow })),
                 && (normalizeOrderBy(params?.orderBy) ?? []).every(([field]) => shape.includes(field));
             for (const [key, entry] of state.rows) {
                 if (seen.has(key) || !this.hasPending(slug, key)) continue;
-                if (!this.isLocallyCreated(slug, key)) continue;
+                if (!this.isLocallyCreated(slug, key) && !this.movedIntoFilter(slug, key, params)) continue;
                 if (!matchesParams(entry.row, params)) continue;
                 if (!placeable) {
                     unplaced = true;
@@ -2233,25 +2243,40 @@ data: u.data as AnyRow })),
     }
 
     /** The queue's row ids for one collection — see {@link pendingIndex}. */
-    private pendingIds(slug: string): { writes: Set<string>; creates: Set<string> } | undefined {
+    private pendingIds(slug: string): PendingIds | undefined {
         if (!this.pendingIndex) {
-            const index = new Map<string, { writes: Set<string>; creates: Set<string> }>();
+            const index = new Map<string, PendingIds>();
+            const note = (entry: PendingIds, key: string, op: PendingMutation) => {
+                entry.writes.add(key);
+                if (!entry.first.has(key)) entry.first.set(key, op);
+            };
             for (const op of this.queue) {
                 let entry = index.get(op.collection);
-                if (!entry) index.set(op.collection, entry = { writes: new Set(), creates: new Set() });
+                if (!entry) index.set(op.collection, entry = { writes: new Set(), creates: new Set(), first: new Map() });
                 if (op.type === "createMany") {
                     for (const row of (op.data as AnyRow[] | undefined) ?? []) {
-                        entry.writes.add(String(row.id));
+                        note(entry, String(row.id), op);
                         entry.creates.add(String(row.id));
                     }
                 } else if (op.id !== undefined) {
-                    entry.writes.add(String(op.id));
+                    note(entry, String(op.id), op);
                     if (op.type === "create") entry.creates.add(String(op.id));
                 }
             }
             this.pendingIndex = index;
         }
         return this.pendingIndex.get(slug);
+    }
+
+    /**
+     * Did the queued writes to this row bring it into the query's filter? The
+     * row as it was before the first of them is that write's rollback; one
+     * that did not match then is in no server page of the query, so only
+     * this side can put it on screen.
+     */
+    private movedIntoFilter(slug: string, idKey: string, params: FindParams | undefined): boolean {
+        const before = this.pendingIds(slug)?.first.get(idKey)?.rollback?.rows?.[idKey];
+        return before !== undefined && before !== null && !matchesParams(before, params);
     }
 
     /** The queue's entries were changed without replacing the array. */

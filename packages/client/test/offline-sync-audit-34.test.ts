@@ -329,3 +329,20 @@ describe("answering a page while writes are queued (L8)", () => {
         expect(reads).toBeLessThanOrEqual(1_000);
     });
 });
+
+describe("an offline edit that moves a cached row into a filtered list", () => {
+    it("shows it in the list, as a refetch would", async () => {
+        const server = fakeServer();
+        server.rows.set("1", { id: "1", status: "open" });
+        server.rows.set("2", { id: "2", status: "closed" });
+        const { posts } = manager(server);
+        const open = { where: { status: ["==", "open"] } } as never;
+        await posts.find();
+        expect((await posts.find(open)).data.map((row) => row.id)).toEqual(["1"]);
+
+        setNavigatorOnLine(false);
+        await posts.update("2", { status: "open" });
+        expect((await posts.find(open)).data.map((row) => row.id).sort()).toEqual(["1", "2"]);
+        expect((await posts.find(open)).meta.total).toBe(2);
+    });
+});
