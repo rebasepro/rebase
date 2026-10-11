@@ -272,6 +272,15 @@ tooling/scripts/casts-baseline.json; growth fails, and so does a shrink that
 was not banked, so a cleanup's room is not spent by the next cast.`
     },
     {
+        run: "check:auth-sql-tests",
+        why: `The MFA challenge cap and the code-replay guard each rest on one SQL
+statement, and for months their only tests mocked drizzle-orm or drove the
+routes over a JavaScript fake: a read-then-write rewrite of either counter
+passed every test. Every module under a package's src/**/auth/ that issues SQL
+must be imported by a test that builds a real database (PGlite, or a pg Pool or
+Client), itself or through a local helper.`
+    },
+    {
         run: "check:test-resolution",
         why: `A workspace package's \`exports\` point at \`dist\`, so a jest or vitest config
 with no source mapping tests the last BUILD of its dependencies. CI builds
