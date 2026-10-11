@@ -19,14 +19,14 @@ Properties define the columns in your database table and how they are rendered i
 
 | Type | Description | PostgreSQL Column |
 |------|-------------|-------------------|
-| `string` | Text, select, markdown, file upload, URL, email | `varchar`, `text`, `jsonb` |
+| `string` | Text, select, markdown, file upload, URL, email | `text` by default; `varchar`, `char` or `uuid` with `columnType` |
 | `number` | Integer, decimal, currency | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | True/false toggle | `boolean` |
 | `date` | Date, datetime, timestamp | `timestamp`, `date` |
-| `array` | Ordered list of values | `jsonb` |
+| `array` | Ordered list of values | A native array (`text[]`, `integer[]`, `numeric[]`, `boolean[]`) when `of` is one string, number or boolean property; `jsonb` otherwise |
 | `map` | Key-value object | `jsonb` |
 | `geopoint` | Latitude/longitude pair | `jsonb` |
-| `reference` | Embedded reference to another entity | `varchar` (stores ID) |
+| `reference` | Embedded reference to another entity | The target's primary-key type (stores its ID) |
 | `relation` | SQL foreign key relation | Uses the `relations` array |
 | `vector` | Embedding, for nearest-neighbour search | `VECTOR(n)` (pgvector) |
 | `binary` | Raw bytes, read and written as base64 | `bytea` |
@@ -219,7 +219,9 @@ category: {
 
 Several values out of a fixed set is an **array of an enum string**, not a flag on
 one: the column holds many values, so the property that describes it is the array.
-`columnType: "text[]"` is what makes it one Postgres column rather than a join.
+It is one Postgres column, a `text[]`, rather than a join: an array whose `of`
+is a single string property gets a native array by default, and the
+`columnType` below only says so explicitly.
 
 ```typescript no-verify
 locales: {
@@ -250,7 +252,7 @@ locales: {
 | `url` | `boolean` | URL format validation |
 | `storage` | `StorageConfig` | Enable file upload — see [File uploads](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Render as select dropdown |
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | The database column. Defaults to `varchar`, or `uuid` when `isId` says so. `text` for unbounded strings, `char` for fixed width |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | The database column. Defaults to `text`, or `uuid` when `isId` says so. `text` for unbounded strings, `char` for fixed width |
 | `isId` | `boolean \| string` | Marks the property as the primary key, and says who fills it: `"manual"` (you do), `"uuid"` (`gen_random_uuid()`), or any other string, used verbatim as the column's SQL default expression — bare (`nanoid()`) or in template form (``"sql`nanoid()`"``). The function has to exist; nothing here creates it. `"increment"` is a **number** strategy and does nothing here, and `"cuid"` is refused at config load |
 | `autoValue` | `"user_on_create" \| "user_on_update"` | Stamp the column with the **uid of the acting user** — on creation only, or on every write. See [Audit columns](#audit-columns) |
 | `userSelect` | `boolean` | Render as a user picker. The value is a plain string column holding the user id — nothing resolves or checks it on the way in. **Admin form only — not enforced by the API or the database.** |

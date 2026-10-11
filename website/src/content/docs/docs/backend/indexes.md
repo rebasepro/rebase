@@ -77,8 +77,8 @@ This is the one that bites. A `belongsTo` relation compiles to its resolved
 { on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
 ```
 
-Writing `author_id` here would work for most properties and quietly index
-nothing for a foreign key, which is the one people reach for. Postgres does not
+Writing `author_id` here is refused at build: it is a column, not a property of
+the collection, and `on` names properties. Postgres does not
 index a foreign key column for you — without this index, both "list this
 author's posts" and the `ON DELETE` cascade are sequential scans.
 

@@ -76,7 +76,7 @@ the code that writes it.
 | Rule | Type | Description |
 |------|------|-------------|
 | `required` | `boolean` | The value must be present |
-| `requiredMessage` | `string` | What the form says when it is not. **Admin form only — not enforced by the API or the database.** |
+| `requiredMessage` | `string` | What is said when it is not: by the admin form, and as the `message` of the field's `required` entry in the API's 400. The database's NOT NULL carries no message |
 | `unique` | `boolean` | Only one row in the table may hold this value. The admin form also checks it when saving a value the edit changed, so a duplicate is named on its field before the write |
 | `uniqueInArray` | `boolean` | Only one entry *per array* may hold it. Applies to a direct child of an `array` property, or a first-level child of a `map` inside one. **Admin form only — not enforced by the API or the database.** |
 

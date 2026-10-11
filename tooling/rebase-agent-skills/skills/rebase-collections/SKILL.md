@@ -681,7 +681,7 @@ title: {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | `"varchar"` | Database column type |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | `"text"` | Database column type |
 | `isId` | `boolean \| "manual" \| "uuid" \| string` | — | Mark as primary key with generation strategy |
 | `enum` | `EnumValues` | — | Dropdown/picklist values |
 | `admin.multiline` | `boolean` | `false` | Multi-line text area |

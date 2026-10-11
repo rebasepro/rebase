@@ -73,7 +73,7 @@ one row or many come back, and what a write through it may touch.
 | Kind | The key lives | Returns | Notes |
 |---|---|---|---|
 | `belongsTo` | on **this** table | one | `localKey`, defaults to `<relationName>_id` |
-| `hasOne` | on the **target's** table | one | `foreignKeyOnTarget`, defaults to `<thisCollection>_id` |
+| `hasOne` | on the **target's** table | one | `foreignKeyOnTarget`, defaults to the singular of this collection plus `_id` (`users` → `user_id`) |
 | `hasMany` | on the **target's** table | many | children belong to this parent alone |
 | `manyToMany` | in a **junction table** | many | rows are shared; you own the link |
 | `via` | an explicit `joinPath` | either | read-only; state `cardinality` yourself |

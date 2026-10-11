@@ -124,7 +124,7 @@ const articlesCollection = defineCollection({
 
         beforeDelete: async ({ id }) => {
             // Prevent deletion of published articles
-            // Throw to block the deletion
+            // Throw (or return false) to block the deletion
         },
 
         afterRead: async ({ row }) => {
@@ -320,7 +320,7 @@ afterRead: async ({
 
 ### `beforeDelete`
 
-Called before a record is deleted. Throw to block deletion.
+Called before a record is deleted. Throw to block deletion, and the caller gets `400 CALLBACK_REJECTED` with your message. Returning `false` blocks it too, as `403 CALLBACK_REJECTED` with no message of yours.
 
 ```typescript
 beforeDelete: async ({

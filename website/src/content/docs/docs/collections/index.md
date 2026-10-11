@@ -234,7 +234,7 @@ export const productsCollection = defineCollection({
         }
     },
     admin: {
-        icon: "inventory_2"           // Material icon key
+        icon: "Package"               // Lucide icon name
     }
 });
 
@@ -278,7 +278,7 @@ All of the following go inside `admin`.
 | `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
 | `kanban` | `KanbanConfig` | — | Kanban configuration (column property). Always pair with `orderProperty` — see [View Modes](/docs/frontend/view-modes) |
 | `orderProperty` | `string` | — | Key of the **string** property holding the drag-and-drop order key. Required for a working Kanban board |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | How entities open for editing |
+| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | From the view: `"split"` for list, `"full_screen"` for table and cards, `"side_panel"` for kanban and custom views | How entities open for editing |
 | `sideDialogWidth` | `number \| string` | — | Width of the side dialog |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default row height in the table |
