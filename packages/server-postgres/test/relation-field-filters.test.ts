@@ -221,7 +221,7 @@ describe("filtering by a column of a related row", () => {
         it("`not-like` is NOT EXISTS of the positive pattern", () => {
             const query = render(filterTalents({ "applications.status": ["not-like", "rejec%"] })[0]);
             expect(query.sql).toContain("NOT EXISTS");
-            expect(query.sql).toContain('"__rel_field"."status" LIKE $1');
+            expect(query.sql).toContain('"__rel_field"."status"::text LIKE $1');
             expect(query.sql).not.toContain("NOT LIKE");
         });
     });
@@ -301,7 +301,7 @@ describe("filtering by a column of a related row", () => {
             expect(query.sql).toBe(
                 'EXISTS (SELECT 1 FROM "agencies" AS "__rel_field" ' +
                 'WHERE "__rel_field"."id" = "talents"."agency_id" ' +
-                'AND "__rel_field"."name" ILIKE $1)'
+                'AND "__rel_field"."name"::text ILIKE $1)'
             );
         });
     });

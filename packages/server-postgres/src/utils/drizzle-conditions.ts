@@ -195,6 +195,29 @@ const supportsILike = (column: AnyPgColumn): boolean => {
 };
 
 /**
+ * What `LIKE` / `ILIKE` compare for this column, or `undefined` where a pattern
+ * means nothing (a number, a date, a uuid).
+ *
+ * Postgres defines `~~` on the text family only, and a string `enum` property
+ * is an enum type: `status LIKE 'dr%'` is `operator does not exist: post_status
+ * ~~ unknown`, a 500 on a filter the admin offers. A pattern over an enum is a
+ * fair question about its label, so it is asked of `status::text`.
+ *
+ * The cast is written for every text column, not only the declared enums: a
+ * catalogue-built table declares an enum column as `text`
+ * (`dynamic-tables.ts`), so the declared type cannot tell the two apart, and
+ * `::text` on a text column is no change at all. `citext` is the exception —
+ * its own `LIKE` is case-insensitive, and casting it to `text` would quietly
+ * make it case-sensitive.
+ */
+const patternOperand = (column: AnyPgColumn, operand: SQL | AnyPgColumn): SQL | undefined => {
+    const sqlType = typeof column?.getSQLType === "function" ? column.getSQLType().toLowerCase() : "";
+    if (/^citext\b/.test(sqlType)) return sql`${operand}`;
+    if (ILIKE_SQL_TYPES.test(sqlType) || column?.columnType === "PgEnumColumn") return sql`${operand}::text`;
+    return undefined;
+};
+
+/**
  * Process-wide default, set once when the driver is constructed.
  *
  * The condition builder is a set of *static* methods reached from a dozen
@@ -1434,25 +1457,26 @@ export class DrizzleConditionBuilder {
             case "not-in":
                 return { predicate: isNullish ? isNull() : inList(), negate: true };
             case "like":
-                return { predicate: sql`${ref} LIKE ${String(value)}`, negate: false };
             case "not-like":
-                return { predicate: sql`${ref} LIKE ${String(value)}`, negate: true };
             case "ilike":
             case "not-ilike": {
-                // `ILIKE` is only defined on the text family. Asking it of a
-                // date or an integer is a Postgres error at execution time — a
-                // 500 on a request whose only fault is an operator the admin
-                // offered for the wrong column.
-                if (!supportsILike(column)) {
+                // A pattern is only defined on text (an enum is matched by its
+                // label — see `patternOperand`). Asking it of a date or an
+                // integer is a Postgres error at execution time — a 500 on a
+                // request whose only fault is an operator the admin offered
+                // for the wrong column.
+                const operand = patternOperand(column, ref);
+                if (!operand) {
                     throw ApiError.badRequest(
                         `Operator '${op}' cannot be applied to '${field}' on collection '${collectionPath}': ` +
-                        `'${column.name}' is ${column.getSQLType?.() ?? "not a text column"}, and case-insensitive ` +
+                        `'${column.name}' is ${column.getSQLType?.() ?? "not a text column"}, and pattern ` +
                         "matching is only defined on text.",
                         "UNSUPPORTED_RELATION_FILTER_OPERATOR",
                         { field, collection: collectionPath, operator: op }
                     );
                 }
-                return { predicate: sql`${ref} ILIKE ${String(value)}`, negate: op === "not-ilike" };
+                const like = op === "like" || op === "not-like" ? sql`LIKE` : sql`ILIKE`;
+                return { predicate: sql`${operand} ${like} ${String(value)}`, negate: op.startsWith("not-") };
             }
             case "is-null":
                 return { predicate: isNull(), negate: false };
@@ -1758,13 +1782,26 @@ export class DrizzleConditionBuilder {
                 return sql`${column} NOT IN (${sql.join(values.map(v => sql`${v}`), sql`, `)})`;
             }
             case "like":
-                return sql`${column} LIKE ${String(value)}`;
             case "ilike":
-                return sql`${column} ILIKE ${String(value)}`;
             case "not-like":
-                return sql`${column} NOT LIKE ${String(value)}`;
-            case "not-ilike":
-                return sql`${column} NOT ILIKE ${String(value)}`;
+            case "not-ilike": {
+                // See `patternOperand`: an enum is matched by its label, and a
+                // pattern over a number or a date is the caller's mistake, not
+                // a Postgres error to pass on as a 500.
+                const operand = patternOperand(column, column);
+                if (!operand) {
+                    throw ApiError.badRequest(
+                        `Operator '${op}' cannot be applied to '${column.name}': it is `
+                        + `${column.getSQLType?.() ?? "not a text column"}, and pattern matching is only defined on text.`,
+                        "INVALID_FILTER_OPERATOR",
+                        { column: column.name, operator: op }
+                    );
+                }
+                const like = op === "like" || op === "not-like" ? sql`LIKE` : sql`ILIKE`;
+                return op.startsWith("not-")
+                    ? sql`${operand} NOT ${like} ${String(value)}`
+                    : sql`${operand} ${like} ${String(value)}`;
+            }
             case "is-null":
                 return sql`${column} IS NULL`;
             case "is-not-null":

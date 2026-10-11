@@ -157,6 +157,11 @@ The alias column is the **wire** spelling, used in REST query strings. It never
 appears in application code: the SDK and the admin panel both speak the
 canonical operator on the left.
 
+The four pattern operators match text. An `enum` field is matched by its value,
+so `{ status: ["like", "draft%"] }` works on a status stored as a Postgres enum.
+On a number, a date or any other field that is not text they are refused with a
+400 `INVALID_FILTER_OPERATOR`.
+
 ### Where Clause Syntaxes
 
 The `where` parameter in `find()` supports two formats:

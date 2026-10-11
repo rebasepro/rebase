@@ -1025,7 +1025,7 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
                 mockUsersTable.name, "like", "post-%"
             );
             const query = pgDialect.sqlToQuery(condition!);
-            expect(query.sql).toBe('"users"."name" LIKE $1');
+            expect(query.sql).toBe('"users"."name"::text LIKE $1');
             expect(query.params).toEqual(["post-%"]);
         });
 
@@ -1034,7 +1034,7 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
                 mockUsersTable.name, "ilike", "%john%"
             );
             const query = pgDialect.sqlToQuery(condition!);
-            expect(query.sql).toBe('"users"."name" ILIKE $1');
+            expect(query.sql).toBe('"users"."name"::text ILIKE $1');
             expect(query.params).toEqual(["%john%"]);
         });
 
@@ -1042,12 +1042,12 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
             const notLike = pgDialect.sqlToQuery(
                 DrizzleConditionBuilder.buildSingleFilterCondition(mockUsersTable.name, "not-like", "tmp-%")!
             );
-            expect(notLike.sql).toBe('"users"."name" NOT LIKE $1');
+            expect(notLike.sql).toBe('"users"."name"::text NOT LIKE $1');
 
             const notIlike = pgDialect.sqlToQuery(
                 DrizzleConditionBuilder.buildSingleFilterCondition(mockUsersTable.name, "not-ilike", "%draft%")!
             );
-            expect(notIlike.sql).toBe('"users"."name" NOT ILIKE $1');
+            expect(notIlike.sql).toBe('"users"."name"::text NOT ILIKE $1');
         });
 
         it("should generate IS NULL / IS NOT NULL ignoring the value", () => {

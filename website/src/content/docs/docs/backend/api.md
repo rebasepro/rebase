@@ -120,6 +120,10 @@ GET /api/data/products?tags=csa.(electronics,books)
 | `isnull` | Column is `NULL` (`is-null`) | `?deleted_at=isnull.null` |
 | `notnull` | Column is not `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
 
+The four pattern operators match text. An enum column is matched by its value
+(`?status=like.draft%25`); on a number, a date or any other column that is not
+text they are a 400 `INVALID_FILTER_OPERATOR`.
+
 `isnull` and `notnull` ignore their value — the operator is the whole condition,
 and anything after the dot is discarded. The SDK writes `.null`, so that is the
 spelling you will see on the wire.
