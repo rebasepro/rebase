@@ -97,6 +97,11 @@ export function RebaseI18nProvider({
         let initialLocale = locale;
         const stored = readStoredString(REBASE_LOCALE_STORAGE_KEY);
         if (stored) initialLocale = stored;
+        // The first language is the prop's (or the stored one), not a choice
+        // the user made now. A language that has to be fetched announces
+        // itself after the listener below is attached, and was stored as the
+        // user's preference — after which the prop was ignored for good.
+        else propLanguageRef.current = initialLocale;
 
         appliedTranslationsRef.current = serializeTranslations(translations);
 

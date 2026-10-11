@@ -45,6 +45,19 @@ describe("RebaseI18nProvider and the locale prop", () => {
         expect(window.localStorage.getItem(REBASE_LOCALE_STORAGE_KEY)).toBeNull();
     });
 
+    it("follows the prop from a first language that is not English", async () => {
+        // The first language arrives asynchronously, so its `languageChanged`
+        // reached the listener and was stored as the user's own choice: the
+        // app's later `locale` was then ignored, across reloads too.
+        const view = renderWithLocale("it");
+        expect(await view.find()).toBe("it:Salva");
+        expect(window.localStorage.getItem(REBASE_LOCALE_STORAGE_KEY)).toBeNull();
+
+        await view.setLocale("de");
+        await waitFor(() => expect(view.text()).toBe("de:Speichern"));
+        expect(window.localStorage.getItem(REBASE_LOCALE_STORAGE_KEY)).toBeNull();
+    });
+
     it("keeps a language the user picked, over the prop and across a reload", async () => {
         const view = renderWithLocale("en");
         await act(async () => {
