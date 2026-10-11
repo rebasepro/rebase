@@ -285,6 +285,22 @@ function fitToLimit<R>(rows: R[], limit: number, added: number, sorted: boolean)
     return [...server.slice(0, Math.max(0, limit - local.length)), ...local].slice(0, limit);
 }
 
+/**
+ * Call the app back without letting it break the engine.
+ *
+ * A status badge that throws while rendering used to abort a replay half way
+ * (and skip every listener registered after it); the replay's own failure
+ * handling then had an error that was never about the replay. The app's error
+ * is still reported, on the console, where an uncaught one would have gone.
+ */
+function callSafely(callback: () => void): void {
+    try {
+        callback();
+    } catch (error) {
+        console.error("[rebase offline] A listener threw:", error);
+    }
+}
+
 /** The server has no such row — deleted by someone else, or never visible to this user. */
 function isNotFoundError(error: unknown): boolean {
     return error instanceof RebaseApiError && error.status === 404;
@@ -1519,7 +1535,7 @@ data: u.data as AnyRow })),
 
     private notifyCollection(slug: string, broadcast = true): void {
         const set = this.observers.get(slug);
-        if (set) for (const observer of [...set]) observer.emit();
+        if (set) for (const observer of [...set]) callSafely(() => observer.emit());
         if (broadcast) this.broadcast({ type: "rows", slugs: [slug] });
     }
 
@@ -2645,7 +2661,7 @@ data: u.data as AnyRow })),
         // discarded along with it were never sent, and say so — with that
         // answer as their cause, so "why" is one property away.
         for (const dropped of doomed) {
-            this.onSyncError?.(dropped === op ? error : dependencyRejected(op, error), dropped);
+            callSafely(() => this.onSyncError?.(dropped === op ? error : dependencyRejected(op, error), dropped));
         }
     }
 
@@ -2718,9 +2734,19 @@ data: u.data as AnyRow })),
         const locks = (globalThis as { navigator?: { locks?: LockManager } }).navigator?.locks;
         // Two tabs replaying the same queue would each send every mutation.
         if (!locks?.request) return fn();
+        // The request settles with the callback's own outcome, so a failure
+        // of the work and a refusal of the lock look the same from here. Only
+        // the refusal may fall back: a replay that had started and thrown was
+        // run a second time with no lock held, alongside whichever tab was
+        // waiting for it.
+        let started = false;
         try {
-            return await locks.request(`rebase-offline-sync:${this.scope}`, fn) as T;
-        } catch {
+            return await locks.request(`rebase-offline-sync:${this.scope}`, () => {
+                started = true;
+                return fn();
+            }) as T;
+        } catch (error) {
+            if (started) throw error;
             // A browser that denies the lock (or a policy that blocks it) must
             // not stop the queue from draining at all.
             return fn();
@@ -2806,7 +2832,7 @@ data: u.data as AnyRow })),
     }
 
     private notifyQueue(): void {
-        for (const listener of this.queueListeners) listener(this.queue.length);
+        for (const listener of this.queueListeners) callSafely(() => listener(this.queue.length));
     }
 
     private patchStatus(patch: Partial<OfflineStatus>): void {
@@ -2819,7 +2845,7 @@ data: u.data as AnyRow })),
         }
         if (!changed) return;
         const snapshot = { ...this.currentStatus };
-        for (const listener of this.statusListeners) listener(snapshot);
+        for (const listener of this.statusListeners) callSafely(() => listener(snapshot));
     }
 
     // ─── Store keys and access ───────────────────────────────────────────────

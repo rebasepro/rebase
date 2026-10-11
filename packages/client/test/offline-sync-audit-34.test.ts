@@ -158,3 +158,69 @@ describe("a walk the local database cannot answer page by page (M7)", () => {
         expect(await posts.findAll()).toHaveLength(online.length);
     });
 });
+
+describe("the replay lock (M9)", () => {
+    it("a replay that throws is not run a second time outside the lock", async () => {
+        const server = fakeServer();
+        const { offline } = manager(server);
+        let held = Promise.resolve();
+        Object.defineProperty(globalThis, "navigator", {
+            value: {
+                onLine: true,
+                locks: {
+                    // As the real one: settles with the callback's own outcome.
+                    request: (_name: string, fn: () => Promise<unknown>) => {
+                        const run = held.then(fn);
+                        held = run.then(() => undefined, () => undefined);
+                        return run;
+                    }
+                }
+            },
+            configurable: true,
+            writable: true
+        });
+        let runs = 0;
+        const withLock = Reflect.get(offline, "withLock") as (fn: () => Promise<unknown>) => Promise<unknown>;
+        await expect(withLock.call(offline, async () => {
+            runs++;
+            throw new Error("the replay itself failed");
+        })).rejects.toThrow("the replay itself failed");
+        expect(runs).toBe(1);
+    });
+
+    it("a browser that refuses the lock still drains the queue, once", async () => {
+        const server = fakeServer();
+        const { offline } = manager(server);
+        Object.defineProperty(globalThis, "navigator", {
+            value: { onLine: true, locks: { request: () => Promise.reject(new DOMException("denied", "SecurityError")) } },
+            configurable: true,
+            writable: true
+        });
+        let runs = 0;
+        const withLock = Reflect.get(offline, "withLock") as (fn: () => Promise<unknown>) => Promise<unknown>;
+        await expect(withLock.call(offline, async () => ++runs)).resolves.toBe(1);
+        expect(runs).toBe(1);
+    });
+});
+
+describe("an application callback that throws (L5)", () => {
+    it("does not stop the queue from draining, or the listeners after it from hearing", async () => {
+        const server = fakeServer();
+        server.rows.set("1", { id: "1", title: "a" });
+        const { offline, posts } = manager(server);
+        await posts.findById("1");
+        setNavigatorOnLine(false);
+        await posts.update("1", { title: "b" });
+        await posts.update("2", { title: "c" }).catch(() => undefined);
+        setNavigatorOnLine(true);
+
+        const heard: number[] = [];
+        offline.api.onStatusChange(() => { throw new Error("a badge failed to render"); });
+        offline.api.onQueueChange(() => { throw new Error("so did the counter"); });
+        offline.api.onQueueChange((count) => heard.push(count));
+
+        const result = await offline.sync();
+        expect(result.remaining).toBe(0);
+        expect(heard.at(-1)).toBe(0);
+    });
+});
