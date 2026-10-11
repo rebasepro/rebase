@@ -214,6 +214,18 @@ export function getRequestId(c: CtxLike): string | undefined {
 }
 
 /**
+ * The signal aborted when this request outlasts the functions timeout and is
+ * answered `504 FUNCTION_TIMEOUT`. Pass it to `fetch` and anything else that
+ * takes one, so the work stops with the request instead of running on after
+ * the caller was told it failed.
+ *
+ * Never aborts when the timeout is off, or outside the functions router.
+ */
+export function getSignal(c: CtxLike): AbortSignal {
+    return read(c, "functionSignal") ?? new AbortController().signal;
+}
+
+/**
  * Whether a Rebase auth middleware has run on this request.
  *
  * Both middlewares populate `driver` for *every* outcome, anonymous included,

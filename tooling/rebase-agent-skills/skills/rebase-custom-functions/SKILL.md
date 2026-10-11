@@ -194,7 +194,7 @@ export default defineFunction((app) => {
 
 `getUser` narrows whatever the middleware resolved: `uid` is a string, `roles` is
 always an array. `getDriver(c)` / `requireDriver(c)` return the caller-scoped
-driver; `getApiKey(c)` and `getRequestId(c)` are there too.
+driver; `getApiKey(c)` and `getRequestId(c)` are there too, and `getSignal(c)`, aborted when the request times out — pass it to `fetch`.
 
 ## Configuration — never at module scope
 

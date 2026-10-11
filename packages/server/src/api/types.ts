@@ -54,6 +54,12 @@ export type HonoEnv = {
         /** Unique request correlation ID (generated or propagated from X-Request-ID header). */
         requestId?: string;
         /**
+         * Aborted when a custom function's request outlasts its timeout and is
+         * answered 504. Read it with `getSignal(c)` from
+         * `@rebasepro/server/functions`. See `functions/request-timeout.ts`.
+         */
+        functionSignal?: AbortSignal;
+        /**
          * The collection this request is about, when it is about one.
          *
          * Set by the REST generator from the first path segment, validated

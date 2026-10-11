@@ -384,6 +384,7 @@ describe("the portable surface keeps its shape", () => {
         "requireDriver",
         "getApiKey",
         "getRequestId",
+        "getSignal",
         "identityResolved",
         "requireAuth",
         "requireAdmin",

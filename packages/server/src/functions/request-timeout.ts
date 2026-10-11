@@ -47,11 +47,13 @@ export function resolveFunctionsTimeoutMs(configured?: number): number {
  * runtime the process is shared between tenants, so that is not only the slow
  * caller's problem.
  *
- * The handler is **not** cancelled — it cannot be, there is no cancellation
- * token to hand user code. What is bounded is the client-visible request: after
- * `ms` the caller gets a 504 and the socket is released, and the handler's
- * eventual result is dropped. It is a ceiling, not a kill switch, and the exact
- * number matters far less than its existence.
+ * The handler is **not** killed — JavaScript cannot stop a function from the
+ * outside. What is bounded is the client-visible request: after `ms` the caller
+ * gets a 504 and the socket is released, and the handler's eventual result is
+ * dropped. The handler is *told*, though: `getSignal(c)` is aborted at the same
+ * moment, so a `fetch` or a driver call it was passed to stops too. It is a
+ * ceiling, not a kill switch, and the exact number matters far less than its
+ * existence.
  *
  * "The handler keeps running" is a **Node** guarantee, not a property of the
  * contract. It follows from the process outliving the request, which is not
@@ -66,11 +68,22 @@ export function resolveFunctionsTimeoutMs(configured?: number): number {
  */
 export function createFunctionsRequestTimeout(ms: number): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
+        // Set either way, so `getSignal(c)` hands every handler a signal it can
+        // pass on without checking whether a ceiling is configured.
+        const controller = new AbortController();
+        c.set("functionSignal", controller.signal);
         if (ms <= 0) return next();
 
         let timer: ReturnType<typeof setTimeout> | undefined;
         const timedOut = new Promise<"timeout">((resolve) => {
-            timer = setTimeout(() => resolve("timeout"), ms);
+            timer = setTimeout(() => {
+                // Settled first, so the race is decided before a handler that
+                // listens on the signal can return in reaction to it; then the
+                // abort, so that handler — or a `fetch` it was handed to —
+                // stops with the request.
+                resolve("timeout");
+                controller.abort(new Error(`Function timed out after ${ms}ms`));
+            }, ms);
         });
 
         try {
@@ -78,8 +91,8 @@ export function createFunctionsRequestTimeout(ms: number): MiddlewareHandler<Hon
             if (outcome === "timeout") {
                 logger.warn(
                     `[functions] ${c.req.method} ${c.req.path} exceeded the ${ms}ms request timeout — ` +
-                    "answering 504. The handler is still running; it cannot be cancelled from here. " +
-                    "Give outbound calls an AbortSignal, or raise `functionsTimeoutMs` / REBASE_FUNCTIONS_TIMEOUT_MS."
+                    "answering 504. Its signal was aborted; work not handed `getSignal(c)` keeps running. " +
+                    "Pass it to outbound calls, or raise `functionsTimeoutMs` / REBASE_FUNCTIONS_TIMEOUT_MS."
                 );
                 // Through `errorHandler`, not `c.json`: that is what puts the
                 // `requestId` in the body and hands the outcome to the request

@@ -90,6 +90,7 @@ export {
     requireDriver,
     getApiKey,
     getRequestId,
+    getSignal,
     identityResolved
 } from "./context";
 export type { FunctionUser } from "./context";
