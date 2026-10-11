@@ -648,6 +648,20 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
 
+    /** The apply running now, which the next one waits for. */
+    let applyInFlight: Promise<void> = Promise.resolve();
+    const oneApplyAtATime = async <T>(work: () => Promise<T>): Promise<T> => {
+        const previous = applyInFlight;
+        let done: () => void = () => undefined;
+        applyInFlight = new Promise<void>(resolve => { done = resolve; });
+        await previous;
+        try {
+            return await work();
+        } finally {
+            done();
+        }
+    };
+
     /**
      * Whether this backend can edit its schema, and what is missing when it
      * cannot.
@@ -843,96 +857,102 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             : commitAuthor(c.get("user"));
         const repository = requireRepository(author);
 
-        const before = config.getCollections();
-        const after = proposedCollections(before, change);
+        // One apply at a time, from the plan to the last statement: two at
+        // once (a double confirm, two tabs) both passed the dirty-tree check,
+        // then wrote and committed in whatever order their awaits fell, and
+        // one commit could carry the other's generated schema.
+        return oneApplyAtATime(async () => {
+            const before = config.getCollections();
+            const after = proposedCollections(before, change);
 
-        // Planned before the source is touched. `writeSource` writes to disk
-        // through the AST editor, outside the repository's dirty-tree check, so
-        // a change that turns out to be unapplicable must be refused *first* —
-        // otherwise a rejected edit still leaves a rewritten collection file
-        // behind, and the refusal reads as "nothing happened" when something did.
-        const plan = sourceOnly
-            ? await planSourceOnly(admin, before, after, config.commitPaths)
-            : await planOrRefusal(admin, before, after, config.commitPaths);
-        if (!plan.classified.applicable && !sourceOnly) {
-            const blocking = plan.classified.changes.filter(c => c.verdict !== "safe");
-            throw ApiError.badRequest(
-                "This change cannot be applied to a running database:\n" +
-                blocking.map(c => `  • ${c.detail}${c.remedy ? `\n    ${c.remedy}` : ""}`).join("\n"),
-                "SCHEMA_CHANGE_UNAPPLICABLE",
-                { changes: plan.classified.changes }
-            );
-        }
+            // Planned before the source is touched. `writeSource` writes to disk
+            // through the AST editor, outside the repository's dirty-tree check, so
+            // a change that turns out to be unapplicable must be refused *first* —
+            // otherwise a rejected edit still leaves a rewritten collection file
+            // behind, and the refusal reads as "nothing happened" when something did.
+            const plan = sourceOnly
+                ? await planSourceOnly(admin, before, after, config.commitPaths)
+                : await planOrRefusal(admin, before, after, config.commitPaths);
+            if (!plan.classified.applicable && !sourceOnly) {
+                const blocking = plan.classified.changes.filter(c => c.verdict !== "safe");
+                throw ApiError.badRequest(
+                    "This change cannot be applied to a running database:\n" +
+                    blocking.map(c => `  • ${c.detail}${c.remedy ? `\n    ${c.remedy}` : ""}`).join("\n"),
+                    "SCHEMA_CHANGE_UNAPPLICABLE",
+                    { changes: plan.classified.changes }
+                );
+            }
 
-        try {
-            const result = await applySchemaChange({
-                plan: sourceOnly
-                    ? { ...plan, statements: [] }
-                    : { ...plan, message: messageFor(sourceChangeFor(before, change), plan) },
-                sourceOnly,
-                repository,
-                // Handed down rather than called here. Writing the source first
-                // and passing the files over is what made every change fail:
-                // the AST editor writes through the filesystem, so by the time
-                // the dirty-tree check ran, the tree was dirty *because of this
-                // change*, and it refused on the evidence of its own edit.
-                sourcePaths: config.sourcePathsFor?.(change) ?? [],
-                writeSource: config.writeSource
-                    ? () => config.writeSource!(sourceChangeFor(before, change))
-                    : undefined,
-                apply: async (statements) => {
-                    const sql = config.getAdmin();
-                    if (!isSQLAdmin(sql)) {
-                        throw new Error("The driver cannot run SQL, so the change cannot be applied here.");
-                    }
-                    // One statement at a time: several of these are
-                    // `CREATE INDEX CONCURRENTLY`, which may not run inside a
-                    // transaction, and a single batched call would open one.
-                    // Which also means a failure part-way leaves the earlier
-                    // ones applied, so the count travels with the error.
-                    for (const [index, statement] of statements.entries()) {
-                        try {
-                            await sql.executeSql(statement);
-                        } catch (err) {
-                            throw new StatementFailedError(index, statement, err);
+            try {
+                const result = await applySchemaChange({
+                    plan: sourceOnly
+                        ? { ...plan, statements: [] }
+                        : { ...plan, message: messageFor(sourceChangeFor(before, change), plan) },
+                    sourceOnly,
+                    repository,
+                    // Handed down rather than called here. Writing the source first
+                    // and passing the files over is what made every change fail:
+                    // the AST editor writes through the filesystem, so by the time
+                    // the dirty-tree check ran, the tree was dirty *because of this
+                    // change*, and it refused on the evidence of its own edit.
+                    sourcePaths: config.sourcePathsFor?.(change) ?? [],
+                    writeSource: config.writeSource
+                        ? () => config.writeSource!(sourceChangeFor(before, change))
+                        : undefined,
+                    apply: async (statements) => {
+                        const sql = config.getAdmin();
+                        if (!isSQLAdmin(sql)) {
+                            throw new Error("The driver cannot run SQL, so the change cannot be applied here.");
+                        }
+                        // One statement at a time: several of these are
+                        // `CREATE INDEX CONCURRENTLY`, which may not run inside a
+                        // transaction, and a single batched call would open one.
+                        // Which also means a failure part-way leaves the earlier
+                        // ones applied, so the count travels with the error.
+                        for (const [index, statement] of statements.entries()) {
+                            try {
+                                await sql.executeSql(statement);
+                            } catch (err) {
+                                throw new StatementFailedError(index, statement, err);
+                            }
                         }
                     }
-                }
-            });
-
-            logger.info(`[schema-edit] ${result.summary}`);
-            // Carried onto the result as well as the plan: whoever reads the
-            // outcome may not be whoever read the preview, and "applied" with a
-            // constraint quietly missing is exactly the state this feature
-            // exists to stop being invisible.
-            return c.json({
-                ...result,
-                withheldConstraints: plan.withheldConstraints ?? [],
-                followUp: followUpFor(config, plan.statements)
-            });
-        } catch (err) {
-            if (err instanceof UnapplicableChangeError) {
-                throw ApiError.badRequest(err.message, "SCHEMA_CHANGE_UNAPPLICABLE", {
-                    changes: err.classified.changes
                 });
+
+                logger.info(`[schema-edit] ${result.summary}`);
+                // Carried onto the result as well as the plan: whoever reads the
+                // outcome may not be whoever read the preview, and "applied" with a
+                // constraint quietly missing is exactly the state this feature
+                // exists to stop being invisible.
+                return c.json({
+                    ...result,
+                    withheldConstraints: plan.withheldConstraints ?? [],
+                    followUp: followUpFor(config, plan.statements)
+                });
+            } catch (err) {
+                if (err instanceof UnapplicableChangeError) {
+                    throw ApiError.badRequest(err.message, "SCHEMA_CHANGE_UNAPPLICABLE", {
+                        changes: err.classified.changes
+                    });
+                }
+                if (err instanceof DirtyWorkingTreeError) {
+                    throw ApiError.conflict(err.message, "SCHEMA_EDIT_DIRTY_TREE");
+                }
+                // Anything else that goes wrong between the check and the commit —
+                // the AST editor refusing a file it cannot parse, git refusing the
+                // commit, a path outside the repository — is a refusal of *this
+                // change*, not a broken server. A 500 tells the person nothing and
+                // reads as an outage; the message is the useful part and it is
+                // already on the error.
+                //
+                // Deliberately below the two specific cases above, so neither is
+                // flattened into this one.
+                throw ApiError.badRequest(
+                    err instanceof Error ? err.message : String(err),
+                    "SCHEMA_CHANGE_FAILED"
+                );
             }
-            if (err instanceof DirtyWorkingTreeError) {
-                throw ApiError.conflict(err.message, "SCHEMA_EDIT_DIRTY_TREE");
-            }
-            // Anything else that goes wrong between the check and the commit —
-            // the AST editor refusing a file it cannot parse, git refusing the
-            // commit, a path outside the repository — is a refusal of *this
-            // change*, not a broken server. A 500 tells the person nothing and
-            // reads as an outage; the message is the useful part and it is
-            // already on the error.
-            //
-            // Deliberately below the two specific cases above, so neither is
-            // flattened into this one.
-            throw ApiError.badRequest(
-                err instanceof Error ? err.message : String(err),
-                "SCHEMA_CHANGE_FAILED"
-            );
-        }
+        });
     });
 
     return router;

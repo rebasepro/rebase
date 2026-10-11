@@ -186,6 +186,43 @@ describe("POST /apply", () => {
         expect(await res.json()).toMatchObject({ applied: true, committed: { branch: "main" } });
     });
 
+    it("runs one apply at a time, so two cannot interleave their writes and commits", async () => {
+        // Two applies at once (a double confirm, two tabs) both passed the
+        // dirty-tree check, then wrote and committed in whatever order their
+        // awaits fell: one commit could carry the other's generated schema.
+        let releaseFirst: () => void = () => undefined;
+        const firstCommitHeld = new Promise<void>(resolve => { releaseFirst = resolve; });
+        let commits = 0;
+        const { post, events } = harness({
+            getRepository: () => ({
+                root: "/tmp/project",
+                currentBranch: async () => "main",
+                dirtyPaths: async () => [],
+                writeFiles: async () => { events.push("write-generated"); },
+                commit: async () => {
+                    commits++;
+                    if (commits === 1) await firstCommitHeld;
+                    events.push("commit");
+                    return "sha";
+                }
+            })
+        });
+
+        const first = post("/apply", change);
+        const second = post("/apply", change);
+        await new Promise(resolve => setTimeout(resolve, 20));
+        // The second has not started writing while the first is still committing.
+        expect(events.filter(e => e === "write-source")).toHaveLength(1);
+
+        releaseFirst();
+        expect((await first).status).toBe(200);
+        expect((await second).status).toBe(200);
+        expect(events.filter(e => e !== "plan")).toEqual([
+            "write-source", "write-generated", "commit", "sql",
+            "write-source", "write-generated", "commit", "sql"
+        ]);
+    });
+
     it("commits the rewritten source alongside the generated files", async () => {
         let staged: string[] = [];
         const { post } = harness({
