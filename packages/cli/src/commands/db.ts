@@ -608,7 +608,7 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
     if (subcommand === "branch") {
         const action = commandWords(rawArgs, "db")[2];
         if (action === "delete") await refuseDeletingActiveBranch(projectRoot, rawArgs);
-        if (action === "list") driverArgs = await listFromParentDatabase(projectRoot, rawArgs);
+        if (action && REGISTRY_ACTIONS.has(action)) driverArgs = await onParentDatabase(projectRoot, rawArgs, action);
     }
 
     // Before the database is resolved — and, for the managed one, started —
@@ -1071,8 +1071,11 @@ async function refuseDeletingActiveBranch(projectRoot: string, rawArgs: readonly
     process.exit(1);
 }
 
+/** The `branch` actions that read or write the registry — every one but `switch`. */
+const REGISTRY_ACTIONS = new Set(["list", "create", "delete", "info", "prune"]);
+
 /**
- * `branch list` reads the branch registry, which lives in the parent.
+ * Every `branch` action runs against the parent, where the registry lives.
  *
  * `rebase.branches` is written in the database branches are made *from*, and a
  * branch is a `CREATE DATABASE … TEMPLATE` copy — so the copy carries a
@@ -1082,11 +1085,22 @@ async function refuseDeletingActiveBranch(projectRoot: string, rawArgs: readonly
  * branch create <name>` while `branch switch` with no argument, one command
  * earlier, had said `● On branch feature_x`.
  *
+ * The same snapshot answered `create`, `delete`, `info` and `prune`: a branch
+ * created from a switched checkout was recorded only in the copy, so `list`
+ * never showed it and `delete` from the main checkout said "not found" while
+ * its database stayed; `info` and `delete` could not find a branch made after
+ * the one this checkout is on. The Branches pane in Studio was fixed the same
+ * way (`REBASE_BRANCH_PARENT_DATABASE`).
+ *
+ * `create` still copies what this checkout is on — a branch of the branch, a
+ * thing the developer asked for by switching first — so it is given
+ * `--from <the branch's database>` unless it names a source itself.
+ *
  * Resolved with `branch: null` — the same rule `switch` uses to find what to
  * branch *from* — and relayed as `--database-url`, which the driver honours
  * over anything it would resolve for itself.
  */
-async function listFromParentDatabase(projectRoot: string, rawArgs: string[]): Promise<string[]> {
+async function onParentDatabase(projectRoot: string, rawArgs: string[], action: string): Promise<string[]> {
     // An explicit `--database-url` is the developer naming the database; this
     // never overrides one.
     if (readFlagValue(rawArgs, "--database-url") !== null) return rawArgs;
@@ -1110,9 +1124,13 @@ async function listFromParentDatabase(projectRoot: string, rawArgs: string[]): P
     const url = (parent.kind === "managed" ? null : parent.url)?.trim();
     if (!url) return rawArgs;
 
-    console.log(chalk.gray(`  ● On branch ${active.name} — listing from the main database, where the registry lives.`));
+    console.log(chalk.gray(`  ● On branch ${active.name} — using the main database, where the branch registry lives.`));
 
-    return [...rawArgs, "--database-url", url];
+    const from = action === "create" && readFlagValue(rawArgs, "--from") === null
+        ? ["--from", active.database]
+        : [];
+
+    return [...rawArgs, ...from, "--database-url", url];
 }
 
 /**

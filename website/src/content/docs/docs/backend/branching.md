@@ -217,6 +217,14 @@ command line is a more immediate instruction than a switch made yesterday.
 `.rebase/` is gitignored, so the branch you are on is a fact about your machine
 and never about the project.
 
+<span class="since-badge" data-since="0.25">Since 0.25</span> On a switched
+checkout, `rebase db branch create`, `list`, `info`, `delete` and `prune` work
+on the main database, where the registry is, and say so. `create` still copies
+the branch you are on unless you pass `--from`; it is recorded in the main
+database, so `list` shows it from any checkout. Before 0.25 only `list` did
+this, and a branch created from a switched checkout was recorded in the branch's
+snapshot alone.
+
 Branches are ordinary PostgreSQL databases named after the branch with an `rb_` prefix, so `dev_sandbox` above is the database `rb_dev_sandbox` on the same server.
 
 Creating a branch does **not** change which database your project talks to. `rebase db branch create` makes the copy and stops there; nothing writes to `.env`, and the next `rebase dev` still uses the database it used before. To work against a branch, point `DATABASE_URL` at it yourself — the connection string is the one you already have, with the database name swapped:

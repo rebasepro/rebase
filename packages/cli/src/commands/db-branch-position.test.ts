@@ -1,5 +1,5 @@
 /**
- * `branch delete` and `branch list` have to know which branch you are on.
+ * Every `branch` action has to know which branch you are on.
  *
  * Neither did, and the driver cannot be told: it runs as a child process, and
  * to it "the branch you are standing on" and "the main database" are the same
@@ -189,14 +189,51 @@ describe("listing branches from a branch", () => {
         expect(driverLine()).toContain(typed);
     });
 
-    it("leaves `create` pointed at the branch it was resolved to", async () => {
-        // Only `list` reads the registry from somewhere other than the resolved
-        // database. `create` copies what this checkout is on, which after a
-        // switch is the branch, and that is a branch of a branch — a thing the
-        // developer asked for by switching first.
+    it("says which database it read", async () => {
+        await dbCommand("branch", argv("db", "branch", "info", "other")).catch(() => undefined);
+
+        expect(printed()).toContain("On branch feature_x");
+    });
+});
+
+/**
+ * `create`, `delete`, `info` and `prune` read the same snapshot `list` did. A
+ * branch created from a switched checkout was recorded only in the copy —
+ * `list` never showed it, and `delete` from the main checkout said "not found"
+ * while its database stayed.
+ */
+describe("the other branch actions from a branch", () => {
+    for (const line of [["create", "another"], ["delete", "other"], ["info", "other"], ["prune"]]) {
+        it(`\`${line.join(" ")}\` runs on the parent, where the registry lives`, async () => {
+            await dbCommand("branch", argv("db", "branch", ...line)).catch(() => undefined);
+
+            expect(driverLine()).toContain("--database-url");
+            expect(driverLine()).toContain(PARENT_URL);
+        });
+    }
+
+    it("`create` still copies the branch this checkout is on", async () => {
+        // A branch of the branch, which the developer asked for by switching
+        // first — only the record moves to the parent.
+        await dbCommand("branch", argv("db", "branch", "create", "another")).catch(() => undefined);
+
+        const line = driverLine();
+        expect(line[line.indexOf("--from") + 1]).toBe("rb_feature_x");
+    });
+
+    it("`create --from` keeps the source the developer named", async () => {
+        await dbCommand("branch", argv("db", "branch", "create", "another", "--from", "shop")).catch(() => undefined);
+
+        expect(driverLine().filter(a => a === "--from")).toHaveLength(1);
+        expect(driverLine()).toContain("shop");
+    });
+
+    it("adds nothing when the checkout is not on a branch", async () => {
+        active = null;
         await dbCommand("branch", argv("db", "branch", "create", "another")).catch(() => undefined);
 
         expect(driverLine()).not.toContain("--database-url");
+        expect(driverLine()).not.toContain("--from");
     });
 });
 
