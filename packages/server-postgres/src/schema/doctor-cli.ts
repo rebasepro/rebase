@@ -9,6 +9,7 @@ import { runDoctor } from "./doctor";
 import { exitCodeForPolicyGate, runPolicyChecks } from "./doctor-policy-checks";
 import { runSearchScaleCheck } from "./doctor-search-scale";
 import { diagnoseDbError } from "../cli-errors";
+import { describeFailure } from "../cli-output";
 
 async function main() {
     const collectionsArg = process.argv.find((a) => a.startsWith("--collections="));
@@ -82,7 +83,7 @@ main().catch((err) => {
     if (banner) {
         console.error(banner);
     } else {
-        console.error(chalk.red("  ✗ Doctor failed"), err instanceof Error ? (err.stack ?? err.message) : String(err));
+        console.error(chalk.red(`  ✗ Doctor failed: ${describeFailure(err)}`));
     }
     process.exit(1);
 });

@@ -192,6 +192,9 @@ const { entry } = await import("../dist/index.es.js");
 // commands spell it: `wantsRawError` in `commands/cloud/errors.ts`.
 const { parseEnvBoolean } = await import("@rebasepro/types");
 const wantsStack = process.argv.includes("--debug") || parseEnvBoolean(process.env.REBASE_DEBUG) === true;
+// Down to the driver too: `db`, `schema` and `doctor` run in a child process
+// that prints its own failures, and it reads the same variable.
+if (wantsStack) process.env.REBASE_DEBUG = "1";
 
 entry(process.argv).catch((error) => {
     const message = error instanceof Error ? error.message : String(error);

@@ -413,7 +413,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         out(chalk.bold("  📦 Rebase DB Generate"));
         out(chalk.gray("  Step 1/2: Generating Drizzle schema & Postgres DDL from collections..."));
         out("");
-        await schemaCommand("generate", rawArgs);
+        await schemaCommand("generate", rawArgs, { nextStep: false });
         await generatePostgresDdlCommand(rawArgs);
         out("");
         out(chalk.gray("  Step 2/2: Generating SQL migration files with Atlas..."));
@@ -559,12 +559,23 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         out("");
 
         if (subcommand === "push") {
-            out(chalk.gray("  Step 1/3: Generating Drizzle schema & Postgres DDL from collections..."));
-            out("");
-            await schemaCommand("generate", rawArgs);
-            await generatePostgresDdlCommand(rawArgs);
-            out("");
             const dryRun = argsList["--dry-run"] === true;
+            out(chalk.gray(dryRun
+                ? "  Step 1/3: Generating the Postgres DDL from collections (the plan's input)..."
+                : "  Step 1/3: Generating Drizzle schema & Postgres DDL from collections..."));
+            out("");
+            // `--dry-run` applies nothing, and that includes the project's
+            // files: it used to rewrite the tracked `src/schema.generated.ts`
+            // and delete the `drizzle/*.sql` copies an older release committed.
+            // Atlas plans from the DDL alone, which goes to the scratch
+            // directory `.rebase/sql/` that ignores itself.
+            if (dryRun) {
+                out(chalk.gray("  --dry-run: src/schema.generated.ts is left as it is."));
+            } else {
+                await schemaCommand("generate", rawArgs, { nextStep: false });
+            }
+            await generatePostgresDdlCommand(rawArgs, { retireLegacyCopies: !dryRun });
+            out("");
             out(chalk.gray(dryRun
                 ? "  Step 2/3: Planning the change against the database (nothing is applied)..."
                 : "  Step 2/3: Pushing schema to database with Atlas..."));
@@ -1723,7 +1734,10 @@ async function runAtlas(
     return "";
 }
 
-async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
+async function generatePostgresDdlCommand(
+    rawArgs: string[],
+    options: { retireLegacyCopies?: boolean } = {}
+): Promise<void> {
     const argsList = arg(
         {
             "--collections": String,
@@ -1750,8 +1764,14 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
     // Only for the default location: an explicit `--output` is somebody's own
     // arrangement, and its directory is theirs to manage.
     if (!argsList["--output"]) {
-        const retired = prepareGeneratedSqlDir();
-        if (retired.length > 0) {
+        const retire = options.retireLegacyCopies !== false;
+        const retired = prepareGeneratedSqlDir(process.cwd(), { retire });
+        if (retired.length > 0 && !retire) {
+            out(chalk.gray(
+                `  The next \`rebase db push\` or \`rebase db generate\` removes the old copies an earlier ` +
+                `release committed:\n    ${retired.join(", ")}`
+            ));
+        } else if (retired.length > 0) {
             out(chalk.gray(
                 `  Generated SQL is written to ${GENERATED_SQL_DIR}/ now, which is not committed. ` +
                 `Removed the old copies — commit the deletion:\n    ${retired.join(", ")}`
@@ -1892,7 +1912,11 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
     await schemaCommand("generate", ["schema", "generate", `--collections=${collectionsPath}`, `--output=${outputPath}`]);
 }
 
-async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<void> {
+async function schemaCommand(
+    subcommand: string,
+    rawArgs: string[],
+    options: { nextStep?: boolean } = {}
+): Promise<void> {
     // The same second line of defence `dbCommand` above carries, for the same
     // reason: this file is also its own CLI, spawned directly by
     // `resolvePluginCliScript` and executable on its own. Nothing here had a
@@ -1946,7 +1970,8 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
             await generateInProcess("schema generator", "Drizzle schema", async ({ writeDrizzleSchema }) => {
                 await writeDrizzleSchema({
                     collectionsPath: path.resolve(process.cwd(), collectionsPath),
-                    outputPath: path.resolve(process.cwd(), outputPath)
+                    outputPath: path.resolve(process.cwd(), outputPath),
+                    nextStep: options.nextStep
                 });
             });
             return;
@@ -1972,6 +1997,9 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         ];
         if (watch) {
             cmdParts.push("--watch");
+        }
+        if (options.nextStep === false) {
+            cmdParts.push("--no-next-step");
         }
 
         try {

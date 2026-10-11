@@ -26,6 +26,7 @@
  * Errors and warnings go to stderr so `rebase db push > plan.txt` keeps the
  * diagnosis on the terminal where it is readable.
  */
+import { parseEnvBoolean } from "@rebasepro/types";
 
 /** One line of human-facing output on stdout. */
 export const out = (line = ""): void => {
@@ -40,4 +41,26 @@ export const outWarn = (line = ""): void => {
 /** One line of human-facing error output on stderr. */
 export const outError = (line = ""): void => {
     console.error(line);
+};
+
+/**
+ * Whether a failure should be printed with its stack — `rebase --debug`, which
+ * the launcher passes down as `REBASE_DEBUG`, or `REBASE_DEBUG` set by hand.
+ */
+export const wantsStack = (): boolean => parseEnvBoolean(process.env.REBASE_DEBUG) === true;
+
+/**
+ * An error as a person reads it: its message, and its stack only under
+ * `--debug`.
+ *
+ * The rule `rebase` itself follows (`bin/rebase.js`). These commands run in a
+ * child process the launcher's handler never sees, so a syntax error in a
+ * collection file reached the terminal as `Doctor failed CollectionConfigError:`
+ * followed by twenty frames of loader internals, under a sentence that already
+ * said which file and which line.
+ */
+export const describeFailure = (error: unknown): string => {
+    if (!(error instanceof Error)) return String(error);
+    if (wantsStack() && error.stack) return error.stack;
+    return `${error.message}\n  Re-run with --debug for the stack trace.`;
 };

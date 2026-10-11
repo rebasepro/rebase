@@ -12,7 +12,7 @@ import {
     generatePostgresTriggersDdl,
     generatePostgresVectorDdl
 } from "./generate-postgres-ddl-logic";
-import { out, outError } from "../cli-output";
+import { describeFailure, out, outError } from "../cli-output";
 import { nextStepAfterGenerate } from "./generate-next-step";
 
 /**
@@ -48,6 +48,12 @@ export interface GenerateFileOptions {
     collectionsPath: string;
     /** Where to write. Absent: print to stdout instead. */
     outputPath?: string;
+    /**
+     * End on the line that says what to run next. Only `rebase schema
+     * generate` itself wants it: inside `db push` it told the push to run
+     * `db generate`, and inside `db generate` to run itself.
+     */
+    nextStep?: boolean;
 }
 
 /** The collections, in slug order so the output does not depend on the directory's. */
@@ -60,10 +66,6 @@ async function loadSortedCollections(collectionsPath: string): Promise<Collectio
     const collections: CollectionConfig[] = Array.isArray(loaded) ? [...loaded] : [];
     collections.sort((a, b) => a.slug.localeCompare(b.slug));
     return collections;
-}
-
-function describe(error: unknown): string {
-    return error instanceof Error ? (error.stack ?? error.message) : String(error);
 }
 
 /** `src/schema.generated.ts`, from the collections. */
@@ -81,9 +83,9 @@ export async function writeDrizzleSchema(options: GenerateFileOptions): Promise<
             out(String(schemaContent));
         }
 
-        out(nextStepAfterGenerate());
+        if (options.nextStep !== false) out(nextStepAfterGenerate());
     } catch (error) {
-        outError(`Error generating schema: ${describe(error)}`);
+        outError(`Error generating schema: ${describeFailure(error)}`);
         // `rebase db push` runs this as step 1 and must stop on it: going on
         // applied whatever `src/schema.generated.ts` was already there.
         throw new GenerationFailed("Drizzle schema generation failed", { cause: error });
@@ -204,7 +206,7 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
             out(String(policiesContent));
         }
     } catch (error) {
-        outError(`Error generating DDL schema: ${describe(error)}`);
+        outError(`Error generating DDL schema: ${describeFailure(error)}`);
         // Step 1 of `rebase db push` is this, and a failure has to stop it.
         // Going on made a resources module that does not evaluate — the single
         // most common cause here — report `✓ rebase db push completed

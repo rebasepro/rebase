@@ -121,6 +121,10 @@ rebase db push
 - <span class="since-badge" data-since="0.25">Since 0.25</span> Stamps the
   policies it applies the way the server's boot does, so the first boot after a
   push leaves them alone instead of re-creating every one
+- <span class="since-badge" data-since="0.25">Since 0.25</span> `--dry-run`
+  writes nothing of the project's: `src/schema.generated.ts` is left as it is,
+  and the `drizzle/*.sql` copies an older release committed are named, not
+  deleted. Only the plan's input goes to `.rebase/sql/`, which is not committed
 - Does **not** create migration files
 
 **How long it takes.** Almost all of a push is Atlas computing the plan: it
